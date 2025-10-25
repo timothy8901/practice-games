@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Naruto Trivia Tac Toe</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter&family=Bungee&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #1a202c; /* Equivalent to bg-gray-900 */
+        }
+        .bungee-font {
+            font-family: 'Bungee', cursive;
+        }
+        .game-board {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+            width: 100%;
+            max-width: 400px;
+        }
+        .cell {
+            aspect-ratio: 1 / 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 3rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            border-radius: 0.5rem;
+            background-color: #2d3748; /* bg-gray-800 */
+        }
+        .cell:hover {
+            background-color: #4a5568; /* bg-gray-700 */
+        }
+        .cell.x {
+            color: #f56565; /* text-red-500 */
+        }
+        .cell.o {
+            color: #4299e1; /* text-blue-500 */
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 10;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.7);
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background-color: #2d3748; /* bg-gray-800 */
+            padding: 2rem;
+            border-radius: 0.5rem;
+            width: 90%;
+            max-width: 500px;
+            text-align: center;
+            border: 2px solid #f97316; /* orange-500 */
+        }
+        .answer-btn {
+            display: block;
+            width: 100%;
+            padding: 0.75rem;
+            margin-top: 0.75rem;
+            border-radius: 0.375rem;
+            font-weight: bold;
+            transition: background-color 0.3s;
+            background-color: #4a5568; /* bg-gray-700 */
+            border: 1px solid #718096; /* bg-gray-500 */
+        }
+        .answer-btn:hover {
+            background-color: #718096; /* bg-gray-600 */
+        }
+        .status-message {
+            min-height: 50px; /* Reserve space to prevent layout shifts */
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white flex flex-col items-center justify-center min-h-screen p-4">
+
+    <div class="text-center mb-8">
+        <h1 class="text-4xl md:text-6xl font-bold bungee-font text-orange-500">Naruto</h1>
+        <h2 class="text-2xl md:text-4xl font-bold bungee-font text-gray-300">Trivia Tac Toe</h2>
+    </div>
+
+    <div id="game-container" class="w-full flex flex-col items-center">
+        <div id="status-message" class="status-message text-xl mb-4 font-semibold">Player X's Turn</div>
+        <div id="game-board" class="game-board mb-6"></div>
+        <button id="reset-button" class="bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 px-6 rounded-lg transition-colors">
+            Reset Game
+        </button>
+    </div>
+
+    <!-- Trivia Modal -->
+    <div id="trivia-modal" class="modal">
+        <div class="modal-content">
+            <h3 id="question-difficulty" class="text-lg font-bold mb-2 text-orange-400">Question</h3>
+            <p id="question-text" class="text-xl mb-6"></p>
+            <div id="answers-container"></div>
+        </div>
+    </div>
+    
+    <!-- Result Modal -->
+    <div id="result-modal" class="modal">
+        <div class="modal-content" id="result-modal-content">
+             <p id="result-text" class="text-2xl font-bold mb-4"></p>
+             <button id="close-result-modal" class="bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 px-6 rounded-lg">Continue</button>
+        </div>
+    </div>
+
+
+    <script>
+        const regularQuestions = [
+            { question: "What is the name of Naruto's signature jutsu?", answers: ["Rasengan", "Chidori", "Shadow Clone Jutsu", "Fireball Jutsu"], correct: "Shadow Clone Jutsu" },
+            { question: "Who is the leader of Team 7?", answers: ["Kakashi Hatake", "Might Guy", "Asuma Sarutobi", "Kurenai Yuhi"], correct: "Kakashi Hatake" },
+            { question: "Which village is Naruto from?", answers: ["Village Hidden in the Sand", "Village Hidden in the Mist", "Village Hidden in the Leaves", "Village Hidden in the Clouds"], correct: "Village Hidden in the Leaves" },
+            { question: "What is the name of the tailed beast sealed inside Naruto?", answers: ["Shukaku", "Matatabi", "Kurama", "Gyuki"], correct: "Kurama" },
+            { question: "What is Sakura Haruno's primary skill?", answers: ["Genjutsu", "Medical Ninjutsu", "Taijutsu", "Kenjutsu"], correct: "Medical Ninjutsu" },
+            { question: "Who is known as the 'Copy Ninja'?", answers: ["Jiraiya", "Itachi Uchiha", "Kakashi Hatake", "Minato Namikaze"], correct: "Kakashi Hatake" },
+            { question: "What is the name of Sasuke's powerful eye technique?", answers: ["Byakugan", "Rinnegan", "Tenseigan", "Sharingan"], correct: "Sharingan" },
+            { question: "Which character is obsessed with 'the springtime of youth'?", answers: ["Rock Lee", "Might Guy", "Both Rock Lee and Might Guy", "Neji Hyuga"], correct: "Both Rock Lee and Might Guy" },
+            { question: "What is Gaara's main weapon?", answers: ["Swords", "Puppets", "Sand", "Paper Bombs"], correct: "Sand" },
+            { question: "Who are the legendary Sannin?", answers: ["Naruto, Sasuke, Sakura", "Jiraiya, Tsunade, Orochimaru", "Kakashi, Guy, Asuma", "Minato, Fugaku, Hizashi"], correct: "Jiraiya, Tsunade, Orochimaru" },
+            { question: "What is the name of the academy Naruto attended?", answers: ["Shinobi Academy", "Ninja Academy", "Chunin Academy", "Konoha Academy"], correct: "Ninja Academy" },
+            { question: "What food is Naruto's absolute favorite?", answers: ["Ramen", "Dango", "Onigiri", "Sushi"], correct: "Ramen" },
+            { question: "Who becomes the Fifth Hokage?", answers: ["Jiraiya", "Danzo Shimura", "Tsunade", "Kakashi Hatake"], correct: "Tsunade" },
+            { question: "What is Shikamaru Nara's specialty?", answers: ["Incredible strength", "Shadow manipulation and strategy", "Insect control", "Mind transfer"], correct: "Shadow manipulation and strategy" },
+            { question: "Which organization does Itachi Uchiha join?", answers: ["The Foundation (Root)", "The Akatsuki", "The Seven Ninja Swordsmen", "The Anbu Black Ops"], correct: "The Akatsuki" },
+            { question: "What is the name of the giant toad Naruto can summon?", answers: ["Manda", "Katsuyu", "Pakkun", "Gamabunta"], correct: "Gamabunta" },
+            { question: "Who is Hinata Hyuga's cousin?", answers: ["Kiba Inuzuka", "Shino Aburame", "Neji Hyuga", "Hanabi Hyuga"], correct: "Neji Hyuga" },
+            { question: "What does 'Chidori' mean in English?", answers: ["One Thousand Birds", "Lightning Blade", "Rasengan's Rival", "Piercing Cry"], correct: "One Thousand Birds" }
+        ];
+
+        const hardQuestions = [
+            { question: "Who was the first of Naruto's generation to become a Chunin?", answers: ["Neji Hyuga", "Shikamaru Nara", "Sasuke Uchiha", "Gaara"], correct: "Shikamaru Nara" },
+            { question: "What is the name of the sword used by Zabuza Momochi?", answers: ["Samehada", "Kubikiribōchō", "Kusanagi", "Hiramekarei"], correct: "Kubikiribōchō" },
+            { question: "Which of the Eight Gates did Rock Lee open during his fight with Gaara?", answers: ["The Fifth Gate: The Gate of Closing", "The Fourth Gate: The Gate of Pain", "The Sixth Gate: The Gate of Joy", "The Third Gate: The Gate of Life"], correct: "The Fifth Gate: The Gate of Closing" },
+            { question: "Who created the Akatsuki?", answers: ["Pain (Nagato)", "Madara Uchiha", "Yahiko", "Obito Uchiha"], correct: "Yahiko" },
+            { question: "What was the name of the Second Hokage's most famous water-style jutsu?", answers: ["Water Prison Jutsu", "Water Dragon Jutsu", "Water Clone Jutsu", "Water Severing Wave"], correct: "Water Dragon Jutsu" },
+            { question: "Who was Danzo Shimura's rival for the title of Third Hokage?", answers: ["Hiruzen Sarutobi", "Tobirama Senju", "Kagami Uchiha", "Homura Mitokado"], correct: "Hiruzen Sarutobi" }
+        ];
+
+        let availableRegularQuestions = [...regularQuestions];
+        let availableHardQuestions = [...hardQuestions];
+
+        const gameBoard = document.getElementById('game-board');
+        const statusMessage = document.getElementById('status-message');
+        const resetButton = document.getElementById('reset-button');
+        const triviaModal = document.getElementById('trivia-modal');
+        const resultModal = document.getElementById('result-modal');
+        const resultText = document.getElementById('result-text');
+        const closeResultModalBtn = document.getElementById('close-result-modal');
+        
+        let currentPlayer = 'X';
+        let boardState = Array(9).fill(null);
+        let gameActive = true;
+        let selectedCellIndex = null;
+        let isStealAttempt = false;
+
+        function initializeGame() {
+            gameBoard.innerHTML = '';
+            boardState = Array(9).fill(null);
+            currentPlayer = 'X';
+            gameActive = true;
+            statusMessage.textContent = `Player ${currentPlayer}'s Turn`;
+            availableRegularQuestions = [...regularQuestions];
+            availableHardQuestions = [...hardQuestions];
+
+            for (let i = 0; i < 9; i++) {
+                const cell = document.createElement('div');
+                cell.classList.add('cell');
+                cell.dataset.index = i;
+                cell.addEventListener('click', handleCellClick);
+                gameBoard.appendChild(cell);
+            }
+        }
+
+        function handleCellClick(event) {
+            if (!gameActive) return;
+
+            const clickedCell = event.target;
+            const clickedCellIndex = parseInt(clickedCell.dataset.index);
+
+            if (boardState[clickedCellIndex] === null) {
+                // Regular move
+                isStealAttempt = false;
+                selectedCellIndex = clickedCellIndex;
+                askQuestion(false);
+            } else if (boardState[clickedCellIndex] !== currentPlayer) {
+                // Steal attempt
+                isStealAttempt = true;
+                selectedCellIndex = clickedCellIndex;
+                askQuestion(true);
+            }
+        }
+
+        function askQuestion(isHard) {
+            let questionPool = isHard ? availableHardQuestions : availableRegularQuestions;
+            if (questionPool.length === 0) {
+                // Refill pool if empty
+                questionPool = isHard ? [...hardQuestions] : [...regularQuestions];
+                if (isHard) availableHardQuestions = questionPool;
+                else availableRegularQuestions = questionPool;
+            }
+
+            const questionIndex = Math.floor(Math.random() * questionPool.length);
+            const questionData = questionPool.splice(questionIndex, 1)[0];
+            
+            document.getElementById('question-difficulty').textContent = isHard ? 'Steal Question! (Hard)' : 'Standard Question';
+            document.getElementById('question-text').textContent = questionData.question;
+            
+            const answersContainer = document.getElementById('answers-container');
+            answersContainer.innerHTML = '';
+
+            // Shuffle answers
+            const shuffledAnswers = [...questionData.answers].sort(() => Math.random() - 0.5);
+
+            shuffledAnswers.forEach(answer => {
+                const button = document.createElement('button');
+                button.textContent = answer;
+                button.classList.add('answer-btn');
+                button.onclick = () => checkAnswer(answer, questionData.correct);
+                answersContainer.appendChild(button);
+            });
+
+            triviaModal.style.display = 'flex';
+        }
+
+        function checkAnswer(selectedAnswer, correctAnswer) {
+            triviaModal.style.display = 'none';
+            if (selectedAnswer === correctAnswer) {
+                showResult(true);
+                updateBoard();
+            } else {
+                showResult(false);
+                switchPlayer();
+            }
+        }
+        
+        function showResult(isCorrect) {
+            const modalContent = document.getElementById('result-modal-content');
+            if (isCorrect) {
+                resultText.textContent = "Correct!";
+                modalContent.style.borderColor = '#48bb78'; // green-500
+            } else {
+                resultText.textContent = "Wrong Answer!";
+                modalContent.style.borderColor = '#f56565'; // red-500
+            }
+            resultModal.style.display = 'flex';
+        }
+
+        closeResultModalBtn.addEventListener('click', () => {
+             resultModal.style.display = 'none';
+        });
+
+        function updateBoard() {
+            boardState[selectedCellIndex] = currentPlayer;
+            const cell = gameBoard.children[selectedCellIndex];
+            cell.textContent = currentPlayer;
+            cell.classList.add(currentPlayer.toLowerCase());
+
+            if (checkWin()) {
+                endGame(false);
+            } else if (boardState.every(cell => cell !== null)) {
+                endGame(true);
+            } else {
+                switchPlayer();
+            }
+        }
+
+        function switchPlayer() {
+            currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
+            statusMessage.textContent = `Player ${currentPlayer}'s Turn`;
+        }
+
+        function checkWin() {
+            const winningCombos = [
+                [0, 1, 2], [3, 4, 5], [6, 7, 8], // Rows
+                [0, 3, 6], [1, 4, 7], [2, 5, 8], // Columns
+                [0, 4, 8], [2, 4, 6]  // Diagonals
+            ];
+
+            return winningCombos.some(combination => {
+                return combination.every(index => {
+                    return boardState[index] === currentPlayer;
+                });
+            });
+        }
+
+        function endGame(isDraw) {
+            gameActive = false;
+            if (isDraw) {
+                statusMessage.textContent = "It's a draw!";
+            } else {
+                statusMessage.textContent = `Player ${currentPlayer} wins!`;
+            }
+        }
+
+        resetButton.addEventListener('click', initializeGame);
+
+        // Initial game start
+        initializeGame();
+    </script>
+</body>
+</html>
