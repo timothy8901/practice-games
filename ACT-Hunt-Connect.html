@@ -82,7 +82,6 @@
         <header class="text-center mb-6 relative">
             <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">A.C.T. Word Quest</h1>
             <p id="header-subtitle" class="text-gray-600 mt-2">Sharpen your vocabulary and critical thinking for test day.</p>
-            <button id="create-puzzle-btn" class="absolute top-0 right-0 px-4 py-2 bg-green-500 text-white font-semibold rounded-full hover:bg-green-600 transition text-sm">Create Custom</button>
         </header>
 
         <div class="flex flex-col md:flex-row gap-8">
@@ -143,18 +142,6 @@
         </div>
     </div>
 
-    <div id="custom-puzzle-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden p-4">
-        <div class="bg-white rounded-2xl shadow-lg p-8 max-w-4xl w-full mx-auto">
-            <h2 class="text-2xl font-bold text-gray-900 mb-4">Create Your Own Puzzle</h2>
-            <p class="text-gray-600 mb-6">Enter 4 categories and 4 words for each. All fields are required.</p>
-            <div id="custom-puzzle-form" class="grid grid-cols-1 md:grid-cols-2 gap-6"></div>
-            <p id="custom-puzzle-error" class="text-red-500 text-center h-6 mt-4"></p>
-            <div class="flex justify-end gap-4 mt-4">
-                <button id="cancel-custom-btn" class="px-6 py-2 bg-gray-200 text-gray-800 font-semibold rounded-full hover:bg-gray-300 transition">Cancel</button>
-                <button id="generate-custom-btn" class="px-6 py-2 bg-green-500 text-white font-semibold rounded-full hover:bg-green-600 transition">Generate Puzzle</button>
-            </div>
-        </div>
-    </div>
 
 <script>
     // --- DOM ELEMENTS ---
@@ -174,12 +161,6 @@
     const scoreTimeEl = document.getElementById('score-time');
     const scoreGuessesEl = document.getElementById('score-guesses');
     const closeScoreBtn = document.getElementById('close-score-btn');
-    const createPuzzleBtn = document.getElementById('create-puzzle-btn');
-    const customPuzzleModal = document.getElementById('custom-puzzle-modal');
-    const customPuzzleForm = document.getElementById('custom-puzzle-form');
-    const cancelCustomBtn = document.getElementById('cancel-custom-btn');
-    const generateCustomBtn = document.getElementById('generate-custom-btn');
-    const customPuzzleError = document.getElementById('custom-puzzle-error');
     const totalWordsCountEl = document.getElementById('total-words-count');
     const wordHuntHintBtn = document.getElementById('word-hunt-hint-btn');
     const connectionsHintBtn = document.getElementById('connections-hint-btn');
@@ -314,17 +295,15 @@
     function handleWordHuntHint() { const unfoundWords = allWords.filter(w => !foundWords.has(w)); if (unfoundWords.length === 0) { wordHuntHintBtn.disabled = true; return; } const hintWord = unfoundWords[Math.floor(Math.random() * unfoundWords.length)]; const path = wordLocations.get(hintWord); if (!path || path.length === 0) { console.error("Could not find path for hint word:", hintWord); return; } let hintCoords; if (path.length <= 3) { hintCoords = path; } else { const start = Math.floor(Math.random() * (path.length - 2)); hintCoords = path.slice(start, start + 3); } const hintElements = hintCoords.map(({r, c}) => wordHuntGrid.querySelector(`.grid-cell[data-r='${r}'][data-c='${c}'] .grid-cell-content`)); flashElements(hintElements, wordHuntHintBtn); }
     function handleConnectionsHint() { const solvedCategoryNames = Array.from(solvedCategoriesEl.querySelectorAll('.font-bold')).map(el => el.textContent); const unsolvedGroups = gameData.filter(group => !solvedCategoryNames.includes(group.category)); if (unsolvedGroups.length === 0) { connectionsHintBtn.disabled = true; return; } const wordsOnBoard = Array.from(connectionsGrid.querySelectorAll('.connections-word')).map(el => el.dataset.word); const hintGroup = unsolvedGroups.find(group => { const wordsInGroupOnBoard = group.words.map(w => w.hunt).filter(word => wordsOnBoard.includes(word)); return wordsInGroupOnBoard.length >= 2; }); if (!hintGroup) { return; } const hintableWords = hintGroup.words.map(w => w.hunt).filter(word => wordsOnBoard.includes(word)); const wordsToFlash = hintableWords.sort(() => 0.5 - Math.random()).slice(0, 2); const hintElements = wordsToFlash.map(word => connectionsGrid.querySelector(`.connections-word[data-word='${word}']`)); flashElements(hintElements, connectionsHintBtn); }
 
-    // --- CUSTOM PUZZLE LOGIC ---
-    function initializeCustomPuzzleForm() { customPuzzleForm.innerHTML = ''; for (let i = 0; i < 4; i++) { const group = document.createElement('div'); group.className = 'flex flex-col gap-2 p-4 bg-gray-100 rounded-lg'; group.innerHTML = `<input type="text" placeholder="Category ${i + 1}" class="category-input font-semibold" maxlength="25"><input type="text" placeholder="Word 1" class="word-input" maxlength="15"><input type="text" placeholder="Word 2" class="word-input" maxlength="15"><input type="text" placeholder="Word 3" class="word-input" maxlength="15"><input type="text" placeholder="Word 4" class="word-input" maxlength="15">`; customPuzzleForm.appendChild(group); } }
-    function handleGenerateCustomPuzzle() { const customData = []; const inputs = customPuzzleForm.querySelectorAll('input'); for (const input of inputs) { if (input.value.trim() === '') { customPuzzleError.textContent = "Please fill out all fields."; return; } } customPuzzleError.textContent = ""; const categoryGroups = customPuzzleForm.querySelectorAll('.flex.flex-col'); categoryGroups.forEach((group) => { const categoryInput = group.querySelector('.category-input'); const wordInputs = group.querySelectorAll('.word-input'); const words = Array.from(wordInputs).map(input => { const display = input.value.trim().toUpperCase(); const hunt = display.replace(/\s+/g, ''); return { hunt, display }; }); customData.push({ category: categoryInput.value.trim().toUpperCase(), words: words }); }); loadPuzzle(customData); resetGame(false); customPuzzleModal.classList.add('hidden'); }
+
 
     // --- GAME FLOW & RESET ---
-    function resetGame(isDaily = true) {
+    function resetGame() {
         grid = []; foundWords.clear(); isSelecting = false; selectionPath = []; selectedConnectionWords = [];
         mistakes = 4; solvedGroups = 0; totalGuesses = 0;
         wordLocations.clear();
         wordHuntSvgOverlay.innerHTML = '';
-        headerSubtitle.textContent = isDaily ? 'Sharpen your vocabulary and critical thinking for test day.' : 'Playing your custom-made puzzle.';
+        headerSubtitle.textContent = 'Sharpen your vocabulary and critical thinking for test day.';
         foundWordsCountEl.textContent = '0'; foundWordsListEl.innerHTML = '';
         solvedCategoriesEl.innerHTML = ''; mistakesCountEl.textContent = '4';
         connectionsMessageEl.textContent = ''; 
@@ -348,9 +327,7 @@
     submitButton.addEventListener('click', handleSubmit);
     shuffleButton.addEventListener('click', renderConnectionsGrid);
     closeScoreBtn.addEventListener('click', () => scoreModal.classList.add('hidden'));
-    createPuzzleBtn.addEventListener('click', () => customPuzzleModal.classList.remove('hidden'));
-    cancelCustomBtn.addEventListener('click', () => customPuzzleModal.classList.add('hidden'));
-    generateCustomBtn.addEventListener('click', handleGenerateCustomPuzzle);
+
     wordHuntHintBtn.addEventListener('click', handleWordHuntHint);
     connectionsHintBtn.addEventListener('click', handleConnectionsHint);
 
@@ -359,7 +336,6 @@
         const dailyPuzzleIndex = getDailyPuzzleIndex();
         loadPuzzle(puzzles[dailyPuzzleIndex]);
         resetGame(true);
-        initializeCustomPuzzleForm();
     }
     
     init();
