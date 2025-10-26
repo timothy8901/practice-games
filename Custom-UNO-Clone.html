@@ -1,0 +1,1070 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cosmic Clash - Card Game</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-image:
+                radial-gradient(circle at center, rgba(0,0,0,0.05) 5%, transparent 5.5%),
+                radial-gradient(circle at center, rgba(0,0,0,0.05) 5%, transparent 5.5%);
+            background-size: 1em 1em;
+            background-color: #f5f3e6; /* Off-white comic paper color */
+        }
+        .font-bangers {
+            font-family: 'Bangers', cursive;
+        }
+        .card {
+            width: 80px;
+            height: 120px;
+            border: 3px solid #1f2937;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            font-size: 2rem;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+            box-shadow: 3px 3px 0px #1f2937;
+            position: relative;
+            user-select: none;
+        }
+        .card.playable:hover {
+            transform: translateY(-10px) rotate(2deg);
+            box-shadow: 5px 15px 10px rgba(0,0,0,0.2);
+        }
+        .card .corner {
+            position: absolute;
+            font-size: 1rem;
+            font-weight: bold;
+        }
+        .card .top-left { top: 5px; left: 8px; }
+        .card .bottom-right { bottom: 5px; right: 8px; transform: rotate(180deg); }
+        .card-back {
+            background-color: #1f2937;
+            color: #facc15;
+            font-size: 1.5rem;
+        }
+        .card-back .inner-border {
+            width: 90%;
+            height: 90%;
+            border: 3px solid #facc15;
+            border-radius: 4px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .bg-card-red { background-color: #ef4444; color: white; }
+        .bg-card-blue { background-color: #3b82f6; color: white; }
+        .bg-card-green { background-color: #22c55e; color: white; }
+        .bg-card-yellow { background-color: #eab308; color: white; }
+        .bg-card-wild { background: linear-gradient(135deg, #ef4444 25%, #3b82f6 25%, #3b82f6 50%, #22c55e 50%, #22c55e 75%, #eab308 75%); color: white; }
+        
+        .player-hand {
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            padding: 10px;
+            min-height: 150px;
+        }
+        .player-hand .card {
+            margin: 0 -20px;
+        }
+
+        .ai-hand .card {
+            margin: 0 -50px;
+        }
+        
+        #player-1-hand, #player-3-hand { /* Left and Right AI */
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+            position: absolute;
+        }
+        #player-1-hand { left: 20px; top: 50%; transform: translateY(-50%) rotate(90deg); }
+        #player-3-hand { right: 20px; top: 50%; transform: translateY(-50%) rotate(-90deg); }
+        #player-1-hand .card, #player-3-hand .card {
+            margin: -40px 0;
+        }
+        
+        .action-effect {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 8rem;
+            font-weight: bold;
+            color: rgba(255, 255, 0, 0.8);
+            -webkit-text-stroke: 4px black;
+            z-index: 100;
+            pointer-events: none;
+            opacity: 0;
+            animation: pop-out 1s ease-out;
+        }
+
+        @keyframes pop-out {
+            0% { transform: translate(-50%, -50%) scale(0.5); opacity: 1; }
+            80% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
+            100% { transform: translate(-50%, -50%) scale(1.2); opacity: 0; }
+        }
+        
+        .player-area.active .player-name {
+            background-color: #facc15;
+            color: #1f2937;
+            transform: scale(1.1);
+        }
+        .player-name {
+            transition: all 0.3s ease;
+        }
+        
+        #water-cup {
+            width: 80px;
+            height: 90px;
+            background-color: #e0f2fe;
+            border: 3px solid #075985;
+            border-top: none;
+            border-radius: 0 0 20px 20px;
+            position: relative;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        #water-cup:hover {
+            transform: scale(1.05);
+        }
+        #water-cup::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90%;
+            height: 10px;
+            background-color: #7dd3fc;
+            border: 3px solid #075985;
+            border-radius: 5px;
+        }
+
+        #slap-button {
+            animation: shake 0.5s infinite;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translate(-50%, -50%) rotate(0deg); }
+            25% { transform: translate(-50%, -50%) rotate(-5deg); }
+            75% { transform: translate(-50%, -50%) rotate(5deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <!-- Main Game Board -->
+    <div id="game-board" class="w-full h-screen flex flex-col items-center justify-between p-4 relative overflow-hidden">
+
+        <div class="absolute top-4 right-4 z-30 flex flex-col items-end space-y-2">
+            <button id="toggle-rules-btn" class="font-bangers text-xl bg-yellow-400 text-black px-4 py-2 rounded-lg border-2 border-black shadow-md">RULES</button>
+            <button id="silent-uno-button" class="hidden font-bangers text-lg bg-purple-500 text-white px-4 py-2 rounded-lg border-2 border-black shadow-md">Someone Talked!</button>
+        </div>
+
+        <!-- Top Player (AI) -->
+        <div id="player-2-area" class="player-area text-center">
+            <div id="player-2-name" class="player-name font-bangers text-2xl bg-white border-2 border-black px-4 py-1 rounded-lg shadow-md">CPU 2</div>
+            <div id="player-2-hand" class="player-hand ai-hand mt-2"></div>
+        </div>
+
+        <!-- Middle Area (Deck, Discard, and Side AIs) -->
+        <div class="w-full flex-grow flex items-center justify-around">
+            <!-- Left Player (AI) -->
+            <div id="player-1-area" class="player-area h-full flex items-center">
+                 <div id="player-1-name" class="player-name font-bangers text-2xl bg-white border-2 border-black px-4 py-1 rounded-lg shadow-md" style="transform: rotate(-90deg);">CPU 1</div>
+                <div id="player-1-hand" class="player-hand ai-hand"></div>
+            </div>
+
+            <!-- Deck and Discard Pile -->
+            <div class="flex items-center space-x-8">
+                <div id="water-cup-container" class="w-24 h-36 flex-col items-center justify-center hidden">
+                    <div id="water-cup"></div>
+                    <div class="font-bangers text-center text-sm mt-1">Stay Hydrated!</div>
+                </div>
+                <div id="deck-pile" class="w-24 h-36 flex items-center justify-center">
+                    <div id="deck" class="card card-back font-bangers">
+                        <div class="inner-border">COSMIC CLASH</div>
+                    </div>
+                </div>
+                <div id="discard-pile" class="w-24 h-36 flex items-center justify-center">
+                    <!-- Top card of discard pile goes here -->
+                </div>
+            </div>
+
+            <!-- Right Player (AI) -->
+            <div id="player-3-area" class="player-area h-full flex items-center">
+                <div id="player-3-hand" class="player-hand ai-hand"></div>
+                <div id="player-3-name" class="player-name font-bangers text-2xl bg-white border-2 border-black px-4 py-1 rounded-lg shadow-md" style="transform: rotate(90deg);">CPU 3</div>
+            </div>
+        </div>
+
+        <!-- Bottom Player (Human) -->
+        <div id="player-0-area" class="player-area text-center">
+            <div id="player-0-hand" class="player-hand mb-2"></div>
+            <div id="player-0-name" class="player-name font-bangers text-2xl bg-white border-2 border-black px-4 py-1 rounded-lg shadow-md">You</div>
+        </div>
+        
+        <!-- Action Effect Text -->
+        <div id="action-effect-container"></div>
+        
+        <!-- Game Log -->
+        <div id="game-log" class="absolute bottom-4 left-4 font-bangers text-xl bg-white/80 p-2 border-2 border-black rounded w-64 h-40 overflow-y-auto text-gray-700">
+            <p>Game Started!</p>
+        </div>
+
+        <!-- Slap Button -->
+        <button id="slap-button" class="hidden absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 font-bangers text-7xl bg-red-600 text-white p-8 rounded-full border-8 border-black shadow-lg z-50">SLAP!</button>
+
+    </div>
+
+    <!-- Modals -->
+    <div id="color-choice-modal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50">
+        <div class="bg-yellow-50 p-8 rounded-lg shadow-2xl border-4 border-black text-center">
+            <h2 class="text-4xl font-bangers mb-6">CHOOSE A COLOR!</h2>
+            <div class="flex space-x-4">
+                <button data-color="red" class="color-choice-btn w-20 h-20 bg-card-red rounded-full border-4 border-black transform hover:scale-110 transition-transform"></button>
+                <button data-color="blue" class="color-choice-btn w-20 h-20 bg-card-blue rounded-full border-4 border-black transform hover:scale-110 transition-transform"></button>
+                <button data-color="green" class="color-choice-btn w-20 h-20 bg-card-green rounded-full border-4 border-black transform hover:scale-110 transition-transform"></button>
+                <button data-color="yellow" class="color-choice-btn w-20 h-20 bg-card-yellow rounded-full border-4 border-black transform hover:scale-110 transition-transform"></button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="player-choice-modal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50">
+        <div class="bg-yellow-50 p-8 rounded-lg shadow-2xl border-4 border-black text-center">
+            <h2 id="player-choice-title" class="text-4xl font-bangers mb-6">CHOOSE A PLAYER</h2>
+            <div id="player-choice-buttons" class="flex space-x-4"></div>
+        </div>
+    </div>
+    
+    <div id="hydration-modal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50">
+        <div class="bg-blue-200 p-8 rounded-lg shadow-2xl border-4 border-black text-center">
+            <h2 class="text-6xl font-bangers mb-2">DRINK!</h2>
+            <p class="text-lg">Click the cup to continue!</p>
+        </div>
+    </div>
+
+    <div id="mad-libs-modal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50">
+        <div class="bg-pink-100 p-8 rounded-lg shadow-2xl border-4 border-black text-center w-1/3">
+            <h2 class="text-4xl font-bangers mb-4">COSMIC MAD LIBS!</h2>
+            <p class="mb-4">The player who played the '8' must provide the words!</p>
+            <div class="space-y-4 text-left">
+                <input type="text" id="mad-libs-noun" placeholder="A Noun" class="w-full p-2 border-2 border-black rounded">
+                <input type="text" id="mad-libs-verb" placeholder="A Verb (ending in -ing)" class="w-full p-2 border-2 border-black rounded">
+                <input type="text" id="mad-libs-adj" placeholder="An Adjective" class="w-full p-2 border-2 border-black rounded">
+            </div>
+            <button id="mad-libs-submit" class="font-bangers text-2xl bg-pink-500 text-white px-8 py-2 mt-6 rounded-lg border-2 border-black hover:bg-pink-600">Reveal Story!</button>
+        </div>
+    </div>
+
+     <div id="charades-modal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50">
+        <div class="bg-orange-100 p-8 rounded-lg shadow-2xl border-4 border-black text-center">
+            <h2 class="text-4xl font-bangers mb-4">COSMIC CHARADES!</h2>
+            <p class="mb-2">Only the current player should see this!</p>
+            <p class="text-2xl font-bold mb-4">Your word to act out is:</p>
+            <p id="charades-word" class="font-bangers text-6xl text-orange-600 mb-6"></p>
+            <button id="charades-done" class="font-bangers text-2xl bg-orange-500 text-white px-8 py-2 rounded-lg border-2 border-black hover:bg-orange-600">I'm Done!</button>
+        </div>
+    </div>
+
+    <div id="game-over-modal" class="hidden fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50">
+        <div class="text-center text-white p-10 bg-blue-600 border-8 border-yellow-400 rounded-lg" style="background-image: url('data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%23ffffff\' fill-opacity=\'0.1\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm-2-20a6 6 0 1 0 0 12 6 6 0 0 0 0-12zm0 10a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm-20 2a6 6 0 1 0 0 12 6 6 0 0 0 0-12zm0 10a4 4 0 1 1 0-8 4 4 0 0 1 0 8z\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E');">
+            <h2 id="winner-message" class="text-8xl font-bangers mb-4" style="-webkit-text-stroke: 4px black;"></h2>
+            <button id="restart-game-btn" class="font-bangers text-3xl bg-yellow-400 text-blue-800 px-8 py-3 rounded-lg border-4 border-black hover:bg-yellow-300 transition-colors">Play Again!</button>
+        </div>
+    </div>
+
+    <!-- House Rules Panel -->
+    <div id="house-rules-panel" class="fixed top-1/2 -right-80 transform -translate-y-1/2 bg-yellow-50 border-4 border-black rounded-l-lg p-6 transition-all duration-300 ease-in-out z-40 w-80 overflow-y-auto max-h-screen">
+        <h3 class="font-bangers text-3xl text-center mb-4">House Rules</h3>
+        <div class="space-y-4">
+            <label class="flex items-center space-x-3">
+                <input type="checkbox" id="stack-plus-two" class="h-6 w-6 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                <span class="text-lg">Stacking "+2" Cards</span>
+            </label>
+            <label class="flex items-center space-x-3">
+                <input type="checkbox" id="draw-until-playable" class="h-6 w-6 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                <span class="text-lg">Draw Until You Can Play</span>
+            </label>
+             <label class="flex items-center space-x-3">
+                <input type="checkbox" id="jump-in" class="h-6 w-6 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                <span class="text-lg">Jump-In Rule</span>
+            </label>
+             <label class="flex items-center space-x-3">
+                <input type="checkbox" id="seven-zero-rule" class="h-6 w-6 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                <span class="text-lg">0/7 Hand Swaps</span>
+            </label>
+            <label class="flex items-center space-x-3">
+                <input type="checkbox" id="swap-hands-wild" class="h-6 w-6 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                <span class="text-lg">Swap Hands Wild Card</span>
+            </label>
+             <label class="flex items-center space-x-3">
+                <input type="checkbox" id="stay-hydrated" class="h-6 w-6 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                <span class="text-lg">Stay Hydrated! (Draw)</span>
+            </label>
+            <hr class="border-gray-400 border-dashed">
+             <label class="flex items-center space-x-3">
+                <input type="checkbox" id="slap-rule" class="h-6 w-6 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                <span class="text-lg">Slap Rule (on '9')</span>
+            </label>
+            <label class="flex items-center space-x-3">
+                <input type="checkbox" id="mad-libs-rule" class="h-6 w-6 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                <span class="text-lg">Mad Libs (on '8')</span>
+            </label>
+            <label class="flex items-center space-x-3">
+                <input type="checkbox" id="charades-rule" class="h-6 w-6 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                <span class="text-lg">Charades (on '7')</span>
+            </label>
+            <label class="flex items-center space-x-3">
+                <input type="checkbox" id="silent-uno-rule" class="h-6 w-6 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                <span class="text-lg">Silent Uno (Honor System)</span>
+            </label>
+        </div>
+        <button id="apply-rules-btn" class="font-bangers text-xl bg-green-500 text-white w-full mt-6 py-2 rounded-lg border-2 border-black hover:bg-green-600">Apply & Restart</button>
+    </div>
+
+
+    <script>
+        // --- DOM Elements ---
+        const gameBoard = document.getElementById('game-board');
+        const deckElement = document.getElementById('deck');
+        const discardPileElement = document.getElementById('discard-pile');
+        const gameLog = document.getElementById('game-log');
+        const actionEffectContainer = document.getElementById('action-effect-container');
+
+        const colorChoiceModal = document.getElementById('color-choice-modal');
+        const playerChoiceModal = document.getElementById('player-choice-modal');
+        const playerChoiceTitle = document.getElementById('player-choice-title');
+        const playerChoiceButtons = document.getElementById('player-choice-buttons');
+        const hydrationModal = document.getElementById('hydration-modal');
+        const gameOverModal = document.getElementById('game-over-modal');
+        const madLibsModal = document.getElementById('mad-libs-modal');
+        const charadesModal = document.getElementById('charades-modal');
+
+        const winnerMessage = document.getElementById('winner-message');
+        const restartGameBtn = document.getElementById('restart-game-btn');
+        const colorButtons = document.querySelectorAll('.color-choice-btn');
+        const waterCupContainer = document.getElementById('water-cup-container');
+        const waterCup = document.getElementById('water-cup');
+        const slapButton = document.getElementById('slap-button');
+        const silentUnoButton = document.getElementById('silent-uno-button');
+        
+        const madLibsSubmit = document.getElementById('mad-libs-submit');
+        const charadesDone = document.getElementById('charades-done');
+        const charadesWord = document.getElementById('charades-word');
+
+
+        // House Rules Elements
+        const houseRulesPanel = document.getElementById('house-rules-panel');
+        const toggleRulesBtn = document.getElementById('toggle-rules-btn');
+        const applyRulesBtn = document.getElementById('apply-rules-btn');
+        const stackPlusTwoCheckbox = document.getElementById('stack-plus-two');
+        const drawUntilPlayableCheckbox = document.getElementById('draw-until-playable');
+        const jumpInCheckbox = document.getElementById('jump-in');
+        const sevenZeroRuleCheckbox = document.getElementById('seven-zero-rule');
+        const stayHydratedCheckbox = document.getElementById('stay-hydrated');
+        const swapHandsWildCheckbox = document.getElementById('swap-hands-wild');
+        const slapRuleCheckbox = document.getElementById('slap-rule');
+        const madLibsRuleCheckbox = document.getElementById('mad-libs-rule');
+        const charadesRuleCheckbox = document.getElementById('charades-rule');
+        const silentUnoRuleCheckbox = document.getElementById('silent-uno-rule');
+
+
+        // --- Game Constants ---
+        const COLORS = ['red', 'green', 'blue', 'yellow'];
+        const VALUES = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'skip', 'reverse', '+2'];
+        const WILD_VALUES = ['wild', '+4', 'swap'];
+        const PLAYER_COUNT = 4;
+        const CHARADE_WORDS = ['Planet', 'Alien', 'Rocket Ship', 'Black Hole', 'Gravity', 'Comet', 'Galaxy', 'Astronaut'];
+
+        // --- Game State ---
+        let deck = [];
+        let discardPile = [];
+        let players = [];
+        let currentPlayerIndex = 0;
+        let gameDirection = 1; 
+        let wildCardToPlay = null;
+        let drawTwoStack = 0;
+        let blockNextTurn = false;
+        let isAwaitingHydration = false;
+        let hydratingPlayerId = null;
+        let actionAfterPlayerChoice = null;
+        let slapState = { active: false, slappers: [] };
+
+        // --- House Rules State ---
+        let houseRules = {
+            stackPlusTwo: false, drawUntilPlayable: false, jumpIn: false,
+            sevenZero: false, stayHydrated: false, swapHandsWild: false,
+            slap: false, madLibs: false, charades: false, silentUno: false,
+        };
+
+        // --- Game Logic ---
+
+        function createDeck() {
+            const newDeck = [];
+            COLORS.forEach(color => {
+                VALUES.forEach(value => {
+                    newDeck.push({ color, value });
+                    if (value !== '0') newDeck.push({ color, value });
+                });
+            });
+            WILD_VALUES.forEach(value => {
+                if (value === 'swap' && !houseRules.swapHandsWild) return;
+                for (let i = 0; i < 4; i++) newDeck.push({ color: 'wild', value });
+            });
+            return newDeck;
+        }
+
+        function shuffle(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+        }
+
+        function setupGame() {
+            deck = createDeck();
+            shuffle(deck);
+            discardPile = [];
+            players = [];
+            currentPlayerIndex = 0;
+            gameDirection = 1;
+            drawTwoStack = 0;
+            blockNextTurn = false;
+            isAwaitingHydration = false;
+            hydratingPlayerId = null;
+            
+            document.querySelectorAll('.fixed.inset-0').forEach(modal => modal.classList.add('hidden'));
+            
+            waterCupContainer.classList.toggle('hidden', !houseRules.stayHydrated);
+            waterCupContainer.classList.toggle('flex', houseRules.stayHydrated);
+            silentUnoButton.classList.toggle('hidden', !houseRules.silentUno);
+
+            for (let i = 0; i < PLAYER_COUNT; i++) {
+                players.push({ id: i, name: i === 0 ? 'You' : `CPU ${i}`, hand: [], isAI: i !== 0 });
+            }
+
+            for (let i = 0; i < 7; i++) {
+                for (let j = 0; j < PLAYER_COUNT; j++) players[j].hand.push(deck.pop());
+            }
+            
+            let firstCard = deck.pop();
+            while (WILD_VALUES.includes(firstCard.value) || ['7','8','9'].includes(firstCard.value)) {
+                deck.push(firstCard);
+                shuffle(deck);
+                firstCard = deck.pop();
+            }
+            
+            discardPile.push(firstCard);
+            logMessage(`First card is a ${firstCard.color} ${firstCard.value}.`);
+
+            // Handle special starting cards
+            if (firstCard.value === 'skip') {
+                logMessage('Player 1 is skipped!');
+                currentPlayerIndex = (currentPlayerIndex + gameDirection + PLAYER_COUNT) % PLAYER_COUNT;
+            } else if (firstCard.value === 'reverse') {
+                gameDirection *= -1;
+                logMessage('Game direction reversed!');
+                currentPlayerIndex = (currentPlayerIndex + gameDirection + PLAYER_COUNT) % PLAYER_COUNT;
+            } else if (firstCard.value === '+2') {
+                handleDrawTwoStack(players[currentPlayerIndex]);
+            } 
+
+            renderGame();
+            setTimeout(gameLoop, 1000);
+        }
+        
+        function renderGame() {
+            players.forEach((player, index) => {
+                const handElement = document.getElementById(`player-${index}-hand`);
+                const nameElement = document.getElementById(`player-${index}-name`);
+                const areaElement = document.getElementById(`player-${index}-area`);
+                handElement.innerHTML = '';
+                
+                if (player.isAI) {
+                    player.hand.forEach(() => {
+                        const cardElement = createCardElement(null, true);
+                        handElement.appendChild(cardElement);
+                    });
+                     nameElement.textContent = `${player.name} (${player.hand.length})`;
+                } else {
+                    player.hand.sort((a, b) => (a.color.localeCompare(b.color) || a.value.localeCompare(b.value)));
+                    player.hand.forEach(card => {
+                        const cardElement = createCardElement(card);
+                        const {isValid} = isValidPlay(card, player);
+                        if (isValid) {
+                            cardElement.classList.add('playable');
+                            cardElement.addEventListener('click', () => handleCardClick(card));
+                        }
+                        handElement.appendChild(cardElement);
+                    });
+                    nameElement.textContent = `You (${player.hand.length})`;
+                }
+
+                areaElement.classList.toggle('active', index === currentPlayerIndex);
+            });
+
+            discardPileElement.innerHTML = '';
+            if (discardPile.length > 0) {
+                const topCard = discardPile[discardPile.length - 1];
+                const cardElement = createCardElement(topCard);
+                cardElement.style.cursor = 'default';
+                discardPileElement.appendChild(cardElement);
+            }
+        }
+        
+        function createCardElement(card, isBack = false) {
+            const cardElement = document.createElement('div');
+            if (isBack) {
+                cardElement.className = 'card card-back font-bangers';
+                cardElement.innerHTML = `<div class="inner-border">COSMIC CLASH</div>`;
+                return cardElement;
+            }
+
+            cardElement.className = `card bg-card-${card.color}`;
+            let valueDisplay = card.value.startsWith('+') ? card.value : card.value.charAt(0).toUpperCase() + card.value.slice(1);
+            if (card.value === 'swap') valueDisplay = 'Swap';
+            
+            let symbol;
+            switch(card.value) {
+                case 'skip': symbol = '🚫'; break;
+                case 'reverse': symbol = '🔄'; break;
+                case '+2': symbol = '+2'; break;
+                case '+4': symbol = '+4'; break;
+                case 'wild': symbol = '🎨'; break;
+                case 'swap': symbol = '🤝'; break;
+                default: symbol = card.value;
+            }
+
+            cardElement.innerHTML = `
+                <span class="corner top-left">${valueDisplay}</span>
+                <span class="text-5xl">${symbol}</span>
+                <span class="corner bottom-right">${valueDisplay}</span>
+            `;
+            return cardElement;
+        }
+
+        function gameLoop() {
+            if (blockNextTurn) return;
+
+            const player = players[currentPlayerIndex];
+
+            // Handle forced draw from stack
+            if (drawTwoStack > 0 && houseRules.stackPlusTwo) {
+                 const canStack = player.hand.some(c => c.value === '+2');
+                 if (!canStack) {
+                    logMessage(`${player.name} must draw ${drawTwoStack} cards.`);
+                    drawCards(player, drawTwoStack);
+                    drawTwoStack = 0;
+                    nextTurn(); // Skips turn
+                    return;
+                 }
+            }
+
+            if (player.isAI) {
+                setTimeout(aiTurn, 1500);
+            } else {
+                logMessage("It's your turn!");
+            }
+        }
+
+        function aiTurn() {
+            const player = players[currentPlayerIndex];
+            
+            if (drawTwoStack > 0 && houseRules.stackPlusTwo) {
+                const plusTwoCard = player.hand.find(c => c.value === '+2');
+                if (plusTwoCard) {
+                    playCard(plusTwoCard, player);
+                    return;
+                }
+                // This case is handled in gameLoop, but as a fallback:
+                logMessage(`${player.name} draws ${drawTwoStack} cards.`);
+                drawCards(player, drawTwoStack);
+                drawTwoStack = 0;
+                nextTurn();
+                return;
+            }
+
+            const playableCards = player.hand.filter(card => isValidPlay(card, player).isValid);
+
+            if (playableCards.length > 0) {
+                let cardToPlay = playableCards[Math.floor(Math.random() * playableCards.length)];
+                playCard(cardToPlay, player);
+            } else {
+                logMessage(`${player.name} has to draw.`);
+                drawAndPlayForAI();
+            }
+        }
+        
+        function handleCardClick(card) {
+            if (blockNextTurn) return;
+            
+            const player = players[0];
+            const {isValid, isJumpIn} = isValidPlay(card, player);
+
+            if (isValid) {
+                 if (isJumpIn) {
+                    logMessage(`You jump in with a ${card.color} ${card.value}!`);
+                    currentPlayerIndex = 0;
+                }
+                playCard(card, player);
+            } else {
+                logMessage("You can't play that card!", 'error');
+            }
+        }
+        
+        function isValidPlay(card, player) {
+            const topCard = discardPile[discardPile.length - 1];
+            
+            if (houseRules.jumpIn && card.color !== 'wild' && card.color === topCard.color && card.value === topCard.value && player.id !== currentPlayerIndex) {
+                 return {isValid: true, isJumpIn: true};
+            }
+
+            if (player.id !== currentPlayerIndex) return {isValid: false, isJumpIn: false};
+            
+            if (drawTwoStack > 0 && houseRules.stackPlusTwo) {
+                return {isValid: card.value === '+2', isJumpIn: false};
+            }
+
+            return {isValid: card.color === 'wild' || card.color === topCard.color || card.value === topCard.value, isJumpIn: false};
+        }
+
+        function playCard(card, player) {
+            if (card.color === 'wild') logMessage(`${player.name} plays a ${card.value} card.`);
+            else logMessage(`${player.name} plays a ${card.color} ${card.value}.`);
+            
+            player.hand = player.hand.filter(c => c !== card);
+            discardPile.push(card);
+            showActionEffect(card.value);
+
+            if (player.hand.length === 0) {
+                endGame(player);
+                return;
+            }
+            if (player.hand.length === 1) logMessage(`${player.name} shouts UNO!`);
+
+            let skipNextPlayer = false;
+            let postAction = () => nextTurn();
+
+            // Handle special card values
+            switch (card.value) {
+                case 'skip': skipNextPlayer = true; break;
+                case 'reverse': gameDirection *= -1; logMessage(`Game direction reversed!`); break;
+                case '+2': drawTwoStack += 2; logMessage(`Draw stack is now ${drawTwoStack}!`); skipNextPlayer = true; break;
+                case '+4': logMessage(`Next player must draw 4 and is skipped!`); drawCards(getNextPlayer(), 4); skipNextPlayer = true; // Fallthrough
+                case 'wild':
+                case 'swap':
+                    blockNextTurn = true;
+                    if (card.value === 'swap') {
+                        actionAfterPlayerChoice = () => promptColorChoice(player);
+                        promptPlayerChoice('SWAP HANDS WITH...', (targetIndex) => handlePlayerChoice(targetIndex));
+                    } else {
+                        promptColorChoice(player);
+                    }
+                    postAction = () => {};
+                    break;
+                case '0': if (houseRules.sevenZero) { logMessage(`0 played! All hands rotate!`); showActionEffect('ROTATE!'); rotateHands(); } break;
+                case '7': 
+                    if (houseRules.charades) {
+                        blockNextTurn = true;
+                        triggerCharades();
+                        postAction = () => {};
+                    } else if (houseRules.sevenZero) {
+                        blockNextTurn = true;
+                        actionAfterPlayerChoice = () => nextTurn();
+                        promptPlayerChoice('SWAP HANDS WITH...', (targetIndex) => handlePlayerChoice(targetIndex));
+                        postAction = () => {};
+                    }
+                    break;
+                case '8': if (houseRules.madLibs) { blockNextTurn = true; triggerMadLibs(); postAction = () => {}; } break;
+                case '9': if (houseRules.slap) { blockNextTurn = true; triggerSlap(); postAction = () => {}; } break;
+            }
+            
+            if (skipNextPlayer) {
+                currentPlayerIndex = (currentPlayerIndex + gameDirection + PLAYER_COUNT) % PLAYER_COUNT;
+            }
+
+            renderGame(); // Render immediately after card is played
+            if (!blockNextTurn) postAction();
+        }
+        
+        function handleDrawTwoStack(player) {
+            if (drawTwoStack > 0 && houseRules.stackPlusTwo) {
+                const hasPlusTwo = player.hand.some(c => c.value === '+2');
+                if (!hasPlusTwo) {
+                    logMessage(`${player.name} must draw ${drawTwoStack} cards.`);
+                    drawCards(player, drawTwoStack);
+                    drawTwoStack = 0;
+                    return true; // Turn is skipped
+                }
+            }
+            return false;
+        }
+
+        function promptColorChoice(player) {
+            if (player.isAI) {
+                const bestColor = getAIBestColor(player);
+                setTimeout(() => handleColorChoice(bestColor), 1000);
+            } else {
+                colorChoiceModal.classList.remove('hidden');
+            }
+        }
+
+        function rotateHands() {
+            const hands = players.map(p => p.hand);
+            if (gameDirection === 1) hands.unshift(hands.pop());
+            else hands.push(hands.shift());
+            players.forEach((p, i) => p.hand = hands[i]);
+            logMessage("Hands have been swapped!");
+        }
+
+        function promptPlayerChoice(title, callback) {
+            playerChoiceTitle.textContent = title;
+            playerChoiceButtons.innerHTML = '';
+            players.forEach((p, index) => {
+                if (p.id === currentPlayerIndex) return;
+                const btn = document.createElement('button');
+                btn.className = 'font-bangers text-2xl bg-blue-500 text-white px-6 py-2 rounded-lg border-2 border-black hover:bg-blue-600';
+                btn.textContent = p.name;
+                btn.onclick = () => {
+                    playerChoiceModal.classList.add('hidden');
+                    callback(index);
+                };
+                playerChoiceButtons.appendChild(btn);
+            });
+            playerChoiceModal.classList.remove('hidden');
+        }
+
+        function handlePlayerChoice(targetIndex) {
+            const currentPlayer = players[currentPlayerIndex];
+            const targetPlayer = players[targetIndex];
+            logMessage(`${currentPlayer.name} swaps hands with ${targetPlayer.name}.`);
+            showActionEffect('SWAP!');
+            [currentPlayer.hand, targetPlayer.hand] = [targetPlayer.hand, currentPlayer.hand];
+            if (actionAfterPlayerChoice) actionAfterPlayerChoice();
+        }
+        
+        function handleColorChoice(color) {
+            logMessage(`Color is now ${color}.`);
+            const topCard = discardPile[discardPile.length - 1];
+            topCard.color = color;
+            colorChoiceModal.classList.add('hidden');
+            blockNextTurn = false;
+            nextTurn();
+        }
+
+        function handleDeckClick() {
+            if (blockNextTurn) return;
+            const player = players[currentPlayerIndex];
+
+            if (handleDrawTwoStack(player)) return;
+            
+            logMessage("You draw a card.");
+
+            if (houseRules.drawUntilPlayable) {
+                let canPlay = false, drawnCard;
+                do {
+                    drawnCard = drawCards(player, 1)[0];
+                    if (!drawnCard) break; // No cards left
+                    logMessage(`You drew a ${drawnCard.color} ${drawnCard.value}.`);
+                    canPlay = isValidPlay(drawnCard, player).isValid;
+                    renderGame();
+                } while (!canPlay && deck.length > 0);
+                
+                if (canPlay) {
+                    logMessage(`You can play the ${drawnCard.color} ${drawnCard.value}!`);
+                    setTimeout(() => playCard(drawnCard, player), 1000);
+                } else {
+                    logMessage("No playable cards drawn. Turn passes.");
+                    setTimeout(nextTurn, 1000);
+                }
+            } else {
+                const drawnCard = drawCards(player, 1)[0];
+                renderGame();
+                if (isValidPlay(drawnCard, player).isValid) {
+                    logMessage(`You drew a playable card. Play it or pass.`);
+                } else {
+                    logMessage("You can't play the drawn card. Turn passes.");
+                    if (!isAwaitingHydration) setTimeout(nextTurn, 1000);
+                }
+            }
+        }
+        
+        function drawAndPlayForAI() {
+            const player = players[currentPlayerIndex];
+            if (houseRules.drawUntilPlayable) {
+                let canPlay = false, drawnCard;
+                do {
+                    drawnCard = drawCards(player, 1)[0];
+                    if (!drawnCard) break;
+                    logMessage(`${player.name} drew a card.`);
+                    canPlay = isValidPlay(drawnCard, player).isValid;
+                    renderGame();
+                } while (!canPlay && deck.length > 0);
+                
+                if (canPlay) {
+                    logMessage(`${player.name} plays the drawn card.`);
+                    setTimeout(() => playCard(drawnCard, player), 1000);
+                } else {
+                    logMessage(`${player.name}'s turn passes.`);
+                    setTimeout(nextTurn, 1000);
+                }
+            } else {
+                const drawnCard = drawCards(player, 1)[0];
+                renderGame();
+                if (isValidPlay(drawnCard, player).isValid) {
+                     setTimeout(() => playCard(drawnCard, player), 1000);
+                } else {
+                    if (!isAwaitingHydration) setTimeout(nextTurn, 1000);
+                }
+            }
+        }
+
+        function nextTurn() {
+            if (blockNextTurn) return;
+            currentPlayerIndex = (currentPlayerIndex + gameDirection + PLAYER_COUNT) % PLAYER_COUNT;
+            renderGame();
+            setTimeout(gameLoop, 1000);
+        }
+
+        function drawCards(player, count) {
+            const drawnCards = [];
+            for (let i = 0; i < count; i++) {
+                if (deck.length === 0) reshuffleDiscardPile();
+                if (deck.length === 0) {
+                    logMessage("No cards left to draw!");
+                    break;
+                }
+                const card = deck.pop();
+                player.hand.push(card);
+                drawnCards.push(card);
+            }
+            if (drawnCards.length > 0) checkForHydration(player);
+            return drawnCards;
+        }
+
+        function reshuffleDiscardPile() {
+            logMessage("Reshuffling the discard pile!");
+            const topCard = discardPile.pop();
+            deck = [...discardPile];
+            shuffle(deck);
+            discardPile = [topCard];
+        }
+        
+        function getNextPlayer() {
+            const nextIndex = (currentPlayerIndex + gameDirection + PLAYER_COUNT) % PLAYER_COUNT;
+            return players[nextIndex];
+        }
+        
+        function getAIBestColor(player) { /* ... */ return COLORS[Math.floor(Math.random() * 4)]; }
+        function getAITargetPlayer(player) { /* ... */ return (player.id + 1) % PLAYER_COUNT; }
+
+        function endGame(winner) {
+            winnerMessage.textContent = `${winner.name} Wins!`;
+            gameOverModal.classList.remove('hidden');
+            blockNextTurn = true;
+        }
+
+        function logMessage(message) {
+            const p = document.createElement('p');
+            p.textContent = message;
+            gameLog.appendChild(p);
+            gameLog.scrollTop = gameLog.scrollHeight;
+        }
+
+        function showActionEffect(value) { /* ... */ }
+        
+        // --- Mini-Game Triggers & Handlers ---
+
+        function triggerSlap() {
+            logMessage("9 played! Get ready to SLAP!");
+            slapState = { active: true, slappers: [] };
+            slapButton.classList.remove('hidden');
+            
+            // AI slapping logic
+            players.forEach(p => {
+                if (p.isAI) {
+                    setTimeout(() => {
+                        if (slapState.active) slapState.slappers.push(p.id);
+                    }, 500 + Math.random() * 2000); // AI slaps between 0.5 and 2.5 seconds
+                }
+            });
+
+            setTimeout(endSlap, 3000); // End slap after 3 seconds
+        }
+
+        function handleSlapClick() {
+            if (slapState.active && !slapState.slappers.includes(0)) {
+                slapState.slappers.push(0); // Player 0 is human
+                logMessage("You slapped!");
+            }
+        }
+
+        function endSlap() {
+            if (!slapState.active) return;
+            slapState.active = false;
+            slapButton.classList.add('hidden');
+            
+            let loser = null;
+            if (slapState.slappers.length < PLAYER_COUNT) {
+                const nonSlappers = players.filter(p => !slapState.slappers.includes(p.id));
+                loser = nonSlappers[0]; // First one who didn't slap
+            } else {
+                const lastSlapperId = slapState.slappers[slapState.slappers.length - 1];
+                loser = players.find(p => p.id === lastSlapperId);
+            }
+
+            if (loser) {
+                logMessage(`${loser.name} was last to slap and draws 2 cards!`);
+                drawCards(loser, 2);
+            }
+
+            blockNextTurn = false;
+            renderGame();
+            nextTurn();
+        }
+
+        function triggerMadLibs() {
+            logMessage("8 played! It's Mad Libs time!");
+            document.getElementById('mad-libs-noun').value = '';
+            document.getElementById('mad-libs-verb').value = '';
+            document.getElementById('mad-libs-adj').value = '';
+            madLibsModal.classList.remove('hidden');
+
+            if (players[currentPlayerIndex].isAI) {
+                // Auto-fill for AI
+                setTimeout(() => {
+                    document.getElementById('mad-libs-noun').value = 'alien';
+                    document.getElementById('mad-libs-verb').value = 'flying';
+                    document.getElementById('mad-libs-adj').value = 'shiny';
+                    handleMadLibsSubmit();
+                }, 1500);
+            }
+        }
+
+        function handleMadLibsSubmit() {
+            const noun = document.getElementById('mad-libs-noun').value || 'planet';
+            const verb = document.getElementById('mad-libs-verb').value || 'spinning';
+            const adj = document.getElementById('mad-libs-adj').value || 'cosmic';
+            logMessage(`STORY: The ${adj} ${noun} was ${verb} through the galaxy!`);
+            madLibsModal.classList.add('hidden');
+            blockNextTurn = false;
+            nextTurn();
+        }
+        
+        function triggerCharades() {
+            logMessage("7 played! Time for Charades!");
+            const word = CHARADE_WORDS[Math.floor(Math.random() * CHARADE_WORDS.length)];
+            charadesWord.textContent = word;
+            charadesModal.classList.remove('hidden');
+
+            if (players[currentPlayerIndex].isAI) {
+                setTimeout(handleCharadesDone, 2000);
+            }
+        }
+
+        function handleCharadesDone() {
+            charadesModal.classList.add('hidden');
+            blockNextTurn = false;
+            nextTurn();
+        }
+        
+        function handleSilentUnoClick() {
+            promptPlayerChoice("Who Talked?", (targetIndex) => {
+                const player = players[targetIndex];
+                logMessage(`${player.name} talked during Silent Uno! Draw 1 card.`);
+                drawCards(player, 1);
+                renderGame();
+            });
+        }
+        
+        function checkForHydration(player) {
+            if (houseRules.stayHydrated && Math.random() < 0.20) {
+                 logMessage(`${player.name} needs to hydrate!`);
+                blockNextTurn = true;
+                isAwaitingHydration = true;
+                hydratingPlayerId = player.id;
+                hydrationModal.classList.remove('hidden');
+
+                if (player.isAI) {
+                    setTimeout(handleHydration, 1500);
+                }
+             }
+        }
+        function handleHydration() { 
+            if (!isAwaitingHydration) return;
+            
+            const player = players[hydratingPlayerId];
+            logMessage(`${player.name} is hydrated!`);
+            
+            hydrationModal.classList.add('hidden');
+            isAwaitingHydration = false;
+            hydratingPlayerId = null;
+            blockNextTurn = false;
+
+            nextTurn();
+         }
+
+        // --- Event Listeners ---
+        deckElement.addEventListener('click', handleDeckClick);
+        restartGameBtn.addEventListener('click', setupGame);
+        waterCup.addEventListener('click', handleHydration);
+        slapButton.addEventListener('click', handleSlapClick);
+        silentUnoButton.addEventListener('click', handleSilentUnoClick);
+        madLibsSubmit.addEventListener('click', handleMadLibsSubmit);
+        charadesDone.addEventListener('click', handleCharadesDone);
+
+        colorButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                handleColorChoice(button.dataset.color);
+            });
+        });
+
+        toggleRulesBtn.addEventListener('click', () => {
+            houseRulesPanel.classList.toggle('-right-80');
+            houseRulesPanel.classList.toggle('right-0');
+        });
+
+        applyRulesBtn.addEventListener('click', () => {
+            houseRules.stackPlusTwo = stackPlusTwoCheckbox.checked;
+            houseRules.drawUntilPlayable = drawUntilPlayableCheckbox.checked;
+            houseRules.jumpIn = jumpInCheckbox.checked;
+            houseRules.sevenZero = sevenZeroRuleCheckbox.checked;
+            houseRules.stayHydrated = stayHydratedCheckbox.checked;
+            houseRules.swapHandsWild = swapHandsWildCheckbox.checked;
+            houseRules.slap = slapRuleCheckbox.checked;
+            houseRules.madLibs = madLibsRuleCheckbox.checked;
+            houseRules.charades = charadesRuleCheckbox.checked;
+            houseRules.silentUno = silentUnoRuleCheckbox.checked;
+            
+            // Special case for Charades rule, as it conflicts with 7-0 swap rule on the same card
+            if (houseRules.charades) {
+                sevenZeroRuleCheckbox.checked = false;
+                houseRules.sevenZero = false;
+            }
+
+            logMessage("New rules applied! Restarting game.");
+            houseRulesPanel.classList.remove('right-0');
+            houseRulesPanel.classList.add('-right-80');
+            setupGame();
+        });
+
+        // --- Initial Setup ---
+        setupGame();
+    </script>
+</body>
+</html>
+```eof
