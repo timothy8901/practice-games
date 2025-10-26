@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>A.C.T. Word Quest</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            /* Prevents scrolling and other default touch actions on the game board */
+            touch-action: none;
+        }
+        .grid-container {
+            position: relative;
+        }
+        #word-hunt-svg-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; /* Allows touch events to pass through to the grid */
+        }
+        .grid-cell {
+            position: relative;
+            user-select: none;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            aspect-ratio: 1 / 1;
+        }
+        .grid-cell-content {
+            position: absolute;
+            width: 80%;
+            height: 80%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            border-radius: 9999px;
+            transition: background-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
+        }
+        .grid-cell-content.selecting {
+            background-color: #60a5fa; /* blue-400 */
+            color: white;
+            transform: scale(1.1);
+        }
+        .connections-word.selected {
+            background-color: #60a5fa; /* blue-400 */
+            color: white;
+            border-color: #3b82f6; /* blue-600 */
+        }
+        .category-solved {
+            transition: all 0.5s ease-in-out;
+            transform-origin: top;
+        }
+        .fade-in { animation: fadeIn 0.5s ease-in-out; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.95) translateY(5px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        #custom-puzzle-modal input {
+            @apply w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-400 focus:border-transparent transition;
+        }
+        .connections-word.flashing, .grid-cell-content.flashing {
+            animation: flash 0.4s ease-in-out 3;
+        }
+        @keyframes flash {
+          50% { 
+            background-color: #fbbf24; /* amber-400 */
+            color: white; 
+            transform: scale(1.1);
+          }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 flex items-center justify-center min-h-screen p-2 sm:p-4">
+
+    <div class="w-full max-w-6xl mx-auto bg-white rounded-2xl shadow-lg p-4 sm:p-6 md:p-8">
+        <header class="text-center mb-6 relative">
+            <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">A.C.T. Word Quest</h1>
+            <p id="header-subtitle" class="text-gray-600 mt-2">Sharpen your vocabulary and critical thinking for test day.</p>
+            <button id="create-puzzle-btn" class="absolute top-0 right-0 px-4 py-2 bg-green-500 text-white font-semibold rounded-full hover:bg-green-600 transition text-sm">Create Custom</button>
+        </header>
+
+        <div class="flex flex-col md:flex-row gap-8">
+            <!-- Word Hunt Section -->
+            <div class="w-full md:w-1/2 flex flex-col">
+                <h2 class="text-2xl font-semibold mb-4 text-center">1. Word Hunt</h2>
+                <div class="grid-container bg-gray-200 rounded-lg p-2">
+                    <div id="word-hunt-grid" class="grid gap-1"></div>
+                    <svg id="word-hunt-svg-overlay"></svg>
+                </div>
+                <div class="mt-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="font-semibold text-lg">Found Words (<span id="found-words-count">0</span>/<span id="total-words-count">16</span>):</h3>
+                        <button id="word-hunt-hint-btn" class="p-2 rounded-full hover:bg-yellow-200 transition disabled:opacity-50 disabled:cursor-not-allowed" title="Get a hint">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-yellow-500"><path d="M15.09 16.05A6.94 6.94 0 0 1 12 19a7 7 0 0 1-7-7c0-2.35 1.13-4.43 2.91-5.78"></path><path d="M12 2a7 7 0 0 0-7 7c0 2.35 1.13-4.43 2.91-5.78"></path><path d="M12 2v10"></path><path d="M22 12h-2"></path><path d="M4 12H2"></path><path d="m19.78 4.22-1.42 1.42"></path><path d="m5.64 18.36-1.42-1.42"></path><path d="M12 22v-2"></path></svg>
+                        </button>
+                    </div>
+                    <div id="found-words-list" class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm"></div>
+                </div>
+            </div>
+
+            <!-- Connections Section -->
+            <div class="w-full md:w-1/2 flex flex-col">
+                <h2 class="text-2xl font-semibold mb-4 text-center">2. Connections</h2>
+                 <div id="solved-categories" class="space-y-2 mb-4"></div>
+                <div id="connections-grid" class="grid grid-cols-4 gap-2"></div>
+                <div class="mt-4 flex flex-col items-center">
+                    <p id="connections-message" class="h-6 text-center font-medium text-red-500"></p>
+                    <div class="flex gap-4 mt-2 items-center">
+                        <button id="shuffle-button" class="px-6 py-3 bg-gray-200 text-gray-800 font-semibold rounded-full hover:bg-gray-300 transition disabled:bg-gray-400">Shuffle</button>
+                        <button id="submit-button" class="px-6 py-3 bg-blue-500 text-white font-semibold rounded-full hover:bg-blue-600 transition disabled:bg-gray-400">Submit</button>
+                        <button id="connections-hint-btn" class="p-2 rounded-full hover:bg-yellow-200 transition disabled:opacity-50 disabled:cursor-not-allowed" title="Get a hint">
+                           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-yellow-500"><path d="M15.09 16.05A6.94 6.94 0 0 1 12 19a7 7 0 0 1-7-7c0-2.35 1.13-4.43 2.91-5.78"></path><path d="M12 2a7 7 0 0 0-7 7c0 2.35 1.13-4.43 2.91-5.78"></path><path d="M12 2v10"></path><path d="M22 12h-2"></path><path d="M4 12H2"></path><path d="m19.78 4.22-1.42 1.42"></path><path d="m5.64 18.36-1.42-1.42"></path><path d="M12 22v-2"></path></svg>
+                        </button>
+                    </div>
+                     <p class="mt-4 text-sm text-gray-500">Mistakes remaining: <span id="mistakes-count">4</span></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div id="score-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden p-4">
+        <div class="bg-white rounded-2xl shadow-lg p-8 text-center max-w-md w-full mx-auto">
+            <h2 class="text-3xl font-bold text-green-500 mb-2">Puzzle Complete!</h2>
+            <p id="score-date" class="text-gray-500 font-medium mb-6"></p>
+            <div class="grid grid-cols-2 gap-4 text-lg mb-8">
+                <div class="flex flex-col items-center p-4 bg-gray-100 rounded-lg">
+                    <span class="text-sm font-semibold text-gray-600">Time</span>
+                    <span id="score-time" class="font-bold text-2xl text-gray-900">--:--</span>
+                </div>
+                <div class="flex flex-col items-center p-4 bg-gray-100 rounded-lg">
+                    <span class="text-sm font-semibold text-gray-600">Guesses</span>
+                    <span id="score-guesses" class="font-bold text-2xl text-gray-900">0</span>
+                </div>
+            </div>
+            <button id="close-score-btn" class="w-full px-6 py-3 bg-blue-500 text-white font-semibold rounded-full hover:bg-blue-600 transition">View Solved Board</button>
+        </div>
+    </div>
+
+    <div id="custom-puzzle-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden p-4">
+        <div class="bg-white rounded-2xl shadow-lg p-8 max-w-4xl w-full mx-auto">
+            <h2 class="text-2xl font-bold text-gray-900 mb-4">Create Your Own Puzzle</h2>
+            <p class="text-gray-600 mb-6">Enter 4 categories and 4 words for each. All fields are required.</p>
+            <div id="custom-puzzle-form" class="grid grid-cols-1 md:grid-cols-2 gap-6"></div>
+            <p id="custom-puzzle-error" class="text-red-500 text-center h-6 mt-4"></p>
+            <div class="flex justify-end gap-4 mt-4">
+                <button id="cancel-custom-btn" class="px-6 py-2 bg-gray-200 text-gray-800 font-semibold rounded-full hover:bg-gray-300 transition">Cancel</button>
+                <button id="generate-custom-btn" class="px-6 py-2 bg-green-500 text-white font-semibold rounded-full hover:bg-green-600 transition">Generate Puzzle</button>
+            </div>
+        </div>
+    </div>
+
+<script>
+    // --- DOM ELEMENTS ---
+    const headerSubtitle = document.getElementById('header-subtitle');
+    const wordHuntGrid = document.getElementById('word-hunt-grid');
+    const wordHuntSvgOverlay = document.getElementById('word-hunt-svg-overlay');
+    const foundWordsCountEl = document.getElementById('found-words-count');
+    const foundWordsListEl = document.getElementById('found-words-list');
+    const connectionsGrid = document.getElementById('connections-grid');
+    const submitButton = document.getElementById('submit-button');
+    const shuffleButton = document.getElementById('shuffle-button');
+    const mistakesCountEl = document.getElementById('mistakes-count');
+    const solvedCategoriesEl = document.getElementById('solved-categories');
+    const connectionsMessageEl = document.getElementById('connections-message');
+    const scoreModal = document.getElementById('score-modal');
+    const scoreDateEl = document.getElementById('score-date');
+    const scoreTimeEl = document.getElementById('score-time');
+    const scoreGuessesEl = document.getElementById('score-guesses');
+    const closeScoreBtn = document.getElementById('close-score-btn');
+    const createPuzzleBtn = document.getElementById('create-puzzle-btn');
+    const customPuzzleModal = document.getElementById('custom-puzzle-modal');
+    const customPuzzleForm = document.getElementById('custom-puzzle-form');
+    const cancelCustomBtn = document.getElementById('cancel-custom-btn');
+    const generateCustomBtn = document.getElementById('generate-custom-btn');
+    const customPuzzleError = document.getElementById('custom-puzzle-error');
+    const totalWordsCountEl = document.getElementById('total-words-count');
+    const wordHuntHintBtn = document.getElementById('word-hunt-hint-btn');
+    const connectionsHintBtn = document.getElementById('connections-hint-btn');
+
+    // --- A.C.T. FOCUSED GAME DATA ---
+    const puzzles = [
+        [ // Puzzle 1: English/Reading
+            { category: "LITERARY DEVICES", words: ["SIMILE", "METAPHOR", "IRONY", "PERSONA"].map(w=>({hunt:w,display:w})) }, 
+            { category: "TYPES OF PUNCTUATION", words: ["COMMA", "PERIOD", "COLON", "DASH"].map(w=>({hunt:w,display:w})) }, 
+            { category: "PREFIXES MEANING 'AGAINST'", words: ["ANTI", "CONTRA", "COUNTER", "OB"].map(w=>({hunt:w,display:w})) }, 
+            { category: "WORDS RELATED TO TONE", words: ["CYNICAL", "NOSTALGIC", "OPTIMISTIC", "SARCASTIC"].map(w=>({hunt:w,display:w})) }
+        ],
+        [ // Puzzle 2: Math
+            { category: "GEOMETRIC SHAPES", words: ["TRIANGLE", "RHOMBUS", "CYLINDER", "SPHERE"].map(w=>({hunt:w,display:w})) }, 
+            { category: "TRIGONOMETRY TERMS", words: ["SINE", "COSINE", "TANGENT", "ANGLE"].map(w=>({hunt:w,display:w})) }, 
+            { category: "TYPES OF NUMBERS", words: ["INTEGER", "PRIME", "RATIONAL", "ODD"].map(w=>({hunt:w,display:w})) }, 
+            { category: "ALGEBRAIC CONCEPTS", words: ["VARIABLE", "EQUATION", "FUNCTION", "SLOPE"].map(w=>({hunt:w,display:w})) }
+        ],
+        [ // Puzzle 3: Science
+            { category: "BIOLOGY TERMS", words: ["MITOSIS", "NUCLEUS", "GENE", "ENZYME"].map(w=>({hunt:w,display:w})) }, 
+            { category: "CHEMISTRY CONCEPTS", words: ["ATOM", "MOLECULE", "BOND", "REACTION"].map(w=>({hunt:w,display:w})) }, 
+            { category: "PHYSICS UNITS", words: ["WATT", "NEWTON", "JOULE", "VOLT"].map(w=>({hunt:w,display:w})) }, 
+            { category: "PARTS OF THE SCIENTIFIC METHOD", words: ["HYPOTHESIS", "ANALYSIS", "EXPERIMENT", "CONCLUSION"].map(w=>({hunt:w,display:w})) }
+        ],
+        [ // Puzzle 4: Advanced Vocabulary
+            { category: "VOCAB: HARD-WORKING", words: ["ASSIDUOUS", "DILIGENT", "SEDULOUS", "TIRELESS"].map(w=>({hunt:w,display:w})) }, 
+            { category: "VOCAB: SHORT-LIVED", words: ["EPHEMERAL", "EVANESCENT", "FLEETING", "TRANSIENT"].map(w=>({hunt:w,display:w})) }, 
+            { category: "VOCAB: TO CRITICIZE", words: ["CENSURE", "LAMBASTE", "REBUKE", "UPBRAID"].map(w=>({hunt:w,display:w})) }, 
+            { category: "VOCAB: FRIENDLY", words: ["AFFABLE", "AMIABLE", "CONGENIAL", "GREGARIOUS"].map(w=>({hunt:w,display:w})) }
+        ],
+        [ // Puzzle 5: Mixed Bag
+            { category: "GRAMMAR: PARTS OF SPEECH", words: ["NOUN", "VERB", "ADJECTIVE", "ADVERB"].map(w=>({hunt:w,display:w})) }, 
+            { category: "LOGICAL FALLACIES", words: [{hunt:"STRAWMAN", display:"STRAW MAN"}, {hunt:"REDHERRING", display:"RED HERRING"}, {hunt:"ADHOMINEM", display:"AD HOMINEM"}, "SLIPPERYSLOPE"].map(w => typeof w === 'string' ? {hunt:w,display:w} : w) }, 
+            { category: "LAB EQUIPMENT", words: ["BEAKER", "FLASK", "MICROSCOPE", "CYLINDER"].map(w=>({hunt:w,display:w})) }, 
+            { category: "TERMS ON A GRAPH", words: ["AXIS", "ORIGIN", "QUADRANT", "COORDINATE"].map(w=>({hunt:w,display:w})) }
+        ]
+    ];
+    const categoryColors = ["bg-yellow-400", "bg-green-400", "bg-blue-400", "bg-orange-400"];
+
+    let gameData = [];
+    let allWords = [];
+    let GRID_SIZE = 10;
+    const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+
+    // --- GAME STATE ---
+    let grid = [];
+    let foundWords = new Set();
+    let isSelecting = false;
+    let selectionPath = [];
+    let selectionDirection = { dr: null, dc: null };
+    let selectedConnectionWords = [];
+    let mistakes = 4;
+    let solvedGroups = 0;
+    let startTime;
+    let totalGuesses = 0;
+    let wordLocations = new Map();
+
+    // --- PUZZLE MANAGEMENT ---
+    function getDailyPuzzleIndex() { const epoch = new Date('2024-01-01T00:00:00Z'); const now = new Date(); const diff = now.getTime() - epoch.getTime(); const dayIndex = Math.floor(diff / (1000 * 60 * 60 * 24)); return dayIndex % puzzles.length; }
+    function loadPuzzle(puzzleData) { gameData = puzzleData.map((cat, i) => ({ ...cat, color: categoryColors[i] })); allWords = gameData.flatMap(cat => cat.words.map(w => w.hunt)); totalWordsCountEl.textContent = allWords.length; const longestWordLength = allWords.reduce((max, word) => Math.max(max, word.length), 0); GRID_SIZE = Math.max(12, longestWordLength + 3); GRID_SIZE = Math.min(20, GRID_SIZE); }
+    
+    // --- WORD HUNT LOGIC ---
+    function initializeWordHunt() { grid = Array.from({ length: GRID_SIZE }, () => Array(GRID_SIZE).fill(null)); wordLocations.clear(); const wordsToPlace = [...allWords].sort((a, b) => b.length - a.length); for (const word of wordsToPlace) { let placed = false, attempts = 0; while (!placed && attempts < 1000) { const currentWord = Math.random() > 0.5 ? word : word.split('').reverse().join(''); const direction = Math.floor(Math.random() * 8); const row = Math.floor(Math.random() * GRID_SIZE); const col = Math.floor(Math.random() * GRID_SIZE); placed = tryPlaceWord(currentWord, row, col, direction, word); attempts++; } if (!placed) console.error(`Could not place word: "${word}".`); } for (let r = 0; r < GRID_SIZE; r++) { for (let c = 0; c < GRID_SIZE; c++) { if (grid[r][c] === null) grid[r][c] = ALPHABET[Math.floor(Math.random() * ALPHABET.length)]; } } renderWordHuntGrid(); }
+    function tryPlaceWord(word, startRow, startCol, direction, originalWord) {
+        const directions = [[0, 1], [1, 0], [1, 1], [-1, 1], [0, -1], [-1, 0], [-1, -1], [1, -1]];
+        const [dr, dc] = directions[direction];
+        let path = []; let r = startRow, c = startCol; 
+        for (const letter of word) { 
+            if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE || (grid[r][c] !== null && grid[r][c] !== letter)) return false; 
+            path.push({ r, c, letter }); 
+            r += dr; c += dc; 
+        } 
+        path.forEach(p => grid[p.r][p.c] = p.letter); 
+        wordLocations.set(originalWord, path.map(p => ({ r: p.r, c: p.c }))); 
+        return true; 
+    }
+    function renderWordHuntGrid() { wordHuntGrid.innerHTML = ''; wordHuntGrid.style.gridTemplateColumns = `repeat(${GRID_SIZE}, 1fr)`; for (let r = 0; r < GRID_SIZE; r++) { for (let c = 0; c < GRID_SIZE; c++) { const cell = document.createElement('div'); cell.className = 'grid-cell'; cell.dataset.r = r; cell.dataset.c = c; const content = document.createElement('div'); content.className = 'grid-cell-content text-base md:text-lg'; content.textContent = grid[r][c]; cell.appendChild(content); wordHuntGrid.appendChild(cell); } } }
+    function handleSelectionStart(e) { e.preventDefault(); const target = getCellFromEvent(e); if (!target) return; isSelecting = true; selectionPath = [target]; updateSelectionUI(); }
+    function handleSelectionMove(e) { e.preventDefault(); if (!isSelecting) return; const target = getCellFromEvent(e); if (!target || target === selectionPath[selectionPath.length - 1]) return; const lastCell = selectionPath[selectionPath.length - 1]; if (selectionPath.length > 1 && target === selectionPath[selectionPath.length - 2]) { selectionPath.pop(); if (selectionPath.length === 1) selectionDirection = { dr: null, dc: null }; updateSelectionUI(); return; } const lastR = parseInt(lastCell.dataset.r), lastC = parseInt(lastCell.dataset.c); const newR = parseInt(target.dataset.r), newC = parseInt(target.dataset.c); if (selectionPath.length === 1) { const dr = Math.sign(newR - lastR), dc = Math.sign(newC - lastC); if (dr !== 0 || dc !== 0) { selectionDirection = { dr, dc }; selectionPath.push(target); } } else { if (newR === lastR + selectionDirection.dr && newC === lastC + selectionDirection.dc) selectionPath.push(target); } updateSelectionUI(); }
+    function handleSelectionEnd(e) { e.preventDefault(); if (!isSelecting) return; isSelecting = false; const selectedWord = selectionPath.map(cell => cell.querySelector('.grid-cell-content').textContent).join(''); const reversedWord = selectedWord.split('').reverse().join(''); if (allWords.includes(selectedWord) && !foundWords.has(selectedWord)) { foundWords.add(selectedWord); markWordAsFound(selectionPath); updateFoundWordsUI(selectedWord); } else if (allWords.includes(reversedWord) && !foundWords.has(reversedWord)) { foundWords.add(reversedWord); markWordAsFound(selectionPath); updateFoundWordsUI(reversedWord); } else { clearSelectionUI(); } selectionPath = []; if (foundWords.size === allWords.length) activateConnectionsGame(); }
+    function getCellFromEvent(e) { const touch = e.touches?.[0] || e.changedTouches?.[0]; const target = touch ? document.elementFromPoint(touch.clientX, touch.clientY) : e.target; return target ? target.closest('.grid-cell') : null; }
+    function updateSelectionUI() { clearSelectionUI(); selectionPath.forEach(cell => cell.querySelector('.grid-cell-content').classList.add('selecting')); }
+    function clearSelectionUI() { document.querySelectorAll('.grid-cell-content.selecting').forEach(content => content.classList.remove('selecting')); }
+    
+    function markWordAsFound(path) {
+        clearSelectionUI();
+        const gridRect = wordHuntGrid.getBoundingClientRect();
+        const startCell = path[0];
+        const endCell = path[path.length - 1];
+        const startRect = startCell.getBoundingClientRect();
+        const endRect = endCell.getBoundingClientRect();
+        const strokeWidth = startRect.width * 0.8; 
+        const x1 = startRect.left + startRect.width / 2 - gridRect.left;
+        const y1 = startRect.top + startRect.height / 2 - gridRect.top;
+        const x2 = endRect.left + endRect.width / 2 - gridRect.left;
+        const y2 = endRect.top + endRect.height / 2 - gridRect.top;
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', x1); line.setAttribute('y1', y1); line.setAttribute('x2', x2); line.setAttribute('y2', y2);
+        line.setAttribute('stroke', '#4ade80'); line.setAttribute('stroke-width', strokeWidth);
+        line.setAttribute('stroke-linecap', 'round'); line.setAttribute('opacity', '0.6');
+        line.classList.add('fade-in');
+        wordHuntSvgOverlay.appendChild(line);
+    }
+    
+    function updateFoundWordsUI(newHuntWord) {
+        const wordData = gameData.flatMap(cat => cat.words).find(w => w.hunt === newHuntWord || w.hunt === newHuntWord.split('').reverse().join(''));
+        const displayWord = wordData ? wordData.display : newHuntWord;
+        const wordEl = document.createElement('div');
+        wordEl.className = 'p-2 bg-green-100 text-green-800 rounded-md text-center font-medium fade-in';
+        wordEl.textContent = displayWord;
+        foundWordsListEl.appendChild(wordEl);
+        foundWordsCountEl.textContent = foundWords.size;
+        addWordToConnectionsGrid(displayWord, wordData.hunt);
+    }
+
+    // --- CONNECTIONS LOGIC ---
+    function handleSubmit() { if (selectedConnectionWords.length !== 4) return; totalGuesses++; const sortedSelection = [...selectedConnectionWords].sort(); let correctGroup = gameData.find(group => JSON.stringify(group.words.map(w => w.hunt).sort()) === JSON.stringify(sortedSelection)); if (correctGroup) { handleCorrectSubmission(correctGroup); } else { handleIncorrectSubmission(); } selectedConnectionWords = []; document.querySelectorAll('.connections-word.selected').forEach(el => el.classList.remove('selected')); submitButton.disabled = true; }
+    function handleCorrectSubmission(group) { solvedGroups++; const solvedGroupEl = document.createElement('div'); solvedGroupEl.className = `category-solved p-4 rounded-lg ${group.color} text-white fade-in`; solvedGroupEl.innerHTML = `<p class="font-bold text-lg">${group.category}</p><p class="font-medium">${group.words.map(w => w.display).join(', ')}</p>`; solvedCategoriesEl.prepend(solvedGroupEl); selectedConnectionWords.forEach(word => { connectionsGrid.querySelector(`[data-word='${word}']`)?.remove(); }); if (solvedGroups === gameData.length) { displayScore(); } }
+    function initializeConnectionsGrid() { connectionsGrid.innerHTML = ''; for (let i = 0; i < 16; i++) { const placeholder = document.createElement('div'); placeholder.className = 'connections-placeholder p-2 h-16 md:h-20 bg-gray-200 rounded-lg'; connectionsGrid.appendChild(placeholder); } }
+    function addWordToConnectionsGrid(displayWord, huntWord) { const placeholder = connectionsGrid.querySelector('.connections-placeholder'); if (!placeholder) return; const wordButton = document.createElement('button'); wordButton.className = 'connections-word p-2 h-16 md:h-20 text-sm sm:text-base bg-gray-200 rounded-lg font-semibold flex items-center justify-center text-center hover:bg-gray-300 transition focus:outline-none focus:ring-2 focus:ring-blue-400 fade-in'; wordButton.textContent = displayWord; wordButton.dataset.word = huntWord; wordButton.addEventListener('click', handleConnectionWordClick); placeholder.replaceWith(wordButton); }
+    function activateConnectionsGame() { shuffleButton.disabled = false; connectionsHintBtn.disabled = false; wordHuntHintBtn.disabled = true; }
+    function shuffleArray(array) { for (let i = array.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1));[array[i], array[j]] = [array[j], array[i]]; } return array; }
+    function renderConnectionsGrid() { const wordsToDisplay = Array.from(connectionsGrid.querySelectorAll('.connections-word')); const shuffledWords = shuffleArray(wordsToDisplay); connectionsGrid.innerHTML = ''; shuffledWords.forEach(wordEl => connectionsGrid.appendChild(wordEl)); }
+    function handleConnectionWordClick(e) { const word = e.target.dataset.word; if (selectedConnectionWords.includes(word)) { selectedConnectionWords = selectedConnectionWords.filter(w => w !== word); e.target.classList.remove('selected'); } else if (selectedConnectionWords.length < 4) { selectedConnectionWords.push(word); e.target.classList.add('selected'); } submitButton.disabled = selectedConnectionWords.length !== 4; }
+    function handleIncorrectSubmission() { mistakes--; mistakesCountEl.textContent = mistakes; connectionsMessageEl.textContent = "Incorrect. Try again."; setTimeout(() => connectionsMessageEl.textContent = "", 1500); if (mistakes === 0) { displayScore(true); } }
+
+    // --- SCORING & DISPLAY ---
+    function displayScore(isGameOver = false) { const endTime = Date.now(); const duration = Math.round((endTime - startTime) / 1000); const minutes = Math.floor(duration / 60).toString().padStart(2, '0'); const seconds = (duration % 60).toString().padStart(2, '0'); scoreTimeEl.textContent = `${minutes}:${seconds}`; scoreGuessesEl.textContent = totalGuesses; scoreDateEl.textContent = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }); if (isGameOver) { scoreModal.querySelector('h2').textContent = "Game Over!"; scoreModal.querySelector('h2').classList.replace('text-green-500', 'text-red-500'); } else { scoreModal.querySelector('h2').textContent = "Puzzle Complete!"; scoreModal.querySelector('h2').classList.replace('text-red-500', 'text-green-500'); } setTimeout(() => scoreModal.classList.remove('hidden'), 500); }
+    
+    // --- HINT LOGIC ---
+    function flashElements(elements, buttonToDisable) { if (!elements || elements.some(el => !el)) return; buttonToDisable.disabled = true; elements.forEach(el => { el.classList.add('flashing'); el.addEventListener('animationend', () => { el.classList.remove('flashing'); }, { once: true }); }); setTimeout(() => { buttonToDisable.disabled = false; }, 1200); }
+    function handleWordHuntHint() { const unfoundWords = allWords.filter(w => !foundWords.has(w)); if (unfoundWords.length === 0) { wordHuntHintBtn.disabled = true; return; } const hintWord = unfoundWords[Math.floor(Math.random() * unfoundWords.length)]; const path = wordLocations.get(hintWord); if (!path || path.length === 0) { console.error("Could not find path for hint word:", hintWord); return; } let hintCoords; if (path.length <= 3) { hintCoords = path; } else { const start = Math.floor(Math.random() * (path.length - 2)); hintCoords = path.slice(start, start + 3); } const hintElements = hintCoords.map(({r, c}) => wordHuntGrid.querySelector(`.grid-cell[data-r='${r}'][data-c='${c}'] .grid-cell-content`)); flashElements(hintElements, wordHuntHintBtn); }
+    function handleConnectionsHint() { const solvedCategoryNames = Array.from(solvedCategoriesEl.querySelectorAll('.font-bold')).map(el => el.textContent); const unsolvedGroups = gameData.filter(group => !solvedCategoryNames.includes(group.category)); if (unsolvedGroups.length === 0) { connectionsHintBtn.disabled = true; return; } const wordsOnBoard = Array.from(connectionsGrid.querySelectorAll('.connections-word')).map(el => el.dataset.word); const hintGroup = unsolvedGroups.find(group => { const wordsInGroupOnBoard = group.words.map(w => w.hunt).filter(word => wordsOnBoard.includes(word)); return wordsInGroupOnBoard.length >= 2; }); if (!hintGroup) { return; } const hintableWords = hintGroup.words.map(w => w.hunt).filter(word => wordsOnBoard.includes(word)); const wordsToFlash = hintableWords.sort(() => 0.5 - Math.random()).slice(0, 2); const hintElements = wordsToFlash.map(word => connectionsGrid.querySelector(`.connections-word[data-word='${word}']`)); flashElements(hintElements, connectionsHintBtn); }
+
+    // --- CUSTOM PUZZLE LOGIC ---
+    function initializeCustomPuzzleForm() { customPuzzleForm.innerHTML = ''; for (let i = 0; i < 4; i++) { const group = document.createElement('div'); group.className = 'flex flex-col gap-2 p-4 bg-gray-100 rounded-lg'; group.innerHTML = `<input type="text" placeholder="Category ${i + 1}" class="category-input font-semibold" maxlength="25"><input type="text" placeholder="Word 1" class="word-input" maxlength="15"><input type="text" placeholder="Word 2" class="word-input" maxlength="15"><input type="text" placeholder="Word 3" class="word-input" maxlength="15"><input type="text" placeholder="Word 4" class="word-input" maxlength="15">`; customPuzzleForm.appendChild(group); } }
+    function handleGenerateCustomPuzzle() { const customData = []; const inputs = customPuzzleForm.querySelectorAll('input'); for (const input of inputs) { if (input.value.trim() === '') { customPuzzleError.textContent = "Please fill out all fields."; return; } } customPuzzleError.textContent = ""; const categoryGroups = customPuzzleForm.querySelectorAll('.flex.flex-col'); categoryGroups.forEach((group) => { const categoryInput = group.querySelector('.category-input'); const wordInputs = group.querySelectorAll('.word-input'); const words = Array.from(wordInputs).map(input => { const display = input.value.trim().toUpperCase(); const hunt = display.replace(/\s+/g, ''); return { hunt, display }; }); customData.push({ category: categoryInput.value.trim().toUpperCase(), words: words }); }); loadPuzzle(customData); resetGame(false); customPuzzleModal.classList.add('hidden'); }
+
+    // --- GAME FLOW & RESET ---
+    function resetGame(isDaily = true) {
+        grid = []; foundWords.clear(); isSelecting = false; selectionPath = []; selectedConnectionWords = [];
+        mistakes = 4; solvedGroups = 0; totalGuesses = 0;
+        wordLocations.clear();
+        wordHuntSvgOverlay.innerHTML = '';
+        headerSubtitle.textContent = isDaily ? 'Sharpen your vocabulary and critical thinking for test day.' : 'Playing your custom-made puzzle.';
+        foundWordsCountEl.textContent = '0'; foundWordsListEl.innerHTML = '';
+        solvedCategoriesEl.innerHTML = ''; mistakesCountEl.textContent = '4';
+        connectionsMessageEl.textContent = ''; 
+        submitButton.disabled = true; 
+        shuffleButton.disabled = true;
+        wordHuntHintBtn.disabled = false;
+        connectionsHintBtn.disabled = true;
+        scoreModal.classList.add('hidden');
+        initializeWordHunt();
+        initializeConnectionsGrid();
+        startTime = Date.now();
+    }
+
+    // --- EVENT LISTENERS ---
+    wordHuntGrid.addEventListener('mousedown', handleSelectionStart);
+    wordHuntGrid.addEventListener('mousemove', handleSelectionMove);
+    document.addEventListener('mouseup', handleSelectionEnd);
+    wordHuntGrid.addEventListener('touchstart', handleSelectionStart, { passive: false });
+    wordHuntGrid.addEventListener('touchmove', handleSelectionMove, { passive: false });
+    document.addEventListener('touchend', handleSelectionEnd);
+    submitButton.addEventListener('click', handleSubmit);
+    shuffleButton.addEventListener('click', renderConnectionsGrid);
+    closeScoreBtn.addEventListener('click', () => scoreModal.classList.add('hidden'));
+    createPuzzleBtn.addEventListener('click', () => customPuzzleModal.classList.remove('hidden'));
+    cancelCustomBtn.addEventListener('click', () => customPuzzleModal.classList.add('hidden'));
+    generateCustomBtn.addEventListener('click', handleGenerateCustomPuzzle);
+    wordHuntHintBtn.addEventListener('click', handleWordHuntHint);
+    connectionsHintBtn.addEventListener('click', handleConnectionsHint);
+
+    // --- INITIALIZE GAME ---
+    function init() {
+        const dailyPuzzleIndex = getDailyPuzzleIndex();
+        loadPuzzle(puzzles[dailyPuzzleIndex]);
+        resetGame(true);
+        initializeCustomPuzzleForm();
+    }
+    
+    init();
+</script>
+</body>
+</html>
+
+
