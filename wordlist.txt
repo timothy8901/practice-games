@@ -1,0 +1,24 @@
+# Sample wordlist for Baker's Dozen game
+# Replace this file with a larger licensed or public-domain wordlist (one word per line).
+# Lines starting with # are ignored.
+BAKE
+BAKES
+BAKING
+CAKE
+MAKE
+TAKE
+LAKE
+RAKE
+WALK
+TALK
+BOOK
+COOK
+LOOK
+POOL
+TOOL
+PANGRAM
+BREAD
+DOZEN
+GAME
+PLAYER
+SCORE

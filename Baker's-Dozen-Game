@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Baker's Dozen</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            touch-action: manipulation; /* Prevents double-tap zoom on mobile */
+        }
+        .hexagon {
+            position: relative;
+            width: 100px;
+            height: 115.47px;
+            background-color: #f0f0f0;
+            margin: 57.74px 0;
+            clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #333;
+            cursor: pointer;
+            transition: background-color 0.2s ease, transform 0.1s ease;
+            -webkit-user-select: none; /* Safari */
+            -ms-user-select: none; /* IE 10+ */
+            user-select: none; /* Standard syntax */
+        }
+        .hexagon:active {
+            transform: scale(0.95);
+        }
+        .hexagon-center {
+            background-color: #fde047; /* yellow-300 */
+        }
+        .hexagon-outer {
+             background-color: #e5e7eb; /* gray-200 */
+        }
+        .hexagon-outer:hover {
+            background-color: #d1d5db; /* gray-300 */
+        }
+        .shake {
+            animation: shake 0.5s;
+        }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+            20%, 40%, 60%, 80% { transform: translateX(5px); }
+        }
+         /* Smaller hexagons for smaller screens */
+        @media (max-width: 640px) {
+            .hexagon {
+                width: 80px;
+                height: 92.38px;
+                margin: 46.19px 0;
+                 font-size: 2rem;
+            }
+        }
+         /* Modal styles */
+        .modal-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 50;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex flex-col items-center justify-center min-h-screen p-4 text-gray-800">
+
+    <div id="game-container" class="w-full max-w-md mx-auto text-center">
+        <h1 class="text-4xl font-bold mb-1">Baker's Dozen</h1>
+        <p class="text-gray-600 mb-4">Find 13 words to win!</p>
+
+        <!-- Game Info: Score & Word Count -->
+        <div class="flex justify-around mb-4 text-lg">
+            <div>
+                <span class="font-semibold">Score:</span>
+                <span id="score">0</span>
+            </div>
+            <div>
+                <span class="font-semibold">Words:</span>
+                <span id="word-count">0 / 13</span>
+            </div>
+        </div>
+
+        <!-- Word Display -->
+        <div id="word-display-container" class="h-12 w-full bg-white rounded-lg shadow-inner flex items-center justify-center mb-4 text-2xl font-semibold tracking-widest">
+            <span id="current-word"></span>
+            <span class="animate-ping">|</span>
+        </div>
+
+        <!-- Notification Area -->
+        <div id="notification" class="h-6 mb-2 text-red-500 font-semibold transition-opacity duration-300 opacity-0"></div>
+
+        <!-- Hexagon Grid -->
+        <div class="relative w-[300px] h-[346px] sm:w-[300px] sm:h-[346.41px] mx-auto mb-4 flex items-center justify-center">
+             <div id="center-hex" class="absolute hexagon hexagon-center"></div>
+             <div id="outer-hex-0" class="absolute hexagon hexagon-outer" style="transform: translate(0, -100px) scale(0.9);"></div>
+             <div id="outer-hex-1" class="absolute hexagon hexagon-outer" style="transform: translate(87px, -50px) scale(0.9);"></div>
+             <div id="outer-hex-2" class="absolute hexagon hexagon-outer" style="transform: translate(87px, 50px) scale(0.9);"></div>
+             <div id="outer-hex-3" class="absolute hexagon hexagon-outer" style="transform: translate(0, 100px) scale(0.9);"></div>
+             <div id="outer-hex-4" class="absolute hexagon hexagon-outer" style="transform: translate(-87px, 50px) scale(0.9);"></div>
+             <div id="outer-hex-5" class="absolute hexagon hexagon-outer" style="transform: translate(-87px, -50px) scale(0.9);"></div>
+        </div>
+
+
+        <!-- Action Buttons -->
+        <div class="grid grid-cols-3 gap-3 mb-4">
+            <button id="shuffle-btn" class="py-3 bg-white rounded-lg shadow-md font-semibold text-gray-700 active:scale-95 transition-transform">Shuffle</button>
+            <button id="enter-btn" class="py-3 bg-blue-500 text-white rounded-lg shadow-md font-semibold active:scale-95 transition-transform">Enter</button>
+            <button id="clear-btn" class="py-3 bg-white rounded-lg shadow-md font-semibold text-gray-700 active:scale-95 transition-transform">Clear</button>
+        </div>
+
+        <!-- Found Words List -->
+        <div class="w-full bg-white rounded-lg shadow-inner p-2 h-32 overflow-y-auto">
+            <h3 class="font-semibold text-left mb-2">Found Words:</h3>
+            <div id="found-words" class="flex flex-wrap gap-2 text-sm">
+                <!-- Words will be added here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Over Modal -->
+    <div id="game-over-modal" class="modal-backdrop hidden">
+        <div class="bg-white rounded-lg shadow-2xl p-8 m-4 max-w-sm w-full text-center">
+            <h2 class="text-3xl font-bold mb-4">Congratulations!</h2>
+            <p class="text-lg mb-2">You baked a dozen (and one)!</p>
+            <p class="text-lg mb-6">Final Score: <span id="final-score" class="font-bold"></span></p>
+            <button id="play-again-btn" class="w-full py-3 bg-blue-500 text-white rounded-lg shadow-md font-semibold active:scale-95 transition-transform">Play Again</button>
+        </div>
+    </div>
+
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // DOM Elements
+            const scoreEl = document.getElementById('score');
+            const wordCountEl = document.getElementById('word-count');
+            const currentWordEl = document.getElementById('current-word');
+            const notificationEl = document.getElementById('notification');
+            const centerHexEl = document.getElementById('center-hex');
+            const outerHexEls = Array.from({ length: 6 }, (_, i) => document.getElementById(`outer-hex-${i}`));
+            const shuffleBtn = document.getElementById('shuffle-btn');
+            const enterBtn = document.getElementById('enter-btn');
+            const clearBtn = document.getElementById('clear-btn');
+            const foundWordsEl = document.getElementById('found-words');
+            const gameOverModal = document.getElementById('game-over-modal');
+            const finalScoreEl = document.getElementById('final-score');
+            const playAgainBtn = document.getElementById('play-again-btn');
+            const wordDisplayContainer = document.getElementById('word-display-container');
+
+            // Game State
+            let score = 0;
+            let foundWords = [];
+            let currentWord = '';
+            let centerLetter = '';
+            let outerLetters = [];
+            const VOWELS = 'AEIOU';
+            const CONSONANTS = 'BCDFGHJKLMNPQRSTVWXYZ';
+            const GAME_END_COUNT = 13;
+
+            // Simplified Word List (fallback)
+            // In a real application, this should be replaced by a large, licensed word list
+            // or a public wordlist placed in `wordlist.txt` (one word per line).
+            // The game will try to load `wordlist.txt` at startup and fall back to this array
+            // if loading fails.
+            const DICTIONARY = [
+                "BAKE", "BAKES", "BAKING", "CAKE", "CAKES", "LAKE", "LAKES", "MAKE", "MAKES", "MAKING", "RAKE", "RAKES", "RAKING", "TAKE", "TAKES", "TAKING", "BEAR", "BEARS", "DEAR", "FEAR", "FEARING", "FEARS", "GEAR", "GEARS", "HEAR", "HEARING", "HEARS", "NEAR", "REAR", "TEAR", "TEARING", "TEARS",
+                "YEAR", "YEARS", "BALK", "TALK", "TALKING", "TALKS", "WALK", "WALKING", "WALKS", "BAND", "BANDS", "HAND", "HANDS", "LAND", "LANDING", "LANDS", "SAND", "BANK", "BANKING", "BANKS", "RANK", "RANKS", "SANK", "TANK", "TANKS", "BELT", "BELTS", "FELT",
+                "MELT", "MELTS", "BENT", "DENT", "DENTS", "RENT", "RENTING", "RENTS", "SENT", "TENT", "TENTS", "WENT", "BEST", "BESTS", "NEST", "NESTS", "REST", "RESTING", "RESTS", "TEST", "TESTING", "TESTS", "VEST", "VESTS", "WEST", "BIND", "BINDING", "BINDS",
+                "FIND", "FINDING", "FINDS", "HIND", "KIND", "MIND", "MINDING", "MINDS", "WIND", "WINDING", "WINDS", "BITE", "BITES", "BITING", "KITE", "KITES", "RITE", "RITES", "SITE", "SITES", "BOAT", "BOATS", "COAT", "COATS", "GOAT", "GOATS", "BOLD", "COLD",
+                "FOLD", "FOLDING", "FOLDS", "GOLD", "HOLD", "HOLDING", "HOLDS", "SOLD", "TOLD", "BOMB", "BOMBS", "COMB", "COMBS", "TOMB", "TOMBS", "BOND", "BONDS", "FOND", "POND", "PONDS", "BONE", "BONES", "CONE", "CONES", "GONE",
+                "HONE", "LONE", "TONE", "ZONE", "ZONES", "BOOK", "BOOKING", "BOOKS", "COOK", "COOKING", "COOKS", "HOOK", "HOOKING", "HOOKS", "LOOK", "LOOKING", "LOOKS", "TOOK", "BOOM", "BOOMING", "BOOMS", "DOOM", "DOOMS", "ROOM", "ROOMS", "ZOOM", "ZOOMING", "ZOOMS", "BORN",
+                "CORN", "CORNS", "HORN", "HORNS", "MORN", "TORN", "WORN", "BOTH", "MOTH", "MOTHS", "BULK", "HULK", "SULK", "BURN", "BURNING", "BURNS", "TURN", "TURNING", "TURNS", "BURY", "FURY",
+                "BUSH", "BUSHES", "PUSH", "PUSHES", "PUSHING", "BUST", "BUSTS", "DUST", "DUSTING", "DUSTS", "GUST", "LUST", "MUST", "RUST", "RUSTING", "RUSTS", "CALL", "CALLING", "CALLS", "FALL", "FALLING", "FALLS", "HALL", "HALLS", "MALL", "MALLS", "TALL", "WALL", "WALLS",
+                "CALM", "PALM", "PALMS", "CAMP", "CAMPING", "CAMPS", "DAMP", "LAMP", "LAMPS", "RAMP", "VAMP", "CARD", "CARDS", "HARD", "YARD", "YARDS", "CARE", "CARES", "CARING", "DARE", "DARES", "DARING", "FARE", "FARES", "HARE", "HARES",
+                "MARE", "MARES", "RARE", "CART", "CARTS", "DART", "DARTS", "HART", "PART", "PARTS", "TART", "TARTS", "CASH", "DASH", "DASHES", "DASHING", "HASH", "LASH", "LASHES", "LASHING", "MASH", "RASH", "CAST", "CASTING", "CASTS",
+                "FAST", "LAST", "LASTING", "LASTS", "PAST", "VAST", "CELL", "CELLS", "FELL", "HELL", "SELL", "SELLING", "SELLS", "TELL", "TELLING", "TELLS", "WELL", "YELL", "YELLING", "YELLS", "CHAT", "CHATS", "THAT", "CHIP", "CHIPS",
+                "FLIP", "FLIPS", "GRIP", "GRIPS", "SHIP", "SHIPS", "SKIP", "SKIPS", "SLIP", "SLIPS", "TRIP", "TRIPS", "WHIP", "WHIPS", "CLAM", "CLAMS", "CRAM", "DRAM", "SCAM", "SCAMS", "SLAM", "SLAMS", "SWAM", "COIN", "COINS",
+                "JOIN", "JOINING", "JOINS", "COME", "COMES", "COMING", "SOME", "COOL", "COOLS", "POOL", "POOLS", "COST", "COSTS", "LOST", "CROP", "CROPS", "DROP", "DROPS", "PLOP", "SHOP", "SHOPS", "STOP", "STOPS", "CULT", "CULTS", "GULT",
+                "DECK", "DECKS", "NECK", "NECKS", "PECK", "PECKS", "DEEP", "JEEP", "JEEPS", "KEEP", "KEEPING", "KEEPS", "PEEP", "PEEPS", "WEEP", "WEEPS", "DEER", "PEER", "PEERS", "DICE", "MICE", "NICE", "RICE",
+                "VICE", "DIME", "DIMES", "LIME", "LIMES", "MIME", "MIMES", "TIME", "TIMES", "TIMING", "DINE", "DINES", "DINING", "FINE", "FINES", "LINE", "LINES", "MINE", "MINES", "NINE", "NINES", "PINE", "PINES", "VINE", "VINES", "WINE", "WINES", "DIRT",
+                "FLIRT", "FLIRTS", "SHIRT", "SHIRTS", "DOLL", "DOLLS", "DULL", "GULL", "GULLS", "HULL", "HULLS", "LULL", "MULL", "DOWN", "DOWNS", "TOWN", "TOWNS", "DRAW", "DRAWS", "PAW", "PAWS", "SAW", "DREAM", "DREAMING", "DREAMS",
+                "CREAM", "CREAMS", "STEAM", "STEAMS", "DRILL", "DRILLS", "GRILL", "GRILLS", "SKILL", "SKILLS", "SPILL", "SPILLS", "STILL", "THRILL", "THRILLS", "DRUM", "DRUMS", "GLUM", "PLUM", "PLUMS", "SLUM", "SLUMS", "SWUM",
+                "EACH", "ECHO", "EDGE", "ELSE", "EPIC", "EVEN", "EVER", "EVIL", "EXAM", "EXIT", "FACE", "LACE", "MACE", "PACE",
+                "RACE", "FAIL", "HAIL", "JAIL", "MAIL", "NAIL", "PAIL", "RAIL", "SAIL", "TAIL", "WAIL", "FAIR", "HAIR", "LAIR",
+                "PAIR", "FAKE", "FAME", "GAME", "LAME", "NAME", "SAME", "TAME", "FARM", "HARM", "WARM", "FEEL", "HEEL", "REEL",
+                "FEET", "MEET", "FILE", "MILE", "PILE", "TILE", "WHILE", "FILL", "HILL", "KILL", "MILL", "PILL", "TILL", "WILL",
+                "FILM", "FIRE", "HIRE", "TIRE", "WIRE", "FIRM", "FISH", "WISH", "FIST", "LIST", "MIST", "FIVE", "HIVE", "LIVE",
+                "FLAG", "SNAG", "STAG", "FLAT", "SPAT", "FLEW", "GREW", "STEW", "FLOW", "GLOW", "SLOW", "SNOW", "FOAM", "ROAM",
+                "FOIL", "SOIL", "FOOD", "MOOD", "FOOL", "TOOL", "FORK", "PORK", "WORK", "FORM", "NORM", "STORM", "WORM", "FOUR",
+                "HOUR", "POUR", "SOUR", "TOUR", "FROM", "FUEL", "FULL", "PULL", "FUSE", "MUSE", "GAIN", "MAIN", "PAIN", "RAIN",
+                "VAIN", "GATE", "HATE", "LATE", "MATE", "RATE", "GAVE", "SAVE", "WAVE", "GILD", "WILD", "GIVE", "LIVE", "GLAD",
+                "GOAL", "SOUL", "GONE", "GOOD", "HOOD", "WOOD", "GOOF", "POOF", "ROOF", "GRAB", "CRAB", "SCAB", "STAB", "GREY",
+                "PREY", "THEY", "GROW", "SHOW", "GULF", "HACK", "JACK", "LACK", "PACK", "RACK", "SACK", "TACK", "HAVE", "HEAD",
+                "LEAD", "READ", "HEAL", "MEAL", "SEAL", "ZEAL", "HEAT", "MEAT", "NEAT", "SEAT", "HELP", "YELP", "HERE", "HIGH",
+                "SIGH", "THIGH", "HIKE", "LIKE", "PIKE", "HINT", "LINT", "MINT", "TINT", "HOLE", "MOLE", "POLE", "ROLE", "SOLE",
+                "HOME", "ROPE", "HOPE", "HUGE", "HUNT", "RUNT", "HURT", "IDEA", "IDLE", "INCH", "INTO", "IRON", "ITEM", "JUMP",
+                "BUMP", "DUMP", "LUMP", "PUMP", "JUNK", "SUNK", "JUST", "KICK", "LICK", "PICK", "QUICK", "SICK", "TICK", "WICK",
+                "KISS", "MISS", "KNEE", "KNEW", "KNOT", "PLOT", "SHOT", "SPOT", "TROT", "KNOW", "BLOW", "CROW", "FLOW", "GLOW",
+                "GROW", "SHOW", "SLOW", "SNOW", "THROW", "LEAK", "PEAK", "WEAK", "LEAN", "MEAN", "LEAP", "CHEAP", "HEAP", "REAP",
+                "LEFT", "LEND", "BEND", "MEND", "SEND", "TEND", "LESS", "MESS", "LIFT", "GIFT", "RIFT", "SIFT", "LIKE", "LOAN",
+                "GROAN", "MOAN", "LOCK", "COCK", "DOCK", "MOCK", "ROCK", "SOCK", "LONG", "SONG", "LOOP", "POOP", "SOUP", "LOSE",
+                "HOSE", "NOSE", "POSE", "ROSE", "LOUD", "CLOUD", "PROUD", "LOVE", "DOVE", "GLOVE", "SHOVE", "LUCK", "BUCK", "DUCK",
+                "TUCK", "LUNG", "SUNG", "MADE", "FADE", "JADE", "SHADE", "SPADE", "TRADE", "MARK", "BARK", "DARK", "HARK", "LARK",
+                "PARK", "SHARK", "SPARK", "STARK", "MASK", "TASK", "MAZE", "GAZE", "HAZE", "MILD", "MOON", "NOON", "SOON", "MORE",
+                "CORE", "PORE", "SORE", "TORE", "WORE", "MOVE", "PROVE", "MUCH", "SUCH", "MUST", "NAIL", "PAIL", "RAIL", "SAIL",
+                "TAIL", "WAIL", "NICE", "RICE", "VICE", "NIGHT", "FIGHT", "LIGHT", "MIGHT", "RIGHT", "SIGHT", "TIGHT", "ONLY",
+                "OPEN", "OVAL", "OVER", "OWED", "OWN", "PACE", "RACE", "PACK", "RACK", "SACK", "TACK", "PAID", "LAID", "MAID",
+                "RAID", "PAGE", "CAGE", "RAGE", "SAGE", "WAGE", "PALE", "SALE", "TALE", "WHALE", "PART", "TART", "PASS", "MASS",
+                "PATH", "BATH", "MATH", "PAVE", "CAVE", "GAVE", "SAVE", "WAVE", "PEEL", "FEEL", "HEEL", "REEL", "PINT", "PIPE",
+                "RIPE", "WIPE", "PLAY", "CLAY", "PRAY", "STAY", "SWAY", "TRAY", "PLUS", "POEM", "POKE", "JOKE", "WOKE", "YOKE",
+                "POOL", "POOR", "DOOR", "FLOOR", "POST", "HOST", "MOST", "POUR", "SOUR", "TOUR", "PULL", "PUSH", "PURE", "CURE",
+                "LURE", "SURE", "QUIT", "QUIET", "QUITE", "QUOTE", "RACE", "RAIN", "VAIN", "RARE", "RATE", "REACH", "BEACH",
+                "EACH", "PEACH", "TEACH", "READ", "LEAD", "RIDE", "HIDE", "SIDE", "TIDE", "WIDE", "RING", "BRING", "KING", "SING",
+                "SLING", "SPRING", "STING", "SWING", "THING", "WING", "RISE", "WISE", "ROAD", "LOAD", "TOAD", "ROLL", "POLL",
+                "TOLL", "ROOF", "ROOM", "ROOT", "BOOT", "HOOT", "LOOT", "ROOT", "SHOOT", "ROSE", "HOSE", "NOSE", "POSE", "ROUGH",
+                "TOUGH", "ROUND", "BOUND", "FOUND", "GROUND", "HOUND", "MOUND", "POUND", "SOUND", "WOUND", "RULE", "RUDE", "RUN",
+                "BUN", "FUN", "GUN", "NUN", "PUN", "RUN", "SUN", "RUSH", "BUSH", "CRUSH", "FLUSH", "GUSH", "HUSH", "LUSH", "PLUSH",
+                "RUSH", "SAFE", "SAME", "SAID", "SALT", "MALT", "SAND", "BAND", "HAND", "LAND", "SANG", "BANG", "GANG", "HANG",
+                "RANG", "SAVE", "WAVE", "SEAT", "BEAT", "FEAT", "HEAT", "MEAT", "NEAT", "WHEAT", "SEED", "FEED", "NEED", "REED",
+                "WEED", "SEEK", "GEEK", "LEEK", "MEEK", "WEEK", "SEEM", "SEEN", "GREEN", "QUEEN", "SCREEN", "TEEN", "SEND", "BEND",
+                "LEND", "MEND", "TEND", "SENSE", "DENSE", "TENSE", "SERVE", "CURVE", "NERVE", "SHED", "SHINE", "WHINE", "SHOE",
+                "SHOP", "STOP", "SHOT", "KNOT", "PLOT", "SPOT", "TROT", "SHOW", "SICK", "KICK", "LICK", "PICK", "QUICK", "TICK",
+                "WICK", "SIGN", "SINK", "INK", "LINK", "PINK", "RINK", "WINK", "SITE", "BITE", "KITE", "RITE", "SIZE", "SKIN",
+                "CHIN", "GRIN", "SPIN", "THIN", "TWIN", "SLAP", "CLAP", "TRAP", "WRAP", "SLID", "GRID", "RID", "SOAK", "CROAK",
+                "SOAP", "SOLD", "TOLD", "SOME", "COME", "SOON", "MOON", "NOON", "SORT", "FORT", "PORT", "SHORT", "SPOT", "STAY",
+                "SUIT", "SURE", "TAKE", "CAKE", "LAKE", "MAKE", "RAKE", "TALK", "WALK", "TALL", "BALL", "CALL", "FALL", "HALL",
+                "MALL", "WALL", "TEAM", "BEAM", "CREAM", "DREAM", "GLEAM", "SEAM", "STEAM", "STREAM", "TELL", "WELL", "YELL",
+                "THAN", "THAT", "THEM", "THEN", "WHEN", "THIN", "CHIN", "GRIN", "SKIN", "SPIN", "TWIN", "THIS", "TICK", "KICK",
+                "LICK", "PICK", "QUICK", "SICK", "WICK", "TIDE", "HIDE", "RIDE", "SIDE", "WIDE", "TIE", "DIE", "LIE", "PIE",
+                "TINY", "TONE", "BONE", "CONE", "GONE", "HONE", "LONE", "ZONE", "TOOK", "BOOK", "COOK", "HOOK", "LOOK", "TOOL",
+                "FOOL", "COOL", "POOL", "TRAP", "CLAP", "SLAP", "WRAP", "TREE", "FREE", "THREE", "TRIP", "CHIP", "FLIP", "GRIP",
+                "SHIP", "SKIP", "SLIP", "WHIP", "TRUE", "BLUE", "CLUE", "GLUE", "TUNE", "DUNE", "JUNE", "TURN", "BURN", "TYPE",
+                "HYPE", "RIPE", "WIPE", "UNIT", "UPON", "USED", "USER", "VAST", "PAST", "VERY", "VIEW", "VOTE", "WAIT", "BAIT",
+                "GAIT", "WAKE", "CAKE", "FAKE", "LAKE", "MAKE", "RAKE", "SAKE", "TAKE", "WANT", "HUNT", "PUNT", "RUNT", "WAR",
+                "JAR", "TAR", "WASH", "CASH", "DASH", "HASH", "LASH", "MASH", "RASH", "WAVE", "CAVE", "GAVE", "PAVE", "SAVE",
+                "WEAR", "BEAR", "DEAR", "FEAR", "GEAR", "HEAR", "NEAR", "REAR", "TEAR", "YEAR", "WEEK", "GEEK", "LEEK", "MEEK",
+                "SEEK", "WENT", "BENT", "DENT", "RENT", "SENT", "TENT", "WERE", "WEST", "BEST", "NEST", "REST", "TEST", "VEST",
+                "WHAT", "WHEN", "WHIP", "CHIP", "FLIP", "GRIP", "SHIP", "SKIP", "SLIP", "TRIP", "WHOM", "WIDE", "HIDE", "RIDE",
+                "SIDE", "TIDE", "WIFE", "KNIFE", "LIFE", "WILD", "MILD", "WILL", "BILL", "FILL", "HILL", "KILL", "MILL", "PILL",
+                "SILL", "TILL", "WIND", "BIND", "FIND", "HIND", "KIND", "MIND", "WINE", "DINE", "FINE", "LINE", "MINE", "NINE",
+                "PINE", "VINE", "WING", "BRING", "KING", "RING", "SING", "SLING", "SPRING", "STING", "SWING", "THING", "WIPE",
+                "PIPE", "RIPE", "TYPE", "WIRE", "FIRE", "HIRE", "TIRE", "WISE", "RISE", "WITH", "MYTH", "WORD", "WORK", "FORK",
+                "PORK", "WORN", "BORN", "CORN", "HORN", "MORN", "TORN", "YARD", "CARD", "HARD", "YAWN", "DAWN", "FAWN", "PAWN",
+                "YEAR", "DEAR", "FEAR", "GEAR", "HEAR", "NEAR", "REAR", "TEAR", "YELL", "BELL", "CELL", "FELL", "HELL", "SELL",
+                "TELL", "WELL", "YOUR", "FOUR", "HOUR", "POUR", "SOUR", "TOUR", "ZERO", "ZONE", "BONE", "CONE", "GONE", "HONE",
+                "LONE", "TONE", "BAKER", "MAKER", "TAKER", "BRAIN", "CHAIN", "GRAIN", "PLAIN", "RAINY", "SPAIN", "STAIN", "TRAIN",
+                "BEACH", "PEACH", "TEACH", "REACH", "BREAD", "DREAD", "STEAD", "THREAD", "TREAD", "CLEAN", "GLEAN", "LEANT", "MEANT",
+                "EARTH", "HEART", "HEAVY", "LEAVY", "READY", "STEADY", "LEMON", "MELON", "BEING", "BRING", "FLING", "SLING", "STING",
+                "SWING", "THING", "WRING", "BLAZE", "CRAZE", "GRAZE", "HAZEL", "MAIZE", "CHECK", "FLECK", "SPECK", "WRECK", "CHEEK",
+                "GREEK", "SLEEK", "CREEP", "SLEEP", "STEEP", "SWEEP", "CHESS", "GUESS", "PRESS", "STRESS", "CHILD", "MILDLY", "WILDLY",
+                "CHILL", "DRILL", "GRILL", "SKILL", "SPILL", "STILL", "THRILL", "CLIMB", "CRUMB", "DUMMY", "PLUMB", "THUMB", "CLOTH",
+                "BROTH", "FROTH", "SLOTH", "COACH", "POACH", "ROACH", "COAST", "BOAST", "ROAST", "TOAST", "COUNT", "MOUNT", "CROWN",
+                "BROWN", "CLOWN", "DROWN", "FROWN", "GROWN", "TOWNY", "DAILY", "GAILY", "DANCE", "FENCE", "HENCE", "PENCE", "SENSE",
+                "TENSE", "WHENCE", "DRIVE", "STRIVE", "THRIVE", "EMPTY", "ENTRY", "EQUAL", "EXTRA", "FABLE", "CABLE", "GABLE", "TABLE",
+                "FAINT", "PAINT", "SAINT", "TAINT", "FIELD", "SHIELD", "WIELD", "YIELD", "FIFTH", "SIXTH", "FIGHT", "LIGHT", "MIGHT",
+                "NIGHT", "RIGHT", "SIGHT", "TIGHT", "FINAL", "FLAME", "BLAME", "FRAME", "SHAME", "FLOOD", "BLOOD", "FOCUS", "FORGE",
+                "GORGE", "FOUND", "GROUND", "HOUND", "MOUND", "POUND", "ROUND", "SOUND", "WOUND", "FRESH", "FRONT", "FRUIT", "SUIT",
+                "FUNNY", "BUNNY", "HONEY", "MONEY", "RUNNY", "SUNNY", "GLASS", "GRASS", "GHOST", "HOSTS", "POSTS", "ROASTS", "TOASTS",
+                "GLOBE", "PROBE", "ROBES", "GLORY", "STORY", "GRACE", "PLACE", "SPACE", "TRACE", "GRADE", "SHADE", "SPADE", "TRADE",
+                "GREAT", "WHEAT", "GREEN", "QUEEN", "SCREEN", "SEEN", "TEEN", "GROUP", "DROOP", "SCOOP", "SNOOP", "STOOP", "SWOOP",
+                "TROOP", "GUARD", "GUIDE", "PRIDE", "SLIDE", "STRIDE", "GUILT", "BUILT", "QUILT", "HAPPY", "SAPPY", "HEARD", "BEARD",
+                "HOUSE", "BLOUSE", "MOUSE", "SPOUSE", "HUMAN", "IMAGE", "INDEX", "INPUT", "ISSUE", "JELLY", "BELLY", "FELLY", "TELLY",
+                "JOINT", "POINT", "JUDGE", "FUDGE", "GRUDGE", "NUDGE", "SLUDGE", "TRUDGE", "JUICE", "SLUICE", "LARGE", "BARGE", "CHARGE",
+                "LEARN", "EARNS", "YEARN", "LEAST", "BEAST", "FEAST", "YEAST", "LEAVE", "CLEAVE", "HEAVE", "WEAVE", "LEVEL", "REVEL",
+                "LIGHT", "MIGHT", "NIGHT", "RIGHT", "SIGHT", "TIGHT", "LOCAL", "VOCAL", "LOOSE", "GOOSE", "NOOSE", "MAGIC", "TRAGIC",
+                "MAJOR", "MAYOR", "MAPLE", "STAPLE", "MARCH", "PARCH", "STARCH", "MATCH", "BATCH", "CATCH", "HATCH", "LATCH", "PATCH",
+                "SNATCH", "THATCH", "WATCH", "METAL", "PETAL", "SETAL", "METER", "PETER", "MODEL", "NODAL", "TODAL", "YODEL", "MONTH",
+                "MORAL", "CORAL", "LORAL", "MUSIC", "NEVER", "CLEVER", "FEVER", "LEVER", "SEVER", "NOBLE", "NOISE", "POISE", "NORTH",
+                "WORTH", "NURSE", "CURSE", "PULSE", "WORSE", "OCEAN", "OFTEN", "ORDER", "BORDER", "OTHER", "BROTHER", "MOTHER", "SMOTHER",
+                "OUGHT", "BOUGHT", "BROUGHT", "FOUGHT", "NOUGHT", "SOUGHT", "THOUGHT", "WROUGHT", "OWNER", "PAPER", "TAPER", "VAPOR",
+                "PARTY", "HEARTY", "TARDY", "PEACE", "CEASE", "CREASE", "GREASE", "LEASE", "PHONE", "SHONE", "STONE", "TONER", "ZONER",
+                "PIANO", "PIECE", "NIECE", "PILOT", "PITCH", "BITCH", "DITCH", "HITCH", "WITCH", "PLACE", "GRACE", "SPACE", "TRACE",
+                "PLANT", "CHANT", "GRANT", "PANTS", "RANTS", "SLANT", "PLATE", "SLATE", "STATE", "POUND", "ROUND", "SOUND", "WOUND",
+                "POWER", "TOWER", "PRICE", "DICE", "MICE", "NICE", "RICE", "SLICE", "SPICE", "THRICE", "TWICE", "VICE", "PRIDE", "BRIDE",
+                "GUIDE", "SLIDE", "STRIDE", "PRIME", "CRIME", "GRIME", "SLIME", "PRINT", "FLINT", "GLINT", "HINT", "LINT", "MINT", "SPLINT",
+                "SQUINT", "TINT", "PRIZE", "PROUD", "CLOUD", "LOUD", "SHROUD", "PROVE", "GROOVE", "MOVE", "QUEEN", "GREEN", "SEEN", "TEEN",
+                "QUICK", "BRICK", "CHICK", "CLICK", "FLICK", "SLICK", "STICK", "THICK", "TRICK", "QUIET", "QUITE", "QUOTE", "RANGE", "CHANGE",
+                "GRANGE", "STRANGE", "REPLY", "IMPLY", "RIGHT", "FIGHT", "LIGHT", "MIGHT", "NIGHT", "SIGHT", "TIGHT", "RIVER", "DIVER", "GIVER",
+                "LIVER", "SHIVER", "ROBOT", "ROUND", "BOUND", "FOUND", "GROUND", "HOUND", "MOUND", "POUND", "SOUND", "WOUND", "ROYAL", "LOYAL",
+                "RULER", "RUMOR", "HUMOR", "TUMOR", "SAUCE", "SCALE", "STALE", "WHALE", "SCARE", "SHARE", "STARE", "SCENE", "SCORE", "SNORE",
+                "STORE", "SENSE", "DENSE", "TENSE", "SERVE", "CURVE", "NERVE", "SHAKE", "BRAKE", "CAKED", "FLAKE", "MAKER", "RAKED", "SNAKE",
+                "STAKE", "TAKER", "SHALL", "SHAPE", "DRAPE", "GRAPE", "SCRAPE", "SHARE", "SCARE", "STARE", "SHARK", "BARK", "DARK", "HARK",
+                "LARK", "MARK", "PARK", "SPARK", "STARK", "SHEET", "BLEET", "FLEET", "GREET", "MEET", "STREET", "SWEET", "TWEET", "SHELF",
+                "SHIRT", "DIRT", "FLIRT", "SKIRT", "SQUIRT", "SHORT", "FORT", "PORT", "SORT", "SIGHT", "FIGHT", "LIGHT", "MIGHT", "NIGHT",
+                "RIGHT", "TIGHT", "SILK", "MILK", "SINCE", "MINCE", "PRINCE", "WINCE", "SIXTY", "SKILL", "CHILL", "DRILL", "GRILL", "SPILL",
+                "STILL", "THRILL", "SLEEP", "CREEP", "JEEP", "KEEP", "PEEP", "STEEP", "SWEEP", "WEEP", "SLICE", "DICE", "MICE", "NICE", "PRICE",
+                "RICE", "SPICE", "THRICE", "TWICE", "VICE", "SMALL", "STALL", "SMILE", "WHILE", "SMOKE", "BROKE", "CHOKE", "POKE", "SPOKE",
+                "STROKE", "WOKE", "YOKE", "SOLID", "SOLVE", "SOUND", "FOUND", "GROUND", "HOUND", "MOUND", "POUND", "ROUND", "WOUND", "SOUTH",
+                "MOUTH", "SPACE", "GRACE", "PLACE", "TRACE", "SPEAK", "CREAK", "FREAK", "SNEAK", "SQUEAK", "STREAK", "WEAK", "SPEND", "BLEND",
+                "LEND", "MEND", "SEND", "TEND", "TREND", "SPOKE", "BROKE", "CHOKE", "SMOKE", "STROKE", "WOKE", "YOKE", "SPORT", "SHORT", "STAFF",
+                "STAGE", "CAGE", "PAGE", "RAGE", "SAGE", "WAGE", "STAND", "BRAND", "GLAND", "GRAND", "STRAND", "START", "CHART", "DART", "HART",
+                "MART", "PART", "SMART", "TART", "STATE", "SLATE", "PLATE", "STEAL", "MEAL", "REAL", "SEAL", "TEAL", "VEAL", "ZEAL", "STEAM",
+                "BEAM", "CREAM", "DREAM", "GLEAM", "SEAM", "STREAM", "TEAM", "STEEL", "FEEL", "HEEL", "PEEL", "REEL", "WHEEL", "STICK", "BRICK",
+                "CHICK", "CLICK", "FLICK", "QUICK", "SLICK", "THICK", "TRICK", "STILL", "CHILL", "DRILL", "GRILL", "SKILL", "SPILL", "THRILL",
+                "STONE", "PHONE", "SHONE", "TONER", "ZONER", "STOOD", "WOOD", "STORE", "CORE", "MORE", "PORE", "SCORE", "SHORE", "SNORE", "SORE",
+                "TORE", "WORE", "STORM", "FORM", "NORM", "WARM", "WORM", "STORY", "GLORY", "STUDY", "STYLE", "SMILE", "WHILE", "SUGAR", "SWEAT",
+                "THREAT", "TABLE", "CABLE", "FABLE", "GABLE", "TASTE", "HASTE", "PASTE", "WASTE", "THANK", "BANK", "BLANK", "CRANK", "DRANK",
+                "FRANK", "PLANK", "PRANK", "RANK", "SHANK", "SHRANK", "SPANK", "STANK", "TANK", "YANK", "THEIR", "THEME", "THERE", "WHERE",
+                "THESE", "THICK", "BRICK", "CHICK", "CLICK", "FLICK", "QUICK", "SLICK", "STICK", "TRICK", "THING", "BRING", "FLING", "KING",
+                "RING", "SING", "SLING", "SPRING", "STING", "SWING", "WING", "WRING", "THINK", "BLINK", "BRINK", "CLINK", "DRINK", "INK",
+                "LINK", "PINK", "RINK", "SHRINK", "SINK", "SLINK", "STINK", "WINK", "THIRD", "BIRD", "GIRD", "HERD", "NERD", "WORD", "THOSE",
+                "THREE", "FREE", "TREE", "THROW", "CROW", "GLOW", "GROW", "SHOW", "SLOW", "SNOW", "TODAY", "TONGUE", "TOUCH", "COUCH", "POUCH",
+                "SLOUCH", "VOUCH", "TOUGH", "ROUGH", "TOWEL", "VOWEL", "TOWER", "POWER", "TRADE", "GRADE", "SHADE", "SPADE", "TRAIN", "BRAIN",
+                "CHAIN", "DRAIN", "GRAIN", "PLAIN", "RAIN", "SPAIN", "STAIN", "TREAT", "BLEAT", "CHEAT", "WHEAT", "TREND", "BLEND", "LEND",
+                "MEND", "SEND", "SPEND", "TEND", "TRIAL", "TRIBE", "SCRIBE", "TRICK", "BRICK", "CHICK", "CLICK", "FLICK", "QUICK", "SLICK",
+                "STICK", "THICK", "TRULY", "DULY", "NEWLY", "TRUST", "BUST", "CRUST", "DUST", "GUST", "LUST", "MUST", "RUST", "TRUTH", "YOUTH",
+                "TWICE", "DICE", "MICE", "NICE", "PRICE", "RICE", "SLICE", "SPICE", "THRICE", "VICE", "UNCLE", "UNDER", "UNION", "UNITE", "UNTIL",
+                "UPSET", "USUAL", "VALUE", "VIDEO", "VOICE", "CHOICE", "REJOICE", "WASTE", "HASTE", "PASTE", "TASTE", "WATCH", "BATCH", "CATCH",
+                "HATCH", "LATCH", "MATCH", "PATCH", "SNATCH", "THATCH", "WATER", "WEIGH", "SLEIGH", "WHALE", "SCALE", "STALE", "WHEAT", "GREAT",
+                "TREAT", "WHEEL", "FEEL", "HEEL", "PEEL", "REEL", "STEEL", "WHERE", "THERE", "WHICH", "WHILE", "SMILE", "STYLE", "WHITE", "QUITE",
+                "WRITE", "WHOLE", "WHOSE", "WOMAN", "LEMON", "WORLD", "WORRY", "HURRY", "SORRY", "WOULD", "COULD", "SHOULD", "WRITE", "QUITE",
+                "WHITE", "WRONG", "ALONG", "STRONG", "YOUNG", "AMONG", "TONGUE", "BEAUTY", "BOTTLE", "BRAVELY", "BREAKFAST", "BUILDING",
+                "BUSINESS", "BUTTER", "BUTTON", "CABBAGE", "CAMERA", "CANDLE", "CARPET", "CASTLE", "CAREFUL", "CELERY", "CENTER", "CENTRE",
+                "CHAIR", "CHANCE", "CHANGE", "CHEESE", "CHICKEN", "CHIMNEY", "CHOICE", "CIRCLE", "CLIMATE", "CLOTHES", "COFFEE", "COLLECT",
+                "COLOUR", "COMFORT", "COMPANY", "COMPLETE", "COMPUTER", "CONTAIN", "CONTINUE", "CONVERSATION", "CORNER", "CORRECT", "COUNTRY",
+                "COURSE", "COVER", "CREATE", "CREATURE", "CULTURE", "CURTAIN", "DANGER", "DECIDE", "DECLARE", "DECREASE", "DELIGHT", "DELIVER",
+                "DEPEND", "DESCRIBE", "DESIGN", "DESTROY", "DEVELOP", "DIAMOND", "DIFFERENT", "DIFFICULT", "DIRECTION", "DISAPPEAR", "DISCOVER",
+                "DISCUSS", "DISTANCE", "DISTURB", "DIVIDE", "DOCTOR", "DOUBLE", "DOUBT", "DOZEN", "DURING", "EARLY", "EARTH", "EAST", "EASY",
+                "EIGHT", "EITHER", "ELECTRIC", "ELEPHANT", "EMPTY", "ENCOURAGE", "ENGINE", "ENJOY", "ENOUGH", "ENTER", "ENTRANCE", "ESCAPE",
+                "EVENING", "EVENT", "EVERY", "EXACT", "EXAMINE", "EXAMPLE", "EXCELLENT", "EXCEPT", "EXCITE", "EXCUSE", "EXERCISE", "EXIST",
+                "EXPECT", "EXPENSIVE", "EXPLAIN", "EXPLODE", "EXPLORE", "EXTRA", "FAMOUS", "FATHER", "FAVOURITE", "FEBRUARY", "FEMALE", "FINALLY",
+                "FINISH", "FLOWER", "FOREIGN", "FOREST", "FORGET", "FORGIVE", "FORWARD", "FRIEND", "FRIGHTEN", "FUTURE", "GARAGE", "GARDEN",
+                "GENERAL", "GIRAFFE", "GOVERNMENT", "GRAMMAR", "GROUP", "GROW", "GUARD", "GUIDE", "HAPPEN", "HAPPY", "HEAVY", "HEIGHT", "HISTORY",
+                "HOLIDAY", "HOSPITAL", "HOUR", "HOWEVER", "HUNGRY", "HUSBAND", "IMPORTANT", "IMPROVE", "INCLUDE", "INCREASE", "INDEED", "INSIDE",
+                "INSTEAD", "INSTRUCT", "INTEREST", "ISLAND", "JANUARY", "JOURNEY", "JULY", "JUNE", "KETTLE", "KITCHEN", "KNIFE", "KNOWLEDGE",
+                "LANGUAGE", "LAUGH", "LEARN", "LEAVE", "LENGTH", "LESSON", "LETTER", "LIBRARY", "LISTEN", "LITTLE", "MACHINE", "MAGAZINE",
+                "MARRIAGE", "MATERIAL", "MEASURE", "MEDICINE", "MEETING", "MENTION", "MIDDLE", "MILLION", "MINUTE", "MISTAKE", "MODERN",
+                "MOMENT", "MONEY", "MONTH", "MORNING", "MOTHER", "MOUNTAIN", "MUSIC", "NARROW", "NATION", "NATURE", "NEARLY", "NECESSARY",
+                "NEIGHBOUR", "NEITHER", "NERVE", "NEVER", "NOBODY", "NOISE", "NORMAL", "NORTH", "NOTHING", "NOTICE", "NOVEMBER", "NUMBER",
+                "OBEY", "OBJECT", "OCEAN", "OCTOBER", "OFFER", "OFFICE", "OFTEN", "OLD-FASHIONED", "ONCE", "ONLY", "OPEN", "OPPOSITE",
+ "ORDINARY", "OTHER", "OURSELVES", "OUTSIDE", "PACKAGE", "PAGE", "PARENT", "PARTICULAR", "PASSAGE", "PAST", "PATIENCE", "PEACE",
+                "PENCIL", "PEOPLE", "PERHAPS", "PERSON", "PETROL", "PHOTOGRAPH", "PIECE", "PLACE", "PLANET", "PLANT", "PLENTY", "POCKET",
+                "POINT", "POLICE", "POLITE", "POOR", "POPULAR", "POSITION", "POSSESS", "POSSIBLE", "POST", "POTATO", "POUR", "POWER", "PREPARE",
+                "PRESENT", "PRESIDENT", "PRESS", "PRETTY", "PREVENT", "PRICE", "PRISON", "PRIVATE", "PRIZE", "PROBABLY", "PRODUCE", "PROMISE",
+                "PROMPT", "PRONOUNCE", "PROTECT", "PROVIDE", "PUBLIC", "PULL", "PUNISH", "PUPIL", "PUSH", "QUARTER", "QUEEN", "QUESTION", "QUICK",
+                "QUIET", "QUITE", "RADIO", "RAIN", "RANGE", "REACH", "READ", "READY", "RECEIVE", "RECENT", "RECORD", "RED", "REMEMBER", "REMIND",
+                "RENT", "REPAIR", "REPEAT", "REPLY", "REPORT", "REST", "RESTAURANT", "RESULT", "RETURN", "RICE", "RICH", "RIDE", "RIGHT",
+                "RISE", "RIVER", "ROAD", "ROB", "ROCK", "ROOM", "ROUND", "RUBBER", "RUDE", "RULE", "RUN", "RUSH", "SAFE", "SAIL", "SALT",
+                "SAME", "SANDWICH", "SATURDAY", "SAVE", "SAY", "SCHOOL", "SCIENCE", "SCISSORS", "SEARCH", "SEAT", "SECOND", "SECRETARY", "SEE",
+                "SEEM", "SELL", "SEND", "SENTENCE", "SEPARATE", "SEPTEMBER", "SERIOUS", "SERVE", "SEVEN", "SEVERAL", "SHADOW", "SHAKE", "SHAPE",
+                "SHARE", "SHARP", "SHE", "SHEEP", "SHEET", "SHELF", "SHINE", "SHIP", "SHIRT", "SHOE", "SHOOT", "SHOP", "SHORT", "SHOUT",
+                "SHOW", "SHUT", "SIDE", "SIGN", "SIGNAL", "SILENCE", "SILLY", "SILVER", "SIMILAR", "SIMPLE", "SINCE", "SING", "SINGLE", "SISTER",
+                "SIT", "SIX", "SIZE", "SKILL", "SKIN", "SKIRT", "SKY", "SLEEP", "SLOW", "SMALL", "SMART", "SMELL", "SMILE", "SMOKE", "SNOW",
+                "SOAP", "SOCK", "SOFT", "SOME", "SOMEBODY", "SOMEONE", "SOMETHING", "SOMETIMES", "SON", "SOON", "SORRY", "SOUND", "SOUP",
+                "SOUTH", "SPACE", "SPEAK", "SPECIAL", "SPEED", "SPELL", "SPEND", "SPOON", "SPORT", "SPREAD", "SPRING", "SQUARE", "STAMP",
+                "STAND", "STAR", "START", "STATION", "STAY", "STEAL", "STEAM", "STEP", "STILL", "STOMACH", "STONE", "STOP", "STORE", "STORM",
+                "STORY", "STRANGE", "STREET", "STRONG", "STRUCTURE", "STUDENT", "STUDY", "STUPID", "SUBJECT", "SUBSTANCE", "SUCCESSFUL", "SUCH",
+                "SUDDEN", "SUGAR", "SUGGEST", "SUIT", "SUMMER", "SUN", "SUNDAY", "SUPPOSE", "SURE", "SURPRISE", "SWEET", "SWIM", "SWORD", "TABLE",
+                "TAKE", "TALK", "TALL", "TASTE", "TAXI", "TEA", "TEACH", "TEAM", "TEAR", "TELEPHONE", "TELEVISION", "TELL", "TEMPERATURE", "TEN",
+                "TERM", "TERRIBLE", "TEST", "THAN", "THANK", "THEATRE", "THEIR", "THEM", "THEMSELVES", "THEN", "THERE", "THESE", "THEY", "THICK",
+                "THIEF", "THIN", "THING", "THINK", "THIRD", "THIRSTY", "THIRTEEN", "THIRTY", "THIS", "THOSE", "THOUGH", "THOUGHT", "THOUSAND",
+                "THROAT", "THROUGH", "THROW", "THURSDAY", "TICKET", "TIDY", "TIE", "TIME", "TIN", "TIRED", "TITLE", "TOBACCO", "TODAY", "TOE",
+                "TOGETHER", "TOMATO", "TOMORROW", "TONGUE", "TONIGHT", "TOO", "TOOTH", "TOP", "TOTAL", "TOUCH", "TOUR", "TOWARDS", "TOWN", "TRAFFIC",
+                "TRAIN", "TRANSLATE", "TRAVEL", "TREAT", "TREE", "TROUBLE", "TROUSERS", "TRUE", "TRUST", "TRY", "TUESDAY", "TURN", "TWELVE",
+                "TWENTY", "TWICE", "TYPE", "UGLY", "UMBRELLA", "UNCLE", "UNDER", "UNDERSTAND", "UNTIL", "UPSTAIRS", "USUAL", "USUALLY", "VEGETABLE",
+                "VERY", "VILLAGE", "VOICE", "VISIT", "WAIT", "WAKE", "WALK", "WANT", "WARM", "WASH", "WASTE", "WATCH", "WATER", "WAY", "WEAK", "WEAR",
+                "WEATHER", "WEDNESDAY", "WEEK", "WEIGH", "WELCOME", "WELL", "WEST", "WHAT", "WHEAT", "WHEEL", "WHEN", "WHERE", "WHICH", "WHILE",
+                "WHITE", "WHO", "WHOLE", "WHOSE", "WHY", "WIDE", "WIFE", "WILD", "WILL", "WIN", "WIND", "WINDOW", "WINE", "WINTER", "WIRE", "WISE",
+                "WISH", "WITH", "WITHOUT", "WOMAN", "WONDER", "WONDERFUL", "WOOD", "WOOL", "WORD", "WORK", "WORLD", "WORRY", "WORSE", "WORST",
+                "WORTH", "WOULD", "WOUND", "WRITE", "WRONG", "YARD", "YEAR", "YELLOW", "YES", "YESTERDAY", "YET", "YOU", "YOUNG", "YOUR", "ZERO",
+                "PANGRAM"
+            ];
+
+            // WORD_SET will be populated from `wordlist.txt` if present. It provides O(1)
+            // lookup for word validation. If loading fails we fall back to DICTIONARY.
+            let WORD_SET = null;
+
+            async function loadWordlist() {
+                // Try sources in order:
+                // 1) Remote dwyl/english-words raw file (fast, openly licensed)
+                // 2) local wordlist_dwyl.txt (if you prefer to store it locally)
+                // 3) local wordlist.txt (legacy / manual replacement)
+                // 4) fallback to embedded DICTIONARY
+                const candidates = [
+                    'https://raw.githubusercontent.com/dwyl/english-words/master/words_alpha.txt',
+                    'wordlist_dwyl.txt',
+                    'wordlist.txt'
+                ];
+
+                for (const url of candidates) {
+                    try {
+                        const resp = await fetch(url);
+                        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+                        const txt = await resp.text();
+                        const words = txt
+                            .split(/\r?\n/)
+                            .map(w => w.trim().toUpperCase())
+                            .filter(w => w && !w.startsWith('#'));
+                        if (words.length > 0) {
+                            WORD_SET = new Set(words);
+                            console.log('Loaded wordlist from', url, 'with', WORD_SET.size, 'words');
+                            return;
+                        }
+                    } catch (err) {
+                        console.warn('Could not load wordlist from', url, err);
+                        // try next candidate
+                    }
+                }
+
+                // Final fallback
+                console.warn('Falling back to embedded DICTIONARY');
+                WORD_SET = new Set(DICTIONARY);
+            }
+
+            function hasValidWord(center, outers) {
+                const allLetters = new Set([center, ...outers]);
+                // Choose source: prefer WORD_SET (loaded file), otherwise fallback to DICTIONARY array
+                const source = WORD_SET ? Array.from(WORD_SET) : DICTIONARY;
+                for (const word of source) {
+                    if (word.length < 4 || !word.includes(center)) {
+                        continue;
+                    }
+
+                    let possible = true;
+                    // Check if all letters in the word are available on the board
+                    const wordLetters = [...word];
+                    for (const letter of wordLetters) {
+                        if (!allLetters.has(letter)) {
+                            possible = false;
+                            break;
+                        }
+                    }
+
+                    if (possible) {
+                        return true; // Found at least one valid word
+                    }
+                }
+                return false; // No valid words found
+            }
+
+            function init() {
+                score = 0;
+                foundWords = [];
+                currentWord = '';
+                generateLetters();
+                updateDisplay();
+                gameOverModal.classList.add('hidden');
+            }
+
+            function generateLetters() {
+                let newCenter, newOuters;
+                let attempts = 0; // Failsafe to prevent infinite loops
+                do {
+                    // Pick a center letter (vowel)
+                    newCenter = VOWELS[Math.floor(Math.random() * VOWELS.length)];
+
+                    // Pick outer letters
+                    newOuters = [];
+                    const allLetters = VOWELS + CONSONANTS;
+                    while (newOuters.length < 6) {
+                        const newLetter = allLetters[Math.floor(Math.random() * allLetters.length)];
+                        if (newLetter !== newCenter && !newOuters.includes(newLetter)) {
+                            newOuters.push(newLetter);
+                        }
+                    }
+                    attempts++;
+                } while (!hasValidWord(newCenter, newOuters) && attempts < 200); 
+
+                centerLetter = newCenter;
+                outerLetters = newOuters;
+            }
+            
+            function updateDisplay() {
+                // Update score and word count
+                scoreEl.textContent = score;
+                wordCountEl.textContent = `${foundWords.length} / ${GAME_END_COUNT}`;
+
+                // Update current word
+                currentWordEl.textContent = currentWord;
+
+                // Update letter hexagons
+                centerHexEl.textContent = centerLetter;
+                outerHexEls.forEach((hex, i) => {
+                    hex.textContent = outerLetters[i];
+                });
+
+                // Update found words list
+                foundWordsEl.innerHTML = '';
+                const sortedWords = [...foundWords].sort();
+                sortedWords.forEach(word => {
+                    const wordDiv = document.createElement('div');
+                    wordDiv.textContent = word;
+                    wordDiv.className = 'px-2 py-1 bg-gray-200 rounded';
+                    foundWordsEl.appendChild(wordDiv);
+                });
+            }
+
+            function handleLetterClick(letter) {
+                currentWord += letter;
+                updateDisplay();
+            }
+
+            function handleClear() {
+                currentWord = currentWord.slice(0, -1);
+                updateDisplay();
+            }
+
+            function handleShuffle() {
+                // Fisher-Yates shuffle
+                for (let i = outerLetters.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [outerLetters[i], outerLetters[j]] = [outerLetters[j], outerLetters[i]];
+                }
+                updateDisplay();
+            }
+
+            function handleEnter() {
+                const word = currentWord.toUpperCase();
+
+                // 1. Check length
+                if (word.length < 4) {
+                    showNotification("Word must be at least 4 letters long");
+                    wordDisplayContainer.classList.add('shake');
+                    setTimeout(() => wordDisplayContainer.classList.remove('shake'), 500);
+                    return;
+                }
+
+                // 2. Check if center letter is used
+                if (!word.includes(centerLetter)) {
+                    showNotification("Must use the center letter");
+                    wordDisplayContainer.classList.add('shake');
+                    setTimeout(() => wordDisplayContainer.classList.remove('shake'), 500);
+                    return;
+                }
+
+                // 3. Check if already found
+                if (foundWords.includes(word)) {
+                    showNotification("Already found");
+                    currentWord = '';
+                    updateDisplay();
+                    return;
+                }
+
+                // 4. Check if it's a real word (prefer loaded wordlist)
+                if (!(WORD_SET ? WORD_SET.has(word) : DICTIONARY.includes(word))) {
+                    showNotification("Not in word list");
+                    wordDisplayContainer.classList.add('shake');
+                    setTimeout(() => wordDisplayContainer.classList.remove('shake'), 500);
+                    currentWord = '';
+                    updateDisplay();
+                    return;
+                }
+                
+                // Word is valid!
+                foundWords.push(word);
+                
+                // Calculate score
+                let wordScore = word.length;
+                const uniqueLetters = new Set(word);
+                
+                // Pangram check (uses all 7 letters)
+                if (uniqueLetters.size === 7) {
+                    wordScore = Math.round(wordScore * 1.5);
+                    showNotification("Pangram! + " + wordScore + " pts");
+                } else {
+                     showNotification("Nice! + " + wordScore + " pts");
+                }
+
+                score += wordScore;
+
+                // The core mechanic: replace used outer letters
+                replaceUsedLetters(word);
+
+                currentWord = '';
+                updateDisplay();
+
+                // Check for game over
+                if (foundWords.length >= GAME_END_COUNT) {
+                    endGame();
+                }
+            }
+            
+            function replaceUsedLetters(word) {
+                const usedIndices = outerLetters
+                    .map((letter, index) => word.includes(letter) ? index : -1)
+                    .filter(index => index !== -1);
+            
+                if (usedIndices.length === 0) return;
+            
+                let candidateOuterLetters;
+                let attempts = 0; // Failsafe to prevent infinite loops
+            
+                do {
+                    candidateOuterLetters = [...outerLetters];
+                    const allPossibleLetters = (VOWELS + CONSONANTS).split('');
+            
+                    // For each index that needs a new letter, find a valid replacement
+                    for (const index of usedIndices) {
+                        let newLetter;
+                        let pickAttempts = 0;
+                        do {
+                            newLetter = allPossibleLetters[Math.floor(Math.random() * allPossibleLetters.length)];
+                            pickAttempts++;
+                        } while (
+                            (candidateOuterLetters.includes(newLetter) || newLetter === centerLetter) && pickAttempts < 100
+                        );
+                        candidateOuterLetters[index] = newLetter;
+                    }
+                    attempts++;
+                } while (!hasValidWord(centerLetter, candidateOuterLetters) && attempts < 100); 
+            
+                outerLetters = candidateOuterLetters;
+            }
+
+            function showNotification(message) {
+                notificationEl.textContent = message;
+                notificationEl.classList.remove('opacity-0');
+                setTimeout(() => {
+                    notificationEl.classList.add('opacity-0');
+                }, 2000);
+            }
+
+            function endGame() {
+                finalScoreEl.textContent = score;
+                gameOverModal.classList.remove('hidden');
+            }
+
+            // Event Listeners
+            centerHexEl.addEventListener('click', () => handleLetterClick(centerLetter));
+            outerHexEls.forEach((hex, i) => {
+                hex.addEventListener('click', () => handleLetterClick(outerLetters[i]));
+            });
+            clearBtn.addEventListener('click', handleClear);
+            shuffleBtn.addEventListener('click', handleShuffle);
+            enterBtn.addEventListener('click', handleEnter);
+            playAgainBtn.addEventListener('click', init);
+            
+            // Keyboard support
+            document.addEventListener('keydown', (e) => {
+                const key = e.key.toUpperCase();
+                const allLettersOnBoard = [centerLetter, ...outerLetters];
+
+                if (key === 'ENTER') {
+                    handleEnter();
+                } else if (key === 'BACKSPACE') {
+                    handleClear();
+                } else if (allLettersOnBoard.includes(key)) {
+                    handleLetterClick(key);
+                } else if (key === ' ') { // Use spacebar to shuffle
+                    e.preventDefault();
+                    handleShuffle();
+                }
+            });
+
+
+            // Start the game: load external wordlist first (if present), then initialize.
+            loadWordlist().then(() => init());
+        });
+    </script>
+</body>
+</html>
+
+
