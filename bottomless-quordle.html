@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Endless Word Twist</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for game tiles and keyboard */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .tile {
+            /* Use aspect-ratio for responsive square tiles */
+            aspect-ratio: 1 / 1;
+            width: 100%;
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 2rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            user-select: none;
+            border: 2px solid #3f3f46; /* border-gray-700 */
+            color: #f3f4f6; /* text-gray-100 */
+            transition: all 0.3s ease;
+        }
+        .tile-filled {
+            border-color: #52525b; /* border-gray-600 */
+            transform: scale(1.02);
+        }
+        .tile-correct {
+            background-color: #16a34a; /* bg-green-600 */
+            border-color: #16a34a;
+            color: white;
+            transform: rotateX(360deg);
+            transition: all 0.5s ease;
+        }
+        .tile-present {
+            background-color: #eab308; /* bg-yellow-500 */
+            border-color: #eab308;
+            color: white;
+            transform: rotateX(360deg);
+            transition: all 0.5s ease;
+        }
+        .tile-absent {
+            background-color: #3f3f46; /* bg-gray-700 */
+            border-color: #3f3f46;
+            color: #d1d5db; /* text-gray-300 */
+            opacity: 0.8;
+            transition: all 0.5s ease;
+        }
+        .key {
+            transition: background-color 0.2s ease, transform 0.1s ease;
+        }
+        .key:active {
+            transform: scale(0.95);
+        }
+        .key-correct { background-color: #16a34a !important; }
+        .key-present { background-color: #eab308 !important; }
+        .key-absent { background-color: #3f3f46 !important; }
+
+        /* Animation for solved quadrant */
+        @keyframes flashGreen {
+            0% { box-shadow: 0 0 0 0px rgba(22, 163, 74, 0.7); }
+            50% { box-shadow: 0 0 0 8px rgba(22, 163, 74, 0.3); }
+            100% { box-shadow: 0 0 0 0px rgba(22, 163, 74, 0.0); }
+        }
+        .quad-solved {
+            animation: flashGreen 1.5s ease;
+        }
+
+        /* Message popup */
+        #message-popup {
+            transition: opacity 0.3s ease, transform 0.3s ease;
+            transform: translateY(-100px);
+            opacity: 0;
+        }
+        #message-popup.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        /* Game Over screen */
+        #game-over-screen {
+            transition: opacity 0.5s ease;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 flex flex-col items-center justify-center min-h-screen p-2">
+
+    <!-- Header -->
+    <header class="w-full max-w-xl mx-auto flex justify-between items-center p-2 mb-2">
+        <h1 class="text-2xl md:text-3xl font-bold text-white">Endless Word Twist</h1>
+        <div class="text-right">
+            <div class="text-lg font-semibold">Score: <span id="score">0</span></div>
+            <div class="text-sm text-gray-400">Guess: <span id="guess-count">1</span> / 8</div>
+        </div>
+    </header>
+
+    <!-- Game Board -->
+    <main id="game-board" class="w-full max-w-xl grid grid-cols-2 gap-2 bg-gray-700 rounded-md overflow-hidden">
+        <!-- Quadrant 0 -->
+        <div id="quad-0" class="grid grid-cols-5 gap-1 bg-gray-900 p-2"></div>
+        <!-- Quadrant 1 -->
+        <div id="quad-1" class="grid grid-cols-5 gap-1 bg-gray-900 p-2"></div>
+        <!-- Quadrant 2 -->
+        <div id="quad-2" class="grid grid-cols-5 gap-1 bg-gray-900 p-2"></div>
+        <!-- Quadrant 3 -->
+        <div id="quad-3" class="grid grid-cols-5 gap-1 bg-gray-900 p-2"></div>
+    </main>
+
+    <!-- Keyboard -->
+    <div id="keyboard" class="w-full max-w-xl mx-auto mt-4">
+        <!-- Keys will be dynamically generated -->
+    </div>
+
+    <!-- Message Popup -->
+    <div id="message-popup" class="fixed top-10 p-3 rounded-md shadow-lg bg-red-600 text-white font-semibold">
+        Not in word list!
+    </div>
+
+    <!-- Game Over Screen -->
+    <div id="game-over-screen" class="fixed inset-0 bg-gray-900 bg-opacity-90 flex flex-col items-center justify-center hidden opacity-0">
+        <h2 class="text-4xl font-bold text-white mb-4">Game Over!</h2>
+        <p class="text-2xl text-gray-300 mb-6">Final Score: <span id="final-score">0</span></p>
+        <button id="play-again-btn" class="px-6 py-3 bg-green-600 text-white text-lg font-bold rounded-md shadow-lg hover:bg-green-700 transition-colors">
+            Play Again
+        </button>
+    </div>
+
+    <script>
+        // --- WORD LISTS ---
+        // A smaller list for solutions to make the game playable
+        const SOLUTION_WORDS = [
+            "APPLE", "BEACH", "BRAIN", "BREAD", "BRUSH", "CHAIR", "CHEST", "CHORD", "CLICK", "CLOCK",
+            "CLOUD", "DANCE", "DIARY", "DREAM", "DRINK", "EARTH", "FLUTE", "GHOST", "GRAPE", "GREEN",
+            "HAPPY", "HEART", "HOUSE", "JUICE", "LIGHT", "LUCKY", "MAGIC", "MONEY", "MUSIC", "NIGHT",
+            "OCEAN", "PAPER", "PARTY", "PHONE", "PIZZA", "PLANT", "QUIET", "RAINB", "RIVER", "ROBOT",
+            "ROCKY", "SHARK", "SHEEP", "SKATE", "SLEEP", "SMILE", "SOUND", "SPACE", "SPORT", "SQUARE",
+            "STARS", "STORM", "SUNNY", "SWEET", "TABLE", "TIGER", "TRAIN", "WATER", "WHALE", "WHITE",
+            "WOMAN", "WORLD", "YACHT", "ZEBRA", "ALIVE", "BLEND", "CARRY", "DATES", "EAGLE", "FABLE",
+            "GIANT", "HOTEL", "IMAGE", "JOKER", "KOALA", "LEMON", "MANGO", "NINJA", "OLIVE", "PILOT",
+            "QUERY", "RADIO", "SUSHI", "TOAST", "ULTRA", "VIDEO", "WAGON", "XENON", "YUMMY", "ZONAL"
+        ];
+
+        // A larger list for guess validation
+        const VALID_WORDS = [
+            ...SOLUTION_WORDS,
+            "ABASE", "ABATE", "ABBED", "ABBOT", "ABHOR", "ABIDE", "ABLED", "ABODE", "ABORT", "ABOUT",
+            "ABOVE", "ABUSE", "ABYSS", "ACORN", "ACRID", "ACTOR", "ACUTE", "ADAGE", "ADAPT", "ADDER",
+            "ADDLE", "ADEPT", "ADIEU", "ADMIT", "ADOBO", "ADOPT", "ADORE", "ADORN", "ADULT", "AFFIX",
+            "AFoul", "AFTER", "AGAPE", "AGATE", "AGENT", "AGILE", "AGLOW", "AGONY", "AGREE", "AHEAD",
+            "AHOY", "ALARM", "ALBUM", "ALERT", "ALGAE", "ALIAS", "ALIBI", "ALIEN", "ALIGN", "ALIKE",
+            "ALLAY", "ALLEY", "ALLOT", "ALLOW", "ALLOY", "ALOFT", "ALONE", "ALONG", "ALOOF", "ALOUD",
+            "ALPHA", "ALTAR", "ALTER", "AMASS", "AMAZE", "AMBER", "AMBLE", "AMEND", "AMISS", "AMITY",
+            "AMONG", "AMPLE", "AMPLY", "AMUSE", "ANGEL", "ANGER", "ANGLE", "ANKLE", "ANNOY", "ANNUL",
+            "ANODE", "ANTIC", "ANVIL", "AORTA", "APART", "APHID", "APNEA", "APPLY", "APRON", "APTLY",
+            "ARBOR", "ARDOR", "ARENA", "ARGUE", "ARISE", "ARMOR", "AROMA", "AROSE", "ARRAY", "ARROW",
+            "ARSON", "ASHEN", "ASIDE", "ASKEW", "ASSET", "ATOLL", "ATONE", "ATTIC", "AUDIO", "AUDIT",
+            "AUGUR", "AURAL", "AVAIL", "AVERT", "AVOID", "AWAKE", "AWASH", "AWFUL", "AWOKE", "AXIOM",
+            "AZURE", "BACON", "BADGE", "BADLY", "BAGEL", "BAGGY", "BAKER", "BALER", "BALMY", "BANAL",
+            "BANJO", "BARGE", "BARON", "BASIC", "BASIL", "BASIN", "BASIS", "BASSO", "BASTE", "BATCH",
+            "BATHE", "BATON", "BATTY", "BAWDY", "BAYOU", "BEADY", "BEAST", "BEEFY", "BEFIT", "BEGAN",
+            "BEGET", "BEGIN", "BEGUN", "BEIGE", "BEING", "BELCH", "BELIE", "BELLY", "BELOW", "BENCH",
+            "BERRY", "BERTH", "BESET", "BETEL", "BEVEL", "BILE", "BILGE", "BILLY", "BINGE", "BINGO",
+            "BIOME", "BIRCH", "BIRTH", "BISON", "BITTY", "BLACK", "BLADE", "BLAME", "BLAND", "BLANK",
+            "BLARE", "BLAST", "BLAZE", "BLEAK", "BLEAT", "BLEED", "BLEEP", "BLEND", "BLESS", "BLIMP",
+            "BLIND", "BLINK", "BLISS", "BLITZ", "BLOAT", "BLOB", "BLOCK", "BLOOD", "BLOOM", "Bloop",
+            "BLOT", "BLOWN", "BLUER", "BLUFF", "BLUNT", "BLURB", "BLURT", "BLUSH", "BOARD", "BOAST",
+            "BOBBY", "BOGEY", "BOGUS", "BOILS", "BOLT", "BONDS", "BONEY", "BONGO", "BONUS", "BOOBY",
+            "BOOST", "BOOTY", "BOOZE", "BORAX", "BORNE", "BOTCH", "BOUGH", "BOUND", "BOWEL", "BOXER",
+            "BRACE", "BRAID", "BRAKE", "BRAND", "BRASH", "BRASS", "BRAVE", "BRAVO", "BRAWL", "BRAWN",
+            "BREAK", "BREED", "BRIAR", "BRIBE", "BRICK", "BRIDE", "BRIEF", "BRINE", "BRING", "BRINK",
+            "BRINY", "BRISK", "BROAD", "BROIL", "BROKE", "BROOD", "BROOK", "BROOM", "BROTH", "BROWN",
+            "BRUTE", "BUDDY", "BUDGE", "BUGGY", "BUILD", "BUILT", "BULGE", "BULKY", "BULLY", "BUNCH",
+            "BURLY", "BURNT", "BURST", "BUSHY", "BUTCH", "BUTTE", "BUXOM", "BUYER", "BYLAW", "CABAL",
+            "CABBY", "CABIN", "CABLE", "CACTI", "CADDY", "CADET", "CAGEY", "CAIRN", "CAMEL", "CAMEO",
+            "CANAL", "CANDY", "CANNY", "CANOE", "CAPER", "CARAT", "CARGO", "CAROL", "CASTE", "CATCH",
+            "CATER", "CATTY", "CAULK", "CAUSE", "CAVIL", "CEASE", "CEDAR", "CHAOS", "CHARM", "CHART",
+            "CHASE", "CHASM", "CHEAP", "CHEAT", "CHECK", "CHEEK", "CHEER", "CHIEF", "CHILD", "CHILL",
+            "CHIME", "CHIRP", "CHOIR", "CHOKE", "CHUNK", "CIGAR", "CINCH", "CIRCA", "CIVIC", "CIVIL",
+            "CLACK", "CLAIM", "CLAMP", "CLANG", "CLANK", "CLASH", "CLASP", "CLASS", "CLEAN", "CLEAR",
+            "CLEAT", "CLEFT", "CLERK", "CLEVER", "CLIMB", "CLING", "CLINK", "CLOAK", "CLONE", "CLOSE",
+            "CLOTH", "CLUMP", "CLUNG", "COACH", "COAST", "COCOA", "COLON", "COLOR", "COMET", "COMIC",
+            "CONCH", "CONDO", "COUCH", "COUGH", "COULD", "COUNT", "COVER", "COVET", "COWER", "COYLY",
+            "CRACK", "CRAFT", "CRANE", "CRANK", "CRASH", "CRASS", "CRATE", "CRAVE", "CRAWL", "CRAZE",
+            "CRAZY", "CREAK", "CREAM", "CREDO", "CREED", "CREEK", "CREEP", "CREME", "CREPE", "CRESS",
+            "CREST", "CRICK", "CRIED", "CRIER", "CRIME", "CRIMP", "CRISP", "CROAK", "CROOK", "CROP",
+            "CROSS", "CROUP", "CROWD", "CROWN", "CRUDE", "CRUEL", "CRUMB", "CRUSH", "CRUST", "CRYPT",
+            "CUBIC", "CURIO", "CURLY", "CURRY", "CURSE", "CURVE", "CUSHY", "CYNIC", "DADDY", "DAILY",
+            "DAIRY", "DAISY", "DANDY", "DANDY", "DAUNT", "DEALT", "DEATH", "DEBAR", "DEBIT", "DEBUG",
+            "DEBUT", "DECAL", "DECAY", "DECOR", "DECOY", "DECRY", "DEFER", "DEIGN", "DEITY", "DELAY",
+            "DELTA", "DELVE", "DEMON", "DENIM", "DEPOT", "DEPTH", "DERBY", "DETER", "DEVIL", "DIET",
+            "DIMLY", "DINER", "DINGO", "DINGY", "DIRGE", "DIRTY", "DISCO", "DITCH", "DITTO", "DITTY",
+            "DIVER", "DIZZY", "DODGE", "DODGY", "DOGMA", "DOING", "DONOR", "DONUT", "DOPEY", "DOUBT",
+            "DOUGH", "DOWDY", "DOWEL", "DOWNY", "DRAFT", "DRAIN", "DRAKE", "DRAMA", "DRAPE", "DRAWL",
+            "DRAWN", "DREAD", "DRESS", "DRIED", "DRIER", "DRIFT", "DRILL", "DRIVE", "DROID", "DROIT",
+            "DROLE", "DRONE", "DROOL", "DROOP", "DROP", "DROVE", "DROWN", "DRUID", "DRUNK", "DRYLY",
+            "DUCHY", "DUMMY", "DUMPY", "DUNCE", "DUSKY", "DUSTY", "DUTCH", "DWARF", "DWELL", "DWELT",
+            "DYING", "EAGER", "EARLY", "EARN", "EBONY", "ECLAT", "EDICT", "EDIFY", "EERIE", "EJECT",
+            "ELATE", "ELBOW", "ELDER", "EJECT", "ELOPE", "ELUDE", "EMAIL", "EMBED", "EMBER", "EMCEE",
+            "EMPTY", "ENACT", "ENDOW", "ENEMA", "ENEMY", "ENJOY", "ENNUI", "ENSUE", "ENTER", "ENTRY",
+            "ENVOY", "EPOCH", "EPOXY", "EQUAL", "EQUIP", "ERODE", "ERROR", "ERUPT", "ESSAY", "ESTATE",
+            "ETHER", "ETHIC", "ETHOS", "ETUDE", "EVADE", "EVENT", "EVERY", "EVICT", "EVOKE", "EXACT",
+            "EXALT", "EXCEL", "EXERT", "EXILE", "EXIST", "EXPEL", "EXTOL", "EXTRA", "EXULT", "EYING",
+            "FACET", "FADE", "FAINT", "FAIRY", "FAITH", "FALSE", "FANCY", "FARCE", "FARCE", "FATAL",
+            "FATTY", "FAULT", "FAUNA", "FAVOR", "FEAST", "FECAL", "FEIGN", "FELLA", "FELON", "FEMUR",
+            "FENCE", "FERAL", "FERRY", "FETCH", "FEVER", "FIBER", "FIELD", "FIEND", "FIERY", "FIFTH",
+            "FIFTY", "FIGHT", "FILER", "FILLET", "FILMY", "FILTH", "FINAL", "FINCH", "FINER", "FIRST",
+            "FISHY", "FIXER", "FIZZY", "FJORD", "FLACK", "FLAIL", "FLAIR", "FLAKE", "FLAKY", "FLAME",
+            "FLANK", "FLAP", "FLASH", "FLASK", "FLAT", "FLAW", "FLECK", "FLEET", "FLESH", "FLICK",
+            "FLIER", "FLING", "FLINT", "FLIRT", "FLOAT", "FLOCK", "FLOOD", "FLOOR", "FLORA", "FLOSS",
+            "FLOUR", "FLOUT", "FLOWN", "FLUFF", "FLUID", "FLUKE", "FLUNG", "FLUNK", "FLUSH", "FOAMY",
+            "FOCAL", "FOCUS", "FOGGY", "FOIST", "FOLIO", "FOLLY", "FORAY", "FORCE", "FORGE", "FORGO",
+            "FORGOT", "FORK", "FORTH", "FORTY", "FORUM", "FOUND", "FOYER", "FRAIL", "FRAME", "FRANK",
+            "FRAUD", "FRAY", "FREAK", "FREED", "FREER", "FRESH", "FRIED", "FRIER", "FRILL", "FRISK",
+            "FROCK", "FROND", "FRONT", "FROST", "FROTH", "FROWN", "FROZE", "FRUIT", "FRY", "FUDGE",
+            "FUGUE", "FULLY", "FUMES", "FUNGI", "FUNKY", "FUNNY", "FUROR", "FURY", "FUSE", "FUSSY",
+        ];
+
+
+        // --- GAME STATE ---
+        let targetWords = ["", "", "", ""];
+        let currentGuessNumber = 1; // Tracks 1 to 10
+        let totalScore = 0;
+        let currentGuess = "";
+        let isGameOver = false;
+        let isProcessing = false; // Prevent spamming Enter
+        let letterStates = {}; // {'A': 'correct', 'B': 'present', 'C': 'absent'}
+
+        // --- DOM Elements ---
+        const quadrants = [
+            document.getElementById('quad-0'),
+            document.getElementById('quad-1'),
+            document.getElementById('quad-2'),
+            document.getElementById('quad-3'),
+        ];
+        const keyboardDiv = document.getElementById('keyboard');
+        const scoreEl = document.getElementById('score');
+        const guessCountEl = document.getElementById('guess-count');
+        const messagePopup = document.getElementById('message-popup');
+        const gameOverScreen = document.getElementById('game-over-screen');
+        const finalScoreEl = document.getElementById('final-score');
+        const playAgainBtn = document.getElementById('play-again-btn');
+
+        // --- KEYBOARD ---
+        const keyboardLayout = [
+            "Q W E R T Y U I O P",
+            "A S D F G H J K L",
+            "ENTER Z X C V B N M BACK"
+        ];
+
+        // --- INITIALIZATION ---
+        function init() {
+            createKeyboard();
+            createGrids();
+            startGame();
+            addEventListeners();
+        }
+
+        function createGrids() {
+            quadrants.forEach((quad) => {
+                quad.innerHTML = '';
+                for (let i = 0; i < 8 * 5; i++) { // 8 rows, 5 cols
+                    const tile = document.createElement('div');
+                    tile.className = 'tile';
+                    quad.appendChild(tile);
+                }
+            });
+        }
+
+        function createKeyboard() {
+            keyboardLayout.forEach(row => {
+                const rowDiv = document.createElement('div');
+                rowDiv.className = 'flex justify-center gap-1 mb-1';
+                row.split(' ').forEach(key => {
+                    const keyBtn = document.createElement('button');
+                    keyBtn.className = 'key h-12 rounded-md font-bold uppercase p-2 bg-gray-600 text-white flex-1';
+                    keyBtn.textContent = key;
+                    keyBtn.dataset.key = key;
+                    if (key === 'ENTER') keyBtn.classList.add('flex-grow-[1.5]');
+                    if (key === 'BACK') keyBtn.classList.add('flex-grow-[1.5]');
+                    rowDiv.appendChild(keyBtn);
+                });
+                keyboardDiv.appendChild(rowDiv);
+            });
+        }
+
+        function addEventListeners() {
+            // On-screen keyboard
+            keyboardDiv.addEventListener('click', (e) => {
+                if (isProcessing || isGameOver) return;
+                const key = e.target.closest('button')?.dataset.key;
+                if (!key) return;
+
+                if (key === 'ENTER') {
+                    submitGuess();
+                } else if (key === 'BACK') {
+                    deleteLetter();
+                } else {
+                    addLetter(key);
+                }
+            });
+
+            // Physical keyboard
+            document.addEventListener('keydown', (e) => {
+                if (isProcessing || isGameOver) return;
+                if (e.key === 'Enter') {
+                    submitGuess();
+                } else if (e.key === 'Backspace') {
+                    deleteLetter();
+                } else if (e.key.match(/^[a-zA-Z]$/)) {
+                    addLetter(e.key.toUpperCase());
+                }
+            });
+
+            // Play Again
+            playAgainBtn.addEventListener('click', startGame);
+        }
+
+        // --- GAME LOGIC ---
+        function startGame() {
+            // Reset game state
+            targetWords = [getNewWord(), getNewWord(), getNewWord(), getNewWord()];
+            currentGuessNumber = 1;
+            totalScore = 0;
+            currentGuess = "";
+            isGameOver = false;
+            isProcessing = false;
+            letterStates = {};
+
+            // Reset UI
+            createGrids(); // Clears all tiles
+            updateScoreUI();
+            updateGuessCountUI();
+            resetKeyboardUI();
+            
+            // Hide Game Over screen
+            gameOverScreen.classList.add('hidden', 'opacity-0');
+        }
+
+        function getNewWord() {
+            return SOLUTION_WORDS[Math.floor(Math.random() * SOLUTION_WORDS.length)];
+        }
+
+        function addLetter(letter) {
+            if (currentGuess.length < 5) {
+                currentGuess += letter;
+                updateCurrentRowUI();
+            }
+        }
+
+        function deleteLetter() {
+            currentGuess = currentGuess.slice(0, -1);
+            updateCurrentRowUI();
+        }
+
+        function updateCurrentRowUI() {
+            // Update the "active" row in all 4 grids
+            const guessRowIndex = currentGuessNumber - 1;
+            for (let i = 0; i < 4; i++) {
+                const quad = quadrants[i];
+                for (let j = 0; j < 5; j++) {
+                    const tile = quad.children[guessRowIndex * 5 + j];
+                    if (tile) {
+                        tile.textContent = currentGuess[j] || '';
+                        if (currentGuess[j]) {
+                            tile.classList.add('tile-filled');
+                        } else {
+                            tile.classList.remove('tile-filled');
+                        }
+                    }
+                }
+            }
+        }
+
+        async function submitGuess() {
+            if (currentGuess.length !== 5) {
+                showMessage("Word must be 5 letters!");
+                return;
+            }
+
+            if (!VALID_WORDS.includes(currentGuess)) {
+                showMessage("Not in word list!");
+                return;
+            }
+
+            if (isProcessing || isGameOver) return;
+            isProcessing = true;
+
+            const guess = currentGuess;
+            const guessRow = currentGuessNumber - 1;
+            const pointsThisTurn = 11 - currentGuessNumber;
+            let solvedQuadrants = [];
+            
+            const currentLetterStates = {};
+
+            // Process each quadrant
+            for (let i = 0; i < 4; i++) {
+                const target = targetWords[i];
+                const feedback = getGuessFeedback(guess, target);
+                
+                // Update grid UI
+                await updateGridRow(i, guessRow, guess, feedback);
+                
+                // Check for solve
+                if (guess === target) {
+                    solvedQuadrants.push(i);
+                    totalScore += pointsThisTurn;
+                }
+
+                // Update keyboard letter states (global)
+                feedback.forEach((status, index) => {
+                    const letter = guess[index];
+                    updateLetterState(letter, status);
+                });
+            }
+
+            // Update UI after processing
+            updateKeyboardUI();
+            updateScoreUI();
+            
+            // Handle solved quadrants
+            if (solvedQuadrants.length > 0) {
+                await handleSolvedQuadrants(solvedQuadrants);
+            }
+
+            // Move to next guess
+            currentGuessNumber++;
+            currentGuess = "";
+            updateGuessCountUI();
+
+            // Check for game over
+            if (currentGuessNumber > 8) {
+                endGame();
+            }
+
+            isProcessing = false;
+        }
+
+        function getGuessFeedback(guess, target) {
+            let feedback = Array(5).fill('absent');
+            let targetLetters = target.split('');
+            let guessLetters = guess.split('');
+
+            // First pass: Find 'correct' (green)
+            for (let i = 0; i < 5; i++) {
+                if (guessLetters[i] === targetLetters[i]) {
+                    feedback[i] = 'correct';
+                    targetLetters[i] = null; // Mark as used
+                    guessLetters[i] = null; // Mark as used
+                }
+            }
+
+            // Second pass: Find 'present' (yellow)
+            for (let i = 0; i < 5; i++) {
+                if (guessLetters[i] !== null) {
+                    const indexInTarget = targetLetters.indexOf(guessLetters[i]);
+                    if (indexInTarget !== -1) {
+                        feedback[i] = 'present';
+                        targetLetters[indexInTarget] = null; // Mark as used
+                    }
+                }
+            }
+            return feedback;
+        }
+
+        async function updateGridRow(quadIndex, rowIndex, guess, feedback) {
+            const quad = quadrants[quadIndex];
+            const tiles = Array.from(quad.children).slice(rowIndex * 5, rowIndex * 5 + 5);
+            
+            // Apply flip animation
+            for (let i = 0; i < 5; i++) {
+                await new Promise(resolve => setTimeout(resolve, 100)); // Stagger flip
+                const tile = tiles[i];
+                tile.textContent = guess[i];
+                tile.classList.remove('tile-filled');
+                if (feedback[i] === 'correct') {
+                    tile.classList.add('tile-correct');
+                } else if (feedback[i] === 'present') {
+                    tile.classList.add('tile-present');
+                } else {
+                    tile.classList.add('tile-absent');
+                }
+            }
+        }
+
+        async function handleSolvedQuadrants(quadIndexes) {
+            // Flash green border
+            for (const i of quadIndexes) {
+                quadrants[i].classList.add('quad-solved');
+            }
+
+            // Wait for animation
+            await new Promise(resolve => setTimeout(resolve, 1500));
+
+            // Reset solved quadrants
+            for (const i of quadIndexes) {
+                quadrants[i].classList.remove('quad-solved');
+                targetWords[i] = getNewWord(); // Get new word
+                clearGridUI(i); // Clear the UI for this grid
+            }
+        }
+
+        function clearGridUI(quadIndex) {
+            const quad = quadrants[quadIndex];
+            const tiles = quad.children;
+            for (let i = 0; i < tiles.length; i++) {
+                tiles[i].textContent = '';
+                tiles[i].className = 'tile'; // Reset to default state
+            }
+        }
+
+        function endGame() {
+            isGameOver = true;
+            finalScoreEl.textContent = totalScore;
+            gameOverScreen.classList.remove('hidden');
+            // Use timeout to allow a DOM repaint, then trigger transition
+            setTimeout(() => {
+                gameOverScreen.classList.remove('opacity-0');
+            }, 10);
+        }
+
+        // --- UI UPDATES ---
+        function updateScoreUI() {
+            scoreEl.textContent = totalScore;
+        }
+
+        function updateGuessCountUI() {
+            guessCountEl.textContent = Math.min(currentGuessNumber, 8);
+        }
+
+        function updateLetterState(letter, status) {
+            const current = letterStates[letter];
+            // Priority: correct > present > absent
+            if (current === 'correct') return;
+            if (current === 'present' && status === 'absent') return;
+            letterStates[letter] = status;
+        }
+
+        function resetKeyboardUI() {
+            keyboardDiv.querySelectorAll('button').forEach(btn => {
+                btn.classList.remove('key-correct', 'key-present', 'key-absent');
+            });
+        }
+
+        function updateKeyboardUI() {
+            keyboardDiv.querySelectorAll('button').forEach(btn => {
+                const key = btn.dataset.key;
+                if (letterStates[key]) {
+                    btn.classList.remove('key-correct', 'key-present', 'key-absent');
+                    btn.classList.add(`key-${letterStates[key]}`);
+                }
+            });
+        }
+
+        function showMessage(msg) {
+            messagePopup.textContent = msg;
+            messagePopup.classList.add('show');
+            setTimeout(() => {
+                messagePopup.classList.remove('show');
+            }, 2000);
+        }
+
+        // --- Start the game ---
+        init();
+    </script>
+</body>
+</html>
+
+
