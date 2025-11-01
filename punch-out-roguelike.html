@@ -1,0 +1,991 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rock'Em Sock'Em Rogues</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <script src="https://cdn/tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Press Start 2P', cursive;
+            background-color: #1a1a1a;
+            color: #fff;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            text-shadow: 2px 2px #000;
+        }
+
+        .game-container {
+            width: 100%;
+            max-width: 800px;
+            height: 600px;
+            background-color: #333;
+            border: 8px solid #555;
+            border-radius: 15px;
+            box-shadow: 0 0 30px rgba(0,0,0,0.7), inset 0 0 20px rgba(0,0,0,0.5);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Screen styles */
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            box-sizing: border-box;
+            background: linear-gradient(45deg, #2a2a2a, #3a3a3a);
+        }
+        .screen.active {
+            display: flex;
+        }
+        
+        /* Arcade Machine Bezel */
+        .arcade-bezel {
+            position: absolute;
+            top: 2%;
+            left: 2%;
+            width: 96%;
+            height: 96%;
+            border-radius: 10px;
+            box-shadow: inset 0 0 15px 5px rgba(0,0,0,0.8);
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        h1 { font-size: 2.5rem; margin-bottom: 20px; color: #ffcc00; text-align: center; line-height: 1.2; }
+        h2 { font-size: 1.8rem; margin-bottom: 15px; color: #00ffff; }
+
+        /* Card Selection Screen */
+        .card-grid-container {
+            width: 100%;
+            max-height: 350px;
+            overflow-y: auto;
+            padding: 10px;
+            margin-bottom: 20px;
+            background: #222;
+            border-radius: 10px;
+        }
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 20px;
+        }
+        .card {
+            background-color: #444;
+            border: 4px solid #666;
+            border-radius: 10px;
+            padding: 15px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-align: center;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+            border-color: #00ffff;
+        }
+        .card.selected {
+            border-color: #ffcc00;
+            box-shadow: 0 0 15px #ffcc00;
+        }
+        .card-title { font-size: 1rem; color: #ffcc00; margin-bottom: 10px; }
+        .card-desc { font-size: 0.7rem; line-height: 1.4; }
+        
+        .button-container {
+            display: flex;
+            gap: 20px;
+        }
+
+        .start-button, .restart-button, .next-level-button, .achievements-button {
+            padding: 15px 30px;
+            font-size: 1.2rem;
+            font-family: 'Press Start 2P', cursive;
+            background-color: #ff3333;
+            border: 4px solid #ff6666;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            text-shadow: 2px 2px #000;
+        }
+        .start-button:hover, .restart-button:hover, .next-level-button:hover, .achievements-button:hover {
+            background-color: #ff0000;
+        }
+
+        .achievements-button {
+            background-color: #00aaff;
+            border-color: #0077bb;
+        }
+        .achievements-button:hover {
+            background-color: #0088cc;
+        }
+        
+        /* Achievements Screen */
+        .achievements-list {
+            width: 100%;
+            max-height: 400px;
+            overflow-y: auto;
+            padding: 20px;
+            background: #222;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .achievement-item {
+            background-color: #3a3a3a;
+            padding: 15px;
+            border-radius: 8px;
+            border: 3px solid #555;
+        }
+        .achievement-item.completed {
+            border-color: #ffcc00;
+        }
+        .achievement-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .achievement-name {
+            font-size: 1rem;
+            color: #fff;
+        }
+        .achievement-progress {
+            font-size: 0.9rem;
+            color: #00ffff;
+        }
+        .achievement-reward {
+            font-size: 0.7rem;
+            color: #aaa;
+        }
+        .achievement-reward span {
+            color: #ffcc00;
+        }
+
+        /* Game Screen */
+        .fight-area {
+            width: 100%;
+            height: 65%;
+            background-image:
+                linear-gradient(rgba(0,0,0,0.3) 2px, transparent 2px),
+                linear-gradient(90deg, rgba(0,0,0,0.3) 2px, transparent 2px);
+            background-size: 40px 40px;
+            background-color: #777;
+            border-bottom: 8px solid #555;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .robot {
+            width: 120px;
+            height: 200px;
+            position: absolute;
+            bottom: 20px;
+            transition: transform 0.1s ease-out;
+        }
+        .robot-body {
+            width: 100%;
+            height: 120px;
+            border-radius: 10px;
+            position: absolute;
+            bottom: 40px;
+        }
+        .robot-head {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            position: absolute;
+            top: 0;
+            left: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .robot-arm {
+            width: 40px;
+            height: 100px;
+            background-color: #999;
+            border: 4px solid #555;
+            border-radius: 20px;
+            position: absolute;
+            top: 60px;
+            transform-origin: 20px 20px;
+            transition: transform 0.15s ease;
+        }
+
+        /* Player Robot */
+        #player { left: 15%; }
+        #player .robot-body { background-color: #c42929; border: 4px solid #8e1d1d; }
+        #player .robot-head { background-color: #e54545; border: 4px solid #a73232; }
+        #player .left-arm { left: -30px; }
+        #player .right-arm { right: -30px; }
+        
+        /* Opponent Robot */
+        #opponent { right: 15%; }
+        #opponent .robot-body { background-color: #295ac4; border: 4px solid #1d3f8e; }
+        #opponent .robot-head { background-color: #4578e5; border: 4px solid #3256a7; }
+        #opponent .left-arm { left: -30px; }
+        #opponent .right-arm { right: -30px; }
+
+        /* Golden Robot Style */
+        #opponent.golden .robot-body { background-color: #e5c100; border: 4px solid #b89b00; }
+        #opponent.golden .robot-head { background-color: #ffd700; border: 4px solid #cca300; }
+
+        /* Robot Animations */
+        .punch-regular { transform: rotate(70deg) translateY(-20px); }
+        .punch-strong { transform: rotate(90deg) translateY(-40px) scale(1.1); }
+        .block-pose { transform: translateY(-40px) scaleX(1.2); }
+        .hit { animation: hit-shake 0.2s; }
+        @keyframes hit-shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-10px); }
+            75% { transform: translateX(10px); }
+        }
+
+        .status-display {
+            width: 100%;
+            display: flex;
+            justify-content: space-around;
+            padding: 10px 20px;
+            position: absolute;
+            top: 0;
+            z-index: 50;
+        }
+        .health-bar-container {
+            width: 40%;
+            background: #222;
+            border: 4px solid #000;
+            border-radius: 10px;
+            padding: 4px;
+        }
+        .health-bar {
+            height: 20px;
+            background-color: #33ff33;
+            border-radius: 5px;
+            transition: width 0.3s ease;
+        }
+        .health-bar.low { background-color: #ffcc00; }
+        .health-bar.critical { background-color: #ff3333; }
+        .name-tag { font-size: 1rem; margin-bottom: 5px; }
+        #player-name { text-align: left; }
+        #opponent-name { text-align: right; }
+
+        .level-indicator {
+            position: absolute;
+            top: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 1.5rem;
+            color: #fff;
+            background-color: #000;
+            padding: 5px 15px;
+            border-radius: 5px;
+            z-index: 51;
+        }
+
+        /* Player Controls */
+        .controls {
+            width: 100%;
+            height: 35%;
+            background-color: #222;
+            display: flex;
+            align-items: center;
+            justify-content: space-around;
+            padding: 20px;
+        }
+        .control-btn {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            border: 8px solid;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.1s;
+        }
+        .control-btn:active {
+            transform: scale(0.95);
+        }
+        .control-btn.disabled {
+            filter: grayscale(80%);
+            cursor: not-allowed;
+            background-color: #666 !important;
+            border-color: #444 !important;
+        }
+        .cooldown-overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.6);
+            transform: translateY(100%);
+            transition: transform 0.1s linear;
+        }
+        .btn-text { font-size: 1rem; }
+        .btn-subtext { font-size: 0.6rem; margin-top: 5px; }
+
+        #regular-punch-btn { background-color: #00aaff; border-color: #0077bb; }
+        #strong-punch-btn { background-color: #ffaa00; border-color: #cc8800; }
+        #block-btn { background-color: #55dd55; border-color: #33aa33; }
+
+        .message-popup {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 2.5rem; /* Smaller for unlock messages */
+            color: #ffcc00;
+            padding: 20px;
+            background: rgba(0,0,0,0.8);
+            border-radius: 10px;
+            z-index: 99;
+            display: none;
+            text-align: center;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="game-container">
+        <div class="arcade-bezel"></div>
+
+        <!-- Card Selection Screen -->
+        <div id="card-select-screen" class="screen active">
+            <h1>Rock'Em Sock'Em<br>Rogues</h1>
+            <h2>Choose up to 3 cards</h2>
+            <div class="card-grid-container">
+                <div id="card-grid" class="card-grid"></div>
+            </div>
+            <div class="button-container">
+                <button id="start-game-btn" class="start-button">Start Run</button>
+                <button id="achievements-btn" class="achievements-button">Achievements</button>
+            </div>
+        </div>
+
+        <!-- Achievements Screen -->
+        <div id="achievements-screen" class="screen">
+            <h1>Achievements</h1>
+            <div id="achievements-list" class="achievements-list">
+                <!-- Achievements will be populated here by JS -->
+            </div>
+            <button id="back-to-start-btn" class="restart-button">Back</button>
+        </div>
+
+        <!-- Game Screen -->
+        <div id="game-screen" class="screen">
+            <div class="level-indicator" id="level-text">LEVEL 1</div>
+            <div class="status-display">
+                <div class="player-status">
+                    <div class="name-tag" id="player-name">PLAYER</div>
+                    <div class="health-bar-container">
+                        <div id="player-health" class="health-bar"></div>
+                    </div>
+                </div>
+                <div class="opponent-status">
+                    <div class="name-tag" id="opponent-name">ROBO-PUNCHO</div>
+                    <div class="health-bar-container">
+                        <div id="opponent-health" class="health-bar"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="fight-area">
+                <div id="player" class="robot">
+                    <div class="robot-head"></div>
+                    <div class="robot-body"></div>
+                    <div class="robot-arm left-arm"></div>
+                    <div class="robot-arm right-arm"></div>
+                </div>
+                <div id="opponent" class="robot">
+                    <div class="robot-head"></div>
+                    <div class="robot-body"></div>
+                    <div class="robot-arm left-arm"></div>
+                    <div class="robot-arm right-arm"></div>
+                </div>
+                <div id="message-popup" class="message-popup"></div>
+            </div>
+
+            <div class="controls">
+                <button id="regular-punch-btn" class="control-btn">
+                    <div class="btn-text">PUNCH</div>
+                    <div class="btn-subtext">QUICK</div>
+                    <div class="cooldown-overlay"></div>
+                </button>
+                <button id="strong-punch-btn" class="control-btn">
+                    <div class="btn-text">MEGA</div>
+                    <div class="btn-subtext">PUNCH</div>
+                    <div class="cooldown-overlay"></div>
+                </button>
+                <button id="block-btn" class="control-btn">
+                    <div class="btn-text">BLOCK</div>
+                    <div class="btn-subtext">DEFEND</div>
+                    <div class="cooldown-overlay"></div>
+                </button>
+            </div>
+        </div>
+
+        <!-- Game Over Screen -->
+        <div id="game-over-screen" class="screen">
+            <h1>GAME OVER</h1>
+            <h2>You were knocked out!</h2>
+            <button id="restart-game-btn" class="restart-button">Try Again</button>
+        </div>
+        
+        <!-- Level Victory Screen -->
+        <div id="level-victory-screen" class="screen">
+            <h1>VICTORY!</h1>
+            <h2 id="victory-level-text"></h2>
+            <button id="next-level-btn" class="next-level-button">Next Opponent</button>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- DOM ELEMENTS ---
+            const screens = {
+                cardSelect: document.getElementById('card-select-screen'),
+                achievements: document.getElementById('achievements-screen'),
+                game: document.getElementById('game-screen'),
+                gameOver: document.getElementById('game-over-screen'),
+                levelVictory: document.getElementById('level-victory-screen')
+            };
+            const cardGrid = document.getElementById('card-grid');
+            const startGameBtn = document.getElementById('start-game-btn');
+            const achievementsBtn = document.getElementById('achievements-btn');
+            const backToStartBtn = document.getElementById('back-to-start-btn');
+            const achievementsList = document.getElementById('achievements-list');
+            const restartGameBtn = document.getElementById('restart-game-btn');
+            const nextLevelBtn = document.getElementById('next-level-btn');
+            const playerHealthBar = document.getElementById('player-health');
+            const opponentHealthBar = document.getElementById('opponent-health');
+            const levelText = document.getElementById('level-text');
+            const victoryLevelText = document.getElementById('victory-level-text');
+            const messagePopup = document.getElementById('message-popup');
+
+            const playerRobot = document.getElementById('player');
+            const opponentRobot = document.getElementById('opponent');
+            
+            const controlBtns = {
+                regular: document.getElementById('regular-punch-btn'),
+                strong: document.getElementById('strong-punch-btn'),
+                block: document.getElementById('block-btn'),
+            };
+
+            // --- GAME DATA ---
+            const ALL_CARDS = {
+                // Starter Cards (Unlocked by default)
+                hp_boost: { title: 'Titanium Hull', desc: '+20% Max Health', unlocked: true, apply: (stats) => stats.maxHealth *= 1.2 },
+                dmg_boost: { title: 'Power Pistons', desc: '+3 Damage to all punches', unlocked: true, apply: (stats) => { stats.regularDamage += 3; stats.strongDamage += 3; } },
+                quick_punch: { title: 'Greased Joints', desc: '-20% Punch Cooldown', unlocked: true, apply: (stats) => { stats.regularCooldown *= 0.8; stats.strongCooldown *= 0.8;} },
+                block_master: { title: 'Force Field', desc: '-30% Block Cooldown', unlocked: true, apply: (stats) => stats.blockCooldown *= 0.7 },
+                strong_start: { title: 'First Strike', desc: 'Start with 25 extra health', unlocked: true, apply: (stats) => stats.health += 25 },
+                heavy_hitter: { title: 'Mega Fists', desc: '+8 Damage to Strong Punches', unlocked: true, apply: (stats) => stats.strongDamage += 8 },
+
+                // Milestone Unlocks
+                level5_unlock: { title: 'Last Stand', desc: 'Deal +50% damage when below 30% health.', unlocked: false, apply: (stats) => stats.conditionalEffects.push({ type: 'last_stand' }) },
+                level10_unlock: { title: 'Scrap Plating', desc: 'Start each fight with 15 temporary armor.', unlocked: false, apply: (stats) => { stats.armor = 15; } },
+                level15_unlock: { title: 'Overdrive', desc: 'All cooldowns reduced by an additional 15%.', unlocked: false, apply: (stats) => { stats.regularCooldown *= 0.85; stats.strongCooldown *= 0.85; stats.blockCooldown *= 0.85;} },
+
+                // Golden Robot Unlock
+                golden_core: { title: 'Golden Core', desc: 'Gain 1 health every 2 seconds.', unlocked: false, apply: (stats) => stats.specialEffects.push({ type: 'regen' }) },
+                
+                // Achievement Unlocks
+                flawless_victory: { title: 'Riposte', desc: 'After a block, your next punch deals double damage.', unlocked: false, apply: (stats) => stats.specialEffects.push({ type: 'riposte' }) },
+                total_kills_1: { title: 'Veteran Brawler', desc: '+5% to all stats.', unlocked: false, apply: (stats) => { stats.maxHealth *= 1.05; stats.regularDamage *= 1.05; stats.strongDamage *= 1.05; } },
+                total_blocks_1: { title: 'Perfect Guard', desc: 'Blocking negates all damage and reflects 2 damage.', unlocked: false, apply: (stats) => { stats.blockReflection = 2; } },
+                cursed_card_1: { title: 'Glass Cannon', desc: 'Cursed: +15 punch damage, -25% max health.', unlocked: false, apply: (stats) => { stats.regularDamage += 15; stats.strongDamage += 15; stats.maxHealth *= 0.75; } },
+            };
+            
+            const MILESTONE_REWARDS = { 5: 'level5_unlock', 10: 'level10_unlock', 15: 'level15_unlock' };
+            const ACHIEVEMENTS = {
+                flawless: { id: 'flawless', name: 'Flawless Victory', description: 'Win a fight without taking damage.', required: 1, rewardCard: 'flawless_victory', progressKey: 'flawlessVictories' },
+                kills10: { id: 'kills10', name: 'Robot Wrecker', description: 'Defeat 10 total robots.', required: 10, rewardCard: 'total_kills_1', progressKey: 'totalKills' },
+                blocks25: { id: 'blocks25', name: 'Iron Wall', description: 'Block 25 total attacks.', required: 25, rewardCard: 'total_blocks_1', progressKey: 'totalBlocks' },
+                // A hidden achievement for losing a run.
+                firstLoss: { id: 'firstLoss', name: 'Learning Experience', description: 'Lose your first run.', required: 1, rewardCard: 'cursed_card_1', progressKey: 'totalLosses' },
+            };
+
+
+            const OPPONENTS = [
+                { name: 'CLUNKER', maxHealth: 80, regularDamage: 4, strongDamage: 8, attackInterval: 1800 },
+                { name: 'GEARHEAD', maxHealth: 120, regularDamage: 6, strongDamage: 12, attackInterval: 1600 },
+                { name: 'RIVET-JAW', maxHealth: 150, regularDamage: 8, strongDamage: 16, attackInterval: 1400 },
+                { name: 'BOLT-BRAIN', maxHealth: 180, regularDamage: 10, strongDamage: 20, attackInterval: 1200 },
+                { name: 'THE SCRAPPER', maxHealth: 250, regularDamage: 12, strongDamage: 25, attackInterval: 1000 },
+            ];
+
+            // --- GAME STATE ---
+            let gameState = {
+                currentScreen: 'cardSelect',
+                currentLevel: 0,
+                selectedCards: [],
+                playerStats: {},
+                opponentStats: {},
+                playerCooldowns: { regular: 0, strong: 0, block: 0 },
+                isPlayerBlocking: false,
+                isOpponentBlocking: false,
+                isGoldenOpponent: false,
+                riposteActive: false,
+                opponentAITimer: null,
+                isGameOver: false,
+            };
+            
+            // --- PERSISTENT DATA ---
+            let unlockedCards = {};
+            let achievementProgress = {};
+
+            function loadGameData() {
+                const savedCards = localStorage.getItem('rockem_unlockedCards');
+                const savedProgress = localStorage.getItem('rockem_achievementProgress');
+
+                if (savedCards) {
+                    unlockedCards = JSON.parse(savedCards);
+                } else {
+                    // Initialize with default cards
+                    unlockedCards = {};
+                    Object.keys(ALL_CARDS).forEach(id => {
+                        if (ALL_CARDS[id].unlocked) unlockedCards[id] = true;
+                    });
+                }
+
+                if (savedProgress) {
+                    achievementProgress = JSON.parse(savedProgress);
+                } else {
+                    achievementProgress = { totalKills: 0, totalBlocks: 0, flawlessVictories: 0, totalLosses: 0 };
+                }
+            }
+
+            function saveGameData() {
+                localStorage.setItem('rockem_unlockedCards', JSON.stringify(unlockedCards));
+                localStorage.setItem('rockem_achievementProgress', JSON.stringify(achievementProgress));
+            }
+
+            function unlockCard(cardId) {
+                if (!unlockedCards[cardId]) {
+                    unlockedCards[cardId] = true;
+                    saveGameData();
+                    showMessage(`New Card Unlocked:<br>${ALL_CARDS[cardId].title}`, 2500);
+                }
+            }
+
+            // --- FUNCTIONS ---
+
+            // Screen Management
+            function showScreen(screenName) {
+                Object.values(screens).forEach(s => s.classList.remove('active'));
+                screens[screenName].classList.add('active');
+                gameState.currentScreen = screenName;
+                if(screenName === 'cardSelect') renderCards();
+                if(screenName === 'achievements') renderAchievements();
+            }
+
+            // Card Selection
+            function renderCards() {
+                cardGrid.innerHTML = '';
+                Object.keys(unlockedCards).forEach(cardId => {
+                    const cardData = ALL_CARDS[cardId];
+                    const cardEl = document.createElement('div');
+                    cardEl.className = 'card';
+                    cardEl.dataset.cardId = cardId;
+                    cardEl.innerHTML = `<div class="card-title">${cardData.title}</div><div class="card-desc">${cardData.desc}</div>`;
+                    cardEl.addEventListener('click', () => toggleCardSelection(cardId, cardEl));
+                    cardGrid.appendChild(cardEl);
+                });
+            }
+
+            function renderAchievements() {
+                achievementsList.innerHTML = '';
+                Object.values(ACHIEVEMENTS).forEach(ach => {
+                    const progress = achievementProgress[ach.progressKey] || 0;
+                    const isCompleted = progress >= ach.required;
+                    const rewardCard = ALL_CARDS[ach.rewardCard];
+
+                    const achEl = document.createElement('div');
+                    achEl.className = 'achievement-item' + (isCompleted ? ' completed' : '');
+                    
+                    achEl.innerHTML = `
+                        <div class="achievement-info">
+                            <div class="achievement-name">${ach.name}</div>
+                            <div class="achievement-progress">${isCompleted ? 'Complete!' : `${progress} / ${ach.required}`}</div>
+                        </div>
+                        <div class="achievement-reward">${ach.description}</div>
+                        <div class="achievement-reward">Reward: <span>${rewardCard.title}</span></div>
+                    `;
+                    achievementsList.appendChild(achEl);
+                });
+            }
+
+            function toggleCardSelection(cardId, cardEl) {
+                const index = gameState.selectedCards.indexOf(cardId);
+                if (index > -1) {
+                    gameState.selectedCards.splice(index, 1);
+                    cardEl.classList.remove('selected');
+                } else {
+                    if (gameState.selectedCards.length < 3) {
+                        gameState.selectedCards.push(cardId);
+                        cardEl.classList.add('selected');
+                    }
+                }
+            }
+            
+            // Game Initialization
+            function initializePlayerStats() {
+                gameState.playerStats = {
+                    maxHealth: 100,
+                    health: 100,
+                    regularDamage: 5,
+                    strongDamage: 15,
+                    regularCooldown: 500,
+                    strongCooldown: 2000,
+                    blockDuration: 400,
+                    blockCooldown: 3000,
+                    armor: 0,
+                    blockReflection: 0,
+                    conditionalEffects: [],
+                    specialEffects: []
+                };
+
+                gameState.selectedCards.forEach(cardId => {
+                    const card = ALL_CARDS[cardId];
+                    if (card) card.apply(gameState.playerStats);
+                });
+                
+                gameState.playerStats.health = Math.min(gameState.playerStats.health, gameState.playerStats.maxHealth);
+            }
+
+            function loadLevel(levelIndex) {
+                gameState.currentLevel = levelIndex;
+                const opponentData = OPPONENTS[levelIndex] || OPPONENTS[OPPONENTS.length - 1];
+                
+                gameState.isGoldenOpponent = !gameState.isGameOver && Math.random() < 0.10; // 10% chance
+                
+                if (gameState.isGoldenOpponent) {
+                    opponentRobot.classList.add('golden');
+                    gameState.opponentStats = {
+                        name: 'GOLDEN BOT',
+                        maxHealth: opponentData.maxHealth * 1.5,
+                        health: opponentData.maxHealth * 1.5,
+                        regularDamage: opponentData.regularDamage * 1.2,
+                        strongDamage: opponentData.strongDamage * 1.2,
+                        attackInterval: opponentData.attackInterval * 0.8,
+                    };
+                } else {
+                    opponentRobot.classList.remove('golden');
+                    gameState.opponentStats = { ...opponentData, health: opponentData.maxHealth };
+                }
+                
+                gameState.playerStats.health = gameState.playerStats.maxHealth;
+                if(gameState.playerStats.armor) gameState.playerStats.health += gameState.playerStats.armor;
+
+                updateUI();
+                levelText.textContent = `LEVEL ${levelIndex + 1}`;
+                document.getElementById('opponent-name').textContent = gameState.opponentStats.name;
+            }
+
+            function startGame() {
+                initializePlayerStats();
+                loadLevel(0);
+                gameState.isGameOver = false;
+                showScreen('game');
+                startOpponentAI();
+                gameLoop();
+            }
+
+            // UI Updates
+            function updateHealthBars() {
+                const playerHealthPercent = (gameState.playerStats.health / gameState.playerStats.maxHealth) * 100;
+                playerHealthBar.style.width = `${playerHealthPercent}%`;
+                updateHealthBarColor(playerHealthBar, playerHealthPercent);
+                
+                const opponentHealthPercent = (gameState.opponentStats.health / gameState.opponentStats.maxHealth) * 100;
+                opponentHealthBar.style.width = `${opponentHealthPercent}%`;
+                updateHealthBarColor(opponentHealthBar, opponentHealthPercent);
+            }
+            
+            function updateHealthBarColor(bar, percent) {
+                bar.classList.remove('low', 'critical');
+                if (percent <= 25) bar.classList.add('critical');
+                else if (percent <= 50) bar.classList.add('low');
+            }
+            
+            function updateUI() {
+                updateHealthBars();
+            }
+            
+            // Combat Logic
+            function playerAction(type) {
+                if (gameState.isGameOver || gameState.playerCooldowns[type] > 0) return;
+
+                let baseDamage = 0;
+                switch (type) {
+                    case 'regular':
+                        baseDamage = gameState.playerStats.regularDamage;
+                        performPunch(playerRobot.querySelector('.right-arm'), 'punch-regular', () => handlePlayerHit(baseDamage));
+                        setCooldown('regular', gameState.playerStats.regularCooldown);
+                        break;
+                    case 'strong':
+                        baseDamage = gameState.playerStats.strongDamage;
+                        performPunch(playerRobot.querySelector('.left-arm'), 'punch-strong', () => handlePlayerHit(baseDamage), 200);
+                        setCooldown('strong', gameState.playerStats.strongCooldown);
+                        break;
+                    case 'block':
+                        gameState.isPlayerBlocking = true;
+                        playerRobot.classList.add('block-pose');
+                        setCooldown('block', gameState.playerStats.blockCooldown);
+                        setTimeout(() => {
+                            gameState.isPlayerBlocking = false;
+                            playerRobot.classList.remove('block-pose');
+                        }, gameState.playerStats.blockDuration);
+                        break;
+                }
+            }
+
+            function handlePlayerHit(baseDamage) {
+                let finalDamage = baseDamage;
+                // Check for Riposte
+                if(gameState.riposteActive) {
+                    finalDamage *= 2;
+                    gameState.riposteActive = false;
+                }
+                // Check for Last Stand
+                if (gameState.playerStats.conditionalEffects.some(e => e.type === 'last_stand') && 
+                    (gameState.playerStats.health / gameState.playerStats.maxHealth) <= 0.30) {
+                    finalDamage *= 1.5;
+                }
+
+                if (!gameState.isOpponentBlocking) {
+                    dealDamage('opponent', Math.round(finalDamage));
+                } else { 
+                    showMessage("BLOCKED!", 800); 
+                }
+            }
+            
+            function opponentAction() {
+                if(gameState.isGameOver) return;
+                
+                const actionRoll = Math.random();
+                if (actionRoll < 0.6) { // Regular punch
+                    performPunch(opponentRobot.querySelector('.right-arm'), 'punch-regular', () => handleOpponentHit(gameState.opponentStats.regularDamage));
+                } else if (actionRoll < 0.85) { // Strong punch
+                    performPunch(opponentRobot.querySelector('.left-arm'), 'punch-strong', () => handleOpponentHit(gameState.opponentStats.strongDamage), 200);
+                } else { // Block
+                    gameState.isOpponentBlocking = true;
+                    opponentRobot.classList.add('block-pose');
+                    setTimeout(() => {
+                        gameState.isOpponentBlocking = false;
+                        opponentRobot.classList.remove('block-pose');
+                    }, 800);
+                }
+            }
+
+            function handleOpponentHit(damage) {
+                if (!gameState.isPlayerBlocking) {
+                    dealDamage('player', damage);
+                } else {
+                    showMessage("BLOCKED!", 800);
+                    achievementProgress.totalBlocks = (achievementProgress.totalBlocks || 0) + 1;
+
+                    if (gameState.playerStats.blockReflection > 0) {
+                        dealDamage('opponent', gameState.playerStats.blockReflection);
+                    }
+                    if(gameState.playerStats.specialEffects.some(e => e.type === 'riposte')) {
+                        gameState.riposteActive = true;
+                    }
+                }
+            }
+
+            function dealDamage(target, amount) {
+                if (target === 'player') {
+                    gameState.playerStats.health -= amount;
+                    playerRobot.classList.add('hit');
+                    setTimeout(() => playerRobot.classList.remove('hit'), 200);
+                } else {
+                    gameState.opponentStats.health -= amount;
+                    opponentRobot.classList.add('hit');
+                     setTimeout(() => opponentRobot.classList.remove('hit'), 200);
+                }
+                gameState.playerStats.health = Math.max(0, gameState.playerStats.health);
+                gameState.opponentStats.health = Math.max(0, gameState.opponentStats.health);
+                updateHealthBars();
+                checkWinLoss();
+            }
+
+            function checkWinLoss() {
+                if (gameState.opponentStats.health <= 0) {
+                    endLevel(true);
+                } else if (gameState.playerStats.health <= 0) {
+                    endLevel(false);
+                }
+            }
+            
+            function endLevel(didPlayerWin) {
+                gameState.isGameOver = true;
+                clearInterval(gameState.opponentAITimer);
+
+                if (didPlayerWin) {
+                    processVictory();
+                    if (gameState.currentLevel >= OPPONENTS.length - 1) {
+                         showMessage("YOU WIN!", 999999);
+                         setTimeout(() => {
+                           showScreen('gameOver');
+                           document.querySelector('#game-over-screen h1').textContent = "CHAMPION!";
+                           document.querySelector('#game-over-screen h2').textContent = "You defeated all opponents!";
+                         }, 2000);
+                    } else {
+                        victoryLevelText.textContent = `LEVEL ${gameState.currentLevel + 1} CLEARED!`;
+                        setTimeout(() => showScreen('levelVictory'), 2600); // Increased delay for unlock message
+                    }
+                } else {
+                    achievementProgress.totalLosses = (achievementProgress.totalLosses || 0) + 1;
+                    checkForUnlocks(); // Check for loss-based achievements
+                    saveGameData();
+                    showMessage("KNOCK OUT!", 999999);
+                    setTimeout(() => {
+                        document.querySelector('#game-over-screen h1').textContent = "GAME OVER";
+                        document.querySelector('#game-over-screen h2').textContent = "You were knocked out!";
+                        showScreen('gameOver');
+                    }, 2000);
+                }
+            }
+
+            function processVictory() {
+                // Update stats
+                achievementProgress.totalKills = (achievementProgress.totalKills || 0) + 1;
+                if (gameState.playerStats.health >= gameState.playerStats.maxHealth) {
+                    achievementProgress.flawlessVictories = (achievementProgress.flawlessVictories || 0) + 1;
+                }
+                checkForUnlocks();
+                saveGameData();
+            }
+
+            function checkForUnlocks() {
+                // Milestone unlocks
+                const milestoneCard = MILESTONE_REWARDS[gameState.currentLevel + 1];
+                if(milestoneCard) unlockCard(milestoneCard);
+
+                // Golden robot unlock
+                if(gameState.isGoldenOpponent) unlockCard('golden_core');
+
+                // Achievement unlocks
+                Object.values(ACHIEVEMENTS).forEach(ach => {
+                    if (achievementProgress[ach.progressKey] >= ach.required) {
+                        unlockCard(ach.rewardCard);
+                    }
+                });
+            }
+
+
+            // Animations & Visuals
+            function performPunch(arm, punchClass, onHit, windup = 100) {
+                setTimeout(() => {
+                    arm.classList.add(punchClass);
+                    setTimeout(() => {
+                        onHit();
+                        setTimeout(() => arm.classList.remove(punchClass), 150);
+                    }, 150);
+                }, windup);
+            }
+
+            function showMessage(text, duration = 1000) {
+                messagePopup.innerHTML = text;
+                messagePopup.style.display = 'block';
+                setTimeout(() => messagePopup.style.display = 'none', duration);
+            }
+
+            // Cooldowns & Game Loop
+            function setCooldown(type, duration) {
+                gameState.playerCooldowns[type] = duration;
+                controlBtns[type].classList.add('disabled');
+            }
+
+            function updateCooldowns(deltaTime) {
+                for (const type in gameState.playerCooldowns) {
+                    if (gameState.playerCooldowns[type] > 0) {
+                        gameState.playerCooldowns[type] -= deltaTime;
+                        let cooldownDuration;
+                        if(type === 'regular') cooldownDuration = gameState.playerStats.regularCooldown;
+                        else if(type === 'strong') cooldownDuration = gameState.playerStats.strongCooldown;
+                        else cooldownDuration = gameState.playerStats.blockCooldown;
+                        
+                        const overlay = controlBtns[type].querySelector('.cooldown-overlay');
+                        const percent = gameState.playerCooldowns[type] / cooldownDuration;
+                        overlay.style.transform = `translateY(${percent * 100}%)`;
+
+                    } else if (controlBtns[type].classList.contains('disabled')) {
+                        controlBtns[type].classList.remove('disabled');
+                        controlBtns[type].querySelector('.cooldown-overlay').style.transform = `translateY(100%)`;
+                    }
+                }
+            }
+
+            let lastTime = 0;
+            function gameLoop(timestamp) {
+                if (gameState.isGameOver) return;
+                
+                const deltaTime = (timestamp - lastTime) || 0;
+                lastTime = timestamp;
+
+                // Handle regen effects
+                if (gameState.playerStats.specialEffects.some(e => e.type === 'regen')) {
+                    gameState.playerStats.health += (1/2000) * deltaTime; // 1hp per 2s
+                    gameState.playerStats.health = Math.min(gameState.playerStats.health, gameState.playerStats.maxHealth);
+                    updateHealthBars();
+                }
+
+                updateCooldowns(deltaTime);
+                requestAnimationFrame(gameLoop);
+            }
+
+            // Event Listeners
+            startGameBtn.addEventListener('click', startGame);
+            restartGameBtn.addEventListener('click', () => showScreen('cardSelect'));
+            achievementsBtn.addEventListener('click', () => showScreen('achievements'));
+            backToStartBtn.addEventListener('click', () => showScreen('cardSelect'));
+            nextLevelBtn.addEventListener('click', () => {
+                loadLevel(gameState.currentLevel + 1);
+                gameState.isGameOver = false;
+                showScreen('game');
+                startOpponentAI();
+                lastTime = performance.now(); // Reset time for game loop
+                gameLoop(lastTime);
+            });
+            
+            controlBtns.regular.addEventListener('click', () => playerAction('regular'));
+            controlBtns.strong.addEventListener('click', () => playerAction('strong'));
+            controlBtns.block.addEventListener('click', () => playerAction('block'));
+            
+            // --- INITIALIZE ---
+            function init() {
+                loadGameData();
+                renderCards();
+                showScreen('cardSelect');
+            }
+
+            init();
+        });
+    </script>
+</body>
+</html>
+
+
