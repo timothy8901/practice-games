@@ -145,80 +145,39 @@
             "QUERY", "RADIO", "SUSHI", "TOAST", "ULTRA", "VIDEO", "WAGON", "XENON", "YUMMY", "ZONAL"
         ];
 
-        // A larger list for guess validation
-        const VALID_WORDS = [
-            ...SOLUTION_WORDS,
-            "ABASE", "ABATE", "ABBED", "ABBOT", "ABHOR", "ABIDE", "ABLED", "ABODE", "ABORT", "ABOUT",
-            "ABOVE", "ABUSE", "ABYSS", "ACORN", "ACRID", "ACTOR", "ACUTE", "ADAGE", "ADAPT", "ADDER",
-            "ADDLE", "ADEPT", "ADIEU", "ADMIT", "ADOBO", "ADOPT", "ADORE", "ADORN", "ADULT", "AFFIX",
-            "AFoul", "AFTER", "AGAPE", "AGATE", "AGENT", "AGILE", "AGLOW", "AGONY", "AGREE", "AHEAD",
-            "AHOY", "ALARM", "ALBUM", "ALERT", "ALGAE", "ALIAS", "ALIBI", "ALIEN", "ALIGN", "ALIKE",
-            "ALLAY", "ALLEY", "ALLOT", "ALLOW", "ALLOY", "ALOFT", "ALONE", "ALONG", "ALOOF", "ALOUD",
-            "ALPHA", "ALTAR", "ALTER", "AMASS", "AMAZE", "AMBER", "AMBLE", "AMEND", "AMISS", "AMITY",
-            "AMONG", "AMPLE", "AMPLY", "AMUSE", "ANGEL", "ANGER", "ANGLE", "ANKLE", "ANNOY", "ANNUL",
-            "ANODE", "ANTIC", "ANVIL", "AORTA", "APART", "APHID", "APNEA", "APPLY", "APRON", "APTLY",
-            "ARBOR", "ARDOR", "ARENA", "ARGUE", "ARISE", "ARMOR", "AROMA", "AROSE", "ARRAY", "ARROW",
-            "ARSON", "ASHEN", "ASIDE", "ASKEW", "ASSET", "ATOLL", "ATONE", "ATTIC", "AUDIO", "AUDIT",
-            "AUGUR", "AURAL", "AVAIL", "AVERT", "AVOID", "AWAKE", "AWASH", "AWFUL", "AWOKE", "AXIOM",
-            "AZURE", "BACON", "BADGE", "BADLY", "BAGEL", "BAGGY", "BAKER", "BALER", "BALMY", "BANAL",
-            "BANJO", "BARGE", "BARON", "BASIC", "BASIL", "BASIN", "BASIS", "BASSO", "BASTE", "BATCH",
-            "BATHE", "BATON", "BATTY", "BAWDY", "BAYOU", "BEADY", "BEAST", "BEEFY", "BEFIT", "BEGAN",
-            "BEGET", "BEGIN", "BEGUN", "BEIGE", "BEING", "BELCH", "BELIE", "BELLY", "BELOW", "BENCH",
-            "BERRY", "BERTH", "BESET", "BETEL", "BEVEL", "BILE", "BILGE", "BILLY", "BINGE", "BINGO",
-            "BIOME", "BIRCH", "BIRTH", "BISON", "BITTY", "BLACK", "BLADE", "BLAME", "BLAND", "BLANK",
-            "BLARE", "BLAST", "BLAZE", "BLEAK", "BLEAT", "BLEED", "BLEEP", "BLEND", "BLESS", "BLIMP",
-            "BLIND", "BLINK", "BLISS", "BLITZ", "BLOAT", "BLOB", "BLOCK", "BLOOD", "BLOOM", "Bloop",
-            "BLOT", "BLOWN", "BLUER", "BLUFF", "BLUNT", "BLURB", "BLURT", "BLUSH", "BOARD", "BOAST",
-            "BOBBY", "BOGEY", "BOGUS", "BOILS", "BOLT", "BONDS", "BONEY", "BONGO", "BONUS", "BOOBY",
-            "BOOST", "BOOTY", "BOOZE", "BORAX", "BORNE", "BOTCH", "BOUGH", "BOUND", "BOWEL", "BOXER",
-            "BRACE", "BRAID", "BRAKE", "BRAND", "BRASH", "BRASS", "BRAVE", "BRAVO", "BRAWL", "BRAWN",
-            "BREAK", "BREED", "BRIAR", "BRIBE", "BRICK", "BRIDE", "BRIEF", "BRINE", "BRING", "BRINK",
-            "BRINY", "BRISK", "BROAD", "BROIL", "BROKE", "BROOD", "BROOK", "BROOM", "BROTH", "BROWN",
-            "BRUTE", "BUDDY", "BUDGE", "BUGGY", "BUILD", "BUILT", "BULGE", "BULKY", "BULLY", "BUNCH",
-            "BURLY", "BURNT", "BURST", "BUSHY", "BUTCH", "BUTTE", "BUXOM", "BUYER", "BYLAW", "CABAL",
-            "CABBY", "CABIN", "CABLE", "CACTI", "CADDY", "CADET", "CAGEY", "CAIRN", "CAMEL", "CAMEO",
-            "CANAL", "CANDY", "CANNY", "CANOE", "CAPER", "CARAT", "CARGO", "CAROL", "CASTE", "CATCH",
-            "CATER", "CATTY", "CAULK", "CAUSE", "CAVIL", "CEASE", "CEDAR", "CHAOS", "CHARM", "CHART",
-            "CHASE", "CHASM", "CHEAP", "CHEAT", "CHECK", "CHEEK", "CHEER", "CHIEF", "CHILD", "CHILL",
-            "CHIME", "CHIRP", "CHOIR", "CHOKE", "CHUNK", "CIGAR", "CINCH", "CIRCA", "CIVIC", "CIVIL",
-            "CLACK", "CLAIM", "CLAMP", "CLANG", "CLANK", "CLASH", "CLASP", "CLASS", "CLEAN", "CLEAR",
-            "CLEAT", "CLEFT", "CLERK", "CLEVER", "CLIMB", "CLING", "CLINK", "CLOAK", "CLONE", "CLOSE",
-            "CLOTH", "CLUMP", "CLUNG", "COACH", "COAST", "COCOA", "COLON", "COLOR", "COMET", "COMIC",
-            "CONCH", "CONDO", "COUCH", "COUGH", "COULD", "COUNT", "COVER", "COVET", "COWER", "COYLY",
-            "CRACK", "CRAFT", "CRANE", "CRANK", "CRASH", "CRASS", "CRATE", "CRAVE", "CRAWL", "CRAZE",
-            "CRAZY", "CREAK", "CREAM", "CREDO", "CREED", "CREEK", "CREEP", "CREME", "CREPE", "CRESS",
-            "CREST", "CRICK", "CRIED", "CRIER", "CRIME", "CRIMP", "CRISP", "CROAK", "CROOK", "CROP",
-            "CROSS", "CROUP", "CROWD", "CROWN", "CRUDE", "CRUEL", "CRUMB", "CRUSH", "CRUST", "CRYPT",
-            "CUBIC", "CURIO", "CURLY", "CURRY", "CURSE", "CURVE", "CUSHY", "CYNIC", "DADDY", "DAILY",
-            "DAIRY", "DAISY", "DANDY", "DANDY", "DAUNT", "DEALT", "DEATH", "DEBAR", "DEBIT", "DEBUG",
-            "DEBUT", "DECAL", "DECAY", "DECOR", "DECOY", "DECRY", "DEFER", "DEIGN", "DEITY", "DELAY",
-            "DELTA", "DELVE", "DEMON", "DENIM", "DEPOT", "DEPTH", "DERBY", "DETER", "DEVIL", "DIET",
-            "DIMLY", "DINER", "DINGO", "DINGY", "DIRGE", "DIRTY", "DISCO", "DITCH", "DITTO", "DITTY",
-            "DIVER", "DIZZY", "DODGE", "DODGY", "DOGMA", "DOING", "DONOR", "DONUT", "DOPEY", "DOUBT",
-            "DOUGH", "DOWDY", "DOWEL", "DOWNY", "DRAFT", "DRAIN", "DRAKE", "DRAMA", "DRAPE", "DRAWL",
-            "DRAWN", "DREAD", "DRESS", "DRIED", "DRIER", "DRIFT", "DRILL", "DRIVE", "DROID", "DROIT",
-            "DROLE", "DRONE", "DROOL", "DROOP", "DROP", "DROVE", "DROWN", "DRUID", "DRUNK", "DRYLY",
-            "DUCHY", "DUMMY", "DUMPY", "DUNCE", "DUSKY", "DUSTY", "DUTCH", "DWARF", "DWELL", "DWELT",
-            "DYING", "EAGER", "EARLY", "EARN", "EBONY", "ECLAT", "EDICT", "EDIFY", "EERIE", "EJECT",
-            "ELATE", "ELBOW", "ELDER", "EJECT", "ELOPE", "ELUDE", "EMAIL", "EMBED", "EMBER", "EMCEE",
-            "EMPTY", "ENACT", "ENDOW", "ENEMA", "ENEMY", "ENJOY", "ENNUI", "ENSUE", "ENTER", "ENTRY",
-            "ENVOY", "EPOCH", "EPOXY", "EQUAL", "EQUIP", "ERODE", "ERROR", "ERUPT", "ESSAY", "ESTATE",
-            "ETHER", "ETHIC", "ETHOS", "ETUDE", "EVADE", "EVENT", "EVERY", "EVICT", "EVOKE", "EXACT",
-            "EXALT", "EXCEL", "EXERT", "EXILE", "EXIST", "EXPEL", "EXTOL", "EXTRA", "EXULT", "EYING",
-            "FACET", "FADE", "FAINT", "FAIRY", "FAITH", "FALSE", "FANCY", "FARCE", "FARCE", "FATAL",
-            "FATTY", "FAULT", "FAUNA", "FAVOR", "FEAST", "FECAL", "FEIGN", "FELLA", "FELON", "FEMUR",
-            "FENCE", "FERAL", "FERRY", "FETCH", "FEVER", "FIBER", "FIELD", "FIEND", "FIERY", "FIFTH",
-            "FIFTY", "FIGHT", "FILER", "FILLET", "FILMY", "FILTH", "FINAL", "FINCH", "FINER", "FIRST",
-            "FISHY", "FIXER", "FIZZY", "FJORD", "FLACK", "FLAIL", "FLAIR", "FLAKE", "FLAKY", "FLAME",
-            "FLANK", "FLAP", "FLASH", "FLASK", "FLAT", "FLAW", "FLECK", "FLEET", "FLESH", "FLICK",
-            "FLIER", "FLING", "FLINT", "FLIRT", "FLOAT", "FLOCK", "FLOOD", "FLOOR", "FLORA", "FLOSS",
-            "FLOUR", "FLOUT", "FLOWN", "FLUFF", "FLUID", "FLUKE", "FLUNG", "FLUNK", "FLUSH", "FOAMY",
-            "FOCAL", "FOCUS", "FOGGY", "FOIST", "FOLIO", "FOLLY", "FORAY", "FORCE", "FORGE", "FORGO",
-            "FORGOT", "FORK", "FORTH", "FORTY", "FORUM", "FOUND", "FOYER", "FRAIL", "FRAME", "FRANK",
-            "FRAUD", "FRAY", "FREAK", "FREED", "FREER", "FRESH", "FRIED", "FRIER", "FRILL", "FRISK",
-            "FROCK", "FROND", "FRONT", "FROST", "FROTH", "FROWN", "FROZE", "FRUIT", "FRY", "FUDGE",
-            "FUGUE", "FULLY", "FUMES", "FUNGI", "FUNKY", "FUNNY", "FUROR", "FURY", "FUSE", "FUSSY",
-        ];
+        // VALID_WORDS will be populated from embedded solutions and optionally an external/local wordlist.
+        let VALID_WORDS = Array.from(new Set(SOLUTION_WORDS.map(w => w.toUpperCase())));
+
+        // Try to load an external wordlist (remote first, then local files) and merge 5-letter words.
+        async function loadWordlist() {
+            const candidates = [
+                'https://raw.githubusercontent.com/dwyl/english-words/master/words_alpha.txt',
+                'wordlist_dwyl.txt',
+                'wordlist.txt'
+            ];
+            for (const url of candidates) {
+                try {
+                    const resp = await fetch(url);
+                    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+                    const txt = await resp.text();
+                    const words = txt
+                        .split(/\r?\n/)
+                        .map(w => w.trim().toUpperCase())
+                        .filter(Boolean)
+                        .filter(w => w.length === 5); // keep 5-letter words for this game
+                    if (words.length > 0) {
+                        const merged = new Set([...VALID_WORDS, ...words]);
+                        VALID_WORDS = Array.from(merged);
+                        console.log('Loaded wordlist from', url, 'words:', VALID_WORDS.length);
+                        return;
+                    }
+                } catch (err) {
+                    console.warn('Could not load wordlist from', url, err);
+                    // try next candidate
+                }
+            }
+            console.warn('No external wordlist loaded; using embedded SOLUTION_WORDS only.');
+        }
 
 
         // --- GAME STATE ---
@@ -253,7 +212,13 @@
         ];
 
         // --- INITIALIZATION ---
-        function init() {
+        async function init() {
+            // Load dictionary (if available) before starting
+            try {
+                await loadWordlist();
+            } catch (e) {
+                console.warn('loadWordlist failed:', e);
+            }
             createKeyboard();
             createGrids();
             startGame();
