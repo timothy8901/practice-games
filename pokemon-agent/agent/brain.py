@@ -12,6 +12,8 @@ Notebook is the only long-term memory that survives across turns and sessions.
 from __future__ import annotations
 
 import base64
+import hashlib
+import io
 import json
 import os
 import time
@@ -20,10 +22,14 @@ from pathlib import Path
 from typing import Any
 
 import anthropic
+from PIL import Image
 
 from .controller import BridgeClient
+from . import ram
 
 DEFAULT_MODEL = os.environ.get("POKEMON_AGENT_MODEL", "claude-sonnet-4-6")
+SCREENSHOT_UPSCALE = 3  # 240x160 -> 720x480 so the vision model can read text
+STUCK_WINDOW = 4  # if the last N screen hashes are identical, warn the model
 
 VALID_BUTTONS = ["A", "B", "START", "SELECT", "UP", "DOWN", "LEFT", "RIGHT", "L", "R", "WAIT"]
 
@@ -152,6 +158,7 @@ class AgentState:
     )
     turn: int = 0
     history: list[HistoryEntry] = field(default_factory=list)
+    screen_hashes: list[str] = field(default_factory=list)
 
 
 class PokemonAgent:
@@ -196,19 +203,67 @@ class PokemonAgent:
             }) + "\n")
 
     # --- turn ----------------------------------------------------------------
+    def _prepare_image(self, raw_path: Path) -> tuple[str, str]:
+        """Upscale the native 240×160 GBA frame so the vision model can read it.
+
+        Returns (base64_png, sha1_of_raw). Nearest-neighbour keeps the pixel
+        art crisp; anti-aliasing would blur single-pixel text.
+        """
+        img = Image.open(raw_path)
+        scaled = img.resize(
+            (img.width * SCREENSHOT_UPSCALE, img.height * SCREENSHOT_UPSCALE),
+            resample=Image.NEAREST,
+        )
+        buf = io.BytesIO()
+        scaled.save(buf, format="PNG", optimize=False)
+        b64 = base64.b64encode(buf.getvalue()).decode()
+        digest = hashlib.sha1(raw_path.read_bytes()).hexdigest()
+        return b64, digest
+
+    def _detect_stuck(self, current_hash: str) -> bool:
+        self.state.screen_hashes.append(current_hash)
+        if len(self.state.screen_hashes) > STUCK_WINDOW + 2:
+            self.state.screen_hashes.pop(0)
+        window = self.state.screen_hashes[-STUCK_WINDOW:]
+        return len(window) >= STUCK_WINDOW and len(set(window)) == 1
+
+    def _read_ram_state(self) -> str:
+        try:
+            state = ram.read_game_state(self.bridge)
+            return ram.format_state(state)
+        except Exception as e:
+            return f"GAME_STATE: read failed ({type(e).__name__}: {e})"
+
     def _build_user_content(self, screenshot_path: Path) -> list[dict[str, Any]]:
-        img_b64 = base64.b64encode(screenshot_path.read_bytes()).decode()
+        img_b64, digest = self._prepare_image(screenshot_path)
+        stuck = self._detect_stuck(digest)
+        ram_summary = self._read_ram_state()
+
         recent_lines = []
         for e in self.state.history[-8:]:
             btns = ",".join(p.get("button", "?") for p in e.presses)
             recent_lines.append(f"  T{e.turn}: {e.observation[:90]} → {btns}")
         recent = "\n".join(recent_lines) if recent_lines else "  (none)"
 
+        stuck_block = ""
+        if stuck:
+            stuck_block = (
+                "\n⚠ STUCK DETECTED: the last "
+                f"{STUCK_WINDOW} screenshots are pixel-identical. Your previous "
+                "actions produced no visible change. Try something DIFFERENT — "
+                "press B, move the other direction, open the START menu, walk "
+                "away from an NPC, or wait longer for a slow animation.\n"
+            )
+
         text = (
             f"TURN {self.state.turn + 1}\n\n"
-            f"NOTEBOOK (your persistent memory):\n```\n{self.state.notebook}\n```\n\n"
+            f"{ram_summary}\n\n"
+            f"NOTEBOOK (your persistent memory):\n```\n{self.state.notebook}\n```\n"
+            f"{stuck_block}\n"
             f"RECENT TURNS (latest last):\n{recent}\n\n"
-            "Screenshot above shows the current frame. Call the `act` tool."
+            "The screenshot above is upscaled 3× from the native 240×160 GBA "
+            "frame. RAM-derived GAME_STATE is authoritative when it disagrees "
+            "with the image. Call the `act` tool."
         )
         return [
             {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": img_b64}},
