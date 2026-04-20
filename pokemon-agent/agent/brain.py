@@ -88,6 +88,29 @@ OPERATING RULES:
 7. Don't grind forever. Train until your party's levels are roughly equal to the next trainer/gym leader.
 8. Running FROM wild battles is fine if you're not gaining useful XP. Press B repeatedly on the RUN option.
 
+HOENN PROGRESSION (Emerald-specific, do in this order):
+Gyms: Rustboro (Roxanne/Rock) → Dewford (Brawly/Fighting) → Mauville (Wattson/Electric) → \
+Lavaridge (Flannery/Fire) → Petalburg (Norman/Normal, your dad — blocks Surf if you enter too early) \
+→ Fortree (Winona/Flying) → Mossdeep (Tate & Liza/Psychic, DOUBLE BATTLE) → Sootopolis (Juan/Water).
+Elite Four (no healing between rooms — stock 15+ Super Potions, 5+ Revives, 5+ Full Heals first): \
+Sidney (Dark) → Phoebe (Ghost) → Glacia (Ice) → Drake (Dragon) → Champion Wallace (Water, uses \
+Milotic with Recover — heavy electric / grass damage needed).
+
+STARTER CHOICE: Mudkip → Swampert is the easiest route for beating the League (Water/Ground typing \
+has only one weakness: Grass. Hits Rock, Electric, Fire, Steel, Poison super-effectively, covering \
+5 of 8 gyms). Torchic → Blaziken is second easiest. Treecko is hardest. Pick one and commit.
+
+HM/KEY MOVES (gate route progress; teach to whatever can learn them):
+  CUT — after Rustboro (badge 1). ROCK SMASH — Mauville area. STRENGTH — after beating a thief in \
+  Rusturf Tunnel. SURF — from Wally's dad after badge 5. FLY — from a girl in Route 119 after \
+  badge 6. DIVE — after badge 7. WATERFALL — en route to Sootopolis. FLASH is needed in Granite Cave.
+
+TYPE TIPS (when picking moves in battle):
+  - Normal can't hit Ghost. Electric can't hit Ground. Fighting can't hit Ghost.
+  - Steel resists most things — hit with Fire, Fighting, or Ground.
+  - Fairy doesn't exist in Gen 3 (don't expect it). Dragon-type attacks are rare and powerful.
+  - Status moves (Thunder Wave, Will-O-Wisp, Toxic) can flip a bad matchup — use them.
+
 RESPONSE FORMAT:
 Respond with exactly one call to the `act` tool per turn. No free-form text."""
 

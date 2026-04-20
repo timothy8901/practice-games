@@ -30,6 +30,9 @@ from .recorder import ScreenRecorder
 ROOT = Path(__file__).resolve().parent.parent
 SESSIONS_DIR = ROOT / "sessions"
 
+CHECKPOINT_EVERY_TURNS = 25     # roughly every ~2-3 minutes of play
+CHECKPOINT_KEEP = 10            # rolling window — older ones get pruned
+
 
 def _pick_session_dir(resume: bool) -> Path:
     SESSIONS_DIR.mkdir(exist_ok=True)
@@ -65,6 +68,19 @@ def _restore_prior_save(session_dir: Path) -> None:
 
 def _stamp(msg: str) -> None:
     print(f"[{dt.datetime.now().strftime('%H:%M:%S')}] {msg}", flush=True)
+
+
+def _write_checkpoint(client: BridgeClient, checkpoints_dir: Path, turn: int) -> None:
+    """Drop a rolling savestate so a run can be rewound if it goes off the rails."""
+    checkpoints_dir.mkdir(exist_ok=True)
+    path = checkpoints_dir / f"t{turn:05d}.ss1"
+    client.savestate(path)
+    existing = sorted(checkpoints_dir.glob("t*.ss1"))
+    for old in existing[:-CHECKPOINT_KEEP]:
+        try:
+            old.unlink()
+        except OSError:
+            pass
 
 
 def run_session(minutes: float, resume: bool, model: str, record: bool) -> int:
@@ -117,6 +133,7 @@ def run_session(minutes: float, resume: bool, model: str, record: bool) -> int:
         signal.signal(signal.SIGTERM, _sigint)
 
         save_hinted = False
+        checkpoints_dir = session_dir / "checkpoints"
         while time.monotonic() < deadline and not stop_requested["flag"]:
             t0 = time.monotonic()
             try:
@@ -127,6 +144,12 @@ def run_session(minutes: float, resume: bool, model: str, record: bool) -> int:
                     f"{entry.observation[:70]} → "
                     f"{','.join(p.get('button','?') for p in entry.presses)}"
                 )
+                if entry.turn % CHECKPOINT_EVERY_TURNS == 0:
+                    try:
+                        _write_checkpoint(client, checkpoints_dir, entry.turn)
+                        _stamp(f"checkpoint saved: t{entry.turn:05d}.ss1")
+                    except Exception as ce:
+                        _stamp(f"checkpoint failed: {ce}")
             except Exception as e:
                 last_error = f"{type(e).__name__}: {e}"
                 _stamp(f"turn failed: {last_error}")
