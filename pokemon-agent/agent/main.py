@@ -96,6 +96,12 @@ def run_session(minutes: float, resume: bool, model: str, record: bool) -> int:
     if resume:
         _restore_prior_save(session_dir)
     else:
+        # Safety net: stash whatever .sav was sitting next to the ROM before wiping,
+        # so a forgotten --resume flag can never silently destroy hours of progress.
+        if launcher.SAV_PATH.exists():
+            backup = session_dir / "pre-wipe.sav"
+            shutil.copy2(launcher.SAV_PATH, backup)
+            _stamp(f"backed up existing save → {backup.relative_to(ROOT)}")
         launcher.wipe_save_file()
         _stamp("wiped save file for fresh run")
 

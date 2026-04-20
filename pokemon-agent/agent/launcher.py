@@ -19,7 +19,14 @@ from .controller import BridgeClient
 
 MGBA_BIN = "/Users/tim/games/mGBA.app/Contents/MacOS/mGBA"
 BRIDGE_LUA = Path(__file__).resolve().parent.parent / "bridge" / "mgba_bridge.lua"
-ROM_PATH = Path(__file__).resolve().parent.parent / "rom" / "pokemon_emerald.gba"
+# mGBA stores the in-game .sav alongside the ROM, so SAV_PATH is derived from ROM_PATH.
+# Override with POKEMON_ROM_PATH if the ROM lives somewhere else.
+ROM_PATH = Path(
+    os.environ.get(
+        "POKEMON_ROM_PATH",
+        "/Users/tim/games/Pokemon - Emerald Version (USA, Europe).gba",
+    )
+).expanduser()
 SAV_PATH = ROM_PATH.with_suffix(".sav")
 
 
