@@ -83,7 +83,7 @@ def _write_checkpoint(client: BridgeClient, checkpoints_dir: Path, turn: int) ->
             pass
 
 
-def run_session(minutes: float, resume: bool, model: str, record: bool) -> int:
+def run_session(minutes: float, resume: bool, fresh: bool, model: str, record: bool) -> int:
     session_dir = _pick_session_dir(resume)
     _stamp(f"session dir: {session_dir}")
 
@@ -92,18 +92,27 @@ def run_session(minutes: float, resume: bool, model: str, record: bool) -> int:
         print("  export ANTHROPIC_API_KEY=sk-ant-...", file=sys.stderr)
         return 2
 
-    # Handle save file
-    if resume:
-        _restore_prior_save(session_dir)
-    else:
-        # Safety net: stash whatever .sav was sitting next to the ROM before wiping,
-        # so a forgotten --resume flag can never silently destroy hours of progress.
+    # Handle save file.
+    #   default  → trust the live .sav sitting next to the ROM (mGBA shows CONTINUE).
+    #              If nothing's there, fall back to the latest session backup.
+    #   --fresh  → wipe the live .sav (after backing it up) and start a new playthrough.
+    #   --resume → force-restore the most recent session's rom.sav, overwriting whatever is live.
+    #              Useful for rolling back a corrupted / bad run.
+    if fresh:
         if launcher.SAV_PATH.exists():
             backup = session_dir / "pre-wipe.sav"
             shutil.copy2(launcher.SAV_PATH, backup)
             _stamp(f"backed up existing save → {backup.relative_to(ROOT)}")
         launcher.wipe_save_file()
-        _stamp("wiped save file for fresh run")
+        _stamp("wiped save file for fresh run (--fresh)")
+    elif resume:
+        _restore_prior_save(session_dir)
+    elif launcher.SAV_PATH.exists():
+        size = launcher.SAV_PATH.stat().st_size
+        _stamp(f"using live save at {launcher.SAV_PATH.name} ({size} B)")
+    else:
+        _stamp("no live save found; trying latest session backup")
+        _restore_prior_save(session_dir)
 
     # Launch mGBA and connect
     _stamp("launching mGBA")
@@ -227,11 +236,13 @@ def run_session(minutes: float, resume: bool, model: str, record: bool) -> int:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run the Pokemon Emerald agent for a timed session.")
     parser.add_argument("--minutes", type=float, default=60.0, help="Session length in minutes (default 60).")
-    parser.add_argument("--resume", action="store_true", help="Continue from the most recent session's save.")
     parser.add_argument("--model", default=DEFAULT_MODEL, help="Claude model id (default from brain.py).")
     parser.add_argument("--no-record", action="store_true", help="Skip screen recording.")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--fresh", action="store_true", help="Wipe the existing save and start a new playthrough (old save backed up to session_dir/pre-wipe.sav).")
+    mode.add_argument("--resume", action="store_true", help="Force-restore the latest session backup over the live save (for rollback).")
     args = parser.parse_args(argv)
-    return run_session(args.minutes, args.resume, args.model, record=not args.no_record)
+    return run_session(args.minutes, args.resume, args.fresh, args.model, record=not args.no_record)
 
 
 if __name__ == "__main__":
