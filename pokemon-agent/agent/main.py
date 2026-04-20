@@ -66,6 +66,27 @@ def _restore_prior_save(session_dir: Path) -> None:
     print("[main] no prior save to restore — starting fresh")
 
 
+def _inherit_notebook(session_dir: Path) -> Path | None:
+    """Seed this session's notebook.md from the most recent prior session's notebook
+    so the agent keeps its accumulated strategy notes across runs.
+    Called before the agent starts, so PokemonAgent._load_notebook picks it up naturally.
+    Skipped on --fresh (new playthrough = clean slate). Returns the source path copied
+    from, or None if no prior notebook was found.
+    """
+    dest = session_dir / "notebook.md"
+    if dest.exists():
+        return None  # already seeded (e.g. mid-run restart)
+    runs = sorted(p for p in SESSIONS_DIR.iterdir() if p.is_dir() and p.name.startswith("run-"))
+    for prior in reversed(runs):
+        if prior == session_dir:
+            continue
+        src = prior / "notebook.md"
+        if src.exists() and src.stat().st_size > 0:
+            shutil.copy2(src, dest)
+            return src
+    return None
+
+
 def _stamp(msg: str) -> None:
     print(f"[{dt.datetime.now().strftime('%H:%M:%S')}] {msg}", flush=True)
 
@@ -113,6 +134,13 @@ def run_session(minutes: float, resume: bool, fresh: bool, model: str, record: b
     else:
         _stamp("no live save found; trying latest session backup")
         _restore_prior_save(session_dir)
+
+    # Seed the notebook from the last session so the agent keeps its accumulated
+    # strategy notes across runs. --fresh skips this (new playthrough, clean slate).
+    if not fresh:
+        src = _inherit_notebook(session_dir)
+        if src is not None:
+            _stamp(f"inherited notebook from {src.parent.name} ({src.stat().st_size} B)")
 
     # Launch mGBA and connect
     _stamp("launching mGBA")
