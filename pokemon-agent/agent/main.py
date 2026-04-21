@@ -29,9 +29,11 @@ from .recorder import ScreenRecorder
 
 ROOT = Path(__file__).resolve().parent.parent
 SESSIONS_DIR = ROOT / "sessions"
+PAUSE_FLAG = ROOT / "pause.flag"   # touch to hand control to the human; rm to resume
 
 CHECKPOINT_EVERY_TURNS = 25     # roughly every ~2-3 minutes of play
 CHECKPOINT_KEEP = 10            # rolling window — older ones get pruned
+PAUSE_POLL_SECONDS = 1.0        # how often to re-check the pause flag while paused
 
 
 def _pick_session_dir(resume: bool) -> Path:
@@ -176,8 +178,24 @@ def run_session(minutes: float, resume: bool, fresh: bool, model: str, record: b
         signal.signal(signal.SIGTERM, _sigint)
 
         save_hinted = False
+        paused = False
         checkpoints_dir = session_dir / "checkpoints"
         while time.monotonic() < deadline and not stop_requested["flag"]:
+            # Human-in-the-loop: if pause.flag exists at repo root, stop calling the
+            # agent so the user can drive mGBA directly from the keyboard. The
+            # emulator keeps running; we just stop queuing presses and API calls.
+            if PAUSE_FLAG.exists():
+                if not paused:
+                    _stamp(f"PAUSED — agent idle while {PAUSE_FLAG.name} exists. `rm {PAUSE_FLAG.relative_to(ROOT)}` to resume.")
+                    paused = True
+                time.sleep(PAUSE_POLL_SECONDS)
+                continue
+            if paused:
+                _stamp("resumed — agent taking control again")
+                paused = False
+                # Drop stale screen hashes so stuck-detection doesn't fire on the
+                # screens the agent never saw during the takeover.
+                agent.state.screen_hashes.clear()
             t0 = time.monotonic()
             try:
                 entry = agent.step()
