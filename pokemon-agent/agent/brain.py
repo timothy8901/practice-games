@@ -31,6 +31,10 @@ DEFAULT_MODEL = os.environ.get("POKEMON_AGENT_MODEL", "claude-sonnet-4-6")
 SCREENSHOT_UPSCALE = 3  # 240x160 -> 720x480 so the vision model can read text
 STUCK_WINDOW = 4  # if the last N screen hashes are identical, warn the model
 
+# Static reference knowledge — a step-by-step Mudkip-solo route to the Elite Four.
+# Loaded once and cached on the API side so per-turn cost is negligible.
+WALKTHROUGH_PATH = Path(__file__).resolve().parent.parent / "walkthrough.md"
+
 VALID_BUTTONS = ["A", "B", "START", "SELECT", "UP", "DOWN", "LEFT", "RIGHT", "L", "R", "WAIT"]
 
 SYSTEM_PROMPT = """You are an autonomous agent playing Pokémon Emerald on a Game Boy Advance emulator.
@@ -205,6 +209,7 @@ class PokemonAgent:
         self.max_retries = max_retries
         self.state = AgentState()
         self._load_notebook()
+        self.walkthrough = self._load_walkthrough()
 
     # --- persistence ----------------------------------------------------------
     def _load_notebook(self) -> None:
@@ -213,6 +218,12 @@ class PokemonAgent:
 
     def _save_notebook(self) -> None:
         self.notebook_path.write_text(self.state.notebook)
+
+    def _load_walkthrough(self) -> str:
+        try:
+            return WALKTHROUGH_PATH.read_text()
+        except FileNotFoundError:
+            return ""
 
     def _log_turn(self, entry: HistoryEntry, screenshot: Path) -> None:
         with self.log_path.open("a") as f:
@@ -298,6 +309,18 @@ class PokemonAgent:
         system_blocks = [
             {"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}},
         ]
+        if self.walkthrough:
+            system_blocks.append({
+                "type": "text",
+                "text": (
+                    "REFERENCE WALKTHROUGH — authoritative step-by-step route to the Elite Four. "
+                    "Follow this order. When the notebook OBJECTIVE drifts, realign to the next "
+                    "uncompleted step here. The X-item setup tactic for E4 is especially important "
+                    "for an agent that struggles with type matchups under time pressure.\n\n"
+                    + self.walkthrough
+                ),
+                "cache_control": {"type": "ephemeral"},
+            })
         tools_with_cache = [dict(ACT_TOOL, cache_control={"type": "ephemeral"})]
         for attempt in range(self.max_retries):
             try:
