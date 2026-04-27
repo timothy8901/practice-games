@@ -1,14 +1,4 @@
-"""Claude-backed decision loop for the Pokemon Emerald agent.
-
-Each turn:
-  1. Take a screenshot from the bridge.
-  2. Build a compact prompt: current frame + notebook + recent action log.
-  3. Call Claude with an `act` tool that forces structured output.
-  4. Execute the queued button presses via the bridge.
-  5. Persist the notebook and log so the agent can resume next session.
-
-Notebook is the only long-term memory that survives across turns and sessions.
-"""
+"""Local-first controller for the Pokemon Emerald agent."""
 from __future__ import annotations
 
 import base64
@@ -17,151 +7,77 @@ import io
 import json
 import os
 import time
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
-import anthropic
 from PIL import Image
 
-from .controller import BridgeClient
+try:
+    import anthropic
+except ImportError:  # pragma: no cover - optional fallback dependency
+    anthropic = None  # type: ignore[assignment]
+
 from . import ram
+from .controller import BridgeClient
+from .learning import ProgressTracker
+from .policy import LocalHybridPolicy, PHASE_OBJECTIVES, PolicyDecision, press, shopping_plan
 
 DEFAULT_MODEL = os.environ.get("POKEMON_AGENT_MODEL", "claude-sonnet-4-6")
-SCREENSHOT_UPSCALE = 3  # 240x160 -> 720x480 so the vision model can read text
-STUCK_WINDOW = 4  # if the last N screen hashes are identical, warn the model
-
-# Static reference knowledge — a step-by-step Mudkip-solo route to the Elite Four.
-# Loaded once and cached on the API side so per-turn cost is negligible.
+SCREENSHOT_UPSCALE = 3
+RAM_STUCK_WINDOW = 6
+SCREEN_STUCK_WINDOW = 4
+# When macro-stuck (per ProgressTracker.macro_stuck), we ask the model for a
+# course correction — but no more than once every this many turns, so a long
+# stagnation doesn't burn one API call per turn.
+MACRO_FALLBACK_COOLDOWN = 25
 WALKTHROUGH_PATH = Path(__file__).resolve().parent.parent / "walkthrough.md"
-
-VALID_BUTTONS = ["A", "B", "START", "SELECT", "UP", "DOWN", "LEFT", "RIGHT", "L", "R", "WAIT"]
-
-SYSTEM_PROMPT = """You are an autonomous agent playing Pokémon Emerald on a Game Boy Advance emulator.
-
-YOUR GOAL: Beat the Pokémon League — the Elite Four and the Champion — as efficiently as possible. \
-Play like a focused speedrunner: train adequately, make good strategic choices, don't waste time. \
-No cheats, no glitches, no code manipulation — just skilled play.
-
-BUTTONS:
-- A: confirm / interact / advance text
-- B: cancel / back / run from wild encounter
-- START: open main menu in overworld / skip title screens
-- SELECT: Pokédex / registered item
-- UP/DOWN/LEFT/RIGHT: move character or cursor
-- L/R: rarely used
-- WAIT: no input, just wait frames
-
-Each button has hold_frames (how long the button is held; 4–8 is normal for menus) and \
-release_frames (how long after release before the NEXT press; 12–20 is normal). \
-For dialog mashing, A with hold=4 release=20 works well. For fast walking, hold a direction for 30+ frames. \
-You may queue up to 8 presses per turn — use this to batch obvious actions and save API calls.
-
-YOUR NOTEBOOK:
-You have a single persistent notebook. It is the only memory that survives between turns and sessions. \
-Keep it structured and under 3KB. Example:
-
-  GOAL: beat the Elite Four
-  PHASE: intro / Littleroot / Route 101 / Petalburg Gym / ...
-  PARTY:
-    - <name> <level> <hp> <moves>
-  OBJECTIVE: "what I'm trying to do right this moment"
-  BADGES: 0/8
-  MONEY: <amount>
-  ITEMS: <key items>
-  ROUTE_NOTES:
-    - short notes about trainers, wild encounters, puzzles
-  BLOCKERS: <nothing, or what I'm stuck on>
-
-Update the notebook ONLY when the world state actually changes in a way you'd want to remember next turn: \
-entered a new area, beat a trainer, leveled up, got a key item, chose a starter, solved a puzzle, \
-or noticed something surprising. Do NOT rewrite the whole notebook every turn — that burns tokens.
-
-OPERATING RULES:
-1. When asked to name your character: name it CLAUDE. Use the on-screen keyboard (move the cursor with \
-   D-pad, press A to select a letter). Don't name any Pokémon — skip naming by selecting OK.
-2. Any starter is fine; pick one and commit.
-3. When dialogue is scrolling or waiting, press A to advance. If the screen hasn't changed after your last \
-   press, keep pressing A — don't invent new actions for no reason.
-4. If you're stuck (same screen for 3+ of your own turns), try a DIFFERENT action: press B to cancel, \
-   try the opposite direction, open the START menu, back away from an NPC.
-5. Save the game frequently via START menu → SAVE → YES → YES — especially before gym leaders and \
-   before unexplored routes. Saving is cheap; losing progress is expensive.
-6. In battle: READ the HP bars, type effectiveness, and move names. Pick moves with type advantage. \
-   Heal at low HP. Switch if your Pokémon is at type disadvantage.
-7. Don't grind forever. Train until your party's levels are roughly equal to the next trainer/gym leader.
-8. Running FROM wild battles is fine if you're not gaining useful XP. Press B repeatedly on the RUN option.
-
-HOENN PROGRESSION (Emerald-specific, do in this order):
-Gyms: Rustboro (Roxanne/Rock) → Dewford (Brawly/Fighting) → Mauville (Wattson/Electric) → \
-Lavaridge (Flannery/Fire) → Petalburg (Norman/Normal, your dad — blocks Surf if you enter too early) \
-→ Fortree (Winona/Flying) → Mossdeep (Tate & Liza/Psychic, DOUBLE BATTLE) → Sootopolis (Juan/Water).
-Elite Four (no healing between rooms — stock 15+ Super Potions, 5+ Revives, 5+ Full Heals first): \
-Sidney (Dark) → Phoebe (Ghost) → Glacia (Ice) → Drake (Dragon) → Champion Wallace (Water, uses \
-Milotic with Recover — heavy electric / grass damage needed).
-
-STARTER CHOICE: Mudkip → Swampert is the easiest route for beating the League (Water/Ground typing \
-has only one weakness: Grass. Hits Rock, Electric, Fire, Steel, Poison super-effectively, covering \
-5 of 8 gyms). Torchic → Blaziken is second easiest. Treecko is hardest. Pick one and commit.
-
-HM/KEY MOVES (gate route progress; teach to whatever can learn them):
-  CUT — after Rustboro (badge 1). ROCK SMASH — Mauville area. STRENGTH — after beating a thief in \
-  Rusturf Tunnel. SURF — from Wally's dad after badge 5. FLY — from a girl in Route 119 after \
-  badge 6. DIVE — after badge 7. WATERFALL — en route to Sootopolis. FLASH is needed in Granite Cave.
-
-TYPE TIPS (when picking moves in battle):
-  - Normal can't hit Ghost. Electric can't hit Ground. Fighting can't hit Ghost.
-  - Steel resists most things — hit with Fire, Fighting, or Ground.
-  - Fairy doesn't exist in Gen 3 (don't expect it). Dragon-type attacks are rare and powerful.
-  - Status moves (Thunder Wave, Will-O-Wisp, Toxic) can flip a bad matchup — use them.
-
-RESPONSE FORMAT:
-Respond with exactly one call to the `act` tool per turn. No free-form text."""
+VALID_BUTTONS = {"A", "B", "START", "SELECT", "UP", "DOWN", "LEFT", "RIGHT", "L", "R", "WAIT"}
 
 ACT_TOOL: dict[str, Any] = {
     "name": "act",
-    "description": (
-        "Report what you see on screen, (optionally) update your notebook, and queue the next button presses."
-    ),
+    "description": "Pick the next safe button presses for the current Pokemon Emerald screen.",
     "input_schema": {
         "type": "object",
         "properties": {
-            "observation": {
-                "type": "string",
-                "description": "One or two sentences describing what is on the screen right now.",
-            },
-            "reasoning": {
-                "type": "string",
-                "description": "Short justification for the chosen actions (≤ 2 sentences).",
-            },
+            "observation": {"type": "string"},
+            "reasoning": {"type": "string"},
             "presses": {
                 "type": "array",
-                "description": "1–8 button presses to execute in order. Use WAIT to let animation/dialog advance.",
                 "minItems": 1,
                 "maxItems": 8,
                 "items": {
                     "type": "object",
                     "properties": {
-                        "button": {"type": "string", "enum": VALID_BUTTONS},
-                        "hold_frames": {"type": "integer", "minimum": 1, "maximum": 600, "default": 6},
-                        "release_frames": {"type": "integer", "minimum": 1, "maximum": 600, "default": 12},
+                        "button": {"type": "string"},
+                        "hold_frames": {"type": "integer"},
+                        "release_frames": {"type": "integer"},
                     },
                     "required": ["button"],
                     "additionalProperties": False,
                 },
-            },
-            "notebook": {
-                "type": "string",
-                "description": (
-                    "New notebook content, fully replacing the old one. Omit this field if you don't want to "
-                    "change the notebook. Keep under 3KB."
-                ),
             },
         },
         "required": ["observation", "reasoning", "presses"],
         "additionalProperties": False,
     },
 }
+
+FALLBACK_SYSTEM_PROMPT = """You are a tactical fallback controller for a local Pokemon Emerald agent.
+
+The local controller already tracks phase, map, flags, and recovery state from RAM.
+Use the RAM summary as authoritative. Only solve the current ambiguous screen.
+
+Hard constraints:
+- Goal: beat Pokemon Emerald efficiently with a Mudkip solo route.
+- Trainer name must be CLAUDE.
+- Always choose Mudkip.
+- Never nickname Pokemon.
+- Prefer compact, safe actions that make immediate progress.
+- If the screen is a battle and the best move is unclear, advancing with A is acceptable.
+
+Return exactly one act tool call.
+"""
 
 
 @dataclass
@@ -170,22 +86,30 @@ class HistoryEntry:
     observation: str
     reasoning: str
     presses: list[dict[str, Any]]
+    phase: str
+    objective: str
+    source: str = "local"
 
 
 @dataclass
 class AgentState:
-    notebook: str = (
-        "GOAL: beat the Pokémon League (Elite Four + Champion)\n"
-        "PHASE: fresh boot — game has just started\n"
-        "PARTY: none yet\n"
-        "OBJECTIVE: press START at the title screen, then choose NEW GAME\n"
-        "BADGES: 0/8\n"
-        "NOTES:\n"
-        "  - player name must be CLAUDE on the naming screen\n"
-    )
+    phase: str = "boot_intro"
+    objective: str = PHASE_OBJECTIVES["boot_intro"]
     turn: int = 0
-    history: list[HistoryEntry] = field(default_factory=list)
-    screen_hashes: list[str] = field(default_factory=list)
+    repeat_count: int = 0
+    screenshot_repeat_count: int = 0
+    recovery_attempts: int = 0
+    rollbacks: int = 0
+    fallback_uses: int = 0
+    # Turn at which we last asked the model to break a macro-stuck pattern.
+    # Used to rate-limit fallback API calls so a long stuck period doesn't
+    # burn one model call per turn.
+    last_macro_fallback_turn: int = -10_000
+    last_signature: list[Any] | None = None
+    last_screen_hash: str = ""
+    last_map: str = ""
+    last_ram: dict[str, Any] = field(default_factory=dict)
+    recent_notes: list[str] = field(default_factory=list)
 
 
 class PokemonAgent:
@@ -195,54 +119,124 @@ class PokemonAgent:
         session_dir: Path,
         model: str = DEFAULT_MODEL,
         api_key: str | None = None,
-        max_retries: int = 4,
+        max_retries: int = 3,
     ):
         self.bridge = bridge
         self.session_dir = Path(session_dir)
         self.session_dir.mkdir(parents=True, exist_ok=True)
         self.frames_dir = self.session_dir / "frames"
         self.frames_dir.mkdir(exist_ok=True)
+        self.checkpoints_dir = self.session_dir / "checkpoints"
         self.notebook_path = self.session_dir / "notebook.md"
         self.log_path = self.session_dir / "turns.jsonl"
+        self.session_state_path = self.session_dir / "session_state.json"
+        self.tracker_path = self.session_dir / "progress_tracker.json"
         self.model = model
-        self.client = anthropic.Anthropic(api_key=api_key or os.environ.get("ANTHROPIC_API_KEY"))
         self.max_retries = max_retries
+        self.policy = LocalHybridPolicy()
         self.state = AgentState()
-        self._load_notebook()
+        self.history: list[HistoryEntry] = []
         self.walkthrough = self._load_walkthrough()
+        # Experiential memory: walls hit, NPCs talked-to, time-since-progress, etc.
+        # Persists per-session and is inherited from the previous run by main.py.
+        self.tracker = ProgressTracker.load(self.tracker_path)
+        self.last_macro_reason: str | None = None
+        self.client = None
+        if anthropic is not None:
+            key = api_key or os.environ.get("ANTHROPIC_API_KEY")
+            if key:
+                self.client = anthropic.Anthropic(api_key=key)
+        self._load_session_state()
+        self._save_human_mirror()
 
-    # --- persistence ----------------------------------------------------------
-    def _load_notebook(self) -> None:
-        if self.notebook_path.exists():
-            self.state.notebook = self.notebook_path.read_text()
-
-    def _save_notebook(self) -> None:
-        self.notebook_path.write_text(self.state.notebook)
-
+    # --- persistence ------------------------------------------------------
     def _load_walkthrough(self) -> str:
         try:
-            return WALKTHROUGH_PATH.read_text()
+            return WALKTHROUGH_PATH.read_text(encoding="utf-8-sig")
         except FileNotFoundError:
             return ""
 
-    def _log_turn(self, entry: HistoryEntry, screenshot: Path) -> None:
-        with self.log_path.open("a") as f:
-            f.write(json.dumps({
-                "turn": entry.turn,
-                "observation": entry.observation,
-                "reasoning": entry.reasoning,
-                "presses": entry.presses,
-                "screenshot": str(screenshot.name),
-                "timestamp": time.time(),
-            }) + "\n")
+    def _load_session_state(self) -> None:
+        if not self.session_state_path.exists():
+            return
+        try:
+            raw = json.loads(self.session_state_path.read_text())
+        except json.JSONDecodeError:
+            return
+        for key in asdict(self.state):
+            if key in raw:
+                setattr(self.state, key, raw[key])
 
-    # --- turn ----------------------------------------------------------------
+    def _save_session_state(self) -> None:
+        self.session_state_path.write_text(json.dumps(asdict(self.state), indent=2, sort_keys=True))
+
+    def _append_note(self, note: str) -> None:
+        if self.state.recent_notes and self.state.recent_notes[-1] == note:
+            return
+        self.state.recent_notes.append(note)
+        if len(self.state.recent_notes) > 12:
+            self.state.recent_notes = self.state.recent_notes[-12:]
+
+    def _save_human_mirror(self) -> None:
+        state = self.state.last_ram
+        badge_count = state.get("badge_count", 0)
+        map_name = state.get("map_name") or "unknown"
+        party = state.get("party") or []
+        party_lines = ["PARTY:"]
+        if not party:
+            party_lines.append("  - none")
+        else:
+            for mon in party:
+                party_lines.append(
+                    f"  - slot {mon['slot']}: Lv{mon['level']} HP {mon['hp']}/{mon['max_hp']}"
+                )
+
+        supply_lines = []
+        tracked_items = state.get("tracked_items") or {}
+        if badge_count >= 6:
+            deficits = shopping_plan(ram.GameState(**state))
+            useful = [f"{name}: need {qty}" for name, qty in deficits.items() if qty > 0]
+            if useful:
+                supply_lines.append("SHOPPING DEFICITS:")
+                supply_lines.extend(f"  - {line}" for line in useful)
+
+        note_lines = ["NOTES:"]
+        if self.state.recent_notes:
+            note_lines.extend(f"  - {note}" for note in self.state.recent_notes)
+        else:
+            note_lines.append("  - none yet")
+
+        text = "\n".join(
+            [
+                "GOAL: Beat the Elite Four and Champion efficiently with a Mudkip solo route.",
+                f"PHASE: {self.state.phase}",
+                f"OBJECTIVE: {self.state.objective}",
+                f"MAP: {map_name}",
+                f"BADGES: {badge_count}/8",
+                f"RECOVERY: repeat_count={self.state.repeat_count} rollback_count={self.state.rollbacks} fallback_uses={self.state.fallback_uses}",
+                *party_lines,
+                "TRACKED ITEMS:",
+                *([f"  - {name}: {qty}" for name, qty in sorted(tracked_items.items())] or ["  - none"]),
+                *supply_lines,
+                *note_lines,
+            ]
+        )
+        self.notebook_path.write_text(text + "\n")
+
+    def request_save_soon(self) -> None:
+        self._append_note("Session timer is low. Prioritize saving from the START menu as soon as the route is safe.")
+        self._save_session_state()
+        self._save_human_mirror()
+
+    def clear_runtime_tracking(self) -> None:
+        self.state.repeat_count = 0
+        self.state.screenshot_repeat_count = 0
+        self.state.recovery_attempts = 0
+        self.state.last_signature = None
+        self.state.last_screen_hash = ""
+
+    # --- utils ------------------------------------------------------------
     def _prepare_image(self, raw_path: Path) -> tuple[str, str]:
-        """Upscale the native 240×160 GBA frame so the vision model can read it.
-
-        Returns (base64_png, sha1_of_raw). Nearest-neighbour keeps the pixel
-        art crisp; anti-aliasing would blur single-pixel text.
-        """
         img = Image.open(raw_path)
         scaled = img.resize(
             (img.width * SCREENSHOT_UPSCALE, img.height * SCREENSHOT_UPSCALE),
@@ -254,100 +248,148 @@ class PokemonAgent:
         digest = hashlib.sha1(raw_path.read_bytes()).hexdigest()
         return b64, digest
 
-    def _detect_stuck(self, current_hash: str) -> bool:
-        self.state.screen_hashes.append(current_hash)
-        if len(self.state.screen_hashes) > STUCK_WINDOW + 2:
-            self.state.screen_hashes.pop(0)
-        window = self.state.screen_hashes[-STUCK_WINDOW:]
-        return len(window) >= STUCK_WINDOW and len(set(window)) == 1
+    def _sanitize_presses(self, presses: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        out: list[dict[str, Any]] = []
+        for step in presses:
+            button = str(step.get("button", "")).upper()
+            if button not in VALID_BUTTONS:
+                continue
+            hold = max(1, min(600, int(step.get("hold_frames", 6))))
+            release = max(1, min(600, int(step.get("release_frames", 12))))
+            out.append({"button": button, "hold_frames": hold, "release_frames": release})
+        if not out:
+            out.append(press("WAIT", 24, 1))
+        return out[:8]
 
-    def _read_ram_state(self) -> str:
-        try:
-            state = ram.read_game_state(self.bridge)
-            return ram.format_state(state)
-        except Exception as e:
-            return f"GAME_STATE: read failed ({type(e).__name__}: {e})"
+    def _latest_checkpoint(self) -> Path | None:
+        if not self.checkpoints_dir.exists():
+            return None
+        checkpoints = sorted(self.checkpoints_dir.glob("t*.ss1"))
+        return checkpoints[-1] if checkpoints else None
 
-    def _build_user_content(self, screenshot_path: Path) -> list[dict[str, Any]]:
-        img_b64, digest = self._prepare_image(screenshot_path)
-        stuck = self._detect_stuck(digest)
-        ram_summary = self._read_ram_state()
+    def _should_recover(self) -> bool:
+        if self.state.repeat_count >= RAM_STUCK_WINDOW:
+            return True
+        if self.state.repeat_count >= 4 and self.state.screenshot_repeat_count >= SCREEN_STUCK_WINDOW:
+            return True
+        return False
 
-        recent_lines = []
-        for e in self.state.history[-8:]:
-            btns = ",".join(p.get("button", "?") for p in e.presses)
-            recent_lines.append(f"  T{e.turn}: {e.observation[:90]} → {btns}")
-        recent = "\n".join(recent_lines) if recent_lines else "  (none)"
+    def _update_progress_tracking(self, game_state: ram.GameState, screen_hash: str) -> None:
+        signature = list(game_state.progress_signature())
+        if self.state.last_signature == signature:
+            self.state.repeat_count += 1
+        else:
+            self.state.repeat_count = 0
+            self.state.recovery_attempts = 0
+        if self.state.last_screen_hash == screen_hash:
+            self.state.screenshot_repeat_count += 1
+        else:
+            self.state.screenshot_repeat_count = 0
+        self.state.last_signature = signature
+        self.state.last_screen_hash = screen_hash
 
-        stuck_block = ""
-        if stuck:
-            stuck_block = (
-                "\n⚠ STUCK DETECTED: the last "
-                f"{STUCK_WINDOW} screenshots are pixel-identical. Your previous "
-                "actions produced no visible change. Try something DIFFERENT — "
-                "press B, move the other direction, open the START menu, walk "
-                "away from an NPC, or wait longer for a slow animation.\n"
+    def _log_turn(
+        self,
+        entry: HistoryEntry,
+        screenshot: Path,
+        game_state: ram.GameState,
+    ) -> None:
+        with self.log_path.open("a") as handle:
+            handle.write(
+                json.dumps(
+                    {
+                        "turn": entry.turn,
+                        "phase": entry.phase,
+                        "objective": entry.objective,
+                        "observation": entry.observation,
+                        "reasoning": entry.reasoning,
+                        "presses": entry.presses,
+                        "source": entry.source,
+                        "screenshot": screenshot.name,
+                        "timestamp": time.time(),
+                        "ram": game_state.to_dict(),
+                    }
+                )
+                + "\n"
             )
 
-        text = (
-            f"TURN {self.state.turn + 1}\n\n"
-            f"{ram_summary}\n\n"
-            f"NOTEBOOK (your persistent memory):\n```\n{self.state.notebook}\n```\n"
-            f"{stuck_block}\n"
-            f"RECENT TURNS (latest last):\n{recent}\n\n"
-            "The screenshot above is upscaled 3× from the native 240×160 GBA "
-            "frame. RAM-derived GAME_STATE is authoritative when it disagrees "
-            "with the image. Call the `act` tool."
-        )
-        return [
-            {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": img_b64}},
-            {"type": "text", "text": text},
-        ]
+    # --- optional model fallback -----------------------------------------
+    def _call_model_fallback(
+        self,
+        screenshot_path: Path,
+        game_state: ram.GameState,
+        local_decision: PolicyDecision,
+    ) -> PolicyDecision:
+        if self.client is None:
+            return local_decision
 
-    def _call_model(self, user_content: list[dict[str, Any]]) -> dict[str, Any]:
-        last_err: Exception | None = None
-        system_blocks = [
-            {"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}},
-        ]
+        img_b64, _ = self._prepare_image(screenshot_path)
+        map_key = f"{game_state.map_group}.{game_state.map_num}"
+        pos_key = (
+            f"{game_state.pos_x},{game_state.pos_y}"
+            if game_state.pos_x is not None and game_state.pos_y is not None
+            else "?"
+        )
+        tracker_summary = self.tracker.summary_for_model(self.state.turn, map_key, pos_key)
+        prompt = (
+            f"Fallback reason: {local_decision.fallback_reason}\n\n"
+            f"{tracker_summary}\n\n"
+            f"{ram.format_state(game_state)}\n\n"
+            f"Local controller phase: {local_decision.phase}\n"
+            f"Local objective: {local_decision.objective}\n"
+            f"Local plan if no better idea exists: {json.dumps(local_decision.presses)}\n\n"
+            "Choose the next 1-8 button presses for the current screen. "
+            "If PROGRESS_TRACKER lists walls at this tile, do NOT press those directions. "
+            "If it lists an NPC loop, walk away rather than pressing A again."
+        )
+        system = FALLBACK_SYSTEM_PROMPT
         if self.walkthrough:
-            system_blocks.append({
-                "type": "text",
-                "text": (
-                    "REFERENCE WALKTHROUGH — authoritative step-by-step route to the Elite Four. "
-                    "Follow this order. When the notebook OBJECTIVE drifts, realign to the next "
-                    "uncompleted step here. The X-item setup tactic for E4 is especially important "
-                    "for an agent that struggles with type matchups under time pressure.\n\n"
-                    + self.walkthrough
-                ),
-                "cache_control": {"type": "ephemeral"},
-            })
-        tools_with_cache = [dict(ACT_TOOL, cache_control={"type": "ephemeral"})]
+            system += "\n\nReference route:\n" + self.walkthrough
+
+        last_error: Exception | None = None
         for attempt in range(self.max_retries):
             try:
-                resp = self.client.messages.create(
+                response = self.client.messages.create(
                     model=self.model,
-                    max_tokens=2048,
-                    system=system_blocks,
-                    tools=tools_with_cache,
+                    max_tokens=1024,
+                    system=system,
+                    tools=[ACT_TOOL],
                     tool_choice={"type": "tool", "name": "act"},
-                    messages=[{"role": "user", "content": user_content}],
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": [
+                                {
+                                    "type": "image",
+                                    "source": {
+                                        "type": "base64",
+                                        "media_type": "image/png",
+                                        "data": img_b64,
+                                    },
+                                },
+                                {"type": "text", "text": prompt},
+                            ],
+                        }
+                    ],
                 )
-                for block in resp.content:
+                for block in response.content:
                     if getattr(block, "type", None) == "tool_use" and block.name == "act":
-                        return dict(block.input)
-                raise RuntimeError("no act tool call in response")
-            except Exception as e:
-                # anthropic.APIConnectionError / RateLimitError / APIStatusError all inherit from Exception
-                last_err = e
-                msg = str(e)
-                # Don't retry on auth errors — they won't fix themselves.
-                if "401" in msg or "authentication" in msg.lower():
-                    raise
-                backoff = min(30, 2 ** attempt)
-                print(f"[brain] API error ({type(e).__name__}: {e}); retrying in {backoff}s")
-                time.sleep(backoff)
-        raise RuntimeError(f"model call failed after {self.max_retries} retries: {last_err}")
+                        args = dict(block.input)
+                        return PolicyDecision(
+                            observation=str(args.get("observation", local_decision.observation)),
+                            reasoning=str(args.get("reasoning", local_decision.reasoning)),
+                            presses=self._sanitize_presses(args.get("presses") or local_decision.presses),
+                            phase=local_decision.phase,
+                            objective=local_decision.objective,
+                        )
+                raise RuntimeError("fallback response did not include act tool output")
+            except Exception as exc:  # pragma: no cover - network and API failures
+                last_error = exc
+                time.sleep(min(20, 2 ** attempt))
+        self._append_note(f"Model fallback failed: {type(last_error).__name__}: {last_error}")
+        return local_decision
 
+    # --- one turn ---------------------------------------------------------
     def step(self) -> HistoryEntry:
         self.state.turn += 1
         shot = self.frames_dir / f"t{self.state.turn:05d}.png"
@@ -355,42 +397,115 @@ class PokemonAgent:
         if not shot.exists():
             raise RuntimeError(f"screenshot did not land at {shot}")
 
-        user_content = self._build_user_content(shot)
-        args = self._call_model(user_content)
+        _, digest = self._prepare_image(shot)
+        game_state = ram.read_game_state(self.bridge, screenshot_path=shot)
+        self._update_progress_tracking(game_state, digest)
 
-        observation = str(args.get("observation", ""))
-        reasoning = str(args.get("reasoning", ""))
-        presses = args.get("presses") or []
-        if not isinstance(presses, list) or not presses:
-            presses = [{"button": "WAIT", "hold_frames": 30}]
-        new_notebook = args.get("notebook")
-        if isinstance(new_notebook, str) and new_notebook.strip():
-            self.state.notebook = new_notebook
-            self._save_notebook()
+        # ---- experiential memory ---------------------------------------------
+        # Compare last turn's RAM to this turn's RAM and the buttons we executed
+        # last turn. The tracker accumulates wall observations, NPC interactions,
+        # map/flag/badge change timestamps, etc.
+        executed_last_turn = self.history[-1].presses if self.history else []
+        for note in self.tracker.observe(
+            self.state.turn,
+            self.state.last_ram or None,
+            game_state.to_dict(),
+            executed_last_turn,
+        ):
+            self._append_note(note)
+        self.last_macro_reason = self.tracker.macro_stuck(self.state.turn)
+        if self.last_macro_reason:
+            self._append_note(f"macro-stuck signal: {self.last_macro_reason}")
 
-        # Execute presses
-        for step in presses:
-            key = str(step.get("button", "")).upper()
-            if key not in VALID_BUTTONS:
-                continue
-            hold = int(step.get("hold_frames", 6))
-            release = int(step.get("release_frames", 12))
-            hold = max(1, min(600, hold))
-            release = max(1, min(600, release))
-            if key == "WAIT":
-                self.bridge.wait(hold)
+        source = "local"
+        if self._should_recover():
+            if self.state.recovery_attempts >= 2:
+                checkpoint = self._latest_checkpoint()
+                if checkpoint is not None:
+                    self.bridge.loadstate(checkpoint)
+                    self.bridge.wait(90)
+                    self.state.rollbacks += 1
+                    self.state.recovery_attempts = 0
+                    self.state.repeat_count = 0
+                    self.state.screenshot_repeat_count = 0
+                    self._append_note(f"Loaded checkpoint {checkpoint.name} after repeated no-progress detection.")
+                    decision = PolicyDecision(
+                        observation=f"Loaded checkpoint {checkpoint.name} to recover from a stuck state.",
+                        reasoning="RAM progress and screen hashes stopped changing, so the controller rolled back to the latest savestate.",
+                        presses=[press("WAIT", 60, 1)],
+                        phase=game_state.phase_hint,
+                        objective=PHASE_OBJECTIVES.get(game_state.phase_hint, self.state.objective),
+                    )
+                    source = "rollback"
+                else:
+                    self.state.recovery_attempts += 1
+                    decision = self.policy.recovery(game_state, self.state.recovery_attempts)
+                    source = "recovery"
             else:
-                self.bridge.press(key, hold=hold, release=release)
+                self.state.recovery_attempts += 1
+                decision = self.policy.recovery(game_state, self.state.recovery_attempts)
+                source = "recovery"
+        else:
+            decision = self.policy.decide(
+                game_state,
+                runtime_state={
+                    "turn": self.state.turn,
+                    "repeat_count": self.state.repeat_count,
+                    "recovery_attempts": self.state.recovery_attempts,
+                    "macro_stuck": self.last_macro_reason,
+                },
+            )
+            # Macro-stuck: long-horizon stagnation (no map / flag / position change
+            # for many turns). Rate-limited so a long stuck period doesn't burn one
+            # API call per turn — we re-trigger only every MACRO_FALLBACK_COOLDOWN
+            # turns, which gives the model a chance to nudge us out of the loop.
+            if (
+                self.last_macro_reason
+                and not decision.fallback_reason
+                and (self.state.turn - self.state.last_macro_fallback_turn) > MACRO_FALLBACK_COOLDOWN
+            ):
+                decision.fallback_reason = f"macro_stuck: {self.last_macro_reason}"
+                self.state.last_macro_fallback_turn = self.state.turn
+            if decision.fallback_reason:
+                fallback = self._call_model_fallback(shot, game_state, decision)
+                if fallback is not decision:
+                    decision = fallback
+                    self.state.fallback_uses += 1
+                    source = "model_fallback"
+
+        presses = self._sanitize_presses(decision.presses)
+        for step in presses:
+            button = step["button"]
+            if button == "WAIT":
+                self.bridge.wait(step["hold_frames"])
+            else:
+                self.bridge.press(button, hold=step["hold_frames"], release=step["release_frames"])
+
+        previous_phase = self.state.phase
+        self.state.phase = decision.phase
+        self.state.objective = decision.objective
+        self.state.last_map = game_state.map_name or ""
+        self.state.last_ram = game_state.to_dict()
+        if previous_phase != decision.phase:
+            self._append_note(f"Reached phase {decision.phase} on {game_state.map_name or 'an unknown map'}.")
+        if source == "model_fallback":
+            self._append_note(f"Used model fallback for {decision.fallback_reason}.")
+
+        self._save_session_state()
+        self._save_human_mirror()
+        self.tracker.save(self.tracker_path)
 
         entry = HistoryEntry(
             turn=self.state.turn,
-            observation=observation,
-            reasoning=reasoning,
+            observation=decision.observation,
+            reasoning=decision.reasoning,
             presses=presses,
+            phase=decision.phase,
+            objective=decision.objective,
+            source=source,
         )
-        self.state.history.append(entry)
-        # keep memory compact
-        if len(self.state.history) > 40:
-            self.state.history = self.state.history[-40:]
-        self._log_turn(entry, shot)
+        self.history.append(entry)
+        if len(self.history) > 60:
+            self.history = self.history[-60:]
+        self._log_turn(entry, shot, game_state)
         return entry

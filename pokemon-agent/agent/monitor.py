@@ -1,6 +1,7 @@
 """Peek at a running (or finished) session without disturbing the agent.
 
-Reads session artifacts from disk — notebook.md, turns.jsonl, frames/ — so it
+Reads session artifacts from disk — session_state.json, notebook.md, turns.jsonl,
+frames/ — so it
 never contends with the mGBA bridge (the bridge only accepts one client, and
 connecting would kick the agent off). Safe to run while a session is live.
 
@@ -47,6 +48,50 @@ def _tail_jsonl(path: Path, n: int) -> list[dict]:
 def snapshot(session_dir: Path, tail: int) -> str:
     parts: list[str] = []
     parts.append(f"=== session: {session_dir.name} ===")
+
+    session_state = session_dir / "session_state.json"
+    if session_state.exists():
+        try:
+            data = json.loads(session_state.read_text())
+            parts.append("\n--- session_state.json ---")
+            parts.append(
+                "phase={phase} objective={objective} repeat_count={repeat_count} "
+                "rollbacks={rollbacks} fallback_uses={fallback_uses}".format(**data)
+            )
+            last_ram = data.get("last_ram") or {}
+            if last_ram:
+                parts.append(
+                    f"map={last_ram.get('map_name') or 'unknown'} "
+                    f"pos=({last_ram.get('pos_x')}, {last_ram.get('pos_y')}) "
+                    f"badges={last_ram.get('badge_count', 0)}/8 "
+                    f"mode={last_ram.get('mode', 'unknown')}"
+                )
+        except json.JSONDecodeError:
+            parts.append("\n(session_state.json is unreadable)")
+
+    tracker_path = session_dir / "progress_tracker.json"
+    if tracker_path.exists():
+        try:
+            tracker = json.loads(tracker_path.read_text())
+            parts.append("\n--- progress_tracker.json ---")
+            parts.append(
+                f"badges_earned={tracker.get('last_badge_count', 0)}/8  "
+                f"last_badge_turn={tracker.get('last_badge_turn', -1)}  "
+                f"last_map_change_turn={tracker.get('last_map_change_turn', 0)}  "
+                f"last_flag_change_turn={tracker.get('last_flag_change_turn', 0)}  "
+                f"last_pos_change_turn={tracker.get('last_pos_change_turn', 0)}"
+            )
+            walls = tracker.get("walls") or {}
+            wall_count = sum(len(dirs) for poses in walls.values() for dirs in poses.values())
+            npcs = tracker.get("npcs") or {}
+            npc_count = sum(len(poses) for poses in npcs.values())
+            parts.append(f"learned: {wall_count} wall observations across {len(walls)} maps; {npc_count} NPC tiles tracked")
+            visits = tracker.get("map_visit_counts") or {}
+            top = sorted(visits.items(), key=lambda kv: -kv[1])[:3]
+            if top:
+                parts.append("most-visited: " + ", ".join(f"{k}×{v}" for k, v in top))
+        except json.JSONDecodeError:
+            parts.append("\n(progress_tracker.json is unreadable)")
 
     notebook = session_dir / "notebook.md"
     if notebook.exists():

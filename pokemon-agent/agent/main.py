@@ -1,23 +1,21 @@
-"""Run a one-hour session of the Pokemon Emerald autonomous agent.
+"""Run a timed session of the local-first Pokemon Emerald agent.
 
 Usage:
     python -m agent.main [--minutes N] [--resume] [--model MODEL] [--no-record]
 
 Each session:
   * launches mGBA, loads the Lua bridge, connects
-  * starts a macOS screen recording (`screencapture -v`) to a session dir
-  * runs the Claude-backed agent loop until the timer expires
-  * asks the agent to save the game, captures a final savestate and backup .sav
-  * stops the screen recording and exits mGBA cleanly
+  * optionally starts a macOS screen recording (`screencapture -v`) to a session dir
+  * runs the local controller until the timer expires
+  * captures a final savestate and backup .sav for later resume/rollback
+  * leaves mGBA open for inspection unless you quit it manually
 """
 from __future__ import annotations
 
 import argparse
 import datetime as dt
-import os
 import shutil
 import signal
-import sys
 import time
 import traceback
 from pathlib import Path
@@ -25,6 +23,7 @@ from pathlib import Path
 from . import launcher
 from .brain import PokemonAgent, DEFAULT_MODEL
 from .controller import BridgeClient
+from .learning import inherit_from_latest as _inherit_progress_tracker
 from .recorder import ScreenRecorder
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -68,27 +67,6 @@ def _restore_prior_save(session_dir: Path) -> None:
     print("[main] no prior save to restore — starting fresh")
 
 
-def _inherit_notebook(session_dir: Path) -> Path | None:
-    """Seed this session's notebook.md from the most recent prior session's notebook
-    so the agent keeps its accumulated strategy notes across runs.
-    Called before the agent starts, so PokemonAgent._load_notebook picks it up naturally.
-    Skipped on --fresh (new playthrough = clean slate). Returns the source path copied
-    from, or None if no prior notebook was found.
-    """
-    dest = session_dir / "notebook.md"
-    if dest.exists():
-        return None  # already seeded (e.g. mid-run restart)
-    runs = sorted(p for p in SESSIONS_DIR.iterdir() if p.is_dir() and p.name.startswith("run-"))
-    for prior in reversed(runs):
-        if prior == session_dir:
-            continue
-        src = prior / "notebook.md"
-        if src.exists() and src.stat().st_size > 0:
-            shutil.copy2(src, dest)
-            return src
-    return None
-
-
 def _stamp(msg: str) -> None:
     print(f"[{dt.datetime.now().strftime('%H:%M:%S')}] {msg}", flush=True)
 
@@ -109,11 +87,6 @@ def _write_checkpoint(client: BridgeClient, checkpoints_dir: Path, turn: int) ->
 def run_session(minutes: float, resume: bool, fresh: bool, model: str, record: bool) -> int:
     session_dir = _pick_session_dir(resume)
     _stamp(f"session dir: {session_dir}")
-
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        print("ERROR: ANTHROPIC_API_KEY is not set in the environment.", file=sys.stderr)
-        print("  export ANTHROPIC_API_KEY=sk-ant-...", file=sys.stderr)
-        return 2
 
     # Handle save file.
     #   default  → trust the live .sav sitting next to the ROM (mGBA shows CONTINUE).
@@ -137,12 +110,13 @@ def run_session(minutes: float, resume: bool, fresh: bool, model: str, record: b
         _stamp("no live save found; trying latest session backup")
         _restore_prior_save(session_dir)
 
-    # Seed the notebook from the last session so the agent keeps its accumulated
-    # strategy notes across runs. --fresh skips this (new playthrough, clean slate).
+    # Carry over the experiential memory (walls hit, NPC loops, time-since-progress
+    # signals) from the prior session. --fresh skips this — a new playthrough
+    # should start with no learned heuristics.
     if not fresh:
-        src = _inherit_notebook(session_dir)
+        src = _inherit_progress_tracker(session_dir, SESSIONS_DIR)
         if src is not None:
-            _stamp(f"inherited notebook from {src.parent.name} ({src.stat().st_size} B)")
+            _stamp(f"inherited progress_tracker from {src.parent.name}")
 
     # Launch mGBA and connect
     _stamp("launching mGBA")
@@ -193,9 +167,7 @@ def run_session(minutes: float, resume: bool, fresh: bool, model: str, record: b
             if paused:
                 _stamp("resumed — agent taking control again")
                 paused = False
-                # Drop stale screen hashes so stuck-detection doesn't fire on the
-                # screens the agent never saw during the takeover.
-                agent.state.screen_hashes.clear()
+                agent.clear_runtime_tracking()
             t0 = time.monotonic()
             try:
                 entry = agent.step()
@@ -229,16 +201,9 @@ def run_session(minutes: float, resume: bool, fresh: bool, model: str, record: b
             # hint to save when we get within 2 minutes of the deadline
             if not save_hinted and time.monotonic() >= save_deadline:
                 save_hinted = True
-                agent.state.notebook = (
-                    agent.state.notebook.rstrip()
-                    + "\n\n"
-                    "SESSION_ENDING_SOON: the run timer is within ~2 minutes of stopping. "
-                    "Finish any battle, then open the START menu and choose SAVE → YES → YES. "
-                    "Do this BEFORE the timer expires.\n"
-                )
-                agent._save_notebook()
-                _stamp("save-soon hint added to notebook")
-            # don't hammer the API if turns are extremely fast
+                agent.request_save_soon()
+                _stamp("save-soon note added to session_state.json and notebook.md")
+            # Don't hammer the bridge if turns are extremely fast.
             dt_s = time.monotonic() - t0
             if dt_s < 0.2:
                 time.sleep(0.2 - dt_s)
@@ -280,9 +245,13 @@ def run_session(minutes: float, resume: bool, fresh: bool, model: str, record: b
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Run the Pokemon Emerald agent for a timed session.")
+    parser = argparse.ArgumentParser(description="Run the local Pokemon Emerald agent for a timed session.")
     parser.add_argument("--minutes", type=float, default=60.0, help="Session length in minutes (default 60).")
-    parser.add_argument("--model", default=DEFAULT_MODEL, help="Claude model id (default from brain.py).")
+    parser.add_argument(
+        "--model",
+        default=DEFAULT_MODEL,
+        help="Optional Claude model id for ambiguous-screen fallback (default from brain.py).",
+    )
     parser.add_argument("--no-record", action="store_true", help="Skip screen recording.")
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--fresh", action="store_true", help="Wipe the existing save and start a new playthrough (old save backed up to session_dir/pre-wipe.sav).")
