@@ -1,0 +1,264 @@
+"""Run a timed session of the local-first Pokemon Emerald agent.
+
+Usage:
+    python -m agent.main [--minutes N] [--resume] [--model MODEL] [--no-record]
+
+Each session:
+  * launches mGBA, loads the Lua bridge, connects
+  * optionally starts a macOS screen recording (`screencapture -v`) to a session dir
+  * runs the local controller until the timer expires
+  * captures a final savestate and backup .sav for later resume/rollback
+  * leaves mGBA open for inspection unless you quit it manually
+"""
+from __future__ import annotations
+
+import argparse
+import datetime as dt
+import shutil
+import signal
+import time
+import traceback
+from pathlib import Path
+
+from . import launcher
+from .brain import PokemonAgent, DEFAULT_MODEL
+from .controller import BridgeClient
+from .learning import inherit_from_latest as _inherit_progress_tracker
+from .recorder import ScreenRecorder
+
+ROOT = Path(__file__).resolve().parent.parent
+SESSIONS_DIR = ROOT / "sessions"
+PAUSE_FLAG = ROOT / "pause.flag"   # touch to hand control to the human; rm to resume
+
+CHECKPOINT_EVERY_TURNS = 25     # roughly every ~2-3 minutes of play
+CHECKPOINT_KEEP = 10            # rolling window — older ones get pruned
+PAUSE_POLL_SECONDS = 1.0        # how often to re-check the pause flag while paused
+
+
+def _pick_session_dir(resume: bool) -> Path:
+    SESSIONS_DIR.mkdir(exist_ok=True)
+    if resume:
+        existing = sorted([p for p in SESSIONS_DIR.iterdir() if p.is_dir() and p.name.startswith("run-")])
+        if existing:
+            return existing[-1]
+    ts = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
+    d = SESSIONS_DIR / f"run-{ts}"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def _restore_prior_save(session_dir: Path) -> None:
+    """On resume: put the prior session's rom.sav next to the ROM so CONTINUE appears."""
+    # Prefer this session's own rom.sav (if we're continuing the same run).
+    here = session_dir / "rom.sav"
+    if here.exists():
+        shutil.copy2(here, launcher.SAV_PATH)
+        print(f"[main] restored save from {session_dir.name}")
+        return
+    runs = sorted([p for p in SESSIONS_DIR.iterdir() if p.is_dir() and p.name.startswith("run-")])
+    for prior in reversed(runs):
+        if prior == session_dir:
+            continue
+        sav = prior / "rom.sav"
+        if sav.exists():
+            shutil.copy2(sav, launcher.SAV_PATH)
+            print(f"[main] restored save from {prior.name}")
+            return
+    print("[main] no prior save to restore — starting fresh")
+
+
+def _stamp(msg: str) -> None:
+    print(f"[{dt.datetime.now().strftime('%H:%M:%S')}] {msg}", flush=True)
+
+
+def _write_checkpoint(client: BridgeClient, checkpoints_dir: Path, turn: int) -> None:
+    """Drop a rolling savestate so a run can be rewound if it goes off the rails."""
+    checkpoints_dir.mkdir(exist_ok=True)
+    path = checkpoints_dir / f"t{turn:05d}.ss1"
+    client.savestate(path)
+    existing = sorted(checkpoints_dir.glob("t*.ss1"))
+    for old in existing[:-CHECKPOINT_KEEP]:
+        try:
+            old.unlink()
+        except OSError:
+            pass
+
+
+def run_session(minutes: float, resume: bool, fresh: bool, model: str, record: bool) -> int:
+    session_dir = _pick_session_dir(resume)
+    _stamp(f"session dir: {session_dir}")
+
+    # Handle save file.
+    #   default  → trust the live .sav sitting next to the ROM (mGBA shows CONTINUE).
+    #              If nothing's there, fall back to the latest session backup.
+    #   --fresh  → wipe the live .sav (after backing it up) and start a new playthrough.
+    #   --resume → force-restore the most recent session's rom.sav, overwriting whatever is live.
+    #              Useful for rolling back a corrupted / bad run.
+    if fresh:
+        if launcher.SAV_PATH.exists():
+            backup = session_dir / "pre-wipe.sav"
+            shutil.copy2(launcher.SAV_PATH, backup)
+            _stamp(f"backed up existing save → {backup.relative_to(ROOT)}")
+        launcher.wipe_save_file()
+        _stamp("wiped save file for fresh run (--fresh)")
+    elif resume:
+        _restore_prior_save(session_dir)
+    elif launcher.SAV_PATH.exists():
+        size = launcher.SAV_PATH.stat().st_size
+        _stamp(f"using live save at {launcher.SAV_PATH.name} ({size} B)")
+    else:
+        _stamp("no live save found; trying latest session backup")
+        _restore_prior_save(session_dir)
+
+    # Carry over the experiential memory (walls hit, NPC loops, time-since-progress
+    # signals) from the prior session. --fresh skips this — a new playthrough
+    # should start with no learned heuristics.
+    if not fresh:
+        src = _inherit_progress_tracker(session_dir, SESSIONS_DIR)
+        if src is not None:
+            _stamp(f"inherited progress_tracker from {src.parent.name}")
+
+    # Launch mGBA and connect
+    _stamp("launching mGBA")
+    proc: "subprocess.Popen | None" = None
+    client: BridgeClient | None = None
+    recorder: ScreenRecorder | None = None
+    last_error: str | None = None
+    try:
+        proc, client = launcher.start_emulation(fresh=False)
+        _stamp("bridge connected; mGBA running")
+        launcher.bring_mgba_game_to_front()
+        time.sleep(0.5)
+
+        if record:
+            rec_path = session_dir / "gameplay.mov"
+            recorder = ScreenRecorder(rec_path)
+            recorder.start()
+            _stamp(f"screen recording started → {rec_path}")
+
+        agent = PokemonAgent(client, session_dir=session_dir, model=model)
+        _stamp(f"agent ready, model={model}")
+        _stamp(f"running for {minutes:.1f} minutes ({int(minutes*60)}s)")
+
+        deadline = time.monotonic() + minutes * 60
+        save_deadline = time.monotonic() + (minutes - 2.0) * 60  # save 2 min before stop
+
+        # Install signal handlers so Ctrl-C shuts down cleanly.
+        stop_requested = {"flag": False}
+        def _sigint(signum, frame):
+            stop_requested["flag"] = True
+            _stamp("stop requested by signal")
+        signal.signal(signal.SIGINT, _sigint)
+        signal.signal(signal.SIGTERM, _sigint)
+
+        save_hinted = False
+        paused = False
+        checkpoints_dir = session_dir / "checkpoints"
+        while time.monotonic() < deadline and not stop_requested["flag"]:
+            # Human-in-the-loop: if pause.flag exists at repo root, stop calling the
+            # agent so the user can drive mGBA directly from the keyboard. The
+            # emulator keeps running; we just stop queuing presses and API calls.
+            if PAUSE_FLAG.exists():
+                if not paused:
+                    _stamp(f"PAUSED — agent idle while {PAUSE_FLAG.name} exists. `rm {PAUSE_FLAG.relative_to(ROOT)}` to resume.")
+                    paused = True
+                time.sleep(PAUSE_POLL_SECONDS)
+                continue
+            if paused:
+                _stamp("resumed — agent taking control again")
+                paused = False
+                agent.clear_runtime_tracking()
+            t0 = time.monotonic()
+            try:
+                entry = agent.step()
+                remaining = int(deadline - time.monotonic())
+                _stamp(
+                    f"T{entry.turn:04d} [{remaining:4d}s left] "
+                    f"{entry.observation[:70]} → "
+                    f"{','.join(p.get('button','?') for p in entry.presses)}"
+                )
+                if entry.turn % CHECKPOINT_EVERY_TURNS == 0:
+                    try:
+                        _write_checkpoint(client, checkpoints_dir, entry.turn)
+                        _stamp(f"checkpoint saved: t{entry.turn:05d}.ss1")
+                    except Exception as ce:
+                        _stamp(f"checkpoint failed: {ce}")
+            except Exception as e:
+                last_error = f"{type(e).__name__}: {e}"
+                _stamp(f"turn failed: {last_error}")
+                traceback.print_exc()
+                time.sleep(2.0)
+                # if connection dropped, try to reconnect
+                if isinstance(e, (ConnectionError, OSError)):
+                    try:
+                        client.close()
+                        client = BridgeClient(); client.connect()
+                        agent.bridge = client
+                        _stamp("bridge reconnected")
+                    except Exception as re:
+                        _stamp(f"bridge reconnect failed: {re}")
+                        break
+            # hint to save when we get within 2 minutes of the deadline
+            if not save_hinted and time.monotonic() >= save_deadline:
+                save_hinted = True
+                agent.request_save_soon()
+                _stamp("save-soon note added to session_state.json and notebook.md")
+            # Don't hammer the bridge if turns are extremely fast.
+            dt_s = time.monotonic() - t0
+            if dt_s < 0.2:
+                time.sleep(0.2 - dt_s)
+
+        _stamp("session loop done; finalising")
+
+        # Final savestate for resume via mGBA itself
+        try:
+            state_path = session_dir / "final.ss1"
+            client.savestate(state_path)
+            _stamp(f"savestate written: {state_path}")
+        except Exception as e:
+            _stamp(f"savestate failed: {e}")
+
+        # Copy the in-game save (.sav) into the session dir so we can resume fresh next run
+        try:
+            if launcher.SAV_PATH.exists():
+                shutil.copy2(launcher.SAV_PATH, session_dir / "rom.sav")
+                _stamp("rom.sav copied into session dir")
+        except Exception as e:
+            _stamp(f"save-backup failed: {e}")
+
+        return 0 if last_error is None else 1
+
+    finally:
+        if recorder is not None:
+            try:
+                out = recorder.stop()
+                _stamp(f"screen recording saved: {out}")
+            except Exception as e:
+                _stamp(f"recorder stop failed: {e}")
+        if client is not None:
+            try:
+                client.close()
+            except Exception:
+                pass
+        if proc is not None:
+            _stamp("leaving mGBA running so you can inspect state (quit via Cmd-Q when done)")
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Run the local Pokemon Emerald agent for a timed session.")
+    parser.add_argument("--minutes", type=float, default=60.0, help="Session length in minutes (default 60).")
+    parser.add_argument(
+        "--model",
+        default=DEFAULT_MODEL,
+        help="Optional Claude model id for ambiguous-screen fallback (default from brain.py).",
+    )
+    parser.add_argument("--no-record", action="store_true", help="Skip screen recording.")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--fresh", action="store_true", help="Wipe the existing save and start a new playthrough (old save backed up to session_dir/pre-wipe.sav).")
+    mode.add_argument("--resume", action="store_true", help="Force-restore the latest session backup over the live save (for rollback).")
+    args = parser.parse_args(argv)
+    return run_session(args.minutes, args.resume, args.fresh, args.model, record=not args.no_record)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

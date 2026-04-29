@@ -1,0 +1,13 @@
+# The ROM is copyrighted — users supply their own.
+rom/*.gba
+rom/*.sav
+
+# Session artifacts: recordings, screenshots, savestates, per-run logs.
+sessions/
+
+# Python
+__pycache__/
+*.pyc
+
+# macOS
+.DS_Store
