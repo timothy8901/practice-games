@@ -1,0 +1,3258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kirby Brawler — Single-Page Web Game</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --card: #2b2b40;
+    --card-inner: #1f1f33;
+    --text: #f0f0f5;
+    --muted: #9090a8;
+    --kirby-pink: #ffc0d3;
+    --kirby-pink-dark: #d96e8a;
+    --kirby-red: #e85a6e;
+    --kirby-red-dark: #8b2c3b;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    margin: 0;
+    padding: 0;
+    line-height: 1.4;
+  }
+
+  header {
+    text-align: center;
+    padding: 32px 20px 8px;
+    background: linear-gradient(180deg, #2b2b40 0%, var(--bg) 100%);
+    border-bottom: 1px solid #44445c;
+  }
+
+  header h1 {
+    margin: 0 0 6px;
+    font-size: 2rem;
+    background: linear-gradient(90deg, #ffc0d3, #ffd54d, #6dd64d, #ec4899);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+  }
+
+  header .subtitle {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.95rem;
+  }
+
+  header .hint {
+    margin-top: 8px;
+    color: var(--muted);
+    font-size: 0.8rem;
+    font-style: italic;
+  }
+
+  main {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 24px 16px 48px;
+    display: flex;
+    flex-direction: column;
+    gap: 36px;
+  }
+
+  .section {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .section-title {
+    font-size: 1.5rem;
+    margin: 0;
+    color: #ffd54d;
+    border-bottom: 2px solid #44445c;
+    padding-bottom: 6px;
+  }
+
+  .section-desc {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+
+  .card-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+  }
+
+  .card {
+    background: var(--card);
+    border-radius: 14px;
+    padding: 18px 20px 20px;
+    border-left: 6px solid var(--accent, #ffc0d3);
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+  }
+
+  .card-header {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+
+  .card-name {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--accent);
+    margin: 0;
+  }
+
+  .card-desc {
+    color: var(--muted);
+    font-size: 0.9rem;
+    margin: 0;
+    flex: 1;
+    min-width: 200px;
+  }
+
+  .poses {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+  }
+
+  @media (max-width: 720px) {
+    .poses { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  .pose {
+    background: var(--card-inner);
+    border-radius: 8px;
+    padding: 10px 8px 8px;
+    text-align: center;
+    border: 1px solid #3a3a52;
+  }
+
+  .pose-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin-bottom: 4px;
+    font-weight: 600;
+  }
+
+  .pose svg {
+    width: 100%;
+    height: auto;
+    max-height: 170px;
+    display: block;
+    margin: 0 auto;
+  }
+
+  /* ============ ANIMATIONS (auto-loop on all poses) ============ */
+
+  /* Sword swing */
+  .pose .swing-blade {
+    transform-origin: 138px 110px;
+    animation: swing 0.7s ease-in-out infinite;
+  }
+  @keyframes swing {
+    0%, 100% { transform: rotate(0deg); }
+    50% { transform: rotate(-110deg); }
+  }
+
+  /* Beam zigzag */
+  .pose .beam-arc {
+    animation: beam-flicker 0.25s steps(2) infinite;
+  }
+  @keyframes beam-flicker {
+    0%, 100% { opacity: 1; filter: brightness(1.2); }
+    50% { opacity: 0.6; filter: brightness(1.8); }
+  }
+
+  /* Cutter spin */
+  .pose .spinner {
+    transform-origin: 100px 100px;
+    animation: spin 0.6s linear infinite;
+  }
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+
+  /* Hammer slam */
+  .pose .hammer-arm {
+    transform-origin: 138px 110px;
+    animation: slam 0.9s ease-in-out infinite;
+  }
+  @keyframes slam {
+    0%, 100% { transform: rotate(0deg); }
+    40% { transform: rotate(-100deg); }
+    50% { transform: rotate(-110deg); }
+    60% { transform: rotate(-100deg); }
+  }
+
+  /* Arrow flight */
+  .pose .arrow-fly {
+    animation: arrow-fly 0.9s ease-out infinite;
+  }
+  @keyframes arrow-fly {
+    0% { transform: translateX(-40px); opacity: 0; }
+    20% { opacity: 1; }
+    100% { transform: translateX(40px); opacity: 1; }
+  }
+
+  /* Fire breathe */
+  .pose .fire-breath {
+    transform-origin: 100px 115px;
+    animation: fire-pulse 0.4s ease-in-out infinite;
+  }
+  @keyframes fire-pulse {
+    0%, 100% { transform: scale(0.85, 0.95); filter: brightness(1); }
+    50% { transform: scale(1.1, 1.05); filter: brightness(1.3); }
+  }
+
+  /* Bomb fuse spark */
+  .pose .fuse-spark {
+    animation: spark 0.2s steps(2) infinite;
+    transform-origin: center;
+  }
+  @keyframes spark {
+    0%, 100% { transform: scale(1) rotate(0deg); opacity: 1; }
+    50% { transform: scale(1.4) rotate(45deg); opacity: 0.7; }
+  }
+
+  /* Bomb explosion pulse */
+  .pose .explosion-burst {
+    transform-origin: center;
+    animation: explode 0.5s ease-out infinite;
+  }
+  @keyframes explode {
+    0% { transform: scale(0.7); opacity: 1; }
+    100% { transform: scale(1.15); opacity: 0.4; }
+  }
+
+  /* Parasol drift */
+  .pose .parasol-drift {
+    transform-origin: 100px 50px;
+    animation: drift 1.8s ease-in-out infinite;
+  }
+  @keyframes drift {
+    0%, 100% { transform: rotate(-5deg) translateY(0); }
+    50% { transform: rotate(5deg) translateY(-4px); }
+  }
+
+  /* Generic float for projectiles */
+  .pose .float {
+    animation: float 1.2s ease-in-out infinite;
+  }
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
+  }
+
+  /* VFX pulse */
+  .pose .vfx-pulse {
+    transform-origin: 100px 100px;
+    animation: vfx-pulse 0.8s ease-in-out infinite;
+  }
+  @keyframes vfx-pulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.1); opacity: 0.85; }
+  }
+
+  /* Slash arc draw */
+  .pose .slash-arc {
+    stroke-dasharray: 200;
+    stroke-dashoffset: 200;
+    animation: slash 0.55s ease-out infinite;
+  }
+  @keyframes slash {
+    0% { stroke-dashoffset: 200; opacity: 0; }
+    20% { opacity: 1; }
+    100% { stroke-dashoffset: 0; opacity: 0.2; }
+  }
+
+  /* Subtle idle breathing on all idle poses */
+  .pose .idle-breathe {
+    transform-origin: 100px 130px;
+    transform-box: fill-box;
+    animation: idle-breathe 2.4s ease-in-out infinite;
+  }
+  @keyframes idle-breathe {
+    0%, 100% { transform: scale(1, 1); }
+    50% { transform: scale(1.03, 0.98); }
+  }
+
+  /* ============ CHARACTER STATES SECTION ============ */
+
+  .states-table {
+    display: grid;
+    grid-template-columns: 80px repeat(3, 1fr);
+    gap: 8px;
+    background: var(--card);
+    padding: 14px;
+    border-radius: 14px;
+    border-left: 6px solid #b388eb;
+  }
+
+  .states-table .states-header {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    font-weight: 700;
+    text-align: center;
+    padding: 6px 0;
+    border-bottom: 1px solid #3a3a52;
+  }
+
+  .states-table .states-header.label {
+    text-align: left;
+    padding-left: 4px;
+  }
+
+  .states-table .ability-label {
+    display: flex;
+    align-items: center;
+    font-weight: 600;
+    color: var(--row-accent, #ffc0d3);
+    font-size: 0.85rem;
+    padding-left: 4px;
+  }
+
+  .state-cell {
+    background: var(--card-inner);
+    border-radius: 8px;
+    padding: 6px;
+    border: 1px solid #3a3a52;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .state-cell svg {
+    width: 100%;
+    height: auto;
+    max-height: 110px;
+    display: block;
+  }
+
+  /* Hit shake: violent left/right jitter */
+  .state-cell.state-hit svg {
+    animation: hit-shake 0.32s steps(2) infinite;
+  }
+  @keyframes hit-shake {
+    0% { transform: translateX(-4px) rotate(-3deg); }
+    50% { transform: translateX(4px) rotate(3deg); }
+    100% { transform: translateX(-4px) rotate(-3deg); }
+  }
+
+  /* Stars circle the head */
+  .state-cell.state-hit .dazed-stars {
+    transform-origin: 100px 70px;
+    transform-box: fill-box;
+    animation: dazed-spin 1.4s linear infinite;
+  }
+  @keyframes dazed-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+
+  /* Jump: up-and-down with squash-stretch */
+  .state-cell.state-jump svg {
+    animation: jump-loop 1.1s ease-in-out infinite;
+    transform-origin: 100px 160px;
+    transform-box: fill-box;
+  }
+  @keyframes jump-loop {
+    0%, 100% { transform: translateY(8px) scaleY(0.88) scaleX(1.12); }
+    20%      { transform: translateY(-4px) scaleY(1.06) scaleX(0.94); }
+    50%      { transform: translateY(-26px) scaleY(1.1) scaleX(0.9); }
+    80%      { transform: translateY(-4px) scaleY(1.06) scaleX(0.94); }
+  }
+
+  /* Dust puff under jump */
+  .state-cell.state-jump .dust-puff {
+    transform-origin: 100px 178px;
+    transform-box: fill-box;
+    animation: dust-fade 1.1s ease-out infinite;
+  }
+  @keyframes dust-fade {
+    0% { opacity: 0; transform: scaleX(0.4); }
+    15% { opacity: 0.7; transform: scaleX(1); }
+    50% { opacity: 0; transform: scaleX(1.4); }
+    100% { opacity: 0; transform: scaleX(1.4); }
+  }
+
+  /* Front flip: rotation with arc */
+  .state-cell.state-flip svg {
+    animation: flip-loop 1.3s ease-in-out infinite;
+    transform-origin: 100px 110px;
+    transform-box: fill-box;
+  }
+  @keyframes flip-loop {
+    0%   { transform: translateY(10px) rotate(0deg); }
+    15%  { transform: translateY(-8px) rotate(90deg); }
+    35%  { transform: translateY(-30px) rotate(220deg); }
+    50%  { transform: translateY(-38px) rotate(360deg); }
+    65%  { transform: translateY(-30px) rotate(500deg); }
+    85%  { transform: translateY(-8px) rotate(630deg); }
+    100% { transform: translateY(10px) rotate(720deg); }
+  }
+
+  /* Motion trail on flip */
+  .state-cell.state-flip .motion-trail {
+    animation: trail-fade 1.3s ease-in-out infinite;
+  }
+  @keyframes trail-fade {
+    0%, 100% { opacity: 0.15; }
+    50% { opacity: 0.55; }
+  }
+
+  /* ============ ARENAS SECTION ============ */
+
+  .arenas-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+  }
+
+  @media (max-width: 720px) {
+    .arenas-grid { grid-template-columns: 1fr; }
+    .states-table { grid-template-columns: 70px repeat(3, 1fr); font-size: 0.7rem; }
+  }
+
+  .arena-card {
+    background: var(--card);
+    border-radius: 14px;
+    padding: 14px;
+    border-left: 6px solid var(--arena-accent, #ffd54d);
+  }
+
+  .arena-card h3 {
+    margin: 0 0 4px;
+    color: var(--arena-accent);
+    font-size: 1.1rem;
+  }
+
+  .arena-card .arena-desc {
+    margin: 0 0 10px;
+    color: var(--muted);
+    font-size: 0.78rem;
+  }
+
+  .arena-card svg {
+    width: 100%;
+    height: auto;
+    display: block;
+    border-radius: 8px;
+    background: #000;
+  }
+
+  /* Arena ambient animations */
+  .whispy-eyes { animation: whispy-blink 4s ease-in-out infinite; transform-origin: center; }
+  @keyframes whispy-blink {
+    0%, 90%, 100% { transform: scaleY(1); }
+    93%, 97% { transform: scaleY(0.1); }
+  }
+
+  .falling-apple { animation: apple-fall 5s ease-in infinite; }
+  @keyframes apple-fall {
+    0% { transform: translateY(-180px); opacity: 0; }
+    10%, 80% { opacity: 1; }
+    100% { transform: translateY(0); opacity: 0; }
+  }
+
+  .spotlight-sweep { animation: spotlight 3s ease-in-out infinite alternate; transform-origin: 300px 0; transform-box: fill-box; }
+  @keyframes spotlight {
+    0% { transform: rotate(-12deg); }
+    100% { transform: rotate(12deg); }
+  }
+
+  .crowd-bob { animation: crowd-bob 1.5s ease-in-out infinite; }
+  @keyframes crowd-bob {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-2px); }
+  }
+
+  .halberd-cloud { animation: cloud-drift 14s linear infinite; }
+  @keyframes cloud-drift {
+    0% { transform: translateX(-100px); }
+    100% { transform: translateX(700px); }
+  }
+
+  .star-twinkle { animation: twinkle 2s ease-in-out infinite alternate; }
+  @keyframes twinkle {
+    0% { opacity: 0.3; }
+    100% { opacity: 1; }
+  }
+
+  .nebula-swirl { transform-origin: 300px 130px; transform-box: fill-box; animation: nebula-spin 30s linear infinite; }
+  @keyframes nebula-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+
+  .comet { animation: comet 4s linear infinite; }
+  @keyframes comet {
+    0% { transform: translate(-50px, -20px); opacity: 0; }
+    20% { opacity: 1; }
+    100% { transform: translate(600px, 240px); opacity: 0; }
+  }
+
+  footer {
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.8rem;
+    padding: 16px;
+    border-top: 1px solid #44445c;
+    padding-bottom: 140px;
+  }
+
+  /* ============ PLAYABLE TEST ARENA ============ */
+
+  .play-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+  }
+
+  .keybinds {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    color: var(--muted);
+    font-size: 0.78rem;
+    align-items: center;
+  }
+
+  .keybinds span { display: inline-flex; align-items: center; gap: 4px; }
+
+  kbd {
+    background: #1a1a2e;
+    border: 1px solid #44445c;
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 0.74rem;
+    color: #ffd54d;
+    font-weight: 700;
+    box-shadow: inset 0 -1px 0 #2b2b40;
+    min-width: 18px;
+    display: inline-block;
+    text-align: center;
+  }
+
+  .ability-picker {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+  }
+
+  .ability-picker button {
+    background: #2b2b40;
+    border: 2px solid #44445c;
+    color: var(--text);
+    padding: 5px 10px;
+    border-radius: 6px;
+    font-size: 0.74rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 0.1s, border-color 0.15s, background 0.15s;
+    border-left: 4px solid var(--ab-accent, #44445c);
+  }
+  .ability-picker button:hover { transform: translateY(-1px); background: #3a3a52; }
+  .ability-picker button.active {
+    border-color: #ffd54d;
+    background: #3a3a52;
+    box-shadow: 0 0 0 2px rgba(255, 213, 77, 0.3);
+  }
+
+  .play-overlay {
+    position: relative;
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .play-arena-wrap {
+    background: #000;
+    border-left: 6px solid #6dd64d;
+    outline: 2px solid transparent;
+    outline-offset: -2px;
+    transition: outline-color 0.15s;
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .play-arena-wrap:focus { outline-color: #ffd54d; }
+  .play-arena-wrap.focused { outline-color: #ffd54d; }
+  .play-arena-wrap svg { display: block; width: 100%; height: auto; }
+
+  .click-to-play {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 8px;
+    background: rgba(0, 0, 0, 0.55);
+    color: #fff5a0;
+    font-weight: 800;
+    font-size: 1.4rem;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    user-select: none;
+    z-index: 5;
+    transition: opacity 0.25s;
+  }
+  .click-to-play.hidden { opacity: 0; pointer-events: none; }
+  .click-to-play .play-hint { font-size: 0.8rem; color: #ffd54d; font-weight: 600; letter-spacing: 0.04em; }
+
+  /* ============ PLAYER HUD (fixed bottom) ============ */
+
+  .player-hud {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    background: linear-gradient(180deg, rgba(26, 26, 46, 0.85), rgba(26, 26, 46, 0.98));
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border-top: 2px solid #44445c;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.5);
+    padding: 10px 14px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .hud-title {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    margin-right: 4px;
+    text-align: center;
+  }
+
+  .player-slot {
+    background: var(--card-inner);
+    border-radius: 10px;
+    padding: 8px 12px;
+    border-left: 4px solid var(--p-accent, #ffc0d3);
+    min-width: 200px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.15s ease;
+    user-select: none;
+    position: relative;
+  }
+
+  .player-slot:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+    background: #25253b;
+  }
+
+  .player-slot.dead {
+    opacity: 0.45;
+    filter: grayscale(0.8);
+  }
+
+  .player-slot.damaged {
+    animation: dmg-flash 0.32s ease-out;
+  }
+  @keyframes dmg-flash {
+    0% { background: #c44b30; transform: translateX(-3px); }
+    35% { background: #c44b30; transform: translateX(3px); }
+    70% { background: #5a3030; }
+    100% { background: var(--card-inner); transform: translateX(0); }
+  }
+
+  .player-portrait {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #2b2b40, #1a1a2e);
+    border: 2px solid var(--p-accent);
+    overflow: hidden;
+    flex-shrink: 0;
+    box-shadow: inset 0 -2px 6px rgba(0, 0, 0, 0.3);
+  }
+
+  .player-portrait svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  .player-info {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+  }
+
+  .player-label {
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    font-weight: 700;
+  }
+
+  .player-name {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--p-accent);
+    line-height: 1;
+  }
+
+  .hearts {
+    display: flex;
+    gap: 3px;
+    margin-top: 4px;
+  }
+
+  .heart {
+    width: 20px;
+    height: 20px;
+    transition: transform 0.15s ease;
+  }
+
+  .heart.lost {
+    opacity: 0.25;
+    filter: saturate(0.2);
+  }
+
+  .heart.just-lost {
+    animation: heart-break 0.4s ease-out;
+  }
+  @keyframes heart-break {
+    0% { transform: scale(1.4) rotate(0deg); opacity: 1; }
+    50% { transform: scale(1.1) rotate(15deg); opacity: 0.6; }
+    100% { transform: scale(1) rotate(0deg); opacity: 0.25; }
+  }
+
+  .heart-beat {
+    animation: heart-beat 1.4s ease-in-out infinite;
+  }
+  @keyframes heart-beat {
+    0%, 100% { transform: scale(1); }
+    20% { transform: scale(1.15); }
+    40% { transform: scale(1); }
+  }
+
+  .ko-badge {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background: #d63131;
+    color: #fff5a0;
+    font-size: 0.65rem;
+    font-weight: 900;
+    padding: 2px 8px;
+    border-radius: 10px;
+    border: 2px solid #7a1818;
+    transform: rotate(8deg);
+  }
+
+  .hud-reset {
+    background: #2b2b40;
+    color: var(--text);
+    border: 2px solid #44445c;
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    cursor: pointer;
+    transition: background 0.12s;
+  }
+
+  .hud-reset:hover { background: #3a3a52; }
+
+  @media (max-width: 720px) {
+    .player-hud { gap: 6px; padding: 8px; }
+    .player-slot { min-width: 0; flex: 1 1 45%; padding: 6px 8px; }
+    .player-portrait { width: 38px; height: 38px; }
+    .heart { width: 16px; height: 16px; }
+    .hud-title { display: none; }
+  }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Kirby Brawler</h1>
+    <p class="subtitle">A single-page Smash-style fighter. Play live below &mdash; abilities, states, and stage assets are documented further down.</p>
+    <p class="hint">Click the arena to focus, then play with the keyboard.</p>
+  </header>
+  <main>
+    <section class="section play-section-headline">
+      <h2 class="section-title">Play &mdash; Whispy Woods</h2>
+      <p class="section-desc">Pick an ability, click the arena, then play. The training dummy respawns &mdash; combo away.</p>
+      <div class="play-controls">
+        <div class="keybinds">
+          <span><kbd>&larr;</kbd> <kbd>&rarr;</kbd> Move</span>
+          <span><kbd>&uarr;</kbd>/<kbd>Space</kbd> Jump (&times;2 = front flip)</span>
+          <span><kbd>&darr;</kbd> Guard</span>
+          <span><kbd>X</kbd> Fast Attack (3-hit combo)</span>
+          <span><kbd>Z</kbd> Charged Attack (hold &middot; aim with arrows)</span>
+          <span><kbd>H</kbd> Take Hit</span>
+        </div>
+        <div class="ability-picker" id="ability-picker"></div>
+      </div>
+      <div class="play-overlay">
+        <div class="play-arena-wrap" id="play-arena-wrap" tabindex="0"></div>
+        <div class="click-to-play" id="click-to-play">
+          &#9654; Click to Play
+          <span class="play-hint">Keyboard takes over inside the arena</span>
+        </div>
+      </div>
+    </section>
+    <section class="section">
+      <h2 class="section-title">Stage Roster</h2>
+      <p class="section-desc">4 boss arenas the brawler can pull from. Whispy Woods is live above; the other three are queued for future matches.</p>
+      <div id="arenas-grid" class="arenas-grid"></div>
+    </section>
+    <section class="section">
+      <h2 class="section-title">Copy Abilities &mdash; Asset Reference</h2>
+      <p class="section-desc">8 abilities &middot; 4 sprites each (idle, attack, projectile, hit VFX). The pieces the live game above swaps between when you change ability.</p>
+      <div id="abilities-grid" class="card-grid"></div>
+    </section>
+    <section class="section">
+      <h2 class="section-title">Character States &mdash; Asset Reference</h2>
+      <p class="section-desc">Hit, jump, and double-jump (front flip) animations &mdash; rendered per ability so each variant keeps its hat.</p>
+      <div id="states-grid" class="states-table"></div>
+    </section>
+  </main>
+  <footer>
+    Each SVG uses <code>viewBox="0 0 200 200"</code> &mdash; copy directly into game code.
+  </footer>
+
+  <aside class="player-hud" id="player-hud" aria-label="Player health HUD"></aside>
+
+<script>
+/* =========================================================================
+   KIRBY ABILITIES — ASSET SHEET
+   All sprites are pure inline SVG composed from reusable fragments.
+   Color palette:
+     pink body  #ffc0d3   pink stroke  #d96e8a
+     red feet   #e85a6e   red stroke   #8b2c3b
+     blush      #ff7a99
+     eye        #1a2c5c   highlight    #ffffff
+     mouth      #8b2c3b
+   ========================================================================= */
+
+const SVG_OPEN = '<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">';
+const SVG_CLOSE = '</svg>';
+
+// ---------- Reusable Kirby body parts ----------
+
+function kirbyFeet({ leftRot = -15, rightRot = 15, leftX = 84, rightX = 116, y = 158 } = {}) {
+  return `
+    <ellipse cx="${leftX}" cy="${y}" rx="17" ry="10" fill="#e85a6e" stroke="#8b2c3b" stroke-width="2.2" transform="rotate(${leftRot} ${leftX} ${y})"/>
+    <ellipse cx="${rightX}" cy="${y}" rx="17" ry="10" fill="#e85a6e" stroke="#8b2c3b" stroke-width="2.2" transform="rotate(${rightRot} ${rightX} ${y})"/>`;
+}
+
+function kirbyBody({ cx = 100, cy = 108, r = 42 } = {}) {
+  return `
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="#ffc0d3" stroke="#d96e8a" stroke-width="2.5"/>
+    <ellipse cx="${cx + 10}" cy="${cy + 14}" rx="20" ry="26" fill="#ff9eb5" opacity="0.35"/>`;
+}
+
+function kirbyArm(side, { rot = 0, cx, cy = 120, rx = 11, ry = 14 } = {}) {
+  const x = cx !== undefined ? cx : (side === 'left' ? 62 : 138);
+  return `<ellipse cx="${x}" cy="${cy}" rx="${rx}" ry="${ry}" fill="#ffc0d3" stroke="#d96e8a" stroke-width="2.5" transform="rotate(${rot} ${x} ${cy})"/>`;
+}
+
+function kirbyFace({ eyesY = 100, blushY = 119, mouthY = 117, mouth = 'small' } = {}) {
+  const mouths = {
+    small: `<path d="M 96 ${mouthY} Q 100 ${mouthY + 3} 104 ${mouthY}" fill="none" stroke="#8b2c3b" stroke-width="2" stroke-linecap="round"/>`,
+    open:  `<ellipse cx="100" cy="${mouthY + 2}" rx="5" ry="4" fill="#7a1f30" stroke="#5a1422" stroke-width="1.2"/>
+            <ellipse cx="100" cy="${mouthY + 4}" rx="3" ry="1.8" fill="#c44060" opacity="0.7"/>`,
+    smirk: `<path d="M 95 ${mouthY} Q 100 ${mouthY + 4} 106 ${mouthY - 1}" fill="none" stroke="#8b2c3b" stroke-width="2" stroke-linecap="round"/>`,
+    determined: `<path d="M 94 ${mouthY + 1} L 106 ${mouthY + 1}" fill="none" stroke="#8b2c3b" stroke-width="2" stroke-linecap="round"/>`,
+  };
+  return `
+    <ellipse cx="80" cy="${blushY}" rx="7" ry="4" fill="#ff7a99" opacity="0.7"/>
+    <ellipse cx="120" cy="${blushY}" rx="7" ry="4" fill="#ff7a99" opacity="0.7"/>
+    <ellipse cx="89" cy="${eyesY}" rx="3.8" ry="9" fill="#1a2c5c"/>
+    <ellipse cx="111" cy="${eyesY}" rx="3.8" ry="9" fill="#1a2c5c"/>
+    <ellipse cx="89" cy="${eyesY - 5.5}" rx="2" ry="2.8" fill="#ffffff"/>
+    <ellipse cx="111" cy="${eyesY - 5.5}" rx="2" ry="2.8" fill="#ffffff"/>
+    ${mouths[mouth] || mouths.small}`;
+}
+
+// Compose a default Kirby (no hat / weapon)
+function kirbyBase({ leftArmRot = -20, rightArmRot = 20, leftArm, rightArm, mouth = 'small', faceOverride } = {}) {
+  return `
+    ${kirbyFeet()}
+    ${kirbyBody()}
+    ${leftArm !== undefined ? leftArm : kirbyArm('left', { rot: leftArmRot })}
+    ${rightArm !== undefined ? rightArm : kirbyArm('right', { rot: rightArmRot })}
+    ${faceOverride !== undefined ? faceOverride : kirbyFace({ mouth })}`;
+}
+
+const svg = (inner) => SVG_OPEN + inner + SVG_CLOSE;
+
+// =========================================================================
+// 1. SWORD — green cap, golden sword
+// =========================================================================
+
+function swordCap() {
+  return `
+    <!-- cap base -->
+    <path d="M 65 80 Q 100 32 135 80 Q 135 84 130 84 Q 100 76 70 84 Q 65 84 65 80 Z"
+      fill="#3aaa42" stroke="#1f6628" stroke-width="2.2"/>
+    <!-- cap brim shadow -->
+    <path d="M 65 78 Q 100 84 135 78 L 135 86 Q 100 90 65 86 Z"
+      fill="#246e2a" stroke="#1f6628" stroke-width="2.2"/>
+    <!-- floppy tip -->
+    <path d="M 100 34 Q 90 18 78 22 Q 92 32 100 38 Z"
+      fill="#3aaa42" stroke="#1f6628" stroke-width="2"/>
+    <circle cx="79" cy="22" r="3" fill="#2d8a35" stroke="#1f6628" stroke-width="1.4"/>`;
+}
+
+function swordWeapon({ x = 138, y = 110, rot = -30, big = false }) {
+  const len = big ? 60 : 52;
+  return `
+    <g class="swing-blade" transform="rotate(${rot} ${x} ${y})">
+      <!-- handle -->
+      <rect x="${x - 3}" y="${y - 8}" width="6" height="22" fill="#8b5a2b" stroke="#5a3a1e" stroke-width="1.6" rx="1"/>
+      <!-- pommel -->
+      <circle cx="${x}" cy="${y + 14}" r="4" fill="#f5c041" stroke="#a87b1a" stroke-width="1.4"/>
+      <!-- crossguard -->
+      <rect x="${x - 13}" y="${y - 12}" width="26" height="5" rx="1.5" fill="#f5c041" stroke="#a87b1a" stroke-width="1.4"/>
+      <!-- blade -->
+      <path d="M ${x - 5} ${y - 12} L ${x - 5} ${y - 12 - len + 6} L ${x} ${y - 12 - len} L ${x + 5} ${y - 12 - len + 6} L ${x + 5} ${y - 12} Z"
+        fill="#e8eef2" stroke="#6a7a86" stroke-width="1.6"/>
+      <!-- blade highlight -->
+      <line x1="${x - 1}" y1="${y - 16}" x2="${x - 1}" y2="${y - 12 - len + 8}" stroke="#ffffff" stroke-width="1.4" opacity="0.7"/>
+    </g>`;
+}
+
+const sword = {
+  key: 'sword',
+  name: 'Sword',
+  desc: 'Slashes with a golden sword. Equips Link-style cap on copy.',
+  accent: '#6dd64d',
+  idle: () => svg(
+    kirbyFeet() + kirbyBody() +
+    kirbyArm('left', { rot: -20 }) +
+    swordCap() +
+    kirbyFace({ mouth: 'determined' }) +
+    swordWeapon({ rot: -25 })
+  ),
+  attack: () => svg(
+    kirbyFeet({ leftRot: -25, rightRot: 5 }) + kirbyBody() +
+    kirbyArm('left', { rot: 40, cx: 60, cy: 100 }) +
+    swordCap() +
+    kirbyFace({ mouth: 'open' }) +
+    swordWeapon({ rot: -85, big: true }) +
+    // motion arc
+    `<path class="slash-arc" d="M 175 60 Q 130 35 95 70" fill="none" stroke="#fffacc" stroke-width="5" stroke-linecap="round" opacity="0.85"/>
+     <path class="slash-arc" d="M 175 60 Q 130 35 95 70" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>`
+  ),
+  projectile: () => svg(`
+    <!-- Sword Beam: crescent energy wave -->
+    <g class="float">
+      <path d="M 50 100 Q 100 40 160 100 Q 100 80 50 100 Z"
+        fill="#fffacc" stroke="#ffd54d" stroke-width="2.5" opacity="0.9"/>
+      <path d="M 60 100 Q 100 55 150 100 Q 100 85 60 100 Z"
+        fill="#ffffff" stroke="#ffea7a" stroke-width="1.5" opacity="0.95"/>
+      <!-- motion lines -->
+      <line x1="35" y1="90" x2="55" y2="98" stroke="#ffd54d" stroke-width="2" stroke-linecap="round"/>
+      <line x1="35" y1="110" x2="55" y2="105" stroke="#ffd54d" stroke-width="2" stroke-linecap="round"/>
+      <!-- sparkle -->
+      <path d="M 100 60 L 102 70 L 112 72 L 102 74 L 100 84 L 98 74 L 88 72 L 98 70 Z" fill="#ffffff" opacity="0.9"/>
+    </g>`
+  ),
+  vfx: () => svg(`
+    <!-- Slash mark VFX -->
+    <g class="vfx-pulse">
+      <path d="M 40 60 Q 100 100 160 140" fill="none" stroke="#ffffff" stroke-width="10" stroke-linecap="round"/>
+      <path d="M 40 60 Q 100 100 160 140" fill="none" stroke="#ffd54d" stroke-width="5" stroke-linecap="round"/>
+      <path d="M 50 50 Q 100 95 150 145" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" opacity="0.7"/>
+      <!-- impact star -->
+      <path d="M 100 100 L 108 80 L 114 100 L 134 100 L 116 110 L 124 130 L 100 116 L 76 130 L 84 110 L 66 100 L 86 100 Z"
+        fill="#fffacc" stroke="#ffd54d" stroke-width="2"/>
+    </g>`
+  ),
+};
+
+// =========================================================================
+// 2. BEAM — wizard hat with pompom, electric whip
+// =========================================================================
+
+function beamHat() {
+  return `
+    <!-- hat base (pointed wizard) -->
+    <path d="M 70 78 Q 100 12 130 78 Q 100 70 70 78 Z"
+      fill="#d23a4a" stroke="#7a1f2c" stroke-width="2.2"/>
+    <!-- hat stripe -->
+    <path d="M 76 64 Q 100 56 124 64 Q 100 60 76 64 Z" fill="#f5d24b" stroke="#a8861c" stroke-width="1.5"/>
+    <!-- hat brim -->
+    <path d="M 65 78 Q 100 86 135 78 L 135 84 Q 100 92 65 84 Z"
+      fill="#a82838" stroke="#7a1f2c" stroke-width="2"/>
+    <!-- pompom -->
+    <circle cx="100" cy="14" r="6" fill="#fff7d2" stroke="#a8861c" stroke-width="1.6"/>
+    <circle cx="98" cy="12" r="2" fill="#ffffff" opacity="0.9"/>`;
+}
+
+function beamArc({ startX = 138, startY = 100 }) {
+  return `
+    <g class="beam-arc">
+      <!-- electric whip path -->
+      <path d="M ${startX} ${startY} Q 158 70 170 95 Q 178 110 190 80"
+        fill="none" stroke="#fff04a" stroke-width="6" stroke-linecap="round" opacity="0.4"/>
+      <path d="M ${startX} ${startY} Q 158 70 170 95 Q 178 110 190 80"
+        fill="none" stroke="#fff7c0" stroke-width="3" stroke-linecap="round"/>
+      <!-- zigzag overlay -->
+      <polyline points="${startX},${startY} 150,85 162,98 170,82 182,95 190,80"
+        fill="none" stroke="#ffffff" stroke-width="1.8" stroke-linecap="round"/>
+      <!-- end star -->
+      <circle cx="190" cy="80" r="5" fill="#fffacc"/>
+      <circle cx="190" cy="80" r="3" fill="#ffffff"/>
+    </g>`;
+}
+
+const beam = {
+  key: 'beam',
+  name: 'Beam',
+  desc: 'Whips a star-tipped electric beam in an arc.',
+  accent: '#ffd54d',
+  idle: () => svg(
+    kirbyFeet() + kirbyBody() +
+    kirbyArm('left', { rot: -20 }) +
+    kirbyArm('right', { rot: 20 }) +
+    beamHat() +
+    kirbyFace({ mouth: 'smirk' })
+  ),
+  attack: () => svg(
+    kirbyFeet({ leftRot: -20, rightRot: 10 }) + kirbyBody() +
+    kirbyArm('left', { rot: -20 }) +
+    kirbyArm('right', { rot: 60, cx: 140, cy: 95 }) +
+    beamHat() +
+    kirbyFace({ mouth: 'open' }) +
+    beamArc({ startX: 145, startY: 88 })
+  ),
+  projectile: () => svg(`
+    <g class="float">
+      <!-- beam segment in flight -->
+      <path d="M 30 100 Q 60 70 95 105 Q 130 140 170 100"
+        fill="none" stroke="#fff04a" stroke-width="10" stroke-linecap="round" opacity="0.35"/>
+      <path d="M 30 100 Q 60 70 95 105 Q 130 140 170 100"
+        fill="none" stroke="#fffacc" stroke-width="5" stroke-linecap="round"/>
+      <polyline points="30,100 50,82 70,105 90,85 110,120 130,90 150,115 170,100"
+        fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>
+      <!-- star tip -->
+      <path d="M 170 100 L 178 86 L 182 100 L 196 102 L 184 110 L 186 124 L 172 116 L 158 124 L 162 110 L 152 102 Z"
+        fill="#fffacc" stroke="#ffd54d" stroke-width="1.8"/>
+    </g>`
+  ),
+  vfx: () => svg(`
+    <g class="vfx-pulse">
+      <!-- lightning burst -->
+      <circle cx="100" cy="100" r="42" fill="#fff7c0" opacity="0.3"/>
+      <circle cx="100" cy="100" r="28" fill="#fffacc" opacity="0.55"/>
+      <circle cx="100" cy="100" r="14" fill="#ffffff" opacity="0.95"/>
+      <!-- jagged spikes -->
+      <path d="M 100 50 L 106 90 L 100 100 L 94 90 Z" fill="#fff04a" stroke="#c9a019" stroke-width="1.4"/>
+      <path d="M 150 100 L 110 106 L 100 100 L 110 94 Z" fill="#fff04a" stroke="#c9a019" stroke-width="1.4"/>
+      <path d="M 100 150 L 94 110 L 100 100 L 106 110 Z" fill="#fff04a" stroke="#c9a019" stroke-width="1.4"/>
+      <path d="M 50 100 L 90 94 L 100 100 L 90 106 Z" fill="#fff04a" stroke="#c9a019" stroke-width="1.4"/>
+      <!-- diagonal sparks -->
+      <path d="M 65 65 L 92 92 M 135 65 L 108 92 M 135 135 L 108 108 M 65 135 L 92 108"
+        stroke="#ffffff" stroke-width="2.5" stroke-linecap="round"/>
+    </g>`
+  ),
+};
+
+// =========================================================================
+// 3. CUTTER — boomerang headdress, green crescent blade
+// =========================================================================
+
+function cutterHat() {
+  return `
+    <!-- headdress base (yellow disc) -->
+    <ellipse cx="100" cy="70" rx="38" ry="18" fill="#f5b939" stroke="#a8761a" stroke-width="2.2"/>
+    <!-- red trim band -->
+    <ellipse cx="100" cy="74" rx="38" ry="6" fill="#d63131" stroke="#7a1818" stroke-width="1.8"/>
+    <!-- crescent points (left + right blade-like) -->
+    <path d="M 62 70 Q 50 50 70 50 Q 64 60 68 72 Z" fill="#f5b939" stroke="#a8761a" stroke-width="2"/>
+    <path d="M 138 70 Q 150 50 130 50 Q 136 60 132 72 Z" fill="#f5b939" stroke="#a8761a" stroke-width="2"/>
+    <!-- center bump -->
+    <ellipse cx="100" cy="62" rx="14" ry="10" fill="#f5b939" stroke="#a8761a" stroke-width="2"/>
+    <!-- highlight -->
+    <ellipse cx="92" cy="62" rx="5" ry="3" fill="#fff5c8" opacity="0.6"/>`;
+}
+
+function cutterBlade({ cx, cy, scale = 1 }) {
+  return `
+    <g transform="translate(${cx - 20 * scale} ${cy - 20 * scale}) scale(${scale})">
+      <!-- outer crescent -->
+      <path d="M 20 4 Q 4 20 20 36 Q 30 22 36 20 Q 30 18 20 4 Z"
+        fill="#5fc242" stroke="#256818" stroke-width="2"/>
+      <!-- inner highlight -->
+      <path d="M 22 8 Q 10 20 22 32 Q 18 22 22 8 Z" fill="#9ee87a" opacity="0.8"/>
+      <!-- center dot -->
+      <circle cx="20" cy="20" r="3" fill="#fff5c8" stroke="#a8761a" stroke-width="1.2"/>
+    </g>`;
+}
+
+const cutter = {
+  key: 'cutter',
+  name: 'Cutter',
+  desc: 'Hurls a returning crescent boomerang blade.',
+  accent: '#f5b939',
+  idle: () => svg(
+    kirbyFeet() + kirbyBody() +
+    kirbyArm('left', { rot: -20 }) +
+    kirbyArm('right', { rot: 50, cx: 138, cy: 100 }) +
+    cutterHat() +
+    kirbyFace({ mouth: 'small' }) +
+    cutterBlade({ cx: 150, cy: 60, scale: 0.9 })
+  ),
+  attack: () => svg(
+    kirbyFeet({ leftRot: -25, rightRot: 10 }) + kirbyBody() +
+    kirbyArm('left', { rot: -30 }) +
+    kirbyArm('right', { rot: 120, cx: 145, cy: 90 }) +
+    cutterHat() +
+    kirbyFace({ mouth: 'determined' }) +
+    // blade just released, motion blur
+    `<g opacity="0.4">${cutterBlade({ cx: 155, cy: 75, scale: 0.85 })}</g>` +
+    cutterBlade({ cx: 170, cy: 60, scale: 1 }) +
+    `<line x1="135" y1="65" x2="165" y2="62" stroke="#5fc242" stroke-width="2" stroke-linecap="round" opacity="0.6"/>`
+  ),
+  projectile: () => svg(`
+    <g class="spinner">
+      <path d="M 60 30 Q 30 100 60 170 Q 100 130 130 170 Q 170 100 130 30 Q 100 70 60 30 Z"
+        fill="#5fc242" stroke="#256818" stroke-width="3"/>
+      <path d="M 70 50 Q 50 100 70 150 Q 100 120 130 150 Q 150 100 130 50 Q 100 80 70 50 Z"
+        fill="#9ee87a" opacity="0.6"/>
+      <circle cx="100" cy="100" r="8" fill="#fff5c8" stroke="#a8761a" stroke-width="2"/>
+      <!-- spin streak -->
+      <circle cx="100" cy="100" r="38" fill="none" stroke="#ffffff" stroke-width="2" stroke-dasharray="10 8" opacity="0.4"/>
+    </g>
+    <!-- speed lines -->
+    <line x1="20" y1="100" x2="35" y2="100" stroke="#5fc242" stroke-width="2.5" stroke-linecap="round" opacity="0.7"/>
+    <line x1="20" y1="85" x2="32" y2="85" stroke="#5fc242" stroke-width="2" stroke-linecap="round" opacity="0.5"/>
+    <line x1="20" y1="115" x2="32" y2="115" stroke="#5fc242" stroke-width="2" stroke-linecap="round" opacity="0.5"/>`
+  ),
+  vfx: () => svg(`
+    <g class="vfx-pulse">
+      <!-- slash cuts (X pattern) -->
+      <path d="M 50 50 L 150 150" stroke="#9ee87a" stroke-width="14" stroke-linecap="round" opacity="0.4"/>
+      <path d="M 50 50 L 150 150" stroke="#ffffff" stroke-width="6" stroke-linecap="round"/>
+      <path d="M 150 50 L 50 150" stroke="#9ee87a" stroke-width="14" stroke-linecap="round" opacity="0.4"/>
+      <path d="M 150 50 L 50 150" stroke="#ffffff" stroke-width="6" stroke-linecap="round"/>
+      <!-- center burst -->
+      <circle cx="100" cy="100" r="14" fill="#fff5c8" stroke="#a8761a" stroke-width="2"/>
+      <path d="M 100 80 L 104 96 L 100 100 L 96 96 Z M 120 100 L 104 104 L 100 100 L 104 96 Z M 100 120 L 96 104 L 100 100 L 104 104 Z M 80 100 L 96 96 L 100 100 L 96 104 Z" fill="#5fc242"/>
+    </g>`
+  ),
+};
+
+// =========================================================================
+// 4. HAMMER — red bandana, wooden mallet
+// =========================================================================
+
+function hammerBandana() {
+  return `
+    <!-- bandana wrapped around head -->
+    <path d="M 62 84 Q 100 70 138 84 Q 138 92 132 94 Q 100 84 68 94 Q 62 92 62 84 Z"
+      fill="#d63131" stroke="#7a1818" stroke-width="2.2"/>
+    <!-- bandana knot -->
+    <path d="M 60 86 L 50 78 L 48 92 L 58 96 Z" fill="#d63131" stroke="#7a1818" stroke-width="2"/>
+    <path d="M 58 92 L 38 96 L 44 100 L 56 98 Z" fill="#d63131" stroke="#7a1818" stroke-width="1.8"/>
+    <!-- bandana stripe -->
+    <path d="M 72 84 Q 100 78 128 84" fill="none" stroke="#fff7d2" stroke-width="2" stroke-linecap="round"/>
+    <!-- center dot -->
+    <circle cx="100" cy="80" r="2" fill="#fff7d2"/>`;
+}
+
+function hammerWeapon({ x = 138, y = 110, rot = -15 }) {
+  return `
+    <g class="hammer-arm" transform="rotate(${rot} ${x} ${y})">
+      <!-- handle -->
+      <rect x="${x - 3.5}" y="${y - 50}" width="7" height="60" fill="#9b6a36" stroke="#5a3a1a" stroke-width="1.8" rx="2"/>
+      <line x1="${x - 1}" y1="${y - 45}" x2="${x - 1}" y2="${y + 5}" stroke="#7a5028" stroke-width="1.5" opacity="0.7"/>
+      <!-- mallet head -->
+      <rect x="${x - 22}" y="${y - 70}" width="44" height="26" rx="4" fill="#6e4d28" stroke="#3a2a16" stroke-width="2.2"/>
+      <!-- mallet metal bands -->
+      <rect x="${x - 22}" y="${y - 70}" width="44" height="5" fill="#3a2a16"/>
+      <rect x="${x - 22}" y="${y - 49}" width="44" height="5" fill="#3a2a16"/>
+      <!-- studs -->
+      <circle cx="${x - 16}" cy="${y - 57}" r="2.5" fill="#c9a560" stroke="#6e4d28" stroke-width="1"/>
+      <circle cx="${x}" cy="${y - 57}" r="2.5" fill="#c9a560" stroke="#6e4d28" stroke-width="1"/>
+      <circle cx="${x + 16}" cy="${y - 57}" r="2.5" fill="#c9a560" stroke="#6e4d28" stroke-width="1"/>
+      <!-- highlight -->
+      <rect x="${x - 19}" y="${y - 66}" width="38" height="3" fill="#a87838" opacity="0.7"/>
+    </g>`;
+}
+
+const hammer = {
+  key: 'hammer',
+  name: 'Hammer',
+  desc: 'Crushes with a heavy two-handed mallet swing.',
+  accent: '#c44b30',
+  idle: () => svg(
+    kirbyFeet() + kirbyBody() +
+    kirbyArm('left', { rot: -10 }) +
+    hammerBandana() +
+    kirbyFace({ mouth: 'determined' }) +
+    hammerWeapon({ rot: -20 })
+  ),
+  attack: () => svg(
+    kirbyFeet({ leftRot: -30, rightRot: 0 }) + kirbyBody() +
+    kirbyArm('left', { rot: 60, cx: 60, cy: 90 }) +
+    hammerBandana() +
+    kirbyFace({ mouth: 'open' }) +
+    hammerWeapon({ x: 138, y: 105, rot: -100 }) +
+    // motion sweep
+    `<path class="slash-arc" d="M 40 30 Q 100 5 175 60" fill="none" stroke="#ffffff" stroke-width="4" stroke-linecap="round" opacity="0.8"/>
+     <path class="slash-arc" d="M 50 40 Q 100 18 168 65" fill="none" stroke="#ffd54d" stroke-width="2" stroke-linecap="round" opacity="0.6"/>`
+  ),
+  projectile: () => svg(`
+    <!-- Ground shockwave (Hammer has no projectile traditionally; show impact wave) -->
+    <g class="float">
+      <ellipse cx="100" cy="130" rx="80" ry="14" fill="#c9a560" opacity="0.4"/>
+      <ellipse cx="100" cy="130" rx="60" ry="10" fill="#fff5c8" opacity="0.6"/>
+      <!-- debris stars -->
+      <path d="M 30 100 L 34 110 L 44 112 L 36 118 L 38 128 L 30 122 L 22 128 L 24 118 L 16 112 L 26 110 Z"
+        fill="#fff5c8" stroke="#a87838" stroke-width="1.4"/>
+      <path d="M 170 90 L 174 100 L 184 102 L 176 108 L 178 118 L 170 112 L 162 118 L 164 108 L 156 102 L 166 100 Z"
+        fill="#fff5c8" stroke="#a87838" stroke-width="1.4"/>
+      <path d="M 100 70 L 104 80 L 114 82 L 106 88 L 108 98 L 100 92 L 92 98 L 94 88 L 86 82 L 96 80 Z"
+        fill="#ffd54d" stroke="#a87838" stroke-width="1.4"/>
+      <!-- ground crack -->
+      <path d="M 60 138 L 75 134 L 90 140 L 105 134 L 120 140 L 135 134 L 150 140"
+        fill="none" stroke="#3a2a16" stroke-width="2.5" stroke-linecap="round"/>
+    </g>`
+  ),
+  vfx: () => svg(`
+    <g class="vfx-pulse">
+      <!-- impact starburst -->
+      <circle cx="100" cy="100" r="50" fill="#ffd54d" opacity="0.3"/>
+      <circle cx="100" cy="100" r="32" fill="#fff5c8" opacity="0.6"/>
+      <path d="M 100 30 L 110 90 L 100 100 L 90 90 Z" fill="#ff8c2a" stroke="#a8400e" stroke-width="2"/>
+      <path d="M 170 100 L 110 110 L 100 100 L 110 90 Z" fill="#ff8c2a" stroke="#a8400e" stroke-width="2"/>
+      <path d="M 100 170 L 90 110 L 100 100 L 110 110 Z" fill="#ff8c2a" stroke="#a8400e" stroke-width="2"/>
+      <path d="M 30 100 L 90 90 L 100 100 L 90 110 Z" fill="#ff8c2a" stroke="#a8400e" stroke-width="2"/>
+      <!-- diagonals -->
+      <path d="M 50 50 L 92 92 L 100 100 L 92 108 L 50 150 L 60 100 Z" fill="#fff5c8" opacity="0.6"/>
+      <path d="M 150 50 L 108 92 L 100 100 L 108 108 L 150 150 L 140 100 Z" fill="#fff5c8" opacity="0.6"/>
+      <!-- core star -->
+      <text x="100" y="112" text-anchor="middle" font-size="36" font-weight="bold" fill="#d63131" stroke="#7a1818" stroke-width="1.5" font-family="Arial Black, sans-serif">!</text>
+    </g>`
+  ),
+};
+
+// =========================================================================
+// 5. ARCHER — Robin Hood hat, bow & arrow
+// =========================================================================
+
+function archerHat() {
+  return `
+    <!-- hat body (folded triangular) -->
+    <path d="M 68 80 Q 100 30 132 80 Q 100 78 68 80 Z"
+      fill="#4d8a3f" stroke="#1f4d18" stroke-width="2.2"/>
+    <!-- folded brim -->
+    <path d="M 64 78 Q 100 88 136 78 L 136 84 Q 100 92 64 84 Z"
+      fill="#3a6a30" stroke="#1f4d18" stroke-width="2"/>
+    <!-- pointed tip flop -->
+    <path d="M 100 32 Q 96 22 88 26 Q 96 36 102 36 Z"
+      fill="#4d8a3f" stroke="#1f4d18" stroke-width="2"/>
+    <!-- red feather -->
+    <path d="M 124 40 Q 145 30 152 18 Q 148 36 134 46 Z"
+      fill="#d63131" stroke="#7a1818" stroke-width="2"/>
+    <path d="M 138 28 L 132 42 M 142 24 L 138 38 M 146 22 L 142 34"
+      stroke="#7a1818" stroke-width="1.4"/>
+    <!-- feather quill base -->
+    <circle cx="124" cy="42" r="2.5" fill="#a8261a" stroke="#7a1818" stroke-width="1.2"/>`;
+}
+
+function bowAndArrow({ drawn = false }) {
+  if (drawn) {
+    return `
+      <!-- bow drawn back -->
+      <path d="M 60 70 Q 30 110 60 150" fill="none" stroke="#8b5a2b" stroke-width="5" stroke-linecap="round"/>
+      <path d="M 60 70 Q 36 110 60 150" fill="none" stroke="#c9a065" stroke-width="2" stroke-linecap="round"/>
+      <!-- bowstring (drawn) -->
+      <path d="M 60 70 L 100 110 L 60 150" fill="none" stroke="#f5f0d2" stroke-width="1.5"/>
+      <!-- arrow nocked -->
+      <line x1="40" y1="110" x2="100" y2="110" stroke="#8b5a2b" stroke-width="3" stroke-linecap="round"/>
+      <!-- arrow head -->
+      <path d="M 40 110 L 28 104 L 28 116 Z" fill="#c0c0c8" stroke="#5a5a68" stroke-width="1.5"/>
+      <!-- fletching -->
+      <path d="M 100 110 L 110 102 L 108 110 L 110 118 Z" fill="#d63131" stroke="#7a1818" stroke-width="1.4"/>`;
+  }
+  return `
+    <!-- bow at side -->
+    <path d="M 56 80 Q 38 110 56 140" fill="none" stroke="#8b5a2b" stroke-width="4" stroke-linecap="round"/>
+    <path d="M 56 80 L 56 140" fill="none" stroke="#f5f0d2" stroke-width="1.2"/>`;
+}
+
+const archer = {
+  key: 'archer',
+  name: 'Archer',
+  desc: 'Fires arrows from a longbow. Hides behind cover on press.',
+  accent: '#4d8a3f',
+  idle: () => svg(
+    kirbyFeet() + kirbyBody() +
+    kirbyArm('left', { rot: -40, cx: 58, cy: 105 }) +
+    kirbyArm('right', { rot: 20 }) +
+    archerHat() +
+    kirbyFace({ mouth: 'small' }) +
+    bowAndArrow({ drawn: false })
+  ),
+  attack: () => svg(
+    kirbyFeet({ leftRot: -25, rightRot: 5 }) + kirbyBody() +
+    kirbyArm('left', { rot: -10, cx: 50, cy: 110 }) +
+    kirbyArm('right', { rot: 10, cx: 108, cy: 108, rx: 9, ry: 12 }) +
+    archerHat() +
+    kirbyFace({ mouth: 'determined' }) +
+    bowAndArrow({ drawn: true })
+  ),
+  projectile: () => svg(`
+    <g class="arrow-fly">
+      <!-- arrow shaft -->
+      <line x1="40" y1="100" x2="155" y2="100" stroke="#8b5a2b" stroke-width="4" stroke-linecap="round"/>
+      <line x1="42" y1="100" x2="150" y2="100" stroke="#c9a065" stroke-width="1.5"/>
+      <!-- arrow head -->
+      <path d="M 175 100 L 150 90 L 155 100 L 150 110 Z" fill="#c0c0c8" stroke="#5a5a68" stroke-width="1.6"/>
+      <path d="M 175 100 L 158 96 L 162 100 L 158 104 Z" fill="#ffffff" opacity="0.6"/>
+      <!-- fletching -->
+      <path d="M 30 100 L 42 88 L 40 100 L 42 112 Z" fill="#d63131" stroke="#7a1818" stroke-width="1.4"/>
+      <path d="M 38 100 L 48 92 L 46 100 L 48 108 Z" fill="#ff7070" opacity="0.7"/>
+      <!-- speed lines -->
+      <line x1="15" y1="92" x2="28" y2="98" stroke="#ffffff" stroke-width="2" stroke-linecap="round" opacity="0.7"/>
+      <line x1="15" y1="108" x2="28" y2="102" stroke="#ffffff" stroke-width="2" stroke-linecap="round" opacity="0.7"/>
+      <line x1="10" y1="100" x2="22" y2="100" stroke="#ffffff" stroke-width="2" stroke-linecap="round" opacity="0.5"/>
+    </g>`
+  ),
+  vfx: () => svg(`
+    <g class="vfx-pulse">
+      <!-- target hit rings -->
+      <circle cx="100" cy="100" r="48" fill="none" stroke="#d63131" stroke-width="3" opacity="0.6"/>
+      <circle cx="100" cy="100" r="34" fill="#ffffff" stroke="#d63131" stroke-width="2.5"/>
+      <circle cx="100" cy="100" r="22" fill="#d63131"/>
+      <circle cx="100" cy="100" r="10" fill="#ffffff"/>
+      <circle cx="100" cy="100" r="4" fill="#d63131"/>
+      <!-- impact star -->
+      <path d="M 100 60 L 105 96 L 100 100 L 95 96 Z" fill="#fff5c8" stroke="#7a1818" stroke-width="1"/>
+      <path d="M 140 100 L 104 105 L 100 100 L 104 95 Z" fill="#fff5c8" stroke="#7a1818" stroke-width="1"/>
+      <path d="M 100 140 L 95 104 L 100 100 L 105 104 Z" fill="#fff5c8" stroke="#7a1818" stroke-width="1"/>
+      <path d="M 60 100 L 96 95 L 100 100 L 96 105 Z" fill="#fff5c8" stroke="#7a1818" stroke-width="1"/>
+    </g>`
+  ),
+};
+
+// =========================================================================
+// 6. FIRE — flame crown, breath cone
+// =========================================================================
+
+function fireCrown() {
+  return `
+    <!-- flame headdress: multiple jagged flame petals -->
+    <path d="M 70 78 Q 64 55 78 50 Q 80 65 82 76 Z" fill="#ff5722" stroke="#a8290a" stroke-width="2"/>
+    <path d="M 82 76 Q 80 40 96 30 Q 94 55 96 76 Z" fill="#ff7a3a" stroke="#a8290a" stroke-width="2"/>
+    <path d="M 96 76 Q 100 22 106 18 Q 110 45 110 76 Z" fill="#ffaa42" stroke="#a8290a" stroke-width="2"/>
+    <path d="M 110 76 Q 116 35 124 32 Q 122 56 122 76 Z" fill="#ff7a3a" stroke="#a8290a" stroke-width="2"/>
+    <path d="M 122 76 Q 128 50 138 50 Q 130 64 130 78 Z" fill="#ff5722" stroke="#a8290a" stroke-width="2"/>
+    <!-- inner glow -->
+    <ellipse cx="100" cy="68" rx="22" ry="10" fill="#fff5a0" opacity="0.5"/>
+    <!-- base band -->
+    <path d="M 68 76 Q 100 86 132 76 L 132 84 Q 100 92 68 84 Z"
+      fill="#d63131" stroke="#7a1818" stroke-width="2"/>`;
+}
+
+function fireBreath({ scale = 1, opacity = 1 }) {
+  return `
+    <g class="fire-breath" opacity="${opacity}">
+      <!-- outer flame -->
+      <path d="M 100 118 Q 130 105 175 100 Q 195 100 195 115 Q 195 130 175 130 Q 130 135 100 122 Z"
+        fill="#ff5722" stroke="#a8290a" stroke-width="2"/>
+      <!-- inner flame -->
+      <path d="M 105 118 Q 130 110 170 108 Q 185 108 185 116 Q 185 124 170 124 Q 130 128 105 122 Z"
+        fill="#ffaa42" stroke="#c44b10" stroke-width="1.4"/>
+      <!-- core -->
+      <path d="M 110 118 Q 135 115 160 115 Q 172 115 172 118 Q 172 122 160 122 Q 135 124 110 122 Z"
+        fill="#fff5a0"/>
+      <!-- floating embers -->
+      <circle cx="180" cy="98" r="3" fill="#ff7a3a" opacity="0.8"/>
+      <circle cx="170" cy="138" r="2.5" fill="#ffaa42" opacity="0.8"/>
+      <circle cx="190" cy="120" r="2" fill="#fff5a0"/>
+    </g>`;
+}
+
+const fire = {
+  key: 'fire',
+  name: 'Fire',
+  desc: 'Breathes a wide flame cone. Tap to dash-charge.',
+  accent: '#ff5722',
+  idle: () => svg(
+    kirbyFeet() + kirbyBody() +
+    kirbyArm('left', { rot: -20 }) +
+    kirbyArm('right', { rot: 20 }) +
+    fireCrown() +
+    kirbyFace({ mouth: 'small' })
+  ),
+  attack: () => svg(
+    kirbyFeet({ leftRot: -25, rightRot: 8 }) + kirbyBody() +
+    kirbyArm('left', { rot: -30 }) +
+    kirbyArm('right', { rot: 30 }) +
+    fireCrown() +
+    kirbyFace({ mouth: 'open' }) +
+    fireBreath({})
+  ),
+  projectile: () => svg(`
+    <g class="fire-breath">
+      <!-- airborne fireball -->
+      <circle cx="100" cy="100" r="46" fill="#ff5722" stroke="#a8290a" stroke-width="2.5"/>
+      <circle cx="100" cy="100" r="34" fill="#ff7a3a"/>
+      <circle cx="100" cy="100" r="22" fill="#ffaa42"/>
+      <circle cx="100" cy="100" r="12" fill="#fff5a0"/>
+      <!-- flame tongues -->
+      <path d="M 100 54 Q 108 70 100 84 Q 92 70 100 54 Z" fill="#ff7a3a" stroke="#a8290a" stroke-width="1.4"/>
+      <path d="M 146 100 Q 130 108 116 100 Q 130 92 146 100 Z" fill="#ff7a3a" stroke="#a8290a" stroke-width="1.4"/>
+      <path d="M 100 146 Q 92 130 100 116 Q 108 130 100 146 Z" fill="#ff7a3a" stroke="#a8290a" stroke-width="1.4"/>
+      <path d="M 54 100 Q 70 92 84 100 Q 70 108 54 100 Z" fill="#ff7a3a" stroke="#a8290a" stroke-width="1.4"/>
+    </g>
+    <!-- embers -->
+    <circle cx="40" cy="60" r="3" fill="#ff7a3a" opacity="0.6"/>
+    <circle cx="165" cy="55" r="2.5" fill="#ffaa42" opacity="0.7"/>
+    <circle cx="170" cy="155" r="3.5" fill="#ff5722" opacity="0.6"/>
+    <circle cx="35" cy="150" r="2.5" fill="#fff5a0" opacity="0.7"/>`
+  ),
+  vfx: () => svg(`
+    <g class="vfx-pulse">
+      <!-- explosion of flames -->
+      <circle cx="100" cy="100" r="60" fill="#ff5722" opacity="0.2"/>
+      <path d="M 100 30 Q 115 70 100 90 Q 85 70 100 30 Z" fill="#ffaa42" stroke="#a8290a" stroke-width="1.8"/>
+      <path d="M 170 100 Q 130 115 110 100 Q 130 85 170 100 Z" fill="#ffaa42" stroke="#a8290a" stroke-width="1.8"/>
+      <path d="M 100 170 Q 85 130 100 110 Q 115 130 100 170 Z" fill="#ffaa42" stroke="#a8290a" stroke-width="1.8"/>
+      <path d="M 30 100 Q 70 85 90 100 Q 70 115 30 100 Z" fill="#ffaa42" stroke="#a8290a" stroke-width="1.8"/>
+      <!-- diagonal flames -->
+      <path d="M 50 50 Q 80 70 100 100 Q 80 70 50 50 Z" fill="#ff7a3a" opacity="0.8"/>
+      <path d="M 150 50 Q 120 70 100 100 Q 120 70 150 50 Z" fill="#ff7a3a" opacity="0.8"/>
+      <path d="M 50 150 Q 80 130 100 100 Q 80 130 50 150 Z" fill="#ff7a3a" opacity="0.8"/>
+      <path d="M 150 150 Q 120 130 100 100 Q 120 130 150 150 Z" fill="#ff7a3a" opacity="0.8"/>
+      <!-- center core -->
+      <circle cx="100" cy="100" r="20" fill="#fff5a0" stroke="#ff5722" stroke-width="2.5"/>
+      <circle cx="100" cy="100" r="8" fill="#ffffff"/>
+    </g>`
+  ),
+};
+
+// =========================================================================
+// 7. BOMB — aviator helmet, round bomb
+// =========================================================================
+
+function bombHelmet() {
+  return `
+    <!-- leather helmet shell -->
+    <path d="M 66 80 Q 100 38 134 80 Q 134 88 128 88 Q 100 72 72 88 Q 66 88 66 80 Z"
+      fill="#7d6249" stroke="#3a2a16" stroke-width="2.2"/>
+    <!-- helmet top stripe -->
+    <path d="M 78 70 Q 100 56 122 70" fill="none" stroke="#3a2a16" stroke-width="2.2" stroke-linecap="round"/>
+    <!-- ear flaps -->
+    <ellipse cx="68" cy="92" rx="6" ry="8" fill="#7d6249" stroke="#3a2a16" stroke-width="2"/>
+    <ellipse cx="132" cy="92" rx="6" ry="8" fill="#7d6249" stroke="#3a2a16" stroke-width="2"/>
+    <!-- goggles (raised) -->
+    <rect x="78" y="56" width="44" height="14" rx="6" fill="#3a2a16" stroke="#1a1208" stroke-width="1.8"/>
+    <circle cx="89" cy="63" r="5" fill="#a8d8f5" stroke="#1a1208" stroke-width="1.5"/>
+    <circle cx="111" cy="63" r="5" fill="#a8d8f5" stroke="#1a1208" stroke-width="1.5"/>
+    <circle cx="87" cy="61" r="1.8" fill="#ffffff" opacity="0.9"/>
+    <circle cx="109" cy="61" r="1.8" fill="#ffffff" opacity="0.9"/>
+    <line x1="100" y1="56" x2="100" y2="70" stroke="#1a1208" stroke-width="1.5"/>
+    <!-- chin strap -->
+    <path d="M 70 92 Q 100 102 130 92" fill="none" stroke="#5a4530" stroke-width="2" stroke-linecap="round"/>`;
+}
+
+function bombObject({ cx, cy, r = 18, lit = true, scale = 1 }) {
+  return `
+    <g transform="translate(${cx} ${cy}) scale(${scale})">
+      <!-- bomb body -->
+      <circle cx="0" cy="0" r="${r}" fill="#1a1a2e" stroke="#000000" stroke-width="2.2"/>
+      <circle cx="-${r * 0.35}" cy="-${r * 0.35}" r="${r * 0.3}" fill="#3a3a52" opacity="0.7"/>
+      <!-- highlight dot -->
+      <circle cx="-${r * 0.4}" cy="-${r * 0.45}" r="${r * 0.12}" fill="#7a7a92"/>
+      <!-- fuse cap -->
+      <rect x="-3" y="-${r + 6}" width="6" height="8" fill="#5a3a1e" stroke="#000" stroke-width="1.4"/>
+      <!-- fuse -->
+      <path d="M 0 -${r + 6} Q -8 -${r + 14} -4 -${r + 22} Q 4 -${r + 26} 0 -${r + 32}"
+        fill="none" stroke="#9b6a36" stroke-width="2.4" stroke-linecap="round"/>
+      ${lit ? `
+        <g class="fuse-spark" transform="translate(0 -${r + 32})">
+          <circle cx="0" cy="0" r="4" fill="#fff5a0"/>
+          <circle cx="0" cy="0" r="2.5" fill="#ff7a3a"/>
+          <path d="M 0 -6 L 2 -2 L 6 0 L 2 2 L 0 6 L -2 2 L -6 0 L -2 -2 Z" fill="#ffd54d" stroke="#ff5722" stroke-width="1"/>
+        </g>` : ''}
+    </g>`;
+}
+
+const bomb = {
+  key: 'bomb',
+  name: 'Bomb',
+  desc: 'Tosses lit bombs that detonate on impact.',
+  accent: '#7d6249',
+  idle: () => svg(
+    kirbyFeet() + kirbyBody() +
+    kirbyArm('left', { rot: -20 }) +
+    kirbyArm('right', { rot: 50, cx: 138, cy: 100 }) +
+    bombHelmet() +
+    kirbyFace({ mouth: 'smirk', eyesY: 102 }) +
+    bombObject({ cx: 150, cy: 70, r: 14, scale: 0.9 })
+  ),
+  attack: () => svg(
+    kirbyFeet({ leftRot: -25, rightRot: 5 }) + kirbyBody() +
+    kirbyArm('left', { rot: -10 }) +
+    kirbyArm('right', { rot: 130, cx: 145, cy: 88 }) +
+    bombHelmet() +
+    kirbyFace({ mouth: 'open', eyesY: 102 }) +
+    bombObject({ cx: 165, cy: 45, r: 14, scale: 0.95 }) +
+    // throw arc
+    `<path d="M 145 90 Q 158 60 168 50" fill="none" stroke="#fff5a0" stroke-width="2" stroke-dasharray="3 3" opacity="0.7"/>`
+  ),
+  projectile: () => svg(`
+    <g class="float">
+      ${bombObject({ cx: 100, cy: 105, r: 28, scale: 1 })}
+      <!-- speed/spin lines -->
+      <path d="M 56 78 Q 50 85 56 92" fill="none" stroke="#9090a8" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
+      <path d="M 144 78 Q 150 85 144 92" fill="none" stroke="#9090a8" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
+    </g>`
+  ),
+  vfx: () => svg(`
+    <g class="explosion-burst">
+      <!-- big explosion -->
+      <circle cx="100" cy="100" r="70" fill="#ff5722" opacity="0.3"/>
+      <!-- outer cloud -->
+      <path d="M 100 30 Q 120 35 130 50 Q 155 50 160 75 Q 180 80 170 105 Q 180 125 155 130
+               Q 150 155 125 155 Q 115 175 95 165 Q 75 175 65 155 Q 40 155 35 130 Q 15 125 25 100
+               Q 15 75 40 70 Q 45 45 70 50 Q 80 30 100 30 Z"
+        fill="#ff7a3a" stroke="#a8290a" stroke-width="2.5"/>
+      <!-- inner cloud -->
+      <path d="M 100 50 Q 130 55 140 80 Q 165 90 150 115 Q 155 140 125 145
+               Q 115 165 95 150 Q 70 160 60 135 Q 35 125 50 100 Q 45 70 75 65 Q 85 50 100 50 Z"
+        fill="#ffaa42"/>
+      <!-- core -->
+      <circle cx="100" cy="100" r="20" fill="#fff5a0"/>
+      <circle cx="100" cy="100" r="10" fill="#ffffff"/>
+      <!-- BOOM text -->
+      <text x="100" y="108" text-anchor="middle" font-size="28" font-weight="900" fill="#7a1818" font-family="Arial Black, sans-serif">BOOM</text>
+    </g>
+    <!-- smoke puffs -->
+    <circle cx="30" cy="40" r="6" fill="#5a5a68" opacity="0.6"/>
+    <circle cx="170" cy="35" r="5" fill="#5a5a68" opacity="0.6"/>
+    <circle cx="170" cy="170" r="7" fill="#5a5a68" opacity="0.6"/>
+    <circle cx="25" cy="165" r="5" fill="#5a5a68" opacity="0.6"/>`
+  ),
+};
+
+// =========================================================================
+// 8. PARASOL — red-and-white umbrella, slow-fall + jab
+// =========================================================================
+
+function parasolAccessory({ x = 100, y = 50, rotation = 0, open = true }) {
+  if (!open) {
+    return `
+      <!-- closed parasol -->
+      <g transform="translate(${x} ${y}) rotate(${rotation})">
+        <ellipse cx="0" cy="0" rx="6" ry="20" fill="#d63131" stroke="#7a1818" stroke-width="2"/>
+        <rect x="-2" y="18" width="4" height="40" fill="#8b5a2b" stroke="#5a3a1e" stroke-width="1.5"/>
+        <circle cx="0" cy="-22" r="3.5" fill="#f5d24b" stroke="#a8861c" stroke-width="1.2"/>
+      </g>`;
+  }
+  return `
+    <g class="parasol-drift" transform="translate(${x} ${y}) rotate(${rotation})">
+      <!-- canopy slices (red & white alternating) -->
+      <path d="M 0 0 L -50 0 Q -45 -35 0 -36 Z" fill="#d63131" stroke="#7a1818" stroke-width="2"/>
+      <path d="M 0 0 L 0 -36 Q -25 -35 -25 -2 Z" fill="#ffffff" stroke="#7a1818" stroke-width="2"/>
+      <path d="M 0 0 L 0 -36 Q 25 -35 25 -2 Z" fill="#d63131" stroke="#7a1818" stroke-width="2"/>
+      <path d="M 0 0 L 50 0 Q 45 -35 0 -36 Z" fill="#ffffff" stroke="#7a1818" stroke-width="2"/>
+      <!-- canopy bottom rim -->
+      <path d="M -50 0 Q -25 8 0 0 Q 25 8 50 0" fill="none" stroke="#7a1818" stroke-width="2"/>
+      <!-- ribs -->
+      <line x1="0" y1="0" x2="-50" y2="0" stroke="#7a1818" stroke-width="1.2"/>
+      <line x1="0" y1="0" x2="50" y2="0" stroke="#7a1818" stroke-width="1.2"/>
+      <line x1="0" y1="0" x2="-25" y2="-32" stroke="#7a1818" stroke-width="1.2"/>
+      <line x1="0" y1="0" x2="25" y2="-32" stroke="#7a1818" stroke-width="1.2"/>
+      <line x1="0" y1="0" x2="0" y2="-36" stroke="#7a1818" stroke-width="1.2"/>
+      <!-- top spike -->
+      <path d="M -3 -36 L 3 -36 L 0 -46 Z" fill="#f5d24b" stroke="#a8861c" stroke-width="1.4"/>
+      <!-- handle -->
+      <path d="M 0 0 Q 0 28 -8 32 Q -14 30 -12 24" fill="none" stroke="#8b5a2b" stroke-width="4" stroke-linecap="round"/>
+      <circle cx="-12" cy="24" r="2" fill="#5a3a1e"/>
+    </g>`;
+}
+
+const parasol = {
+  key: 'parasol',
+  name: 'Parasol',
+  desc: 'Blocks attacks and slows falls. Stab-jabs at close range.',
+  accent: '#ec4899',
+  idle: () => svg(
+    kirbyFeet() + kirbyBody() +
+    kirbyArm('left', { rot: -20 }) +
+    kirbyArm('right', { rot: 0, cx: 100, cy: 78 }) +
+    parasolAccessory({ x: 100, y: 60, rotation: 0, open: true }) +
+    kirbyFace({ mouth: 'small' })
+  ),
+  attack: () => svg(
+    kirbyFeet({ leftRot: -25, rightRot: 5 }) + kirbyBody() +
+    kirbyArm('left', { rot: -30 }) +
+    kirbyArm('right', { rot: 80, cx: 140, cy: 100 }) +
+    kirbyFace({ mouth: 'determined' }) +
+    // parasol thrust forward (sideways)
+    `<g transform="translate(170 90) rotate(90)">
+       <path d="M 0 0 L -36 0 Q -34 -25 0 -26 Z" fill="#d63131" stroke="#7a1818" stroke-width="2"/>
+       <path d="M 0 0 L 0 -26 Q -18 -25 -18 -2 Z" fill="#ffffff" stroke="#7a1818" stroke-width="2"/>
+       <path d="M 0 0 L 0 -26 Q 18 -25 18 -2 Z" fill="#d63131" stroke="#7a1818" stroke-width="2"/>
+       <path d="M 0 0 L 36 0 Q 34 -25 0 -26 Z" fill="#ffffff" stroke="#7a1818" stroke-width="2"/>
+       <path d="M -36 0 Q -18 6 0 0 Q 18 6 36 0" fill="none" stroke="#7a1818" stroke-width="2"/>
+       <path d="M -3 -26 L 3 -26 L 0 -36 Z" fill="#f5d24b" stroke="#a8861c" stroke-width="1.4"/>
+     </g>` +
+    // shaft and handle
+    `<line x1="142" y1="100" x2="170" y2="90" stroke="#8b5a2b" stroke-width="4" stroke-linecap="round"/>
+     <path d="M 142 100 Q 134 105 134 112 Q 138 116 144 113" fill="none" stroke="#8b5a2b" stroke-width="4" stroke-linecap="round"/>` +
+    // poke sparkles
+    `<path d="M 190 78 L 192 84 L 198 86 L 192 88 L 190 94 L 188 88 L 182 86 L 188 84 Z" fill="#fff5c8" stroke="#ec4899" stroke-width="1"/>`
+  ),
+  projectile: () => svg(`
+    <!-- Parasol has no traditional projectile; show falling Kirby slow-drift silhouette -->
+    <g class="parasol-drift">
+      <!-- mini Kirby beneath parasol, indicating slow-fall behaviour -->
+      <g transform="translate(100 110)">
+        <path d="M 0 0 L -50 0 Q -45 -35 0 -36 Z" fill="#d63131" stroke="#7a1818" stroke-width="2"/>
+        <path d="M 0 0 L 0 -36 Q -25 -35 -25 -2 Z" fill="#ffffff" stroke="#7a1818" stroke-width="2"/>
+        <path d="M 0 0 L 0 -36 Q 25 -35 25 -2 Z" fill="#d63131" stroke="#7a1818" stroke-width="2"/>
+        <path d="M 0 0 L 50 0 Q 45 -35 0 -36 Z" fill="#ffffff" stroke="#7a1818" stroke-width="2"/>
+        <path d="M -50 0 Q -25 8 0 0 Q 25 8 50 0" fill="none" stroke="#7a1818" stroke-width="2"/>
+        <line x1="0" y1="0" x2="-50" y2="0" stroke="#7a1818" stroke-width="1.2"/>
+        <line x1="0" y1="0" x2="50" y2="0" stroke="#7a1818" stroke-width="1.2"/>
+        <line x1="0" y1="0" x2="-25" y2="-32" stroke="#7a1818" stroke-width="1.2"/>
+        <line x1="0" y1="0" x2="25" y2="-32" stroke="#7a1818" stroke-width="1.2"/>
+        <line x1="0" y1="0" x2="0" y2="-36" stroke="#7a1818" stroke-width="1.2"/>
+        <path d="M -3 -36 L 3 -36 L 0 -46 Z" fill="#f5d24b" stroke="#a8861c" stroke-width="1.4"/>
+      </g>
+      <!-- small kirby silhouette dangling -->
+      <circle cx="100" cy="135" r="18" fill="#ffc0d3" stroke="#d96e8a" stroke-width="2"/>
+      <ellipse cx="93" cy="132" rx="2" ry="4" fill="#1a2c5c"/>
+      <ellipse cx="107" cy="132" rx="2" ry="4" fill="#1a2c5c"/>
+      <ellipse cx="93" cy="129" rx="1" ry="1.3" fill="#ffffff"/>
+      <ellipse cx="107" cy="129" rx="1" ry="1.3" fill="#ffffff"/>
+      <ellipse cx="89" cy="139" rx="3" ry="2" fill="#ff7a99" opacity="0.7"/>
+      <ellipse cx="111" cy="139" rx="3" ry="2" fill="#ff7a99" opacity="0.7"/>
+      <line x1="100" y1="110" x2="100" y2="120" stroke="#8b5a2b" stroke-width="2"/>
+    </g>
+    <!-- floating sparkles (slow-fall indicator) -->
+    <circle cx="40" cy="80" r="2.5" fill="#fff5c8" opacity="0.7"/>
+    <circle cx="160" cy="50" r="2" fill="#fff5c8" opacity="0.7"/>
+    <circle cx="50" cy="170" r="2" fill="#ec4899" opacity="0.7"/>
+    <circle cx="170" cy="160" r="2.5" fill="#ec4899" opacity="0.7"/>`
+  ),
+  vfx: () => svg(`
+    <g class="vfx-pulse">
+      <!-- block shield bubble -->
+      <circle cx="100" cy="100" r="55" fill="#ec4899" opacity="0.15"/>
+      <circle cx="100" cy="100" r="42" fill="#ec4899" opacity="0.25"/>
+      <circle cx="100" cy="100" r="42" fill="none" stroke="#ffffff" stroke-width="3" stroke-dasharray="6 4"/>
+      <!-- shine ring -->
+      <ellipse cx="88" cy="80" rx="20" ry="6" fill="#ffffff" opacity="0.5" transform="rotate(-30 88 80)"/>
+      <!-- protected umbrella -->
+      <g transform="translate(100 105)">
+        <path d="M 0 0 L -38 0 Q -35 -28 0 -28 Z" fill="#d63131" stroke="#7a1818" stroke-width="2"/>
+        <path d="M 0 0 L 0 -28 Q -20 -27 -20 -2 Z" fill="#ffffff" stroke="#7a1818" stroke-width="2"/>
+        <path d="M 0 0 L 0 -28 Q 20 -27 20 -2 Z" fill="#d63131" stroke="#7a1818" stroke-width="2"/>
+        <path d="M 0 0 L 38 0 Q 35 -28 0 -28 Z" fill="#ffffff" stroke="#7a1818" stroke-width="2"/>
+        <path d="M -3 -28 L 3 -28 L 0 -36 Z" fill="#f5d24b" stroke="#a8861c" stroke-width="1.4"/>
+      </g>
+      <!-- sparkle stars -->
+      <path d="M 50 55 L 53 62 L 60 64 L 53 66 L 50 73 L 47 66 L 40 64 L 47 62 Z" fill="#fff5c8" stroke="#ec4899" stroke-width="1"/>
+      <path d="M 150 55 L 153 62 L 160 64 L 153 66 L 150 73 L 147 66 L 140 64 L 147 62 Z" fill="#fff5c8" stroke="#ec4899" stroke-width="1"/>
+      <path d="M 150 145 L 152 150 L 158 152 L 152 154 L 150 160 L 148 154 L 142 152 L 148 150 Z" fill="#fff5c8" stroke="#ec4899" stroke-width="1"/>
+      <path d="M 50 145 L 52 150 L 58 152 L 52 154 L 50 160 L 48 154 L 42 152 L 48 150 Z" fill="#fff5c8" stroke="#ec4899" stroke-width="1"/>
+    </g>`
+  ),
+};
+
+// =========================================================================
+// CHARACTER STATE FRAGMENTS (hit / jump / flip)
+// =========================================================================
+
+// Dazed face — X-eyes, swirly mouth — used in hit state
+function kirbyDazedFace({ eyesY = 100, mouthY = 120 } = {}) {
+  return `
+    <ellipse cx="80" cy="${eyesY + 18}" rx="7" ry="4" fill="#ff7a99" opacity="0.7"/>
+    <ellipse cx="120" cy="${eyesY + 18}" rx="7" ry="4" fill="#ff7a99" opacity="0.7"/>
+    <!-- X eyes -->
+    <path d="M 84 ${eyesY - 6} L 94 ${eyesY + 6} M 94 ${eyesY - 6} L 84 ${eyesY + 6}"
+      stroke="#1a2c5c" stroke-width="2.5" stroke-linecap="round"/>
+    <path d="M 106 ${eyesY - 6} L 116 ${eyesY + 6} M 116 ${eyesY - 6} L 106 ${eyesY + 6}"
+      stroke="#1a2c5c" stroke-width="2.5" stroke-linecap="round"/>
+    <!-- wobbly mouth -->
+    <path d="M 92 ${mouthY} Q 96 ${mouthY + 4} 100 ${mouthY} Q 104 ${mouthY - 4} 108 ${mouthY}"
+      fill="none" stroke="#8b2c3b" stroke-width="2" stroke-linecap="round"/>`;
+}
+
+// Rotating "tweet birds + stars" above the head
+function dazedStars() {
+  return `
+    <g class="dazed-stars">
+      <!-- yellow stars around head perimeter -->
+      <path d="M 70 60 L 73 67 L 80 68 L 73 70 L 70 77 L 67 70 L 60 68 L 67 67 Z"
+        fill="#fff5a0" stroke="#a8861c" stroke-width="1.2"/>
+      <path d="M 130 60 L 133 67 L 140 68 L 133 70 L 130 77 L 127 70 L 120 68 L 127 67 Z"
+        fill="#fff5a0" stroke="#a8861c" stroke-width="1.2"/>
+      <path d="M 100 50 L 103 56 L 109 57 L 103 59 L 100 65 L 97 59 L 91 57 L 97 56 Z"
+        fill="#ffd54d" stroke="#a8861c" stroke-width="1.2"/>
+      <!-- small swirl bird -->
+      <path d="M 50 80 Q 55 76 60 80 Q 55 82 58 86" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>
+      <path d="M 142 80 Q 147 76 152 80 Q 147 82 150 86" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>
+    </g>`;
+}
+
+// Ability hat / accessory (no weapon) — used for state poses to keep things readable
+const ABILITY_ACCESSORY = {
+  sword:   () => swordCap(),
+  beam:    () => beamHat(),
+  cutter:  () => cutterHat(),
+  hammer:  () => hammerBandana(),
+  archer:  () => archerHat(),
+  fire:    () => fireCrown(),
+  bomb:    () => bombHelmet(),
+  parasol: () => parasolAccessory({ x: 100, y: 60, rotation: 0, open: true }),
+};
+
+// HIT pose — knocked back, arms flailing, X eyes, dazed stars
+function kirbyHitFor(ab) {
+  return svg(
+    kirbyFeet({ leftRot: -50, rightRot: 50, leftX: 78, rightX: 122, y: 162 }) +
+    kirbyBody() +
+    kirbyArm('left',  { rot: -120, cx: 56, cy: 95 }) +
+    kirbyArm('right', { rot: 120,  cx: 144, cy: 95 }) +
+    ABILITY_ACCESSORY[ab.key]() +
+    kirbyDazedFace({ eyesY: 102, mouthY: 122 }) +
+    dazedStars()
+  );
+}
+
+// JUMP pose — arms up, feet tucked, mouth open
+function kirbyJumpFor(ab) {
+  return svg(
+    // dust puff (drawn first, at ground level)
+    `<ellipse class="dust-puff" cx="100" cy="178" rx="34" ry="5" fill="#9a9aab" opacity="0.6"/>` +
+    kirbyFeet({ leftRot: -55, rightRot: 55, leftX: 86, rightX: 114, y: 152 }) +
+    kirbyBody() +
+    kirbyArm('left',  { rot: -160, cx: 68, cy: 78 }) +
+    kirbyArm('right', { rot: 160,  cx: 132, cy: 78 }) +
+    ABILITY_ACCESSORY[ab.key]() +
+    kirbyFace({ mouth: 'open', eyesY: 102 })
+  );
+}
+
+// FLIP pose — front-flip / double jump, arms tucked, eyes closed wink
+function kirbyFlipFor(ab) {
+  return svg(
+    // motion trail behind
+    `<g class="motion-trail">
+       <circle cx="50" cy="110" r="3" fill="#ffffff" opacity="0.3"/>
+       <circle cx="60" cy="110" r="4" fill="#ffffff" opacity="0.4"/>
+       <circle cx="72" cy="110" r="5" fill="#ffffff" opacity="0.5"/>
+     </g>` +
+    kirbyFeet({ leftRot: -90, rightRot: 90, leftX: 90, rightX: 110, y: 148 }) +
+    kirbyBody() +
+    kirbyArm('left',  { rot: -90, cx: 64, cy: 108 }) +
+    kirbyArm('right', { rot: 90,  cx: 136, cy: 108 }) +
+    ABILITY_ACCESSORY[ab.key]() +
+    // happy closed-eye wink face
+    `<ellipse cx="80" cy="119" rx="7" ry="4" fill="#ff7a99" opacity="0.7"/>
+     <ellipse cx="120" cy="119" rx="7" ry="4" fill="#ff7a99" opacity="0.7"/>
+     <path d="M 84 100 Q 89 96 94 100" fill="none" stroke="#1a2c5c" stroke-width="2.2" stroke-linecap="round"/>
+     <path d="M 106 100 Q 111 96 116 100" fill="none" stroke="#1a2c5c" stroke-width="2.2" stroke-linecap="round"/>
+     <path d="M 94 117 Q 100 122 106 117" fill="none" stroke="#8b2c3b" stroke-width="2" stroke-linecap="round"/>`
+  );
+}
+
+// =========================================================================
+// BOSS ARENAS
+// =========================================================================
+
+// Small Kirby silhouette placed inside each arena for scale.
+function arenaKirby(x, y, scale = 0.45) {
+  return `
+    <g transform="translate(${x} ${y}) scale(${scale})">
+      <ellipse cx="-16" cy="50" rx="17" ry="10" fill="#e85a6e" stroke="#8b2c3b" stroke-width="2.2" transform="rotate(-15 -16 50)"/>
+      <ellipse cx="16" cy="50" rx="17" ry="10" fill="#e85a6e" stroke="#8b2c3b" stroke-width="2.2" transform="rotate(15 16 50)"/>
+      <circle cx="0" cy="0" r="42" fill="#ffc0d3" stroke="#d96e8a" stroke-width="2.5"/>
+      <ellipse cx="-20" cy="11" rx="7" ry="4" fill="#ff7a99" opacity="0.7"/>
+      <ellipse cx="20" cy="11" rx="7" ry="4" fill="#ff7a99" opacity="0.7"/>
+      <ellipse cx="-11" cy="-8" rx="3.8" ry="9" fill="#1a2c5c"/>
+      <ellipse cx="11" cy="-8" rx="3.8" ry="9" fill="#1a2c5c"/>
+      <ellipse cx="-11" cy="-13" rx="2" ry="2.8" fill="#ffffff"/>
+      <ellipse cx="11" cy="-13" rx="2" ry="2.8" fill="#ffffff"/>
+      <path d="M -4 9 Q 0 12 4 9" fill="none" stroke="#8b2c3b" stroke-width="2" stroke-linecap="round"/>
+    </g>`;
+}
+
+// Arena 1: Whispy Woods
+const whispyArena = `
+<svg viewBox="0 0 600 300" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="sky-forest" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#a8d8ee"/>
+      <stop offset="55%" stop-color="#c8e8c0"/>
+      <stop offset="100%" stop-color="#e2f0c8"/>
+    </linearGradient>
+    <radialGradient id="sun" cx="0.85" cy="0.15" r="0.2">
+      <stop offset="0%" stop-color="#fff5a0" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#fff5a0" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <!-- sky -->
+  <rect width="600" height="240" fill="url(#sky-forest)"/>
+  <rect width="600" height="240" fill="url(#sun)"/>
+  <!-- clouds -->
+  <g fill="#ffffff" opacity="0.85">
+    <ellipse cx="80" cy="60" rx="40" ry="14"/>
+    <ellipse cx="100" cy="55" rx="28" ry="12"/>
+    <ellipse cx="480" cy="40" rx="30" ry="10"/>
+    <ellipse cx="500" cy="36" rx="20" ry="8"/>
+  </g>
+  <!-- distant hills -->
+  <path d="M 0 220 L 60 180 L 130 210 L 220 170 L 300 200 L 380 160 L 480 210 L 600 175 L 600 240 L 0 240 Z"
+    fill="#5a8e6e" opacity="0.55"/>
+  <path d="M 0 240 L 100 215 L 200 235 L 320 205 L 440 235 L 600 215 L 600 250 L 0 250 Z"
+    fill="#3a6e4e" opacity="0.7"/>
+  <!-- background trees -->
+  <ellipse cx="60" cy="220" rx="40" ry="55" fill="#3a6b3a"/>
+  <rect x="55" y="240" width="10" height="20" fill="#5a3a1e"/>
+  <ellipse cx="540" cy="220" rx="40" ry="55" fill="#3a6b3a"/>
+  <rect x="535" y="240" width="10" height="20" fill="#5a3a1e"/>
+  <!-- Whispy Woods (big tree) -->
+  <g>
+    <!-- trunk with bark texture -->
+    <rect x="240" y="160" width="120" height="100" fill="#7a5028" stroke="#3a2a16" stroke-width="3"/>
+    <path d="M 250 170 L 252 250 M 270 165 L 268 250 M 300 162 L 302 250 M 330 165 L 332 250 M 350 170 L 348 250"
+      stroke="#5a3a1e" stroke-width="2" fill="none"/>
+    <!-- canopy lobes -->
+    <ellipse cx="300" cy="130" rx="130" ry="80" fill="#4caf50" stroke="#1f6628" stroke-width="3"/>
+    <ellipse cx="230" cy="110" rx="65" ry="55" fill="#5fc242" stroke="#1f6628" stroke-width="2.5"/>
+    <ellipse cx="370" cy="110" rx="65" ry="55" fill="#5fc242" stroke="#1f6628" stroke-width="2.5"/>
+    <ellipse cx="300" cy="95" rx="60" ry="48" fill="#6dd64d" stroke="#1f6628" stroke-width="2.5"/>
+    <!-- canopy highlights -->
+    <ellipse cx="270" cy="100" rx="20" ry="14" fill="#9ee87a" opacity="0.5"/>
+    <ellipse cx="340" cy="115" rx="14" ry="10" fill="#9ee87a" opacity="0.5"/>
+    <!-- Whispy face -->
+    <ellipse class="whispy-eyes" cx="278" cy="200" rx="10" ry="6" fill="#3a2a16"/>
+    <ellipse class="whispy-eyes" cx="322" cy="200" rx="10" ry="6" fill="#3a2a16"/>
+    <!-- big nose -->
+    <ellipse cx="300" cy="220" rx="16" ry="11" fill="#c98b6b" stroke="#7a4a2a" stroke-width="2"/>
+    <ellipse cx="295" cy="216" rx="5" ry="3" fill="#e8b89a" opacity="0.8"/>
+    <!-- mouth -->
+    <path d="M 282 240 Q 300 248 318 240" fill="none" stroke="#3a2a16" stroke-width="2.5" stroke-linecap="round"/>
+    <!-- apples in tree -->
+    <circle cx="240" cy="80" r="6" fill="#d63131" stroke="#7a1818" stroke-width="1.5"/>
+    <path d="M 240 75 L 241 71" stroke="#3a2a16" stroke-width="1.5"/>
+    <circle cx="350" cy="90" r="6" fill="#d63131" stroke="#7a1818" stroke-width="1.5"/>
+    <path d="M 350 85 L 351 81" stroke="#3a2a16" stroke-width="1.5"/>
+  </g>
+  <!-- falling apple -->
+  <g class="falling-apple">
+    <circle cx="180" cy="240" r="7" fill="#d63131" stroke="#7a1818" stroke-width="1.5"/>
+    <path d="M 180 234 L 181 230" stroke="#3a2a16" stroke-width="1.5"/>
+    <ellipse cx="178" cy="237" rx="2" ry="1" fill="#ff7070" opacity="0.7"/>
+  </g>
+  <!-- ground -->
+  <rect y="240" width="600" height="60" fill="#8b6940"/>
+  <rect y="240" width="600" height="6" fill="#5fc242"/>
+  <!-- grass tufts -->
+  <g fill="#5fc242">
+    <path d="M 50 248 L 55 240 L 60 248 Z"/>
+    <path d="M 100 250 L 106 242 L 112 250 Z"/>
+    <path d="M 420 250 L 425 240 L 430 250 Z"/>
+    <path d="M 480 252 L 486 244 L 492 252 Z"/>
+  </g>
+  <!-- mushroom -->
+  <g transform="translate(440 270)">
+    <rect x="-3" y="-2" width="6" height="12" fill="#fff5d2"/>
+    <ellipse cx="0" cy="-3" rx="9" ry="6" fill="#d63131" stroke="#7a1818" stroke-width="1.5"/>
+    <circle cx="-3" cy="-4" r="1.5" fill="#fff5d2"/>
+    <circle cx="3" cy="-3" r="1" fill="#fff5d2"/>
+  </g>
+  <!-- fallen apple -->
+  <circle cx="120" cy="275" r="6" fill="#d63131" stroke="#7a1818" stroke-width="1.5"/>
+  <!-- platform marker -->
+  <line x1="0" y1="246" x2="600" y2="246" stroke="#3a2a16" stroke-width="1" stroke-dasharray="4 3" opacity="0.3"/>
+  ${arenaKirby(420, 232, 0.4)}
+</svg>`;
+
+// Arena 2: King Dedede's Stadium
+const dededeArena = `
+<svg viewBox="0 0 600 300" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="curtain" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#7a1818"/>
+      <stop offset="100%" stop-color="#3a0a0a"/>
+    </linearGradient>
+    <linearGradient id="floor-dd" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#c44a30"/>
+      <stop offset="100%" stop-color="#8a2a18"/>
+    </linearGradient>
+    <radialGradient id="spotlight-grad" cx="0.5" cy="0" r="0.6">
+      <stop offset="0%" stop-color="#fff5a0" stop-opacity="0.7"/>
+      <stop offset="100%" stop-color="#fff5a0" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <!-- ceiling -->
+  <rect width="600" height="60" fill="#3a0a0a"/>
+  <!-- back curtain -->
+  <rect width="600" height="200" y="40" fill="url(#curtain)"/>
+  <!-- curtain folds -->
+  <g stroke="#5a1818" stroke-width="2" opacity="0.5">
+    <line x1="60" y1="40" x2="60" y2="240"/>
+    <line x1="120" y1="40" x2="120" y2="240"/>
+    <line x1="180" y1="40" x2="180" y2="240"/>
+    <line x1="240" y1="40" x2="240" y2="240"/>
+    <line x1="360" y1="40" x2="360" y2="240"/>
+    <line x1="420" y1="40" x2="420" y2="240"/>
+    <line x1="480" y1="40" x2="480" y2="240"/>
+    <line x1="540" y1="40" x2="540" y2="240"/>
+  </g>
+  <!-- swinging spotlight -->
+  <g class="spotlight-sweep">
+    <path d="M 280 0 L 320 0 L 380 240 L 220 240 Z" fill="url(#spotlight-grad)"/>
+    <rect x="280" y="0" width="40" height="14" fill="#3a3a3a" stroke="#000" stroke-width="1.5"/>
+    <circle cx="300" cy="12" r="6" fill="#fff5a0" stroke="#a8861c" stroke-width="1.5"/>
+  </g>
+  <!-- banners with crown -->
+  <g>
+    <path d="M 50 50 L 110 50 L 100 90 L 80 80 L 60 90 Z" fill="#f5d24b" stroke="#7a5028" stroke-width="2"/>
+    <!-- crown -->
+    <path d="M 70 62 L 75 56 L 80 62 L 85 56 L 90 62 L 92 72 L 68 72 Z" fill="#d63131" stroke="#7a1818" stroke-width="1.5"/>
+    <circle cx="80" cy="68" r="2" fill="#fff5a0"/>
+  </g>
+  <g>
+    <path d="M 490 50 L 550 50 L 540 90 L 520 80 L 500 90 Z" fill="#f5d24b" stroke="#7a5028" stroke-width="2"/>
+    <path d="M 510 62 L 515 56 L 520 62 L 525 56 L 530 62 L 532 72 L 508 72 Z" fill="#d63131" stroke="#7a1818" stroke-width="1.5"/>
+    <circle cx="520" cy="68" r="2" fill="#fff5a0"/>
+  </g>
+  <!-- crowd silhouettes (animated bob) -->
+  <g class="crowd-bob" fill="#1a1a2e">
+    <ellipse cx="40" cy="220" rx="14" ry="20"/>
+    <circle cx="40" cy="205" r="9"/>
+    <ellipse cx="80" cy="225" rx="14" ry="22"/>
+    <circle cx="80" cy="208" r="9"/>
+    <ellipse cx="540" cy="220" rx="14" ry="20"/>
+    <circle cx="540" cy="205" r="9"/>
+    <ellipse cx="570" cy="225" rx="14" ry="22"/>
+    <circle cx="570" cy="208" r="9"/>
+  </g>
+  <!-- ring rope (boxing ring perimeter) -->
+  <line x1="0" y1="225" x2="600" y2="225" stroke="#f5d24b" stroke-width="4"/>
+  <line x1="0" y1="232" x2="600" y2="232" stroke="#d63131" stroke-width="3"/>
+  <!-- ring posts -->
+  <rect x="10" y="218" width="8" height="30" fill="#3a2a16" stroke="#000" stroke-width="1"/>
+  <rect x="582" y="218" width="8" height="30" fill="#3a2a16" stroke="#000" stroke-width="1"/>
+  <circle cx="14" cy="218" r="5" fill="#f5d24b" stroke="#7a5028" stroke-width="1.5"/>
+  <circle cx="586" cy="218" r="5" fill="#f5d24b" stroke="#7a5028" stroke-width="1.5"/>
+  <!-- ring mat -->
+  <rect y="240" width="600" height="60" fill="url(#floor-dd)"/>
+  <!-- mat pattern -->
+  <g stroke="#7a1818" stroke-width="1.5" opacity="0.4">
+    <line x1="0" y1="260" x2="600" y2="260"/>
+    <line x1="0" y1="280" x2="600" y2="280"/>
+  </g>
+  <!-- center "D" emblem on floor -->
+  <text x="300" y="285" text-anchor="middle" font-size="36" font-weight="900"
+    fill="#f5d24b" stroke="#7a1818" stroke-width="1.5" font-family="Arial Black, sans-serif"
+    opacity="0.8">D</text>
+  ${arenaKirby(150, 240, 0.4)}
+</svg>`;
+
+// Arena 3: Halberd Deck
+const halberdArena = `
+<svg viewBox="0 0 600 300" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="sky-halberd" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0a1230"/>
+      <stop offset="60%" stop-color="#1a2a6a"/>
+      <stop offset="100%" stop-color="#3a4a9a"/>
+    </linearGradient>
+    <linearGradient id="deck-halberd" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#7a8290"/>
+      <stop offset="100%" stop-color="#4a5260"/>
+    </linearGradient>
+  </defs>
+  <!-- night sky -->
+  <rect width="600" height="240" fill="url(#sky-halberd)"/>
+  <!-- stars -->
+  <g class="star-twinkle" fill="#ffffff">
+    <circle cx="50" cy="30" r="1.5"/>
+    <circle cx="120" cy="50" r="1"/>
+    <circle cx="200" cy="20" r="1.5"/>
+    <circle cx="280" cy="60" r="1"/>
+    <circle cx="350" cy="30" r="2"/>
+    <circle cx="430" cy="50" r="1"/>
+    <circle cx="500" cy="20" r="1.5"/>
+    <circle cx="560" cy="55" r="1"/>
+    <circle cx="80" cy="100" r="1"/>
+    <circle cx="180" cy="120" r="1"/>
+    <circle cx="320" cy="90" r="1.5"/>
+    <circle cx="450" cy="110" r="1"/>
+    <circle cx="540" cy="100" r="1.5"/>
+  </g>
+  <!-- crescent moon -->
+  <g transform="translate(490 75)">
+    <circle r="22" fill="#fff5d2"/>
+    <circle cx="6" r="22" fill="#1a2a6a"/>
+    <circle cx="-8" cy="-5" r="2" fill="#e8d8a8" opacity="0.7"/>
+  </g>
+  <!-- drifting clouds -->
+  <g class="halberd-cloud" fill="#5a6a9a" opacity="0.6">
+    <ellipse cx="100" cy="160" rx="40" ry="8"/>
+    <ellipse cx="80" cy="155" rx="24" ry="6"/>
+  </g>
+  <!-- mast (back) -->
+  <rect x="295" y="20" width="10" height="220" fill="#3a3a4a" stroke="#000" stroke-width="1.5"/>
+  <!-- sail with halberd emblem -->
+  <path d="M 220 50 L 380 50 L 380 170 L 300 180 L 220 170 Z"
+    fill="#3a3a52" stroke="#000" stroke-width="2"/>
+  <path d="M 230 55 L 370 55 L 370 165 L 300 173 L 230 165 Z" fill="#2a2a42"/>
+  <!-- crescent + sword emblem -->
+  <g transform="translate(300 110)">
+    <path d="M -25 0 A 25 25 0 1 0 0 -25 A 18 18 0 0 1 -25 0 Z"
+      fill="#c0c0c8" stroke="#1a2a6a" stroke-width="1.5" transform="rotate(-30)"/>
+    <!-- sword crossing -->
+    <line x1="-30" y1="20" x2="30" y2="-20" stroke="#e0e0e8" stroke-width="3"/>
+    <line x1="-30" y1="20" x2="30" y2="-20" stroke="#1a2a6a" stroke-width="1"/>
+    <circle cx="-30" cy="20" r="3" fill="#f5d24b"/>
+  </g>
+  <!-- top sail crossbeam -->
+  <rect x="215" y="48" width="170" height="6" fill="#3a3a4a" stroke="#000" stroke-width="1"/>
+  <circle cx="220" cy="51" r="5" fill="#f5d24b" stroke="#7a5028" stroke-width="1.5"/>
+  <circle cx="380" cy="51" r="5" fill="#f5d24b" stroke="#7a5028" stroke-width="1.5"/>
+  <!-- railings -->
+  <g stroke="#5a6270" stroke-width="2" fill="none">
+    <line x1="0" y1="222" x2="600" y2="222"/>
+    <line x1="0" y1="232" x2="600" y2="232"/>
+  </g>
+  <g fill="#5a6270" stroke="#000" stroke-width="1">
+    <rect x="30" y="218" width="6" height="22"/>
+    <rect x="130" y="218" width="6" height="22"/>
+    <rect x="230" y="218" width="6" height="22"/>
+    <rect x="370" y="218" width="6" height="22"/>
+    <rect x="470" y="218" width="6" height="22"/>
+    <rect x="560" y="218" width="6" height="22"/>
+  </g>
+  <!-- cannons -->
+  <g transform="translate(70 220)">
+    <rect x="-14" y="-8" width="28" height="14" rx="3" fill="#3a3a4a" stroke="#000" stroke-width="1.5"/>
+    <rect x="-2" y="-12" width="16" height="6" rx="2" fill="#1a1a2e" stroke="#000" stroke-width="1.5"/>
+    <circle cx="13" cy="-9" r="3" fill="#1a1a2e" stroke="#000" stroke-width="1"/>
+    <rect x="-18" y="6" width="36" height="6" fill="#5a3a1e" stroke="#3a2a16" stroke-width="1"/>
+    <circle cx="-12" cy="14" r="4" fill="#3a2a16"/>
+    <circle cx="12" cy="14" r="4" fill="#3a2a16"/>
+  </g>
+  <g transform="translate(530 220)">
+    <rect x="-14" y="-8" width="28" height="14" rx="3" fill="#3a3a4a" stroke="#000" stroke-width="1.5"/>
+    <rect x="-14" y="-12" width="16" height="6" rx="2" fill="#1a1a2e" stroke="#000" stroke-width="1.5"/>
+    <circle cx="-13" cy="-9" r="3" fill="#1a1a2e" stroke="#000" stroke-width="1"/>
+    <rect x="-18" y="6" width="36" height="6" fill="#5a3a1e" stroke="#3a2a16" stroke-width="1"/>
+    <circle cx="-12" cy="14" r="4" fill="#3a2a16"/>
+    <circle cx="12" cy="14" r="4" fill="#3a2a16"/>
+  </g>
+  <!-- deck floor -->
+  <rect y="240" width="600" height="60" fill="url(#deck-halberd)"/>
+  <!-- deck planks -->
+  <g stroke="#3a3a4a" stroke-width="1.2" opacity="0.5">
+    <line x1="0" y1="252" x2="600" y2="252"/>
+    <line x1="0" y1="266" x2="600" y2="266"/>
+    <line x1="0" y1="280" x2="600" y2="280"/>
+    <line x1="0" y1="294" x2="600" y2="294"/>
+  </g>
+  <g stroke="#3a3a4a" stroke-width="0.8" opacity="0.4">
+    <line x1="100" y1="240" x2="100" y2="300"/>
+    <line x1="200" y1="240" x2="200" y2="300"/>
+    <line x1="300" y1="240" x2="300" y2="300"/>
+    <line x1="400" y1="240" x2="400" y2="300"/>
+    <line x1="500" y1="240" x2="500" y2="300"/>
+  </g>
+  ${arenaKirby(180, 232, 0.4)}
+</svg>`;
+
+// Arena 4: Galactic / Final Boss Arena
+const galacticArena = `
+<svg viewBox="0 0 600 300" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="space-bg" cx="0.5" cy="0.5" r="0.7">
+      <stop offset="0%" stop-color="#2a1a4a"/>
+      <stop offset="60%" stop-color="#0a0518"/>
+      <stop offset="100%" stop-color="#000005"/>
+    </radialGradient>
+    <radialGradient id="nebula" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0%" stop-color="#ec4899" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#ec4899" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="planet" cx="0.4" cy="0.35" r="0.5">
+      <stop offset="0%" stop-color="#fff5a0"/>
+      <stop offset="50%" stop-color="#ff7a3a"/>
+      <stop offset="100%" stop-color="#7a1818"/>
+    </radialGradient>
+    <linearGradient id="crystal-platform" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#a8d8ee" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#5a6ec8" stop-opacity="0.5"/>
+    </linearGradient>
+  </defs>
+  <!-- space -->
+  <rect width="600" height="300" fill="url(#space-bg)"/>
+  <!-- nebula clouds -->
+  <ellipse class="nebula-swirl" cx="300" cy="130" rx="280" ry="120" fill="url(#nebula)"/>
+  <ellipse cx="150" cy="80" rx="100" ry="40" fill="#5a3aa8" opacity="0.3"/>
+  <ellipse cx="450" cy="120" rx="120" ry="50" fill="#9a3a8a" opacity="0.3"/>
+  <!-- stars -->
+  <g fill="#ffffff" class="star-twinkle">
+    <circle cx="30" cy="40" r="1.5"/>
+    <circle cx="80" cy="80" r="1"/>
+    <circle cx="140" cy="30" r="2"/>
+    <circle cx="200" cy="60" r="1"/>
+    <circle cx="240" cy="20" r="1.5"/>
+    <circle cx="350" cy="40" r="1"/>
+    <circle cx="400" cy="70" r="2"/>
+    <circle cx="470" cy="30" r="1.5"/>
+    <circle cx="520" cy="60" r="1"/>
+    <circle cx="580" cy="40" r="1.5"/>
+    <circle cx="60" cy="170" r="1"/>
+    <circle cx="540" cy="180" r="1.5"/>
+  </g>
+  <!-- larger stars with sparkle -->
+  <g fill="#fff5a0">
+    <path d="M 100 130 L 102 136 L 108 138 L 102 140 L 100 146 L 98 140 L 92 138 L 98 136 Z"/>
+    <path d="M 500 100 L 502 106 L 508 108 L 502 110 L 500 116 L 498 110 L 492 108 L 498 106 Z"/>
+    <path d="M 250 180 L 252 184 L 256 185 L 252 187 L 250 191 L 248 187 L 244 185 L 248 184 Z"/>
+  </g>
+  <!-- comet streak -->
+  <g class="comet">
+    <line x1="0" y1="0" x2="40" y2="-15" stroke="#ffffff" stroke-width="2" stroke-linecap="round" opacity="0.7"/>
+    <line x1="0" y1="0" x2="60" y2="-22" stroke="#ffffff" stroke-width="1" stroke-linecap="round" opacity="0.4"/>
+    <circle cx="0" cy="0" r="3" fill="#fff5a0"/>
+    <circle cx="0" cy="0" r="6" fill="#fff5a0" opacity="0.3"/>
+  </g>
+  <!-- distant planet -->
+  <g transform="translate(450 60)">
+    <circle r="32" fill="url(#planet)" stroke="#3a1a1a" stroke-width="1"/>
+    <ellipse cx="0" cy="0" rx="48" ry="6" fill="none" stroke="#ec4899" stroke-width="2" opacity="0.6" transform="rotate(-15)"/>
+    <ellipse cx="0" cy="0" rx="44" ry="5" fill="none" stroke="#ec4899" stroke-width="1.2" opacity="0.8" transform="rotate(-15)"/>
+  </g>
+  <!-- Marx-style jester silhouette (small in distance) -->
+  <g transform="translate(110 120)" opacity="0.85">
+    <!-- jester body -->
+    <circle r="14" fill="#3a1a4a" stroke="#000" stroke-width="1"/>
+    <!-- wings -->
+    <path d="M -14 -4 Q -28 -10 -22 -16 Q -16 -10 -8 -8 Z" fill="#ec4899" stroke="#7a1858" stroke-width="1"/>
+    <path d="M 14 -4 Q 28 -10 22 -16 Q 16 -10 8 -8 Z" fill="#ec4899" stroke="#7a1858" stroke-width="1"/>
+    <!-- jester hat (red & blue) -->
+    <path d="M -10 -10 Q -14 -22 -6 -20" fill="#d63131" stroke="#7a1818" stroke-width="1"/>
+    <path d="M 10 -10 Q 14 -22 6 -20" fill="#3a4ac8" stroke="#1a2a6a" stroke-width="1"/>
+    <circle cx="-6" cy="-22" r="2" fill="#f5d24b"/>
+    <circle cx="6" cy="-22" r="2" fill="#f5d24b"/>
+    <!-- creepy smile -->
+    <path d="M -6 4 Q 0 8 6 4" fill="none" stroke="#fff5a0" stroke-width="1.5"/>
+    <circle cx="-4" cy="-1" r="1.5" fill="#fff5a0"/>
+    <circle cx="4" cy="-1" r="1.5" fill="#fff5a0"/>
+  </g>
+  <!-- crystal platform -->
+  <g transform="translate(0 240)">
+    <path d="M 0 0 L 600 0 L 600 60 L 0 60 Z" fill="url(#crystal-platform)"/>
+    <path d="M 0 0 L 600 0" stroke="#ffffff" stroke-width="1.5" opacity="0.8"/>
+    <!-- crystal facets -->
+    <g stroke="#ffffff" stroke-width="1" opacity="0.4" fill="none">
+      <path d="M 60 0 L 30 60 L 90 60 L 60 0"/>
+      <path d="M 180 0 L 150 60 L 210 60 L 180 0"/>
+      <path d="M 300 0 L 270 60 L 330 60 L 300 0"/>
+      <path d="M 420 0 L 390 60 L 450 60 L 420 0"/>
+      <path d="M 540 0 L 510 60 L 570 60 L 540 0"/>
+    </g>
+    <!-- glowing edge -->
+    <path d="M 0 0 L 600 0" stroke="#ec4899" stroke-width="2" opacity="0.5"/>
+  </g>
+  ${arenaKirby(300, 230, 0.4)}
+</svg>`;
+
+const ARENAS = [
+  { key: 'whispy',   name: 'Whispy Woods',     desc: 'Forest floor under the apple tree. The face winks in the back.',                     accent: '#6dd64d', svg: whispyArena },
+  { key: 'dedede',   name: "King Dedede's Stadium", desc: 'Wrestling-ring throne arena. Crown banners, spotlights, royal crowd.',           accent: '#d63131', svg: dededeArena },
+  { key: 'halberd',  name: "Meta Knight's Halberd", desc: 'Battleship deck under moonlight. Cannons port and starboard.',                    accent: '#5a6ec8', svg: halberdArena },
+  { key: 'galactic', name: 'Galactic Boss Arena', desc: 'Floating crystal platform in deep space. Marx watches from afar.',                  accent: '#ec4899', svg: galacticArena },
+];
+
+// =========================================================================
+// RENDER
+// =========================================================================
+
+const ABILITIES = [sword, beam, cutter, hammer, archer, fire, bomb, parasol];
+
+const POSE_LABELS = ['Idle', 'Attack', 'Projectile', 'Hit VFX'];
+const POSE_KEYS = ['idle', 'attack', 'projectile', 'vfx'];
+
+function renderCard(ab) {
+  const poses = POSE_KEYS.map((k, i) => `
+    <div class="pose">
+      <div class="pose-label">${POSE_LABELS[i]}</div>
+      ${ab[k]()}
+    </div>`).join('');
+  return `
+    <section class="card" style="--accent:${ab.accent}">
+      <div class="card-header">
+        <h2 class="card-name">${ab.name}</h2>
+        <p class="card-desc">${ab.desc}</p>
+      </div>
+      <div class="poses">${poses}</div>
+    </section>`;
+}
+
+function renderStatesGrid() {
+  const headers = `
+    <div class="states-header label">Ability</div>
+    <div class="states-header">Hit</div>
+    <div class="states-header">Jump</div>
+    <div class="states-header">Front Flip</div>`;
+  const rows = ABILITIES.map(ab => `
+    <div class="ability-label" style="--row-accent:${ab.accent}">${ab.name}</div>
+    <div class="state-cell state-hit">${kirbyHitFor(ab)}</div>
+    <div class="state-cell state-jump">${kirbyJumpFor(ab)}</div>
+    <div class="state-cell state-flip">${kirbyFlipFor(ab)}</div>`).join('');
+  return headers + rows;
+}
+
+function renderArenaCard(arena) {
+  return `
+    <article class="arena-card" style="--arena-accent:${arena.accent}">
+      <h3>${arena.name}</h3>
+      <p class="arena-desc">${arena.desc}</p>
+      ${arena.svg}
+    </article>`;
+}
+
+document.getElementById('abilities-grid').innerHTML = ABILITIES.map(renderCard).join('');
+document.getElementById('states-grid').innerHTML = renderStatesGrid();
+document.getElementById('arenas-grid').innerHTML = ARENAS.map(renderArenaCard).join('');
+
+// =========================================================================
+// PLAYER HUD — 4 players, 4 hearts each, click a slot to deal damage
+// =========================================================================
+
+const HEART_SVG = (filled, beating) => `
+  <svg class="heart ${filled ? '' : 'lost'} ${filled && beating ? 'heart-beat' : ''}" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    <path d="M 12 21.5 C 3.5 14.5, 1.5 9, 5.5 5.5 Q 8.5 3, 12 6.5 Q 15.5 3, 18.5 5.5 C 22.5 9, 20.5 14.5, 12 21.5 Z"
+      fill="${filled ? '#ec4899' : '#3a3a52'}"
+      stroke="${filled ? '#a8246c' : '#5a5a72'}"
+      stroke-width="1.5"
+      stroke-linejoin="round"/>
+    ${filled ? `<ellipse cx="8.5" cy="8" rx="2.4" ry="1.6" fill="#ffb3d2" opacity="0.85"/>` : ''}
+    ${!filled ? `<path d="M 7 9 L 17 19 M 17 9 L 7 19" stroke="#5a5a72" stroke-width="1.2" opacity="0.6" stroke-linecap="round"/>` : ''}
+  </svg>`;
+
+// Mini head-and-hat portrait for HUD avatars (cropped viewBox)
+function miniPortrait(ab) {
+  return `<svg viewBox="30 10 140 150" xmlns="http://www.w3.org/2000/svg">
+    ${kirbyBody()}
+    ${kirbyArm('left',  { rot: -20 })}
+    ${kirbyArm('right', { rot: 20 })}
+    ${ABILITY_ACCESSORY[ab.key]()}
+    ${kirbyFace({ mouth: 'small' })}
+  </svg>`;
+}
+
+// Live player state — 4 players, all start at 4 hearts
+const MAX_HEARTS = 4;
+const players = [
+  { id: 1, ability: sword,  hearts: MAX_HEARTS, justLost: false },
+  { id: 2, ability: hammer, hearts: MAX_HEARTS, justLost: false },
+  { id: 3, ability: fire,   hearts: MAX_HEARTS, justLost: false },
+  { id: 4, ability: bomb,   hearts: MAX_HEARTS, justLost: false },
+];
+
+function renderPlayerSlot(p) {
+  const isLastHeart = p.hearts === 1;
+  const hearts = Array.from({ length: MAX_HEARTS }, (_, i) => {
+    const filled = i < p.hearts;
+    const justLost = p.justLost && i === p.hearts;
+    const cls = !filled && justLost ? 'just-lost' : '';
+    return HEART_SVG(filled, filled && isLastHeart).replace('class="heart', `class="heart ${cls}`);
+  }).join('');
+
+  return `
+    <div class="player-slot ${p.hearts === 0 ? 'dead' : ''}"
+         style="--p-accent:${p.ability.accent}"
+         data-player-id="${p.id}">
+      <div class="player-portrait">${miniPortrait(p.ability)}</div>
+      <div class="player-info">
+        <div class="player-label">Player ${p.id}</div>
+        <div class="player-name">${p.ability.name}</div>
+        <div class="hearts">${hearts}</div>
+      </div>
+      ${p.hearts === 0 ? '<div class="ko-badge">KO</div>' : ''}
+    </div>`;
+}
+
+function renderHud() {
+  const slots = players.map(renderPlayerSlot).join('');
+  return `
+    <div class="hud-title">Players<br>&amp; Health</div>
+    ${slots}
+    <button class="hud-reset" type="button" id="hud-reset-btn" title="Restore all players to full health">Reset HUD</button>`;
+}
+
+function updateHud() {
+  document.getElementById('player-hud').innerHTML = renderHud();
+}
+
+// Click a slot to deal 1 damage (simulates being hit by another player)
+document.addEventListener('click', (e) => {
+  if (e.target.closest('#hud-reset-btn')) {
+    players.forEach(p => { p.hearts = MAX_HEARTS; p.justLost = false; });
+    updateHud();
+    // also reset the live arena dummy + clear projectiles/effects
+    if (typeof game !== 'undefined' && game.dummy) {
+      game.dummy.x = 440;
+      game.dummy.y = PLAY.GROUND_Y - PLAY.PLAYER_RADIUS;
+      game.dummy.vx = 0; game.dummy.vy = 0;
+      game.dummy.hearts = MAX_HEARTS;
+      game.dummy.state = 'idle';
+      game.dummy.koTimer = 0;
+      game.dummy.invulnTime = 0;
+      game.projectiles.length = 0;
+      game.effects.length = 0;
+    }
+    return;
+  }
+  const slot = e.target.closest('.player-slot');
+  if (!slot) return;
+  const id = parseInt(slot.dataset.playerId, 10);
+  const p = players.find(pl => pl.id === id);
+  if (!p || p.hearts === 0) return;
+  p.hearts -= 1;
+  p.justLost = true;
+  updateHud();
+  // clear just-lost flag after the heart-break animation completes
+  setTimeout(() => {
+    p.justLost = false;
+  }, 450);
+  // damage flash on the slot itself
+  const newSlot = document.querySelector(`.player-slot[data-player-id="${id}"]`);
+  if (newSlot) {
+    newSlot.classList.add('damaged');
+    setTimeout(() => newSlot.classList.remove('damaged'), 320);
+  }
+});
+
+updateHud();
+
+// =========================================================================
+// PLAYABLE TEST ARENA — Whispy Woods, physics + input + sprite swapping
+// =========================================================================
+
+const PLAY = {
+  W: 600,
+  H: 300,
+  GROUND_Y: 240,           // top of grass (y, in viewBox units)
+  PLAYER_SCALE: 0.22,      // Kirby renders at 0.22 of source 200px viewBox
+  PLAYER_RADIUS: 22,       // half the visual height for collision
+  GRAVITY: 0.36,
+  JUMP_VY: -8.2,
+  DOUBLE_JUMP_VY: -7.6,
+  MOVE_SPEED: 2.4,
+  FLIP_DUR: 22,
+  COMBO_DUR: [0, 12, 12, 22],   // index by combo step (1, 2, 3); step 0 unused
+  COMBO_WINDOW: 14,             // extra frames after attack ends to chain
+  CHARGE_MAX: 72,               // frames to fully charge (1.2s)
+  CHARGE_DUR: 28,               // frames the charge release lasts
+  HIT_DUR: 24,
+  INVULN_DUR: 50,
+  GUARD_INVULN: 14,             // brief shield-stun on blocked hit
+  DUMMY_INVULN: 14,            // dummy i-frames after a connect
+  DUMMY_RESPAWN: 90,           // frames before a KO'd dummy returns
+  PROJ_GRAVITY: 0.22,          // arc gravity for thrown projectiles
+};
+
+// Melee-style abilities use the combo system more meaningfully. Ranged abilities
+// still chain via X but the third hit doesn't get extra reach.
+const MELEE_ABILITIES = new Set(['sword', 'hammer', 'cutter', 'parasol']);
+
+// =========================================================================
+// MOVESETS — Nightmare-in-Dreamland-style: a signature neutral move + a
+// charged special per ability. `type` decides melee hitbox vs. spawned
+// projectile. Damage is in hearts; knockback in arena units/frame.
+// =========================================================================
+const MOVESETS = {
+  sword:   {
+    neutral: { type: 'melee',      reach: 64, height: 46, damage: 1, knockback: 3.2, active: [3, 12] },
+    charged: { type: 'projectile', proj: 'swordbeam', damage: 1, knockback: 4.5, speed: 6.5 },
+  },
+  hammer:  {
+    neutral: { type: 'melee',      reach: 56, height: 54, damage: 1, knockback: 5.0, active: [6, 16] },
+    charged: { type: 'melee',      reach: 66, height: 60, damage: 2, knockback: 9.0, active: [8, 22] },
+  },
+  cutter:  {
+    neutral: { type: 'projectile', proj: 'cutter', damage: 1, knockback: 3.0, speed: 6.0, boomerang: true },
+    charged: { type: 'projectile', proj: 'cutter', damage: 2, knockback: 4.0, speed: 7.0, boomerang: true, big: true },
+  },
+  beam:    {
+    neutral: { type: 'melee',      reach: 60, height: 44, damage: 1, knockback: 2.4, active: [2, 12] },
+    charged: { type: 'projectile', proj: 'beamshot', damage: 2, knockback: 3.5, speed: 5.5 },
+  },
+  archer:  {
+    neutral: { type: 'projectile', proj: 'arrow', damage: 1, knockback: 2.2, speed: 7.5 },
+    charged: { type: 'projectile', proj: 'arrow', damage: 2, knockback: 5.0, speed: 11, piercing: true },
+  },
+  fire:    {
+    neutral: { type: 'melee',      reach: 70, height: 40, damage: 1, knockback: 2.0, active: [2, 14] },
+    charged: { type: 'projectile', proj: 'fireball', damage: 2, knockback: 4.0, speed: 5.0 },
+  },
+  bomb:    {
+    neutral: { type: 'projectile', proj: 'bomb', damage: 1, knockback: 4.0, speed: 5.5, arc: true },
+    charged: { type: 'projectile', proj: 'bomb', damage: 2, knockback: 7.0, speed: 7.0, arc: true, big: true },
+  },
+  parasol: {
+    neutral: { type: 'melee',      reach: 52, height: 50, damage: 1, knockback: 3.0, active: [3, 13] },
+    charged: { type: 'melee',      reach: 46, height: 64, damage: 2, knockback: 5.5, active: [4, 24], down: true },
+  },
+};
+
+const game = {
+  active: false,
+  player: {
+    x: 300,
+    y: PLAY.GROUND_Y - PLAY.PLAYER_RADIUS,
+    vx: 0, vy: 0,
+    facing: 1,
+    onGround: true,
+    canDoubleJump: true,
+    ability: sword,
+    state: 'idle',
+    stateTimer: 0,
+    flipTime: 0,
+    invulnTime: 0,
+    hearts: MAX_HEARTS,
+    // attack / combo
+    attackType: null,    // 'fast' | 'charged' | null
+    comboCount: 0,
+    comboTimer: 0,
+    // charge
+    charging: false,
+    chargeTime: 0,
+    chargedPower: 0,
+    aimAngle: 0,         // degrees; 0 = facing-forward horizontal
+    // guard
+    guarding: false,
+    blockFlashTime: 0,
+    // combat bookkeeping
+    activeMove: null,    // the resolved move for the current attack
+    moveFrame: 0,        // frames elapsed in current attack
+    attackConnected: false, // melee already landed this swing?
+  },
+  dummy: {
+    x: 440,
+    y: PLAY.GROUND_Y - PLAY.PLAYER_RADIUS,
+    vx: 0, vy: 0,
+    facing: -1,
+    onGround: true,
+    state: 'idle',
+    stateTimer: 0,
+    invulnTime: 0,
+    hearts: MAX_HEARTS,
+    koTimer: 0,          // counts down while KO'd, then respawns
+  },
+  projectiles: [],       // { kind, x, y, vx, vy, life, damage, knockback, owner, ... }
+  effects: [],           // transient hit sparks { x, y, life, maxLife, color }
+  input: { left: false, right: false, jump: false, guard: false, fastAttack: false, chargeAttack: false, hit: false },
+  prev:  { jump: false, fastAttack: false, chargeAttack: false, hit: false },
+};
+
+// Strip the outer <svg> wrapper so a fragment can be embedded into the arena SVG.
+const stripSvg = (s) => s.replace(/^\s*<svg[^>]*>/, '').replace(/<\/svg>\s*$/, '');
+
+// Build the playable Whispy Woods scene (same scenery as the gallery card, sans static Kirby).
+function buildPlayScene() {
+  return `
+<svg viewBox="0 0 600 300" id="play-arena-svg" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="play-sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#a8d8ee"/>
+      <stop offset="55%" stop-color="#c8e8c0"/>
+      <stop offset="100%" stop-color="#e2f0c8"/>
+    </linearGradient>
+    <radialGradient id="play-sun" cx="0.85" cy="0.15" r="0.2">
+      <stop offset="0%" stop-color="#fff5a0" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#fff5a0" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="600" height="240" fill="url(#play-sky)"/>
+  <rect width="600" height="240" fill="url(#play-sun)"/>
+  <g fill="#ffffff" opacity="0.85">
+    <ellipse cx="80" cy="60" rx="40" ry="14"/>
+    <ellipse cx="100" cy="55" rx="28" ry="12"/>
+    <ellipse cx="480" cy="40" rx="30" ry="10"/>
+    <ellipse cx="500" cy="36" rx="20" ry="8"/>
+  </g>
+  <path d="M 0 220 L 60 180 L 130 210 L 220 170 L 300 200 L 380 160 L 480 210 L 600 175 L 600 240 L 0 240 Z"
+    fill="#5a8e6e" opacity="0.55"/>
+  <path d="M 0 240 L 100 215 L 200 235 L 320 205 L 440 235 L 600 215 L 600 250 L 0 250 Z"
+    fill="#3a6e4e" opacity="0.7"/>
+  <ellipse cx="60" cy="220" rx="40" ry="55" fill="#3a6b3a"/>
+  <rect x="55" y="240" width="10" height="20" fill="#5a3a1e"/>
+  <ellipse cx="540" cy="220" rx="40" ry="55" fill="#3a6b3a"/>
+  <rect x="535" y="240" width="10" height="20" fill="#5a3a1e"/>
+  <g>
+    <rect x="240" y="160" width="120" height="100" fill="#7a5028" stroke="#3a2a16" stroke-width="3"/>
+    <path d="M 250 170 L 252 250 M 270 165 L 268 250 M 300 162 L 302 250 M 330 165 L 332 250 M 350 170 L 348 250" stroke="#5a3a1e" stroke-width="2" fill="none"/>
+    <ellipse cx="300" cy="130" rx="130" ry="80" fill="#4caf50" stroke="#1f6628" stroke-width="3"/>
+    <ellipse cx="230" cy="110" rx="65" ry="55" fill="#5fc242" stroke="#1f6628" stroke-width="2.5"/>
+    <ellipse cx="370" cy="110" rx="65" ry="55" fill="#5fc242" stroke="#1f6628" stroke-width="2.5"/>
+    <ellipse cx="300" cy="95" rx="60" ry="48" fill="#6dd64d" stroke="#1f6628" stroke-width="2.5"/>
+    <ellipse cx="270" cy="100" rx="20" ry="14" fill="#9ee87a" opacity="0.5"/>
+    <ellipse cx="340" cy="115" rx="14" ry="10" fill="#9ee87a" opacity="0.5"/>
+    <ellipse class="whispy-eyes" cx="278" cy="200" rx="10" ry="6" fill="#3a2a16"/>
+    <ellipse class="whispy-eyes" cx="322" cy="200" rx="10" ry="6" fill="#3a2a16"/>
+    <ellipse cx="300" cy="220" rx="16" ry="11" fill="#c98b6b" stroke="#7a4a2a" stroke-width="2"/>
+    <ellipse cx="295" cy="216" rx="5" ry="3" fill="#e8b89a" opacity="0.8"/>
+    <path d="M 282 240 Q 300 248 318 240" fill="none" stroke="#3a2a16" stroke-width="2.5" stroke-linecap="round"/>
+    <circle cx="240" cy="80" r="6" fill="#d63131" stroke="#7a1818" stroke-width="1.5"/>
+    <path d="M 240 75 L 241 71" stroke="#3a2a16" stroke-width="1.5"/>
+    <circle cx="350" cy="90" r="6" fill="#d63131" stroke="#7a1818" stroke-width="1.5"/>
+    <path d="M 350 85 L 351 81" stroke="#3a2a16" stroke-width="1.5"/>
+  </g>
+  <rect y="240" width="600" height="60" fill="#8b6940"/>
+  <rect y="240" width="600" height="6" fill="#5fc242"/>
+  <g fill="#5fc242">
+    <path d="M 50 248 L 55 240 L 60 248 Z"/>
+    <path d="M 100 250 L 106 242 L 112 250 Z"/>
+    <path d="M 420 250 L 425 240 L 430 250 Z"/>
+    <path d="M 480 252 L 486 244 L 492 252 Z"/>
+  </g>
+  <g transform="translate(160 270)">
+    <rect x="-3" y="-2" width="6" height="12" fill="#fff5d2"/>
+    <ellipse cx="0" cy="-3" rx="9" ry="6" fill="#d63131" stroke="#7a1818" stroke-width="1.5"/>
+    <circle cx="-3" cy="-4" r="1.5" fill="#fff5d2"/>
+    <circle cx="3" cy="-3" r="1" fill="#fff5d2"/>
+  </g>
+  <circle cx="460" cy="275" r="6" fill="#d63131" stroke="#7a1818" stroke-width="1.5"/>
+  <g id="play-dummy"></g>
+  <g id="play-player"></g>
+  <g id="play-projectiles"></g>
+  <g id="play-effects"></g>
+  <g id="play-overlay-svg"></g>
+</svg>`;
+}
+
+// Guard pose: Kirby crouches with arms up; shield bubble overlay
+function kirbyGuardFor(ab, flashing) {
+  const shieldFill   = flashing ? '#ffffff' : '#a8d8ee';
+  const shieldOpac   = flashing ? 0.75 : 0.28;
+  const ringStroke   = flashing ? '#ffd54d' : '#ffffff';
+  return svg(
+    kirbyFeet({ leftRot: -45, rightRot: 45, leftX: 80, rightX: 120, y: 158 }) +
+    kirbyBody({ cx: 100, cy: 112, r: 40 }) +
+    kirbyArm('left',  { rot: -90, cx: 70, cy: 96 }) +
+    kirbyArm('right', { rot: 90,  cx: 130, cy: 96 }) +
+    ABILITY_ACCESSORY[ab.key]() +
+    kirbyFace({ mouth: 'determined', eyesY: 104 }) +
+    // shield bubble (drawn over the top so it reads as protection)
+    `<circle cx="100" cy="112" r="62" fill="${shieldFill}" opacity="${shieldOpac}"/>
+     <circle cx="100" cy="112" r="62" fill="none" stroke="${ringStroke}" stroke-width="2.2" opacity="0.85"/>
+     <circle cx="100" cy="112" r="55" fill="none" stroke="#ffffff" stroke-width="1" stroke-dasharray="6 4" opacity="0.6"/>
+     <ellipse cx="80" cy="80" rx="22" ry="9" fill="#ffffff" opacity="0.45" transform="rotate(-30 80 80)"/>`
+  );
+}
+
+// Charge pose: arms forward / raised; growing aura tinted to ability accent
+function kirbyChargeFor(ab, ratio) {
+  const r = Math.max(0, Math.min(1, ratio));
+  const glowR = 46 + r * 28;
+  const accent = ab.accent;
+  // sparkle particles around Kirby that pulse with charge
+  const sparkles = r > 0.2
+    ? `<g opacity="${0.4 + r * 0.5}">
+         <path d="M 40 70 L 43 76 L 50 77 L 43 79 L 40 85 L 37 79 L 30 77 L 37 76 Z" fill="${accent}"/>
+         <path d="M 160 70 L 163 76 L 170 77 L 163 79 L 160 85 L 157 79 L 150 77 L 157 76 Z" fill="${accent}"/>
+         <path d="M 100 38 L 103 46 L 110 48 L 103 50 L 100 58 L 97 50 L 90 48 L 97 46 Z" fill="#fff5a0"/>
+       </g>`
+    : '';
+  return svg(
+    `<circle cx="100" cy="110" r="${glowR}" fill="${accent}" opacity="${0.15 + r * 0.35}"/>
+     <circle cx="100" cy="110" r="${glowR - 8}" fill="${accent}" opacity="${0.1 + r * 0.25}"/>` +
+    kirbyFeet({ leftRot: -10, rightRot: 10, leftX: 86, rightX: 114, y: 158 }) +
+    kirbyBody() +
+    kirbyArm('left',  { rot: -110, cx: 60, cy: 80 }) +
+    kirbyArm('right', { rot: 110,  cx: 140, cy: 80 }) +
+    ABILITY_ACCESSORY[ab.key]() +
+    kirbyFace({ mouth: 'open', eyesY: 100 }) +
+    sparkles +
+    (r > 0.98
+      ? `<circle cx="100" cy="110" r="${glowR + 6}" fill="none" stroke="#ffd54d" stroke-width="2.5" opacity="0.9"/>`
+      : '')
+  );
+}
+
+function playerInnerSvg(p) {
+  const ab = p.ability;
+  switch (p.state) {
+    case 'jump': case 'fall':  return stripSvg(kirbyJumpFor(ab));
+    case 'flip':               return stripSvg(kirbyFlipFor(ab));
+    case 'attack':             return stripSvg(ab.attack());
+    case 'hit':                return stripSvg(kirbyHitFor(ab));
+    case 'guard':              return stripSvg(kirbyGuardFor(ab, p.blockFlashTime > 0));
+    case 'charge':             return stripSvg(kirbyChargeFor(ab, p.chargeTime / PLAY.CHARGE_MAX));
+    case 'run': case 'idle':
+    default:                   return stripSvg(ab.idle());
+  }
+}
+
+// =========================================================================
+// COMBAT — training dummy, projectiles, hit detection, knockback
+// =========================================================================
+
+// Yellow "Keeby" training dummy. `hit` swaps to dizzy X-eyes.
+function dummyInnerSvg(d) {
+  const hit = d.state === 'hit' || d.koTimer > 0;
+  const body = `
+    <ellipse cx="84" cy="158" rx="17" ry="10" fill="#e8a84a" stroke="#a87020" stroke-width="2.2" transform="rotate(-15 84 158)"/>
+    <ellipse cx="116" cy="158" rx="17" ry="10" fill="#e8a84a" stroke="#a87020" stroke-width="2.2" transform="rotate(15 116 158)"/>
+    <circle cx="100" cy="108" r="42" fill="#ffe16a" stroke="#d6a832" stroke-width="2.5"/>
+    <ellipse cx="110" cy="122" rx="20" ry="26" fill="#f5c842" opacity="0.4"/>
+    <ellipse cx="62" cy="120" rx="11" ry="14" fill="#ffe16a" stroke="#d6a832" stroke-width="2.5" transform="rotate(-20 62 120)"/>
+    <ellipse cx="138" cy="120" rx="11" ry="14" fill="#ffe16a" stroke="#d6a832" stroke-width="2.5" transform="rotate(20 138 120)"/>
+    <ellipse cx="80" cy="119" rx="7" ry="4" fill="#ff9a5a" opacity="0.6"/>
+    <ellipse cx="120" cy="119" rx="7" ry="4" fill="#ff9a5a" opacity="0.6"/>`;
+  const face = hit
+    ? `<path d="M 84 96 L 94 106 M 94 96 L 84 106" stroke="#5a3a1a" stroke-width="2.5" stroke-linecap="round"/>
+       <path d="M 106 96 L 116 106 M 116 96 L 106 106" stroke="#5a3a1a" stroke-width="2.5" stroke-linecap="round"/>
+       <ellipse cx="100" cy="120" rx="5" ry="4" fill="#7a4a1a"/>`
+    : `<ellipse cx="89" cy="100" rx="3.8" ry="9" fill="#3a2a1a"/>
+       <ellipse cx="111" cy="100" rx="3.8" ry="9" fill="#3a2a1a"/>
+       <ellipse cx="89" cy="94.5" rx="2" ry="2.8" fill="#ffffff"/>
+       <ellipse cx="111" cy="94.5" rx="2" ry="2.8" fill="#ffffff"/>
+       <path d="M 96 117 Q 100 120 104 117" fill="none" stroke="#8b5a2b" stroke-width="2" stroke-linecap="round"/>`;
+  return body + face;
+}
+
+// Compact projectile sprites (drawn around origin, arena-scale units)
+const PROJECTILE_SPRITES = {
+  arrow: (p) => {
+    const ang = Math.atan2(p.vy, p.vx) * 180 / Math.PI;
+    return `<g transform="rotate(${ang})">
+      <line x1="-13" y1="0" x2="11" y2="0" stroke="#8b5a2b" stroke-width="2.4" stroke-linecap="round"/>
+      <path d="M 17 0 L 8 -4 L 11 0 L 8 4 Z" fill="#c0c0c8" stroke="#5a5a68" stroke-width="0.7"/>
+      <path d="M -13 0 L -8 -4 L -10 0 L -8 4 Z" fill="#d63131"/>
+    </g>`;
+  },
+  bomb: (p) => `
+    <circle r="${p.big ? 9 : 7}" fill="#1a1a2e" stroke="#000" stroke-width="1.3"/>
+    <circle cx="-2.5" cy="-2.5" r="2" fill="#3a3a52"/>
+    <path d="M 0 ${p.big ? -9 : -7} q -4 -4 -1 -7" fill="none" stroke="#9b6a36" stroke-width="1.4"/>
+    <circle cx="-1" cy="${p.big ? -16 : -14}" r="2.2" fill="#ff7a3a"/>
+    <circle cx="-1" cy="${p.big ? -16 : -14}" r="1" fill="#fff5a0"/>`,
+  cutter: (p) => `<g transform="rotate(${p.spin || 0})">
+      <path d="M 0 -11 Q -11 0 0 11 Q 7 0 11 -2 Q 4 -3 0 -11 Z" fill="#5fc242" stroke="#256818" stroke-width="1.6"/>
+      <circle r="2.6" fill="#fff5c8" stroke="#a8761a" stroke-width="0.8"/>
+    </g>`,
+  swordbeam: (p) => {
+    const ang = Math.atan2(p.vy, p.vx) * 180 / Math.PI;
+    return `<g transform="rotate(${ang})">
+      <path d="M -5 -15 Q 11 0 -5 15 Q 2 0 -5 -15 Z" fill="#fffacc" stroke="#ffd54d" stroke-width="1.6"/>
+      <path d="M -2 -9 Q 6 0 -2 9 Q 1 0 -2 -9 Z" fill="#ffffff"/>
+    </g>`;
+  },
+  beamshot: (p) => `
+    <circle r="9" fill="#fff04a" opacity="0.45"/>
+    <circle r="5.5" fill="#fffacc"/>
+    <circle r="2.6" fill="#ffffff"/>`,
+  fireball: (p) => `
+    <circle r="11" fill="#ff5722" stroke="#a8290a" stroke-width="1.1"/>
+    <circle r="7.5" fill="#ff9a42"/>
+    <circle r="3.6" fill="#fff5a0"/>`,
+};
+
+// rectangle (center rx,ry; size rw,rh) vs circle (cx,cy,cr)
+function rectCircleHit(rx, ry, rw, rh, cx, cy, cr) {
+  const nx = Math.max(rx - rw / 2, Math.min(cx, rx + rw / 2));
+  const ny = Math.max(ry - rh / 2, Math.min(cy, ry + rh / 2));
+  const dx = cx - nx, dy = cy - ny;
+  return dx * dx + dy * dy <= cr * cr;
+}
+
+function spawnProjectile(kind, x, y, angleDeg, speed, move) {
+  const rad = angleDeg * Math.PI / 180;
+  game.projectiles.push({
+    kind, x, y,
+    vx: Math.cos(rad) * speed,
+    vy: Math.sin(rad) * speed,
+    spin: 0,
+    life: 160,
+    age: 0,
+    damage: move.damage,
+    knockback: move.knockback,
+    arc: !!move.arc,
+    boomerang: !!move.boomerang,
+    piercing: !!move.piercing,
+    big: !!move.big,
+    returning: false,
+  });
+}
+
+function spawnHitEffect(x, y, color) {
+  game.effects.push({ x, y, life: 16, maxLife: 16, color: color || '#fff5a0' });
+}
+
+// Resolve & launch the move bound to a slot ('neutral' | 'charged')
+function executeMove(p, slot, power) {
+  const move = MOVESETS[p.ability.key][slot];
+  if (!move) return;
+  p.activeMove = move;
+  p.moveFrame = 0;
+  p.attackConnected = false;
+  if (move.type === 'projectile') {
+    let angle = (slot === 'charged') ? p.aimAngle : (p.facing > 0 ? 0 : 180);
+    if (move.arc && slot !== 'charged') angle = p.facing > 0 ? -38 : -142; // default lob
+    const speed = move.speed * (slot === 'charged' ? (0.7 + 0.6 * power) : 1);
+    spawnProjectile(move.proj, p.x + p.facing * 16, p.y - 4, angle, speed, move);
+  }
+}
+
+function applyDamageToDummy(dmg, kbx, kby) {
+  const d = game.dummy;
+  if (d.koTimer > 0 || d.invulnTime > 0) return;
+  d.hearts = Math.max(0, d.hearts - dmg);
+  d.vx = kbx; d.vy = kby;
+  d.onGround = false;
+  d.state = 'hit';
+  d.stateTimer = 18;
+  d.invulnTime = PLAY.DUMMY_INVULN;
+  spawnHitEffect(d.x, d.y - 6, game.player.ability.accent);
+  const hud = players.find(pl => pl.id === 2);
+  if (hud) {
+    hud.hearts = d.hearts;
+    hud.justLost = true;
+    updateHud();
+    setTimeout(() => { hud.justLost = false; }, 400);
+  }
+  if (d.hearts <= 0) d.koTimer = PLAY.DUMMY_RESPAWN;
+}
+
+function explodeBomb(proj) {
+  spawnHitEffect(proj.x, Math.min(proj.y, PLAY.GROUND_Y - 4), '#ff7a3a');
+  const d = game.dummy;
+  const dx = d.x - proj.x, dy = d.y - proj.y;
+  if (dx * dx + dy * dy < 42 * 42) {
+    const dir = Math.sign(dx) || 1;
+    applyDamageToDummy(proj.damage, dir * proj.knockback, -proj.knockback * 0.6);
+  }
+}
+
+// Melee active-window hit detection (player attacks dummy)
+function updateCombat() {
+  const p = game.player;
+  const d = game.dummy;
+  if (p.state === 'attack' && p.activeMove && p.activeMove.type === 'melee' && !p.attackConnected) {
+    const m = p.activeMove;
+    const [a0, a1] = m.active || [2, 12];
+    if (p.moveFrame >= a0 && p.moveFrame <= a1) {
+      const hbx = p.x + p.facing * (m.reach / 2);
+      const hby = m.down ? p.y + 18 : p.y - 4;
+      if (rectCircleHit(hbx, hby, m.reach, m.height, d.x, d.y, PLAY.PLAYER_RADIUS)) {
+        const dir = Math.sign(d.x - p.x) || p.facing;
+        applyDamageToDummy(m.damage, dir * m.knockback, m.down ? 2.5 : -m.knockback * 0.55);
+        p.attackConnected = true;
+      }
+    }
+  }
+  if (p.state === 'attack') p.moveFrame++;
+  else p.activeMove = null;
+}
+
+function updateProjectiles() {
+  const d = game.dummy;
+  for (const pr of game.projectiles) {
+    pr.age++;
+    pr.life--;
+    pr.spin += 22;
+    if (pr.arc) pr.vy += PLAY.PROJ_GRAVITY;
+    if (pr.boomerang) {
+      pr.vx -= Math.sign(pr.vx) * 0.13;
+      if (!pr.returning && Math.abs(pr.vx) < 1.0) pr.returning = true;
+      if (pr.returning) {
+        const dir = Math.sign(game.player.x - pr.x) || 1;
+        pr.vx += dir * 0.28;
+        if (pr.age > 24 && Math.abs(pr.x - game.player.x) < 18) pr.life = 0;
+      }
+    }
+    pr.x += pr.vx;
+    pr.y += pr.vy;
+    // bomb detonates on ground
+    if (pr.arc && pr.y >= PLAY.GROUND_Y) { explodeBomb(pr); pr.life = 0; continue; }
+    // off-screen cull
+    if (pr.x < -30 || pr.x > PLAY.W + 30 || pr.y > PLAY.H + 30) { pr.life = 0; continue; }
+    // dummy collision
+    if (d.koTimer <= 0 && d.invulnTime <= 0) {
+      const dx = d.x - pr.x, dy = d.y - pr.y;
+      if (dx * dx + dy * dy < (PLAY.PLAYER_RADIUS + 8) * (PLAY.PLAYER_RADIUS + 8)) {
+        if (pr.arc) { explodeBomb(pr); pr.life = 0; }
+        else {
+          const dir = Math.sign(pr.vx) || game.player.facing;
+          applyDamageToDummy(pr.damage, dir * pr.knockback, -pr.knockback * 0.5);
+          if (!pr.piercing && !pr.boomerang) pr.life = 0;
+        }
+      }
+    }
+  }
+  game.projectiles = game.projectiles.filter(pr => pr.life > 0);
+}
+
+function updateEffects() {
+  for (const fx of game.effects) fx.life--;
+  game.effects = game.effects.filter(fx => fx.life > 0);
+}
+
+function updateDummy() {
+  const d = game.dummy;
+  if (d.koTimer > 0) {
+    d.koTimer--;
+    d.vy += PLAY.GRAVITY;
+    d.x += d.vx; d.y += d.vy; d.vx *= 0.97;
+    if (d.koTimer === 0) {
+      d.x = 440; d.y = PLAY.GROUND_Y - PLAY.PLAYER_RADIUS;
+      d.vx = 0; d.vy = 0; d.hearts = MAX_HEARTS;
+      d.state = 'idle'; d.invulnTime = 30; d.onGround = true;
+      const hud = players.find(pl => pl.id === 2);
+      if (hud) { hud.hearts = MAX_HEARTS; updateHud(); }
+    }
+    return;
+  }
+  d.vy += PLAY.GRAVITY;
+  if (d.vy > 10) d.vy = 10;
+  d.x += d.vx; d.y += d.vy;
+  d.vx *= d.onGround ? 0.82 : 0.98;
+  const groundY = PLAY.GROUND_Y - PLAY.PLAYER_RADIUS;
+  if (d.y >= groundY) { d.y = groundY; d.vy = 0; d.onGround = true; }
+  else d.onGround = false;
+  d.x = Math.max(PLAY.PLAYER_RADIUS, Math.min(PLAY.W - PLAY.PLAYER_RADIUS, d.x));
+  if (d.stateTimer > 0) { d.stateTimer--; if (d.stateTimer === 0 && d.state === 'hit') d.state = 'idle'; }
+  if (d.invulnTime > 0) d.invulnTime--;
+  if (Math.abs(d.vx) < 0.2) d.facing = (game.player.x > d.x) ? 1 : -1;
+}
+
+function heartIcon(x, y, filled) {
+  return `<path transform="translate(${x},${y}) scale(0.5)"
+    d="M 0 3 C 0 0 -4 -2 -4 -5 C -4 -8 0 -8 0 -4 C 0 -8 4 -8 4 -5 C 4 -2 0 0 0 3 Z"
+    fill="${filled ? '#ff5a7a' : '#3a3a52'}" stroke="${filled ? '#a82a4a' : '#555'}" stroke-width="1"/>`;
+}
+
+function renderAbilityPicker() {
+  return ABILITIES.map(ab => `
+    <button type="button" data-ability="${ab.key}" style="--ab-accent:${ab.accent}"
+      class="${ab.key === game.player.ability.key ? 'active' : ''}">${ab.name}</button>`).join('');
+}
+
+function setAbility(key) {
+  const ab = ABILITIES.find(a => a.key === key);
+  if (!ab) return;
+  game.player.ability = ab;
+  // clear in-progress combat state so a fresh ability starts clean
+  game.player.comboCount = 0;
+  game.player.comboTimer = 0;
+  game.player.charging = false;
+  game.player.chargeTime = 0;
+  document.getElementById('ability-picker').innerHTML = renderAbilityPicker();
+}
+
+const KEY_MAP = {
+  ArrowLeft: 'left',
+  ArrowRight: 'right',
+  ArrowUp: 'jump',
+  Space: 'jump',
+  ArrowDown: 'guard',
+  KeyX: 'fastAttack',
+  KeyZ: 'chargeAttack',
+  KeyH: 'hit',
+};
+
+window.addEventListener('keydown', (e) => {
+  if (!game.active) return;
+  const action = KEY_MAP[e.code];
+  if (action) {
+    game.input[action] = true;
+    e.preventDefault();
+  }
+});
+window.addEventListener('keyup', (e) => {
+  const action = KEY_MAP[e.code];
+  if (action) game.input[action] = false;
+});
+
+function tick() {
+  const p = game.player;
+  const I = game.input;
+
+  // edge-detect button presses
+  const jumpPressed   = I.jump         && !game.prev.jump;
+  const fastPressed   = I.fastAttack   && !game.prev.fastAttack;
+  const chargeStart   = I.chargeAttack && !game.prev.chargeAttack;
+  const chargeRelease = !I.chargeAttack && game.prev.chargeAttack;
+  const hitPressed    = I.hit          && !game.prev.hit;
+  game.prev.jump         = I.jump;
+  game.prev.fastAttack   = I.fastAttack;
+  game.prev.chargeAttack = I.chargeAttack;
+  game.prev.hit          = I.hit;
+
+  const inAttack = p.state === 'attack';
+  const inHit    = p.state === 'hit';
+
+  // --- GUARD (down arrow, ground only) ---
+  // While charging, down arrow becomes an aim input rather than a guard.
+  const canGuard = p.onGround && !inAttack && !inHit && !p.charging;
+  if (I.guard && canGuard) {
+    p.guarding = true;
+    if (p.state !== 'guard') p.state = 'guard';
+    p.vx = 0;
+  } else if (p.guarding && (!I.guard || !p.onGround || inAttack || inHit)) {
+    p.guarding = false;
+    if (p.state === 'guard') p.state = 'idle';
+  }
+  if (p.blockFlashTime > 0) p.blockFlashTime--;
+
+  // --- CHARGED ATTACK (Z) ---
+  if (chargeStart && !inHit && !p.guarding && !inAttack) {
+    p.charging = true;
+    p.chargeTime = 0;
+    p.state = 'charge';
+  }
+  if (p.charging) {
+    p.chargeTime = Math.min(PLAY.CHARGE_MAX, p.chargeTime + 1);
+    p.vx = 0;
+    // arrow keys reinterpreted as aim direction while charging
+    let ax = 0, ay = 0;
+    if (I.left)  ax -= 1;
+    if (I.right) ax += 1;
+    if (I.jump)  ay -= 1;  // ↑/space aims up
+    if (I.guard) ay += 1;  // ↓ aims down
+    if (ax !== 0 || ay !== 0) {
+      p.aimAngle = Math.atan2(ay, ax) * 180 / Math.PI;
+      if (ax !== 0) p.facing = ax > 0 ? 1 : -1;
+    } else {
+      // default aim = horizontally forward
+      p.aimAngle = p.facing > 0 ? 0 : 180;
+    }
+  }
+  if (chargeRelease && p.charging) {
+    p.chargedPower = p.chargeTime / PLAY.CHARGE_MAX;
+    p.charging = false;
+    p.attackType = 'charged';
+    p.state = 'attack';
+    p.stateTimer = PLAY.CHARGE_DUR;
+    p.chargeTime = 0;
+    executeMove(p, 'charged', p.chargedPower);
+  }
+
+  // --- FAST ATTACK (X) — 3-hit combo for melee abilities ---
+  if (fastPressed && !inHit && !p.guarding && !p.charging) {
+    const isMelee = MELEE_ABILITIES.has(p.ability.key);
+    const maxCombo = isMelee ? 3 : 2;
+    // chain if we're inside the combo window OR the previous hit is still active
+    if (p.comboTimer > 0 && p.comboCount > 0 && p.comboCount < maxCombo) {
+      p.comboCount += 1;
+    } else {
+      p.comboCount = 1;
+    }
+    p.attackType = 'fast';
+    p.state = 'attack';
+    p.stateTimer = PLAY.COMBO_DUR[Math.min(3, p.comboCount)];
+    p.comboTimer = p.stateTimer + PLAY.COMBO_WINDOW;
+    if (p.onGround) p.vx = 0;
+    executeMove(p, 'neutral', 0);
+  }
+  if (p.comboTimer > 0) {
+    p.comboTimer--;
+    if (p.comboTimer === 0) p.comboCount = 0;
+  }
+
+  // --- MOVEMENT & JUMP (only when not guarding/charging/locked) ---
+  const canMove = !p.guarding && !p.charging && !inAttack && !inHit;
+  if (canMove) {
+    let dx = 0;
+    if (I.left)  dx -= 1;
+    if (I.right) dx += 1;
+    p.vx = dx * PLAY.MOVE_SPEED;
+    if (dx !== 0) p.facing = dx;
+
+    if (jumpPressed) {
+      if (p.onGround) {
+        p.vy = PLAY.JUMP_VY;
+        p.onGround = false;
+      } else if (p.canDoubleJump) {
+        p.vy = PLAY.DOUBLE_JUMP_VY;
+        p.canDoubleJump = false;
+        p.flipTime = PLAY.FLIP_DUR;
+      }
+    }
+  }
+
+  // --- HIT (test damage with H; guard blocks it) ---
+  if (hitPressed && p.invulnTime <= 0 && p.hearts > 0) {
+    if (p.guarding) {
+      // blocked! brief shield flash + tiny stun, no heart loss
+      p.blockFlashTime = 12;
+      p.invulnTime = PLAY.GUARD_INVULN;
+    } else {
+      p.hearts -= 1;
+      p.state = 'hit';
+      p.stateTimer = PLAY.HIT_DUR;
+      p.invulnTime = PLAY.INVULN_DUR;
+      p.vy = -5;
+      p.vx = -p.facing * 4;
+      p.charging = false;
+      p.chargeTime = 0;
+      p.comboCount = 0;
+      p.comboTimer = 0;
+      const hudP1 = players.find(pl => pl.id === 1);
+      if (hudP1) {
+        hudP1.hearts = p.hearts;
+        hudP1.justLost = true;
+        updateHud();
+        setTimeout(() => { hudP1.justLost = false; }, 450);
+      }
+    }
+  }
+
+  // --- PHYSICS ---
+  p.vy += PLAY.GRAVITY;
+  if (p.vy > 10) p.vy = 10;
+  p.x += p.vx;
+  p.y += p.vy;
+
+  const groundY = PLAY.GROUND_Y - PLAY.PLAYER_RADIUS;
+  if (p.y >= groundY) {
+    p.y = groundY;
+    p.vy = 0;
+    if (!p.onGround) p.canDoubleJump = true;
+    p.onGround = true;
+    p.flipTime = 0;
+  } else {
+    p.onGround = false;
+    // guarding requires being grounded — drop guard if we're airborne
+    if (p.guarding) { p.guarding = false; if (p.state === 'guard') p.state = 'fall'; }
+  }
+
+  if (p.x < PLAY.PLAYER_RADIUS) { p.x = PLAY.PLAYER_RADIUS; p.vx = 0; }
+  if (p.x > PLAY.W - PLAY.PLAYER_RADIUS) { p.x = PLAY.W - PLAY.PLAYER_RADIUS; p.vx = 0; }
+
+  // --- TIMERS ---
+  if (p.stateTimer > 0) p.stateTimer--;
+  if (p.flipTime > 0) p.flipTime--;
+  if (p.invulnTime > 0) p.invulnTime--;
+
+  // attack/hit auto-recover when timer expires (unless still guarding/charging)
+  if (p.stateTimer === 0 && (p.state === 'attack' || p.state === 'hit')) {
+    p.state = 'idle';
+    p.attackType = null;
+  }
+
+  // physics-driven state selection (only when no locked state)
+  const locked = (p.state === 'attack' || p.state === 'hit' || p.state === 'guard' || p.state === 'charge');
+  if (!locked) {
+    if (!p.onGround) {
+      if (p.flipTime > 0) p.state = 'flip';
+      else if (p.vy < 0)  p.state = 'jump';
+      else                p.state = 'fall';
+    } else if (Math.abs(p.vx) > 0.1) {
+      p.state = 'run';
+    } else {
+      p.state = 'idle';
+    }
+  }
+
+  // combat layer
+  updateCombat();
+  updateProjectiles();
+  updateDummy();
+  updateEffects();
+}
+
+function render() {
+  const p = game.player;
+  const el = document.getElementById('play-player');
+  if (!el) return;
+  const flipDeg = p.state === 'flip'
+    ? (1 - p.flipTime / PLAY.FLIP_DUR) * 360 * p.facing
+    : 0;
+  const bounce = (p.state === 'run' && p.onGround) ? Math.sin(performance.now() / 80) * 0.04 : 0;
+  const sx = p.facing * PLAY.PLAYER_SCALE * (1 - bounce);
+  const sy = PLAY.PLAYER_SCALE * (1 + bounce);
+  el.setAttribute('transform',
+    `translate(${p.x}, ${p.y}) scale(${sx}, ${sy}) rotate(${flipDeg}) translate(-100, -100)`);
+  el.style.opacity = (p.invulnTime > 0 && Math.floor(p.invulnTime / 4) % 2 === 0) ? 0.4 : 1;
+  el.innerHTML = playerInnerSvg(p);
+
+  // dummy
+  const dEl = document.getElementById('play-dummy');
+  if (dEl) {
+    const d = game.dummy;
+    const dRot = d.koTimer > 0 ? (PLAY.DUMMY_RESPAWN - d.koTimer) * 12 : 0;
+    dEl.setAttribute('transform',
+      `translate(${d.x}, ${d.y}) scale(${d.facing * PLAY.PLAYER_SCALE}, ${PLAY.PLAYER_SCALE}) rotate(${dRot}) translate(-100,-100)`);
+    dEl.style.opacity = (d.invulnTime > 0 && Math.floor(d.invulnTime / 3) % 2 === 0)
+      ? 0.5
+      : (d.koTimer > 0 ? 0.7 : 1);
+    dEl.innerHTML = dummyInnerSvg(d);
+  }
+
+  // projectiles
+  const projEl = document.getElementById('play-projectiles');
+  if (projEl) {
+    projEl.innerHTML = game.projectiles.map(pr => {
+      const spr = PROJECTILE_SPRITES[pr.kind] ? PROJECTILE_SPRITES[pr.kind](pr) : '';
+      const scale = pr.big ? 1.4 : 1;
+      return `<g transform="translate(${pr.x}, ${pr.y}) scale(${scale})">${spr}</g>`;
+    }).join('');
+  }
+
+  // hit-spark effects
+  const fxEl = document.getElementById('play-effects');
+  if (fxEl) {
+    fxEl.innerHTML = game.effects.map(fx => {
+      const t = 1 - fx.life / fx.maxLife;
+      const r = 6 + t * 22;
+      const op = 1 - t;
+      return `<g transform="translate(${fx.x}, ${fx.y})" opacity="${op}">
+        <circle r="${r}" fill="none" stroke="${fx.color}" stroke-width="2.5"/>
+        <path d="M 0 ${-r} L ${r*0.3} ${-r*0.3} L ${r} 0 L ${r*0.3} ${r*0.3} L 0 ${r} L ${-r*0.3} ${r*0.3} L ${-r} 0 L ${-r*0.3} ${-r*0.3} Z"
+          fill="${fx.color}" opacity="0.55"/>
+      </g>`;
+    }).join('');
+  }
+
+  // overlay (charge meter, combo badge, aim arrow, dummy hearts) — sits in screen-aligned space
+  const overlay = document.getElementById('play-overlay-svg');
+  if (overlay) overlay.innerHTML = renderOverlay(p);
+}
+
+function renderOverlay(p) {
+  let out = '';
+  // charge meter above head
+  if (p.charging) {
+    const ratio = p.chargeTime / PLAY.CHARGE_MAX;
+    const w = 36, h = 5;
+    const x = p.x - w / 2;
+    const y = p.y - 32;
+    const fillColor = ratio > 0.98 ? '#ffd54d' : p.ability.accent;
+    out += `
+      <rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#1a1a2e" stroke="#000" stroke-width="0.8" rx="2"/>
+      <rect x="${x}" y="${y}" width="${w * ratio}" height="${h}" fill="${fillColor}" rx="2"/>
+      <rect x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="#ffffff" stroke-width="0.4" rx="2" opacity="0.6"/>`;
+    if (ratio > 0.98) {
+      out += `<text x="${p.x}" y="${y - 2}" text-anchor="middle" font-size="6" font-weight="900" fill="#ffd54d" stroke="#7a1818" stroke-width="0.4">MAX</text>`;
+    }
+    // aim arrow projecting from player
+    const len = 18 + ratio * 22;
+    const rad = p.aimAngle * Math.PI / 180;
+    const ax = p.x + Math.cos(rad) * len;
+    const ay = p.y + Math.sin(rad) * len;
+    out += `
+      <line x1="${p.x}" y1="${p.y - 4}" x2="${ax}" y2="${ay}" stroke="#ffd54d" stroke-width="2" stroke-dasharray="3 2" opacity="0.85"/>
+      <circle cx="${ax}" cy="${ay}" r="3" fill="#ffd54d" stroke="#7a1818" stroke-width="0.8"/>`;
+  }
+  // combo badge during/after a chained X attack
+  if (p.comboCount >= 2 && (p.state === 'attack' || p.comboTimer > 0)) {
+    const color = p.comboCount === 3 ? '#ffd54d' : '#fff5a0';
+    out += `<text x="${p.x}" y="${p.y - 40}" text-anchor="middle" font-size="11" font-weight="900"
+      fill="${color}" stroke="#7a1818" stroke-width="0.7" font-family="Arial Black, sans-serif">
+      &#215;${p.comboCount}!
+    </text>`;
+  }
+  // guard glow extension below feet (subtle indicator)
+  if (p.state === 'guard') {
+    out += `<ellipse cx="${p.x}" cy="${PLAY.GROUND_Y + 2}" rx="22" ry="3" fill="#a8d8ee" opacity="0.5"/>`;
+  }
+  // dummy floating hearts / KO badge
+  const d = game.dummy;
+  if (d.koTimer > 0) {
+    out += `<text x="${d.x}" y="${Math.max(d.y - 30, 20)}" text-anchor="middle" font-size="11" font-weight="900"
+      fill="#ff5a5a" stroke="#7a1818" stroke-width="0.7" font-family="Arial Black, sans-serif">KO!</text>`;
+  } else {
+    const hx = d.x, hy = d.y - 34;
+    out += `<text x="${hx}" y="${hy - 6}" text-anchor="middle" font-size="5" font-weight="800" fill="#fff5a0" letter-spacing="0.6">DUMMY</text>`;
+    for (let i = 0; i < MAX_HEARTS; i++) {
+      out += heartIcon(hx - 12 + i * 8, hy, i < d.hearts);
+    }
+  }
+  return out;
+}
+
+let lastTickAt = 0;
+function gameLoop(now) {
+  if (!lastTickAt) lastTickAt = now;
+  let safety = 5;
+  while (now - lastTickAt > 1000 / 60 && safety-- > 0) {
+    if (game.active) tick();
+    lastTickAt += 1000 / 60;
+  }
+  if (safety <= 0) lastTickAt = now;
+  render();
+  requestAnimationFrame(gameLoop);
+}
+
+function initPlayArena() {
+  document.getElementById('play-arena-wrap').innerHTML = buildPlayScene();
+  document.getElementById('ability-picker').innerHTML = renderAbilityPicker();
+
+  document.getElementById('ability-picker').addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-ability]');
+    if (btn) setAbility(btn.dataset.ability);
+  });
+
+  const overlay = document.getElementById('click-to-play');
+  const wrap = document.getElementById('play-arena-wrap');
+  const activate = () => {
+    game.active = true;
+    overlay.classList.add('hidden');
+    wrap.classList.add('focused');
+    wrap.focus();
+  };
+  const deactivate = () => {
+    game.active = false;
+    Object.keys(game.input).forEach(k => game.input[k] = false);
+    overlay.classList.remove('hidden');
+    wrap.classList.remove('focused');
+  };
+  overlay.addEventListener('click', activate);
+  wrap.addEventListener('focus', activate);
+  wrap.addEventListener('blur', deactivate);
+
+  requestAnimationFrame(gameLoop);
+}
+
+initPlayArena();
+</script>
+</body>
+</html>

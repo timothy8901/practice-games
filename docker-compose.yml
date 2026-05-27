@@ -1,0 +1,25 @@
+# Kirby Brawler — local docker setup
+# Run:   docker compose up -d
+# Open:  http://localhost:8080
+# Stop:  docker compose down
+#
+# To preview from your phone on the same wifi:
+#   1) `ipconfig getifaddr en0`  (macOS wifi)   →  e.g. 192.168.1.42
+#   2) On the phone browser: http://192.168.1.42:8080
+
+services:
+  kirby-brawler:
+    build: .
+    image: kirby-brawler:latest
+    container_name: kirby-brawler
+    ports:
+      # Host 8080 → container 80. Bound to 0.0.0.0 so other devices on
+      # the LAN (your phone) can reach it.
+      - "8080:80"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
