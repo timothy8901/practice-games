@@ -1,98 +1,289 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Awesome Website</title>
-    <style>
-        /* This is a simple CSS block for styling */
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            line-height: 1.6;
-            background-color: #f4f4f4;
-            color: #333;
-            margin: 0;
-            padding: 0;
-        }
-        .container {
-            max-width: 800px;
-            margin: 20px auto;
-            padding: 20px;
-            background-color: #ffffff;
-            border-radius: 8px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-        }
-        header {
-            text-align: center;
-            border-bottom: 2px solid #eeeeee;
-            padding-bottom: 20px;
-        }
-        header h1 {
-            color: #444;
-            margin: 0;
-        }
-        main {
-            padding-top: 20px;
-        }
-        main p {
-            font-size: 1.1em;
-        }
-        footer {
-            text-align: center;
-            margin-top: 30px;
-            padding-top: 15px;
-            border-top: 1px solid #eeeeee;
-            font-size: 0.9em;
-            color: #777;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Tim Howley's collection of practice web games — playable in the browser. Featured: Kirby Brawler, a single-page Smash-style fighter.">
+  <title>Tim's Games</title>
+  <style>
+    :root {
+      --bg: #1a1a2e;
+      --card: #2b2b40;
+      --card-hover: #3a3a52;
+      --text: #f0f0f5;
+      --muted: #9090a8;
+      --accent: #ffd54d;
+      --pink: #ffc0d3;
+      --green: #6dd64d;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      margin: 0;
+      line-height: 1.55;
+      min-height: 100vh;
+    }
+
+    header.hero {
+      text-align: center;
+      padding: 56px 20px 24px;
+      background: linear-gradient(180deg, #2b2b40 0%, var(--bg) 100%);
+      border-bottom: 1px solid #44445c;
+    }
+    header.hero h1 {
+      margin: 0 0 8px;
+      font-size: 2.6rem;
+      background: linear-gradient(90deg, #ffc0d3, #ffd54d, #6dd64d, #ec4899);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: -0.02em;
+    }
+    header.hero p { margin: 0; color: var(--muted); font-size: 1.05rem; }
+
+    main { max-width: 1100px; margin: 0 auto; padding: 32px 16px 64px; }
+
+    .section-title {
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--muted);
+      margin: 0 0 14px;
+      font-weight: 700;
+    }
+
+    /* ============ FEATURED CARD ============ */
+    .featured {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 24px;
+      align-items: center;
+      background: linear-gradient(135deg, #2b2b40 0%, #3a2b4a 100%);
+      border-radius: 18px;
+      padding: 28px;
+      border: 2px solid #44445c;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+      text-decoration: none;
+      color: inherit;
+      transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+      margin-bottom: 36px;
+    }
+    .featured:hover {
+      transform: translateY(-3px);
+      border-color: var(--accent);
+      box-shadow: 0 14px 48px rgba(255, 213, 77, 0.18);
+    }
+    .featured .label {
+      display: inline-block;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: var(--accent);
+      background: rgba(255, 213, 77, 0.12);
+      padding: 4px 10px;
+      border-radius: 999px;
+      margin-bottom: 8px;
+    }
+    .featured h2 {
+      margin: 0 0 8px;
+      font-size: 2rem;
+      color: var(--pink);
+      letter-spacing: -0.01em;
+    }
+    .featured p { margin: 0 0 14px; color: #c5c5d8; font-size: 1.02rem; }
+    .featured .meta {
+      display: flex; gap: 14px; flex-wrap: wrap;
+      font-size: 0.82rem; color: var(--muted);
+    }
+    .featured .meta span::before { content: '•  '; color: #555; }
+    .featured .meta span:first-child::before { content: ''; }
+    .featured .play-cta {
+      display: inline-block;
+      margin-top: 16px;
+      background: var(--accent);
+      color: #2b2b40;
+      padding: 10px 22px;
+      border-radius: 8px;
+      font-weight: 800;
+      font-size: 0.95rem;
+      letter-spacing: 0.03em;
+    }
+    .featured .preview {
+      flex-shrink: 0;
+      width: 180px;
+      height: 180px;
+      background: radial-gradient(circle at 50% 60%, #c8e8c0 0%, #5fc242 70%, #1f6628 100%);
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    .featured .preview svg { width: 130px; height: 130px; }
+
+    @media (max-width: 640px) {
+      .featured { grid-template-columns: 1fr; text-align: center; }
+      .featured .preview { margin: 0 auto; width: 140px; height: 140px; }
+      .featured h2 { font-size: 1.5rem; }
+      header.hero h1 { font-size: 2rem; }
+    }
+
+    /* ============ GAMES GRID ============ */
+    .games-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+      gap: 14px;
+    }
+    .game-card {
+      background: var(--card);
+      border-radius: 12px;
+      padding: 18px;
+      text-decoration: none;
+      color: inherit;
+      border: 1px solid #3a3a52;
+      transition: transform 0.12s, background 0.12s, border-color 0.12s;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .game-card:hover {
+      background: var(--card-hover);
+      transform: translateY(-2px);
+      border-color: var(--accent);
+    }
+    .game-card .game-name {
+      font-weight: 700;
+      font-size: 1rem;
+      color: var(--text);
+    }
+    .game-card .game-tag {
+      font-size: 0.74rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .game-card .game-desc {
+      font-size: 0.82rem;
+      color: #b0b0c0;
+      margin-top: 4px;
+    }
+
+    footer {
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.82rem;
+      padding: 28px 16px;
+      border-top: 1px solid #44445c;
+      margin-top: 40px;
+    }
+    footer a { color: var(--accent); text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+  </style>
 </head>
 <body>
 
-    <div class="container">
-        <header>
-            <h1>Welcome to My Homepage!</h1>
-        </header>
+  <header class="hero">
+    <h1>Tim's Games</h1>
+    <p>MVPs of games I'm building. Play them, test them, tell me what you think.</p>
+  </header>
 
-        <main>
-            <p>
-                Hello and welcome! This is the beginnings of my hosting page for the MVPs of games I am working on. 
-                Play them, test them, tell me what you think of them.
-            </p>
-            <p>
-                This template includes a basic structure with a header, main content
-                area, and a footer. The styles are included directly in the 
-                <code>&lt;style&gt;</code> tag within the <code>&lt;head&gt;</code> 
-                section for easy editing.
-            </p>
-            
-            <h2>What's next?</h2>
-            <ul>
-                <li>Edit the <code>&lt;title&gt;</code> in the head to change the browser tab text.</li>
-                <li>Change the <code>&lt;h1&gt;</code> to your own site title.</li>
-                <li>Replace the text in the <code>&lt;p&gt;</code> tags with your own content.</li>
-            </ul>
-        </main>
+  <main>
+    <h2 class="section-title">Featured</h2>
+    <a class="featured" href="kirby-abilities.html" aria-label="Play Kirby Brawler">
+      <div>
+        <span class="label">New &middot; Single-page game</span>
+        <h2>Kirby Brawler</h2>
+        <p>A Smash-style fighter built around 8 Kirby copy abilities. Real moveset per ability, charged attacks with aimable projectiles, a training-dummy Keeby that respawns, and 4 stage backdrops.</p>
+        <div class="meta">
+          <span>Keyboard controls</span>
+          <span>8 abilities</span>
+          <span>Inline-SVG art</span>
+        </div>
+        <span class="play-cta">Play now &rarr;</span>
+      </div>
+      <div class="preview" aria-hidden="true">
+        <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+          <!-- mini cartoon Kirby -->
+          <ellipse cx="84" cy="158" rx="17" ry="10" fill="#e85a6e" stroke="#8b2c3b" stroke-width="2.2" transform="rotate(-15 84 158)"/>
+          <ellipse cx="116" cy="158" rx="17" ry="10" fill="#e85a6e" stroke="#8b2c3b" stroke-width="2.2" transform="rotate(15 116 158)"/>
+          <circle cx="100" cy="108" r="42" fill="#ffc0d3" stroke="#d96e8a" stroke-width="2.5"/>
+          <ellipse cx="110" cy="122" rx="20" ry="26" fill="#ff9eb5" opacity="0.35"/>
+          <ellipse cx="62" cy="120" rx="11" ry="14" fill="#ffc0d3" stroke="#d96e8a" stroke-width="2.5" transform="rotate(-20 62 120)"/>
+          <ellipse cx="138" cy="120" rx="11" ry="14" fill="#ffc0d3" stroke="#d96e8a" stroke-width="2.5" transform="rotate(20 138 120)"/>
+          <ellipse cx="80" cy="119" rx="7" ry="4" fill="#ff7a99" opacity="0.7"/>
+          <ellipse cx="120" cy="119" rx="7" ry="4" fill="#ff7a99" opacity="0.7"/>
+          <ellipse cx="89" cy="100" rx="3.8" ry="9" fill="#1a2c5c"/>
+          <ellipse cx="111" cy="100" rx="3.8" ry="9" fill="#1a2c5c"/>
+          <ellipse cx="89" cy="94.5" rx="2" ry="2.8" fill="#ffffff"/>
+          <ellipse cx="111" cy="94.5" rx="2" ry="2.8" fill="#ffffff"/>
+          <path d="M 96 117 Q 100 120 104 117" fill="none" stroke="#8b2c3b" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </div>
+    </a>
 
-        <footer>
-            <p>&copy; 2025 Timothy Howley. All rights reserved.</p>
-        </footer>
+    <h2 class="section-title">More Games</h2>
+    <div class="games-grid">
+      <a class="game-card" href="punch-out-roguelike.html">
+        <span class="game-tag">Action</span>
+        <span class="game-name">Punch-Out Roguelike</span>
+        <span class="game-desc">Procedurally generated boxing runs.</span>
+      </a>
+      <a class="game-card" href="bottomless-quordle.html">
+        <span class="game-tag">Word</span>
+        <span class="game-name">Bottomless Quordle</span>
+        <span class="game-desc">Quordle that never ends.</span>
+      </a>
+      <a class="game-card" href="Custom-UNO-Clone.html">
+        <span class="game-tag">Card</span>
+        <span class="game-name">Custom UNO Clone</span>
+        <span class="game-desc">UNO with house rules.</span>
+      </a>
+      <a class="game-card" href="Baker's-Dozen-Game.html">
+        <span class="game-tag">Strategy</span>
+        <span class="game-name">Baker's Dozen</span>
+        <span class="game-desc">Solitaire variant.</span>
+      </a>
+      <a class="game-card" href="naruto-tic-tac-toe.html">
+        <span class="game-tag">Casual</span>
+        <span class="game-name">Naruto Tic Tac Toe</span>
+        <span class="game-desc">Tic tac toe with a ninja twist.</span>
+      </a>
+      <a class="game-card" href="ACT-Hunt-Connect.html">
+        <span class="game-tag">Word</span>
+        <span class="game-name">A.C.T. Hunt &amp; Connect</span>
+        <span class="game-desc">Vocabulary-finding puzzle.</span>
+      </a>
+      <a class="game-card" href="AP-Hunt-Connect.html">
+        <span class="game-tag">Word</span>
+        <span class="game-name">A.P. Hunt &amp; Connect</span>
+        <span class="game-desc">Advanced-Placement vocab edition.</span>
+      </a>
+      <a class="game-card" href="STEM-Hunt-Connect.html">
+        <span class="game-tag">Word</span>
+        <span class="game-name">STEM Hunt &amp; Connect</span>
+        <span class="game-desc">Science/math word edition.</span>
+      </a>
+      <a class="game-card" href="Falling-Word-Hunt.html">
+        <span class="game-tag">Action / Word</span>
+        <span class="game-name">Falling Word Hunt</span>
+        <span class="game-desc">Catch letters before they hit the floor.</span>
+      </a>
+      <a class="game-card" href="shameless-game.html">
+        <span class="game-tag">Card</span>
+        <span class="game-name">Shameless</span>
+        <span class="game-desc">House-rule card battler.</span>
+      </a>
     </div>
+  </main>
 
-    <ul>
-        <li><a href="naruto-tic-tac-toe.html">Naruto Tic Tac Toe Game</a></li>
-        <li><a href="shameless-game.html">Shameless</a></li>
-        <li><a href="Baker's-Dozen-Game.html">Baker's Dozen</a></li>
-        <li><a href="ACT-Hunt-Connect.html">A.C.T. Hunt and Connect</a></li>
-        <li><a href="AP-Hunt-Connect.html">A.P. Hunt and Connect</a></li>
-        <li><a href="Custom-UNO-Clone.html">Custom UNO Clone</a></li>
-        <li><a href="bottomless-quordle.html">Bottomless Quordle</a></li>
-        <li><a href="Falling-Word-Hunt.html">Falling Word hunt</a></li>
-        <li><a href="punch-out-roguelike.html">Punchout Roguelike</a></li>
-    
-
-        
-    </ul>
+  <footer>
+    <p>&copy; 2025 Timothy Howley &middot; <a href="https://github.com/timothy8901/practice-games">Source on GitHub</a></p>
+  </footer>
 
 </body>
 </html>

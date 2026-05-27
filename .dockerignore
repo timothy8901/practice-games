@@ -1,0 +1,41 @@
+# Keep the build context small — only the game + nginx config matter
+
+# Repo metadata
+.git
+.gitignore
+.github
+.claude
+
+# Other practice games in this workspace (Docker image is Kirby-brawler-only)
+ACT-Hunt-Connect.html
+AP-Hunt-Connect.html
+Baker's-Dozen-Game.html
+BakersDozen
+Custom-UNO-Clone.html
+Falling-Word-Hunt.html
+STEM-Hunt-Connect.html
+bottomless-quordle.html
+index.html
+naruto-tic-tac-toe.html
+punch-out-roguelike.html
+shameless-game.html
+
+# Pokemon agent (separate project)
+pokemon-agent
+
+# Docs / scratch
+*.md
+README*
+
+# Docker plumbing itself
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Editor / OS junk
+.vscode
+.idea
+.DS_Store
+*.swp
+*.swo
+node_modules
