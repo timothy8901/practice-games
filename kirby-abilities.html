@@ -621,6 +621,110 @@
   .click-to-play.hidden { opacity: 0; pointer-events: none; }
   .click-to-play .play-hint { font-size: 0.8rem; color: #ffd54d; font-weight: 600; letter-spacing: 0.04em; }
 
+  /* ============ MULTI-PHASE OVERLAY (menu / pick / victory / gameOver / paused) ============ */
+  .overlay-card {
+    background: linear-gradient(160deg, #2b2b40 0%, #1a1a2e 100%);
+    border-radius: 14px;
+    padding: 22px 26px;
+    border: 2px solid #44445c;
+    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
+    text-align: center;
+    max-width: 520px;
+    width: calc(100% - 32px);
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    align-items: center;
+  }
+  .overlay-title {
+    font-size: 1.6rem;
+    font-weight: 900;
+    letter-spacing: 0.05em;
+    color: #fff5a0;
+    margin: 0;
+  }
+  .overlay-title.victory {
+    background: linear-gradient(90deg, #ffd54d, #6dd64d, #c8a4ff);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+    font-size: 2rem;
+  }
+  .overlay-title.gameover { color: #ff5a7a; font-size: 1.9rem; }
+  .overlay-sub {
+    color: #b0b0c0;
+    font-size: 0.9rem;
+    margin: 0;
+    line-height: 1.5;
+  }
+  .overlay-sub strong { color: #ffd54d; }
+  .overlay-buttons {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .overlay-btn {
+    border: 2px solid #44445c;
+    border-radius: 8px;
+    padding: 10px 22px;
+    font-size: 0.95rem;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    transition: transform 0.1s, background 0.15s, border-color 0.15s;
+    font-family: inherit;
+  }
+  .overlay-btn.primary {
+    background: #ffd54d;
+    color: #2b2b40;
+    border-color: #ffd54d;
+  }
+  .overlay-btn.primary:hover { transform: translateY(-1px); background: #fff5a0; }
+  .overlay-btn.ghost {
+    background: transparent;
+    color: var(--text);
+  }
+  .overlay-btn.ghost:hover { background: #2b2b40; border-color: #ffd54d; }
+
+  .overlay-picker {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    width: 100%;
+  }
+  @media (max-width: 480px) {
+    .overlay-picker { grid-template-columns: repeat(2, 1fr); }
+  }
+  .overlay-ability {
+    background: #1a1a2e;
+    border: 2px solid #3a3a52;
+    border-left: 5px solid var(--ab-accent, #ffd54d);
+    color: var(--text);
+    padding: 12px 6px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-family: inherit;
+    font-weight: 700;
+    font-size: 0.82rem;
+    letter-spacing: 0.04em;
+    transition: transform 0.1s, background 0.15s, border-color 0.15s;
+  }
+  .overlay-ability:hover {
+    background: #2b2b40;
+    border-color: #ffd54d;
+    transform: translateY(-1px);
+  }
+  .overlay-ability-name { display: block; }
+
+  /* Ability picker locked-state during gauntlet runs */
+  .ability-picker.locked {
+    opacity: 0.55;
+    pointer-events: none;
+    filter: saturate(0.7);
+  }
+
   /* ============ PLAYER HUD (fixed bottom) ============ */
 
   .player-hud {
@@ -2274,13 +2378,16 @@ const HEART_SVG = (filled, beating) => `
     ${!filled ? `<path d="M 7 9 L 17 19 M 17 9 L 7 19" stroke="#5a5a72" stroke-width="1.2" opacity="0.6" stroke-linecap="round"/>` : ''}
   </svg>`;
 
-// Mini head-and-hat portrait for HUD avatars (cropped viewBox)
+// Mini head-and-hat portrait for HUD avatars (cropped viewBox).
+// Abilities without an accessory (e.g. the secret boss) render a plain
+// neutral Kirby — the HUD label already shows "???" so it stays anonymous.
 function miniPortrait(ab) {
+  const accessory = ABILITY_ACCESSORY[ab.key];
   return `<svg viewBox="30 10 140 150" xmlns="http://www.w3.org/2000/svg">
     ${kirbyBody()}
     ${kirbyArm('left',  { rot: -20 })}
     ${kirbyArm('right', { rot: 20 })}
-    ${ABILITY_ACCESSORY[ab.key]()}
+    ${typeof accessory === 'function' ? accessory() : ''}
     ${kirbyFace({ mouth: 'small' })}
   </svg>`;
 }
@@ -2460,10 +2567,167 @@ const MOVESETS = {
     neutral: { type: 'melee',      reach: 52, height: 50, damage: 1, knockback: 3.0, active: [3, 13] },
     charged: { type: 'melee',      reach: 46, height: 64, damage: 2, knockback: 5.5, active: [4, 24], down: true },
   },
+  // ---- Secret final-wave moveset (boss). Key is intentionally non-iterable
+  // from any user-facing surface. Never add to ABILITIES. ----
+  __boss: {
+    neutral: { type: 'melee',      reach: 70, height: 56, damage: 1, knockback: 4.5, active: [4, 16] },
+    charged: { type: 'projectile', proj: 'starshot', damage: 2, knockback: 6.0, speed: 6.5, piercing: true },
+  },
 };
+
+// Boss "ability" — surfaces as '???' anywhere the HUD touches it.
+// Defined in code only, never appended to ABILITIES so the gallery never sees it.
+const BOSS_ABILITY = {
+  key: '__boss',
+  name: '???',
+  accent: '#c8a4ff',
+  // stubs so any defensive caller doesn't NPE
+  idle: () => '',
+  attack: () => '',
+  projectile: () => '',
+  vfx: () => '',
+};
+
+// Wand accessory + boss face are drawn via these helpers (held by the right
+// hand, rotated for swings, with star sparkles trailing).
+function bossWand({ rot = -20, hand = { x: 138, y: 110 } } = {}) {
+  return `
+    <g transform="rotate(${rot} ${hand.x} ${hand.y})">
+      <!-- staff shaft -->
+      <rect x="${hand.x - 2}" y="${hand.y - 56}" width="4" height="70" rx="1.5"
+        fill="#d4b266" stroke="#7a5a1a" stroke-width="1.5"/>
+      <!-- 5-point star tip -->
+      <path d="M ${hand.x} ${hand.y - 74}
+               L ${hand.x + 6} ${hand.y - 62}
+               L ${hand.x + 18} ${hand.y - 60}
+               L ${hand.x + 8} ${hand.y - 52}
+               L ${hand.x + 11} ${hand.y - 40}
+               L ${hand.x} ${hand.y - 47}
+               L ${hand.x - 11} ${hand.y - 40}
+               L ${hand.x - 8} ${hand.y - 52}
+               L ${hand.x - 18} ${hand.y - 60}
+               L ${hand.x - 6} ${hand.y - 62} Z"
+        fill="#ffd54d" stroke="#a8761a" stroke-width="1.6"/>
+      <!-- inner star shine -->
+      <path d="M ${hand.x} ${hand.y - 68}
+               L ${hand.x + 4} ${hand.y - 60}
+               L ${hand.x + 11} ${hand.y - 58}
+               L ${hand.x + 5} ${hand.y - 52}
+               L ${hand.x + 7} ${hand.y - 44}
+               L ${hand.x} ${hand.y - 49}
+               L ${hand.x - 7} ${hand.y - 44}
+               L ${hand.x - 5} ${hand.y - 52}
+               L ${hand.x - 11} ${hand.y - 58}
+               L ${hand.x - 4} ${hand.y - 60} Z"
+        fill="#fffacc"/>
+      <circle cx="${hand.x}" cy="${hand.y - 58}" r="3" fill="#ffffff" opacity="0.9"/>
+      <!-- sparkle trail dots -->
+      <circle cx="${hand.x + 14}" cy="${hand.y - 30}" r="1.4" fill="#fffacc" opacity="0.8"/>
+      <circle cx="${hand.x - 12}" cy="${hand.y - 24}" r="1.2" fill="#ffd54d" opacity="0.7"/>
+    </g>`;
+}
+
+// Crown of small stars circling the head (boss vibe)
+function bossCrown() {
+  return `
+    <g class="boss-crown">
+      <path d="M 100 30 L 103 38 L 110 39 L 104 44 L 106 52 L 100 47 L 94 52 L 96 44 L 90 39 L 97 38 Z"
+        fill="#ffd54d" stroke="#a8761a" stroke-width="1.2"/>
+      <path d="M 74 52 L 76 57 L 82 58 L 77 61 L 79 66 L 74 63 L 69 66 L 71 61 L 66 58 L 72 57 Z"
+        fill="#fffacc" stroke="#a8761a" stroke-width="0.9"/>
+      <path d="M 126 52 L 128 57 L 134 58 L 129 61 L 131 66 L 126 63 L 121 66 L 123 61 L 118 58 L 124 57 Z"
+        fill="#fffacc" stroke="#a8761a" stroke-width="0.9"/>
+    </g>`;
+}
+
+// Soft glowing aura behind the boss
+function bossAura(opacity = 0.5) {
+  return `
+    <circle cx="100" cy="108" r="62" fill="#c8a4ff" opacity="${opacity * 0.35}"/>
+    <circle cx="100" cy="108" r="50" fill="#fff5a0" opacity="${opacity * 0.25}"/>`;
+}
+
+// State-aware boss renderer. Built from the same primitives as the player so
+// the body, arms, feet, face all animate consistently — only the accessories
+// (wand + crown + aura) are unique.
+function bossInnerSvg(e) {
+  const aura = bossAura(1);
+  switch (e.state) {
+    case 'jump': case 'fall': return aura +
+      kirbyFeet({ leftRot: -55, rightRot: 55, leftX: 86, rightX: 114, y: 152 }) +
+      kirbyBody() +
+      kirbyArm('left', { rot: -160, cx: 68, cy: 78 }) +
+      kirbyArm('right', { rot: 160, cx: 132, cy: 78 }) +
+      bossCrown() +
+      kirbyFace({ mouth: 'open', eyesY: 102 }) +
+      bossWand({ rot: -90, hand: { x: 132, y: 78 } });
+    case 'flip': return aura +
+      kirbyFeet({ leftRot: -90, rightRot: 90, leftX: 90, rightX: 110, y: 148 }) +
+      kirbyBody() +
+      kirbyArm('left',  { rot: -90, cx: 64, cy: 108 }) +
+      kirbyArm('right', { rot: 90,  cx: 136, cy: 108 }) +
+      bossCrown() +
+      kirbyFace({ mouth: 'smirk' }) +
+      bossWand({ rot: 60, hand: { x: 136, y: 108 } });
+    case 'attack': return aura +
+      kirbyFeet({ leftRot: -25, rightRot: 5 }) +
+      kirbyBody() +
+      kirbyArm('left', { rot: -10 }) +
+      bossCrown() +
+      kirbyFace({ mouth: 'open' }) +
+      bossWand({ rot: -100, hand: { x: 138, y: 105 } }) +
+      `<path class="slash-arc" d="M 40 30 Q 100 5 175 60" fill="none"
+         stroke="#ffd54d" stroke-width="4" stroke-linecap="round" opacity="0.85"/>
+       <path class="slash-arc" d="M 50 40 Q 100 18 168 65" fill="none"
+         stroke="#ffffff" stroke-width="2" stroke-linecap="round" opacity="0.7"/>`;
+    case 'hit': return bossAura(0.6) +
+      kirbyFeet({ leftRot: -50, rightRot: 50, leftX: 78, rightX: 122, y: 162 }) +
+      kirbyBody() +
+      kirbyArm('left',  { rot: -120, cx: 56, cy: 95 }) +
+      kirbyArm('right', { rot: 120,  cx: 144, cy: 95 }) +
+      bossCrown() +
+      // dazed face
+      `<ellipse cx="80" cy="120" rx="7" ry="4" fill="#ff7a99" opacity="0.7"/>
+       <ellipse cx="120" cy="120" rx="7" ry="4" fill="#ff7a99" opacity="0.7"/>
+       <path d="M 84 96 L 94 106 M 94 96 L 84 106" stroke="#1a2c5c" stroke-width="2.5" stroke-linecap="round"/>
+       <path d="M 106 96 L 116 106 M 116 96 L 106 106" stroke="#1a2c5c" stroke-width="2.5" stroke-linecap="round"/>`;
+    case 'charge': {
+      const r = (e.chargeTime || 0) / PLAY.CHARGE_MAX;
+      const glowR = 50 + r * 30;
+      return `<circle cx="100" cy="108" r="${glowR}" fill="#c8a4ff" opacity="${0.25 + r * 0.45}"/>
+              <circle cx="100" cy="108" r="${glowR - 10}" fill="#fff5a0" opacity="${0.18 + r * 0.4}"/>` +
+        kirbyFeet({ leftRot: -10, rightRot: 10, leftX: 86, rightX: 114, y: 158 }) +
+        kirbyBody() +
+        kirbyArm('left',  { rot: -110, cx: 60, cy: 80 }) +
+        kirbyArm('right', { rot: 110,  cx: 140, cy: 80 }) +
+        bossCrown() +
+        kirbyFace({ mouth: 'open' }) +
+        bossWand({ rot: -110, hand: { x: 140, y: 80 } });
+    }
+    case 'run': case 'idle':
+    default: return aura +
+      kirbyFeet() + kirbyBody() +
+      kirbyArm('left', { rot: -20 }) +
+      bossCrown() +
+      kirbyFace({ mouth: 'smirk' }) +
+      bossWand({ rot: -22 });
+  }
+}
 
 const game = {
   active: false,
+  mode: 'free',                  // 'free' | 'gauntlet'
+  phase: 'menu',                 // 'menu' | 'pickAbility' | 'fighting' | 'bossIntro' | 'victory' | 'gameOver'
+  gauntlet: {
+    waveIndex: 0,                // 0..7 = the 8 ability waves, 8 = boss
+    totalWaves: 9,
+    queue: [],                   // ability objects, drained as waves advance
+    lockedAbility: null,
+    bannerTimer: 0,              // frames remaining to show "Wave X/9" banner
+    bannerText: '',              // current banner text (e.g., "WAVE 3 / 9 — HAMMER")
+    pendingAdvance: false,       // set on enemy KO, consumed by banner end
+    bossDefeated: false,         // once true, victory is latched (no double-fire)
+  },
   player: {
     controller: 'human',
     x: 300,
@@ -2701,7 +2965,9 @@ function recolorEnemy(svg) {
 
 // State-aware enemy renderer — same animation system as the player, just
 // recolored. The ability hat is already baked into kirby*For() helpers.
+// Boss enemies bypass the recolor and use a dedicated renderer instead.
 function enemyInnerSvg(e) {
+  if (e.isBoss) return bossInnerSvg(e);
   const ab = e.ability;
   let frag;
   switch (e.state) {
@@ -2758,6 +3024,17 @@ const PROJECTILE_SPRITES = {
     <circle r="11" fill="#ff5722" stroke="#a8290a" stroke-width="1.1"/>
     <circle r="7.5" fill="#ff9a42"/>
     <circle r="3.6" fill="#fff5a0"/>`,
+  // Boss-only star projectile — large, glowing, spinning
+  starshot: (p) => {
+    const ang = (p.spin || 0);
+    return `<g transform="rotate(${ang})">
+      <circle r="14" fill="#c8a4ff" opacity="0.5"/>
+      <path d="M 0 -13 L 4 -4 L 13 -3 L 5 3 L 8 12 L 0 7 L -8 12 L -5 3 L -13 -3 L -4 -4 Z"
+        fill="#ffd54d" stroke="#a8761a" stroke-width="1.4"/>
+      <path d="M 0 -8 L 2.5 -3 L 8 -2 L 3 1 L 5 7 L 0 4 L -5 7 L -3 1 L -8 -2 L -2.5 -3 Z" fill="#fffacc"/>
+      <circle r="2.5" fill="#ffffff"/>
+    </g>`;
+  },
 };
 
 // rectangle (center rx,ry; size rw,rh) vs circle (cx,cy,cr)
@@ -3003,20 +3280,37 @@ function aiThink(e) {
 function tickEnemy() {
   const e = game.enemy;
 
-  // KO'd: spin off + respawn with a NEW random ability
+  // KO'd: spin off + respawn (free play) OR advance gauntlet wave
   if (e.koTimer > 0) {
     e.koTimer--;
     e.vy += PLAY.GRAVITY;
     e.x += e.vx; e.y += e.vy; e.vx *= 0.97;
     if (e.koTimer === 0) {
-      e.ability = randomAbility(e.ability);   // fresh ability on respawn
-      e.x = 440; e.y = PLAY.GROUND_Y - PLAY.PLAYER_RADIUS;
-      e.vx = 0; e.vy = 0; e.hearts = MAX_HEARTS;
-      e.state = 'idle'; e.invulnTime = 30; e.onGround = true;
-      e.charging = false; e.chargeTime = 0;
-      e.comboCount = 0; e.comboTimer = 0;
-      e.aiCooldown = 24; e.aiChargeTimer = 0;
-      syncEnemyHud();
+      if (game.mode === 'gauntlet') {
+        // gauntlet: clear the field then advance — no instant respawn
+        if (e.isBoss) {
+          // boss down → victory
+          game.gauntlet.bossDefeated = true;
+          game.phase = 'victory';
+          game.active = false;
+          game.projectiles.length = 0; game.effects.length = 0;
+          updateOverlay();
+        } else {
+          // next wave (or boss intro after wave 8)
+          advanceGauntletWave();
+        }
+      } else {
+        // free play: existing random-respawn
+        e.ability = randomAbility(e.ability);
+        e.x = 440; e.y = PLAY.GROUND_Y - PLAY.PLAYER_RADIUS;
+        e.vx = 0; e.vy = 0; e.hearts = MAX_HEARTS;
+        e.state = 'idle'; e.invulnTime = 30; e.onGround = true;
+        e.charging = false; e.chargeTime = 0;
+        e.comboCount = 0; e.comboTimer = 0;
+        e.aiCooldown = 24; e.aiChargeTimer = 0;
+        e.isBoss = false;
+        syncEnemyHud();
+      }
     }
     return;
   }
@@ -3143,6 +3437,235 @@ function heartIcon(x, y, filled) {
     fill="${filled ? '#ff5a7a' : '#3a3a52'}" stroke="${filled ? '#a82a4a' : '#555'}" stroke-width="1"/>`;
 }
 
+// =========================================================================
+// GAUNTLET MODE — flow control
+// =========================================================================
+
+function shuffle(arr) {
+  const out = arr.slice();
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
+function startGauntlet(chosenAbility) {
+  game.mode = 'gauntlet';
+  game.phase = 'fighting';
+  game.gauntlet.queue = shuffle(ABILITIES);  // all 8 in random order
+  game.gauntlet.waveIndex = 0;
+  game.gauntlet.lockedAbility = chosenAbility;
+  game.gauntlet.bannerTimer = 90;
+  game.gauntlet.bossDefeated = false;
+  // configure player
+  game.player.ability = chosenAbility;
+  game.player.x = 200; game.player.y = PLAY.GROUND_Y - PLAY.PLAYER_RADIUS;
+  game.player.vx = 0; game.player.vy = 0;
+  game.player.hearts = MAX_HEARTS;
+  game.player.state = 'idle';
+  game.player.koTimer = 0; game.player.invulnTime = 30;
+  game.player.facing = 1;
+  game.player.charging = false; game.player.chargeTime = 0;
+  game.player.comboCount = 0; game.player.comboTimer = 0;
+  // first opponent
+  spawnGauntletEnemy(game.gauntlet.queue[0], false);
+  // sync P1 HUD
+  const p1 = players.find(pl => pl.id === 1);
+  if (p1) { p1.ability = chosenAbility; p1.hearts = MAX_HEARTS; }
+  updateHud();
+  updateAbilityPickerLock();
+  // banner for the first wave
+  game.gauntlet.bannerText = `WAVE 1 / 9 — ${game.gauntlet.queue[0].name.toUpperCase()}`;
+  game.active = true;
+  hideOverlay();
+}
+
+function spawnGauntletEnemy(ability, isBoss) {
+  const e = game.enemy;
+  e.isBoss = !!isBoss;
+  e.ability = isBoss ? BOSS_ABILITY : ability;
+  e.x = 440; e.y = PLAY.GROUND_Y - PLAY.PLAYER_RADIUS;
+  e.vx = 0; e.vy = 0;
+  e.hearts = isBoss ? MAX_HEARTS * 2 : MAX_HEARTS;
+  e.state = 'idle';
+  e.koTimer = 0; e.invulnTime = 40;
+  e.onGround = true;
+  e.facing = -1;
+  e.charging = false; e.chargeTime = 0;
+  e.comboCount = 0; e.comboTimer = 0;
+  e.aiCooldown = 30; e.aiChargeTimer = 0;
+  syncEnemyHud();
+  // Boss-mode HUD: extra hearts visible in slot 2 would overflow at 4; the
+  // syncEnemyHud cap leaves it as MAX_HEARTS but the in-arena fight tracks
+  // the true e.hearts under the hood
+  if (isBoss) {
+    const hud = players.find(pl => pl.id === 2);
+    if (hud) { hud.hearts = MAX_HEARTS; updateHud(); }
+  }
+}
+
+function advanceGauntletWave() {
+  game.gauntlet.waveIndex += 1;
+  game.projectiles.length = 0;
+  game.effects.length = 0;
+  if (game.gauntlet.waveIndex >= 8) {
+    // intro the final wave — boss spawn
+    spawnGauntletEnemy(null, true);
+    game.gauntlet.bannerText = `FINAL WAVE — ???`;
+    game.gauntlet.bannerTimer = 130;
+  } else {
+    const next = game.gauntlet.queue[game.gauntlet.waveIndex];
+    spawnGauntletEnemy(next, false);
+    game.gauntlet.bannerText = `WAVE ${game.gauntlet.waveIndex + 1} / 9 — ${next.name.toUpperCase()}`;
+    game.gauntlet.bannerTimer = 90;
+  }
+}
+
+function retryGauntlet() {
+  game.phase = 'pickAbility';
+  game.active = false;
+  game.projectiles.length = 0;
+  game.effects.length = 0;
+  updateOverlay();
+}
+
+function returnToMenu() {
+  game.mode = 'free';
+  game.phase = 'menu';
+  game.active = false;
+  // restore enemy to default state so menu doesn't look weird behind overlay
+  game.enemy.isBoss = false;
+  game.enemy.ability = randomAbility();
+  game.enemy.hearts = MAX_HEARTS;
+  game.enemy.state = 'idle'; game.enemy.koTimer = 0; game.enemy.invulnTime = 30;
+  game.enemy.x = 440; game.enemy.y = PLAY.GROUND_Y - PLAY.PLAYER_RADIUS;
+  game.enemy.vx = 0; game.enemy.vy = 0;
+  game.player.hearts = MAX_HEARTS;
+  game.player.state = 'idle'; game.player.koTimer = 0;
+  game.player.x = 200; game.player.y = PLAY.GROUND_Y - PLAY.PLAYER_RADIUS;
+  game.player.vx = 0; game.player.vy = 0;
+  game.projectiles.length = 0;
+  game.effects.length = 0;
+  syncEnemyHud();
+  const p1 = players.find(pl => pl.id === 1);
+  if (p1) { p1.hearts = MAX_HEARTS; }
+  updateHud();
+  updateAbilityPickerLock();
+  updateOverlay();
+}
+
+function startFreePlay() {
+  game.mode = 'free';
+  game.phase = 'fighting';
+  game.gauntlet.lockedAbility = null;
+  // reset both fighters for a clean start
+  game.player.x = 200; game.player.y = PLAY.GROUND_Y - PLAY.PLAYER_RADIUS;
+  game.player.vx = 0; game.player.vy = 0;
+  game.player.hearts = MAX_HEARTS; game.player.state = 'idle';
+  game.player.koTimer = 0; game.player.invulnTime = 30;
+  game.enemy.isBoss = false;
+  game.enemy.ability = randomAbility(game.enemy.ability);
+  game.enemy.x = 440; game.enemy.y = PLAY.GROUND_Y - PLAY.PLAYER_RADIUS;
+  game.enemy.vx = 0; game.enemy.vy = 0;
+  game.enemy.hearts = MAX_HEARTS;
+  game.enemy.state = 'idle'; game.enemy.koTimer = 0; game.enemy.invulnTime = 30;
+  game.projectiles.length = 0;
+  game.effects.length = 0;
+  syncEnemyHud();
+  const p1 = players.find(pl => pl.id === 1);
+  if (p1) { p1.hearts = MAX_HEARTS; }
+  updateHud();
+  updateAbilityPickerLock();
+  hideOverlay();
+  game.active = true;
+}
+
+// ---------- Overlay rendering ----------
+// Reuses the existing #click-to-play element; its innerHTML is rebuilt
+// per phase. The element shows/hides via the existing .hidden class.
+
+function hideOverlay() {
+  const overlay = document.getElementById('click-to-play');
+  if (overlay) overlay.classList.add('hidden');
+  const wrap = document.getElementById('play-arena-wrap');
+  if (wrap) { wrap.classList.add('focused'); wrap.focus(); }
+}
+
+function showOverlay() {
+  const overlay = document.getElementById('click-to-play');
+  if (overlay) overlay.classList.remove('hidden');
+  const wrap = document.getElementById('play-arena-wrap');
+  if (wrap) wrap.classList.remove('focused');
+}
+
+function updateOverlay() {
+  const overlay = document.getElementById('click-to-play');
+  if (!overlay) return;
+  if (game.phase === 'fighting' || game.phase === 'bossIntro') {
+    overlay.classList.add('hidden');
+    return;
+  }
+  overlay.classList.remove('hidden');
+  overlay.innerHTML = renderOverlayContent();
+}
+
+function renderOverlayContent() {
+  switch (game.phase) {
+    case 'menu':
+      return `
+        <div class="overlay-card">
+          <div class="overlay-title">Choose Mode</div>
+          <div class="overlay-buttons">
+            <button class="overlay-btn primary" data-action="free">Free Play</button>
+            <button class="overlay-btn primary" data-action="gauntlet">Gauntlet</button>
+          </div>
+          <div class="overlay-sub">Free Play: pick + swap abilities, infinite respawn. Gauntlet: pick once, survive 9 waves.</div>
+        </div>`;
+    case 'pickAbility':
+      return `
+        <div class="overlay-card">
+          <div class="overlay-title">Choose Your Kirby</div>
+          <div class="overlay-sub">Locked for the whole gauntlet. 8 opponents in random order, then a final challenge.</div>
+          <div class="overlay-picker">${ABILITIES.map(ab => `
+            <button class="overlay-ability" data-pick="${ab.key}" style="--ab-accent:${ab.accent}">
+              <span class="overlay-ability-name">${ab.name}</span>
+            </button>`).join('')}</div>
+          <button class="overlay-btn ghost" data-action="menu">Back</button>
+        </div>`;
+    case 'victory':
+      return `
+        <div class="overlay-card">
+          <div class="overlay-title victory">VICTORY!</div>
+          <div class="overlay-sub">You cleared all 9 waves with <strong>${game.gauntlet.lockedAbility ? game.gauntlet.lockedAbility.name : '???'}</strong>.</div>
+          <div class="overlay-buttons">
+            <button class="overlay-btn primary" data-action="retry">Run It Back</button>
+            <button class="overlay-btn ghost" data-action="menu">Back to Menu</button>
+          </div>
+        </div>`;
+    case 'gameOver':
+      return `
+        <div class="overlay-card">
+          <div class="overlay-title gameover">KO!</div>
+          <div class="overlay-sub">You fell on <strong>Wave ${Math.min(game.gauntlet.waveIndex + 1, 9)} / 9</strong>.</div>
+          <div class="overlay-buttons">
+            <button class="overlay-btn primary" data-action="retry">Retry</button>
+            <button class="overlay-btn ghost" data-action="menu">Back to Menu</button>
+          </div>
+        </div>`;
+    default:
+      return '';
+  }
+}
+
+// Lock / unlock the ability picker based on phase
+function updateAbilityPickerLock() {
+  const picker = document.getElementById('ability-picker');
+  if (!picker) return;
+  picker.classList.toggle('locked',
+    game.mode === 'gauntlet' && game.phase === 'fighting');
+}
+
 function renderAbilityPicker() {
   return ABILITIES.map(ab => `
     <button type="button" data-ability="${ab.key}" style="--ab-accent:${ab.accent}"
@@ -3150,6 +3673,8 @@ function renderAbilityPicker() {
 }
 
 function setAbility(key) {
+  // Locked during a gauntlet run — must finish the current attempt first
+  if (game.mode === 'gauntlet' && game.phase === 'fighting') return;
   const ab = ABILITIES.find(a => a.key === key);
   if (!ab) return;
   game.player.ability = ab;
@@ -3158,6 +3683,9 @@ function setAbility(key) {
   game.player.comboTimer = 0;
   game.player.charging = false;
   game.player.chargeTime = 0;
+  // also keep HUD P1 in sync so the slot shows the current ability
+  const p1 = players.find(pl => pl.id === 1);
+  if (p1) { p1.ability = ab; updateHud(); }
   document.getElementById('ability-picker').innerHTML = renderAbilityPicker();
 }
 
@@ -3189,12 +3717,21 @@ function tick() {
   const p = game.player;
   const I = game.input;
 
-  // Player KO: spin out + respawn at the player spawn after RESPAWN_DUR
+  // Player KO: in free play, spin out then respawn; in gauntlet, game over
   if (p.koTimer > 0) {
     p.koTimer--;
     p.vy += PLAY.GRAVITY;
     p.x += p.vx; p.y += p.vy; p.vx *= 0.97;
     if (p.koTimer === 0) {
+      if (game.mode === 'gauntlet') {
+        // run is over — show Game Over overlay
+        game.phase = 'gameOver';
+        game.active = false;
+        game.projectiles.length = 0; game.effects.length = 0;
+        updateOverlay();
+        return;
+      }
+      // free play: respawn
       p.x = 200; p.y = PLAY.GROUND_Y - PLAY.PLAYER_RADIUS;
       p.vx = 0; p.vy = 0;
       p.hearts = MAX_HEARTS;
@@ -3468,17 +4005,43 @@ function renderOverlay(p) {
   if (p.state === 'guard') {
     out += `<ellipse cx="${p.x}" cy="${PLAY.GROUND_Y + 2}" rx="22" ry="3" fill="#a8d8ee" opacity="0.5"/>`;
   }
-  // dummy floating hearts / KO badge
+  // enemy floating hearts / KO badge
   const d = game.enemy;
   if (d.koTimer > 0) {
     out += `<text x="${d.x}" y="${Math.max(d.y - 30, 20)}" text-anchor="middle" font-size="11" font-weight="900"
       fill="#ff5a5a" stroke="#7a1818" stroke-width="0.7" font-family="Arial Black, sans-serif">KO!</text>`;
   } else {
     const hx = d.x, hy = d.y - 34;
-    out += `<text x="${hx}" y="${hy - 6}" text-anchor="middle" font-size="5" font-weight="800" fill="#fff5a0" letter-spacing="0.6">DUMMY</text>`;
-    for (let i = 0; i < MAX_HEARTS; i++) {
-      out += heartIcon(hx - 12 + i * 8, hy, i < d.hearts);
+    // label: ability name during fights ('???' for the boss), 'DUMMY' in menus
+    const label = (game.phase === 'fighting')
+      ? (d.ability ? d.ability.name.toUpperCase() : 'DUMMY')
+      : 'DUMMY';
+    out += `<text x="${hx}" y="${hy - 6}" text-anchor="middle" font-size="5" font-weight="800" fill="#fff5a0" letter-spacing="0.6">${label}</text>`;
+    if (d.isBoss) {
+      // boss has more than 4 hearts → draw a thin bar instead
+      const total = MAX_HEARTS * 2;
+      const w = 38, h = 5;
+      const ratio = Math.max(0, d.hearts / total);
+      out += `<rect x="${hx - w/2}" y="${hy - 3}" width="${w}" height="${h}" rx="2"
+        fill="#1a1a2e" stroke="#000" stroke-width="0.6"/>
+        <rect x="${hx - w/2}" y="${hy - 3}" width="${w * ratio}" height="${h}" rx="2"
+          fill="#c8a4ff"/>`;
+    } else {
+      for (let i = 0; i < MAX_HEARTS; i++) {
+        out += heartIcon(hx - 12 + i * 8, hy, i < d.hearts);
+      }
     }
+  }
+  // gauntlet wave banner (drawn last so it sits on top)
+  if (game.mode === 'gauntlet' && game.gauntlet.bannerTimer > 0) {
+    const fade = Math.min(1, game.gauntlet.bannerTimer / 30);
+    const cx = PLAY.W / 2, cy = 70;
+    out += `<g opacity="${fade}">
+      <rect x="${cx - 130}" y="${cy - 14}" width="260" height="28" rx="6"
+        fill="#1a1a2e" stroke="#ffd54d" stroke-width="1.5" opacity="0.92"/>
+      <text x="${cx}" y="${cy + 5}" text-anchor="middle" font-size="11" font-weight="900"
+        fill="#ffd54d" font-family="Arial Black, sans-serif" letter-spacing="0.12em">${game.gauntlet.bannerText}</text>
+    </g>`;
   }
   return out;
 }
@@ -3489,6 +4052,9 @@ function gameLoop(now) {
   let safety = 5;
   while (now - lastTickAt > 1000 / 60 && safety-- > 0) {
     if (game.active) tick();
+    // wave banner ticks down regardless of game.active so the intro plays
+    // even during the brief pause between waves
+    if (game.gauntlet.bannerTimer > 0) game.gauntlet.bannerTimer--;
     lastTickAt += 1000 / 60;
   }
   if (safety <= 0) lastTickAt = now;
@@ -3507,25 +4073,58 @@ function initPlayArena() {
 
   const overlay = document.getElementById('click-to-play');
   const wrap = document.getElementById('play-arena-wrap');
-  const activate = () => {
-    game.active = true;
-    overlay.classList.add('hidden');
-    wrap.classList.add('focused');
-    wrap.focus();
-  };
-  const deactivate = () => {
-    game.active = false;
-    Object.keys(game.input).forEach(k => game.input[k] = false);
-    overlay.classList.remove('hidden');
-    wrap.classList.remove('focused');
-  };
-  overlay.addEventListener('click', activate);
-  wrap.addEventListener('focus', activate);
-  wrap.addEventListener('blur', deactivate);
 
-  // Enemy spawns with a random copy ability and the HUD slot mirrors it
+  // Overlay click handler — dispatch on data-action / data-pick attributes
+  overlay.addEventListener('click', (e) => {
+    const actionBtn = e.target.closest('[data-action]');
+    if (actionBtn) {
+      e.stopPropagation();
+      const action = actionBtn.dataset.action;
+      if (action === 'free')      startFreePlay();
+      else if (action === 'gauntlet') { game.phase = 'pickAbility'; updateOverlay(); }
+      else if (action === 'menu') returnToMenu();
+      else if (action === 'resume') { hideOverlay(); game.active = true; }
+      else if (action === 'retry') {
+        if (game.mode === 'gauntlet' && game.gauntlet.lockedAbility) {
+          startGauntlet(game.gauntlet.lockedAbility);
+        } else {
+          game.phase = 'pickAbility';
+          updateOverlay();
+        }
+      }
+      return;
+    }
+    const pickBtn = e.target.closest('[data-pick]');
+    if (pickBtn) {
+      e.stopPropagation();
+      const ab = ABILITIES.find(a => a.key === pickBtn.dataset.pick);
+      if (ab) startGauntlet(ab);
+    }
+  });
+
+  // Arena blur during a fight → pause and show resume overlay
+  wrap.addEventListener('blur', () => {
+    if (game.phase === 'fighting' && game.active) {
+      game.active = false;
+      Object.keys(game.input).forEach(k => game.input[k] = false);
+      overlay.classList.remove('hidden');
+      overlay.innerHTML = `
+        <div class="overlay-card">
+          <div class="overlay-title">Paused</div>
+          <div class="overlay-buttons">
+            <button class="overlay-btn primary" data-action="resume">Resume</button>
+            <button class="overlay-btn ghost" data-action="menu">Back to Menu</button>
+          </div>
+        </div>`;
+    }
+  });
+
+  // Start on the mode-select menu — enemy is a passive placeholder until the
+  // player chooses a mode.
   game.enemy.ability = randomAbility();
+  game.enemy.isBoss = false;
   syncEnemyHud();
+  updateOverlay();   // renders the menu
 
   requestAnimationFrame(gameLoop);
 }
