@@ -2334,17 +2334,33 @@ document.addEventListener('click', (e) => {
   if (e.target.closest('#hud-reset-btn')) {
     players.forEach(p => { p.hearts = MAX_HEARTS; p.justLost = false; });
     updateHud();
-    // also reset the live arena dummy + clear projectiles/effects
-    if (typeof game !== 'undefined' && game.dummy) {
-      game.dummy.x = 440;
-      game.dummy.y = PLAY.GROUND_Y - PLAY.PLAYER_RADIUS;
-      game.dummy.vx = 0; game.dummy.vy = 0;
-      game.dummy.hearts = MAX_HEARTS;
-      game.dummy.state = 'idle';
-      game.dummy.koTimer = 0;
-      game.dummy.invulnTime = 0;
+    // reset the live arena: player + AI enemy (fresh random ability) + cleanup
+    if (typeof game !== 'undefined' && game.enemy) {
+      // enemy
+      game.enemy.ability = randomAbility(game.enemy.ability);
+      game.enemy.x = 440;
+      game.enemy.y = PLAY.GROUND_Y - PLAY.PLAYER_RADIUS;
+      game.enemy.vx = 0; game.enemy.vy = 0;
+      game.enemy.facing = -1;
+      game.enemy.hearts = MAX_HEARTS;
+      game.enemy.state = 'idle';
+      game.enemy.koTimer = 0;
+      game.enemy.invulnTime = 0;
+      game.enemy.charging = false; game.enemy.chargeTime = 0;
+      game.enemy.comboCount = 0; game.enemy.comboTimer = 0;
+      game.enemy.aiCooldown = 30; game.enemy.aiChargeTimer = 0;
+      // player (also recover position so a KO'd P1 comes back)
+      game.player.x = 200; game.player.y = PLAY.GROUND_Y - PLAY.PLAYER_RADIUS;
+      game.player.vx = 0; game.player.vy = 0;
+      game.player.state = 'idle';
+      game.player.koTimer = 0; game.player.invulnTime = 0;
+      game.player.charging = false; game.player.chargeTime = 0;
+      game.player.comboCount = 0; game.player.comboTimer = 0;
+      // arena cleanup
       game.projectiles.length = 0;
       game.effects.length = 0;
+      // resync HUD entries so the enemy slot shows its new ability
+      syncEnemyHud();
     }
     return;
   }
@@ -2392,9 +2408,14 @@ const PLAY = {
   HIT_DUR: 24,
   INVULN_DUR: 50,
   GUARD_INVULN: 14,             // brief shield-stun on blocked hit
-  DUMMY_INVULN: 14,            // dummy i-frames after a connect
-  DUMMY_RESPAWN: 90,           // frames before a KO'd dummy returns
+  ENEMY_INVULN: 14,            // enemy i-frames after a connect
+  RESPAWN_DUR: 90,             // frames before a KO'd fighter returns
   PROJ_GRAVITY: 0.22,          // arc gravity for thrown projectiles
+  AI_THINK_INTERVAL: 6,        // how often the AI re-evaluates (frames)
+  AI_ATTACK_COOLDOWN: 32,      // min frames between enemy attacks
+  AI_CHARGE_HOLD: 36,          // how long the AI holds Z when it decides to charge
+  AI_JUMP_CHANCE: 0.03,        // per-think chance of jumping while chasing
+  AI_BACKOFF_CHANCE: 0.18,     // per-attack chance the enemy backs off after swinging
 };
 
 // Melee-style abilities use the combo system more meaningfully. Ranged abilities
@@ -2444,6 +2465,7 @@ const MOVESETS = {
 const game = {
   active: false,
   player: {
+    controller: 'human',
     x: 300,
     y: PLAY.GROUND_Y - PLAY.PLAYER_RADIUS,
     vx: 0, vy: 0,
@@ -2473,17 +2495,45 @@ const game = {
     moveFrame: 0,        // frames elapsed in current attack
     attackConnected: false, // melee already landed this swing?
   },
-  dummy: {
+  enemy: {
+    // identity / loadout
+    controller: 'ai',
+    ability: sword,         // overwritten on init/respawn with a random pick
+    // physics
     x: 440,
     y: PLAY.GROUND_Y - PLAY.PLAYER_RADIUS,
     vx: 0, vy: 0,
     facing: -1,
     onGround: true,
+    canDoubleJump: true,
+    // state / animation
     state: 'idle',
     stateTimer: 0,
+    flipTime: 0,
     invulnTime: 0,
     hearts: MAX_HEARTS,
-    koTimer: 0,          // counts down while KO'd, then respawns
+    koTimer: 0,            // counts down while KO'd, then respawns
+    // attack / combo
+    attackType: null,
+    comboCount: 0,
+    comboTimer: 0,
+    activeMove: null,
+    moveFrame: 0,
+    attackConnected: false,
+    // charge
+    charging: false,
+    chargeTime: 0,
+    chargedPower: 0,
+    aimAngle: 180,
+    // guard
+    guarding: false,
+    blockFlashTime: 0,
+    // AI brain
+    input: { left: false, right: false, jump: false, guard: false, fastAttack: false, chargeAttack: false },
+    prev:  { jump: false, fastAttack: false, chargeAttack: false },
+    aiCooldown: 0,
+    aiThinkTimer: 0,
+    aiChargeTimer: 0,      // frames remaining the AI will hold Z
   },
   projectiles: [],       // { kind, x, y, vx, vy, life, damage, knockback, owner, ... }
   effects: [],           // transient hit sparks { x, y, life, maxLife, color }
@@ -2634,28 +2684,43 @@ function playerInnerSvg(p) {
 // COMBAT — training dummy, projectiles, hit detection, knockback
 // =========================================================================
 
-// Yellow "Keeby" training dummy. `hit` swaps to dizzy X-eyes.
-function dummyInnerSvg(d) {
-  const hit = d.state === 'hit' || d.koTimer > 0;
-  const body = `
-    <ellipse cx="84" cy="158" rx="17" ry="10" fill="#e8a84a" stroke="#a87020" stroke-width="2.2" transform="rotate(-15 84 158)"/>
-    <ellipse cx="116" cy="158" rx="17" ry="10" fill="#e8a84a" stroke="#a87020" stroke-width="2.2" transform="rotate(15 116 158)"/>
-    <circle cx="100" cy="108" r="42" fill="#ffe16a" stroke="#d6a832" stroke-width="2.5"/>
-    <ellipse cx="110" cy="122" rx="20" ry="26" fill="#f5c842" opacity="0.4"/>
-    <ellipse cx="62" cy="120" rx="11" ry="14" fill="#ffe16a" stroke="#d6a832" stroke-width="2.5" transform="rotate(-20 62 120)"/>
-    <ellipse cx="138" cy="120" rx="11" ry="14" fill="#ffe16a" stroke="#d6a832" stroke-width="2.5" transform="rotate(20 138 120)"/>
-    <ellipse cx="80" cy="119" rx="7" ry="4" fill="#ff9a5a" opacity="0.6"/>
-    <ellipse cx="120" cy="119" rx="7" ry="4" fill="#ff9a5a" opacity="0.6"/>`;
-  const face = hit
-    ? `<path d="M 84 96 L 94 106 M 94 96 L 84 106" stroke="#5a3a1a" stroke-width="2.5" stroke-linecap="round"/>
-       <path d="M 106 96 L 116 106 M 116 96 L 106 106" stroke="#5a3a1a" stroke-width="2.5" stroke-linecap="round"/>
-       <ellipse cx="100" cy="120" rx="5" ry="4" fill="#7a4a1a"/>`
-    : `<ellipse cx="89" cy="100" rx="3.8" ry="9" fill="#3a2a1a"/>
-       <ellipse cx="111" cy="100" rx="3.8" ry="9" fill="#3a2a1a"/>
-       <ellipse cx="89" cy="94.5" rx="2" ry="2.8" fill="#ffffff"/>
-       <ellipse cx="111" cy="94.5" rx="2" ry="2.8" fill="#ffffff"/>
-       <path d="M 96 117 Q 100 120 104 117" fill="none" stroke="#8b5a2b" stroke-width="2" stroke-linecap="round"/>`;
-  return body + face;
+// Recolor a player-style Kirby fragment to the yellow Keeby palette
+// used for the AI enemy. Hats/weapons aren't pink so they pass through.
+const ENEMY_PALETTE = [
+  ['#ffc0d3', '#ffe16a'],  // body fill
+  ['#d96e8a', '#d6a832'],  // body stroke
+  ['#e85a6e', '#e8a84a'],  // feet fill
+  ['#ff9eb5', '#f5c842'],  // body shading
+  ['#ff7a99', '#ff9a5a'],  // blush
+];
+function recolorEnemy(svg) {
+  let out = svg;
+  for (const [from, to] of ENEMY_PALETTE) out = out.split(from).join(to);
+  return out;
+}
+
+// State-aware enemy renderer — same animation system as the player, just
+// recolored. The ability hat is already baked into kirby*For() helpers.
+function enemyInnerSvg(e) {
+  const ab = e.ability;
+  let frag;
+  switch (e.state) {
+    case 'jump': case 'fall':  frag = stripSvg(kirbyJumpFor(ab)); break;
+    case 'flip':               frag = stripSvg(kirbyFlipFor(ab)); break;
+    case 'attack':             frag = stripSvg(ab.attack()); break;
+    case 'hit':                frag = stripSvg(kirbyHitFor(ab)); break;
+    case 'guard':              frag = stripSvg(kirbyGuardFor(ab, e.blockFlashTime > 0)); break;
+    case 'charge':             frag = stripSvg(kirbyChargeFor(ab, e.chargeTime / PLAY.CHARGE_MAX)); break;
+    case 'run': case 'idle':
+    default:                   frag = stripSvg(ab.idle());
+  }
+  return recolorEnemy(frag);
+}
+
+// Pick a fresh random ability for the enemy
+function randomAbility(exclude) {
+  const pool = ABILITIES.filter(a => !exclude || a.key !== exclude.key);
+  return pool[Math.floor(Math.random() * pool.length)];
 }
 
 // Compact projectile sprites (drawn around origin, arena-scale units)
@@ -2703,7 +2768,7 @@ function rectCircleHit(rx, ry, rw, rh, cx, cy, cr) {
   return dx * dx + dy * dy <= cr * cr;
 }
 
-function spawnProjectile(kind, x, y, angleDeg, speed, move) {
+function spawnProjectile(kind, x, y, angleDeg, speed, move, owner) {
   const rad = angleDeg * Math.PI / 180;
   game.projectiles.push({
     kind, x, y,
@@ -2719,6 +2784,7 @@ function spawnProjectile(kind, x, y, angleDeg, speed, move) {
     piercing: !!move.piercing,
     big: !!move.big,
     returning: false,
+    owner: owner || 'player',   // 'player' | 'enemy'
   });
 }
 
@@ -2727,73 +2793,94 @@ function spawnHitEffect(x, y, color) {
 }
 
 // Resolve & launch the move bound to a slot ('neutral' | 'charged')
-function executeMove(p, slot, power) {
-  const move = MOVESETS[p.ability.key][slot];
+// `actor` is the character performing it (player or enemy)
+function executeMove(actor, slot, power) {
+  const move = MOVESETS[actor.ability.key][slot];
   if (!move) return;
-  p.activeMove = move;
-  p.moveFrame = 0;
-  p.attackConnected = false;
+  actor.activeMove = move;
+  actor.moveFrame = 0;
+  actor.attackConnected = false;
   if (move.type === 'projectile') {
-    let angle = (slot === 'charged') ? p.aimAngle : (p.facing > 0 ? 0 : 180);
-    if (move.arc && slot !== 'charged') angle = p.facing > 0 ? -38 : -142; // default lob
+    let angle = (slot === 'charged') ? actor.aimAngle : (actor.facing > 0 ? 0 : 180);
+    if (move.arc && slot !== 'charged') angle = actor.facing > 0 ? -38 : -142; // default lob
     const speed = move.speed * (slot === 'charged' ? (0.7 + 0.6 * power) : 1);
-    spawnProjectile(move.proj, p.x + p.facing * 16, p.y - 4, angle, speed, move);
+    const owner = (actor === game.player) ? 'player' : 'enemy';
+    spawnProjectile(move.proj, actor.x + actor.facing * 16, actor.y - 4, angle, speed, move, owner);
   }
 }
 
-function applyDamageToDummy(dmg, kbx, kby) {
-  const d = game.dummy;
-  if (d.koTimer > 0 || d.invulnTime > 0) return;
-  d.hearts = Math.max(0, d.hearts - dmg);
-  d.vx = kbx; d.vy = kby;
-  d.onGround = false;
-  d.state = 'hit';
-  d.stateTimer = 18;
-  d.invulnTime = PLAY.DUMMY_INVULN;
-  spawnHitEffect(d.x, d.y - 6, game.player.ability.accent);
-  const hud = players.find(pl => pl.id === 2);
+// Apply damage + knockback to any character (player or enemy)
+function applyDamage(target, dmg, kbx, kby, attackerAccent) {
+  if (target.koTimer > 0 || target.invulnTime > 0) return;
+  // Guard blocks all damage (player only — enemy AI doesn't shield yet)
+  if (target.guarding) {
+    target.blockFlashTime = 12;
+    target.invulnTime = PLAY.GUARD_INVULN;
+    return;
+  }
+  target.hearts = Math.max(0, target.hearts - dmg);
+  target.vx = kbx; target.vy = kby;
+  target.onGround = false;
+  target.state = 'hit';
+  target.stateTimer = PLAY.HIT_DUR;
+  target.invulnTime = (target === game.player) ? PLAY.INVULN_DUR : PLAY.ENEMY_INVULN;
+  // cancel any in-progress attack/charge so the hit interrupts
+  target.charging = false; target.chargeTime = 0;
+  target.comboCount = 0; target.comboTimer = 0;
+  target.activeMove = null;
+  spawnHitEffect(target.x, target.y - 6, attackerAccent || '#fff5a0');
+  // HUD sync: player → P1, enemy → P2
+  const hudId = (target === game.player) ? 1 : 2;
+  const hud = players.find(pl => pl.id === hudId);
   if (hud) {
-    hud.hearts = d.hearts;
+    hud.hearts = target.hearts;
     hud.justLost = true;
     updateHud();
     setTimeout(() => { hud.justLost = false; }, 400);
   }
-  if (d.hearts <= 0) d.koTimer = PLAY.DUMMY_RESPAWN;
+  if (target.hearts <= 0) target.koTimer = PLAY.RESPAWN_DUR;
 }
 
 function explodeBomb(proj) {
   spawnHitEffect(proj.x, Math.min(proj.y, PLAY.GROUND_Y - 4), '#ff7a3a');
-  const d = game.dummy;
-  const dx = d.x - proj.x, dy = d.y - proj.y;
+  const target = (proj.owner === 'player') ? game.enemy : game.player;
+  const dx = target.x - proj.x, dy = target.y - proj.y;
   if (dx * dx + dy * dy < 42 * 42) {
     const dir = Math.sign(dx) || 1;
-    applyDamageToDummy(proj.damage, dir * proj.knockback, -proj.knockback * 0.6);
+    applyDamage(target, proj.damage, dir * proj.knockback, -proj.knockback * 0.6, '#ff7a3a');
   }
 }
 
-// Melee active-window hit detection (player attacks dummy)
-function updateCombat() {
-  const p = game.player;
-  const d = game.dummy;
-  if (p.state === 'attack' && p.activeMove && p.activeMove.type === 'melee' && !p.attackConnected) {
-    const m = p.activeMove;
-    const [a0, a1] = m.active || [2, 12];
-    if (p.moveFrame >= a0 && p.moveFrame <= a1) {
-      const hbx = p.x + p.facing * (m.reach / 2);
-      const hby = m.down ? p.y + 18 : p.y - 4;
-      if (rectCircleHit(hbx, hby, m.reach, m.height, d.x, d.y, PLAY.PLAYER_RADIUS)) {
-        const dir = Math.sign(d.x - p.x) || p.facing;
-        applyDamageToDummy(m.damage, dir * m.knockback, m.down ? 2.5 : -m.knockback * 0.55);
-        p.attackConnected = true;
-      }
-    }
+// Melee active-window hit detection — checks both sides each tick.
+// Player's swing can hit the enemy; enemy's swing can hit the player.
+function meleeCheck(attacker, defender) {
+  if (attacker.state !== 'attack' || !attacker.activeMove
+      || attacker.activeMove.type !== 'melee' || attacker.attackConnected) return;
+  const m = attacker.activeMove;
+  const [a0, a1] = m.active || [2, 12];
+  if (attacker.moveFrame < a0 || attacker.moveFrame > a1) return;
+  const hbx = attacker.x + attacker.facing * (m.reach / 2);
+  const hby = m.down ? attacker.y + 18 : attacker.y - 4;
+  if (rectCircleHit(hbx, hby, m.reach, m.height, defender.x, defender.y, PLAY.PLAYER_RADIUS)) {
+    const dir = Math.sign(defender.x - attacker.x) || attacker.facing;
+    applyDamage(defender, m.damage, dir * m.knockback,
+                m.down ? 2.5 : -m.knockback * 0.55,
+                attacker.ability.accent);
+    attacker.attackConnected = true;
   }
-  if (p.state === 'attack') p.moveFrame++;
-  else p.activeMove = null;
+}
+
+function updateCombat() {
+  meleeCheck(game.player, game.enemy);
+  meleeCheck(game.enemy,  game.player);
+  // moveFrame advances while in attack; reset activeMove when leaving attack
+  for (const c of [game.player, game.enemy]) {
+    if (c.state === 'attack') c.moveFrame++;
+    else c.activeMove = null;
+  }
 }
 
 function updateProjectiles() {
-  const d = game.dummy;
   for (const pr of game.projectiles) {
     pr.age++;
     pr.life--;
@@ -2803,9 +2890,11 @@ function updateProjectiles() {
       pr.vx -= Math.sign(pr.vx) * 0.13;
       if (!pr.returning && Math.abs(pr.vx) < 1.0) pr.returning = true;
       if (pr.returning) {
-        const dir = Math.sign(game.player.x - pr.x) || 1;
+        // Boomerang returns to its owner (player or enemy)
+        const home = (pr.owner === 'player') ? game.player : game.enemy;
+        const dir = Math.sign(home.x - pr.x) || 1;
         pr.vx += dir * 0.28;
-        if (pr.age > 24 && Math.abs(pr.x - game.player.x) < 18) pr.life = 0;
+        if (pr.age > 24 && Math.abs(pr.x - home.x) < 18) pr.life = 0;
       }
     }
     pr.x += pr.vx;
@@ -2814,14 +2903,15 @@ function updateProjectiles() {
     if (pr.arc && pr.y >= PLAY.GROUND_Y) { explodeBomb(pr); pr.life = 0; continue; }
     // off-screen cull
     if (pr.x < -30 || pr.x > PLAY.W + 30 || pr.y > PLAY.H + 30) { pr.life = 0; continue; }
-    // dummy collision
-    if (d.koTimer <= 0 && d.invulnTime <= 0) {
-      const dx = d.x - pr.x, dy = d.y - pr.y;
+    // collision check — projectile damages the side it doesn't belong to
+    const target = (pr.owner === 'player') ? game.enemy : game.player;
+    if (target.koTimer <= 0 && target.invulnTime <= 0) {
+      const dx = target.x - pr.x, dy = target.y - pr.y;
       if (dx * dx + dy * dy < (PLAY.PLAYER_RADIUS + 8) * (PLAY.PLAYER_RADIUS + 8)) {
         if (pr.arc) { explodeBomb(pr); pr.life = 0; }
         else {
-          const dir = Math.sign(pr.vx) || game.player.facing;
-          applyDamageToDummy(pr.damage, dir * pr.knockback, -pr.knockback * 0.5);
+          const dir = Math.sign(pr.vx) || (pr.owner === 'player' ? game.player.facing : game.enemy.facing);
+          applyDamage(target, pr.damage, dir * pr.knockback, -pr.knockback * 0.5, '#fff5a0');
           if (!pr.piercing && !pr.boomerang) pr.life = 0;
         }
       }
@@ -2835,32 +2925,216 @@ function updateEffects() {
   game.effects = game.effects.filter(fx => fx.life > 0);
 }
 
-function updateDummy() {
-  const d = game.dummy;
-  if (d.koTimer > 0) {
-    d.koTimer--;
-    d.vy += PLAY.GRAVITY;
-    d.x += d.vx; d.y += d.vy; d.vx *= 0.97;
-    if (d.koTimer === 0) {
-      d.x = 440; d.y = PLAY.GROUND_Y - PLAY.PLAYER_RADIUS;
-      d.vx = 0; d.vy = 0; d.hearts = MAX_HEARTS;
-      d.state = 'idle'; d.invulnTime = 30; d.onGround = true;
-      const hud = players.find(pl => pl.id === 2);
-      if (hud) { hud.hearts = MAX_HEARTS; updateHud(); }
+// ---------- AI brain ----------
+// Populates `enemy.input` each tick. Directional inputs persist between
+// thinks (so the enemy walks every frame, not just on think frames);
+// edge-triggered inputs (jump, attack) only fire on a fresh decision.
+function aiThink(e) {
+  const I = e.input;
+  // edge-triggered inputs must reset each tick so press/release fires once
+  I.jump = false; I.fastAttack = false;
+  // (chargeAttack is held across multiple ticks below)
+
+  if (e.koTimer > 0) {
+    I.left = I.right = I.guard = I.chargeAttack = false;
+    return;
+  }
+  if (e.state === 'hit') return;  // hit-stun freezes existing inputs
+
+  const p = game.player;
+  const dx = p.x - e.x;
+  const dist = Math.abs(dx);
+  const dir = Math.sign(dx) || -1;
+  const move = MOVESETS[e.ability.key].neutral;
+  const isMelee = move.type === 'melee';
+  // Melee gets in close; ranged stops at mid-distance to fire
+  const idealRange = isMelee ? (move.reach || 50) - 12 : 170;
+
+  // Re-evaluate the chase/attack decision periodically (not every frame)
+  if (e.aiThinkTimer > 0) {
+    e.aiThinkTimer--;
+  } else {
+    e.aiThinkTimer = PLAY.AI_THINK_INTERVAL;
+    // clear directional intent on each new decision
+    I.left = I.right = false;
+
+    if (e.aiCooldown > 0) {
+      // post-attack: chase only when too far, otherwise hold ground
+      if (dist > idealRange + 40) {
+        if (dir > 0) I.right = true; else I.left = true;
+      } else if (Math.random() < PLAY.AI_BACKOFF_CHANCE) {
+        if (dir > 0) I.left = true; else I.right = true;
+      }
+    } else if (dist <= idealRange) {
+      // in range → attack
+      e.facing = dir;
+      if (Math.random() < 0.18 && !e.charging && e.aiChargeTimer === 0) {
+        // start a charged attack
+        e.aiChargeTimer = PLAY.AI_CHARGE_HOLD + Math.floor(Math.random() * 24);
+        e.aimAngle = dir > 0 ? 0 : 180;
+      } else {
+        I.fastAttack = true;
+        e.aiCooldown = PLAY.AI_ATTACK_COOLDOWN + Math.floor(Math.random() * 18);
+      }
+    } else {
+      // chase the player
+      if (dir > 0) I.right = true; else I.left = true;
+      if (Math.random() < PLAY.AI_JUMP_CHANCE) I.jump = true;
+    }
+  }
+
+  // Hold-then-release Z for charged attacks
+  if (e.aiChargeTimer > 0) {
+    I.chargeAttack = true;
+    e.aiChargeTimer--;
+    if (e.aiChargeTimer === 0) {
+      I.chargeAttack = false;
+      e.aiCooldown = PLAY.AI_ATTACK_COOLDOWN + 20;
+    }
+  } else {
+    I.chargeAttack = false;
+  }
+
+  if (e.aiCooldown > 0) e.aiCooldown--;
+}
+
+// ---------- Enemy character tick ----------
+// Mirrors tick() for player but driven by AI inputs and without keyboard.
+function tickEnemy() {
+  const e = game.enemy;
+
+  // KO'd: spin off + respawn with a NEW random ability
+  if (e.koTimer > 0) {
+    e.koTimer--;
+    e.vy += PLAY.GRAVITY;
+    e.x += e.vx; e.y += e.vy; e.vx *= 0.97;
+    if (e.koTimer === 0) {
+      e.ability = randomAbility(e.ability);   // fresh ability on respawn
+      e.x = 440; e.y = PLAY.GROUND_Y - PLAY.PLAYER_RADIUS;
+      e.vx = 0; e.vy = 0; e.hearts = MAX_HEARTS;
+      e.state = 'idle'; e.invulnTime = 30; e.onGround = true;
+      e.charging = false; e.chargeTime = 0;
+      e.comboCount = 0; e.comboTimer = 0;
+      e.aiCooldown = 24; e.aiChargeTimer = 0;
+      syncEnemyHud();
     }
     return;
   }
-  d.vy += PLAY.GRAVITY;
-  if (d.vy > 10) d.vy = 10;
-  d.x += d.vx; d.y += d.vy;
-  d.vx *= d.onGround ? 0.82 : 0.98;
+
+  aiThink(e);
+
+  const I = e.input;
+  const jumpPressed   = I.jump         && !e.prev.jump;
+  const fastPressed   = I.fastAttack   && !e.prev.fastAttack;
+  const chargeStart   = I.chargeAttack && !e.prev.chargeAttack;
+  const chargeRelease = !I.chargeAttack && e.prev.chargeAttack;
+  e.prev.jump = I.jump;
+  e.prev.fastAttack = I.fastAttack;
+  e.prev.chargeAttack = I.chargeAttack;
+
+  const inAttack = e.state === 'attack';
+  const inHit    = e.state === 'hit';
+
+  // Charge
+  if (chargeStart && !inHit && !inAttack) {
+    e.charging = true; e.chargeTime = 0; e.state = 'charge';
+  }
+  if (e.charging) {
+    e.chargeTime = Math.min(PLAY.CHARGE_MAX, e.chargeTime + 1);
+    e.vx = 0;
+    e.aimAngle = e.facing > 0 ? 0 : 180;
+  }
+  if (chargeRelease && e.charging) {
+    e.chargedPower = e.chargeTime / PLAY.CHARGE_MAX;
+    e.charging = false;
+    e.attackType = 'charged';
+    e.state = 'attack';
+    e.stateTimer = PLAY.CHARGE_DUR;
+    e.chargeTime = 0;
+    executeMove(e, 'charged', e.chargedPower);
+  }
+
+  // Fast attack (no combo chaining for AI — keeps it readable)
+  if (fastPressed && !inHit && !e.charging) {
+    e.comboCount = 1;
+    e.attackType = 'fast';
+    e.state = 'attack';
+    e.stateTimer = PLAY.COMBO_DUR[1];
+    e.comboTimer = e.stateTimer + PLAY.COMBO_WINDOW;
+    if (e.onGround) e.vx = 0;
+    executeMove(e, 'neutral', 0);
+  }
+  if (e.comboTimer > 0) e.comboTimer--;
+
+  // Movement & jump
+  const canMove = !e.charging && !inAttack && !inHit;
+  if (canMove) {
+    let dx = 0;
+    if (I.left)  dx -= 1;
+    if (I.right) dx += 1;
+    e.vx = dx * PLAY.MOVE_SPEED;
+    if (dx !== 0) e.facing = dx;
+
+    if (jumpPressed) {
+      if (e.onGround) {
+        e.vy = PLAY.JUMP_VY;
+        e.onGround = false;
+      } else if (e.canDoubleJump) {
+        e.vy = PLAY.DOUBLE_JUMP_VY;
+        e.canDoubleJump = false;
+        e.flipTime = PLAY.FLIP_DUR;
+      }
+    }
+  }
+
+  // Physics
+  e.vy += PLAY.GRAVITY;
+  if (e.vy > 10) e.vy = 10;
+  e.x += e.vx;
+  e.y += e.vy;
+
   const groundY = PLAY.GROUND_Y - PLAY.PLAYER_RADIUS;
-  if (d.y >= groundY) { d.y = groundY; d.vy = 0; d.onGround = true; }
-  else d.onGround = false;
-  d.x = Math.max(PLAY.PLAYER_RADIUS, Math.min(PLAY.W - PLAY.PLAYER_RADIUS, d.x));
-  if (d.stateTimer > 0) { d.stateTimer--; if (d.stateTimer === 0 && d.state === 'hit') d.state = 'idle'; }
-  if (d.invulnTime > 0) d.invulnTime--;
-  if (Math.abs(d.vx) < 0.2) d.facing = (game.player.x > d.x) ? 1 : -1;
+  if (e.y >= groundY) {
+    e.y = groundY; e.vy = 0;
+    if (!e.onGround) e.canDoubleJump = true;
+    e.onGround = true;
+    e.flipTime = 0;
+  } else {
+    e.onGround = false;
+  }
+  if (e.x < PLAY.PLAYER_RADIUS) { e.x = PLAY.PLAYER_RADIUS; e.vx = 0; }
+  if (e.x > PLAY.W - PLAY.PLAYER_RADIUS) { e.x = PLAY.W - PLAY.PLAYER_RADIUS; e.vx = 0; }
+
+  // Timers
+  if (e.stateTimer > 0) e.stateTimer--;
+  if (e.flipTime > 0) e.flipTime--;
+  if (e.invulnTime > 0) e.invulnTime--;
+
+  if (e.stateTimer === 0 && (e.state === 'attack' || e.state === 'hit')) {
+    e.state = 'idle';
+    e.attackType = null;
+  }
+  const locked = (e.state === 'attack' || e.state === 'hit' || e.state === 'charge');
+  if (!locked) {
+    if (!e.onGround) {
+      if (e.flipTime > 0) e.state = 'flip';
+      else if (e.vy < 0)  e.state = 'jump';
+      else                e.state = 'fall';
+    } else if (Math.abs(e.vx) > 0.1) {
+      e.state = 'run';
+    } else {
+      e.state = 'idle';
+    }
+  }
+}
+
+// HUD slot 2 reflects the enemy's current ability (label + hearts)
+function syncEnemyHud() {
+  const hud = players.find(pl => pl.id === 2);
+  if (!hud) return;
+  hud.ability = game.enemy.ability;
+  hud.hearts = game.enemy.hearts;
+  updateHud();
 }
 
 function heartIcon(x, y, filled) {
@@ -2914,6 +3188,26 @@ window.addEventListener('keyup', (e) => {
 function tick() {
   const p = game.player;
   const I = game.input;
+
+  // Player KO: spin out + respawn at the player spawn after RESPAWN_DUR
+  if (p.koTimer > 0) {
+    p.koTimer--;
+    p.vy += PLAY.GRAVITY;
+    p.x += p.vx; p.y += p.vy; p.vx *= 0.97;
+    if (p.koTimer === 0) {
+      p.x = 200; p.y = PLAY.GROUND_Y - PLAY.PLAYER_RADIUS;
+      p.vx = 0; p.vy = 0;
+      p.hearts = MAX_HEARTS;
+      p.state = 'idle'; p.invulnTime = 40; p.onGround = true;
+      p.charging = false; p.chargeTime = 0;
+      p.comboCount = 0; p.comboTimer = 0;
+      const hud = players.find(pl => pl.id === 1);
+      if (hud) { hud.hearts = MAX_HEARTS; updateHud(); }
+    }
+    // still run downstream combat so projectiles + enemy keep updating
+    updateCombat(); updateProjectiles(); tickEnemy(); updateEffects();
+    return;
+  }
 
   // edge-detect button presses
   const jumpPressed   = I.jump         && !game.prev.jump;
@@ -3019,30 +3313,10 @@ function tick() {
   }
 
   // --- HIT (test damage with H; guard blocks it) ---
-  if (hitPressed && p.invulnTime <= 0 && p.hearts > 0) {
-    if (p.guarding) {
-      // blocked! brief shield flash + tiny stun, no heart loss
-      p.blockFlashTime = 12;
-      p.invulnTime = PLAY.GUARD_INVULN;
-    } else {
-      p.hearts -= 1;
-      p.state = 'hit';
-      p.stateTimer = PLAY.HIT_DUR;
-      p.invulnTime = PLAY.INVULN_DUR;
-      p.vy = -5;
-      p.vx = -p.facing * 4;
-      p.charging = false;
-      p.chargeTime = 0;
-      p.comboCount = 0;
-      p.comboTimer = 0;
-      const hudP1 = players.find(pl => pl.id === 1);
-      if (hudP1) {
-        hudP1.hearts = p.hearts;
-        hudP1.justLost = true;
-        updateHud();
-        setTimeout(() => { hudP1.justLost = false; }, 450);
-      }
-    }
+  // debug self-damage (H key) — routed through the shared damage helper so
+  // it behaves identically to taking a hit from the AI enemy
+  if (hitPressed && p.hearts > 0) {
+    applyDamage(p, 1, -p.facing * 4, -5, '#ff5a7a');
   }
 
   // --- PHYSICS ---
@@ -3095,7 +3369,7 @@ function tick() {
   // combat layer
   updateCombat();
   updateProjectiles();
-  updateDummy();
+  tickEnemy();
   updateEffects();
 }
 
@@ -3117,14 +3391,14 @@ function render() {
   // dummy
   const dEl = document.getElementById('play-dummy');
   if (dEl) {
-    const d = game.dummy;
-    const dRot = d.koTimer > 0 ? (PLAY.DUMMY_RESPAWN - d.koTimer) * 12 : 0;
+    const d = game.enemy;
+    const dRot = d.koTimer > 0 ? (PLAY.RESPAWN_DUR - d.koTimer) * 12 : 0;
     dEl.setAttribute('transform',
       `translate(${d.x}, ${d.y}) scale(${d.facing * PLAY.PLAYER_SCALE}, ${PLAY.PLAYER_SCALE}) rotate(${dRot}) translate(-100,-100)`);
     dEl.style.opacity = (d.invulnTime > 0 && Math.floor(d.invulnTime / 3) % 2 === 0)
       ? 0.5
       : (d.koTimer > 0 ? 0.7 : 1);
-    dEl.innerHTML = dummyInnerSvg(d);
+    dEl.innerHTML = enemyInnerSvg(d);
   }
 
   // projectiles
@@ -3195,7 +3469,7 @@ function renderOverlay(p) {
     out += `<ellipse cx="${p.x}" cy="${PLAY.GROUND_Y + 2}" rx="22" ry="3" fill="#a8d8ee" opacity="0.5"/>`;
   }
   // dummy floating hearts / KO badge
-  const d = game.dummy;
+  const d = game.enemy;
   if (d.koTimer > 0) {
     out += `<text x="${d.x}" y="${Math.max(d.y - 30, 20)}" text-anchor="middle" font-size="11" font-weight="900"
       fill="#ff5a5a" stroke="#7a1818" stroke-width="0.7" font-family="Arial Black, sans-serif">KO!</text>`;
@@ -3248,6 +3522,10 @@ function initPlayArena() {
   overlay.addEventListener('click', activate);
   wrap.addEventListener('focus', activate);
   wrap.addEventListener('blur', deactivate);
+
+  // Enemy spawns with a random copy ability and the HUD slot mirrors it
+  game.enemy.ability = randomAbility();
+  syncEnemyHud();
 
   requestAnimationFrame(gameLoop);
 }
