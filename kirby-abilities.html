@@ -30,9 +30,32 @@
 
   header {
     text-align: center;
-    padding: 32px 20px 8px;
+    padding: 28px 20px 10px;
     background: linear-gradient(180deg, #2b2b40 0%, var(--bg) 100%);
     border-bottom: 1px solid #44445c;
+  }
+
+  /* Brand mark — Not Tim Games logo */
+  .ntg-brand {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 8px;
+  }
+  .ntg-brand a {
+    display: inline-block;
+    text-decoration: none;
+    transition: transform 0.15s;
+  }
+  .ntg-brand a:hover { transform: translateY(-1px) scale(1.02); }
+  .ntg-logo {
+    width: 140px;
+    height: auto;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+  }
+  header.compact-brand h1 { margin-top: 4px; font-size: 1.7rem; }
+  @media (max-width: 480px) {
+    .ntg-logo { width: 110px; }
   }
 
   header h1 {
@@ -725,6 +748,100 @@
     filter: saturate(0.7);
   }
 
+  /* Menu stats + settings */
+  .stats-row {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+    justify-content: center;
+    font-size: 0.8rem;
+    color: #b0b0c0;
+    padding: 10px 0 4px;
+    border-top: 1px solid #3a3a52;
+    width: 100%;
+  }
+  .stats-row strong { color: #ffd54d; font-weight: 800; }
+  .stats-row.stats-empty { color: #9090a8; font-style: italic; border: none; }
+  .overlay-settings {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .overlay-toggle {
+    background: #1a1a2e;
+    border: 1px solid #44445c;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 0.78rem;
+    font-weight: 600;
+    padding: 5px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .overlay-toggle:hover { background: #2b2b40; border-color: #ffd54d; }
+  .overlay-toggle strong { color: #ffd54d; font-weight: 800; }
+  .overlay-toggle.ghost { color: #9090a8; }
+
+  /* Smooth shake — the JS applies the translate, but a transition would
+     fight the per-frame updates, so we keep it instant */
+  .play-arena-wrap { will-change: transform; }
+
+  /* ============ TOUCH CONTROLS (visible only on coarse pointers) ============ */
+  .touch-pad {
+    display: none;
+    pointer-events: none;
+    position: fixed;
+    bottom: 90px;
+    left: 0;
+    right: 0;
+    padding: 0 16px;
+    justify-content: space-between;
+    z-index: 200;
+  }
+  @media (pointer: coarse) {
+    .touch-pad { display: flex; }
+  }
+  .touch-side { display: grid; gap: 8px; pointer-events: auto; }
+  .touch-dpad {
+    grid-template-columns: repeat(3, 56px);
+    grid-template-rows: repeat(3, 56px);
+  }
+  .touch-actions {
+    grid-template-columns: repeat(2, 64px);
+    grid-template-rows: repeat(2, 64px);
+  }
+  .touch-btn {
+    background: rgba(43, 43, 64, 0.85);
+    border: 2px solid #44445c;
+    color: var(--text);
+    border-radius: 10px;
+    font-family: inherit;
+    font-weight: 800;
+    font-size: 0.95rem;
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .touch-btn:active, .touch-btn.pressed {
+    background: #ffd54d;
+    color: #2b2b40;
+    border-color: #ffd54d;
+    transform: translateY(1px);
+  }
+  .touch-btn.dpad-up    { grid-column: 2; grid-row: 1; }
+  .touch-btn.dpad-left  { grid-column: 1; grid-row: 2; }
+  .touch-btn.dpad-down  { grid-column: 2; grid-row: 3; }
+  .touch-btn.dpad-right { grid-column: 3; grid-row: 2; }
+  .touch-btn.dpad-empty { background: transparent; border: 0; }
+  .touch-btn.act-x { background: rgba(214, 49, 49, 0.85); border-color: #7a1818; }
+  .touch-btn.act-z { background: rgba(108, 92, 231, 0.85); border-color: #4a3a9b; }
+
   /* ============ PLAYER HUD (fixed bottom) ============ */
 
   .player-hud {
@@ -905,7 +1022,66 @@
 </style>
 </head>
 <body>
-  <header>
+  <header class="compact-brand">
+    <div class="ntg-brand">
+      <a href="index.html" aria-label="Not Tim Games — back to homepage">
+        <svg class="ntg-logo" viewBox="0 0 320 320" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <!-- shoulder buttons -->
+          <rect x="70" y="30" width="40" height="16" rx="3" fill="#0a0a0a" stroke="#000" stroke-width="2"/>
+          <rect x="210" y="30" width="40" height="16" rx="3" fill="#0a0a0a" stroke="#000" stroke-width="2"/>
+          <!-- main controller body -->
+          <path d="M 60 50 Q 60 38 75 38 L 245 38 Q 260 38 260 50 L 260 120 Q 280 140 260 165 Q 240 195 205 195 L 115 195 Q 80 195 60 165 Q 40 140 60 120 Z"
+            fill="#1a1a1a" stroke="#000" stroke-width="3"/>
+          <!-- center red panel -->
+          <rect x="135" y="60" width="50" height="32" rx="3" fill="#d63131" stroke="#7a1818" stroke-width="2"/>
+          <line x1="160" y1="60" x2="160" y2="92" stroke="#7a1818" stroke-width="2"/>
+          <rect x="140" y="100" width="14" height="4" rx="1" fill="#d63131"/>
+          <rect x="166" y="100" width="14" height="4" rx="1" fill="#d63131"/>
+          <!-- d-pad -->
+          <g transform="translate(95, 80)">
+            <path d="M -24 -8 L -8 -8 L -8 -24 L 8 -24 L 8 -8 L 24 -8 L 24 8 L 8 8 L 8 24 L -8 24 L -8 8 L -24 8 Z"
+              fill="#d63131" stroke="#7a1818" stroke-width="2"/>
+            <rect x="-7" y="-22" width="14" height="44" fill="#1a1a1a"/>
+            <rect x="-22" y="-7" width="44" height="14" fill="#1a1a1a"/>
+            <circle r="3" fill="#d63131"/>
+          </g>
+          <!-- face buttons (Y / X / B / A) -->
+          <g transform="translate(225, 80)" font-family="Arial Black, Impact, sans-serif" font-weight="900">
+            <circle r="28" fill="#d63131" stroke="#7a1818" stroke-width="2"/>
+            <g transform="translate(0, -15)">
+              <circle r="7" fill="#d63131" stroke="#7a1818" stroke-width="1.5"/>
+              <text y="3" text-anchor="middle" font-size="9" fill="#0a0a0a">Y</text>
+            </g>
+            <g transform="translate(-15, 0)">
+              <circle r="7" fill="#d63131" stroke="#7a1818" stroke-width="1.5"/>
+              <text y="3" text-anchor="middle" font-size="9" fill="#0a0a0a">X</text>
+            </g>
+            <g transform="translate(15, 0)">
+              <circle r="7" fill="#d63131" stroke="#7a1818" stroke-width="1.5"/>
+              <text y="3" text-anchor="middle" font-size="9" fill="#0a0a0a">B</text>
+            </g>
+            <g transform="translate(0, 15)">
+              <circle r="7" fill="#d63131" stroke="#7a1818" stroke-width="1.5"/>
+              <text y="3" text-anchor="middle" font-size="9" fill="#0a0a0a">A</text>
+            </g>
+          </g>
+          <!-- analog sticks -->
+          <g transform="translate(125, 150)">
+            <circle r="18" fill="#d63131" stroke="#7a1818" stroke-width="2"/>
+            <circle r="12" fill="#1a1a1a"/>
+          </g>
+          <g transform="translate(195, 150)">
+            <circle r="18" fill="#d63131" stroke="#7a1818" stroke-width="2"/>
+            <circle r="12" fill="#1a1a1a"/>
+          </g>
+          <!-- brand text -->
+          <g font-family="Impact, 'Arial Black', sans-serif" font-weight="900" text-anchor="middle">
+            <text x="160" y="248" font-size="40" fill="#f0f0f5" letter-spacing="3">NOT TIM</text>
+            <text x="160" y="290" font-size="40" fill="#d63131" letter-spacing="3">GAMES</text>
+          </g>
+        </svg>
+      </a>
+    </div>
     <h1>Kirby Brawler</h1>
     <p class="subtitle">A single-page Smash-style fighter. Play live below &mdash; abilities, states, and stage assets are documented further down.</p>
     <p class="hint">Click the arena to focus, then play with the keyboard.</p>
@@ -954,6 +1130,20 @@
   </footer>
 
   <aside class="player-hud" id="player-hud" aria-label="Player health HUD"></aside>
+
+  <!-- Touch controls — only shown on coarse-pointer devices via CSS -->
+  <div class="touch-pad" id="touch-pad" aria-hidden="true">
+    <div class="touch-side touch-dpad">
+      <button class="touch-btn dpad-up"    data-touch="jump"  aria-label="Jump">&#9650;</button>
+      <button class="touch-btn dpad-left"  data-touch="left"  aria-label="Move left">&#9664;</button>
+      <button class="touch-btn dpad-down"  data-touch="guard" aria-label="Guard">&#9660;</button>
+      <button class="touch-btn dpad-right" data-touch="right" aria-label="Move right">&#9654;</button>
+    </div>
+    <div class="touch-side touch-actions">
+      <button class="touch-btn act-x" data-touch="fastAttack"  aria-label="Fast attack">X</button>
+      <button class="touch-btn act-z" data-touch="chargeAttack" aria-label="Charged attack">Z</button>
+    </div>
+  </div>
 
 <script>
 /* =========================================================================
@@ -2494,6 +2684,193 @@ document.addEventListener('click', (e) => {
 updateHud();
 
 // =========================================================================
+// =========================================================================
+// AUDIO — Web Audio synthesized SFX (no external files)
+// =========================================================================
+const sfx = (() => {
+  let ctx = null;
+  let masterGain = null;
+  let enabled = (() => {
+    try { return localStorage.getItem('ntg-sfx') !== '0'; } catch { return true; }
+  })();
+
+  function ensure() {
+    if (ctx) {
+      // Resume if browser suspended it (autoplay rules) — must be called from
+      // within a user-gesture stack
+      if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+      return ctx;
+    }
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      ctx = new AC();
+      masterGain = ctx.createGain();
+      masterGain.gain.value = 0.35;
+      masterGain.connect(ctx.destination);
+    } catch (e) { ctx = null; }
+    return ctx;
+  }
+
+  // Tone with a quick attack + decay envelope
+  function tone({ freq = 440, freqEnd = null, type = 'sine', dur = 0.12, gain = 0.6, attack = 0.005, when = 0 }) {
+    if (!enabled) return;
+    const c = ensure(); if (!c) return;
+    const t0 = c.currentTime + when;
+    const osc = c.createOscillator();
+    const g = c.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, t0);
+    if (freqEnd !== null) osc.frequency.exponentialRampToValueAtTime(Math.max(20, freqEnd), t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(gain, t0 + attack);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    osc.connect(g); g.connect(masterGain);
+    osc.start(t0);
+    osc.stop(t0 + dur + 0.02);
+  }
+
+  // Short noise burst (white-ish) for impacts
+  function noise({ dur = 0.08, gain = 0.4, filter = 1200, when = 0 }) {
+    if (!enabled) return;
+    const c = ensure(); if (!c) return;
+    const t0 = c.currentTime + when;
+    const bufSize = Math.max(1, Math.floor(c.sampleRate * dur));
+    const buf = c.createBuffer(1, bufSize, c.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < bufSize; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / bufSize);
+    const src = c.createBufferSource();
+    src.buffer = buf;
+    const bp = c.createBiquadFilter();
+    bp.type = 'bandpass'; bp.frequency.value = filter; bp.Q.value = 0.8;
+    const g = c.createGain();
+    g.gain.setValueAtTime(gain, t0);
+    g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    src.connect(bp); bp.connect(g); g.connect(masterGain);
+    src.start(t0);
+  }
+
+  return {
+    isEnabled: () => enabled,
+    toggle() {
+      enabled = !enabled;
+      try { localStorage.setItem('ntg-sfx', enabled ? '1' : '0'); } catch {}
+      return enabled;
+    },
+    // ---- effects ----
+    jump()    { tone({ freq: 280, freqEnd: 540, type: 'square', dur: 0.10, gain: 0.18 }); },
+    land()    { noise({ dur: 0.05, gain: 0.18, filter: 700 }); },
+    hitLight() { tone({ freq: 320, freqEnd: 150, type: 'square', dur: 0.08, gain: 0.25 });
+                 noise({ dur: 0.06, gain: 0.18, filter: 900 }); },
+    hitHeavy() { tone({ freq: 180, freqEnd: 70,  type: 'sawtooth', dur: 0.15, gain: 0.32 });
+                 noise({ dur: 0.10, gain: 0.25, filter: 600 }); },
+    block()   { tone({ freq: 820, type: 'sine', dur: 0.10, gain: 0.22 });
+                tone({ freq: 1240, type: 'sine', dur: 0.08, gain: 0.16, when: 0.02 }); },
+    chargeStart() { tone({ freq: 180, freqEnd: 380, type: 'sine', dur: 0.6, gain: 0.16 }); },
+    fire()    { tone({ freq: 700, freqEnd: 220, type: 'sawtooth', dur: 0.16, gain: 0.22 }); },
+    ko()      { tone({ freq: 440, freqEnd: 110, type: 'triangle', dur: 0.5, gain: 0.3 });
+                noise({ dur: 0.25, gain: 0.15, filter: 400, when: 0.05 }); },
+    pickup()  { tone({ freq: 880, freqEnd: 1320, type: 'sine', dur: 0.12, gain: 0.25 });
+                tone({ freq: 1760, type: 'sine', dur: 0.08, gain: 0.18, when: 0.08 }); },
+    banner()  { tone({ freq: 660, type: 'square', dur: 0.08, gain: 0.18 });
+                tone({ freq: 990, type: 'square', dur: 0.08, gain: 0.18, when: 0.09 }); },
+    victory() {
+      // little ascending arpeggio
+      [523, 659, 784, 1047].forEach((f, i) =>
+        tone({ freq: f, type: 'triangle', dur: 0.22, gain: 0.28, when: i * 0.13 }));
+    },
+    gameOver() {
+      [392, 330, 262, 196].forEach((f, i) =>
+        tone({ freq: f, type: 'sawtooth', dur: 0.28, gain: 0.24, when: i * 0.16 }));
+    },
+  };
+})();
+
+// =========================================================================
+// GAME FEEL — screen shake + hit-stop
+// =========================================================================
+const fx = {
+  shakeMag: 0,
+  shakeDecay: 0.85,
+  stopFrames: 0,    // skip this many ticks (hit-stop pause for impact)
+};
+function shake(amount) { fx.shakeMag = Math.max(fx.shakeMag, amount); }
+function hitStop(ms) { fx.stopFrames = Math.max(fx.stopFrames, Math.round(ms / (1000 / 60))); }
+
+// ---------- Heart pickup (drops between gauntlet waves) ----------
+function spawnHeartPickup() {
+  // place at a random x on the ground
+  const x = 120 + Math.floor(Math.random() * 360);
+  game.pickups = game.pickups || [];
+  game.pickups.push({ kind: 'heart', x, y: 230, vy: 0, life: 360, age: 0 });
+}
+function updatePickups() {
+  if (!game.pickups || game.pickups.length === 0) return;
+  for (const p of game.pickups) {
+    p.age++;
+    p.life--;
+    // gentle floating bob
+    p.y = 230 + Math.sin(p.age / 12) * 4;
+    // pickup if player overlaps
+    const dx = game.player.x - p.x;
+    const dy = game.player.y - p.y;
+    if (dx * dx + dy * dy < 28 * 28 && game.player.hearts < MAX_HEARTS) {
+      game.player.hearts = Math.min(MAX_HEARTS, game.player.hearts + 1);
+      const hud = players.find(pl => pl.id === 1);
+      if (hud) { hud.hearts = game.player.hearts; updateHud(); }
+      sfx.pickup();
+      p.life = 0;
+    }
+  }
+  game.pickups = game.pickups.filter(p => p.life > 0);
+}
+function renderPickups() {
+  if (!game.pickups || game.pickups.length === 0) return '';
+  return game.pickups.map(p => {
+    const wobble = Math.sin(p.age / 5) * 2;
+    const fade = p.life < 90 ? p.life / 90 : 1;
+    return `<g transform="translate(${p.x}, ${p.y + wobble})" opacity="${fade}">
+      <circle r="14" fill="#ff5a7a" opacity="0.25"/>
+      <path d="M 0 5 C 0 0 -7 -3 -7 -8 C -7 -13 0 -13 0 -7 C 0 -13 7 -13 7 -8 C 7 -3 0 0 0 5 Z"
+        fill="#ff5a7a" stroke="#a82a4a" stroke-width="1.6"/>
+      <ellipse cx="-3" cy="-7" rx="2" ry="1.5" fill="#ffd5e0" opacity="0.9"/>
+    </g>`;
+  }).join('');
+}
+
+// =========================================================================
+// STATS — persisted via localStorage (best wave, total runs/wins/losses)
+// =========================================================================
+const stats = (() => {
+  const KEY = 'ntg-kirby-stats';
+  let data = { runs: 0, wins: 0, losses: 0, bestWave: 0, freePlayKOs: 0 };
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (raw) Object.assign(data, JSON.parse(raw));
+  } catch {}
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(data)); } catch {}
+  }
+  return {
+    get() { return { ...data }; },
+    recordRun(outcome) {
+      data.runs++;
+      if (outcome === 'win') data.wins++;
+      else if (outcome === 'loss') data.losses++;
+      const reached = (game.gauntlet?.bossDefeated ? 9 : Math.min(game.gauntlet.waveIndex + 1, 9));
+      if (reached > data.bestWave) data.bestWave = reached;
+      save();
+    },
+    incFreePlayKO() { data.freePlayKOs++; save(); },
+    reset() {
+      data = { runs: 0, wins: 0, losses: 0, bestWave: 0, freePlayKOs: 0 };
+      save();
+    },
+  };
+})();
+function recordRun(outcome) { stats.recordRun(outcome); }
+
+// =========================================================================
 // PLAYABLE TEST ARENA — Whispy Woods, physics + input + sprite swapping
 // =========================================================================
 
@@ -2876,6 +3253,7 @@ function buildPlayScene() {
   <g id="play-dummy"></g>
   <g id="play-player"></g>
   <g id="play-projectiles"></g>
+  <g id="play-pickups"></g>
   <g id="play-effects"></g>
   <g id="play-overlay-svg"></g>
 </svg>`;
@@ -3083,6 +3461,10 @@ function executeMove(actor, slot, power) {
     const speed = move.speed * (slot === 'charged' ? (0.7 + 0.6 * power) : 1);
     const owner = (actor === game.player) ? 'player' : 'enemy';
     spawnProjectile(move.proj, actor.x + actor.facing * 16, actor.y - 4, angle, speed, move, owner);
+    sfx.fire();
+  } else {
+    // melee swing — light whoosh
+    sfx.jump();
   }
 }
 
@@ -3093,8 +3475,12 @@ function applyDamage(target, dmg, kbx, kby, attackerAccent) {
   if (target.guarding) {
     target.blockFlashTime = 12;
     target.invulnTime = PLAY.GUARD_INVULN;
+    sfx.block();
     return;
   }
+  // SFX + game-feel: heavy hits get the bigger thud + screen shake + hit-stop
+  if (dmg >= 2) { sfx.hitHeavy(); shake(8); hitStop(80); }
+  else          { sfx.hitLight(); shake(3); }
   target.hearts = Math.max(0, target.hearts - dmg);
   target.vx = kbx; target.vy = kby;
   target.onGround = false;
@@ -3115,7 +3501,11 @@ function applyDamage(target, dmg, kbx, kby, attackerAccent) {
     updateHud();
     setTimeout(() => { hud.justLost = false; }, 400);
   }
-  if (target.hearts <= 0) target.koTimer = PLAY.RESPAWN_DUR;
+  if (target.hearts <= 0) {
+    target.koTimer = PLAY.RESPAWN_DUR;
+    sfx.ko();
+    shake(14);
+  }
 }
 
 function explodeBomb(proj) {
@@ -3294,6 +3684,8 @@ function tickEnemy() {
           game.phase = 'victory';
           game.active = false;
           game.projectiles.length = 0; game.effects.length = 0;
+          recordRun('win');
+          sfx.victory();
           updateOverlay();
         } else {
           // next wave (or boss intro after wave 8)
@@ -3301,6 +3693,7 @@ function tickEnemy() {
         }
       } else {
         // free play: existing random-respawn
+        stats.incFreePlayKO();
         e.ability = randomAbility(e.ability);
         e.x = 440; e.y = PLAY.GROUND_Y - PLAY.PLAYER_RADIUS;
         e.vx = 0; e.vy = 0; e.hearts = MAX_HEARTS;
@@ -3477,6 +3870,7 @@ function startGauntlet(chosenAbility) {
   updateAbilityPickerLock();
   // banner for the first wave
   game.gauntlet.bannerText = `WAVE 1 / 9 — ${game.gauntlet.queue[0].name.toUpperCase()}`;
+  sfx.banner();
   game.active = true;
   hideOverlay();
 }
@@ -3519,6 +3913,11 @@ function advanceGauntletWave() {
     spawnGauntletEnemy(next, false);
     game.gauntlet.bannerText = `WAVE ${game.gauntlet.waveIndex + 1} / 9 — ${next.name.toUpperCase()}`;
     game.gauntlet.bannerTimer = 90;
+  }
+  sfx.banner();
+  // 50/50: drop a heart pickup somewhere on the platform if player isn't full
+  if (game.player.hearts < MAX_HEARTS && Math.random() < 0.55) {
+    spawnHeartPickup();
   }
 }
 
@@ -3612,7 +4011,16 @@ function updateOverlay() {
 
 function renderOverlayContent() {
   switch (game.phase) {
-    case 'menu':
+    case 'menu': {
+      const s = stats.get();
+      const statsHtml = (s.runs > 0)
+        ? `<div class="stats-row">
+            <span><strong>${s.wins}</strong> Wins</span>
+            <span><strong>${s.losses}</strong> Losses</span>
+            <span>Best Wave <strong>${s.bestWave}/9</strong></span>
+            <span><strong>${s.freePlayKOs}</strong> KOs</span>
+          </div>`
+        : `<div class="stats-row stats-empty">No runs yet — pick a mode</div>`;
       return `
         <div class="overlay-card">
           <div class="overlay-title">Choose Mode</div>
@@ -3621,7 +4029,15 @@ function renderOverlayContent() {
             <button class="overlay-btn primary" data-action="gauntlet">Gauntlet</button>
           </div>
           <div class="overlay-sub">Free Play: pick + swap abilities, infinite respawn. Gauntlet: pick once, survive 9 waves.</div>
+          ${statsHtml}
+          <div class="overlay-settings">
+            <button class="overlay-toggle" data-action="toggleSound" aria-pressed="${sfx.isEnabled()}">
+              Sound: <strong>${sfx.isEnabled() ? 'ON' : 'OFF'}</strong>
+            </button>
+            ${s.runs > 0 ? `<button class="overlay-toggle ghost" data-action="resetStats">Reset Stats</button>` : ''}
+          </div>
         </div>`;
+    }
     case 'pickAbility':
       return `
         <div class="overlay-card">
@@ -3728,6 +4144,8 @@ function tick() {
         game.phase = 'gameOver';
         game.active = false;
         game.projectiles.length = 0; game.effects.length = 0;
+        recordRun('loss');
+        sfx.gameOver();
         updateOverlay();
         return;
       }
@@ -3841,10 +4259,12 @@ function tick() {
       if (p.onGround) {
         p.vy = PLAY.JUMP_VY;
         p.onGround = false;
+        sfx.jump();
       } else if (p.canDoubleJump) {
         p.vy = PLAY.DOUBLE_JUMP_VY;
         p.canDoubleJump = false;
         p.flipTime = PLAY.FLIP_DUR;
+        sfx.jump();
       }
     }
   }
@@ -3947,6 +4367,10 @@ function render() {
       return `<g transform="translate(${pr.x}, ${pr.y}) scale(${scale})">${spr}</g>`;
     }).join('');
   }
+
+  // heart pickups (between waves)
+  const puEl = document.getElementById('play-pickups');
+  if (puEl) puEl.innerHTML = renderPickups();
 
   // hit-spark effects
   const fxEl = document.getElementById('play-effects');
@@ -4051,14 +4475,34 @@ function gameLoop(now) {
   if (!lastTickAt) lastTickAt = now;
   let safety = 5;
   while (now - lastTickAt > 1000 / 60 && safety-- > 0) {
-    if (game.active) tick();
+    if (fx.stopFrames > 0) {
+      // hit-stop: skip the tick to emphasize impact (briefly freeze)
+      fx.stopFrames--;
+    } else if (game.active) {
+      tick();
+      updatePickups();
+    }
     // wave banner ticks down regardless of game.active so the intro plays
     // even during the brief pause between waves
     if (game.gauntlet.bannerTimer > 0) game.gauntlet.bannerTimer--;
+    // shake decays each frame whether or not the sim is paused
+    fx.shakeMag *= fx.shakeDecay;
+    if (fx.shakeMag < 0.1) fx.shakeMag = 0;
     lastTickAt += 1000 / 60;
   }
   if (safety <= 0) lastTickAt = now;
   render();
+  // apply shake to the arena wrap via CSS transform (cheap)
+  const wrap = document.getElementById('play-arena-wrap');
+  if (wrap) {
+    if (fx.shakeMag > 0.1) {
+      const dx = (Math.random() - 0.5) * fx.shakeMag;
+      const dy = (Math.random() - 0.5) * fx.shakeMag;
+      wrap.style.transform = `translate(${dx.toFixed(1)}px, ${dy.toFixed(1)}px)`;
+    } else if (wrap.style.transform) {
+      wrap.style.transform = '';
+    }
+  }
   requestAnimationFrame(gameLoop);
 }
 
@@ -4084,6 +4528,8 @@ function initPlayArena() {
       else if (action === 'gauntlet') { game.phase = 'pickAbility'; updateOverlay(); }
       else if (action === 'menu') returnToMenu();
       else if (action === 'resume') { hideOverlay(); game.active = true; }
+      else if (action === 'toggleSound') { sfx.toggle(); updateOverlay(); }
+      else if (action === 'resetStats') { stats.reset(); updateOverlay(); }
       else if (action === 'retry') {
         if (game.mode === 'gauntlet' && game.gauntlet.lockedAbility) {
           startGauntlet(game.gauntlet.lockedAbility);
@@ -4117,6 +4563,31 @@ function initPlayArena() {
           </div>
         </div>`;
     }
+  });
+
+  // Touch controls: each button toggles the matching game.input flag while held
+  document.querySelectorAll('#touch-pad .touch-btn[data-touch]').forEach(btn => {
+    const action = btn.dataset.touch;
+    const press = (e) => {
+      e.preventDefault();
+      if (!game.active) return;
+      // ensure audio context warms up after a user gesture (autoplay rules)
+      try { sfx.jump.bind ? null : null; } catch {}
+      game.input[action] = true;
+      btn.classList.add('pressed');
+    };
+    const release = (e) => {
+      e.preventDefault();
+      game.input[action] = false;
+      btn.classList.remove('pressed');
+    };
+    btn.addEventListener('touchstart', press,   { passive: false });
+    btn.addEventListener('touchend',   release, { passive: false });
+    btn.addEventListener('touchcancel', release,{ passive: false });
+    // also support mouse for desktop testing of the touch pad
+    btn.addEventListener('mousedown', press);
+    btn.addEventListener('mouseup',   release);
+    btn.addEventListener('mouseleave',release);
   });
 
   // Start on the mode-select menu — enemy is a passive placeholder until the
