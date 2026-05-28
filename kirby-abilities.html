@@ -796,6 +796,47 @@
   }
   .stats-row strong { color: #ffd54d; font-weight: 800; }
   .stats-row.stats-empty { color: #9090a8; font-style: italic; border: none; }
+
+  /* Free-play stage picker */
+  .overlay-stage-row {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    padding: 6px 0;
+  }
+  .overlay-stage-label {
+    font-size: 0.78rem;
+    color: var(--muted);
+    margin-right: 6px;
+    font-weight: 600;
+  }
+  .overlay-stage {
+    background: #1a1a2e;
+    border: 2px solid #44445c;
+    border-bottom: 4px solid var(--st-accent, #44445c);
+    color: var(--text);
+    padding: 5px 10px;
+    border-radius: 6px;
+    font-family: inherit;
+    font-weight: 700;
+    font-size: 0.75rem;
+    letter-spacing: 0.03em;
+    cursor: pointer;
+    transition: transform 0.1s, background 0.15s, border-color 0.15s;
+  }
+  .overlay-stage:hover { transform: translateY(-1px); background: #2b2b40; }
+  .overlay-stage.active { border-color: #ffd54d; background: #2b2b40; box-shadow: 0 0 0 2px rgba(255, 213, 77, 0.3); }
+
+  .overlay-hotkeys {
+    font-size: 0.7rem;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+    margin-top: 4px;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    text-transform: uppercase;
+  }
   .overlay-settings {
     display: flex;
     gap: 8px;
@@ -3858,8 +3899,13 @@ function meleeCheck(attacker, defender) {
   const hby = m.down ? attacker.y + 18 : attacker.y - 4;
   if (rectCircleHit(hbx, hby, m.reach, m.height, defender.x, defender.y, PLAY.PLAYER_RADIUS)) {
     const dir = Math.sign(defender.x - attacker.x) || attacker.facing;
-    applyDamage(defender, m.damage, dir * m.knockback,
-                m.down ? 2.5 : -m.knockback * 0.55,
+    // Combo damage bonus — 3rd hit of an X-combo deals +1 damage (the
+    // finisher). Aerial hits get a small knockback boost.
+    const comboBonus = (attacker.attackType === 'fast' && attacker.comboCount === 3) ? 1 : 0;
+    const aerialMult = !attacker.onGround ? 1.15 : 1;
+    applyDamage(defender, m.damage + comboBonus,
+                dir * m.knockback * aerialMult,
+                m.down ? 2.5 : -m.knockback * 0.55 * aerialMult,
                 attacker.ability.accent);
     attacker.attackConnected = true;
   }
@@ -4387,6 +4433,12 @@ function renderOverlayContent() {
             <span><strong>${s.freePlayKOs}</strong> KOs</span>
           </div>`
         : `<div class="stats-row stats-empty">No runs yet — pick a mode</div>`;
+      const stagePicker = `<div class="overlay-stage-row">
+        <span class="overlay-stage-label">Free Play Stage:</span>
+        ${Object.entries(STAGES).map(([k, v]) => `
+          <button class="overlay-stage ${game.stage === k ? 'active' : ''}"
+            data-stage="${k}" style="--st-accent:${v.accent}">${v.name}</button>`).join('')}
+      </div>`;
       return `
         <div class="overlay-card">
           <div class="overlay-title">Choose Mode</div>
@@ -4395,6 +4447,7 @@ function renderOverlayContent() {
             <button class="overlay-btn primary" data-action="gauntlet">Gauntlet</button>
           </div>
           <div class="overlay-sub">Free Play: pick + swap abilities, infinite respawn. Gauntlet: pick once, survive 9 waves.</div>
+          ${stagePicker}
           ${statsHtml}
           <div class="overlay-settings">
             <button class="overlay-toggle" data-action="toggleSound" aria-pressed="${sfx.isEnabled()}">
@@ -4402,6 +4455,7 @@ function renderOverlayContent() {
             </button>
             ${s.runs > 0 ? `<button class="overlay-toggle ghost" data-action="resetStats">Reset Stats</button>` : ''}
           </div>
+          <div class="overlay-hotkeys">P pause · M mute · H take hit</div>
         </div>`;
     }
     case 'pickAbility':
@@ -4483,6 +4537,39 @@ const KEY_MAP = {
 };
 
 window.addEventListener('keydown', (e) => {
+  // Global hotkeys: M = mute toggle, P = pause/resume (work anywhere)
+  if (e.code === 'KeyM') {
+    sfx.toggle();
+    if (game.phase === 'menu') updateOverlay();
+    e.preventDefault();
+    return;
+  }
+  if (e.code === 'KeyP' && game.phase === 'fighting') {
+    if (game.active) {
+      game.active = false;
+      Object.keys(game.input).forEach(k => game.input[k] = false);
+      const ov = document.getElementById('click-to-play');
+      if (ov) {
+        ov.classList.remove('hidden');
+        ov.innerHTML = `
+          <div class="overlay-card">
+            <div class="overlay-title">Paused</div>
+            <div class="overlay-buttons">
+              <button class="overlay-btn primary" data-action="resume">Resume</button>
+              <button class="overlay-btn ghost" data-action="menu">Back to Menu</button>
+            </div>
+            <div class="overlay-hotkeys">Press P to resume · M to mute</div>
+          </div>`;
+      }
+    } else {
+      // Resume
+      const ov = document.getElementById('click-to-play');
+      if (ov) ov.classList.add('hidden');
+      game.active = true;
+    }
+    e.preventDefault();
+    return;
+  }
   if (!game.active) return;
   const action = KEY_MAP[e.code];
   if (action) {
@@ -4888,8 +4975,18 @@ function initPlayArena() {
   const overlay = document.getElementById('click-to-play');
   const wrap = document.getElementById('play-arena-wrap');
 
+  // First-interaction audio warm-up: many browsers suspend AudioContext
+  // until a user gesture. Playing a tiny silent tone here forces it open.
+  let audioWarmedUp = false;
+  function warmUpAudio() {
+    if (audioWarmedUp) return;
+    audioWarmedUp = true;
+    try { sfx.banner(); } catch {}
+  }
+
   // Overlay click handler — dispatch on data-action / data-pick attributes
   overlay.addEventListener('click', (e) => {
+    warmUpAudio();
     const actionBtn = e.target.closest('[data-action]');
     if (actionBtn) {
       e.stopPropagation();
@@ -4908,6 +5005,14 @@ function initPlayArena() {
           updateOverlay();
         }
       }
+      return;
+    }
+    // free-play stage picker
+    const stageBtn = e.target.closest('[data-stage]');
+    if (stageBtn) {
+      e.stopPropagation();
+      setStage(stageBtn.dataset.stage);
+      updateOverlay();
       return;
     }
     const pickBtn = e.target.closest('[data-pick]');
