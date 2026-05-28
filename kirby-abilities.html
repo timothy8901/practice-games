@@ -3816,6 +3816,38 @@ function spawnHitEffect(x, y, color) {
   game.effects.push({ x, y, life: 16, maxLife: 16, color: color || '#fff5a0' });
 }
 
+// Damage popup — floating number that drifts up and fades
+function spawnDamagePopup(x, y, dmg, target) {
+  game.popups = game.popups || [];
+  game.popups.push({
+    x, y: y - 18,
+    vy: -1.2,
+    life: 42, maxLife: 42,
+    text: '-' + dmg,
+    color: target === game.player ? '#ff5a7a' : '#ffd54d',
+  });
+}
+function updateDamagePopups() {
+  if (!game.popups || game.popups.length === 0) return;
+  for (const p of game.popups) {
+    p.y += p.vy;
+    p.vy *= 0.95;
+    p.life--;
+  }
+  game.popups = game.popups.filter(p => p.life > 0);
+}
+function renderDamagePopups() {
+  if (!game.popups || game.popups.length === 0) return '';
+  return game.popups.map(p => {
+    const op = Math.min(1, p.life / 24);
+    const scale = 1 + (1 - p.life / p.maxLife) * 0.3;
+    return `<g transform="translate(${p.x.toFixed(1)}, ${p.y.toFixed(1)}) scale(${scale.toFixed(2)})" opacity="${op.toFixed(2)}">
+      <text text-anchor="middle" font-size="9" font-weight="900" font-family="Impact, Arial Black, sans-serif"
+        fill="${p.color}" stroke="#1a1a2e" stroke-width="1.5" paint-order="stroke">${p.text}</text>
+    </g>`;
+  }).join('');
+}
+
 // Resolve & launch the move bound to a slot ('neutral' | 'charged')
 // `actor` is the character performing it (player or enemy)
 function executeMove(actor, slot, power) {
@@ -3829,7 +3861,17 @@ function executeMove(actor, slot, power) {
     if (move.arc && slot !== 'charged') angle = actor.facing > 0 ? -38 : -142; // default lob
     const speed = move.speed * (slot === 'charged' ? (0.7 + 0.6 * power) : 1);
     const owner = (actor === game.player) ? 'player' : 'enemy';
-    spawnProjectile(move.proj, actor.x + actor.facing * 16, actor.y - 4, angle, speed, move, owner);
+    // Boss phase 2 + charged = three-shot spread (the boss's signature move)
+    const isPhase2Boss = actor.isBoss && actor.hearts <= MAX_HEARTS;
+    if (isPhase2Boss && slot === 'charged') {
+      const offsets = [-18, 0, 18];
+      for (const off of offsets) {
+        spawnProjectile(move.proj, actor.x + actor.facing * 16, actor.y - 4,
+          angle + off, speed, move, owner);
+      }
+    } else {
+      spawnProjectile(move.proj, actor.x + actor.facing * 16, actor.y - 4, angle, speed, move, owner);
+    }
     sfx.fire();
   } else {
     // melee swing — light whoosh
@@ -3850,6 +3892,8 @@ function applyDamage(target, dmg, kbx, kby, attackerAccent) {
   // SFX + game-feel: heavy hits get the bigger thud + screen shake + hit-stop
   if (dmg >= 2) { sfx.hitHeavy(); shake(8); hitStop(80); }
   else          { sfx.hitLight(); shake(3); }
+  // Floating damage number above the target
+  spawnDamagePopup(target.x, target.y, dmg, target);
   target.hearts = Math.max(0, target.hearts - dmg);
   target.vx = kbx; target.vy = kby;
   target.onGround = false;
@@ -3975,6 +4019,14 @@ function aiThink(e) {
   // edge-triggered inputs must reset each tick so press/release fires once
   I.jump = false; I.fastAttack = false;
   // (chargeAttack is held across multiple ticks below)
+  // Guard is held briefly via e.aiGuardTimer
+  if (e.aiGuardTimer > 0) {
+    e.aiGuardTimer--;
+    I.guard = true;
+    return;
+  } else {
+    I.guard = false;
+  }
 
   if (e.koTimer > 0) {
     I.left = I.right = I.guard = I.chargeAttack = false;
@@ -3982,7 +4034,21 @@ function aiThink(e) {
   }
   if (e.state === 'hit') return;  // hit-stun freezes existing inputs
 
+  // AI reactively guards when the player is attacking nearby (smart play)
+  // Boss is more reactive than regular enemies.
   const p = game.player;
+  const distToPlayer = Math.abs(p.x - e.x);
+  const playerAttacking = (p.state === 'attack' || p.charging);
+  if (e.onGround && playerAttacking && distToPlayer < 60 && !e.charging && e.state !== 'attack') {
+    const guardChance = e.isBoss ? 0.35 : 0.12;
+    if (Math.random() < guardChance) {
+      e.aiGuardTimer = 14 + Math.floor(Math.random() * 10);
+      I.guard = true;
+      return;
+    }
+  }
+
+  // (p already defined above by the guard check)
   const dx = p.x - e.x;
   const dist = Math.abs(dx);
   const dir = Math.sign(dx) || -1;
@@ -4909,6 +4975,8 @@ function renderOverlay(p) {
       }
     }
   }
+  // damage popup numbers (drawn before confetti so they stay readable)
+  out += renderDamagePopups();
   // victory confetti — drawn before banner so banner sits on top of it
   out += renderConfetti();
   // gauntlet wave banner (drawn last so it sits on top)
@@ -4937,8 +5005,9 @@ function gameLoop(now) {
       tick();
       updatePickups();
     }
-    // confetti keeps falling even when game is paused (so victory celebration plays)
+    // confetti + damage popups keep animating even when game is paused
     updateConfetti();
+    updateDamagePopups();
     // wave banner ticks down regardless of game.active so the intro plays
     // even during the brief pause between waves
     if (game.gauntlet.bannerTimer > 0) game.gauntlet.bannerTimer--;
