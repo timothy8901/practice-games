@@ -837,6 +837,87 @@
     font-family: ui-monospace, "SF Mono", Menlo, monospace;
     text-transform: uppercase;
   }
+
+  /* Run summary (victory / game-over) */
+  .run-summary {
+    display: flex;
+    gap: 18px;
+    justify-content: center;
+    font-size: 0.85rem;
+    color: #b0b0c0;
+    padding: 8px 0 4px;
+  }
+  .run-summary strong { color: #ffd54d; font-weight: 800; }
+  .pb-tag {
+    display: inline-block;
+    background: #6dd64d;
+    color: #1a1a2e;
+    font-weight: 900;
+    font-size: 0.65rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-left: 4px;
+    letter-spacing: 0.06em;
+    animation: pb-pulse 0.9s ease-in-out infinite;
+  }
+  @keyframes pb-pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.08); }
+  }
+
+  /* Per-ability win chips */
+  .ability-wins-row {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    justify-content: center;
+    padding: 4px 0;
+  }
+  .ability-win {
+    background: #1a1a2e;
+    border: 1px solid #3a3a52;
+    border-left: 3px solid var(--ab-accent, #ffd54d);
+    color: #b0b0c0;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.72rem;
+    font-weight: 600;
+  }
+  .ability-win strong { color: #ffd54d; }
+
+  /* Boss intro flash — runs once when boss spawns */
+  .boss-intro-flash {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 50% 50%, rgba(200, 164, 255, 0.7) 0%, transparent 60%);
+    pointer-events: none;
+    animation: boss-flash 1.6s ease-out forwards;
+    z-index: 6;
+  }
+  @keyframes boss-flash {
+    0%   { opacity: 0; transform: scale(0.6); }
+    20%  { opacity: 1; transform: scale(1); }
+    100% { opacity: 0; transform: scale(1.4); }
+  }
+
+  /* Mobile responsive tweaks */
+  @media (max-width: 600px) {
+    .overlay-card { padding: 18px 14px; gap: 10px; }
+    .overlay-title { font-size: 1.3rem; }
+    .overlay-title.victory { font-size: 1.55rem; }
+    .overlay-title.gameover { font-size: 1.4rem; }
+    .overlay-buttons { gap: 8px; }
+    .overlay-btn { padding: 8px 16px; font-size: 0.85rem; }
+    .stats-row, .run-summary { gap: 10px; font-size: 0.72rem; }
+    .overlay-stage { font-size: 0.7rem; padding: 4px 8px; }
+    .keybinds { font-size: 0.7rem; gap: 6px; }
+    kbd { font-size: 0.65rem; padding: 1px 5px; min-width: 14px; }
+    .ability-picker button { font-size: 0.66rem; padding: 4px 8px; }
+    header.compact-brand h1 { font-size: 1.3rem; }
+    header.compact-brand .subtitle { font-size: 0.8rem; }
+    header.compact-brand .hint { font-size: 0.7rem; }
+    .ntg-logo { width: 96px; }
+  }
   .overlay-settings {
     display: flex;
     gap: 8px;
@@ -2976,32 +3057,49 @@ function renderPickups() {
 // =========================================================================
 const stats = (() => {
   const KEY = 'ntg-kirby-stats';
-  let data = { runs: 0, wins: 0, losses: 0, bestWave: 0, freePlayKOs: 0 };
+  let data = {
+    runs: 0, wins: 0, losses: 0, bestWave: 0, freePlayKOs: 0,
+    bestTime: 0,                // best winning run time in ms (0 = none yet)
+    abilityWins: {},            // { sword: 2, hammer: 1, ... }
+  };
   try {
     const raw = localStorage.getItem(KEY);
     if (raw) Object.assign(data, JSON.parse(raw));
+    if (!data.abilityWins) data.abilityWins = {};
   } catch {}
   function save() {
     try { localStorage.setItem(KEY, JSON.stringify(data)); } catch {}
   }
   return {
-    get() { return { ...data }; },
-    recordRun(outcome) {
+    get() { return { ...data, abilityWins: { ...data.abilityWins } }; },
+    recordRun(outcome, runTimeMs, abilityKey) {
       data.runs++;
-      if (outcome === 'win') data.wins++;
-      else if (outcome === 'loss') data.losses++;
+      if (outcome === 'win') {
+        data.wins++;
+        if (abilityKey) data.abilityWins[abilityKey] = (data.abilityWins[abilityKey] || 0) + 1;
+        if (runTimeMs && (!data.bestTime || runTimeMs < data.bestTime)) data.bestTime = runTimeMs;
+      } else if (outcome === 'loss') data.losses++;
       const reached = (game.gauntlet?.bossDefeated ? 9 : Math.min(game.gauntlet.waveIndex + 1, 9));
       if (reached > data.bestWave) data.bestWave = reached;
       save();
     },
     incFreePlayKO() { data.freePlayKOs++; save(); },
     reset() {
-      data = { runs: 0, wins: 0, losses: 0, bestWave: 0, freePlayKOs: 0 };
+      data = { runs: 0, wins: 0, losses: 0, bestWave: 0, freePlayKOs: 0, bestTime: 0, abilityWins: {} };
       save();
     },
   };
 })();
-function recordRun(outcome) { stats.recordRun(outcome); }
+function recordRun(outcome) {
+  const elapsed = game.gauntlet?.startedAt ? (performance.now() - game.gauntlet.startedAt) : 0;
+  const key = game.gauntlet?.lockedAbility?.key;
+  stats.recordRun(outcome, elapsed, key);
+}
+function fmtTime(ms) {
+  if (!ms) return '—';
+  const s = Math.floor(ms / 1000);
+  return `${Math.floor(s/60)}:${(s%60).toString().padStart(2,'0')}`;
+}
 
 // =========================================================================
 // PLAYABLE TEST ARENA — Whispy Woods, physics + input + sprite swapping
@@ -4322,6 +4420,7 @@ function startGauntlet(chosenAbility) {
   game.gauntlet.lockedAbility = chosenAbility;
   game.gauntlet.bannerTimer = 90;
   game.gauntlet.bossDefeated = false;
+  game.gauntlet.startedAt = performance.now();
   // configure player
   game.player.ability = chosenAbility;
   game.player.x = 200; game.player.y = PLAY.GROUND_Y - PLAY.PLAYER_RADIUS;
@@ -4370,6 +4469,14 @@ function spawnGauntletEnemy(ability, isBoss) {
   if (isBoss) {
     const hud = players.find(pl => pl.id === 2);
     if (hud) { hud.hearts = MAX_HEARTS; updateHud(); }
+    // Boss-intro flash: a one-shot pulse over the arena
+    const wrap = document.getElementById('play-arena-wrap')?.parentElement;
+    if (wrap) {
+      const flash = document.createElement('div');
+      flash.className = 'boss-intro-flash';
+      wrap.appendChild(flash);
+      setTimeout(() => flash.remove(), 1700);
+    }
   }
 }
 
@@ -4491,13 +4598,20 @@ function renderOverlayContent() {
   switch (game.phase) {
     case 'menu': {
       const s = stats.get();
+      const winList = Object.entries(s.abilityWins || {})
+        .sort((a, b) => b[1] - a[1])
+        .map(([k, n]) => {
+          const ab = ABILITIES.find(a => a.key === k);
+          return ab ? `<span class="ability-win" style="--ab-accent:${ab.accent}">${ab.name} <strong>×${n}</strong></span>` : '';
+        }).join('');
       const statsHtml = (s.runs > 0)
         ? `<div class="stats-row">
             <span><strong>${s.wins}</strong> Wins</span>
             <span><strong>${s.losses}</strong> Losses</span>
             <span>Best Wave <strong>${s.bestWave}/9</strong></span>
+            <span>Best Time <strong>${fmtTime(s.bestTime)}</strong></span>
             <span><strong>${s.freePlayKOs}</strong> KOs</span>
-          </div>`
+          </div>${winList ? `<div class="ability-wins-row">${winList}</div>` : ''}`
         : `<div class="stats-row stats-empty">No runs yet — pick a mode</div>`;
       const stagePicker = `<div class="overlay-stage-row">
         <span class="overlay-stage-label">Free Play Stage:</span>
@@ -4535,26 +4649,37 @@ function renderOverlayContent() {
             </button>`).join('')}</div>
           <button class="overlay-btn ghost" data-action="menu">Back</button>
         </div>`;
-    case 'victory':
+    case 'victory': {
+      const elapsed = game.gauntlet.startedAt ? (performance.now() - game.gauntlet.startedAt) : 0;
+      const s = stats.get();
+      const isPB = elapsed && (!s.bestTime || elapsed <= s.bestTime);
       return `
         <div class="overlay-card">
           <div class="overlay-title victory">VICTORY!</div>
           <div class="overlay-sub">You cleared all 9 waves with <strong>${game.gauntlet.lockedAbility ? game.gauntlet.lockedAbility.name : '???'}</strong>.</div>
+          <div class="run-summary">
+            <span>Time <strong>${fmtTime(elapsed)}</strong>${isPB ? ' <span class="pb-tag">NEW BEST!</span>' : ''}</span>
+            <span>Best <strong>${fmtTime(s.bestTime)}</strong></span>
+          </div>
           <div class="overlay-buttons">
             <button class="overlay-btn primary" data-action="retry">Run It Back</button>
             <button class="overlay-btn ghost" data-action="menu">Back to Menu</button>
           </div>
         </div>`;
-    case 'gameOver':
+    }
+    case 'gameOver': {
+      const elapsed = game.gauntlet.startedAt ? (performance.now() - game.gauntlet.startedAt) : 0;
+      const ab = game.gauntlet.lockedAbility;
       return `
         <div class="overlay-card">
           <div class="overlay-title gameover">KO!</div>
-          <div class="overlay-sub">You fell on <strong>Wave ${Math.min(game.gauntlet.waveIndex + 1, 9)} / 9</strong>.</div>
+          <div class="overlay-sub">${ab ? `<strong>${ab.name} Kirby</strong> fell on ` : ''}<strong>Wave ${Math.min(game.gauntlet.waveIndex + 1, 9)} / 9</strong>${elapsed ? ` &middot; ${fmtTime(elapsed)}` : ''}.</div>
           <div class="overlay-buttons">
             <button class="overlay-btn primary" data-action="retry">Retry</button>
             <button class="overlay-btn ghost" data-action="menu">Back to Menu</button>
           </div>
         </div>`;
+    }
     default:
       return '';
   }
