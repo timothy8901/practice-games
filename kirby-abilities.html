@@ -3912,6 +3912,41 @@ function spawnProjectile(kind, x, y, angleDeg, speed, move, owner) {
 
 function spawnHitEffect(x, y, color) {
   game.effects.push({ x, y, life: 16, maxLife: 16, color: color || '#fff5a0' });
+  // Also spawn a burst of small particles fanning out
+  const count = 8;
+  for (let i = 0; i < count; i++) {
+    const ang = (Math.PI * 2 * i / count) + Math.random() * 0.6;
+    const speed = 1.5 + Math.random() * 2.5;
+    game.particles = game.particles || [];
+    game.particles.push({
+      x, y,
+      vx: Math.cos(ang) * speed,
+      vy: Math.sin(ang) * speed - 0.4,
+      life: 18 + Math.floor(Math.random() * 10),
+      maxLife: 28,
+      color: color || '#fff5a0',
+      size: 1.5 + Math.random() * 1.5,
+    });
+  }
+}
+function updateParticles() {
+  if (!game.particles || game.particles.length === 0) return;
+  for (const p of game.particles) {
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vy += 0.18; // gravity on sparks
+    p.vx *= 0.94;
+    p.life--;
+  }
+  game.particles = game.particles.filter(p => p.life > 0);
+}
+function renderParticles() {
+  if (!game.particles || game.particles.length === 0) return '';
+  return game.particles.map(p => {
+    const op = Math.min(1, p.life / 14);
+    return `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${p.size.toFixed(1)}"
+      fill="${p.color}" opacity="${op.toFixed(2)}"/>`;
+  }).join('');
 }
 
 // Damage popup — floating number that drifts up and fades
@@ -5100,20 +5135,34 @@ function renderOverlay(p) {
       }
     }
   }
-  // damage popup numbers (drawn before confetti so they stay readable)
+  // particle sparks + damage popup numbers (drawn before confetti)
+  out += renderParticles();
   out += renderDamagePopups();
   // victory confetti — drawn before banner so banner sits on top of it
   out += renderConfetti();
   // gauntlet wave banner (drawn last so it sits on top)
   if (game.mode === 'gauntlet' && game.gauntlet.bannerTimer > 0) {
-    const fade = Math.min(1, game.gauntlet.bannerTimer / 30);
+    const bt = game.gauntlet.bannerTimer;
     const cx = PLAY.W / 2, cy = 70;
-    out += `<g opacity="${fade}">
+    // Top banner — wave info, fades out across the last 30 frames
+    const fade = Math.min(1, bt / 30);
+    out += `<g opacity="${fade.toFixed(2)}">
       <rect x="${cx - 130}" y="${cy - 14}" width="260" height="28" rx="6"
         fill="#1a1a2e" stroke="#ffd54d" stroke-width="1.5" opacity="0.92"/>
       <text x="${cx}" y="${cy + 5}" text-anchor="middle" font-size="11" font-weight="900"
         fill="#ffd54d" font-family="Arial Black, sans-serif" letter-spacing="0.12em">${game.gauntlet.bannerText}</text>
     </g>`;
+    // FIGHT! pop at center-arena during the last ~30 frames of the banner
+    if (bt > 8 && bt <= 38) {
+      const t = 1 - (bt - 8) / 30;     // 0..1 from start of pop to end
+      const scale = 0.6 + t * 0.8;     // grow as it appears
+      const op = bt < 14 ? bt / 14 : 1;
+      out += `<g transform="translate(${PLAY.W/2}, 130) scale(${scale.toFixed(2)})" opacity="${op.toFixed(2)}">
+        <text text-anchor="middle" font-size="48" font-weight="900"
+          fill="#ff5a5a" stroke="#1a1a2e" stroke-width="4" paint-order="stroke"
+          font-family="Impact, Arial Black, sans-serif" letter-spacing="0.06em">FIGHT!</text>
+      </g>`;
+    }
   }
   return out;
 }
@@ -5130,9 +5179,10 @@ function gameLoop(now) {
       tick();
       updatePickups();
     }
-    // confetti + damage popups keep animating even when game is paused
+    // confetti + damage popups + particles keep animating even when paused
     updateConfetti();
     updateDamagePopups();
+    updateParticles();
     // wave banner ticks down regardless of game.active so the intro plays
     // even during the brief pause between waves
     if (game.gauntlet.bannerTimer > 0) game.gauntlet.bannerTimer--;
