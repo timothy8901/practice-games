@@ -8,9 +8,10 @@ This workspace contains small browser games (HTML/JS) used for practice.
   8 copy abilities, gauntlet mode, all inline-SVG art.
 - **Kirby Brawler 2: Rumble Arena** (`kirby-rumble.html`) — top-down 3D
   sequel on one circular arena. Chunky low-poly toy fighters (Three.js),
-  the same 8 abilities — each with **two attacks** (`X` / `Z`) and a
-  **shield** (`Shift`/`C`) — against a CPU Kirby with a random ability.
-  Move with WASD/arrows, `P` pause, `M` mute.
+  the same 8 abilities — each with **two attacks** (`H` / `J`, or `X` / `Z`)
+  and a **shield** (`K`, or `Shift`/`C`) — against a CPU Kirby with a
+  random ability. Move with WASD/arrows, **`Space` jump-dodges** over
+  swings and projectiles, `P` pause, `M` mute.
 
 Both are single self-contained HTML pages (the sequel pulls Three.js from
 a CDN). The homepage `index.html` links to every game in the repo.

@@ -223,9 +223,10 @@
 
     <div class="keybar">
       <span><kbd>W A S D</kbd>/<kbd>&larr;&uarr;&darr;&rarr;</kbd> Move</span>
-      <span><kbd>X</kbd> Attack</span>
-      <span><kbd>Z</kbd> Special</span>
-      <span><kbd>Shift</kbd>/<kbd>C</kbd> Shield (hold)</span>
+      <span><kbd>Space</kbd> Jump (dodge)</span>
+      <span><kbd>H</kbd>/<kbd>X</kbd> Attack</span>
+      <span><kbd>J</kbd>/<kbd>Z</kbd> Special</span>
+      <span><kbd>K</kbd>/<kbd>Shift</kbd> Shield (hold)</span>
       <span><kbd>P</kbd> Pause</span>
       <span><kbd>M</kbd> Mute</span>
     </div>
@@ -285,6 +286,7 @@ const sfx = (() => {
     isEnabled: () => enabled,
     toggle() { enabled = !enabled; try { localStorage.setItem('ntg-sfx', enabled?'1':'0'); } catch{} return enabled; },
     swing()  { tone({ freq: 300, freqEnd: 580, type:'square', dur:0.08, gain:0.14 }); },
+    jump()   { tone({ freq: 250, freqEnd: 530, type:'square', dur:0.12, gain:0.16 }); },
     shoot()  { tone({ freq: 720, freqEnd: 240, type:'sawtooth', dur:0.13, gain:0.2 }); },
     hit()    { tone({ freq: 330, freqEnd: 150, type:'square', dur:0.08, gain:0.24 }); noise({ dur:0.05, gain:0.16, filter:900 }); },
     heavy()  { tone({ freq: 170, freqEnd: 65, type:'sawtooth', dur:0.16, gain:0.3 }); noise({ dur:0.1, gain:0.24, filter:550 }); },
@@ -585,6 +587,7 @@ function makeFighter(isPlayer, abilityKey) {
     hp: MAX_HP,
     facing: isPlayer ? 0 : Math.PI,    // player faces +Z(away cam start ok), cpu faces player
     vx: 0, vz: 0, kvx: 0, kvz: 0,
+    airY: 0, airVy: 0,                 // jump height + vertical velocity
     state: 'idle',                     // idle | attack | hit | ko
     attack: null,                      // { slot, def, t, didHit, spawned }
     cd: { a1: 0, a2: 0 },
@@ -621,8 +624,8 @@ const game = {
   hitStop: 0,
   over: false,
   result: null,           // 'win' | 'lose'
-  input: { up:false, down:false, left:false, right:false, a1:false, a2:false, shield:false },
-  prev: { a1:false, a2:false },
+  input: { up:false, down:false, left:false, right:false, a1:false, a2:false, shield:false, jump:false },
+  prev: { a1:false, a2:false, jump:false },
 };
 window.game = game; // exposed for testing
 
@@ -679,6 +682,8 @@ function meleeResolve(f, def) {
   const dz = target.group.position.z - f.group.position.z;
   const d = Math.hypot(dx, dz);
   if (d > def.range + 0.9) return;
+  // airborne dodge: a hopped target evades grounded swings (air-to-air still trades)
+  if (target.airY > 0.6 && f.airY < 0.4) return;
   if (def.kind === 'melee') {
     const dirA = Math.atan2(dx, dz);
     if (Math.abs(angNorm(dirA - f.group.rotation.y)) > def.arc / 2) return;
@@ -826,6 +831,18 @@ function updateFighter(f, dt, input) {
     f.parts.bubble.scale.setScalar(s);
   }
 
+  // jump (Space / AI dodge) — quick hop; airborne fighters evade
+  // grounded melee swings and projectiles. Explosions still clip you.
+  if (input.jumpPressed && f.state === 'idle' && !f.shield.active && f.airY <= 0) {
+    f.airVy = 9.5;
+    sfx.jump();
+  }
+  if (f.airY > 0 || f.airVy !== 0) {
+    f.airVy -= 26 * dt;
+    f.airY += f.airVy * dt;
+    if (f.airY <= 0) { f.airY = 0; f.airVy = 0; }
+  }
+
   // attacks
   if (f.state === 'idle' && !f.shield.active) {
     if (input.a1Pressed) tryAttack(f, 'a1');
@@ -910,9 +927,10 @@ function updateFighter(f, dt, input) {
     g.position.x *= PLAY_R / r;
     g.position.z *= PLAY_R / r;
   }
-  // keep grounded — except while KO'd or mid ground-pound jump (anim owns y)
+  // vertical: jump height owns y — except while KO'd or mid ground-pound
+  // (those anims drive y directly)
   const pounding = f.attack && f.attack.def.anim === 'pound';
-  if (f.state !== 'ko' && !pounding) g.position.y = 0;
+  if (f.state !== 'ko' && !pounding) g.position.y = f.airY;
 
   // idle/run animation
   const bob = Math.sin(game.time * 3 + (f.isPlayer ? 0 : 2)) * 0.04;
@@ -998,7 +1016,7 @@ function animateAttack(f, A, p) {
 
 // ------------------------------------------------------------------- AI ----
 function aiControl(cpu, dt) {
-  const out = { mx: 0, mz: 0, a1Pressed: false, a2Pressed: false, shield: false };
+  const out = { mx: 0, mz: 0, a1Pressed: false, a2Pressed: false, shield: false, jumpPressed: false };
   const pl = game.player;
   if (!pl || pl.state === 'ko' || cpu.state === 'ko') return out;
 
@@ -1024,6 +1042,10 @@ function aiControl(cpu, dt) {
     }
     // choose strafe direction occasionally
     if (Math.random() < 0.1) ai.strafe = -ai.strafe;
+    // hop to dodge incoming ranged attacks
+    if (pl.state === 'attack' && d > 2.5 && cpu.airY <= 0 && Math.random() < 0.2) {
+      out.jumpPressed = true;
+    }
     // attack decisions
     if (ai.cool <= 0 && d < (ranged ? 8.5 : ideal + 1.2)) {
       // face the player before firing
@@ -1099,6 +1121,7 @@ function updateProjectiles(dt) {
     // fighter collision
     for (const t of [game.player, game.cpu]) {
       if (!t || t === pr.owner || t.state === 'ko' || pr.hitSet.has(t)) continue;
+      if (t.airY > 0.6) continue;   // hopped over the projectile
       const ddx = t.group.position.x - pr.mesh.position.x;
       const ddz = t.group.position.z - pr.mesh.position.z;
       if (Math.hypot(ddx, ddz) < 1.0) {
@@ -1162,7 +1185,10 @@ function updateParticlesAndFx(dt) {
 const KEYMAP = {
   KeyW:'up', ArrowUp:'up', KeyS:'down', ArrowDown:'down',
   KeyA:'left', ArrowLeft:'left', KeyD:'right', ArrowRight:'right',
-  KeyX:'a1', KeyZ:'a2', ShiftLeft:'shield', ShiftRight:'shield', KeyC:'shield',
+  Space:'jump',
+  KeyH:'a1', KeyX:'a1',
+  KeyJ:'a2', KeyZ:'a2',
+  KeyK:'shield', ShiftLeft:'shield', ShiftRight:'shield', KeyC:'shield',
 };
 window.addEventListener('keydown', (e) => {
   if (e.code === 'KeyM') { sfx.toggle(); return; }
@@ -1213,7 +1239,8 @@ function renderOverlay() {
       <div class="overlay-card">
         <div class="overlay-title">Rumble Arena</div>
         <div class="overlay-sub">One circular arena. You vs a CPU Kirby with a random ability.<br>
-          Every ability has <strong>two attacks</strong> (<kbd>X</kbd> + <kbd>Z</kbd>) and a <strong>shield</strong> (<kbd>Shift</kbd>/<kbd>C</kbd>).</div>
+          Every ability has <strong>two attacks</strong> (<kbd>H</kbd> + <kbd>J</kbd>) and a <strong>shield</strong> (<kbd>K</kbd>).<br>
+          <kbd>Space</kbd> hops over swings and projectiles.</div>
         <div class="overlay-buttons">
           <button class="overlay-btn primary" data-act="pick">Choose Your Kirby</button>
         </div>
@@ -1299,6 +1326,7 @@ function startFight(playerAbility) {
     f.group.rotation.set(0, face + (x < 0 ? Math.PI/2 : -Math.PI/2), 0);
     f.state = 'idle'; f.attack = null; f.dash = null;
     f.kvx = f.kvz = f.vx = f.vz = 0;
+    f.airY = 0; f.airVy = 0;
     f.cd.a1 = 0; f.cd.a2 = 0;
     f.shield.active = false; f.shield.stamina = 1; f.shield.broken = 0;
     f.invuln = 1.0; f.flashT = 0; f.redT = 0; f.reflect = 0;
@@ -1346,9 +1374,10 @@ function loop() {
         mz: (I.down ? 1 : 0) - (I.up ? 1 : 0),
         a1Pressed: I.a1 && !game.prev.a1,
         a2Pressed: I.a2 && !game.prev.a2,
+        jumpPressed: I.jump && !game.prev.jump,
         shield: I.shield,
       };
-      game.prev.a1 = I.a1; game.prev.a2 = I.a2;
+      game.prev.a1 = I.a1; game.prev.a2 = I.a2; game.prev.jump = I.jump;
       updateFighter(game.player, dt, pin);
       const cin = aiControl(game.cpu, dt);
       cin.a1Pressed = cin.a1Pressed || false;
