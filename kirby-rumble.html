@@ -589,7 +589,7 @@ function makeFighter(isPlayer, abilityKey) {
     attack: null,                      // { slot, def, t, didHit, spawned }
     cd: { a1: 0, a2: 0 },
     shield: { active: false, stamina: 1, broken: 0 },
-    hitT: 0, invuln: 0, flashT: 0,
+    hitT: 0, invuln: 0, flashT: 0, redT: 0,
     reflect: 0,                        // parasol twirl reflect window
     dash: null,                        // { dx, dz, t, dur, hitSet }
     anim: { run: 0 },
@@ -762,6 +762,7 @@ function applyHit(target, dmg, dirx, dirz, kb, accent) {
   target.state = 'hit'; target.hitT = 0.32;
   target.invuln = 0.55;
   target.flashT = 0.22;
+  target.redT = 0.6;     // red hit-pulse window (spawn invuln stays uncolored)
   if (dmg >= 2) { sfx.heavy(); camShake = Math.max(camShake, 0.4); game.hitStop = Math.max(game.hitStop, 0.07); }
   else { sfx.hit(); camShake = Math.max(camShake, 0.18); }
   spawnParticles(target.group.position.x, 1.2, target.group.position.z, new THREE.Color(accent).getHex(), 9, 5);
@@ -792,6 +793,7 @@ function updateFighter(f, dt, input) {
   if (f.cd.a2 > 0) f.cd.a2 -= dt;
   if (f.invuln > 0) f.invuln -= dt;
   if (f.flashT > 0) f.flashT -= dt;
+  if (f.redT > 0) f.redT -= dt;
   if (f.reflect > 0) f.reflect -= dt;
   if (f.shield.broken > 0) f.shield.broken -= dt;
 
@@ -921,10 +923,16 @@ function updateFighter(f, dt, input) {
   // run lean only while in control — attack anims own rotation.x during swings
   if (f.state === 'idle') f.group.rotation.x = runAmt * 0.1;
 
-  // hit flash
-  f.parts.body.material.emissive = new THREE.Color(f.flashT > 0 ? 0x991122 : 0x000000);
-  // i-frame blink
-  f.group.visible = !(f.invuln > 0 && Math.floor(game.time * 18) % 2 === 0) || f.state === 'ko';
+  // hit reaction: pulse the whole body RED after taking a hit.
+  // Kirby always stays visible — no blink-out. Spawn invuln stays uncolored.
+  const flashing = f.flashT > 0 || (f.redT > 0 && Math.floor(game.time * 14) % 2 === 0);
+  const emis = flashing ? 0xcc2233 : 0x000000;
+  f.parts.body.material.emissive.setHex(emis);
+  f.parts.footL.material.emissive.setHex(emis);
+  f.parts.footR.material.emissive.setHex(emis);
+  f.parts.armL.children[0].material.emissive.setHex(emis);
+  f.parts.armR.children[0].material.emissive.setHex(emis);
+  f.group.visible = true;
 }
 
 function resetPose(f) {
@@ -1293,7 +1301,7 @@ function startFight(playerAbility) {
     f.kvx = f.kvz = f.vx = f.vz = 0;
     f.cd.a1 = 0; f.cd.a2 = 0;
     f.shield.active = false; f.shield.stamina = 1; f.shield.broken = 0;
-    f.invuln = 1.0; f.flashT = 0; f.reflect = 0;
+    f.invuln = 1.0; f.flashT = 0; f.redT = 0; f.reflect = 0;
     f.group.visible = true;
     f.group.position.y = 0;
     resetPose(f);
