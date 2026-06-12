@@ -1,0 +1,4 @@
+.DS_Store
+/node_modules/
+/app/node_modules/ffmpeg-static/ffmpeg
+/models/
