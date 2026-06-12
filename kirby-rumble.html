@@ -147,15 +147,55 @@
   .pick-btn:hover { background: #2b2b40; border-color: var(--accent); transform: translateY(-1px); }
   .pick-moves { display: block; font-size: 0.58rem; color: var(--muted); font-weight: 600; margin-top: 3px; }
 
-  .keybar {
-    display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;
-    color: var(--muted); font-size: 0.76rem; padding: 10px 4px 2px;
-  }
   kbd {
     background: #11111e; border: 1px solid #44445c; border-radius: 4px;
     padding: 1px 6px; font-family: ui-monospace, Menlo, monospace; font-size: 0.7rem;
     color: var(--accent); font-weight: 700;
   }
+
+  /* ---------- controls panel (beneath the gameplay screen) ---------- */
+  .controls-panel {
+    margin-top: 12px;
+    background: var(--card);
+    border: 1px solid #44445c;
+    border-left: 6px solid var(--accent);
+    border-radius: 12px;
+    padding: 12px 16px 14px;
+  }
+  .controls-title {
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 9px;
+  }
+  .controls-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+    gap: 8px;
+  }
+  .ctl {
+    background: #1f1f33;
+    border: 1px solid #3a3a52;
+    border-radius: 8px;
+    padding: 8px 6px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    align-items: center;
+    justify-content: center;
+  }
+  .ctl .keys { display: flex; gap: 3px; align-items: center; flex-wrap: wrap; justify-content: center; }
+  .ctl .keys .or { color: #555570; font-size: 0.62rem; }
+  .ctl label {
+    font-size: 0.7rem;
+    color: var(--text);
+    font-weight: 600;
+    letter-spacing: 0.03em;
+  }
+  .ctl label small { display: block; color: var(--muted); font-weight: 500; font-size: 0.62rem; }
   footer { text-align: center; color: var(--muted); font-size: 0.75rem; padding: 14px; }
   footer a { color: var(--accent); text-decoration: none; }
 </style>
@@ -221,14 +261,38 @@
       <div class="overlay" id="overlay"></div>
     </div>
 
-    <div class="keybar">
-      <span><kbd>W A S D</kbd>/<kbd>&larr;&uarr;&darr;&rarr;</kbd> Move</span>
-      <span><kbd>Space</kbd> Jump (dodge)</span>
-      <span><kbd>H</kbd>/<kbd>X</kbd> Attack</span>
-      <span><kbd>J</kbd>/<kbd>Z</kbd> Special</span>
-      <span><kbd>K</kbd>/<kbd>Shift</kbd> Shield (hold)</span>
-      <span><kbd>P</kbd> Pause</span>
-      <span><kbd>M</kbd> Mute</span>
+    <div class="controls-panel" aria-label="Keyboard controls">
+      <div class="controls-title">Controls</div>
+      <div class="controls-grid">
+        <div class="ctl">
+          <div class="keys"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span class="or">or</span><kbd>&larr;&uarr;&darr;&rarr;</kbd></div>
+          <label>Move</label>
+        </div>
+        <div class="ctl">
+          <div class="keys"><kbd>Space</kbd></div>
+          <label>Jump <small>dodges swings &amp; shots</small></label>
+        </div>
+        <div class="ctl">
+          <div class="keys"><kbd>H</kbd><span class="or">or</span><kbd>X</kbd></div>
+          <label>Attack</label>
+        </div>
+        <div class="ctl">
+          <div class="keys"><kbd>J</kbd><span class="or">or</span><kbd>Z</kbd></div>
+          <label>Special</label>
+        </div>
+        <div class="ctl">
+          <div class="keys"><kbd>K</kbd><span class="or">or</span><kbd>Shift</kbd></div>
+          <label>Shield <small>hold</small></label>
+        </div>
+        <div class="ctl">
+          <div class="keys"><kbd>P</kbd></div>
+          <label>Pause</label>
+        </div>
+        <div class="ctl">
+          <div class="keys"><kbd>M</kbd></div>
+          <label>Mute</label>
+        </div>
+      </div>
     </div>
   </main>
 
