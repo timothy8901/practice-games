@@ -27,4 +27,24 @@ anchors after an update; never rely on byte offsets; never reformat
 
 Repacking invalidates the signature + `ElectronAsarIntegrity` hash in
 Info.plist. For local use: update/disable the asar-integrity fuse and
-ad-hoc re-sign (`codesign --force --deep --sign - Comnyang.app`).
+re-sign. build.sh handles both.
+
+## Signing identity + macOS permissions (TCC)
+
+macOS pins Accessibility / Input Monitoring grants to the app's code-signing
+identity. Ad-hoc signatures (`--sign -`) change identity (cdhash) on every
+rebuild, so the grant goes stale and macOS re-prompts on each launch — the
+System Settings toggle looks ON but points at the old signature.
+
+Fix in place (2026-06-12): a self-signed cert **"Comnyang Local Signing"**
+(login keychain, 10-year, codeSigning EKU, user-domain trusted) signs the
+app; build.sh auto-uses it when present and falls back to ad-hoc. Grants are
+pinned to the cert, so they survive rebuilds.
+
+If permissions ever go stale again (e.g. cert recreated):
+```
+tccutil reset Accessibility app.comnyang.desktop
+tccutil reset ListenEvent app.comnyang.desktop
+tccutil reset PostEvent app.comnyang.desktop
+```
+then relaunch and grant once.

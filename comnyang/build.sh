@@ -62,9 +62,17 @@ if [ -f "$REPO/models/qwen3-1.7b-q4_k_m.gguf" ] && [ ! -f "$RES/models/qwen3-1.7
   cp "$REPO/models/qwen3-1.7b-q4_k_m.gguf" "$RES/models/"
 fi
 
-echo "[build] clearing quarantine + ad-hoc re-signing…"
+echo "[build] clearing quarantine + re-signing…"
 xattr -dr com.apple.quarantine "$APP" 2>/dev/null || true
-codesign --force --deep --sign - "$APP"
+# Prefer the stable local identity: macOS pins TCC grants (Accessibility /
+# Input Monitoring) to the signing cert, so signing with the same cert keeps
+# permissions across rebuilds. Ad-hoc fallback re-prompts after every rebuild.
+SIGN_ID="-"
+if security find-identity -v -p codesigning 2>/dev/null | grep -q "Comnyang Local Signing"; then
+  SIGN_ID="Comnyang Local Signing"
+fi
+echo "[build] signing as: $SIGN_ID"
+codesign --force --deep --sign "$SIGN_ID" "$APP"
 codesign --verify --deep --strict "$APP" && echo "[build] signature verifies."
 
 echo "[build] launching Comnyang…"
