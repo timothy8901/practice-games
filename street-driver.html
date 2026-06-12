@@ -36,14 +36,14 @@
   }
   .hidden { display: none !important; }
 
-  #start { background: linear-gradient(160deg, #1b2a3a 0%, #0e1622 100%); }
+  #start { background: linear-gradient(160deg, #1b2a3a 0%, #0e1622 100%); overflow-y: auto; }
   .title {
     font-size: clamp(2rem, 9vw, 3.6rem);
     font-weight: 900; letter-spacing: -0.02em; margin: 0 0 6px;
     color: #ffe14d;
     text-shadow: 3px 3px 0 #b8480f, 6px 6px 0 rgba(0,0,0,.35);
   }
-  .subtitle { color: #9fb4c8; margin: 0 0 28px; font-size: clamp(.85rem,3.6vw,1.05rem); max-width: 30ch; }
+  .subtitle { color: #9fb4c8; margin: 0 0 24px; font-size: clamp(.85rem,3.6vw,1.05rem); max-width: 30ch; }
   .ziprow { display: flex; gap: 10px; align-items: stretch; flex-wrap: wrap; justify-content: center; }
   #zipInput {
     font-size: 1.6rem; font-weight: 800; letter-spacing: .35em;
@@ -60,10 +60,22 @@
     box-shadow: 0 4px 0 #b8480f; transition: transform .06s, box-shadow .06s;
   }
   .btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #b8480f; }
-  .btn.ghost { background: #2a3b4d; color: #cfe0f0; box-shadow: 0 4px 0 #16222e; }
-  #randomBtn { margin-top: 16px; font-size: .9rem; background:none; border:none; color:#7fa8d0; text-decoration:underline; cursor:pointer; }
-  #zipError { color: #ff8a7a; min-height: 1.4em; margin: 14px 0 0; font-size: .95rem; font-weight: 600; max-width: 32ch; }
-  .hint { color: #6f8499; font-size: .78rem; margin-top: 22px; max-width: 34ch; line-height: 1.5; }
+  #randomBtn { margin-top: 14px; font-size: .9rem; background:none; border:none; color:#7fa8d0; text-decoration:underline; cursor:pointer; }
+  #zipError { color: #ff8a7a; min-height: 1.4em; margin: 12px 0 0; font-size: .95rem; font-weight: 600; max-width: 32ch; }
+  .hint { color: #6f8499; font-size: .78rem; margin-top: 18px; max-width: 34ch; line-height: 1.5; }
+
+  /* ---- car picker (start screen) ---- */
+  .picker-label { color:#7fa8d0; font-size:.74rem; text-transform:uppercase; letter-spacing:.14em; margin: 22px 0 8px; }
+  .carpick { display:flex; gap:12px; justify-content:center; flex-wrap:wrap; }
+  .swatch {
+    width:54px; height:36px; border-radius:7px; cursor:pointer;
+    border:3px solid rgba(255,255,255,.15); position:relative; overflow:hidden;
+    transition: transform .08s, border-color .08s;
+  }
+  .swatch:active { transform: scale(.93); }
+  .swatch.sel { border-color:#ffe14d; }
+  .swatch .roof { position:absolute; left:30%; top:22%; width:40%; height:56%; border-radius:3px; }
+  .swatch .glass { position:absolute; left:34%; top:30%; width:14%; height:40%; background:#bfe8ff; border-radius:1px; }
 
   /* ---- loading ---- */
   #loading { background: #0e1622; gap: 18px; }
@@ -89,15 +101,24 @@
     padding: 7px 12px; font-weight: 700; font-size: .92rem;
     pointer-events: auto;
   }
-  #locLabel { color: #ffe14d; max-width: 56vw; line-height: 1.25; }
+  #locLabel { color: #ffe14d; max-width: 52vw; line-height: 1.25; }
   #speedLabel { color: #8fe08f; font-variant-numeric: tabular-nums; }
-  #newZipBtn {
+  .hud-right { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+  .btn-row { display:flex; gap:8px; }
+  .icon-btn {
     pointer-events: auto; cursor: pointer;
-    font-size: 1.4rem; line-height: 1; font-weight: 900;
+    font-size: 1.25rem; line-height: 1; font-weight: 900;
     width: 44px; height: 44px; border-radius: 10px;
     background: rgba(8,14,22,.62); color: #fff; border: 2px solid rgba(255,255,255,.18);
+    display:flex; align-items:center; justify-content:center;
   }
-  .hud-right { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+  #miniMap {
+    pointer-events:auto;
+    width: 92px; height: 92px;
+    image-rendering: pixelated; image-rendering: crisp-edges;
+    border: 2px solid rgba(255,255,255,.18); border-radius: 8px;
+    background: rgba(8,14,22,.55);
+  }
 
   /* ---- touch controls ---- */
   #controls { position: absolute; inset: 0; z-index: 14; pointer-events: none; }
@@ -123,9 +144,9 @@
   .ctrl.brake { background: rgba(220,70,60,.28); }
   .ctrl.brake.pressed { background: rgba(240,70,60,.8); }
 
-  @media (max-height: 380px) { .ctrl { width: 66px; height: 66px; font-size: 1.6rem; } }
+  @media (max-height: 380px) { .ctrl { width: 66px; height: 66px; font-size: 1.6rem; } #miniMap { width:78px; height:78px; } }
 
-  .credit { position:absolute; bottom:8px; left:50%; transform:translateX(-50%); color:#46586a; font-size:.68rem; pointer-events:none; }
+  .credit { position:absolute; bottom:8px; left:50%; transform:translateX(-50%); color:#46586a; font-size:.68rem; pointer-events:none; z-index:13; }
 </style>
 </head>
 <body>
@@ -136,8 +157,13 @@
   <div id="hud" class="hidden">
     <div id="locLabel" class="hud-pill">Driving…</div>
     <div class="hud-right">
-      <button id="newZipBtn" title="New zip code" aria-label="Enter a new zip code">↻</button>
+      <div class="btn-row">
+        <button id="dayNightBtn" class="icon-btn" title="Toggle day / night" aria-label="Toggle day or night">🌙</button>
+        <button id="muteBtn" class="icon-btn" title="Mute / unmute" aria-label="Mute or unmute sound">🔊</button>
+        <button id="newZipBtn" class="icon-btn" title="New zip code" aria-label="Enter a new zip code">↻</button>
+      </div>
       <div id="speedLabel" class="hud-pill">0 mph</div>
+      <canvas id="miniMap" width="92" height="92" aria-label="Minimap"></canvas>
     </div>
   </div>
 
@@ -164,6 +190,10 @@
     </div>
     <p id="zipError" role="alert"></p>
     <button id="randomBtn">🎲 Surprise me with a random spot</button>
+
+    <p class="picker-label">Pick your ride</p>
+    <div class="carpick" id="carPick"></div>
+
     <p class="hint">Tip: turn your phone landscape. Use the on-screen buttons, or Arrow keys / WASD on a keyboard.</p>
   </div>
 
@@ -181,23 +211,39 @@
 "use strict";
 (function () {
   // ============================================================
-  //  Constants & palette
+  //  Constants & palettes
   // ============================================================
   const RENDER_RADIUS = 800;      // meters fetched from Overpass
-  const VW = 480, VH = 270;       // internal pixel resolution (16:9-ish)
-  const PAL = {
-    grass:    "#3f8a3a",
-    grassDk:  "#367731",
-    asphalt:  "#52555c",
-    asphaltLt:"#5e626a",
-    casing:   "#34363b",
-    marking:  "#e8e4cf",
-    carBody:  "#e23b3b",
-    carBody2: "#2f6fe0",
-    carRoof:  "#1c1c22",
-    carWind:  "#bfe8ff",
-    shadow:   "rgba(0,0,0,0.28)",
+  const VW = 480;                 // base internal pixel width (height derives from aspect)
+
+  // Day / night palettes. `PAL` points at the active one.
+  const PALS = {
+    day: {
+      grass:"#3f8a3a", grassDk:"#367731",
+      asphalt:"#52555c", casing:"#34363b", marking:"#e8e4cf",
+      building:"#b9a98c", buildingCasing:"#6d6253", buildingRoof:"#a89578",
+      miniBg:"#24402a", miniRoad:"#9aa0a8", miniBldg:"#7a6e58", miniCar:"#ffe14d",
+      vignette:0,
+    },
+    night: {
+      grass:"#1f3a24", grassDk:"#1a3020",
+      asphalt:"#2c2f36", casing:"#16181d", marking:"#c9b66b",
+      building:"#2a2740", buildingCasing:"#14121f", buildingRoof:"#34315010",
+      miniBg:"#0e1a12", miniRoad:"#566", miniBldg:"#3a3654", miniCar:"#ffe14d",
+      vignette:0.8,
+    },
   };
+  let mode = "day";
+  let PAL = PALS.day;
+
+  // Car designs (procedural, no assets). body/trim/roof colors.
+  const CAR_DESIGNS = [
+    { name:"Crimson", body:"#e23b3b", trim:"#ff7a7a", roof:"#201013" },
+    { name:"Azure",   body:"#2f6fe0", trim:"#6aa6ff", roof:"#0f1320" },
+    { name:"Lime",    body:"#54c23a", trim:"#9bee78", roof:"#142312" },
+    { name:"Gold",    body:"#f0b429", trim:"#ffd861", roof:"#241a05" },
+  ];
+  let carDesign = CAR_DESIGNS[0];
 
   // Road width (in meters) + whether it gets a dashed center line, per highway class.
   const ROAD_STYLE = {
@@ -230,16 +276,19 @@
   const zipInput = $("zipInput"), zipError = $("zipError");
   const locLabel = $("locLabel"), speedLabel = $("speedLabel");
   const loadingSub = $("loadingSub");
+  const miniMap = $("miniMap"), miniCtx = miniMap.getContext("2d");
 
   // ============================================================
   //  Game state
   // ============================================================
   let state = "start";       // start | loading | game
-  let roads = [];            // [{ pts:[{x,y}], style }]
+  let roads = [];            // [{ pts, style, bbox }]
+  let buildings = [];        // [{ pts, bbox }]
   let bounds = null;
   let car = null;            // { x, y, heading, speed }
-  let lastT = 0, rafId = 0;
+  let lastT = 0;
   let busy = false;          // request debounce
+  let pendingWideZip = null;
 
   const input = { left:false, right:false, gas:false, brake:false };
 
@@ -259,8 +308,6 @@
   //  Canvas sizing (internal low-res buffer, CSS upscales it)
   // ============================================================
   function resize() {
-    // Keep a fixed low internal resolution; CSS stretches to viewport.
-    // We pick internal dims matching the screen aspect to avoid distortion.
     const ar = window.innerWidth / window.innerHeight;
     let w = VW, h = Math.round(VW / ar);
     if (h < 180) { h = 180; w = Math.round(h * ar); }
@@ -272,7 +319,7 @@
   resize();
 
   // ============================================================
-  //  Networking: geocode + roads
+  //  Networking: geocode + map data
   // ============================================================
   async function geocodeZip(zip) {
     const res = await fetch("https://api.zippopotam.us/us/" + encodeURIComponent(zip));
@@ -289,12 +336,16 @@
   }
 
   function overpassQuery(lat, lon, radius) {
+    // Roads + building footprints in one request.
     return `[out:json][timeout:25];
-way["highway"~"motorway|trunk|primary|secondary|tertiary|residential|unclassified|living_street|service"](around:${radius},${lat},${lon});
+(
+  way["highway"~"motorway|trunk|primary|secondary|tertiary|residential|unclassified|living_street|service"](around:${radius},${lat},${lon});
+  way["building"](around:${radius},${lat},${lon});
+);
 out geom;`;
   }
 
-  async function fetchRoads(lat, lon, radius) {
+  async function fetchMapData(lat, lon, radius) {
     const body = "data=" + encodeURIComponent(overpassQuery(lat, lon, radius));
     const endpoints = [
       "https://overpass-api.de/api/interpreter",
@@ -322,6 +373,15 @@ out geom;`;
   // ============================================================
   //  Projection: lat/lon -> local meters (equirectangular)
   // ============================================================
+  function bboxOf(pts) {
+    let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
+    for (const p of pts) {
+      if(p.x<x0)x0=p.x; if(p.x>x1)x1=p.x;
+      if(p.y<y0)y0=p.y; if(p.y>y1)y1=p.y;
+    }
+    return { x0, y0, x1, y1 };
+  }
+
   function buildWorld(elements, lat0, lon0) {
     const cosLat = Math.cos(lat0 * Math.PI / 180);
     const project = (lat, lon) => ({
@@ -329,24 +389,30 @@ out geom;`;
       y: -(lat - lat0) * 110540,   // negate so north is up
     });
 
-    const out = [];
+    roads = []; buildings = [];
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    const swallow = (b) => {
+      if (b.x0 < minX) minX = b.x0; if (b.x1 > maxX) maxX = b.x1;
+      if (b.y0 < minY) minY = b.y0; if (b.y1 > maxY) maxY = b.y1;
+    };
 
     for (const el of elements) {
       if (el.type !== "way" || !el.geometry || el.geometry.length < 2) continue;
-      const cls = el.tags && el.tags.highway;
-      const style = ROAD_STYLE[cls] || ROAD_STYLE._default;
-      const pts = el.geometry.map((g) => {
-        const p = project(g.lat, g.lon);
-        if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
-        if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
-        return p;
-      });
-      out.push({ pts, style });
+      const tags = el.tags || {};
+      const pts = el.geometry.map((g) => project(g.lat, g.lon));
+      const bbox = bboxOf(pts);
+      if (tags.highway) {
+        const style = ROAD_STYLE[tags.highway] || ROAD_STYLE._default;
+        roads.push({ pts, style, bbox });
+        swallow(bbox);
+      } else if (tags.building) {
+        // need at least a triangle to be a footprint
+        if (pts.length >= 3) { buildings.push({ pts, bbox }); swallow(bbox); }
+      }
     }
-    roads = out;
     bounds = { minX, minY, maxX, maxY };
-    return out.length;
+    buildMinimap();
+    return roads.length;
   }
 
   // Snap spawn to nearest road vertex to centroid (0,0), face along that road.
@@ -360,12 +426,11 @@ out geom;`;
       }
     }
     if (!best) { car = { x: 0, y: 0, heading: 0, speed: 0 }; return; }
-    // heading: toward the next point along the road (or previous if at the end)
     const pts = bestRoad.pts;
     const a = pts[bestIdx];
     const b = pts[bestIdx + 1] || pts[bestIdx - 1] || a;
     let heading = Math.atan2(b.y - a.y, b.x - a.x);
-    if (b === pts[bestIdx - 1]) heading += Math.PI; // flip if we used the previous point
+    if (b === pts[bestIdx - 1]) heading += Math.PI;
     car = { x: best.x, y: best.y, heading, speed: 0 };
   }
 
@@ -398,7 +463,7 @@ out geom;`;
 
     let elements;
     try {
-      elements = await fetchRoads(place.lat, place.lon, radius || RENDER_RADIUS);
+      elements = await fetchMapData(place.lat, place.lon, radius || RENDER_RADIUS);
     } catch (e) {
       busy = false; show("start");
       zipError.textContent = "The map server is busy right now. Please try again in a moment.";
@@ -408,12 +473,10 @@ out geom;`;
     const n = buildWorld(elements, place.lat, place.lon);
     if (n === 0) {
       busy = false; show("start");
-      const bigger = (radius || RENDER_RADIUS) < 2000;
-      zipError.textContent = "No roads found near " + place.city + "." +
-        (bigger ? " That area is pretty rural." : "");
-      if (bigger) {
-        // offer a one-tap retry with a larger radius
-        zipError.textContent += " Tap Drive again to search a wider area.";
+      const canGoBigger = (radius || RENDER_RADIUS) < 2000;
+      zipError.textContent = "No roads found near " + place.city + ".";
+      if (canGoBigger) {
+        zipError.textContent += " That area is pretty rural — tap Drive again to search a wider area.";
         pendingWideZip = zip;
       }
       return;
@@ -423,52 +486,51 @@ out geom;`;
     spawnCar();
     locLabel.textContent = "Driving in " + place.city + ", " + place.state;
     busy = false;
+    initAudio();      // user already gestured (Drive/random/Enter)
     show("game");
     lastT = performance.now();
   }
-  let pendingWideZip = null;
 
   // ============================================================
-  //  Physics
+  //  Physics + collisions
   // ============================================================
-  const MAX_SPEED = 95;       // world units (~m) per second forward
-  const MAX_REV = 28;
-  const ACCEL = 70;
-  const BRAKE = 120;
-  const FRICTION = 26;
-  const TURN_RATE = 2.6;      // radians/sec at full effectiveness
+  const MAX_SPEED = 95, MAX_REV = 28;
+  const ACCEL = 70, BRAKE = 120, FRICTION = 26;
+  const TURN_RATE = 2.6;
 
   function updatePhysics(dt) {
     if (!car) return;
 
-    // throttle / brake
-    if (input.gas) {
-      car.speed += ACCEL * dt;
-    } else if (input.brake) {
-      car.speed -= BRAKE * dt;
-    } else {
-      // friction decays toward zero
+    if (input.gas)        car.speed += ACCEL * dt;
+    else if (input.brake) car.speed -= BRAKE * dt;
+    else {
       const f = FRICTION * dt;
       if (car.speed > 0) car.speed = Math.max(0, car.speed - f);
       else if (car.speed < 0) car.speed = Math.min(0, car.speed + f);
     }
     car.speed = Math.max(-MAX_REV, Math.min(MAX_SPEED, car.speed));
 
-    // steering: turn rate scales with speed (no turn at standstill)
     const speedFrac = Math.min(1, Math.abs(car.speed) / 35);
-    const dir = car.speed >= 0 ? 1 : -1; // reverse inverts steering
+    const dir = car.speed >= 0 ? 1 : -1;
     let steer = 0;
     if (input.left) steer -= 1;
     if (input.right) steer += 1;
     car.heading += steer * TURN_RATE * speedFrac * dir * dt;
 
-    // move
-    let vx = Math.cos(car.heading) * car.speed;
-    let vy = Math.sin(car.heading) * car.speed;
+    const vx = Math.cos(car.heading) * car.speed;
+    const vy = Math.sin(car.heading) * car.speed;
     let nx = car.x + vx * dt;
     let ny = car.y + vy * dt;
 
-    // off-road slowdown (slight): if far from any road, sap speed
+    // Building collision: if the new spot is inside a footprint, stop & bounce.
+    if (insideBuilding(nx, ny)) {
+      // try sliding along one axis so we don't fully stick on glancing hits
+      if (!insideBuilding(nx, car.y)) { ny = car.y; }
+      else if (!insideBuilding(car.x, ny)) { nx = car.x; }
+      else { nx = car.x; ny = car.y; car.speed = -car.speed * 0.3; }
+    }
+
+    // Off-road grass drag
     if (Math.abs(car.speed) > 4 && isOffRoad(nx, ny)) {
       const drag = 55 * dt;
       if (car.speed > 0) car.speed = Math.max(0, car.speed - drag);
@@ -477,24 +539,41 @@ out geom;`;
     car.x = nx; car.y = ny;
   }
 
-  // Coarse off-road test: distance to nearest road segment (sampled, cheap).
-  // Only checks roads whose bounding interest is near the car for speed.
+  function insideBuilding(x, y) {
+    for (const b of buildings) {
+      const bb = b.bbox;
+      if (x < bb.x0 || x > bb.x1 || y < bb.y0 || y > bb.y1) continue;
+      if (pointInPoly(x, y, b.pts)) return true;
+    }
+    return false;
+  }
+
+  function pointInPoly(x, y, pts) {
+    let inside = false;
+    for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+      const xi = pts[i].x, yi = pts[i].y, xj = pts[j].x, yj = pts[j].y;
+      const hit = ((yi > y) !== (yj > y)) &&
+                  (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+      if (hit) inside = !inside;
+    }
+    return inside;
+  }
+
   function isOffRoad(x, y) {
     let minDist2 = Infinity;
-    const R = 30; // only consider points within ~30m for the check window
+    const R = 30;
     for (const r of roads) {
       const pts = r.pts;
       for (let i = 0; i < pts.length - 1; i++) {
         const a = pts[i], b = pts[i + 1];
-        // quick reject
         if (Math.abs(a.x - x) > R && Math.abs(b.x - x) > R) continue;
         if (Math.abs(a.y - y) > R && Math.abs(b.y - y) > R) continue;
         const d2 = distToSeg2(x, y, a.x, a.y, b.x, b.y);
         if (d2 < minDist2) minDist2 = d2;
-        if (minDist2 < 64) return false; // within ~8m of road centerline
+        if (minDist2 < 64) return false;
       }
     }
-    return minDist2 > 100; // >10m from any road = off-road
+    return minDist2 > 100;
   }
 
   function distToSeg2(px, py, ax, ay, bx, by) {
@@ -513,87 +592,77 @@ out geom;`;
   // ============================================================
   function render() {
     const W = canvas.width, H = canvas.height;
-    // ground
     ctx.fillStyle = PAL.grass;
     ctx.fillRect(0, 0, W, H);
-    // subtle grass texture (cheap dithered darker patches via static pattern)
     drawGrassTexture(W, H);
 
     if (!car) return;
     const camX = car.x, camY = car.y;
-    const ox = W / 2 - camX, oy = H / 2 - camY; // world -> screen offset
+    const ox = W / 2 - camX, oy = H / 2 - camY;
 
-    // Cull: only draw roads near the viewport.
     const margin = 40;
-    const viewMinX = camX - W/2 - margin, viewMaxX = camX + W/2 + margin;
-    const viewMinY = camY - H/2 - margin, viewMaxY = camY + H/2 + margin;
+    const vMinX = camX - W/2 - margin, vMaxX = camX + W/2 + margin;
+    const vMinY = camY - H/2 - margin, vMaxY = camY + H/2 + margin;
+    const inView = (bb) => !(bb.x1 < vMinX || bb.x0 > vMaxX || bb.y1 < vMinY || bb.y0 > vMaxY);
 
-    const visible = [];
-    for (const r of roads) {
-      // bounding check
-      let bx0=Infinity,by0=Infinity,bx1=-Infinity,by1=-Infinity;
-      for (const p of r.pts) {
-        if(p.x<bx0)bx0=p.x; if(p.x>bx1)bx1=p.x;
-        if(p.y<by0)by0=p.y; if(p.y>by1)by1=p.y;
-      }
-      if (bx1 < viewMinX || bx0 > viewMaxX || by1 < viewMinY || by0 > viewMaxY) continue;
-      visible.push(r);
-    }
+    // roads: casing then asphalt
+    ctx.lineJoin = "round"; ctx.lineCap = "round";
+    const visRoads = roads.filter(r => inView(r.bbox));
+    for (const r of visRoads) strokeRoad(r, ox, oy, r.style.w + 2.5, PAL.casing);
+    for (const r of visRoads) strokeRoad(r, ox, oy, r.style.w, PAL.asphalt);
 
-    ctx.lineJoin = "round";
-    ctx.lineCap = "round";
-
-    // 1) road casing (outline) — draw all roads slightly wider & darker
-    for (const r of visible) {
-      strokeRoad(r, ox, oy, r.style.w + 2.5, PAL.casing);
-    }
-    // 2) asphalt fill
-    for (const r of visible) {
-      strokeRoad(r, ox, oy, r.style.w, PAL.asphalt);
-    }
-    // 3) dashed center lines on larger roads
+    // dashed center lines
     ctx.save();
-    ctx.setLineDash([6, 7]);
-    ctx.strokeStyle = PAL.marking;
-    ctx.lineWidth = 1;
-    for (const r of visible) {
+    ctx.setLineDash([6, 7]); ctx.strokeStyle = PAL.marking; ctx.lineWidth = 1;
+    for (const r of visRoads) {
       if (!r.style.dash) continue;
-      ctx.beginPath();
       const pts = r.pts;
+      ctx.beginPath();
       ctx.moveTo(pts[0].x + ox, pts[0].y + oy);
       for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x + ox, pts[i].y + oy);
       ctx.stroke();
     }
     ctx.restore();
 
-    // 4) car
+    // buildings (footprint fill + casing)
+    for (const b of buildings) {
+      if (!inView(b.bbox)) continue;
+      const pts = b.pts;
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x + ox, pts[0].y + oy);
+      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x + ox, pts[i].y + oy);
+      ctx.closePath();
+      ctx.fillStyle = PAL.building; ctx.fill();
+      ctx.lineWidth = 1; ctx.strokeStyle = PAL.buildingCasing; ctx.stroke();
+    }
+
+    // night lighting (vignette + headlights) under the car
+    if (PAL.vignette > 0) drawNight(W, H);
+
     drawCar(W / 2, H / 2, car.heading);
+
+    drawMinimap();
   }
 
   function strokeRoad(r, ox, oy, width, color) {
     const pts = r.pts;
-    ctx.strokeStyle = color;
-    ctx.lineWidth = width;
+    ctx.strokeStyle = color; ctx.lineWidth = width;
     ctx.beginPath();
     ctx.moveTo(pts[0].x + ox, pts[0].y + oy);
     for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x + ox, pts[i].y + oy);
     ctx.stroke();
   }
 
-  // Sparse darker grass tufts on a fixed world grid, scrolling with the camera
-  // so the ground reads as moving while you drive.
   function drawGrassTexture(W, H) {
     ctx.fillStyle = PAL.grassDk;
     const cam = car || { x: 0, y: 0 };
     const G = 18;
-    // world-space index of the tuft nearest the top-left of the screen
     const startGX = Math.floor((cam.x - W / 2) / G);
     const startGY = Math.floor((cam.y - H / 2) / G);
     const offX = W / 2 - cam.x;
     const offY = H / 2 - cam.y;
     for (let gx = startGX - 1; gx <= startGX + Math.ceil(W / G) + 1; gx++) {
       for (let gy = startGY - 1; gy <= startGY + Math.ceil(H / G) + 1; gy++) {
-        // deterministic pseudo-random selection per world cell
         if ((((gx * 7) ^ (gy * 13)) & 7) === 0) {
           ctx.fillRect(Math.round(gx * G + offX), Math.round(gy * G + offY), 3, 3);
         }
@@ -601,44 +670,168 @@ out geom;`;
     }
   }
 
+  function drawNight(W, H) {
+    // darkening vignette over the whole world
+    ctx.save();
+    const cx = W/2, cy = H/2;
+    const g = ctx.createRadialGradient(cx, cy, 20, cx, cy, Math.max(W, H) * 0.7);
+    g.addColorStop(0, "rgba(6,8,24,0.25)");
+    g.addColorStop(1, "rgba(4,6,18," + PAL.vignette + ")");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+    // headlight beams: two warm cones cast forward from the car
+    ctx.translate(cx, cy);
+    ctx.rotate(car.heading);
+    ctx.globalCompositeOperation = "lighter";
+    for (const sgn of [-1, 1]) {
+      const beam = ctx.createLinearGradient(6, 0, 70, 0);
+      beam.addColorStop(0, "rgba(255,240,200,0.30)");
+      beam.addColorStop(1, "rgba(255,240,200,0)");
+      ctx.fillStyle = beam;
+      ctx.beginPath();
+      ctx.moveTo(6, sgn * 3);
+      ctx.lineTo(72, sgn * 26);
+      ctx.lineTo(72, -sgn * 6);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
   function drawCar(cx, cy, heading) {
     ctx.save();
     ctx.translate(cx, cy);
-    // sprite drawn pointing +x (east); rotate by heading so it faces travel dir
     ctx.rotate(heading);
-    // shadow
-    ctx.fillStyle = PAL.shadow;
-    ctx.fillRect(-7, -4, 16, 9);
-    // body (length along x, width along y)
-    ctx.fillStyle = PAL.carBody;
-    ctx.fillRect(-8, -5, 16, 10);
-    // nose highlight
-    ctx.fillStyle = "#ff6b6b";
-    ctx.fillRect(5, -5, 3, 10);
-    // roof
-    ctx.fillStyle = PAL.carRoof;
-    ctx.fillRect(-4, -4, 8, 8);
-    // windshield (front)
-    ctx.fillStyle = PAL.carWind;
-    ctx.fillRect(2, -3, 2, 6);
-    // rear window
-    ctx.fillStyle = "#7fb8d8";
-    ctx.fillRect(-4, -3, 2, 6);
+    ctx.fillStyle = "rgba(0,0,0,0.28)"; ctx.fillRect(-7, -4, 16, 9);   // shadow
+    ctx.fillStyle = carDesign.body;     ctx.fillRect(-8, -5, 16, 10);  // body
+    ctx.fillStyle = carDesign.trim;     ctx.fillRect(5, -5, 3, 10);    // nose
+    ctx.fillStyle = carDesign.roof;     ctx.fillRect(-4, -4, 8, 8);    // roof
+    ctx.fillStyle = "#bfe8ff";          ctx.fillRect(2, -3, 2, 6);     // windshield
+    ctx.fillStyle = "#7fb8d8";          ctx.fillRect(-4, -3, 2, 6);    // rear window
+    if (PAL.vignette > 0) {                                            // headlamp dots at night
+      ctx.fillStyle = "#fff6d0"; ctx.fillRect(7, -4, 1, 2); ctx.fillRect(7, 2, 1, 2);
+    }
     ctx.restore();
+  }
+
+  // ============================================================
+  //  Minimap
+  // ============================================================
+  let mini = null; // { bg, scale, offX, offY, size }
+  function buildMinimap() {
+    if (!bounds || !isFinite(bounds.minX)) { mini = null; return; }
+    const size = 92, pad = 5;
+    const wW = (bounds.maxX - bounds.minX) || 1;
+    const wH = (bounds.maxY - bounds.minY) || 1;
+    const scale = Math.min((size - 2*pad) / wW, (size - 2*pad) / wH);
+    const offX = (size - wW * scale) / 2 - bounds.minX * scale;
+    const offY = (size - wH * scale) / 2 - bounds.minY * scale;
+    const bg = document.createElement("canvas");
+    bg.width = size; bg.height = size;
+    const g = bg.getContext("2d");
+    g.fillStyle = PAL.miniBg; g.fillRect(0, 0, size, size);
+    // buildings
+    g.fillStyle = PAL.miniBldg;
+    for (const b of buildings) {
+      const pts = b.pts;
+      g.beginPath();
+      g.moveTo(pts[0].x*scale+offX, pts[0].y*scale+offY);
+      for (let i=1;i<pts.length;i++) g.lineTo(pts[i].x*scale+offX, pts[i].y*scale+offY);
+      g.closePath(); g.fill();
+    }
+    // roads
+    g.strokeStyle = PAL.miniRoad; g.lineWidth = 0.7; g.lineCap = "round";
+    for (const r of roads) {
+      const pts = r.pts;
+      g.beginPath();
+      g.moveTo(pts[0].x*scale+offX, pts[0].y*scale+offY);
+      for (let i=1;i<pts.length;i++) g.lineTo(pts[i].x*scale+offX, pts[i].y*scale+offY);
+      g.stroke();
+    }
+    mini = { bg, scale, offX, offY, size };
+  }
+
+  function drawMinimap() {
+    if (!mini || !car) { miniCtx.clearRect(0,0,miniMap.width,miniMap.height); return; }
+    miniCtx.clearRect(0, 0, mini.size, mini.size);
+    miniCtx.drawImage(mini.bg, 0, 0);
+    // car marker (heading triangle)
+    const mx = car.x * mini.scale + mini.offX;
+    const my = car.y * mini.scale + mini.offY;
+    miniCtx.save();
+    miniCtx.translate(mx, my);
+    miniCtx.rotate(car.heading);
+    miniCtx.fillStyle = PAL.miniCar;
+    miniCtx.beginPath();
+    miniCtx.moveTo(5, 0); miniCtx.lineTo(-3, -3.5); miniCtx.lineTo(-3, 3.5);
+    miniCtx.closePath(); miniCtx.fill();
+    miniCtx.restore();
+  }
+
+  // ============================================================
+  //  Audio (WebAudio engine hum + tire screech)
+  // ============================================================
+  const audio = { ctx:null, started:false, muted:false, osc:null, og:null, filt:null, tg:null, master:null };
+  function initAudio() {
+    if (audio.started) { if (audio.ctx.state === "suspended") audio.ctx.resume(); return; }
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    try {
+      const ac = new AC();
+      const master = ac.createGain();
+      master.gain.value = audio.muted ? 0 : 0.9;
+      master.connect(ac.destination);
+
+      // engine: sawtooth through a lowpass, pitch follows speed
+      const osc = ac.createOscillator(); osc.type = "sawtooth"; osc.frequency.value = 55;
+      const filt = ac.createBiquadFilter(); filt.type = "lowpass"; filt.frequency.value = 500;
+      const og = ac.createGain(); og.gain.value = 0.0;
+      osc.connect(filt); filt.connect(og); og.connect(master); osc.start();
+
+      // tires: looped white noise through a bandpass, gated by hard cornering
+      const len = ac.sampleRate * 1;
+      const buf = ac.createBuffer(1, len, ac.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+      const noise = ac.createBufferSource(); noise.buffer = buf; noise.loop = true;
+      const bp = ac.createBiquadFilter(); bp.type = "bandpass"; bp.frequency.value = 1900; bp.Q = 0.7;
+      const tg = ac.createGain(); tg.gain.value = 0;
+      noise.connect(bp); bp.connect(tg); tg.connect(master); noise.start();
+
+      Object.assign(audio, { ctx:ac, started:true, osc, og, filt, tg, master });
+    } catch (e) { /* audio optional */ }
+  }
+
+  function updateAudio() {
+    if (!audio.started || audio.muted || !car) return;
+    const t = audio.ctx.currentTime;
+    const sp = Math.abs(car.speed);
+    audio.osc.frequency.setTargetAtTime(50 + sp * 2.6, t, 0.05);
+    audio.og.gain.setTargetAtTime(0.05 + Math.min(0.13, sp * 0.0032), t, 0.08);
+    audio.filt.frequency.setTargetAtTime(450 + sp * 22, t, 0.08);
+    const turning = (input.left || input.right) ? 1 : 0;
+    const screech = (turning && sp > 42) ? Math.min(0.2, (sp - 42) * 0.006) : 0;
+    audio.tg.gain.setTargetAtTime(screech, t, 0.05);
+  }
+
+  function setMuted(m) {
+    audio.muted = m;
+    $("muteBtn").textContent = m ? "🔇" : "🔊";
+    if (audio.started) audio.master.gain.setTargetAtTime(m ? 0 : 0.9, audio.ctx.currentTime, 0.05);
   }
 
   // ============================================================
   //  Game loop
   // ============================================================
   function loop(t) {
-    rafId = requestAnimationFrame(loop);
+    requestAnimationFrame(loop);
     let dt = (t - lastT) / 1000;
     lastT = t;
-    if (dt > 0.05) dt = 0.05; // clamp big frame gaps
+    if (dt > 0.05) dt = 0.05;
     if (state === "game") {
       updatePhysics(dt);
+      updateAudio();
       render();
-      // HUD speed: convert world m/s to mph (1 m/s = 2.23694 mph), scaled for arcade feel
       const mph = Math.round(Math.abs(car.speed) * 2.0);
       speedLabel.textContent = (car.speed < -1 ? "R " : "") + mph + " mph";
     }
@@ -669,57 +862,78 @@ out geom;`;
   // ============================================================
   document.querySelectorAll(".ctrl").forEach((el) => {
     const key = el.dataset.key;
-    const press = (e) => {
-      e.preventDefault();
-      input[key] = true; el.classList.add("pressed");
-    };
-    const release = (e) => {
-      e.preventDefault();
-      input[key] = false; el.classList.remove("pressed");
-    };
-    el.addEventListener("pointerdown", press);
+    const press = (e) => { e.preventDefault(); input[key] = true; el.classList.add("pressed"); };
+    const release = (e) => { e.preventDefault(); input[key] = false; el.classList.remove("pressed"); };
+    el.addEventListener("pointerdown", (e) => { press(e); try { el.setPointerCapture(e.pointerId); } catch (_) {} });
     el.addEventListener("pointerup", release);
     el.addEventListener("pointercancel", release);
-    el.addEventListener("pointerleave", release);
-    // if a pointer is captured then dragged off, also release on lostpointercapture
     el.addEventListener("lostpointercapture", release);
-    el.addEventListener("pointerdown", (e) => {
-      try { el.setPointerCapture(e.pointerId); } catch (_) {}
-    });
   });
 
   // ============================================================
-  //  Start-screen wiring
+  //  Car picker (start screen)
+  // ============================================================
+  function buildCarPicker() {
+    const wrap = $("carPick");
+    CAR_DESIGNS.forEach((d, i) => {
+      const sw = document.createElement("button");
+      sw.className = "swatch" + (d === carDesign ? " sel" : "");
+      sw.style.background = d.body;
+      sw.title = d.name;
+      sw.setAttribute("aria-label", "Choose " + d.name + " car");
+      const roof = document.createElement("div"); roof.className = "roof"; roof.style.background = d.roof;
+      const glass = document.createElement("div"); glass.className = "glass";
+      sw.appendChild(roof); sw.appendChild(glass);
+      sw.addEventListener("click", () => {
+        carDesign = d;
+        wrap.querySelectorAll(".swatch").forEach(s => s.classList.remove("sel"));
+        sw.classList.add("sel");
+      });
+      wrap.appendChild(sw);
+    });
+  }
+
+  // ============================================================
+  //  Day / night
+  // ============================================================
+  function setMode(m) {
+    mode = m;
+    PAL = PALS[m];
+    $("dayNightBtn").textContent = m === "day" ? "🌙" : "☀️";
+    if (state === "game") canvas.style.background = PAL.grass;
+    buildMinimap(); // recolor minimap for the new palette
+  }
+
+  // ============================================================
+  //  Start-screen / HUD wiring
   // ============================================================
   function handleDrive() {
     const zip = zipInput.value.trim();
-    if (pendingWideZip && zip === pendingWideZip) {
-      startDrive(zip, 2000); // wider radius retry
-    } else {
-      startDrive(zip, RENDER_RADIUS);
-    }
+    initAudio(); // capture the gesture so audio can start
+    if (pendingWideZip && zip === pendingWideZip) startDrive(zip, 2000);
+    else startDrive(zip, RENDER_RADIUS);
   }
   $("driveBtn").addEventListener("click", handleDrive);
   zipInput.addEventListener("keydown", (e) => { if (e.key === "Enter") handleDrive(); });
   zipInput.addEventListener("input", () => {
     zipInput.value = zipInput.value.replace(/\D/g, "").slice(0, 5);
-    zipError.textContent = "";
-    pendingWideZip = null;
+    zipError.textContent = ""; pendingWideZip = null;
   });
   $("randomBtn").addEventListener("click", () => {
-    const z = RANDOM_ZIPS[Math.floor(Math.random() * RANDOM_ZIPS.length)];
-    zipInput.value = z;
+    zipInput.value = RANDOM_ZIPS[Math.floor(Math.random() * RANDOM_ZIPS.length)];
     handleDrive();
   });
   $("newZipBtn").addEventListener("click", () => {
-    // reset inputs and return to start
     for (const k in input) input[k] = false;
     document.querySelectorAll(".ctrl").forEach(el => el.classList.remove("pressed"));
-    show("start");
-    zipInput.focus();
+    show("start"); zipInput.focus();
   });
+  $("muteBtn").addEventListener("click", () => setMuted(!audio.muted));
+  $("dayNightBtn").addEventListener("click", () => setMode(mode === "day" ? "night" : "day"));
 
   // boot
+  buildCarPicker();
+  setMode("day");
   show("start");
 })();
 </script>
