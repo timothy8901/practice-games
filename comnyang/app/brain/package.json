@@ -1,0 +1,17 @@
+{
+  "name": "comnyang-brain",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Pluggable local/cloud 'brain' prototype for the Comnyang desktop cat. Standalone — does not modify the app.",
+  "type": "commonjs",
+  "main": "src/brain-controller.js",
+  "scripts": {
+    "demo": "node test/harness.js --backend mock",
+    "demo:local": "node test/harness.js --backend local --model ./models/model.gguf",
+    "demo:claude": "node test/harness.js --backend claude"
+  },
+  "optionalDependencies": {
+    "node-llama-cpp": "^3.0.0"
+  },
+  "comment": "node-llama-cpp is optional on purpose: the mock backend (default) needs no install. Run 'npm install node-llama-cpp' only when you want real on-device inference. The claude backend uses plain fetch and needs no SDK."
+}
