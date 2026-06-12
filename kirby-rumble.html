@@ -418,27 +418,30 @@ scene.add(new THREE.HemisphereLight(0xeaf6ff, 0xffd9c0, 0.85));
 const sun = new THREE.DirectionalLight(0xfff4dd, 1.0);
 sun.position.set(7, 14, 6);
 sun.castShadow = true;
-sun.shadow.mapSize.set(1024, 1024);
+sun.shadow.mapSize.set(2048, 2048);
 sun.shadow.camera.left = -14; sun.shadow.camera.right = 14;
 sun.shadow.camera.top = 14; sun.shadow.camera.bottom = -14;
 scene.add(sun);
 
 function mat(color, opts = {}) {
-  return new THREE.MeshPhongMaterial(Object.assign({ color, flatShading: true, shininess: 18 }, opts));
+  // Smooth shading (flatShading: false) + a touch more sheen so the toy
+  // fighters read as rounded plastic rather than faceted blocks. Boxes are
+  // unaffected (per-face normals), so blades/hammer heads stay crisp.
+  return new THREE.MeshPhongMaterial(Object.assign({ color, flatShading: false, shininess: 30 }, opts));
 }
 
 // ---------------------------------------------------------------- ARENA ----
 const ARENA_R = 9, PLAY_R = 8.1;
 const decor = [];   // floating clouds + stars (must exist before buildArena runs)
 (function buildArena() {
-  const base = new THREE.Mesh(new THREE.CylinderGeometry(ARENA_R, ARENA_R + 0.7, 1.4, 28), mat(0xe8a8c8));
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(ARENA_R, ARENA_R + 0.7, 1.4, 64), mat(0xe8a8c8));
   base.position.y = -0.7; base.receiveShadow = true; scene.add(base);
   // floor rings (alternating pastel)
   const ringColors = [0xfff3e0, 0xffd1e3, 0xfff3e0, 0xffb9d4];
   const radii = [[0, 2.2], [2.2, 4.5], [4.5, 6.8], [6.8, 9]];
   radii.forEach(([r0, r1], i) => {
-    const g = r0 === 0 ? new THREE.CircleGeometry(r1, 36) : new THREE.RingGeometry(r0, r1, 36);
-    const m = new THREE.Mesh(g, new THREE.MeshPhongMaterial({ color: ringColors[i], flatShading: true }));
+    const g = r0 === 0 ? new THREE.CircleGeometry(r1, 64) : new THREE.RingGeometry(r0, r1, 64);
+    const m = new THREE.Mesh(g, new THREE.MeshPhongMaterial({ color: ringColors[i] }));
     m.rotation.x = -Math.PI/2; m.position.y = 0.012 + i*0.001; m.receiveShadow = true; scene.add(m);
   });
   // center star emblem
@@ -449,22 +452,22 @@ const decor = [];   // floating clouds + stars (must exist before buildArena run
     const x = Math.cos(ang) * r, y = Math.sin(ang) * r;
     if (i === 0) starShape.moveTo(x, y); else starShape.lineTo(x, y);
   }
-  const star = new THREE.Mesh(new THREE.ShapeGeometry(starShape), new THREE.MeshPhongMaterial({ color: 0xffd54d, flatShading: true }));
+  const star = new THREE.Mesh(new THREE.ShapeGeometry(starShape), new THREE.MeshPhongMaterial({ color: 0xffd54d }));
   star.rotation.x = -Math.PI/2; star.position.y = 0.02; scene.add(star);
   // pillars around the edge
   for (let i = 0; i < 10; i++) {
     const a = i / 10 * Math.PI * 2;
-    const p = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.4, 1.25, 7), mat(0xa8e0c0));
+    const p = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.4, 1.25, 24), mat(0xa8e0c0));
     p.position.set(Math.cos(a) * (ARENA_R + 0.25), 0.62, Math.sin(a) * (ARENA_R + 0.25));
     p.castShadow = true; scene.add(p);
-    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.3, 6, 4), mat(0xffd54d));
+    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.3, 18, 14), mat(0xffd54d));
     cap.position.set(p.position.x, 1.35, p.position.z); cap.castShadow = true; scene.add(cap);
   }
   // floating decor: blocky clouds + gold stars
   for (let i = 0; i < 4; i++) {
     const cl = new THREE.Group();
     [[0,0,0,1.3],[1.1,0.25,0.3,0.9],[-1.0,0.2,-0.2,0.8]].forEach(([x,y,z,s]) => {
-      const b = new THREE.Mesh(new THREE.SphereGeometry(s, 6, 4), mat(0xffffff));
+      const b = new THREE.Mesh(new THREE.SphereGeometry(s, 16, 12), mat(0xffffff));
       b.position.set(x, y, z); cl.add(b);
     });
     const a = i / 4 * Math.PI * 2 + 0.6;
@@ -492,13 +495,13 @@ function buildKirby(palette, abilityKey) {
   const g = new THREE.Group();
   const parts = {};
 
-  const body = new THREE.Mesh(new THREE.SphereGeometry(0.92, 8, 6), mat(palette.body));
+  const body = new THREE.Mesh(new THREE.SphereGeometry(0.92, 32, 24), mat(palette.body));
   body.castShadow = true; body.position.y = 0.92;
   g.add(body); parts.body = body;
 
   // feet
   for (const side of [-1, 1]) {
-    const f = new THREE.Mesh(new THREE.SphereGeometry(0.42, 6, 4), mat(palette.feet));
+    const f = new THREE.Mesh(new THREE.SphereGeometry(0.42, 20, 16), mat(palette.feet));
     f.scale.set(1, 0.6, 1.2);
     f.position.set(side * 0.45, 0.22, 0.1);
     f.castShadow = true;
@@ -508,7 +511,7 @@ function buildKirby(palette, abilityKey) {
   for (const side of [-1, 1]) {
     const pivot = new THREE.Group();
     pivot.position.set(side * 0.82, 1.0, 0.12);
-    const a = new THREE.Mesh(new THREE.SphereGeometry(0.3, 6, 4), mat(palette.body));
+    const a = new THREE.Mesh(new THREE.SphereGeometry(0.3, 18, 14), mat(palette.body));
     a.castShadow = true;
     pivot.add(a);
     g.add(pivot);
@@ -516,14 +519,14 @@ function buildKirby(palette, abilityKey) {
   }
   // face (front = +Z)
   for (const side of [-1, 1]) {
-    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.1, 5, 4), mat(0x20305e));
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.1, 14, 10), mat(0x20305e));
     eye.scale.set(0.75, 2.0, 0.6);
     eye.position.set(side * 0.3, 1.18, 0.82);
     g.add(eye);
-    const hl = new THREE.Mesh(new THREE.SphereGeometry(0.045, 4, 3), mat(0xffffff));
+    const hl = new THREE.Mesh(new THREE.SphereGeometry(0.045, 10, 8), mat(0xffffff));
     hl.position.set(side * 0.3, 1.3, 0.9);
     g.add(hl);
-    const blush = new THREE.Mesh(new THREE.SphereGeometry(0.1, 5, 4), mat(palette.blush));
+    const blush = new THREE.Mesh(new THREE.SphereGeometry(0.1, 14, 10), mat(palette.blush));
     blush.scale.set(1, 0.5, 0.4);
     blush.position.set(side * 0.55, 0.95, 0.72);
     g.add(blush);
@@ -536,8 +539,8 @@ function buildKirby(palette, abilityKey) {
 
   // shield bubble (hidden until used)
   const bubble = new THREE.Mesh(
-    new THREE.SphereGeometry(1.45, 10, 8),
-    new THREE.MeshPhongMaterial({ color: 0x8fd4ff, transparent: true, opacity: 0.34, flatShading: true })
+    new THREE.SphereGeometry(1.45, 32, 24),
+    new THREE.MeshPhongMaterial({ color: 0x8fd4ff, transparent: true, opacity: 0.34, flatShading: false })
   );
   bubble.position.y = 0.95; bubble.visible = false;
   g.add(bubble); parts.bubble = bubble;
@@ -552,9 +555,9 @@ function buildHatAndWeapon(g, parts, key) {
 
   switch (key) {
     case 'sword': {
-      const cone = add(hat, new THREE.Mesh(new THREE.ConeGeometry(0.62, 0.85, 7), mat(0x3aaa42)));
+      const cone = add(hat, new THREE.Mesh(new THREE.ConeGeometry(0.62, 0.85, 28), mat(0x3aaa42)));
       cone.position.y = 0.32;
-      const tip = add(hat, new THREE.Mesh(new THREE.SphereGeometry(0.13, 5, 4), mat(0xffd54d)));
+      const tip = add(hat, new THREE.Mesh(new THREE.SphereGeometry(0.13, 16, 12), mat(0xffd54d)));
       tip.position.y = 0.8;
       // sword in right hand
       const blade = add(wep, new THREE.Mesh(new THREE.BoxGeometry(0.13, 1.0, 0.2), mat(0xe8eef2)));
@@ -564,40 +567,40 @@ function buildHatAndWeapon(g, parts, key) {
       break;
     }
     case 'beam': {
-      const cone = add(hat, new THREE.Mesh(new THREE.ConeGeometry(0.58, 0.95, 7), mat(0xd23a4a)));
+      const cone = add(hat, new THREE.Mesh(new THREE.ConeGeometry(0.58, 0.95, 28), mat(0xd23a4a)));
       cone.position.y = 0.36;
-      const band = add(hat, new THREE.Mesh(new THREE.CylinderGeometry(0.46, 0.5, 0.16, 7), mat(0xf5d24b)));
+      const band = add(hat, new THREE.Mesh(new THREE.CylinderGeometry(0.46, 0.5, 0.16, 28), mat(0xf5d24b)));
       band.position.y = 0.28;
-      const pom = add(hat, new THREE.Mesh(new THREE.SphereGeometry(0.14, 5, 4), mat(0xfff7d2)));
+      const pom = add(hat, new THREE.Mesh(new THREE.SphereGeometry(0.14, 16, 12), mat(0xfff7d2)));
       pom.position.y = 0.9;
-      const rod = add(wep, new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.8, 6), mat(0xf5d24b)));
+      const rod = add(wep, new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.8, 20), mat(0xf5d24b)));
       rod.position.set(0, -0.6, 0.3);
-      const orb = add(wep, new THREE.Mesh(new THREE.SphereGeometry(0.14, 6, 4), mat(0xfff04a, { emissive: 0x6b5500 })));
+      const orb = add(wep, new THREE.Mesh(new THREE.SphereGeometry(0.14, 16, 12), mat(0xfff04a, { emissive: 0x6b5500 })));
       orb.position.set(0, -1.05, 0.3);
       break;
     }
     case 'cutter': {
-      const cap = add(hat, new THREE.Mesh(new THREE.SphereGeometry(0.62, 8, 5, 0, Math.PI*2, 0, Math.PI/2), mat(0xf5b939)));
+      const cap = add(hat, new THREE.Mesh(new THREE.SphereGeometry(0.62, 28, 18, 0, Math.PI*2, 0, Math.PI/2), mat(0xf5b939)));
       cap.position.y = -0.02;
       const fin = add(hat, new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.5, 0.72), mat(0xffe18a)));
       fin.position.y = 0.42;
       break;
     }
     case 'hammer': {
-      const band = add(hat, new THREE.Mesh(new THREE.TorusGeometry(0.74, 0.1, 5, 12), mat(0xd63131)));
+      const band = add(hat, new THREE.Mesh(new THREE.TorusGeometry(0.74, 0.1, 16, 32), mat(0xd63131)));
       band.rotation.x = Math.PI/2 - 0.18; band.position.y = -0.18;
-      const handle = add(wep, new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 1.15, 6), mat(0x9b6a36)));
+      const handle = add(wep, new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 1.15, 20), mat(0x9b6a36)));
       handle.position.set(0, -0.75, 0.3);
       const head = add(wep, new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.36, 0.36), mat(0x6e4d28)));
       head.position.set(0, -1.3, 0.3);
       break;
     }
     case 'archer': {
-      const cone = add(hat, new THREE.Mesh(new THREE.ConeGeometry(0.56, 0.78, 7), mat(0x4d8a3f)));
+      const cone = add(hat, new THREE.Mesh(new THREE.ConeGeometry(0.56, 0.78, 28), mat(0x4d8a3f)));
       cone.position.y = 0.26; cone.rotation.z = 0.28;
       const feather = add(hat, new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.5, 0.18), mat(0xd63131)));
       feather.position.set(0.4, 0.5, 0); feather.rotation.z = -0.5;
-      const bow = add(parts.armL, new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.05, 5, 10, Math.PI), mat(0x8b5a2b)));
+      const bow = add(parts.armL, new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.05, 12, 24, Math.PI), mat(0x8b5a2b)));
       bow.rotation.y = Math.PI/2; bow.position.set(0, 0, 0.25);
       parts.bow = bow;
       break;
@@ -605,33 +608,33 @@ function buildHatAndWeapon(g, parts, key) {
     case 'fire': {
       const colors = [0xff5722, 0xffaa42, 0xff7a3a];
       [[-0.3, 0.45, 0], [0, 0.7, 0.05], [0.3, 0.5, 0]].forEach(([x, h, z], i) => {
-        const fl = add(hat, new THREE.Mesh(new THREE.ConeGeometry(0.24, h + 0.35, 6), mat(colors[i], { emissive: 0x431200 })));
+        const fl = add(hat, new THREE.Mesh(new THREE.ConeGeometry(0.24, h + 0.35, 20), mat(colors[i], { emissive: 0x431200 })));
         fl.position.set(x, 0.25 + h * 0.3, z);
       });
-      const band = add(hat, new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.66, 0.18, 8), mat(0xd63131)));
+      const band = add(hat, new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.66, 0.18, 28), mat(0xd63131)));
       band.position.y = -0.06;
       break;
     }
     case 'bomb': {
-      const cap = add(hat, new THREE.Mesh(new THREE.SphereGeometry(0.66, 8, 5, 0, Math.PI*2, 0, Math.PI/2.1), mat(0x7d6249)));
+      const cap = add(hat, new THREE.Mesh(new THREE.SphereGeometry(0.66, 28, 18, 0, Math.PI*2, 0, Math.PI/2.1), mat(0x7d6249)));
       cap.position.y = -0.05;
       for (const side of [-1, 1]) {
-        const lens = add(hat, new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.1, 8), mat(0xa8d8f5, { emissive: 0x1a3340 })));
+        const lens = add(hat, new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.1, 20), mat(0xa8d8f5, { emissive: 0x1a3340 })));
         lens.rotation.x = Math.PI/2;
         lens.position.set(side * 0.22, 0.08, 0.58);
       }
-      const held = add(wep, new THREE.Mesh(new THREE.SphereGeometry(0.2, 6, 5), mat(0x222232)));
+      const held = add(wep, new THREE.Mesh(new THREE.SphereGeometry(0.2, 18, 14), mat(0x222232)));
       held.position.set(0, -0.4, 0.3);
       break;
     }
     case 'parasol': {
-      const pole = add(wep, new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.5, 6), mat(0xf2ead8)));
+      const pole = add(wep, new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.5, 18), mat(0xf2ead8)));
       pole.position.set(0, -0.3, 0.3);
-      const canopy = add(wep, new THREE.Mesh(new THREE.ConeGeometry(0.78, 0.5, 9), mat(0xd63131)));
+      const canopy = add(wep, new THREE.Mesh(new THREE.ConeGeometry(0.78, 0.5, 32), mat(0xd63131)));
       canopy.position.set(0, 0.55, 0.3);
-      const tip = add(wep, new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.2, 5), mat(0xffd54d)));
+      const tip = add(wep, new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.2, 14), mat(0xffd54d)));
       tip.position.set(0, 0.9, 0.3);
-      const frill = add(wep, new THREE.Mesh(new THREE.CylinderGeometry(0.78, 0.84, 0.1, 9), mat(0xfff3e0)));
+      const frill = add(wep, new THREE.Mesh(new THREE.CylinderGeometry(0.78, 0.84, 0.1, 32), mat(0xfff3e0)));
       frill.position.set(0, 0.32, 0.3);
       parts.canopy = canopy;
       break;
@@ -710,7 +713,7 @@ function spawnParticles(x, y, z, color, n = 8, speed = 4) {
 }
 
 function spawnShockwave(x, z, maxR, color = 0xffd54d) {
-  const m = new THREE.Mesh(new THREE.RingGeometry(0.3, 0.55, 24),
+  const m = new THREE.Mesh(new THREE.RingGeometry(0.3, 0.55, 48),
     new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.85, side: THREE.DoubleSide }));
   m.rotation.x = -Math.PI/2; m.position.set(x, 0.06, z);
   shockwaves.push({ mesh: m, t: 0, dur: 0.4, maxR });
@@ -764,20 +767,20 @@ function spawnAttackProjectile(f, def, angleOffset = 0) {
   let mesh, kind = def.proj;
   if (kind === 'arrow') {
     mesh = new THREE.Group();
-    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.8, 5), mat(0x8b5a2b));
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.8, 16), mat(0x8b5a2b));
     shaft.rotation.x = Math.PI/2; mesh.add(shaft);
-    const tip = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.26, 5), mat(0xc0c0c8));
+    const tip = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.26, 16), mat(0xc0c0c8));
     tip.rotation.x = Math.PI/2; tip.position.z = 0.5; mesh.add(tip);
     if (def.big) mesh.scale.setScalar(1.5);
   } else if (kind === 'cutter') {
     mesh = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.09, 0.4), mat(0xffe18a, { emissive: 0x4a3a00 }));
   } else if (kind === 'beam') {
-    mesh = new THREE.Mesh(new THREE.SphereGeometry(0.26, 7, 5), mat(0xfff04a, { emissive: 0x8a7000 }));
+    mesh = new THREE.Mesh(new THREE.SphereGeometry(0.26, 20, 16), mat(0xfff04a, { emissive: 0x8a7000 }));
   } else if (kind === 'bomb') {
     mesh = new THREE.Group();
-    const ball = new THREE.Mesh(new THREE.SphereGeometry(def.big ? 0.36 : 0.26, 7, 5), mat(0x222232));
+    const ball = new THREE.Mesh(new THREE.SphereGeometry(def.big ? 0.36 : 0.26, 20, 16), mat(0x222232));
     mesh.add(ball);
-    const fuse = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.2, 4), mat(0x9b6a36));
+    const fuse = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.2, 12), mat(0x9b6a36));
     fuse.position.y = def.big ? 0.42 : 0.32; mesh.add(fuse);
   }
   mesh.position.set(o.x, o.y, o.z);
@@ -948,7 +951,7 @@ function updateFighter(f, dt, input) {
     g.position.z += D.dz * sp * dt;
     // flame trail
     if (Math.random() < 0.6) {
-      const fl = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.45, 5), mat(0xff7a3a, { emissive: 0x521a00 }));
+      const fl = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.45, 14), mat(0xff7a3a, { emissive: 0x521a00 }));
       fl.position.set(g.position.x, 0.4, g.position.z);
       particles.push({ mesh: fl, vx: 0, vy: 1.6, vz: 0, life: 0.3, maxLife: 0.3, spin: 4 });
       scene.add(fl);
@@ -1060,7 +1063,7 @@ function animateAttack(f, A, p) {
       if (Math.random() < 0.75) {
         const d = fwd(f), g = f.group.position;
         const spreadA = f.group.rotation.y + (Math.random() - 0.5) * 0.7;
-        const fl = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.4, 5), mat(Math.random() < 0.5 ? 0xff7a3a : 0xffaa42, { emissive: 0x521a00 }));
+        const fl = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.4, 14), mat(Math.random() < 0.5 ? 0xff7a3a : 0xffaa42, { emissive: 0x521a00 }));
         fl.position.set(g.x + d.x * 1.1, 1.0, g.z + d.z * 1.1);
         particles.push({ mesh: fl, vx: Math.sin(spreadA) * 7, vy: 0.6, vz: Math.cos(spreadA) * 7, life: 0.3, maxLife: 0.3, spin: 6 });
         scene.add(fl);
