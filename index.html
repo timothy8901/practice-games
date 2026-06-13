@@ -142,6 +142,21 @@
       background: radial-gradient(circle at 50% 35%, #bfe4ff 0%, #ffd1e3 55%, #e8a8c8 100%);
     }
 
+    /* driver variant — asphalt + headlight yellow */
+    .featured.driver {
+      background: linear-gradient(135deg, #2b2b40 0%, #3a2f1f 100%);
+    }
+    .featured.driver:hover {
+      border-color: #ffe14d;
+      box-shadow: 0 14px 48px rgba(255, 225, 77, 0.18);
+    }
+    .featured.driver .label { color: #ffe14d; background: rgba(255, 225, 77, 0.12); }
+    .featured.driver h2 { color: #ffe14d; }
+    .featured.driver .play-cta { background: #ffe14d; }
+    .featured.driver .preview {
+      background: linear-gradient(160deg, #5a6b3f 0%, #46566a 45%, #52555c 100%);
+    }
+
     @media (max-width: 640px) {
       .featured { grid-template-columns: 1fr; text-align: center; }
       .featured .preview { margin: 0 auto; width: 140px; height: 140px; }
@@ -317,13 +332,53 @@
       </div>
     </a>
 
+    <a class="featured driver" href="street-driver.html" aria-label="Play Street Cruiser">
+      <div>
+        <span class="label">New &middot; Real-world driving</span>
+        <h2>Street Cruiser</h2>
+        <p>Type any US zip code and cruise its real streets — pulled live from OpenStreetMap and rendered as chunky top-down pixel art. Real buildings &amp; collisions, a minimap, day/night with headlights, engine &amp; tire sounds, and four cars to choose from. Touch controls or keyboard.</p>
+        <div class="meta">
+          <span>Real OSM streets</span>
+          <span>Touch + keyboard</span>
+          <span>Day / night</span>
+          <span>Minimap &amp; SFX</span>
+        </div>
+        <span class="play-cta">Play now &rarr;</span>
+      </div>
+      <div class="preview" aria-hidden="true">
+        <!-- top-down pixel car cruising a road -->
+        <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+          <!-- road -->
+          <rect x="68" y="0" width="4" height="200" fill="#34363b"/>
+          <rect x="72" y="0" width="56" height="200" fill="#52555c"/>
+          <rect x="128" y="0" width="4" height="200" fill="#34363b"/>
+          <!-- dashed center line -->
+          <g fill="#e8e4cf">
+            <rect x="98" y="6" width="4" height="20"/>
+            <rect x="98" y="42" width="4" height="20"/>
+            <rect x="98" y="78" width="4" height="20"/>
+            <rect x="98" y="114" width="4" height="20"/>
+            <rect x="98" y="150" width="4" height="20"/>
+            <rect x="98" y="186" width="4" height="14"/>
+          </g>
+          <!-- building footprints -->
+          <rect x="12" y="16" width="40" height="48" fill="#b9a98c" stroke="#6d6253" stroke-width="3"/>
+          <rect x="150" y="118" width="40" height="54" fill="#b9a98c" stroke="#6d6253" stroke-width="3"/>
+          <!-- car (top-down, facing up) -->
+          <rect x="82" y="77" width="40" height="64" rx="6" fill="#000000" opacity="0.25"/>
+          <rect x="80" y="74" width="40" height="64" rx="6" fill="#e23b3b"/>
+          <rect x="80" y="74" width="40" height="11" rx="5" fill="#ff7a7a"/>
+          <rect x="88" y="92" width="24" height="30" rx="4" fill="#201013"/>
+          <rect x="90" y="84" width="20" height="8" rx="2" fill="#bfe8ff"/>
+          <rect x="90" y="122" width="20" height="7" rx="2" fill="#7fb8d8"/>
+          <rect x="83" y="75" width="6" height="4" fill="#fff6d0"/>
+          <rect x="111" y="75" width="6" height="4" fill="#fff6d0"/>
+        </svg>
+      </div>
+    </a>
+
     <h2 class="section-title">More Games</h2>
     <div class="games-grid">
-      <a class="game-card" href="street-driver.html">
-        <span class="game-tag">Driving</span>
-        <span class="game-name">Street Cruiser</span>
-        <span class="game-desc">Type a US zip and drive its real streets as retro pixel art — buildings, minimap, day/night &amp; engine sounds.</span>
-      </a>
       <a class="game-card" href="https://timothy8901.github.io/robo-revolution/" target="_blank" rel="noopener">
         <span class="game-tag">3D Action</span>
         <span class="game-name">Robo Revolution</span>
