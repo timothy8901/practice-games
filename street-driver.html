@@ -101,8 +101,11 @@
     padding: 7px 12px; font-weight: 700; font-size: .92rem;
     pointer-events: auto;
   }
-  #locLabel { color: #ffe14d; max-width: 52vw; line-height: 1.25; }
+  #locLabel { color: #ffe14d; line-height: 1.25; }
   #speedLabel { color: #8fe08f; font-variant-numeric: tabular-nums; }
+  .hud-left { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; max-width: 60vw; }
+  #questLabel { color: #ffe6a6; }
+  #scoreLabel { color: #ffd23f; }
   .hud-right { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
   .btn-row { display:flex; gap:8px; }
   .icon-btn {
@@ -155,7 +158,11 @@
 
   <!-- HUD (game) -->
   <div id="hud" class="hidden">
-    <div id="locLabel" class="hud-pill">Driving…</div>
+    <div class="hud-left">
+      <div id="locLabel" class="hud-pill">Driving…</div>
+      <div id="questLabel" class="hud-pill quest">📦 New job…</div>
+      <div id="scoreLabel" class="hud-pill score">★ 0 · $0</div>
+    </div>
     <div class="hud-right">
       <div class="btn-row">
         <button id="dayNightBtn" class="icon-btn" title="Toggle day / night" aria-label="Toggle day or night">🌙</button>
@@ -182,7 +189,7 @@
   <!-- Start screen -->
   <div id="start" class="screen">
     <h1 class="title">STREET CRUISER</h1>
-    <p class="subtitle">Type a US zip code and cruise its real streets in chunky pixel art.</p>
+    <p class="subtitle">Type a US zip code, cruise its real streets in chunky pixel art, and run package deliveries for cash.</p>
     <div class="ziprow">
       <input id="zipInput" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="5"
              placeholder="90210" autocomplete="off" aria-label="US zip code">
@@ -215,6 +222,8 @@
   // ============================================================
   const RENDER_RADIUS = 800;      // meters fetched from Overpass
   const VW = 480;                 // base internal pixel width (height derives from aspect)
+  const SCALE = 2.7;              // pixels per world-meter (zoom). Higher = more zoomed in / faster feel.
+  const REACH = 16;               // world meters: how close counts as "arrived" at a quest target
 
   // Day / night palettes. `PAL` points at the active one.
   const PALS = {
@@ -275,6 +284,7 @@
   const hud = $("hud"), controls = $("controls");
   const zipInput = $("zipInput"), zipError = $("zipError");
   const locLabel = $("locLabel"), speedLabel = $("speedLabel");
+  const questLabel = $("questLabel"), scoreLabel = $("scoreLabel");
   const loadingSub = $("loadingSub");
   const miniMap = $("miniMap"), miniCtx = miniMap.getContext("2d");
 
@@ -289,6 +299,11 @@
   let lastT = 0;
   let busy = false;          // request debounce
   let pendingWideZip = null;
+
+  // fetch-quest (delivery) state
+  let worldPoints = [];      // flat list of road vertices, for sampling quest targets
+  let quest = null;          // { stage:'pickup'|'dropoff', pickup:{x,y}, dropoff:{x,y} }
+  let deliveries = 0, cash = 0;
 
   const input = { left:false, right:false, gas:false, brake:false };
 
@@ -389,7 +404,7 @@ out geom;`;
       y: -(lat - lat0) * 110540,   // negate so north is up
     });
 
-    roads = []; buildings = [];
+    roads = []; buildings = []; worldPoints = [];
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     const swallow = (b) => {
       if (b.x0 < minX) minX = b.x0; if (b.x1 > maxX) maxX = b.x1;
@@ -404,6 +419,7 @@ out geom;`;
       if (tags.highway) {
         const style = ROAD_STYLE[tags.highway] || ROAD_STYLE._default;
         roads.push({ pts, style, bbox });
+        for (const p of pts) worldPoints.push(p);
         swallow(bbox);
       } else if (tags.building) {
         // need at least a triangle to be a footprint
@@ -432,6 +448,52 @@ out geom;`;
     let heading = Math.atan2(b.y - a.y, b.x - a.x);
     if (b === pts[bestIdx - 1]) heading += Math.PI;
     car = { x: best.x, y: best.y, heading, speed: 0 };
+  }
+
+  // ============================================================
+  //  Fetch quests (drive to pickup -> deliver to dropoff -> repeat)
+  // ============================================================
+  // Pick a random road vertex whose distance from (rx,ry) is in [min,max].
+  function randomRoadPointNear(rx, ry, min, max) {
+    if (!worldPoints.length) return { x: rx, y: ry };
+    const pool = [];
+    for (const p of worldPoints) {
+      const d = Math.hypot(p.x - rx, p.y - ry);
+      if (d >= min && d <= max) pool.push(p);
+    }
+    const src = pool.length ? pool : worldPoints;
+    const p = src[Math.floor(Math.random() * src.length)];
+    return { x: p.x, y: p.y };
+  }
+
+  function generateQuest() {
+    const px = car ? car.x : 0, py = car ? car.y : 0;
+    const pickup = randomRoadPointNear(px, py, 120, 520);
+    const dropoff = randomRoadPointNear(pickup.x, pickup.y, 200, 700);
+    quest = { stage: "pickup", pickup, dropoff };
+  }
+
+  function updateQuest() {
+    if (!quest || !car) return;
+    const target = quest.stage === "pickup" ? quest.pickup : quest.dropoff;
+    const d = Math.hypot(car.x - target.x, car.y - target.y);
+    questLabel.textContent = (quest.stage === "pickup"
+      ? "📦 Pick up the package — "
+      : "🏁 Deliver it — ") + Math.round(d) + " m";
+
+    if (d < REACH) {
+      if (quest.stage === "pickup") {
+        quest.stage = "dropoff";
+        blip(680, 0.12);
+      } else {
+        deliveries++;
+        const dist = Math.hypot(quest.dropoff.x - quest.pickup.x, quest.dropoff.y - quest.pickup.y);
+        cash += Math.max(5, Math.round(dist / 12));
+        scoreLabel.textContent = "★ " + deliveries + " · $" + cash;
+        blip(680, 0.1); blip(990, 0.16);
+        generateQuest();
+      }
+    }
   }
 
   // ============================================================
@@ -484,6 +546,9 @@ out geom;`;
     pendingWideZip = null;
 
     spawnCar();
+    deliveries = 0; cash = 0;
+    scoreLabel.textContent = "★ 0 · $0";
+    generateQuest();
     locLabel.textContent = "Driving in " + place.city + ", " + place.state;
     busy = false;
     initAudio();      // user already gestured (Drive/random/Enter)
@@ -494,8 +559,9 @@ out geom;`;
   // ============================================================
   //  Physics + collisions
   // ============================================================
-  const MAX_SPEED = 95, MAX_REV = 28;
-  const ACCEL = 70, BRAKE = 120, FRICTION = 26;
+  // Speeds are in meters/second (world units). 45 m/s ≈ 100 mph.
+  const MAX_SPEED = 46, MAX_REV = 13;
+  const ACCEL = 19, BRAKE = 42, FRICTION = 9;
   const TURN_RATE = 2.6;
 
   function updatePhysics(dt) {
@@ -510,7 +576,7 @@ out geom;`;
     }
     car.speed = Math.max(-MAX_REV, Math.min(MAX_SPEED, car.speed));
 
-    const speedFrac = Math.min(1, Math.abs(car.speed) / 35);
+    const speedFrac = Math.min(1, Math.abs(car.speed) / 16);
     const dir = car.speed >= 0 ? 1 : -1;
     let steer = 0;
     if (input.left) steer -= 1;
@@ -531,8 +597,8 @@ out geom;`;
     }
 
     // Off-road grass drag
-    if (Math.abs(car.speed) > 4 && isOffRoad(nx, ny)) {
-      const drag = 55 * dt;
+    if (Math.abs(car.speed) > 2 && isOffRoad(nx, ny)) {
+      const drag = 24 * dt;
       if (car.speed > 0) car.speed = Math.max(0, car.speed - drag);
       else car.speed = Math.min(0, car.speed + drag);
     }
@@ -598,14 +664,15 @@ out geom;`;
 
     if (!car) return;
     const camX = car.x, camY = car.y;
-    const ox = W / 2 - camX, oy = H / 2 - camY;
+    const ox = W / 2 - camX * SCALE, oy = H / 2 - camY * SCALE;
 
-    const margin = 40;
-    const vMinX = camX - W/2 - margin, vMaxX = camX + W/2 + margin;
-    const vMinY = camY - H/2 - margin, vMaxY = camY + H/2 + margin;
+    // cull in world units (account for zoom)
+    const halfW = (W / 2) / SCALE, halfH = (H / 2) / SCALE, margin = 20;
+    const vMinX = camX - halfW - margin, vMaxX = camX + halfW + margin;
+    const vMinY = camY - halfH - margin, vMaxY = camY + halfH + margin;
     const inView = (bb) => !(bb.x1 < vMinX || bb.x0 > vMaxX || bb.y1 < vMinY || bb.y0 > vMaxY);
 
-    // roads: casing then asphalt
+    // roads: casing then asphalt (widths in world meters, scaled to pixels)
     ctx.lineJoin = "round"; ctx.lineCap = "round";
     const visRoads = roads.filter(r => inView(r.bbox));
     for (const r of visRoads) strokeRoad(r, ox, oy, r.style.w + 2.5, PAL.casing);
@@ -613,13 +680,13 @@ out geom;`;
 
     // dashed center lines
     ctx.save();
-    ctx.setLineDash([6, 7]); ctx.strokeStyle = PAL.marking; ctx.lineWidth = 1;
+    ctx.setLineDash([7, 8]); ctx.strokeStyle = PAL.marking; ctx.lineWidth = 1.5;
     for (const r of visRoads) {
       if (!r.style.dash) continue;
       const pts = r.pts;
       ctx.beginPath();
-      ctx.moveTo(pts[0].x + ox, pts[0].y + oy);
-      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x + ox, pts[i].y + oy);
+      ctx.moveTo(pts[0].x * SCALE + ox, pts[0].y * SCALE + oy);
+      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x * SCALE + ox, pts[i].y * SCALE + oy);
       ctx.stroke();
     }
     ctx.restore();
@@ -629,8 +696,8 @@ out geom;`;
       if (!inView(b.bbox)) continue;
       const pts = b.pts;
       ctx.beginPath();
-      ctx.moveTo(pts[0].x + ox, pts[0].y + oy);
-      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x + ox, pts[i].y + oy);
+      ctx.moveTo(pts[0].x * SCALE + ox, pts[0].y * SCALE + oy);
+      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x * SCALE + ox, pts[i].y * SCALE + oy);
       ctx.closePath();
       ctx.fillStyle = PAL.building; ctx.fill();
       ctx.lineWidth = 1; ctx.strokeStyle = PAL.buildingCasing; ctx.stroke();
@@ -639,32 +706,83 @@ out geom;`;
     // night lighting (vignette + headlights) under the car
     if (PAL.vignette > 0) drawNight(W, H);
 
+    // quest target marker (on the world), then car, then an off-screen arrow
+    if (quest) {
+      const tgt = quest.stage === "pickup" ? quest.pickup : quest.dropoff;
+      drawMarker(tgt.x, tgt.y, quest.stage, ox, oy);
+    }
+
     drawCar(W / 2, H / 2, car.heading);
+
+    if (quest) {
+      const tgt = quest.stage === "pickup" ? quest.pickup : quest.dropoff;
+      const col = quest.stage === "pickup" ? "#ffd23f" : "#48e06a";
+      drawTargetArrow(tgt.x, tgt.y, ox, oy, W, H, col);
+    }
 
     drawMinimap();
   }
 
-  function strokeRoad(r, ox, oy, width, color) {
+  function strokeRoad(r, ox, oy, worldWidth, color) {
     const pts = r.pts;
-    ctx.strokeStyle = color; ctx.lineWidth = width;
+    ctx.strokeStyle = color; ctx.lineWidth = worldWidth * SCALE;
     ctx.beginPath();
-    ctx.moveTo(pts[0].x + ox, pts[0].y + oy);
-    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x + ox, pts[i].y + oy);
+    ctx.moveTo(pts[0].x * SCALE + ox, pts[0].y * SCALE + oy);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x * SCALE + ox, pts[i].y * SCALE + oy);
     ctx.stroke();
+  }
+
+  // pulsing pickup / dropoff beacon, drawn in screen space at the world target
+  function drawMarker(wx, wy, kind, ox, oy) {
+    const sx = wx * SCALE + ox, sy = wy * SCALE + oy;
+    const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 220);
+    const col   = kind === "pickup" ? "#ffd23f" : "#48e06a";
+    const colDk = kind === "pickup" ? "#a8791a" : "#1f7a36";
+    ctx.save();
+    ctx.globalAlpha = 0.35 + 0.35 * pulse;
+    ctx.strokeStyle = col; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(sx, sy, 7 + pulse * 6, 0, Math.PI * 2); ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = colDk; ctx.beginPath(); ctx.arc(sx, sy, 6, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = col;   ctx.beginPath(); ctx.arc(sx, sy - 1, 5, 0, Math.PI * 2); ctx.fill();
+    if (kind === "pickup") {
+      ctx.fillStyle = colDk; ctx.fillRect(sx - 2, sy - 3, 4, 5);          // little box
+    } else {
+      ctx.fillStyle = "#ffffff"; ctx.fillRect(sx - 2, sy - 4, 4, 2);      // checkered flag
+      ctx.fillStyle = colDk;     ctx.fillRect(sx - 2, sy - 2, 4, 2);
+    }
+    ctx.restore();
+  }
+
+  // arrow pinned to the screen edge pointing toward an off-screen target
+  function drawTargetArrow(wx, wy, ox, oy, W, H, color) {
+    const sx = wx * SCALE + ox, sy = wy * SCALE + oy;
+    const m = 16;
+    if (sx >= m && sx <= W - m && sy >= m && sy <= H - m) return; // on screen
+    const ang = Math.atan2(sy - H / 2, sx - W / 2);
+    const ex = Math.max(m, Math.min(W - m, sx));
+    const ey = Math.max(m, Math.min(H - m, sy));
+    ctx.save();
+    ctx.translate(ex, ey); ctx.rotate(ang);
+    ctx.fillStyle = color;
+    ctx.beginPath(); ctx.moveTo(9, 0); ctx.lineTo(-6, -6); ctx.lineTo(-6, 6); ctx.closePath(); ctx.fill();
+    ctx.restore();
   }
 
   function drawGrassTexture(W, H) {
     ctx.fillStyle = PAL.grassDk;
     const cam = car || { x: 0, y: 0 };
-    const G = 18;
-    const startGX = Math.floor((cam.x - W / 2) / G);
-    const startGY = Math.floor((cam.y - H / 2) / G);
-    const offX = W / 2 - cam.x;
-    const offY = H / 2 - cam.y;
-    for (let gx = startGX - 1; gx <= startGX + Math.ceil(W / G) + 1; gx++) {
-      for (let gy = startGY - 1; gy <= startGY + Math.ceil(H / G) + 1; gy++) {
+    const G = 14;                          // grid spacing in world meters
+    const ox = W / 2 - cam.x * SCALE, oy = H / 2 - cam.y * SCALE;
+    const halfW = (W / 2) / SCALE, halfH = (H / 2) / SCALE;
+    const startGX = Math.floor((cam.x - halfW) / G);
+    const startGY = Math.floor((cam.y - halfH) / G);
+    const endGX = Math.ceil((cam.x + halfW) / G);
+    const endGY = Math.ceil((cam.y + halfH) / G);
+    for (let gx = startGX - 1; gx <= endGX + 1; gx++) {
+      for (let gy = startGY - 1; gy <= endGY + 1; gy++) {
         if ((((gx * 7) ^ (gy * 13)) & 7) === 0) {
-          ctx.fillRect(Math.round(gx * G + offX), Math.round(gy * G + offY), 3, 3);
+          ctx.fillRect(Math.round(gx * G * SCALE + ox), Math.round(gy * G * SCALE + oy), 3, 3);
         }
       }
     }
@@ -766,6 +884,13 @@ out geom;`;
     miniCtx.moveTo(5, 0); miniCtx.lineTo(-3, -3.5); miniCtx.lineTo(-3, 3.5);
     miniCtx.closePath(); miniCtx.fill();
     miniCtx.restore();
+    // quest target dot
+    if (quest) {
+      const tgt = quest.stage === "pickup" ? quest.pickup : quest.dropoff;
+      const qx = tgt.x * mini.scale + mini.offX, qy = tgt.y * mini.scale + mini.offY;
+      miniCtx.fillStyle = quest.stage === "pickup" ? "#ffd23f" : "#48e06a";
+      miniCtx.beginPath(); miniCtx.arc(qx, qy, 2.6, 0, Math.PI * 2); miniCtx.fill();
+    }
   }
 
   // ============================================================
@@ -805,12 +930,12 @@ out geom;`;
   function updateAudio() {
     if (!audio.started || audio.muted || !car) return;
     const t = audio.ctx.currentTime;
-    const sp = Math.abs(car.speed);
-    audio.osc.frequency.setTargetAtTime(50 + sp * 2.6, t, 0.05);
-    audio.og.gain.setTargetAtTime(0.05 + Math.min(0.13, sp * 0.0032), t, 0.08);
-    audio.filt.frequency.setTargetAtTime(450 + sp * 22, t, 0.08);
+    const sp = Math.abs(car.speed);            // m/s, 0..46
+    audio.osc.frequency.setTargetAtTime(52 + sp * 5.0, t, 0.05);
+    audio.og.gain.setTargetAtTime(0.05 + Math.min(0.13, sp * 0.0065), t, 0.08);
+    audio.filt.frequency.setTargetAtTime(450 + sp * 42, t, 0.08);
     const turning = (input.left || input.right) ? 1 : 0;
-    const screech = (turning && sp > 42) ? Math.min(0.2, (sp - 42) * 0.006) : 0;
+    const screech = (turning && sp > 22) ? Math.min(0.2, (sp - 22) * 0.012) : 0;
     audio.tg.gain.setTargetAtTime(screech, t, 0.05);
   }
 
@@ -818,6 +943,19 @@ out geom;`;
     audio.muted = m;
     $("muteBtn").textContent = m ? "🔇" : "🔊";
     if (audio.started) audio.master.gain.setTargetAtTime(m ? 0 : 0.9, audio.ctx.currentTime, 0.05);
+  }
+
+  // short UI beep (quest pickup / delivery chime)
+  function blip(freq, dur) {
+    if (!audio.started || audio.muted) return;
+    const ac = audio.ctx, t = ac.currentTime;
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.type = "square"; o.frequency.value = freq;
+    o.connect(g); g.connect(audio.master);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.22, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.start(t); o.stop(t + dur + 0.02);
   }
 
   // ============================================================
@@ -830,9 +968,10 @@ out geom;`;
     if (dt > 0.05) dt = 0.05;
     if (state === "game") {
       updatePhysics(dt);
+      updateQuest();
       updateAudio();
       render();
-      const mph = Math.round(Math.abs(car.speed) * 2.0);
+      const mph = Math.round(Math.abs(car.speed) * 2.237); // m/s -> mph
       speedLabel.textContent = (car.speed < -1 ? "R " : "") + mph + " mph";
     }
   }
@@ -926,6 +1065,7 @@ out geom;`;
   $("newZipBtn").addEventListener("click", () => {
     for (const k in input) input[k] = false;
     document.querySelectorAll(".ctrl").forEach(el => el.classList.remove("pressed"));
+    quest = null;
     show("start"); zipInput.focus();
   });
   $("muteBtn").addEventListener("click", () => setMuted(!audio.muted));
