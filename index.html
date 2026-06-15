@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Tim Howley's collection of practice web games — playable in the browser. Featured: Kirby Brawler, a single-page Smash-style fighter.">
+  <meta name="description" content="Tim Howley's collection of practice web games — playable in the browser. Featured: Elder Story RPG, a 2D side-scroller with MapleStory platforming and Skyrim-style progression.">
   <title>Tim's Games</title>
   <style>
     :root {
@@ -142,6 +142,36 @@
       background: radial-gradient(circle at 50% 35%, #bfe4ff 0%, #ffd1e3 55%, #e8a8c8 100%);
     }
 
+    /* driver variant — asphalt + headlight yellow */
+    .featured.driver {
+      background: linear-gradient(135deg, #2b2b40 0%, #3a2f1f 100%);
+    }
+    .featured.driver:hover {
+      border-color: #ffe14d;
+      box-shadow: 0 14px 48px rgba(255, 225, 77, 0.18);
+    }
+    .featured.driver .label { color: #ffe14d; background: rgba(255, 225, 77, 0.12); }
+    .featured.driver h2 { color: #ffe14d; }
+    .featured.driver .play-cta { background: #ffe14d; }
+    .featured.driver .preview {
+      background: linear-gradient(160deg, #5a6b3f 0%, #46566a 45%, #52555c 100%);
+    }
+
+    /* undead variant — dark theater + blood red */
+    .featured.undead {
+      background: linear-gradient(135deg, #2b2b40 0%, #2a1d1d 100%);
+    }
+    .featured.undead:hover {
+      border-color: #9b2f2f;
+      box-shadow: 0 14px 48px rgba(155, 47, 47, 0.22);
+    }
+    .featured.undead .label { color: #e0b35a; background: rgba(224, 179, 90, 0.12); }
+    .featured.undead h2 { color: #cc4444; }
+    .featured.undead .play-cta { background: #9b2f2f; color: #f0f0f5; }
+    .featured.undead .preview {
+      background: radial-gradient(circle at 50% 38%, #3c5036 0%, #20281c 60%, #11140d 100%);
+    }
+
     @media (max-width: 640px) {
       .featured { grid-template-columns: 1fr; text-align: center; }
       .featured .preview { margin: 0 auto; width: 140px; height: 140px; }
@@ -214,6 +244,12 @@
     @media (max-width: 480px) {
       .ntg-logo { width: 140px; }
     }
+    footer .studio-banner {
+      display: block; margin: 0 auto 18px; width: min(360px, 72vw); height: auto;
+      border-radius: 10px; image-rendering: auto;
+      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 12px 36px rgba(0, 0, 0, 0.5);
+    }
+    footer .studio-hint { color: var(--muted); font-size: 0.78rem; letter-spacing: 0.12em; text-transform: uppercase; margin: 0 0 14px; }
   </style>
 </head>
 <body>
@@ -275,6 +311,84 @@
 
   <main>
     <h2 class="section-title">Featured</h2>
+    <a class="featured undead" href="theater-of-the-undead/index.html" aria-label="Play Theater of the Undead">
+      <div>
+        <span class="label">New &middot; Top-down Zombies</span>
+        <h2>Theater of the Undead</h2>
+        <p>A top-down twin-stick <b>Call of Duty Zombies</b> clone of <b>Kino der Toten</b> — rendered in the chunky low-poly look of classic <b>RuneScape</b>. Survive escalating hordes, buy doors &amp; perks, hit the moving Mystery Box and Pack-a-Punch, and outrun hellhound rounds. Keyboard + mouse or controller.</p>
+        <div class="meta">
+          <span>WebGL 3D &middot; RuneScape look</span>
+          <span>Perks, box &amp; Pack-a-Punch</span>
+          <span>Keyboard / mouse + gamepad</span>
+          <span>Round-based survival</span>
+        </div>
+        <span class="play-cta">Play now &rarr;</span>
+      </div>
+      <div class="preview" aria-hidden="true">
+        <!-- blocky low-poly zombie (original art) -->
+        <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+          <ellipse cx="100" cy="174" rx="42" ry="10" fill="#000000" opacity="0.32"/>
+          <!-- faceted head -->
+          <polygon points="100,38 138,62 140,118 116,150 84,150 60,118 62,62" fill="#4f6a44" stroke="#2f3f28" stroke-width="3"/>
+          <polygon points="100,38 138,62 116,84 90,72" fill="#5f7d52" opacity="0.85"/>
+          <polygon points="62,62 84,150 72,150 56,110" fill="#3c5036" opacity="0.6"/>
+          <!-- jaw -->
+          <polygon points="84,150 116,150 110,166 90,166" fill="#445939" stroke="#2f3f28" stroke-width="2"/>
+          <!-- sunken eye sockets -->
+          <polygon points="73,90 93,86 93,104 73,106" fill="#14160e"/>
+          <polygon points="107,86 127,90 127,106 107,104" fill="#14160e"/>
+          <!-- glowing red pupils -->
+          <rect x="79" y="93" width="8" height="8" fill="#ff4444"/>
+          <rect x="113" y="93" width="8" height="8" fill="#ff4444"/>
+          <!-- stitched mouth -->
+          <polygon points="82,126 118,126 114,138 86,138" fill="#16100d"/>
+          <g stroke="#2f3f28" stroke-width="2">
+            <line x1="91" y1="124" x2="91" y2="140"/>
+            <line x1="100" y1="124" x2="100" y2="140"/>
+            <line x1="109" y1="124" x2="109" y2="140"/>
+          </g>
+          <!-- blood drip -->
+          <path d="M122 149 q5 15 0 22 q-5 -7 0 -22" fill="#9b2f2f"/>
+        </svg>
+      </div>
+    </a>
+
+    <a class="featured" href="https://timothy8901.github.io/elder-story-rpg/" aria-label="Play Elder Story RPG">
+      <div>
+        <span class="label">New &middot; Side-scrolling RPG</span>
+        <h2>Elder Story RPG</h2>
+        <p>A 2D side-scroller with MapleStory-style platforming and Skyrim-style progression: use-to-level skills &amp; perks, modular loot, eight joinable guilds, a dragon-slaying main quest with Thu'um shouts, animated pixel art, and auto-saving — all in the browser, no install.</p>
+        <div class="meta">
+          <span>Keyboard controls</span>
+          <span>8 guilds &amp; quests</span>
+          <span>Dragons &amp; Thu'um</span>
+          <span>Saves your progress</span>
+        </div>
+        <span class="play-cta">Play now &rarr;</span>
+      </div>
+      <div class="preview" aria-hidden="true">
+        <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+          <!-- chibi hero with a sword -->
+          <ellipse cx="100" cy="171" rx="34" ry="9" fill="#000000" opacity="0.22"/>
+          <rect x="84" y="132" width="13" height="31" rx="3" fill="#39405a"/>
+          <rect x="103" y="132" width="13" height="31" rx="3" fill="#39405a"/>
+          <g transform="rotate(20 138 92)">
+            <rect x="134" y="44" width="8" height="74" rx="3" fill="#eef2f7" stroke="#9aa9bc" stroke-width="2"/>
+            <rect x="127" y="113" width="22" height="7" rx="2" fill="#caa24a"/>
+            <rect x="135" y="119" width="6" height="15" rx="2" fill="#6b4a2a"/>
+          </g>
+          <rect x="77" y="92" width="46" height="47" rx="9" fill="#3f78c0" stroke="#2d5994" stroke-width="2"/>
+          <rect x="77" y="120" width="46" height="19" rx="6" fill="#2d5994"/>
+          <circle cx="100" cy="72" r="26" fill="#ffd9a8" stroke="#e0b98f" stroke-width="2"/>
+          <path d="M74 72 A26 26 0 0 1 126 72 Z" fill="#5a3a1c"/>
+          <rect x="74" y="68" width="52" height="6" fill="#5a3a1c"/>
+          <circle cx="92" cy="80" r="3.4" fill="#241c2e"/>
+          <circle cx="108" cy="80" r="3.4" fill="#241c2e"/>
+          <path d="M94 89 Q100 94 106 89" fill="none" stroke="#9c5a3c" stroke-width="2.4" stroke-linecap="round"/>
+        </svg>
+      </div>
+    </a>
+
     <a class="featured" href="kirby-abilities.html" aria-label="Play Kirby Brawler">
       <div>
         <span class="label">New &middot; Single-page game</span>
@@ -346,6 +460,51 @@
       </div>
     </a>
 
+    <a class="featured driver" href="street-driver.html" aria-label="Play Street Cruiser">
+      <div>
+        <span class="label">New &middot; Real-world driving</span>
+        <h2>Street Cruiser</h2>
+        <p>Type any US zip code and cruise its real streets — pulled live from OpenStreetMap and rendered as chunky top-down pixel art. Real buildings &amp; collisions, a minimap, day/night with headlights, engine &amp; tire sounds, and four cars to choose from. Touch controls or keyboard.</p>
+        <div class="meta">
+          <span>Real OSM streets</span>
+          <span>Touch + keyboard</span>
+          <span>Day / night</span>
+          <span>Minimap &amp; SFX</span>
+        </div>
+        <span class="play-cta">Play now &rarr;</span>
+      </div>
+      <div class="preview" aria-hidden="true">
+        <!-- top-down pixel car cruising a road -->
+        <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+          <!-- road -->
+          <rect x="68" y="0" width="4" height="200" fill="#34363b"/>
+          <rect x="72" y="0" width="56" height="200" fill="#52555c"/>
+          <rect x="128" y="0" width="4" height="200" fill="#34363b"/>
+          <!-- dashed center line -->
+          <g fill="#e8e4cf">
+            <rect x="98" y="6" width="4" height="20"/>
+            <rect x="98" y="42" width="4" height="20"/>
+            <rect x="98" y="78" width="4" height="20"/>
+            <rect x="98" y="114" width="4" height="20"/>
+            <rect x="98" y="150" width="4" height="20"/>
+            <rect x="98" y="186" width="4" height="14"/>
+          </g>
+          <!-- building footprints -->
+          <rect x="12" y="16" width="40" height="48" fill="#b9a98c" stroke="#6d6253" stroke-width="3"/>
+          <rect x="150" y="118" width="40" height="54" fill="#b9a98c" stroke="#6d6253" stroke-width="3"/>
+          <!-- car (top-down, facing up) -->
+          <rect x="82" y="77" width="40" height="64" rx="6" fill="#000000" opacity="0.25"/>
+          <rect x="80" y="74" width="40" height="64" rx="6" fill="#e23b3b"/>
+          <rect x="80" y="74" width="40" height="11" rx="5" fill="#ff7a7a"/>
+          <rect x="88" y="92" width="24" height="30" rx="4" fill="#201013"/>
+          <rect x="90" y="84" width="20" height="8" rx="2" fill="#bfe8ff"/>
+          <rect x="90" y="122" width="20" height="7" rx="2" fill="#7fb8d8"/>
+          <rect x="83" y="75" width="6" height="4" fill="#fff6d0"/>
+          <rect x="111" y="75" width="6" height="4" fill="#fff6d0"/>
+        </svg>
+      </div>
+    </a>
+
     <h2 class="section-title">More Games</h2>
     <div class="games-grid">
       <a class="game-card" href="https://timothy8901.github.io/robo-revolution/" target="_blank" rel="noopener">
@@ -407,6 +566,8 @@
   </main>
 
   <footer>
+    <p class="studio-hint">&#9662;&nbsp; a Not Tim Games joint &nbsp;&#9662;</p>
+    <img class="studio-banner" src="assets/not-tim-games.jpg" alt="Not Tim Games" />
     <p>&copy; 2025 Timothy Howley &middot; <a href="https://github.com/timothy8901/practice-games">Source on GitHub</a></p>
   </footer>
 

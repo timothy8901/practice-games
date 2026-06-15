@@ -71,6 +71,16 @@ WASD / arrows, **`Space` jump-dodges** over swings and projectiles, `P`
 pauses, `M` mutes. It pulls Three.js from a CDN but is still a single
 self-contained HTML page.
 
+## Theater of the Undead
+
+- **Theater of the Undead** (`theater-of-the-undead/`) — a top-down twin-stick
+  **Call of Duty Zombies** clone of *Kino der Toten*, rendered in the chunky
+  low-poly style of classic **RuneScape** (Three.js, vendored — no build step).
+  Round-based horde survival with the power switch, 4 perks, the moving Mystery
+  Box, Pack-a-Punch, wall-buys, traps, hellhound rounds, power-ups, and 4
+  survivors. Keyboard + mouse **or** controller. A multi-file game, so it lives in
+  its own folder; the homepage links to `theater-of-the-undead/index.html`.
+
 ## Dictionary / wordlist notes
 
 The Baker's Dozen game supports validating player words against a wordlist.
