@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>THEATER OF THE UNDEAD — a low-poly zombies survival</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+<div id="stage">
+  <canvas id="gl"></canvas>
+
+  <!-- overlays -->
+  <div id="vignette"></div>
+  <div id="reticle"></div>
+
+  <!-- ===================== BATTLE HUD ===================== -->
+  <div id="hud" class="hidden">
+    <div id="topbar">
+      <div class="stat"><div class="lbl">POINTS</div><div id="points" class="val">500</div></div>
+      <div class="stat round"><div class="lbl">ROUND</div><div id="round" class="val">0</div></div>
+    </div>
+
+    <div id="perks"></div>
+
+    <div id="ammobox">
+      <div id="weapon-name">M1911</div>
+      <div class="ammo"><span id="ammo-mag">8</span><span class="sep">/</span><span id="ammo-res">80</span></div>
+      <div class="nades"><span id="grenades">✸ 4</span> <span id="tacticals"></span></div>
+    </div>
+
+    <div id="prompt"></div>
+    <div id="toast"></div>
+    <div id="announce"></div>
+    <div id="downbar"><div id="down-fill"></div></div>
+  </div>
+
+  <!-- ===================== TITLE ===================== -->
+  <div id="title" class="panel">
+    <div class="logo">
+      <div class="logo-top">THEATER&nbsp;OF&nbsp;THE</div>
+      <div class="logo-bottom">UNDEAD</div>
+    </div>
+    <div class="tag">KINO&nbsp;DER&nbsp;TOTEN&nbsp;·&nbsp;SURVIVE&nbsp;THE&nbsp;HORDE</div>
+    <div class="press" id="press-start">CLICK&nbsp;OR&nbsp;PRESS&nbsp;ANY&nbsp;KEY</div>
+    <div class="foot">an original low-poly tribute — not affiliated with Activision / Treyarch or Jagex</div>
+  </div>
+
+  <!-- ===================== CHARACTER SELECT ===================== -->
+  <div id="charsel" class="panel hidden">
+    <div class="cs-title">CHOOSE YOUR SURVIVOR</div>
+    <div id="char-grid"></div>
+    <div class="cs-hint">◀ ▶ / A·D to choose · ENTER / A to begin · or click a survivor</div>
+  </div>
+
+  <!-- ===================== PAUSE ===================== -->
+  <div id="pause" class="panel center hidden">
+    <div class="p-title">PAUSED</div>
+    <button id="btn-resume">RESUME</button>
+    <button id="btn-quit">QUIT TO TITLE</button>
+  </div>
+
+  <!-- ===================== GAME OVER ===================== -->
+  <div id="gameover" class="panel center hidden">
+    <div class="go-title">YOU DIED</div>
+    <div class="go-stats">REACHED ROUND <b id="go-round">0</b><br>SCORE <b id="go-points">0</b></div>
+    <button id="btn-restart">PLAY AGAIN</button>
+  </div>
+
+  <div id="fps" class="hidden"></div>
+</div>
+
+<section id="controls-legend">
+  <div class="cl-title">Controls</div>
+  <div class="cl-grid">
+    <div class="cl-row"><span class="cl-keys"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></span><span class="cl-act">Move</span></div>
+    <div class="cl-row"><span class="cl-keys"><kbd>Mouse</kbd></span><span class="cl-act">Aim</span></div>
+    <div class="cl-row"><span class="cl-keys"><kbd>LMB</kbd></span><span class="cl-act">Fire</span></div>
+    <div class="cl-row"><span class="cl-keys"><kbd>R</kbd></span><span class="cl-act">Reload</span></div>
+    <div class="cl-row"><span class="cl-keys"><kbd>F</kbd></span><span class="cl-act">Buy / Use</span></div>
+    <div class="cl-row"><span class="cl-keys"><kbd>V</kbd></span><span class="cl-act">Knife</span></div>
+    <div class="cl-row"><span class="cl-keys"><kbd>G</kbd></span><span class="cl-act">Grenade</span></div>
+    <div class="cl-row"><span class="cl-keys"><kbd>Q</kbd></span><span class="cl-act">Swap weapon</span></div>
+    <div class="cl-row"><span class="cl-keys"><kbd>◀</kbd><kbd>▶</kbd></span><span class="cl-act">Rotate camera</span></div>
+    <div class="cl-row"><span class="cl-keys"><kbd>P</kbd></span><span class="cl-act">Pause</span></div>
+  </div>
+  <div class="cl-title" style="margin-top:6px">Controller</div>
+  <div class="cl-grid">
+    <div class="cl-row"><span class="cl-keys"><kbd>L-Stick</kbd></span><span class="cl-act">Move</span></div>
+    <div class="cl-row"><span class="cl-keys"><kbd>R-Stick</kbd></span><span class="cl-act">Aim</span></div>
+    <div class="cl-row"><span class="cl-keys"><kbd>RT</kbd></span><span class="cl-act">Fire</span></div>
+    <div class="cl-row"><span class="cl-keys"><kbd>X</kbd></span><span class="cl-act">Reload</span></div>
+    <div class="cl-row"><span class="cl-keys"><kbd>A</kbd></span><span class="cl-act">Buy / Use</span></div>
+    <div class="cl-row"><span class="cl-keys"><kbd>B</kbd></span><span class="cl-act">Knife</span></div>
+    <div class="cl-row"><span class="cl-keys"><kbd>LT</kbd></span><span class="cl-act">Grenade</span></div>
+    <div class="cl-row"><span class="cl-keys"><kbd>Y</kbd></span><span class="cl-act">Swap</span></div>
+    <div class="cl-row"><span class="cl-keys"><kbd>D-Pad</kbd></span><span class="cl-act">Rotate camera</span></div>
+  </div>
+</section>
+
+<!-- ===================== STUDIO FOOTER ===================== -->
+<footer id="site-footer">
+  <div class="scroll-hint">▾ &nbsp; a Not Tim Games joint &nbsp; ▾</div>
+  <img class="studio" src="assets/not-tim-games.jpg" alt="Not Tim Games" />
+  <div class="links">
+    <a href="https://github.com/timothy8901" target="_blank" rel="noopener">▸ More Not Tim Games</a>
+  </div>
+  <div class="copy">THEATER OF THE UNDEAD · original code &amp; art · a fan tribute to Call of Duty Zombies &amp; RuneScape — not affiliated with Activision / Treyarch or Jagex</div>
+</footer>
+
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.js", "three/addons/": "./vendor/jsm/" } }
+</script>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
