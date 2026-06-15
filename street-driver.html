@@ -77,6 +77,17 @@
   .swatch .roof { position:absolute; left:30%; top:22%; width:40%; height:56%; border-radius:3px; }
   .swatch .glass { position:absolute; left:34%; top:30%; width:14%; height:40%; background:#bfe8ff; border-radius:1px; }
 
+  /* ---- game over ---- */
+  #gameover { background: linear-gradient(160deg, #3a1f1f 0%, #14080a 100%); }
+  .title.go { color: #ff6b5a; text-shadow: 3px 3px 0 #7a1c12, 6px 6px 0 rgba(0,0,0,.35); }
+  .go-sub { color: #e0a89c; margin: 0 0 22px; font-size: clamp(.85rem,3.6vw,1.05rem); }
+  .go-stats { display: flex; gap: 36px; margin: 4px 0 28px; }
+  .stat { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .stat-num { font-size: 2.4rem; font-weight: 900; color: #ffe14d; line-height: 1; }
+  .stat-lbl { font-size: .7rem; text-transform: uppercase; letter-spacing: .1em; color: #c79a90; }
+  .go-btns { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+  .btn.ghost { background: #2a3b4d; color: #cfe0f0; box-shadow: 0 4px 0 #16222e; }
+
   /* ---- loading ---- */
   #loading { background: #0e1622; gap: 18px; }
   .spinner {
@@ -189,7 +200,7 @@
   <!-- Start screen -->
   <div id="start" class="screen">
     <h1 class="title">STREET CRUISER</h1>
-    <p class="subtitle">Type a US zip code, cruise its real streets in chunky pixel art, and run package deliveries for cash.</p>
+    <p class="subtitle">Type a US zip code and run package deliveries on its real streets. Each drop-off makes your rig longer and faster — don't crash into a building!</p>
     <div class="ziprow">
       <input id="zipInput" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="5"
              placeholder="90210" autocomplete="off" aria-label="US zip code">
@@ -211,6 +222,20 @@
     <div id="loadingSub"></div>
   </div>
 
+  <!-- Game over screen -->
+  <div id="gameover" class="screen hidden">
+    <h1 class="title go">CRASHED!</h1>
+    <p class="go-sub">You wrapped your rig around a building.</p>
+    <div class="go-stats">
+      <div class="stat"><span class="stat-num" id="goPackages">0</span><span class="stat-lbl">packages delivered</span></div>
+      <div class="stat"><span class="stat-num" id="goSpeed">0 mph</span><span class="stat-lbl">top speed</span></div>
+    </div>
+    <div class="go-btns">
+      <button id="retryBtn" class="btn">Drive again</button>
+      <button id="newLocBtn" class="btn ghost">New location</button>
+    </div>
+  </div>
+
   <div class="credit">Map data © OpenStreetMap contributors</div>
 </div>
 
@@ -224,6 +249,14 @@
   const VW = 480;                 // base internal pixel width (height derives from aspect)
   const SCALE = 2.7;              // pixels per world-meter (zoom). Higher = more zoomed in / faster feel.
   const REACH = 16;               // world meters: how close counts as "arrived" at a quest target
+  const BUILDING_INFLATE = 1.2;   // grow building footprints slightly (visual + collision)
+
+  // Snake-style growth: each delivery lengthens the car and raises its top speed.
+  const SEG_SPACING = 5;          // world meters between tail segments
+  const MAX_SEG = 40;             // cap on tail length
+  const BASE_TOP = 46;            // base top speed (m/s); grows with deliveries
+  const SPEED_PER_PKG = 3;        // m/s added to top speed per delivery
+  const CRASH_SPEED = 6;          // below this you just nudge a wall; above it you crash
 
   // Day / night palettes. `PAL` points at the active one.
   const PALS = {
@@ -280,7 +313,7 @@
   const $ = (id) => document.getElementById(id);
   const canvas = $("game");
   const ctx = canvas.getContext("2d");
-  const screens = { start: $("start"), loading: $("loading") };
+  const screens = { start: $("start"), loading: $("loading"), gameover: $("gameover") };
   const hud = $("hud"), controls = $("controls");
   const zipInput = $("zipInput"), zipError = $("zipError");
   const locLabel = $("locLabel"), speedLabel = $("speedLabel");
@@ -305,6 +338,11 @@
   let quest = null;          // { stage:'pickup'|'dropoff', pickup:{x,y}, dropoff:{x,y} }
   let deliveries = 0, cash = 0;
 
+  // snake-growth / run state
+  let trail = [];            // recent head positions (most-recent first) for the tail
+  let topSpeed = BASE_TOP;   // current speed cap (grows with deliveries)
+  let bestMph = 0;           // fastest speed reached this run (for the game-over screen)
+
   const input = { left:false, right:false, gas:false, brake:false };
 
   // ============================================================
@@ -314,6 +352,7 @@
     state = s;
     screens.start.classList.toggle("hidden", s !== "start");
     screens.loading.classList.toggle("hidden", s !== "loading");
+    screens.gameover.classList.toggle("hidden", s !== "gameover");
     hud.classList.toggle("hidden", s !== "game");
     controls.classList.toggle("hidden", s !== "game");
     if (s === "game") canvas.style.background = PAL.grass;
@@ -388,6 +427,14 @@ out geom;`;
   // ============================================================
   //  Projection: lat/lon -> local meters (equirectangular)
   // ============================================================
+  // Scale a polygon outward from its centroid (used to enlarge building footprints).
+  function inflatePolygon(pts, f) {
+    let cx = 0, cy = 0;
+    for (const p of pts) { cx += p.x; cy += p.y; }
+    cx /= pts.length; cy /= pts.length;
+    return pts.map((p) => ({ x: cx + (p.x - cx) * f, y: cy + (p.y - cy) * f }));
+  }
+
   function bboxOf(pts) {
     let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
     for (const p of pts) {
@@ -422,8 +469,13 @@ out geom;`;
         for (const p of pts) worldPoints.push(p);
         swallow(bbox);
       } else if (tags.building) {
-        // need at least a triangle to be a footprint
-        if (pts.length >= 3) { buildings.push({ pts, bbox }); swallow(bbox); }
+        // need at least a triangle to be a footprint; inflate it a touch
+        if (pts.length >= 3) {
+          const ip = inflatePolygon(pts, BUILDING_INFLATE);
+          const ib = bboxOf(ip);
+          buildings.push({ pts: ip, bbox: ib });
+          swallow(ib);
+        }
       }
     }
     bounds = { minX, minY, maxX, maxY };
@@ -437,6 +489,7 @@ out geom;`;
     for (const r of roads) {
       for (let i = 0; i < r.pts.length; i++) {
         const p = r.pts[i];
+        if (insideBuilding(p.x, p.y)) continue;   // don't spawn inside a footprint
         const d = p.x * p.x + p.y * p.y;
         if (d < bestD) { bestD = d; best = p; bestRoad = r; bestIdx = i; }
       }
@@ -491,10 +544,45 @@ out geom;`;
         cash += Math.max(5, Math.round(dist / 12));
         scoreLabel.textContent = "★ " + deliveries + " · $" + cash;
         blip(680, 0.1); blip(990, 0.16);
+        topSpeed = Math.min(95, BASE_TOP + deliveries * SPEED_PER_PKG); // faster as you grow
         generateQuest();
       }
     }
   }
+
+  // (re)start a run: fresh car, reset score/length/speed, new first job.
+  function beginRun() {
+    spawnCar();
+    deliveries = 0; cash = 0; bestMph = 0;
+    topSpeed = BASE_TOP;
+    trail = [{ x: car.x, y: car.y }];
+    scoreLabel.textContent = "★ 0 · $0";
+    generateQuest();
+  }
+
+  function restartRun() {
+    beginRun();
+    show("game");
+    lastT = performance.now();
+  }
+
+  // crash into a building -> end the run and show the score.
+  function crash() {
+    if (state !== "game") return;
+    blip(180, 0.25); blip(90, 0.45);
+    if (audio.started) {
+      audio.og.gain.setTargetAtTime(0, audio.ctx.currentTime, 0.05);
+      audio.tg.gain.setTargetAtTime(0, audio.ctx.currentTime, 0.05);
+    }
+    for (const k in input) input[k] = false;
+    document.querySelectorAll(".ctrl").forEach((el) => el.classList.remove("pressed"));
+    $("goPackages").textContent = deliveries;
+    $("goSpeed").textContent = Math.round(bestMph) + " mph";
+    show("gameover");
+  }
+
+  // current tail length (segments), capped
+  function segCount() { return Math.min(MAX_SEG, deliveries); }
 
   // ============================================================
   //  Main "drive here" flow
@@ -545,10 +633,7 @@ out geom;`;
     }
     pendingWideZip = null;
 
-    spawnCar();
-    deliveries = 0; cash = 0;
-    scoreLabel.textContent = "★ 0 · $0";
-    generateQuest();
+    beginRun();
     locLabel.textContent = "Driving in " + place.city + ", " + place.state;
     busy = false;
     initAudio();      // user already gestured (Drive/random/Enter)
@@ -560,7 +645,8 @@ out geom;`;
   //  Physics + collisions
   // ============================================================
   // Speeds are in meters/second (world units). 45 m/s ≈ 100 mph.
-  const MAX_SPEED = 46, MAX_REV = 13;
+  // Top speed is dynamic (topSpeed, grows per delivery); reverse is fixed.
+  const MAX_REV = 13;
   const ACCEL = 19, BRAKE = 42, FRICTION = 9;
   const TURN_RATE = 2.6;
 
@@ -574,7 +660,7 @@ out geom;`;
       if (car.speed > 0) car.speed = Math.max(0, car.speed - f);
       else if (car.speed < 0) car.speed = Math.min(0, car.speed + f);
     }
-    car.speed = Math.max(-MAX_REV, Math.min(MAX_SPEED, car.speed));
+    car.speed = Math.max(-MAX_REV, Math.min(topSpeed, car.speed));
 
     const speedFrac = Math.min(1, Math.abs(car.speed) / 16);
     const dir = car.speed >= 0 ? 1 : -1;
@@ -588,12 +674,12 @@ out geom;`;
     let nx = car.x + vx * dt;
     let ny = car.y + vy * dt;
 
-    // Building collision: if the new spot is inside a footprint, stop & bounce.
+    // Building collision: at speed it's a crash (game over); crawling, just nudge.
     if (insideBuilding(nx, ny)) {
-      // try sliding along one axis so we don't fully stick on glancing hits
+      if (Math.abs(car.speed) > CRASH_SPEED) { crash(); return; }
       if (!insideBuilding(nx, car.y)) { ny = car.y; }
       else if (!insideBuilding(car.x, ny)) { nx = car.x; }
-      else { nx = car.x; ny = car.y; car.speed = -car.speed * 0.3; }
+      else { nx = car.x; ny = car.y; car.speed = 0; }
     }
 
     // Off-road grass drag
@@ -603,6 +689,40 @@ out geom;`;
       else car.speed = Math.min(0, car.speed + drag);
     }
     car.x = nx; car.y = ny;
+    recordTrail();
+  }
+
+  // Record the head's path so tail segments can follow it (Snake-style).
+  function recordTrail() {
+    const head = trail[0];
+    if (!head || Math.hypot(car.x - head.x, car.y - head.y) >= 1.2) {
+      trail.unshift({ x: car.x, y: car.y });
+      const needed = (segCount() + 1) * SEG_SPACING + 8;
+      let dist = 0;
+      for (let i = 1; i < trail.length; i++) {
+        dist += Math.hypot(trail[i].x - trail[i - 1].x, trail[i].y - trail[i - 1].y);
+        if (dist > needed) { trail.length = i + 1; break; }
+      }
+    }
+  }
+
+  // Point (and facing) a given distance back along the recorded trail.
+  function getTrailPoint(d) {
+    if (trail.length < 2) return null;
+    let acc = 0;
+    for (let i = 1; i < trail.length; i++) {
+      const a = trail[i - 1], b = trail[i];
+      const seg = Math.hypot(b.x - a.x, b.y - a.y);
+      if (seg === 0) continue;
+      if (acc + seg >= d) {
+        const t = (d - acc) / seg;
+        return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t,
+                 ang: Math.atan2(b.y - a.y, b.x - a.x) };
+      }
+      acc += seg;
+    }
+    const last = trail[trail.length - 1], prev = trail[trail.length - 2];
+    return { x: last.x, y: last.y, ang: Math.atan2(last.y - prev.y, last.x - prev.x) };
   }
 
   function insideBuilding(x, y) {
@@ -706,12 +826,13 @@ out geom;`;
     // night lighting (vignette + headlights) under the car
     if (PAL.vignette > 0) drawNight(W, H);
 
-    // quest target marker (on the world), then car, then an off-screen arrow
+    // quest target marker (on the world), then tail + car, then an off-screen arrow
     if (quest) {
       const tgt = quest.stage === "pickup" ? quest.pickup : quest.dropoff;
       drawMarker(tgt.x, tgt.y, quest.stage, ox, oy);
     }
 
+    drawTail(ox, oy);
     drawCar(W / 2, H / 2, car.heading);
 
     if (quest) {
@@ -814,6 +935,23 @@ out geom;`;
       ctx.fill();
     }
     ctx.restore();
+  }
+
+  // Snake-style tail: a convoy of car segments trailing the head, growing per delivery.
+  function drawTail(ox, oy) {
+    const n = segCount();
+    for (let i = n; i >= 1; i--) {           // far segments first so near ones overlap
+      const p = getTrailPoint(i * SEG_SPACING);
+      if (!p) continue;
+      const sx = p.x * SCALE + ox, sy = p.y * SCALE + oy;
+      ctx.save();
+      ctx.translate(sx, sy);
+      ctx.rotate(p.ang);
+      ctx.fillStyle = "rgba(0,0,0,0.25)"; ctx.fillRect(-6, -3, 13, 8);
+      ctx.fillStyle = carDesign.body;     ctx.fillRect(-6, -4, 12, 9);
+      ctx.fillStyle = carDesign.roof;     ctx.fillRect(-3, -3, 6, 6);
+      ctx.restore();
+    }
   }
 
   function drawCar(cx, cy, heading) {
@@ -928,7 +1066,7 @@ out geom;`;
   }
 
   function updateAudio() {
-    if (!audio.started || audio.muted || !car) return;
+    if (!audio.started || audio.muted || !car || state !== "game") return;
     const t = audio.ctx.currentTime;
     const sp = Math.abs(car.speed);            // m/s, 0..46
     audio.osc.frequency.setTargetAtTime(52 + sp * 5.0, t, 0.05);
@@ -972,6 +1110,7 @@ out geom;`;
       updateAudio();
       render();
       const mph = Math.round(Math.abs(car.speed) * 2.237); // m/s -> mph
+      if (mph > bestMph) bestMph = mph;
       speedLabel.textContent = (car.speed < -1 ? "R " : "") + mph + " mph";
     }
   }
@@ -1070,6 +1209,8 @@ out geom;`;
   });
   $("muteBtn").addEventListener("click", () => setMuted(!audio.muted));
   $("dayNightBtn").addEventListener("click", () => setMode(mode === "day" ? "night" : "day"));
+  $("retryBtn").addEventListener("click", () => { initAudio(); restartRun(); });
+  $("newLocBtn").addEventListener("click", () => { quest = null; show("start"); zipInput.focus(); });
 
   // boot
   buildCarPicker();
