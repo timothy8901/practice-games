@@ -71,6 +71,23 @@ WASD / arrows, **`Space` jump-dodges** over swings and projectiles, `P`
 pauses, `M` mutes. It pulls Three.js from a CDN but is still a single
 self-contained HTML page.
 
+## Grocery Tycoon
+
+- **Grocery Tycoon** (`grocery-tycoon.html`) — a single-file produce-store tycoon
+  in the spirit of *RollerCoaster Tycoon* / *Zoo Tycoon*, built around the tension
+  of **perishable goods**. Grow a fruit stand into a hypermarket across five store
+  tiers while managing inventory & pricing (a real demand curve), freshness &
+  **spoilage** (green→yellow→brown, refrigeration, markdowns), a supply chain
+  (co-op vs. distributor vs. depot, delivery times, refrigerated trucks, bulk &
+  JIT), marketing with diminishing returns, four seasons, random events (heatwave,
+  craze, festival, supplier disruption, bad press, health inspection), reputation,
+  cashiers & stockers, a rival store, and a no-fail loan system. Real-time day clock
+  with Pause/1×/2×/4×. Includes a full **110-achievement** system (categories,
+  progress bars, secret `???` entries, completion %), a vegan "Green Thumb" challenge
+  ladder, and `localStorage` autosave. Point-and-click / touch only; all balancing
+  constants are grouped and commented at the top of the file. Pure vanilla JS, no
+  build step — runs by double-clicking.
+
 ## Theater of the Undead
 
 - **Theater of the Undead** (`theater-of-the-undead/`) — a top-down twin-stick

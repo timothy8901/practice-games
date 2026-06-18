@@ -1,0 +1,1753 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="description" content="Grocery Tycoon — run a produce store, fight spoilage, grow from a fruit stand to a hypermarket empire. 110 achievements.">
+<title>Grocery Tycoon</title>
+<style>
+/* ============================================================================
+   GROCERY TYCOON — single-file browser game
+   All theming via CSS variables; balancing constants live in the <script>.
+   ============================================================================ */
+:root{
+  --bg:#14241c; --bg2:#1b3327; --panel:#1f3b2d; --panel2:#27493700;
+  --card:#244836; --card-hi:#2e5a43; --line:#356b4f;
+  --text:#eaf6ee; --muted:#9dc4ad; --dim:#6f9a82;
+  --green:#5fd273; --green-d:#2f8c46; --accent:#ffd54d; --accent-d:#c9a020;
+  --red:#ff6b6b; --red-d:#b83a3a; --orange:#ff9f43; --blue:#5db4ff; --purple:#c08bff;
+  --fresh:#5fd273; --aging:#ffd54d; --stale:#ff9f43; --rotten:#9b6b3a;
+  --shadow:0 8px 30px rgba(0,0,0,.45);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{margin:0;padding:0;height:100%;}
+body{
+  background:radial-gradient(1200px 700px at 50% -10%, #1f3b2d 0%, var(--bg) 60%) fixed;
+  color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif;
+  overflow:hidden; line-height:1.4; user-select:none; -webkit-user-select:none;
+}
+button{font-family:inherit;cursor:pointer;border:none;color:inherit;}
+.hidden{display:none !important;}
+
+/* ---------- App shell ---------- */
+#app{display:flex;flex-direction:column;height:100dvh;max-width:1180px;margin:0 auto;position:relative;}
+
+/* ---------- Top bar ---------- */
+#topbar{
+  display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  padding:8px 12px;background:linear-gradient(180deg,#1b3327,#16271d);
+  border-bottom:1px solid var(--line);z-index:30;
+}
+.stat{display:flex;flex-direction:column;line-height:1.05;min-width:0;}
+.stat .lbl{font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);}
+.stat .val{font-size:1.02rem;font-weight:800;white-space:nowrap;}
+.stat .val small{font-size:.7rem;font-weight:600;color:var(--muted);}
+#cashStat .val{color:var(--accent);}
+#repWrap{flex:1;min-width:120px;max-width:240px;}
+#repBar{height:9px;border-radius:6px;background:#16271d;overflow:hidden;margin-top:3px;border:1px solid var(--line);}
+#repFill{height:100%;width:50%;background:linear-gradient(90deg,#ff6b6b,#ffd54d,#5fd273);transition:width .4s;}
+.spacer{flex:1;}
+#speedCtl{display:flex;gap:4px;background:#16271d;padding:4px;border-radius:10px;border:1px solid var(--line);}
+#speedCtl button{
+  min-width:42px;height:36px;border-radius:7px;background:transparent;color:var(--muted);
+  font-weight:800;font-size:.85rem;display:flex;align-items:center;justify-content:center;
+}
+#speedCtl button.on{background:var(--green);color:#0f2016;box-shadow:0 2px 8px rgba(95,210,115,.4);}
+#dayProgWrap{position:absolute;left:0;bottom:-1px;height:3px;width:100%;background:transparent;}
+#dayProg{height:100%;width:0%;background:var(--accent);transition:width .12s linear;}
+
+/* ---------- Layout below topbar ---------- */
+#body{flex:1;display:flex;min-height:0;position:relative;overflow:hidden;}
+#store{flex:1;overflow-y:auto;padding:12px 12px 90px;-webkit-overflow-scrolling:touch;}
+#store h2.section{font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);margin:4px 2px 10px;font-weight:800;}
+
+/* ---------- Storefront tiles ---------- */
+#shelf{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:10px;}
+.tile{
+  background:linear-gradient(180deg,var(--card),#1f3b2d);border:1px solid var(--line);
+  border-radius:14px;padding:9px 9px 8px;position:relative;display:flex;flex-direction:column;gap:5px;
+  transition:transform .08s, box-shadow .12s, border-color .12s;overflow:hidden;
+}
+.tile.empty{opacity:.62;border-style:dashed;}
+.tile.sale-pulse{animation:salePulse .4s;}
+@keyframes salePulse{0%{transform:scale(1);}40%{transform:scale(1.045);box-shadow:0 0 0 2px var(--green);}100%{transform:scale(1);}}
+.tile .emoji{font-size:2.1rem;line-height:1;filter:drop-shadow(0 2px 2px rgba(0,0,0,.4));}
+.tile .seas{position:absolute;top:7px;right:8px;font-size:.85rem;}
+.tile .nm{font-weight:800;font-size:.86rem;display:flex;align-items:center;gap:4px;}
+.tile .vegtag{font-size:.6rem;background:#2f8c46;color:#eafff0;padding:1px 4px;border-radius:5px;letter-spacing:.04em;}
+.tile .nonveg{background:#b83a3a;}
+.tile .row{display:flex;justify-content:space-between;align-items:center;gap:6px 8px;font-size:.78rem;color:var(--muted);flex-wrap:wrap;}
+.tile .stock{font-weight:800;color:var(--text);font-size:.9rem;}
+.tile .price{font-weight:800;color:var(--accent);font-size:.84rem;background:#1a3326;border:1px solid var(--line);border-radius:7px;padding:4px 9px;min-height:30px;display:inline-flex;align-items:center;flex-shrink:0;}
+.tile .price:active{transform:translateY(1px);}
+.tile .freshWrap{height:7px;border-radius:5px;background:#16271d;overflow:hidden;border:1px solid #1d3829;}
+.tile .freshFill{height:100%;width:100%;background:var(--fresh);transition:width .3s,background .3s;}
+.tile .spoiled{font-size:.66rem;color:var(--orange);font-weight:700;}
+.tile .tossBtn{min-height:30px;border-radius:8px;font-weight:800;font-size:.68rem;background:#5a2f2f;border:1px solid #8a4a4a;color:#ffd8d8;width:100%;}
+.tile .tossBtn:active{transform:translateY(1px);}
+.tile .btns{display:flex;gap:5px;margin-top:1px;}
+.tile .btns button{
+  flex:1;min-width:0;min-height:32px;border-radius:8px;font-weight:800;font-size:.74rem;white-space:nowrap;
+  background:#1a3326;border:1px solid var(--line);color:var(--text);display:flex;align-items:center;justify-content:center;
+}
+.tile .btns button.buy{background:var(--green-d);border-color:#3aa85a;color:#eafff0;}
+.tile .btns button.mkdn{background:#7a5a1e;border-color:#a8821c;color:#fff6e0;}
+.tile .btns button.price{background:#244836;}
+.tile .btns button:active{transform:translateY(1px);}
+.tile.front::after{content:"⭐ FRONT";position:absolute;bottom:0;left:0;font-size:.52rem;background:var(--accent);color:#1f3b2d;padding:1px 5px;border-top-right-radius:6px;font-weight:800;letter-spacing:.05em;}
+.addTile{display:flex;align-items:center;justify-content:center;flex-direction:column;gap:4px;color:var(--dim);font-weight:800;cursor:pointer;min-height:150px;}
+.addTile .plus{font-size:1.8rem;}
+
+/* ---------- Bottom tab bar ---------- */
+#tabbar{
+  position:absolute;left:0;right:0;bottom:0;display:flex;background:linear-gradient(0deg,#16271d,#1b3327);
+  border-top:1px solid var(--line);z-index:40;padding-bottom:env(safe-area-inset-bottom);
+}
+#tabbar button{
+  flex:1;min-height:56px;background:transparent;color:var(--muted);display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:2px;font-size:.62rem;font-weight:700;letter-spacing:.03em;position:relative;
+}
+#tabbar button .ic{font-size:1.2rem;}
+#tabbar button.on{color:var(--accent);}
+#tabbar button.on::before{content:"";position:absolute;top:0;left:18%;right:18%;height:3px;border-radius:0 0 4px 4px;background:var(--accent);}
+#tabbar button .badge{position:absolute;top:6px;right:calc(50% - 22px);background:var(--red);color:#fff;font-size:.58rem;min-width:16px;height:16px;border-radius:9px;display:flex;align-items:center;justify-content:center;padding:0 4px;font-weight:800;}
+
+/* ---------- Slide-up panel ---------- */
+#panelWrap{position:absolute;left:0;right:0;bottom:0;top:0;z-index:50;display:flex;flex-direction:column;justify-content:flex-end;pointer-events:none;}
+#panelScrim{position:absolute;inset:0;background:rgba(0,0,0,.5);opacity:0;transition:opacity .2s;pointer-events:none;}
+#panelWrap.open #panelScrim{opacity:1;pointer-events:auto;}
+#panel{
+  position:relative;background:linear-gradient(180deg,#234435,#1a3225);border-top:1px solid var(--line);
+  border-radius:18px 18px 0 0;max-height:82%;display:flex;flex-direction:column;
+  transform:translateY(110%);transition:transform .26s cubic-bezier(.2,.8,.2,1);pointer-events:auto;box-shadow:var(--shadow);
+}
+#panelWrap.open #panel{transform:translateY(0);}
+#panelHead{display:flex;align-items:center;gap:10px;padding:14px 16px 8px;}
+#panelHead h3{margin:0;font-size:1.1rem;font-weight:800;flex:1;}
+#panelClose{width:36px;height:36px;border-radius:50%;background:#16271d;border:1px solid var(--line);font-size:1.1rem;color:var(--muted);}
+#panelBody{overflow-y:auto;padding:4px 16px 24px;-webkit-overflow-scrolling:touch;}
+
+/* ---------- Generic panel UI ---------- */
+.itemRow{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:9px;}
+.itemRow .ic{font-size:1.6rem;width:32px;text-align:center;flex-shrink:0;}
+.itemRow .info{flex:1;min-width:0;}
+.itemRow .info .t{font-weight:800;font-size:.92rem;}
+.itemRow .info .d{font-size:.74rem;color:var(--muted);margin-top:1px;}
+.itemRow .act{flex-shrink:0;display:flex;flex-direction:column;gap:5px;align-items:flex-end;}
+.btn{min-height:38px;padding:0 14px;border-radius:9px;font-weight:800;font-size:.82rem;background:var(--green-d);color:#eafff0;border:1px solid #3aa85a;display:inline-flex;align-items:center;justify-content:center;gap:5px;}
+.btn.alt{background:#244836;border-color:var(--line);color:var(--text);}
+.btn.gold{background:var(--accent-d);border-color:var(--accent);color:#1f1300;}
+.btn.danger{background:var(--red-d);border-color:#d05050;color:#fff;}
+.btn:disabled{opacity:.4;filter:grayscale(.5);}
+.btn:active:not(:disabled){transform:translateY(1px);}
+.pill{display:inline-block;font-size:.66rem;font-weight:800;padding:2px 7px;border-radius:6px;background:#16271d;color:var(--muted);border:1px solid var(--line);}
+.pill.on{background:var(--green-d);color:#eafff0;border-color:#3aa85a;}
+.pill.warn{background:#7a5a1e;color:#fff6e0;border-color:#a8821c;}
+.note{font-size:.76rem;color:var(--muted);margin:2px 0 12px;}
+.tagline{font-size:.7rem;color:var(--dim);}
+hr.sep{border:none;border-top:1px solid var(--line);margin:14px 0;}
+.subhd{font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);font-weight:800;margin:14px 0 8px;}
+
+/* qty stepper */
+.stepper{display:flex;align-items:center;gap:0;background:#16271d;border:1px solid var(--line);border-radius:9px;overflow:hidden;}
+.stepper button{width:44px;height:44px;font-size:1.2rem;font-weight:800;background:#244836;color:var(--text);}
+.stepper button:active{background:var(--card-hi);}
+.stepper .qv{min-width:54px;text-align:center;font-weight:800;font-size:.95rem;padding:0 6px;}
+
+/* ---------- Modal ---------- */
+#modalWrap{position:absolute;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;padding:18px;background:rgba(0,0,0,.6);opacity:0;pointer-events:none;transition:opacity .2s;}
+#modalWrap.open{opacity:1;pointer-events:auto;}
+#modal{background:linear-gradient(180deg,#264a38,#1c3527);border:1px solid var(--line);border-radius:18px;max-width:440px;width:100%;max-height:88%;overflow-y:auto;box-shadow:var(--shadow);padding:20px;}
+#modal h3{margin:0 0 8px;font-size:1.3rem;}
+#modal p{color:var(--muted);font-size:.9rem;margin:6px 0;}
+#modal .modalBtns{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;}
+#modal .modalBtns .btn{flex:1;}
+
+/* ---------- Toasts ---------- */
+#toasts{position:absolute;top:62px;left:0;right:0;z-index:70;display:flex;flex-direction:column;align-items:center;gap:7px;pointer-events:none;padding:0 12px;}
+.toast{background:rgba(20,40,30,.96);border:1px solid var(--line);border-radius:12px;padding:9px 14px;font-size:.84rem;font-weight:700;max-width:380px;box-shadow:var(--shadow);animation:toastIn .3s, toastOut .4s 3.1s forwards;display:flex;align-items:center;gap:9px;}
+.toast .tic{font-size:1.2rem;}
+.toast.event{border-color:var(--blue);} .toast.good{border-color:var(--green);} .toast.bad{border-color:var(--red);}
+@keyframes toastIn{from{transform:translateY(-16px);opacity:0;}to{transform:translateY(0);opacity:1;}}
+@keyframes toastOut{to{transform:translateY(-10px);opacity:0;}}
+
+/* ---------- Achievement banner ---------- */
+#achBanner{position:absolute;top:70px;left:50%;transform:translateX(-50%) translateY(-160px);z-index:90;
+  background:linear-gradient(135deg,#3a2f00,#5a4a00);border:2px solid var(--accent);border-radius:16px;
+  padding:12px 18px;display:flex;align-items:center;gap:14px;box-shadow:0 10px 40px rgba(255,213,77,.35);transition:transform .5s cubic-bezier(.2,1.3,.4,1);min-width:280px;max-width:92%;}
+#achBanner.show{transform:translateX(-50%) translateY(0);}
+#achBanner .aic{font-size:2.2rem;animation:achSpin .8s;}
+@keyframes achSpin{0%{transform:scale(0) rotate(-40deg);}60%{transform:scale(1.25) rotate(8deg);}100%{transform:scale(1) rotate(0);}}
+#achBanner .atxt .k{font-size:.62rem;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);font-weight:800;}
+#achBanner .atxt .n{font-size:1.05rem;font-weight:800;}
+#achBanner .atxt .d{font-size:.74rem;color:#e9dca8;}
+#confetti{position:absolute;inset:0;pointer-events:none;z-index:88;overflow:hidden;}
+.confo{position:absolute;width:9px;height:14px;border-radius:2px;will-change:transform;}
+
+/* ---------- Floating +$ ---------- */
+.floatp{position:absolute;z-index:60;font-weight:800;font-size:.82rem;color:var(--green);pointer-events:none;text-shadow:0 1px 3px rgba(0,0,0,.7);animation:floatUp 1s ease-out forwards;}
+.floatp.neg{color:var(--red);}
+@keyframes floatUp{0%{transform:translateY(0);opacity:0;}15%{opacity:1;}100%{transform:translateY(-38px);opacity:0;}}
+
+/* ---------- Achievements panel ---------- */
+#achProgTop{display:flex;align-items:center;gap:12px;margin-bottom:6px;}
+#achPct{font-size:1.7rem;font-weight:800;color:var(--accent);}
+#achProgBar{flex:1;height:12px;border-radius:8px;background:#16271d;overflow:hidden;border:1px solid var(--line);}
+#achProgFill{height:100%;background:linear-gradient(90deg,var(--green),var(--accent));transition:width .5s;}
+.achCat{margin-top:16px;}
+.achCat .ch{font-size:.74rem;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);font-weight:800;margin-bottom:7px;display:flex;justify-content:space-between;}
+.achItem{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:11px;padding:8px 11px;margin-bottom:7px;opacity:.62;}
+.achItem.un{opacity:1;border-color:var(--green-d);background:linear-gradient(90deg,#244836,#27543a);}
+.achItem .aic2{font-size:1.4rem;width:30px;text-align:center;flex-shrink:0;filter:grayscale(1);}
+.achItem.un .aic2{filter:none;}
+.achItem .ab{flex:1;min-width:0;}
+.achItem .ab .an{font-weight:800;font-size:.86rem;}
+.achItem .ab .ad{font-size:.72rem;color:var(--muted);}
+.achItem .ab .apb{height:6px;border-radius:4px;background:#16271d;overflow:hidden;margin-top:4px;border:1px solid #1d3829;}
+.achItem .ab .apf{height:100%;background:var(--green);}
+.achItem .ab .apt{font-size:.62rem;color:var(--dim);margin-top:2px;}
+.achItem .when{font-size:.62rem;color:var(--dim);flex-shrink:0;text-align:right;}
+.achItem.secret .an{font-style:italic;color:var(--muted);}
+.achFilter{display:flex;gap:6px;margin:10px 0 4px;flex-wrap:wrap;}
+.achFilter button{padding:5px 11px;border-radius:8px;background:#16271d;border:1px solid var(--line);color:var(--muted);font-size:.72rem;font-weight:700;}
+.achFilter button.on{background:var(--green-d);color:#eafff0;border-color:#3aa85a;}
+
+/* ---------- helpers ---------- */
+.kv{display:flex;justify-content:space-between;font-size:.82rem;padding:3px 0;}
+.kv .k{color:var(--muted);} .kv .v{font-weight:700;}
+.good-t{color:var(--green);} .bad-t{color:var(--red);} .gold-t{color:var(--accent);}
+.center{text-align:center;}
+@media(max-width:480px){
+  #shelf{grid-template-columns:repeat(auto-fill,minmax(108px,1fr));gap:8px;}
+  .tile .emoji{font-size:1.8rem;}
+  .stat .val{font-size:.92rem;}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="topbar">
+    <div class="stat" id="cashStat"><span class="lbl">Cash</span><span class="val" id="cashVal">$0</span></div>
+    <div class="stat"><span class="lbl">Net Worth</span><span class="val" id="nwVal">$0</span></div>
+    <div class="stat"><span class="lbl">Day</span><span class="val" id="dayVal">1 <small id="seasonVal">Spring</small></span></div>
+    <div class="stat" id="repWrap"><span class="lbl">Reputation <span id="repNum" style="color:var(--text)"></span></span><div id="repBar"><div id="repFill"></div></div></div>
+    <div class="spacer"></div>
+    <div id="speedCtl">
+      <button data-spd="0" id="spdPause">❚❚</button>
+      <button data-spd="1" class="on">1×</button>
+      <button data-spd="2">2×</button>
+      <button data-spd="4">4×</button>
+    </div>
+    <div id="dayProgWrap"><div id="dayProg"></div></div>
+  </div>
+
+  <div id="body">
+    <div id="store">
+      <h2 class="section" id="storeTitle">🍎 Fruit Stand</h2>
+      <div id="shelf"></div>
+    </div>
+  </div>
+
+  <div id="tabbar">
+    <button data-tab="restock"><span class="ic">📦</span>Restock</button>
+    <button data-tab="upgrades"><span class="ic">🏪</span>Store</button>
+    <button data-tab="marketing"><span class="ic">📣</span>Marketing</button>
+    <button data-tab="staff"><span class="ic">👥</span>Staff</button>
+    <button data-tab="achievements"><span class="ic">🏆</span>Awards</button>
+  </div>
+
+  <div id="panelWrap">
+    <div id="panelScrim"></div>
+    <div id="panel">
+      <div id="panelHead"><h3 id="panelTitle">Restock</h3><button id="panelClose">✕</button></div>
+      <div id="panelBody"></div>
+    </div>
+  </div>
+
+  <div id="modalWrap"><div id="modal"></div></div>
+  <div id="toasts"></div>
+  <div id="achBanner"><div class="aic">🏆</div><div class="atxt"><div class="k">Achievement Unlocked!</div><div class="n">—</div><div class="d">—</div></div></div>
+  <div id="confetti"></div>
+</div>
+
+<script>
+"use strict";
+/* ============================================================================
+   ============================  BALANCING CONSTANTS  =========================
+   Everything tunable lives here, grouped & commented for easy iteration.
+   ============================================================================ */
+const C = {
+  VERSION: 4,                       // save schema version
+  SAVE_KEY: 'grocery_tycoon_save_v4',
+
+  START_CASH: 200,                  // starting bankroll (a few hundred bucks)
+  START_REP: 50,                    // reputation 0..100
+
+  // --- Day clock --- (real seconds per in-game day at 1x; faster speeds divide)
+  DAY_MS_1X: 14000,                 // one day takes 14s at 1×
+  CUSTOMER_BATCH_CAP: 120,          // max customers simulated per animation frame
+  MAX_FLOATERS: 14,                 // cap simultaneous floating +$ texts
+
+  // --- Demand / pricing model ---
+  MARKET_MARKUP: 2.5,               // marketPrice = wholesale * markup
+  ELASTICITY: 0.85,                 // price elasticity (higher = pickier shoppers)
+  BASKET_BASE: 1.6,                 // avg units a buying customer takes
+  BASKET_PER_TIER: 0.7,             // basket grows with store tier
+  BASKET_LOYALTY: 0.6,              // extra basket when loyalty program active
+
+  // --- Reputation dynamics ---
+  REP_LERP: 0.2,                    // how fast rep moves toward its daily target
+  REP_W_AVAIL: 34, REP_W_FRESH: 26, REP_W_PRICE: 20, REP_W_VARIETY: 12, REP_W_SPOIL: 8,
+
+  // --- Store tiers --- index 0..4 (cost = upgrade price; value = cumulative, feeds net worth)
+  TIERS: [
+    {name:'Fruit Stand',     emoji:'🍎', slots:4,  cap:140,    traffic:85,   rent:0,    maxEmp:0,  cost:0,      value:0},
+    {name:'Corner Store',    emoji:'🏬', slots:7,  cap:650,    traffic:300,  rent:45,   maxEmp:3,  cost:500,    value:500},
+    {name:'Neighborhood Market',emoji:'🏪',slots:12,cap:2600,  traffic:950,  rent:220,  maxEmp:5,  cost:3000,   value:3500},
+    {name:'Supermarket',     emoji:'🛒', slots:18, cap:8500,   traffic:3000, rent:950,  maxEmp:8,  cost:16000,  value:19500},
+    {name:'Hypermarket',     emoji:'🏙️', slots:26, cap:130000, traffic:8500, rent:3000, maxEmp:12, cost:130000, value:149500},
+  ],
+
+  // --- Refrigeration upgrade --- effShelf *= (1 + level*step)
+  REFRIG_MAX:5, REFRIG_STEP:0.22,
+  REFRIG_COST:[0, 800, 2600, 7000, 18000, 45000],   // cost to reach each level
+
+  // --- Supply chain ---
+  SUPPLIERS:{
+    quick:       {name:'Quick Restock (counter)', costMult:1.55, fresh:0,  days:0, min:1,   max:200,  tier:0, emoji:'⚡', desc:'Instant but pricey. Counts as an emergency order.'},
+    coop:        {name:'Local Farm Co-op',        costMult:1.10, fresh:2,  days:1, min:5,   max:60,   tier:0, emoji:'🚜', desc:'Fresh & local. Small batches, next-day. Needs a contract.'},
+    distributor: {name:'Regional Distributor',    costMult:0.82, fresh:0,  days:2, min:20,  max:600,  tier:1, emoji:'🚚', desc:'Cheaper in bulk, 2-day delivery.'},
+    depot:       {name:'Wholesale Depot',         costMult:0.64, fresh:-1, days:3, min:100, max:6000, tier:2, emoji:'🏭', desc:'Rock-bottom prices, huge minimums, 3 days, less fresh.'},
+  },
+  SUPPLY_UP:{
+    reefer:   {name:'Refrigerated Trucks', max:3, cost:[0,3000,9000,22000], desc:'+1 freshness per level on every delivery.'},
+    bulk:     {name:'Bulk Discount Deals',  max:3, cost:[0,2500,7500,20000], desc:'-6% supplier cost per level.'},
+    jit:      {name:'Just-in-Time Logistics',max:1,cost:[0,16000],          desc:'All supplier deliveries arrive same day.'},
+  },
+
+  // --- Marketing channels --- diminishing returns applied across active channels
+  MKT:{
+    flyers:{name:'Flyer Drop',   emoji:'📄', cost:120,  days:3, boost:0.45, repBoost:1, desc:'Cheap local reach.'},
+    radio: {name:'Radio Spot',   emoji:'📻', cost:480,  days:4, boost:0.85, repBoost:2, desc:'Wider reach, jingle included.'},
+    social:{name:'Social Blitz', emoji:'📱', cost:900,  days:4, boost:1.25, repBoost:3, desc:'Can go viral for a huge spike.'},
+  },
+  LOYALTY_COST:35,                  // daily cost while loyalty program active
+  LOYALTY_JOIN_RATE:0.04,           // fraction of daily customers who join as members
+  LOYALTY_BOOST_PER_100:0.18,       // customer multiplier per 100 members
+  LOYALTY_BOOST_MAX:1.5,            // cap on the loyalty traffic multiplier (+150%)
+  SOCIAL_VIRAL_CHANCE:0.28,         // chance a social blitz goes viral (spike day)
+  MKT_DIMINISH:0.78,                // each additional active channel counts less
+
+  // --- Staff ---
+  WAGE_CASHIER:42, WAGE_STOCKER:46,
+  CUST_PER_CASHIER:2600,            // checkout capacity per cashier (a maxed hypermarket can serve huge crowds)
+  CUST_BASE_CAPACITY:150,           // owner alone can serve this many/day
+  STOCKER_SPOIL_CUT:0.16,           // each stocker cuts spoilage by this (multiplicative, capped)
+  STOCKER_TOSS:0.5,                 // each stocker auto-tosses this fraction of sitting spoilage/day
+
+  // --- Events ---
+  EVENT_CHANCE:0.26,
+  EVENTS:['heatwave','craze','festival','disruption','badpress','inspection','coldsnap'],
+  EVENT_WEIGHTS:{heatwave:1,craze:1.1,festival:0.8,disruption:0.9,badpress:0.7,inspection:0.8,coldsnap:0.8},
+  HEATWAVE_HOT:['watermelon','strawberry','orange','grapes','lemon','mango','pineapple'],
+  COLDSNAP_HARDY:['potato','carrot','apple','broccoli'],
+  INSPECT_FAIL_SPOIL:25,            // sitting spoiled units above this risks failing inspection
+  FESTIVAL_MULT:3.0, HEATWAVE_MULT:1.25, BADPRESS_MULT:0.65, BADPRESS_REP:-9,
+
+  // --- Seasons --- 0 Spring 1 Summer 2 Fall 3 Winter ; new season every N days
+  SEASON_LEN:14,
+  SEASON_NAMES:['Spring','Summer','Fall','Winter'],
+  SEASON_EMOJI:['🌷','☀️','🍂','❄️'],
+  IN_SEASON_DEMAND:1.35, OFF_SEASON_DEMAND:0.6,
+  IN_SEASON_COST:0.82,  OFF_SEASON_COST:1.4,
+  IN_SEASON_FRESH:1.15, OFF_SEASON_FRESH:0.85,
+
+  // --- Loans ---
+  LOAN_INCREMENT:500, LOAN_INTEREST:0.012,   // 1.2%/day on outstanding balance
+
+  // --- Rival store ---
+  RIVAL_OPEN_DAY:38,                // rival opens around here (or at tier>=2)
+  RIVAL_CLOSE_DAYS:30,              // dominate this many days to drive rival out
+  PRICE_TOL:0.04,                   // "optimal price" tolerance (4%)
+};
+
+/* ----------------------------------------------------------------------------
+   PRODUCT CATALOG
+   wholesale = base buy price; demand = relative pull; shelf = days good;
+   seasons = in-season indices; tier = store tier needed to stock; vegan flag.
+   ---------------------------------------------------------------------------- */
+const CATALOG = [
+  {id:'banana',     name:'Bananas',     emoji:'🍌', wholesale:0.30, demand:10, shelf:6,  seasons:[0,1,2,3], tier:0, vegan:true},
+  {id:'apple',      name:'Apples',      emoji:'🍎', wholesale:0.40, demand:9,  shelf:14, seasons:[2,3],     tier:0, vegan:true},
+  {id:'lettuce',    name:'Lettuce',     emoji:'🥬', wholesale:0.50, demand:6,  shelf:4,  seasons:[0,2],     tier:0, vegan:true},
+  {id:'tomato',     name:'Tomatoes',    emoji:'🍅', wholesale:0.45, demand:8,  shelf:6,  seasons:[1,2],     tier:0, vegan:true},
+  {id:'strawberry', name:'Strawberries',emoji:'🍓', wholesale:0.80, demand:7,  shelf:3,  seasons:[0,1],     tier:0, vegan:true},
+  {id:'orange',     name:'Oranges',     emoji:'🍊', wholesale:0.45, demand:7,  shelf:12, seasons:[3,0],     tier:1, vegan:true},
+  {id:'grapes',     name:'Grapes',      emoji:'🍇', wholesale:0.90, demand:6,  shelf:7,  seasons:[1,2],     tier:1, vegan:true},
+  {id:'carrot',     name:'Carrots',     emoji:'🥕', wholesale:0.30, demand:6,  shelf:21, seasons:[0,3],     tier:1, vegan:true},
+  {id:'potato',     name:'Potatoes',    emoji:'🥔', wholesale:0.25, demand:7,  shelf:40, seasons:[2,3],     tier:1, vegan:true},
+  {id:'eggs',       name:'Eggs',        emoji:'🥚', wholesale:1.20, demand:8,  shelf:21, seasons:[0,1,2,3], tier:1, vegan:false},
+  {id:'corn',       name:'Corn',        emoji:'🌽', wholesale:0.35, demand:6,  shelf:8,  seasons:[1,2],     tier:2, vegan:true},
+  {id:'watermelon', name:'Watermelon',  emoji:'🍉', wholesale:1.50, demand:5,  shelf:10, seasons:[1],       tier:2, vegan:true},
+  {id:'avocado',    name:'Avocados',    emoji:'🥑', wholesale:1.00, demand:6,  shelf:5,  seasons:[0,1],     tier:2, vegan:true},
+  {id:'broccoli',   name:'Broccoli',    emoji:'🥦', wholesale:0.55, demand:5,  shelf:9,  seasons:[0,3],     tier:2, vegan:true},
+  {id:'milk',       name:'Milk',        emoji:'🥛', wholesale:1.40, demand:8,  shelf:10, seasons:[0,1,2,3], tier:2, vegan:false},
+  {id:'cheese',     name:'Cheese',      emoji:'🧀', wholesale:2.50, demand:6,  shelf:30, seasons:[0,1,2,3], tier:2, vegan:false},
+  {id:'mango',      name:'Mangoes',     emoji:'🥭', wholesale:1.20, demand:5,  shelf:6,  seasons:[1],       tier:3, vegan:true},
+  {id:'pineapple',  name:'Pineapple',   emoji:'🍍', wholesale:1.80, demand:4,  shelf:12, seasons:[1],       tier:3, vegan:true},
+  {id:'lemon',      name:'Lemons',      emoji:'🍋', wholesale:0.40, demand:5,  shelf:18, seasons:[0,3],     tier:3, vegan:true},
+  {id:'honey',      name:'Honey',       emoji:'🍯', wholesale:3.00, demand:4,  shelf:365,seasons:[0,1,2,3], tier:3, vegan:false},
+  {id:'truffle',    name:'Truffles',    emoji:'🍄', wholesale:40.0, demand:5,  shelf:5,  seasons:[2,3],     tier:4, vegan:true},
+];
+const CAT = {}; CATALOG.forEach(p=>CAT[p.id]=p);
+function marketPrice(p){ return p.wholesale * C.MARKET_MARKUP; }
+// profit-maximising price under the linear-elastic demand model (see math in design)
+function optimalPrice(p){ const m=marketPrice(p),E=C.ELASTICITY; return (1+E)*m/(2*E) + p.wholesale/2; }
+
+/* ============================================================================
+   ==============================  GAME STATE  ================================
+   ============================================================================ */
+let S = null;           // the entire save object
+let RT = {};            // runtime-only (not saved): timers, flags-this-frame
+
+function freshState(){
+  const products = {};
+  CATALOG.forEach(p=>{
+    products[p.id] = {
+      price: +(marketPrice(p)).toFixed(2),  // start at market price
+      batches: [],        // [{qty, age}] ; age can be negative (extra-fresh)
+      spoiled: 0,         // spoiled units sitting on the shelf, awaiting toss
+      front: false,       // premium front-of-store slot
+      soldToday: 0,
+      noSaleDays: 0,      // consecutive days stocked w/ no sale (Hoarder)
+      soldOutToday: false,
+    };
+  });
+  return {
+    v: C.VERSION,
+    cash: C.START_CASH,
+    day: 1,
+    season: 0,
+    rep: C.START_REP,
+    tier: 0,
+    products,
+    refrig: 0,
+    supply: { coopSigned:false, reefer:0, bulk:0, jit:0 },
+    marketing: { flyers:{active:false,days:0}, radio:{active:false,days:0}, social:{active:false,days:0}, loyalty:false },
+    loyaltyMembers: 0,
+    staff: [],              // [{type:'cashier'|'stocker', hireDay}]
+    deliveries: [],         // [{pid, qty, arriveDay, startAge}]
+    loan: 0,
+    everTookLoan:false,
+    event: null,            // {type, daysLeft, data}
+    seasonsSeen:[true,false,false,false],
+    regulars: [],           // visit counts
+    rival: null,            // {open, prices:{}, undercutStreak, dominateDays, closed}
+    speed: 1,
+    // ---- lifetime + per-period stats (persisted) ----
+    stats: {
+      itemsSold:0, soldBy:{}, itemsSpoiled:0, spoiledBy:{}, customersTotal:0,
+      revenue:0, profit:0, marketingSpend:0, campaigns:0,
+      flyerRuns:0, radioRuns:0, socialRuns:0,
+      bananaRevenue:0, bananasStocked:0, unitsStockedEver:0,
+      veganSold:0, nonVeganSold:0,
+      bestDayRev:0, bestDayProfit:0, profitStreak:0, flawlessStreak:0,
+      noSpoilStreak:0, noEmptyStreak:0,
+      markdownsLife:0, maxRegular:0, stockerMaxTenure:0, empHiredEver:0,
+      eventsProfited:{}, lostLineEver:false, viral:false, loanPaidOff:false,
+    },
+    // ---- sticky one-shot flags (persisted) ----
+    flags: { soldAt3x:false, soldAt5x:false, soldBelowCost:false, soldPeakFresh:false,
+             soldLastLeg:false, mkdnDayBefore:false, offSeasonProfit:false,
+             optimalHit:false, bottleneckHire:false, rivalClosed:false,
+             veganLocked:false, bulkMaxOrder:false, jitSameDay:false,
+             bigSpender:false, lastDollar:false, wetFloor:false },
+    // ---- achievements: id -> {un:true, day} ----
+    ach: {},
+    // ---- per-day scratch (persisted so reload mid-day is consistent) ----
+    today: null,
+    createdAtDay:1,
+  };
+}
+
+function freshDay(){
+  return {
+    customers:0, served:0, lostLine:0, revenue:0, cogs:0, spoiled:0,
+    markdowns:0, emergencies:0, emptyShelf:false, wages:0, rent:0, mktSpend:0,
+    interest:0, spoilLoss:0, eventType:(S.event?S.event.type:null),
+    priceChanges:{}, soldOut:{}, stockedSet:{}, scheduled:0, processed:0,
+    inspectResult:null,
+  };
+}
+
+/* ============================================================================
+   ==============================  PERSISTENCE  ===============================
+   ============================================================================ */
+let saveTimer=0;
+function save(){ try{ localStorage.setItem(C.SAVE_KEY, JSON.stringify(S)); }catch(e){} }
+function queueSave(){ clearTimeout(saveTimer); saveTimer=setTimeout(save,400); }
+function load(){
+  try{
+    const raw = localStorage.getItem(C.SAVE_KEY);
+    if(!raw) return false;
+    const o = JSON.parse(raw);
+    if(!o || o.v!==C.VERSION) return false;
+    S = o;
+    // make sure newer catalog products exist on older saves of same version
+    CATALOG.forEach(p=>{ if(!S.products[p.id]) S.products[p.id]={price:+marketPrice(p).toFixed(2),batches:[],spoiled:0,front:false,soldToday:0,noSaleDays:0,soldOutToday:false}; });
+    // prune any products / deliveries no longer in the catalog (defensive — avoids CAT[id] crashes)
+    for(const id in S.products){ if(!CAT[id]) delete S.products[id]; }
+    S.deliveries = (S.deliveries||[]).filter(d=>CAT[d.pid]);
+    if(!S.flags) S.flags = freshState().flags;
+    if(S.flags.wetFloor===undefined) S.flags.wetFloor=false;
+    if(!S.today) S.today = freshDay();
+    return true;
+  }catch(e){ return false; }
+}
+function resetGame(){
+  localStorage.removeItem(C.SAVE_KEY);
+  S = freshState(); S.today = freshDay();
+  RT.sessionDays=0;
+  closePanel(); closeModal();
+  startDay(true);
+  fullRender();
+  save();
+}
+
+/* ============================================================================
+   ============================  HELPERS / MATH  ==============================
+   ============================================================================ */
+const rnd = Math.random;
+function rint(a,b){ return Math.floor(rnd()*(b-a+1))+a; }
+function clamp(v,a,b){ return v<a?a:(v>b?b:v); }
+function money(n){
+  const neg=n<0; n=Math.abs(n);
+  let s;
+  if(n>=1e9) s='$'+(n/1e9).toFixed(2)+'B';
+  else if(n>=1e6) s='$'+(n/1e6).toFixed(2)+'M';
+  else if(n>=10000) s='$'+Math.round(n).toLocaleString();
+  else s='$'+ (Math.round(n*100)/100).toLocaleString(undefined,{minimumFractionDigits:(n%1?2:0),maximumFractionDigits:2});
+  return (neg?'-':'')+s;
+}
+function money0(n){ return '$'+Math.round(n).toLocaleString(); }
+function fmtStock(n){ return n>=10000 ? (n/1000).toFixed(n>=100000?0:1)+'k' : n.toLocaleString(); }
+function tier(){ return C.TIERS[S.tier]; }
+function isVegan(p){ return CAT[p].vegan; }
+function inSeason(pid){ return CAT[pid].seasons.includes(S.season); }
+
+function units(pid){ const pr=S.products[pid]; let n=0; for(const b of pr.batches) n+=b.qty; return n; }
+function totalUnits(){ let n=0; for(const id in S.products) n+=units(id); return n; }
+function totalSpoiledSitting(){ let n=0; for(const id in S.products) n+=S.products[id].spoiled; return n; }
+function distinctStocked(){ let n=0; for(const id in S.products) if(units(id)>0) n++; return n; }
+// slots a player can actually fill = min(store slots, products unlocked at this tier)
+function slotsFillable(){ return Math.min(tier().slots, CATALOG.filter(p=>p.tier<=S.tier).length); }
+
+function effShelf(pid){
+  const p=CAT[pid];
+  let s = p.shelf * (1 + S.refrig*C.REFRIG_STEP);
+  s *= inSeason(pid)?C.IN_SEASON_FRESH:C.OFF_SEASON_FRESH;
+  if(S.event && S.event.type==='heatwave') s *= 0.82;
+  return Math.max(1, Math.round(s));
+}
+// remaining freshness fraction (0..1), qty-weighted across batches
+function freshFrac(pid){
+  const pr=S.products[pid]; const sh=effShelf(pid); let tot=0,acc=0;
+  for(const b of pr.batches){ const rem=clamp((sh-b.age)/sh,0,1); acc+=rem*b.qty; tot+=b.qty; }
+  return tot? acc/tot : 1;
+}
+function freshColor(f){ return f>0.6?'var(--fresh)':(f>0.32?'var(--aging)':(f>0.12?'var(--stale)':'var(--rotten)')); }
+
+function effWholesale(pid, supKey){
+  const p=CAT[pid]; let c=p.wholesale;
+  c *= inSeason(pid)?C.IN_SEASON_COST:C.OFF_SEASON_COST;
+  if(supKey){ c *= C.SUPPLIERS[supKey].costMult; c *= (1 - 0.06*S.supply.bulk); }
+  return c;
+}
+function netWorth(){
+  let inv=0;
+  for(const id in S.products){ inv += units(id)*CAT[id].wholesale; }
+  return S.cash + inv + tier().value - S.loan;
+}
+
+/* ============================================================================
+   ==============================  DAY ENGINE  ================================
+   ============================================================================ */
+function startDay(initial){
+  // season rollover
+  const newSeason = Math.floor((S.day-1)/C.SEASON_LEN) % 4;
+  if(newSeason !== S.season || initial){ S.season=newSeason; S.seasonsSeen[newSeason]=true; }
+  // event roll (skip on the very first day)
+  if(!initial){
+    if(S.event && S.event.daysLeft>1){ S.event.daysLeft--; }
+    else { S.event = rollEvent(); }
+  } else if(!S.event){ S.event=null; }
+  // reset per-product daily markers
+  for(const id in S.products){ S.products[id].soldToday=0; S.products[id].soldOutToday=false; }
+  // expire marketing campaigns (count down the days they stay active)
+  if(!initial){ ['flyers','radio','social'].forEach(k=>{ if(S.marketing[k].active){ S.marketing[k].days--; if(S.marketing[k].days<=0){ S.marketing[k].active=false; S.marketing[k].days=0; } } }); }
+  S.today = freshDay();
+  updateRivalDaily();   // refresh rival before computeCustomers reads its prices
+  // schedule today's customers
+  S.today.customers = computeCustomers();
+  // record products that begin the day stocked (for "Cleaned Out")
+  for(const id in S.products){ if(units(id)>0) S.today.stockedSet[id]=true; }
+  RT.dayClock=0; RT.lastFrame=performance.now();
+  syncTop(); renderShelfStatic(); refreshPanelIfOpen();
+  if(S.event && !initial) announceEvent(S.event);
+  checkAch();
+}
+
+// Resume a loaded, in-progress day without recreating S.today. This preserves
+// already-banked revenue and the day's processed-customer count so reloading
+// mid-day cannot re-run (re-farm) the day, and same-day achievement progress
+// (markdowns, price changes, emergency restocks, served) survives a reload.
+function resumeDay(){
+  if(!S.today) S.today = freshDay();
+  if(S.today.customers===undefined || S.today.customers===null) S.today.customers = computeCustomers();
+  RT.dayClock = 0; RT.lastFrame = performance.now();
+  syncTop(); renderShelfStatic(); refreshPanelIfOpen();
+  checkAch();
+}
+
+function rollEvent(){
+  if(rnd()>C.EVENT_CHANCE) return null;
+  // weighted pick
+  let total=0; const W=C.EVENT_WEIGHTS;
+  C.EVENTS.forEach(e=>total+=W[e]);
+  let r=rnd()*total, pick=C.EVENTS[0];
+  for(const e of C.EVENTS){ r-=W[e]; if(r<=0){ pick=e; break; } }
+  const ev={type:pick, daysLeft:1, data:{}};
+  if(pick==='craze'){
+    const avail=CATALOG.filter(p=>p.tier<=S.tier);
+    ev.data.pid = avail[rint(0,avail.length-1)].id;
+  } else if(pick==='disruption'){
+    ev.daysLeft=rint(2,3);
+    const opts=['distributor','depot','coop'].filter(k=>C.SUPPLIERS[k].tier<=S.tier);
+    ev.data.supplier = opts.length?opts[rint(0,opts.length-1)]:'distributor';
+  } else if(pick==='heatwave'){ ev.daysLeft=rint(1,2); }
+  return ev;
+}
+
+function computeCustomers(){
+  let base = tier().traffic;
+  // reputation multiplier 0.4..1.8
+  const repMult = 0.4 + (S.rep/100)*1.4;
+  base *= repMult;
+  // marketing — diminishing across active channels
+  let mboost=0, idx=0;
+  ['social','radio','flyers'].forEach(k=>{ if(S.marketing[k].active){ mboost += C.MKT[k].boost*Math.pow(C.MKT_DIMINISH,idx); idx++; } });
+  base *= (1+mboost);
+  // loyalty members (capped so it can't run away)
+  if(S.marketing.loyalty) base *= (1 + clamp((S.loyaltyMembers/100)*C.LOYALTY_BOOST_PER_100, 0, C.LOYALTY_BOOST_MAX));
+  // event modifiers
+  const ev=S.event;
+  if(ev){
+    if(ev.type==='festival') base*=C.FESTIVAL_MULT;
+    else if(ev.type==='heatwave') base*=C.HEATWAVE_MULT;
+    else if(ev.type==='badpress') base*=C.BADPRESS_MULT;
+  }
+  // rival steals a share
+  if(S.rival && S.rival.open && !S.rival.closed){
+    base *= clamp(1 - rivalShare(), 0.35, 1);
+  }
+  // seasonal foot traffic wobble + noise
+  base *= (0.9 + rnd()*0.2);
+  return Math.max(0, Math.round(base));
+}
+
+// fraction of customers the rival pulls away (0..~0.5)
+function rivalShare(){
+  if(!S.rival||!S.rival.open||S.rival.closed) return 0;
+  // compare average price ratio across shared products + rep
+  let myAvg=0,rvAvg=0,n=0;
+  for(const id in S.rival.prices){ if(units(id)>0){ myAvg+=S.products[id].price; rvAvg+=S.rival.prices[id]; n++; } }
+  let priceEdge=0;
+  if(n){ myAvg/=n; rvAvg/=n; priceEdge=(myAvg-rvAvg)/rvAvg; } // >0 means you're pricier
+  const repEdge=(70 - S.rep)/100; // higher your rep, less share lost
+  return clamp(0.28 + priceEdge*0.25 + repEdge*0.2, 0.05, 0.55);
+}
+
+/* ---- in-frame customer processing ---- */
+function processCustomers(n){
+  const T=S.today;
+  const avail = CATALOG.filter(p=>p.tier<=S.tier);
+  // build desire weights (independent of stock, so OOS => empty-shelf signal)
+  const weights=[]; let wsum=0;
+  for(const p of avail){
+    let w=p.demand;
+    if(inSeason(p.id)) w*=C.IN_SEASON_DEMAND; else w*=C.OFF_SEASON_DEMAND;
+    const ev=S.event;
+    if(ev){
+      if(ev.type==='craze' && ev.data.pid===p.id) w*=4.0;
+      else if(ev.type==='heatwave' && C.HEATWAVE_HOT.includes(p.id)) w*=2.1;
+      else if(ev.type==='heatwave') w*=0.9;
+      else if(ev.type==='coldsnap' && C.COLDSNAP_HARDY.includes(p.id)) w*=1.8;
+      else if(ev.type==='coldsnap') w*=0.85;
+    }
+    weights.push(w); wsum+=w;
+  }
+  const capacity = C.CUST_BASE_CAPACITY + countStaff('cashier')*C.CUST_PER_CASHIER;
+  const basket = C.BASKET_BASE + S.tier*C.BASKET_PER_TIER + (S.marketing.loyalty?C.BASKET_LOYALTY:0);
+
+  for(let i=0;i<n;i++){
+    T.processed++;
+    // line / checkout capacity: beyond capacity, rising chance to abandon
+    if(T.served >= capacity){
+      const over=(T.served-capacity)/Math.max(20,capacity);
+      if(rnd() < clamp(0.35+over*0.5,0,0.95)){ T.lostLine++; S.stats.lostLineEver=true; continue; }
+    }
+    // pick desired product
+    let r=rnd()*wsum, di=0; for(;di<avail.length;di++){ r-=weights[di]; if(r<=0) break; }
+    if(di>=avail.length) di=avail.length-1;
+    const p=avail[di]; const pr=S.products[p.id];
+    // price-based purchase probability
+    const rel = pr.price / marketPrice(p);
+    let buyProb = clamp(1 - C.ELASTICITY*(rel-1), 0.02, 1.6);
+    buyProb *= (0.6 + freshFrac(p.id)*0.4);     // fresher sells better
+    if(units(p.id)<=0){
+      // wanted it, none in stock -> empty shelf
+      T.emptyShelf=true;
+      continue;
+    }
+    if(rnd()>clamp(buyProb,0,0.98)) { T.served++; continue; } // browsed, didn't buy
+    // BUY: basket quantity, capped by stock
+    let want = Math.max(1, Math.round(basket*(0.6+rnd()*0.9)));
+    want = Math.min(want, units(p.id));
+    const got = sellUnits(p.id, want, false);
+    T.served++; S.stats.customersTotal++;
+  }
+}
+
+// sell `qty` of pid from oldest batches first; returns units actually sold
+function sellUnits(pid, qty, isMarkdown){
+  const p=CAT[pid], pr=S.products[pid], T=S.today;
+  let sold=0, revenue=0, cogs=0;
+  const sh=effShelf(pid);
+  // sort oldest-first
+  pr.batches.sort((a,b)=>b.age-a.age);
+  const price = isMarkdown ? Math.max(p.wholesale*0.7, pr.price*0.5) : pr.price;
+  while(qty>0 && pr.batches.length){
+    const b=pr.batches[0];
+    const take=Math.min(qty,b.qty);
+    // freshness-driven achievement flags
+    if(!isMarkdown){
+      if(b.age<=0) S.flags.soldPeakFresh=true;
+      if(b.age>=sh-1) S.flags.soldLastLeg=true;
+    }
+    b.qty-=take; qty-=take; sold+=take;
+    revenue += take*price; cogs += take*p.wholesale;
+    if(b.qty<=0) pr.batches.shift();
+  }
+  if(sold>0){
+    S.cash += revenue;
+    T.revenue += revenue; T.cogs += cogs;
+    S.stats.revenue += revenue;
+    S.stats.itemsSold += sold;
+    S.stats.soldBy[pid]=(S.stats.soldBy[pid]||0)+sold;
+    pr.soldToday += sold; pr.noSaleDays=0;
+    T.stockedSet[pid]=true;
+    // vegan tracking
+    if(isVegan(pid)) S.stats.veganSold+=sold;
+    else { S.stats.nonVeganSold+=sold; S.flags.veganLocked=true; }
+    if(pid==='banana') S.stats.bananaRevenue += revenue;
+    // pricing flags
+    const mult = pr.price/p.wholesale;
+    if(!isMarkdown){
+      if(mult>=3) S.flags.soldAt3x=true;
+      if(mult>=5) S.flags.soldAt5x=true;
+      if(pr.price < p.wholesale) S.flags.soldBelowCost=true;
+      if(!inSeason(pid) && pr.price>effWholesale(pid)) S.flags.offSeasonProfit=true;
+    }
+    // sold out?
+    if(units(pid)<=0){ pr.soldOutToday=true; T.soldOut[pid]=true; }
+    // floating feedback at tile
+    floatSale(pid, revenue, isMarkdown);
+    RT.dirtyTiles[pid]=true;
+  }
+  return sold;
+}
+
+function countStaff(type){ return S.staff.filter(e=>e.type===type).length; }
+
+function endDay(){
+  const T=S.today;
+  // --- age inventory & spoil ---
+  let spoiledToday=0, spoilLoss=0;
+  const spoilCut = Math.min(0.7, countStaff('stocker')*C.STOCKER_SPOIL_CUT);
+  for(const id in S.products){
+    const pr=S.products[id]; const sh=effShelf(id);
+    const keep=[];
+    for(const b of pr.batches){
+      b.age++;
+      if(b.age>=sh){
+        // Stockers can "save" a fraction of an expiring batch; the rest spoils.
+        // floor() on the SAVED side guarantees a 1-unit batch always fully resolves
+        // (saved=0, lost=1) so no immortal never-spoiling ghost unit can form, and
+        // spoilage stats / no-spoil streaks stay honest.
+        const saved = spoilCut>0 ? Math.floor(b.qty*spoilCut) : 0;
+        const lost = b.qty - saved;
+        if(lost>0){
+          pr.spoiled += lost;
+          spoiledToday += lost; spoilLoss += lost*CAT[id].wholesale;
+          S.stats.itemsSpoiled += lost;
+          S.stats.spoiledBy[id]=(S.stats.spoiledBy[id]||0)+lost;
+          if(id==='banana' && lost===1 && !S.flags.wetFloor) S.flags.wetFloor=true; // #100 one-shot
+        }
+        if(saved>0) keep.push({qty:saved, age:sh-1}); // saved units get one more day
+      } else keep.push(b);
+    }
+    pr.batches=keep;
+    // Hoarder streak: increment only when stocked with no sale today, else reset
+    if(units(id)>0 && pr.soldToday===0) pr.noSaleDays++; else pr.noSaleDays=0;
+  }
+  T.spoiled=spoiledToday; T.spoilLoss=spoilLoss;
+
+  // stockers auto-toss sitting spoilage
+  const tossRate=Math.min(0.95, countStaff('stocker')*C.STOCKER_TOSS);
+  if(tossRate>0){ for(const id in S.products){ S.products[id].spoiled=Math.floor(S.products[id].spoiled*(1-tossRate)); } }
+
+  // --- expenses: rent, wages, marketing, interest ---
+  // (campaign costs were already charged at purchase time in runCampaign — only the
+  //  recurring loyalty fee is swept here, so marketing is never double-charged.)
+  T.rent = tier().rent;
+  T.wages = countStaff('cashier')*C.WAGE_CASHIER + countStaff('stocker')*C.WAGE_STOCKER;
+  let loyaltyCost = 0;
+  if(S.marketing.loyalty){ loyaltyCost = C.LOYALTY_COST; T.mktSpend += loyaltyCost; S.stats.marketingSpend += loyaltyCost; }
+  T.interest = S.loan*C.LOAN_INTEREST;
+  S.loan += T.interest;
+  const expenses = T.rent + T.wages + loyaltyCost + T.interest;
+  S.cash -= expenses;
+
+  // --- day profit (economic) ---
+  const dayProfit = T.revenue - T.cogs - T.spoilLoss - T.rent - T.wages - T.mktSpend - T.interest;
+  S.stats.profit += dayProfit;
+  if(T.revenue>S.stats.bestDayRev) S.stats.bestDayRev=T.revenue;
+  if(dayProfit>S.stats.bestDayProfit) S.stats.bestDayProfit=dayProfit;
+  S.stats.profitStreak = dayProfit>0 ? S.stats.profitStreak+1 : 0;
+
+  // --- streaks ---
+  const hadStock = Object.keys(T.stockedSet).length>0;
+  if(hadStock && spoiledToday===0) S.stats.noSpoilStreak++; else S.stats.noSpoilStreak=0;
+  if(!T.emptyShelf) S.stats.noEmptyStreak++; else S.stats.noEmptyStreak=0;
+  if(hadStock && spoiledToday===0 && !T.emptyShelf) S.stats.flawlessStreak++; else S.stats.flawlessStreak=0;
+
+  // --- health inspection resolution ---
+  if(S.event && S.event.type==='inspection'){
+    const sitting=totalSpoiledSitting();
+    if(sitting>C.INSPECT_FAIL_SPOIL || S.rep<25){
+      T.inspectResult='fail'; S.rep=clamp(S.rep-15,0,100); S.cash-=200;
+      toast('🚫','Health inspection FAILED — fined $200 & rep hit.','bad');
+    } else { T.inspectResult='pass'; S.rep=clamp(S.rep+5,0,100);
+      toast('✅','Passed the health inspection! +reputation','good'); }
+  }
+  if(S.event && S.event.type==='badpress'){ S.rep=clamp(S.rep+C.BADPRESS_REP,0,100); }
+
+  // --- reputation target & lerp ---
+  updateReputation(T);
+
+  // --- loyalty member growth ---
+  if(S.marketing.loyalty){ S.loyaltyMembers += Math.floor(T.served*C.LOYALTY_JOIN_RATE)+ (T.served>0?1:0); }
+
+  // --- regulars (Regulars achievement) ---
+  if(S.rep>45 || S.marketing.loyalty){
+    if(S.regulars.length<12 && rnd()<0.35) S.regulars.push(0);
+    for(let i=0;i<S.regulars.length;i++){ if(rnd()<clamp(0.35+S.rep/250,0,0.9)) S.regulars[i]++; }
+    S.stats.maxRegular=Math.max(S.stats.maxRegular, ...S.regulars, 0);
+  }
+
+  // --- stocker tenure ---
+  S.staff.forEach(e=>{ if(e.type==='stocker'){ const t=S.day-e.hireDay; if(t>S.stats.stockerMaxTenure) S.stats.stockerMaxTenure=t; } });
+
+  // --- event-profit tracking (Storm Chaser) ---
+  if(dayProfit>0 && S.event){ S.stats.eventsProfited[S.event.type]=true; }
+
+  // --- last-dollar survival ---
+  if(S.cash>=0 && S.cash<10) S.flags.lastDollar=true;
+
+  // --- emergency loan if bankrupt (no hard fail) ---
+  if(S.cash<0){
+    const need=Math.ceil((-S.cash)/C.LOAN_INCREMENT)*C.LOAN_INCREMENT;
+    S.loan+=need; S.cash+=need; S.everTookLoan=true;
+    toast('🏦','Emergency loan of '+money0(need)+' taken to stay afloat.','event');
+  }
+
+  T.daySnapshotProfit=dayProfit;
+  // record this day's "today" before advancing for end-of-day achievement checks
+  checkAchEndOfDay(T, dayProfit);
+
+  // --- deliveries arriving ---
+  S.day++;
+  RT.sessionDays=(RT.sessionDays||0)+1;
+  const arrived=[];
+  S.deliveries = S.deliveries.filter(d=>{
+    if(d.arriveDay<=S.day){ receiveDelivery(d); arrived.push(d); return false; }
+    return true;
+  });
+  if(arrived.length) toast('📦','Delivery arrived: '+arrived.map(d=>units2(d.qty)+' '+CAT[d.pid].name).join(', '),'good');
+
+  checkAch();
+  save();
+  startDay(false);
+}
+function units2(n){ return n; }
+
+function updateReputation(T){
+  // availability: 1 - emptyShelfPenalty
+  const avail = T.emptyShelf ? 0.55 : 1.0;
+  // freshness: avg fresh frac across stocked
+  let fr=0,fn=0; for(const id in S.products){ if(units(id)>0){ fr+=freshFrac(id); fn++; } }
+  const freshness = fn? fr/fn : 0.7;
+  // price fairness: avg price vs market (cheaper => better, but with floor)
+  let pr=0,pn=0; for(const id in S.products){ if(units(id)>0){ pr += S.products[id].price/marketPrice(CAT[id]); pn++; } }
+  const relPrice = pn? pr/pn : 1;
+  const priceFair = clamp(1.6 - relPrice*0.6, 0, 1); // 1.0 at/below market, ~0.83 at optimal, low when gouging
+  // variety
+  const variety = clamp(distinctStocked()/Math.max(1,tier().slots),0,1);
+  // spoilage penalty (sitting + today)
+  const spoilPen = clamp(1 - (totalSpoiledSitting()+T.spoiled)/60, 0, 1);
+  let target = (C.REP_W_AVAIL*avail + C.REP_W_FRESH*freshness + C.REP_W_PRICE*priceFair +
+                  C.REP_W_VARIETY*variety + C.REP_W_SPOIL*spoilPen);
+  // weights sum to 100; the ×1.05 lets a near-flawless store crest 100 so max
+  // reputation (Local Celebrity) is attainable through excellent — not perfect — play.
+  target = Math.min(100, target*1.05);
+  S.rep = clamp(S.rep + (target - S.rep)*C.REP_LERP, 0, 100);
+}
+
+function receiveDelivery(d){
+  const pr=S.products[d.pid];
+  pr.batches.push({qty:d.qty, age:d.startAge});
+  S.stats.unitsStockedEver += d.qty;
+  if(d.pid==='banana') S.stats.bananasStocked += d.qty;
+  // if it had sold out today and arrives same day -> JIT
+  if(pr.soldOutToday && d.arriveDay===S.day) S.flags.jitSameDay=true;
+}
+
+/* ---- rival store ---- */
+function updateRivalDaily(){
+  // open rival
+  if(!S.rival && (S.day>=C.RIVAL_OPEN_DAY || S.tier>=2)){
+    S.rival={open:true, prices:{}, undercutStreak:0, dominateDays:0, closed:false};
+    toast('🏪','A rival grocer opened down the street! Compete on price & reputation.','event');
+  }
+  if(!S.rival||S.rival.closed) return;
+  // rival prices shared (produce up to your tier) slightly under market with noise
+  const shared=CATALOG.filter(p=>p.tier<=S.tier);
+  shared.forEach(p=>{ S.rival.prices[p.id]=+(marketPrice(p)*(0.85+rnd()*0.2)).toFixed(2); });
+  // undercut streak: are you beating rival on every shared product?
+  let beatAll=true, any=false;
+  for(const p of shared){ if(units(p.id)>0){ any=true; if(S.products[p.id].price>=S.rival.prices[p.id]) beatAll=false; } }
+  if(any && beatAll) S.rival.undercutStreak++; else S.rival.undercutStreak=0;
+  // dominance: better rep AND beating on price share
+  if(S.rep>62 && rivalShare()<0.22){ S.rival.dominateDays++; } else { S.rival.dominateDays=Math.max(0,S.rival.dominateDays-1); }
+  if(S.rival.dominateDays>=C.RIVAL_CLOSE_DAYS){ S.rival.closed=true; S.flags.rivalClosed=true; toast('🏆','The rival store CLOSED for good. You own this town!','good'); }
+}
+
+function announceEvent(ev){
+  const m={
+    heatwave:['🔥','Heatwave! Cold & juicy items are flying off the shelves.'],
+    craze:['🤳','Food craze: '+(ev.data.pid?CAT[ev.data.pid].name:'an item')+' is suddenly everywhere!'],
+    festival:['🎪','Street festival nearby — huge foot traffic today!'],
+    disruption:['⛔','Supplier disruption: '+(ev.data.supplier?C.SUPPLIERS[ev.data.supplier].name:'a supplier')+' is down for '+ev.daysLeft+' day(s).'],
+    badpress:['📰','Bad press! Fewer customers and a reputation ding today.'],
+    inspection:['🧑‍⚕️','Health inspector is in today — keep spoilage low!'],
+    coldsnap:['🥶','Cold snap — hearty staples are in demand.'],
+  };
+  const x=m[ev.type]; if(x) toast(x[0],x[1],'event');
+}
+
+/* ============================================================================
+   ===========================  PLAYER ACTIONS  ===============================
+   ============================================================================ */
+function canStock(pid){
+  // can we put this product on a shelf slot? (already stocked OR slots free)
+  if(units(pid)>0 || S.products[pid].batches.length>0) return true;
+  // count distinct slots in use (units or incoming-but-shelved). incoming deliveries don't take a slot until arrival
+  return distinctStocked() < tier().slots;
+}
+function capRemaining(){ return tier().cap - totalUnits(); }
+
+// QUICK restock at the counter (instant, premium price) -> emergency
+function quickRestock(pid, qty){
+  qty=Math.floor(qty); if(qty<=0) return;
+  if(!canStock(pid)){ toast('🚫','No free shelf slot. Sell out or pick a stocked item.','bad'); return; }
+  const room=capRemaining(); if(room<=0){ toast('🚫','Shelves are full!','bad'); return; }
+  qty=Math.min(qty, room);
+  const unit=effWholesale(pid,'quick');
+  let cost=qty*unit;
+  if(cost>S.cash){ qty=Math.floor(S.cash/unit); cost=qty*unit; }
+  if(qty<=0){ toast('💸','Not enough cash.','bad'); return; }
+  const before=S.cash;
+  S.cash-=cost;
+  S.products[pid].batches.push({qty, age:0});
+  S.stats.unitsStockedEver+=qty; if(pid==='banana') S.stats.bananasStocked+=qty;
+  S.today.emergencies++; S.today.scheduled++;
+  // big spender check
+  if(before>0 && S.cash<1 && cost>=before*0.95) S.flags.bigSpender=true;
+  // JIT same-day if it had sold out
+  if(S.products[pid].soldOutToday) S.flags.jitSameDay=true;
+  toast('⚡','Quick-stocked '+qty+' '+CAT[pid].name+' for '+money(cost)+'.','good');
+  RT.dirtyTiles[pid]=true; syncTop(); renderShelfStatic(); refreshPanelIfOpen(); checkAch(); queueSave();
+}
+
+// SUPPLIER order (delayed delivery, cheaper)
+function supplierOrder(pid, qty, supKey){
+  const sup=C.SUPPLIERS[supKey];
+  qty=Math.floor(qty);
+  if(supKey==='coop' && !S.supply.coopSigned){ toast('🚫','Sign the Co-op contract first (Store tab).','bad'); return; }
+  if(S.event && S.event.type==='disruption' && S.event.data.supplier===supKey){ toast('⛔','That supplier is disrupted right now.','bad'); return; }
+  if(qty<sup.min){ toast('🚫','Minimum order for this supplier is '+sup.min+'.','bad'); return; }
+  if(qty>sup.max) qty=sup.max;
+  if(!canStock(pid)){ toast('🚫','No free shelf slot for a new product.','bad'); return; }
+  // capacity check against current + already-incoming for this product is loose; just cap by store cap on arrival
+  const unit=effWholesale(pid,supKey);
+  let cost=qty*unit;
+  if(cost>S.cash){ toast('💸','Not enough cash for that order ('+money(cost)+').','bad'); return; }
+  const before=S.cash;
+  S.cash-=cost;
+  let startAge = -(sup.fresh) - S.supply.reefer;       // more fresh = more negative age
+  const days = S.supply.jit?0:sup.days;
+  const arrive = S.day + days;
+  if(days===0){ // arrives instantly
+    S.products[pid].batches.push({qty,age:startAge});
+    S.stats.unitsStockedEver+=qty; if(pid==='banana') S.stats.bananasStocked+=qty;
+    if(S.products[pid].soldOutToday) S.flags.jitSameDay=true;
+    toast(sup.emoji,'Received '+qty+' '+CAT[pid].name+' instantly (JIT).','good');
+  } else {
+    S.deliveries.push({pid,qty,arriveDay:arrive,startAge});
+    toast(sup.emoji,'Ordered '+qty+' '+CAT[pid].name+' — arrives day '+arrive+'.','good');
+  }
+  if(qty===sup.max) S.flags.bulkMaxOrder=true;
+  if(before>0 && S.cash<1 && cost>=before*0.95) S.flags.bigSpender=true;
+  syncTop(); renderShelfStatic(); refreshPanelIfOpen(); checkAch(); queueSave();
+}
+
+function setPrice(pid, price){
+  price=Math.max(0.01, +price);
+  const pr=S.products[pid];
+  if(Math.abs(price-pr.price)<0.001) return;
+  pr.price=+price.toFixed(2);
+  S.today.priceChanges[pid]=(S.today.priceChanges[pid]||0)+1;
+  if(Math.abs(pr.price-optimalPrice(CAT[pid]))/optimalPrice(CAT[pid]) <= C.PRICE_TOL) S.flags.optimalHit=true;
+  RT.dirtyTiles[pid]=true; checkAch(); queueSave();
+}
+
+function markdown(pid){
+  const pr=S.products[pid]; if(units(pid)<=0){ toast('🚫','Nothing to mark down.','bad'); return; }
+  // mark down the OLDEST batch — quick low-margin clearance of aging stock
+  pr.batches.sort((a,b)=>b.age-a.age);
+  const sh=effShelf(pid); const oldest=pr.batches[0];
+  if(oldest && oldest.age>=sh-1) S.flags.mkdnDayBefore=true;   // day before spoilage
+  const qty=Math.min(units(pid), Math.max(1, Math.ceil(units(pid)*0.5)));
+  const sold=sellUnits(pid, qty, true);
+  S.today.markdowns+=sold; S.stats.markdownsLife+=sold;
+  toast('🏷️','Marked down '+sold+' '+CAT[pid].name+' for a quick sale.','good');
+  RT.dirtyTiles[pid]=true; syncTop(); refreshPanelIfOpen(); checkAch(); queueSave();
+}
+
+function tossSpoiled(pid){
+  const pr=S.products[pid]; if(pr.spoiled<=0) return;
+  pr.spoiled=0; renderShelfStatic(); refreshPanelIfOpen(); queueSave();
+}
+
+function upgradeTier(){
+  if(S.tier>=C.TIERS.length-1){ toast('🏙️','Already at the maximum tier — Empire!','good'); return; }
+  const next=C.TIERS[S.tier+1];
+  if(S.cash<next.cost){ toast('💸','Need '+money(next.cost)+' to upgrade.','bad'); return; }
+  S.cash-=next.cost; S.tier++;
+  toast('🎉','Upgraded to '+next.name+'! More slots, traffic & products.','good');
+  syncTop(); renderShelfStatic(); refreshPanelIfOpen(); checkAch(); queueSave();
+}
+
+function buyRefrig(){
+  if(S.refrig>=C.REFRIG_MAX) return;
+  const cost=C.REFRIG_COST[S.refrig+1];
+  if(S.cash<cost){ toast('💸','Need '+money(cost)+'.','bad'); return; }
+  S.cash-=cost; S.refrig++;
+  toast('❄️','Refrigeration upgraded to level '+S.refrig+'.','good');
+  refreshPanelIfOpen(); renderShelfStatic(); checkAch(); queueSave();
+}
+
+function signCoop(){
+  if(S.supply.coopSigned) return;
+  S.supply.coopSigned=true; toast('🚜','Signed the Local Farm Co-op contract!','good');
+  refreshPanelIfOpen(); checkAch(); queueSave();
+}
+function buySupplyUp(key){
+  const u=C.SUPPLY_UP[key]; const lvl=S.supply[key];
+  if(lvl>=u.max) return;
+  const cost=u.cost[lvl+1];
+  if(S.cash<cost){ toast('💸','Need '+money(cost)+'.','bad'); return; }
+  S.cash-=cost; S.supply[key]++;
+  toast('🚚',u.name+' upgraded.','good');
+  refreshPanelIfOpen(); checkAch(); queueSave();
+}
+
+function runCampaign(key){
+  const m=C.MKT[key];
+  if(S.cash<m.cost){ toast('💸','Need '+money(m.cost)+'.','bad'); return; }
+  S.cash-=m.cost; S.today.mktSpend+=m.cost; S.stats.marketingSpend+=m.cost; S.stats.campaigns++;
+  S.marketing[key].active=true; S.marketing[key].days=m.days;
+  S.rep=clamp(S.rep+m.repBoost,0,100);
+  if(key==='flyers') S.stats.flyerRuns++;
+  if(key==='radio') S.stats.radioRuns++;
+  if(key==='social'){ S.stats.socialRuns++;
+    if(rnd()<C.SOCIAL_VIRAL_CHANCE){ S.stats.viral=true; S.today.customers=Math.round(S.today.customers*1.8); toast('🚀','Your post went VIRAL! Massive traffic spike today!','good'); }
+  }
+  toast(m.emoji,'Ran a '+m.name+' campaign ('+m.days+' days).','good');
+  refreshPanelIfOpen(); syncTop(); checkAch(); queueSave();
+}
+function toggleLoyalty(){
+  S.marketing.loyalty=!S.marketing.loyalty;
+  toast('💳', S.marketing.loyalty?'Loyalty program launched!':'Loyalty program paused.', 'event');
+  refreshPanelIfOpen(); checkAch(); queueSave();
+}
+
+function hire(type){
+  if(S.staff.length>=tier().maxEmp){ toast('🚫','No room on payroll at this tier.','bad'); return; }
+  S.staff.push({type, hireDay:S.day});
+  S.stats.empHiredEver++;
+  if(type==='cashier' && S.stats.lostLineEver) S.flags.bottleneckHire=true;
+  toast(type==='cashier'?'🧑‍💼':'📦','Hired a '+type+'.','good');
+  refreshPanelIfOpen(); checkAch(); queueSave();
+}
+function fire(idx){ S.staff.splice(idx,1); refreshPanelIfOpen(); checkAch(); queueSave(); }
+
+function takeLoan(){
+  S.loan+=C.LOAN_INCREMENT; S.cash+=C.LOAN_INCREMENT; S.everTookLoan=true;
+  toast('🏦','Took a '+money0(C.LOAN_INCREMENT)+' loan.','event');
+  syncTop(); refreshPanelIfOpen(); queueSave();
+}
+function repayLoan(){
+  const pay=Math.min(S.loan, S.cash);
+  if(pay<=0) return;
+  const wasOwed=S.loan;
+  S.cash-=pay; S.loan-=pay;
+  if(S.loan<0.01){ S.loan=0; if(wasOwed>0) S.stats.loanPaidOff=true; toast('✅','Loan paid off in full!','good'); }
+  else toast('🏦','Paid '+money(pay)+' toward loan.','good');
+  syncTop(); refreshPanelIfOpen(); checkAch(); queueSave();
+}
+
+/* ============================================================================
+   ============================  ACHIEVEMENTS  ================================
+   each: {id,n(name),d(desc),cat,secret,pun, progress(){return{c,g}} , chk()}
+   ============================================================================ */
+const ST=()=>S.stats;
+const ACH = [
+  // -- Progression & milestones --
+  {id:1,n:'Achievement Unlocked',d:'Earn your very first achievement.',cat:'Milestones',chk:()=>unlockedCount()>=1},
+  {id:2,n:'First Sale',d:'Sell your first item.',cat:'Milestones',chk:()=>ST().itemsSold>=1},
+  {id:3,n:'Open for Business',d:'Complete your first full day.',cat:'Milestones',chk:()=>S.day>=2},
+  {id:4,n:'In the Black',d:'End a day in profit.',cat:'Milestones',chk:()=>RT.everProfitDay},
+  {id:5,n:'Penny Pincher',d:'Save up $1,000 cash.',cat:'Milestones',pun:true,chk:()=>S.cash>=1000},
+  {id:6,n:'Petty Cash',d:'Reach $5,000 net worth.',cat:'Milestones',pun:true,chk:()=>netWorth()>=5000},
+  {id:7,n:'Small Fortune',d:'Reach $25,000 net worth.',cat:'Milestones',chk:()=>netWorth()>=25000},
+  {id:8,n:'Six Figures',d:'Reach $100,000 net worth.',cat:'Milestones',chk:()=>netWorth()>=100000},
+  {id:9,n:'Produce Mogul',d:'Reach $1,000,000 net worth.',cat:'Milestones',chk:()=>netWorth()>=1e6},
+  {id:10,n:'Filthy Rich',d:'Reach $10,000,000 net worth.',cat:'Milestones',chk:()=>netWorth()>=1e7},
+  {id:11,n:'Corner Store',d:'Upgrade from a stand to a corner store.',cat:'Milestones',chk:()=>S.tier>=1},
+  {id:12,n:'Neighborhood Staple',d:'Reach the neighborhood market tier.',cat:'Milestones',chk:()=>S.tier>=2},
+  {id:13,n:'Supermarket Sweep',d:'Reach the supermarket tier.',cat:'Milestones',pun:true,chk:()=>S.tier>=3},
+  {id:14,n:'Empire',d:'Reach the maximum store tier.',cat:'Milestones',chk:()=>S.tier>=4},
+  {id:15,n:'Week One',d:'Survive 7 days.',cat:'Milestones',progress:()=>({c:S.day,g:7}),chk:()=>S.day>=7},
+  {id:16,n:'Monthly Regular',d:'Reach day 30.',cat:'Milestones',progress:()=>({c:S.day,g:30}),chk:()=>S.day>=30},
+  {id:17,n:'Seasoned Owner',d:'Reach day 100.',cat:'Milestones',progress:()=>({c:S.day,g:100}),chk:()=>S.day>=100},
+  {id:18,n:'Anniversary',d:'Reach day 365 (one full year).',cat:'Milestones',progress:()=>({c:S.day,g:365}),chk:()=>S.day>=365},
+  {id:19,n:'Old Guard',d:'Reach day 1,000.',cat:'Milestones',progress:()=>({c:S.day,g:1000}),chk:()=>S.day>=1000},
+  // -- Inventory & products --
+  {id:20,n:'Stock Boy',d:'Stock your first item.',cat:'Inventory',chk:()=>ST().unitsStockedEver>=1},
+  {id:21,n:'Variety Pack',d:'Display 5 different products at once.',cat:'Inventory',progress:()=>({c:distinctStocked(),g:5}),chk:()=>distinctStocked()>=5},
+  {id:22,n:'Full Spread',d:'Fill every shelf slot in your store.',cat:'Inventory',progress:()=>({c:distinctStocked(),g:slotsFillable()}),chk:()=>distinctStocked()>=slotsFillable()},
+  {id:23,n:'The Whole Aisle',d:'Unlock every product in the catalog.',cat:'Inventory',progress:()=>({c:CATALOG.filter(p=>p.tier<=S.tier).length,g:CATALOG.length}),chk:()=>CATALOG.every(p=>p.tier<=S.tier)},
+  {id:24,n:'One of Everything',d:'Hold at least one unit of every product simultaneously.',cat:'Inventory',progress:()=>({c:CATALOG.filter(p=>units(p.id)>=1).length,g:CATALOG.length}),chk:()=>CATALOG.every(p=>units(p.id)>=1)},
+  {id:25,n:'Banana Stand',d:'Stock 1,000 bananas lifetime. There’s always money in the banana stand.',cat:'Inventory',pun:true,progress:()=>({c:ST().bananasStocked,g:1000}),chk:()=>ST().bananasStocked>=1000},
+  {id:26,n:'Apple a Day',d:'Sell 365 apples.',cat:'Inventory',pun:true,progress:()=>({c:ST().soldBy.apple||0,g:365}),chk:()=>(ST().soldBy.apple||0)>=365},
+  {id:27,n:'Berry Baron',d:'Sell 10,000 strawberries.',cat:'Inventory',pun:true,progress:()=>({c:ST().soldBy.strawberry||0,g:10000}),chk:()=>(ST().soldBy.strawberry||0)>=10000},
+  {id:28,n:'Overstocked',d:'Hold 10,000 total units at once.',cat:'Inventory',progress:()=>({c:totalUnits(),g:10000}),chk:()=>totalUnits()>=10000},
+  {id:29,n:'Cleaned Out',d:'Sell out of every product in a single day.',cat:'Inventory',chk:()=>RT.cleanedOut},
+  // -- Pricing --
+  {id:30,n:'The Price Is Right',d:'Hit a product’s optimal price point.',cat:'Pricing',chk:()=>S.flags.optimalHit},
+  {id:31,n:'Gouger',d:'Sell something priced at 3× wholesale.',cat:'Pricing',pun:true,chk:()=>S.flags.soldAt3x},
+  {id:32,n:'Highway Robbery',d:'Sell something priced at 5× wholesale.',cat:'Pricing',pun:true,chk:()=>S.flags.soldAt5x},
+  {id:33,n:'Loss Leader',d:'Knowingly sell an item below wholesale.',cat:'Pricing',pun:true,chk:()=>S.flags.soldBelowCost},
+  {id:34,n:'The People’s Grocer',d:'Profit a full day with every price below market average.',cat:'Pricing',chk:()=>RT.peoplesGrocer},
+  {id:35,n:'Fire Sale',d:'Mark down 50 items in one day.',cat:'Pricing',pun:true,progress:()=>({c:S.today?S.today.markdowns:0,g:50}),chk:()=>S.today&&S.today.markdowns>=50},
+  {id:36,n:'Twitchy Trigger',d:'Change a single product’s price 10 times in one day.',cat:'Pricing',chk:()=>S.today&&Object.values(S.today.priceChanges).some(v=>v>=10)},
+  // -- Freshness & spoilage --
+  {id:37,n:'Fresh Start',d:'Sell an item at peak freshness.',cat:'Freshness',chk:()=>S.flags.soldPeakFresh},
+  {id:38,n:'Crisis Averted',d:'Mark down an item the day before it spoils.',cat:'Freshness',chk:()=>S.flags.mkdnDayBefore},
+  {id:39,n:'Waste Not',d:'Finish a day with zero spoilage.',cat:'Freshness',chk:()=>RT.wasteNot},
+  {id:40,n:'Zero-Waste Week',d:'Seven straight days with no spoilage.',cat:'Freshness',progress:()=>({c:ST().noSpoilStreak,g:7}),chk:()=>ST().noSpoilStreak>=7},
+  {id:41,n:'Cold Chain',d:'Buy your first refrigeration upgrade.',cat:'Freshness',pun:true,chk:()=>S.refrig>=1},
+  {id:42,n:'Sub-Zero',d:'Max out refrigeration.',cat:'Freshness',pun:true,progress:()=>({c:S.refrig,g:C.REFRIG_MAX}),chk:()=>S.refrig>=C.REFRIG_MAX},
+  {id:43,n:'Last Legs',d:'Sell an item on the final day of its shelf life.',cat:'Freshness',chk:()=>S.flags.soldLastLeg},
+  {id:44,n:'Brown Banana Club',d:'Let a single banana spoil completely.',cat:'Freshness',secret:true,pun:true,chk:()=>(ST().spoiledBy.banana||0)>=1},
+  {id:45,n:'Compost Heap',d:'Spoil 100 items lifetime.',cat:'Freshness',pun:true,progress:()=>({c:ST().itemsSpoiled,g:100}),chk:()=>ST().itemsSpoiled>=100},
+  {id:46,n:'The Smell',d:'Spoil 1,000 items lifetime.',cat:'Freshness',pun:true,progress:()=>({c:ST().itemsSpoiled,g:1000}),chk:()=>ST().itemsSpoiled>=1000},
+  {id:47,n:'Biohazard',d:'Spoil 10,000 items lifetime.',cat:'Freshness',pun:true,progress:()=>({c:ST().itemsSpoiled,g:10000}),chk:()=>ST().itemsSpoiled>=10000},
+  {id:48,n:'Mold Farmer',d:'Have 50 spoiled items sitting out at once.',cat:'Freshness',pun:true,progress:()=>({c:totalSpoiledSitting(),g:50}),chk:()=>totalSpoiledSitting()>=50},
+  // -- Marketing & reputation --
+  {id:49,n:'Word of Mouth',d:'Run your first marketing campaign.',cat:'Marketing',chk:()=>ST().campaigns>=1},
+  {id:50,n:'Jingle All the Way',d:'Run a radio campaign.',cat:'Marketing',pun:true,chk:()=>ST().radioRuns>=1},
+  {id:51,n:'Going Viral',d:'Trigger a social-media demand spike.',cat:'Marketing',chk:()=>ST().viral},
+  {id:52,n:'Omnichannel',d:'Have every marketing channel active at once.',cat:'Marketing',chk:()=>S.marketing.flyers.active&&S.marketing.radio.active&&S.marketing.social.active&&S.marketing.loyalty},
+  {id:53,n:'Flyer Guy',d:'Run 50 flyer campaigns.',cat:'Marketing',progress:()=>({c:ST().flyerRuns,g:50}),chk:()=>ST().flyerRuns>=50},
+  {id:54,n:'Loyalty Pays',d:'Enroll your 100th loyalty member.',cat:'Marketing',progress:()=>({c:S.loyaltyMembers,g:100}),chk:()=>S.loyaltyMembers>=100},
+  {id:55,n:'Local Celebrity',d:'Reach maximum reputation.',cat:'Marketing',progress:()=>({c:Math.floor(S.rep),g:100}),chk:()=>S.rep>=99.5},
+  {id:56,n:'Ad Nauseam',d:'Spend $100,000 total on marketing.',cat:'Marketing',pun:true,progress:()=>({c:ST().marketingSpend,g:100000}),chk:()=>ST().marketingSpend>=100000},
+  // -- Supply chain --
+  {id:57,n:'Farm to Table',d:'Sign your first local farm co-op contract.',cat:'Supply',chk:()=>S.supply.coopSigned},
+  {id:58,n:'Bulk Buyer',d:'Place a maximum-size order.',cat:'Supply',chk:()=>S.flags.bulkMaxOrder},
+  {id:59,n:'Just in Time',d:'Restock a product the same day it sold out.',cat:'Supply',chk:()=>S.flags.jitSameDay},
+  {id:60,n:'Supply Lines',d:'Upgrade to refrigerated trucks.',cat:'Supply',chk:()=>S.supply.reefer>=1},
+  {id:61,n:'Vertical Integration',d:'Max out every supply-chain upgrade.',cat:'Supply',chk:()=>S.supply.reefer>=C.SUPPLY_UP.reefer.max&&S.supply.bulk>=C.SUPPLY_UP.bulk.max&&S.supply.jit>=C.SUPPLY_UP.jit.max},
+  {id:62,n:'Never Empty',d:'Go 30 days without a single empty shelf.',cat:'Supply',progress:()=>({c:ST().noEmptyStreak,g:30}),chk:()=>ST().noEmptyStreak>=30},
+  {id:63,n:'Panic Buy',d:'Place 5 emergency restocks in one day.',cat:'Supply',progress:()=>({c:S.today?S.today.emergencies:0,g:5}),chk:()=>S.today&&S.today.emergencies>=5},
+  // -- Customers & staff --
+  {id:64,n:'First Customer',d:'Serve your very first customer.',cat:'Staff',chk:()=>ST().customersTotal>=1},
+  {id:65,n:'Rush Hour',d:'Serve 100 customers in one day.',cat:'Staff',progress:()=>({c:S.today?S.today.served:0,g:100}),chk:()=>S.today&&S.today.served>=100},
+  {id:66,n:'Black Friday',d:'Serve 500 customers in one day.',cat:'Staff',progress:()=>({c:S.today?S.today.served:0,g:500}),chk:()=>S.today&&S.today.served>=500},
+  {id:67,n:'Regulars',d:'Have one customer return 10 times.',cat:'Staff',progress:()=>({c:ST().maxRegular,g:10}),chk:()=>ST().maxRegular>=10},
+  {id:68,n:'First Hire',d:'Hire your first employee.',cat:'Staff',chk:()=>ST().empHiredEver>=1},
+  {id:69,n:'Middle Management',d:'Keep 5 employees on payroll.',cat:'Staff',progress:()=>({c:S.staff.length,g:5}),chk:()=>S.staff.length>=5},
+  {id:70,n:'Full Staff',d:'Hire the maximum number of employees.',cat:'Staff',progress:()=>({c:S.staff.length,g:C.TIERS[4].maxEmp}),chk:()=>S.staff.length>=C.TIERS[4].maxEmp},
+  {id:71,n:'Employee of the Month',d:'Keep the same stocker for 30 days.',cat:'Staff',progress:()=>({c:ST().stockerMaxTenure,g:30}),chk:()=>ST().stockerMaxTenure>=30},
+  {id:72,n:'Bottleneck',d:'Lose a sale to a long line, then fix it by hiring a cashier.',cat:'Staff',chk:()=>S.flags.bottleneckHire},
+  {id:73,n:'Overstaffed',d:'Pay more in wages than you earn in a single day.',cat:'Staff',chk:()=>RT.overstaffed},
+  // -- Seasons & events --
+  {id:74,n:'Four Seasons',d:'Experience all four seasons.',cat:'Events',progress:()=>({c:S.seasonsSeen.filter(Boolean).length,g:4}),chk:()=>S.seasonsSeen.every(Boolean)},
+  {id:75,n:'Heatwave Hustle',d:'Turn a profit during a heatwave.',cat:'Events',chk:()=>!!ST().eventsProfited.heatwave},
+  {id:76,n:'Festival Frenzy',d:'Cash in on a nearby festival.',cat:'Events',chk:()=>!!ST().eventsProfited.festival},
+  {id:77,n:'Trendsetter',d:'Ride a food-trend craze to a record day.',cat:'Events',chk:()=>RT.trendsetter},
+  {id:78,n:'Disaster Recovery',d:'Survive a supplier disruption with no empty shelf.',cat:'Events',chk:()=>RT.disasterRecovery},
+  {id:79,n:'Squeaky Clean',d:'Pass a health inspection.',cat:'Events',pun:true,chk:()=>RT.passedInspect},
+  {id:80,n:'Shut It Down',d:'Fail a health inspection.',cat:'Events',chk:()=>RT.failedInspect},
+  {id:81,n:'In Season',d:'Sell out of a seasonal product during its season.',cat:'Events',chk:()=>RT.inSeasonSellout},
+  {id:82,n:'Against the Grain',d:'Profit on an out-of-season product.',cat:'Events',pun:true,chk:()=>S.flags.offSeasonProfit},
+  {id:83,n:'Storm Chaser',d:'Profit during three different random events.',cat:'Events',progress:()=>({c:Object.keys(ST().eventsProfited).length,g:3}),chk:()=>Object.keys(ST().eventsProfited).length>=3},
+  // -- Ambitious challenges --
+  {id:84,n:'Million-Dollar Day',d:'Earn $1,000,000 revenue in a single day.',cat:'Challenges',chk:()=>ST().bestDayRev>=1e6},
+  {id:85,n:'Profit King',d:'Net $100,000 profit in a single day.',cat:'Challenges',chk:()=>ST().bestDayProfit>=1e5},
+  {id:86,n:'Hot Streak',d:'String together 30 profitable days in a row.',cat:'Challenges',progress:()=>({c:ST().profitStreak,g:30}),chk:()=>ST().profitStreak>=30},
+  {id:87,n:'Flawless Month',d:'30 days with no spoilage and no empty shelves.',cat:'Challenges',progress:()=>({c:ST().flawlessStreak,g:30}),chk:()=>ST().flawlessStreak>=30},
+  {id:88,n:'Six-Figure Seller',d:'Sell 100,000 items lifetime.',cat:'Challenges',progress:()=>({c:ST().itemsSold,g:100000}),chk:()=>ST().itemsSold>=100000},
+  {id:89,n:'Millionaire Mover',d:'Sell 1,000,000 items lifetime.',cat:'Challenges',progress:()=>({c:ST().itemsSold,g:1000000}),chk:()=>ST().itemsSold>=1000000},
+  {id:90,n:'Debt Free',d:'Pay off a loan in full.',cat:'Challenges',chk:()=>ST().loanPaidOff},
+  {id:91,n:'Self-Made',d:'Reach supermarket tier without ever taking a loan.',cat:'Challenges',chk:()=>S.tier>=3&&!S.everTookLoan},
+  {id:92,n:'Speedrun',d:'Hit $100,000 net worth before day 50.',cat:'Challenges',chk:()=>S.day<50&&netWorth()>=100000},
+  {id:93,n:'Undercut',d:'Beat the rival store’s price on every shared product for a week.',cat:'Challenges',progress:()=>({c:S.rival?S.rival.undercutStreak:0,g:7}),chk:()=>S.rival&&S.rival.undercutStreak>=7},
+  {id:94,n:'Monopoly',d:'Outlast the rival store until it closes for good.',cat:'Challenges',chk:()=>S.flags.rivalClosed},
+  // -- Green Thumb (vegan run) --
+  {id:95,n:'Green Thumb',d:'Sell 100 vegan items without ever selling a non-vegan one.',cat:'Green Thumb',progress:()=>({c:ST().veganSold,g:100}),chk:()=>ST().veganSold>=100&&ST().nonVeganSold===0},
+  {id:96,n:'Plant Powered',d:'Sell 1,000 vegan items without ever selling a non-vegan one.',cat:'Green Thumb',progress:()=>({c:ST().veganSold,g:1000}),chk:()=>ST().veganSold>=1000&&ST().nonVeganSold===0},
+  {id:97,n:'Herbivore',d:'Sell 10,000 vegan items without ever selling a non-vegan one.',cat:'Green Thumb',progress:()=>({c:ST().veganSold,g:10000}),chk:()=>ST().veganSold>=10000&&ST().nonVeganSold===0},
+  {id:98,n:'Plant Kingdom',d:'Sell 100,000 vegan items without ever selling a non-vegan one.',cat:'Green Thumb',progress:()=>({c:ST().veganSold,g:100000}),chk:()=>ST().veganSold>=100000&&ST().nonVeganSold===0},
+  // -- Comical & secret --
+  {id:99,n:'There’s Always Money',d:'Earn $1,000 from banana sales alone.',cat:'Secret',pun:true,progress:()=>({c:ST().bananaRevenue,g:1000}),chk:()=>ST().bananaRevenue>=1000},
+  {id:100,n:'Caution: Wet Floor',d:'Spoil exactly one banana.',cat:'Secret',secret:true,pun:true,chk:()=>S.flags.wetFloor},
+  {id:101,n:'Hoarder',d:'Keep a product stocked for 30 days without ever selling it.',cat:'Secret',secret:true,chk:()=>Object.keys(S.products).some(id=>S.products[id].noSaleDays>=30)},
+  {id:102,n:'Big Spender',d:'Spend your entire cash balance in one transaction.',cat:'Secret',secret:true,chk:()=>S.flags.bigSpender},
+  {id:103,n:'Down to the Last Dollar',d:'Drop below $10 cash and survive.',cat:'Secret',secret:true,chk:()=>S.flags.lastDollar},
+  {id:104,n:'Idle Hands',d:'Leave the game paused for 5 real minutes.',cat:'Secret',secret:true,chk:()=>RT.idleHands},
+  {id:105,n:'The Grind',d:'Play 100 in-game days in a single session.',cat:'Secret',pun:true,progress:()=>({c:RT.sessionDays||0,g:100}),chk:()=>(RT.sessionDays||0)>=100},
+  {id:106,n:'Touch Grass',d:'Reach day 2,000 in one save.',cat:'Secret',secret:true,pun:true,progress:()=>({c:S.day,g:2000}),chk:()=>S.day>=2000},
+  {id:107,n:'Lettuce Pray',d:'Hold 100 heads of lettuce at once.',cat:'Secret',secret:true,pun:true,progress:()=>({c:units('lettuce'),g:100}),chk:()=>units('lettuce')>=100},
+  {id:108,n:'Cabbage',d:'Bank your first $1,000,000 in cash.',cat:'Secret',pun:true,progress:()=>({c:S.cash,g:1000000}),chk:()=>S.cash>=1e6},
+  {id:109,n:'Pun Intended',d:'Unlock 10 pun- or joke-named achievements.',cat:'Secret',pun:true,progress:()=>({c:punUnlocked(),g:10}),chk:()=>punUnlocked()>=10},
+  {id:110,n:'Completionist',d:'Unlock every other achievement.',cat:'Secret',progress:()=>({c:unlockedCount(),g:ACH.length-1}),chk:()=>unlockedCount()>=ACH.length-1},
+];
+const ACH_BY_ID={}; ACH.forEach(a=>ACH_BY_ID[a.id]=a);
+function unlockedCount(){ let n=0; for(const k in S.ach) if(S.ach[k]&&S.ach[k].un) n++; return n; }
+function punUnlocked(){ let n=0; ACH.forEach(a=>{ if(a.pun && S.ach[a.id]&&S.ach[a.id].un) n++; }); return n; }
+
+let achQueue=[], achShowing=false;
+function checkAch(){
+  for(const a of ACH){
+    if(S.ach[a.id]&&S.ach[a.id].un) continue;
+    let ok=false; try{ ok=a.chk(); }catch(e){ ok=false; }
+    if(ok){
+      S.ach[a.id]={un:true, day:S.day};
+      achQueue.push(a);
+    }
+  }
+  if(achQueue.length && !achShowing) showNextAch();
+  updateAwardsBadge();
+}
+// end-of-day specific computed flags, then run checkAch
+function checkAchEndOfDay(T, dayProfit){
+  if(dayProfit>0) RT.everProfitDay=true;
+  // waste not: completed day, had stock, zero spoilage
+  RT.wasteNot = (Object.keys(T.stockedSet).length>0 && T.spoiled===0);
+  // cleaned out: every product that was stocked today is now 0, and >=1 such product, and we actually sold today
+  const stockedIds=Object.keys(T.stockedSet);
+  RT.cleanedOut = stockedIds.length>0 && T.revenue>0 && stockedIds.every(id=>units(id)<=0);
+  // people's grocer: profit & every stocked product priced below market
+  RT.peoplesGrocer = dayProfit>0 && stockedIds.length>0 && stockedIds.every(id=> S.products[id].price < marketPrice(CAT[id]));
+  // overstaffed
+  RT.overstaffed = T.wages>0 && T.wages>T.revenue;
+  // event-driven
+  RT.trendsetter = (T.eventType==='craze' && T.revenue>0 && T.revenue>=S.stats.bestDayRev-0.001);
+  RT.disasterRecovery = (T.eventType==='disruption' && !T.emptyShelf);
+  RT.passedInspect = (T.inspectResult==='pass');
+  RT.failedInspect = (T.inspectResult==='fail');
+  // in-season sellout: a product in season sold out today (S.season is still this
+  // day's season — checkAchEndOfDay runs before the day++/season rollover in endDay)
+  RT.inSeasonSellout = Object.keys(T.soldOut).some(id=>CAT[id].seasons.includes(S.season));
+  checkAch();
+}
+
+function showNextAch(){
+  if(!achQueue.length){ achShowing=false; return; }
+  achShowing=true;
+  const a=achQueue.shift();
+  const banner=document.getElementById('achBanner');
+  banner.querySelector('.n').textContent=a.n;
+  banner.querySelector('.d').textContent=a.d;
+  banner.querySelector('.aic').textContent=achIcon(a);
+  banner.classList.add('show');
+  fireConfetti();
+  try{ beep(); }catch(e){}
+  setTimeout(()=>{ banner.classList.remove('show'); setTimeout(showNextAch,400); }, 2600);
+}
+function achIcon(a){
+  const cat={Milestones:'🏅',Inventory:'📦',Pricing:'💲',Freshness:'🧊',Marketing:'📣',Supply:'🚚',Staff:'👥',Events:'🌦️','Green Thumb':'🌱',Challenges:'👑',Secret:'❓'};
+  return cat[a.cat]||'🏆';
+}
+function updateAwardsBadge(){
+  const btn=document.querySelector('#tabbar button[data-tab="achievements"]');
+  if(!btn) return;
+  let b=btn.querySelector('.badge');
+  // no persistent badge needed; keep clean
+}
+
+/* ============================================================================
+   ============================  RENDERING  ===================================
+   ============================================================================ */
+function syncTop(){
+  document.getElementById('cashVal').textContent=money(S.cash);
+  document.getElementById('nwVal').textContent=money(netWorth());
+  document.getElementById('dayVal').innerHTML=S.day+' <small id="seasonVal">'+C.SEASON_EMOJI[S.season]+' '+C.SEASON_NAMES[S.season]+'</small>';
+  document.getElementById('repFill').style.width=S.rep+'%';
+  document.getElementById('repNum').textContent=Math.round(S.rep);
+  document.getElementById('storeTitle').textContent=tier().emoji+' '+tier().name+'  ·  '+distinctStocked()+'/'+tier().slots+' slots  ·  '+totalUnits()+'/'+tier().cap+' units';
+}
+
+let tileRefs={};
+function renderShelfStatic(){
+  const shelf=document.getElementById('shelf');
+  const avail=CATALOG.filter(p=>p.tier<=S.tier);
+  // figure which to show: stocked ones + an "add" affordance
+  shelf.innerHTML=''; tileRefs={};
+  avail.forEach(p=>{
+    const u=units(p.id); const pr=S.products[p.id];
+    if(u<=0 && pr.batches.length===0 && pr.spoiled<=0){
+      // unstocked but available -> compact "add" style only if slots available, else skip showing as full tile
+    }
+    const tile=document.createElement('div');
+    tile.className='tile'+(u<=0?' empty':'')+(pr.front?' front':'');
+    tile.dataset.pid=p.id;
+    const f=freshFrac(p.id);
+    tile.innerHTML=`
+      <span class="seas" title="${inSeason(p.id)?'In season':'Out of season'}">${inSeason(p.id)?C.SEASON_EMOJI[S.season]:'·'}</span>
+      <div class="emoji">${p.emoji}</div>
+      <div class="nm">${p.name}<span class="vegtag ${p.vegan?'':'nonveg'}">${p.vegan?'V':'N'}</span></div>
+      <div class="row"><span>📦 <span class="stock">${fmtStock(u)}</span></span><button class="price" data-act="price">$${pr.price.toFixed(2)}</button></div>
+      <div class="freshWrap"><div class="freshFill" style="width:${Math.round(f*100)}%;background:${freshColor(f)}"></div></div>
+      ${pr.spoiled>0?`<button class="tossBtn" data-act="toss">🗑️ Toss ${pr.spoiled} spoiled</button>`:''}
+      <div class="btns">
+        <button class="buy" data-act="buy">📦 Stock</button>
+        <button class="mkdn" data-act="mkdn">🏷️ Sale</button>
+      </div>`;
+    shelf.appendChild(tile);
+    tileRefs[p.id]={el:tile, stock:tile.querySelector('.stock'), price:tile.querySelector('.price'), fresh:tile.querySelector('.freshFill'), spoiledWrap:tile};
+  });
+  syncTop();
+}
+function syncTiles(){
+  for(const pid in tileRefs){
+    const r=tileRefs[pid]; const u=units(pid); const pr=S.products[pid];
+    r.stock.textContent=fmtStock(u);
+    r.price.textContent='$'+pr.price.toFixed(2);
+    const f=freshFrac(pid);
+    r.fresh.style.width=Math.round(f*100)+'%'; r.fresh.style.background=freshColor(f);
+    r.el.classList.toggle('empty', u<=0);
+  }
+}
+function pulseTile(pid){ const r=tileRefs[pid]; if(r){ r.el.classList.remove('sale-pulse'); void r.el.offsetWidth; r.el.classList.add('sale-pulse'); } }
+
+/* floating +$ */
+let floaterCount=0;
+function floatSale(pid, amt, mkdn){
+  if(floaterCount>=C.MAX_FLOATERS) return;
+  const r=tileRefs[pid]; if(!r) return;
+  const rect=r.el.getBoundingClientRect(); const app=document.getElementById('app').getBoundingClientRect();
+  const f=document.createElement('div');
+  f.className='floatp'+(mkdn?' neg':'');
+  f.textContent=(mkdn?'':'+')+money(amt);
+  f.style.left=(rect.left-app.left+rect.width/2-16+ (rnd()*20-10))+'px';
+  f.style.top=(rect.top-app.top+10)+'px';
+  document.getElementById('app').appendChild(f); floaterCount++;
+  setTimeout(()=>{ f.remove(); floaterCount--; },1000);
+}
+
+/* ============================================================================
+   ============================  PANELS / TABS  ===============================
+   ============================================================================ */
+let curTab=null;
+function openTab(tab){
+  curTab=tab;
+  document.querySelectorAll('#tabbar button').forEach(b=>b.classList.toggle('on', b.dataset.tab===tab));
+  document.getElementById('panelTitle').textContent={restock:'📦 Restock',upgrades:'🏪 Store & Supply',marketing:'📣 Marketing',staff:'👥 Staff & Finance',achievements:'🏆 Achievements'}[tab];
+  renderPanel();
+  document.getElementById('panelWrap').classList.add('open');
+}
+function closePanel(){ curTab=null; document.getElementById('panelWrap').classList.remove('open'); document.querySelectorAll('#tabbar button').forEach(b=>b.classList.remove('on')); }
+function refreshPanelIfOpen(){ if(curTab) renderPanel(); }
+function renderPanel(){
+  const b=document.getElementById('panelBody');
+  if(curTab==='restock') b.innerHTML=panelRestock();
+  else if(curTab==='upgrades') b.innerHTML=panelUpgrades();
+  else if(curTab==='marketing') b.innerHTML=panelMarketing();
+  else if(curTab==='staff') b.innerHTML=panelStaff();
+  else if(curTab==='achievements') b.innerHTML=panelAch();
+  bindPanel();
+}
+
+let restockState={pid:CATALOG[0].id, qty:20, sup:'quick'};
+function panelRestock(){
+  const avail=CATALOG.filter(p=>p.tier<=S.tier);
+  if(!avail.find(p=>p.id===restockState.pid)) restockState.pid=avail[0].id;
+  const p=CAT[restockState.pid]; const pr=S.products[p.id];
+  const supList=Object.keys(C.SUPPLIERS).filter(k=>C.SUPPLIERS[k].tier<=S.tier && (k!=='coop'||true));
+  if(!supList.includes(restockState.sup)) restockState.sup='quick';
+  const sup=C.SUPPLIERS[restockState.sup];
+  const unit=effWholesale(p.id, restockState.sup);
+  let qty=restockState.qty;
+  const cost=qty*unit;
+  let html=`<div class="note">Pick a product, supplier & quantity. Cheaper suppliers are slower and may be less fresh. Co-op needs a contract; the counter is instant but pricey.</div>`;
+  // product selector
+  html+=`<div class="subhd">Product</div><div style="display:flex;flex-wrap:wrap;gap:6px;">`;
+  avail.forEach(pp=>{ html+=`<button class="pill ${pp.id===p.id?'on':''}" data-rp="${pp.id}" style="font-size:1.1rem;padding:6px 9px;">${pp.emoji}</button>`; });
+  html+=`</div>`;
+  html+=`<div class="itemRow" style="margin-top:10px;"><div class="ic">${p.emoji}</div><div class="info"><div class="t">${p.name} ${inSeason(p.id)?'<span class="pill on">in season</span>':'<span class="pill warn">off season</span>'}</div><div class="d">In stock: ${units(p.id)} · Shelf life ~${effShelf(p.id)}d · Sells ~$${pr.price.toFixed(2)} · Optimal $${optimalPrice(p).toFixed(2)}</div></div></div>`;
+  // supplier selector
+  html+=`<div class="subhd">Supplier</div>`;
+  supList.forEach(k=>{
+    const s=C.SUPPLIERS[k]; const locked=(k==='coop'&&!S.supply.coopSigned);
+    const disrupt=(S.event&&S.event.type==='disruption'&&S.event.data.supplier===k);
+    html+=`<div class="itemRow"><div class="ic">${s.emoji}</div><div class="info"><div class="t">${s.name} ${restockState.sup===k?'<span class="pill on">selected</span>':''}${locked?'<span class="pill warn">no contract</span>':''}${disrupt?'<span class="pill warn">disrupted</span>':''}</div><div class="d">${s.desc}<br>×${s.costMult} cost · ${s.days===0?'same-day':s.days+'-day'} · min ${s.min}${s.max<9999?' · max '+s.max:''}${s.fresh?` · ${s.fresh>0?'+':''}${s.fresh} fresh`:''}</div></div><div class="act"><button class="btn alt" data-rsup="${k}" ${locked?'disabled':''}>Pick</button></div></div>`;
+  });
+  // quantity + order
+  const room=capRemaining();
+  html+=`<div class="subhd">Quantity (shelf room: ${room} / ${tier().cap})</div>`;
+  html+=`<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+    <div class="stepper"><button data-rq="-10">−</button><div class="qv" id="rqv">${qty}</div><button data-rq="10">+</button></div>
+    <button class="pill" data-rq="set:${sup.min}">min ${sup.min}</button>
+    <button class="pill" data-rq="set:50">50</button>
+    <button class="pill" data-rq="set:200">200</button>
+    ${sup.max<9999?`<button class="pill" data-rq="set:${sup.max}">max ${sup.max}</button>`:''}
+    <button class="pill" data-rq="max">fill cash</button>
+  </div>`;
+  html+=`<div class="kv" style="margin-top:12px;"><span class="k">Unit cost</span><span class="v">${money(unit)}</span></div>
+         <div class="kv"><span class="k">Order total</span><span class="v gold-t">${money(cost)}</span></div>
+         <div class="kv"><span class="k">Arrives</span><span class="v">${(restockState.sup==='quick'||S.supply.jit||sup.days===0)?'instantly':'day '+(S.day+sup.days)}</span></div>`;
+  html+=`<button class="btn" id="orderBtn" style="width:100%;margin-top:12px;height:48px;font-size:.95rem;" ${cost>S.cash?'disabled':''}>${restockState.sup==='quick'?'⚡ Quick Restock':'🛒 Place Order'} — ${money(cost)}</button>`;
+  if(cost>S.cash) html+=`<div class="note center" style="color:var(--red)">Not enough cash.</div>`;
+  // pending deliveries
+  if(S.deliveries.length){
+    html+=`<div class="subhd">Incoming deliveries</div>`;
+    S.deliveries.slice().sort((a,b)=>a.arriveDay-b.arriveDay).forEach(d=>{
+      html+=`<div class="kv"><span class="k">${CAT[d.pid].emoji} ${d.qty} ${CAT[d.pid].name}</span><span class="v">day ${d.arriveDay} (in ${d.arriveDay-S.day}d)</span></div>`;
+    });
+  }
+  return html;
+}
+
+function panelUpgrades(){
+  let html='';
+  // tier upgrade
+  const t=tier();
+  html+=`<div class="subhd">Store Tier</div>`;
+  html+=`<div class="itemRow"><div class="ic">${t.emoji}</div><div class="info"><div class="t">${t.name} (current)</div><div class="d">${t.slots} slots · ${t.cap} unit cap · ~${t.traffic} base traffic · rent ${money0(t.rent)}/day · up to ${t.maxEmp} staff</div></div></div>`;
+  if(S.tier<C.TIERS.length-1){
+    const n=C.TIERS[S.tier+1];
+    html+=`<div class="itemRow"><div class="ic">${n.emoji}</div><div class="info"><div class="t">Upgrade → ${n.name}</div><div class="d">${n.slots} slots · ${n.cap} cap · ~${n.traffic} traffic · rent ${money0(n.rent)}/day · ${n.maxEmp} staff · unlocks new products</div></div><div class="act"><button class="btn gold" id="tierUp" ${S.cash<n.cost?'disabled':''}>${money(n.cost)}</button></div></div>`;
+  } else { html+=`<div class="note">🏙️ You’ve reached the maximum tier — Empire status!</div>`; }
+
+  // refrigeration
+  html+=`<div class="subhd">Refrigeration (extends shelf life)</div>`;
+  html+=`<div class="itemRow"><div class="ic">❄️</div><div class="info"><div class="t">Level ${S.refrig} / ${C.REFRIG_MAX}</div><div class="d">Shelf life ×${(1+S.refrig*C.REFRIG_STEP).toFixed(2)} on all produce.</div></div><div class="act">`;
+  if(S.refrig<C.REFRIG_MAX) html+=`<button class="btn" id="refrigUp" ${S.cash<C.REFRIG_COST[S.refrig+1]?'disabled':''}>${money(C.REFRIG_COST[S.refrig+1])}</button>`;
+  else html+=`<span class="pill on">MAX</span>`;
+  html+=`</div></div>`;
+
+  // supply chain
+  html+=`<div class="subhd">Supply Chain</div>`;
+  html+=`<div class="itemRow"><div class="ic">🚜</div><div class="info"><div class="t">Local Farm Co-op Contract</div><div class="d">Unlocks the fresh, local co-op supplier.</div></div><div class="act">${S.supply.coopSigned?'<span class="pill on">signed</span>':'<button class="btn" id="signCoop">Sign (free)</button>'}</div></div>`;
+  Object.keys(C.SUPPLY_UP).forEach(k=>{
+    const u=C.SUPPLY_UP[k]; const lvl=S.supply[k];
+    html+=`<div class="itemRow"><div class="ic">${k==='reefer'?'🚚':k==='bulk'?'💰':'⏱️'}</div><div class="info"><div class="t">${u.name} ${lvl}/${u.max}</div><div class="d">${u.desc}</div></div><div class="act">`;
+    if(lvl<u.max) html+=`<button class="btn" data-supup="${k}" ${S.cash<u.cost[lvl+1]?'disabled':''}>${money(u.cost[lvl+1])}</button>`;
+    else html+=`<span class="pill on">MAX</span>`;
+    html+=`</div></div>`;
+  });
+  return html;
+}
+
+function panelMarketing(){
+  let html=`<div class="note">Campaigns boost daily customers (with diminishing returns — diversify!). The loyalty program grows repeat shoppers over time.</div>`;
+  Object.keys(C.MKT).forEach(k=>{
+    const m=C.MKT[k]; const st=S.marketing[k];
+    html+=`<div class="itemRow"><div class="ic">${m.emoji}</div><div class="info"><div class="t">${m.name} ${st.active?`<span class="pill on">active ${st.days}d</span>`:''}</div><div class="d">${m.desc} · +${Math.round(m.boost*100)}% traffic · +${m.repBoost} rep · ${m.days} days · ${money0(m.cost)}</div></div><div class="act"><button class="btn" data-mkt="${k}" ${S.cash<m.cost?'disabled':''}>${st.active?'Renew':'Run'}</button></div></div>`;
+  });
+  html+=`<div class="itemRow"><div class="ic">💳</div><div class="info"><div class="t">Loyalty Program ${S.marketing.loyalty?'<span class="pill on">on</span>':'<span class="pill">off</span>'}</div><div class="d">${money0(C.LOYALTY_COST)}/day · grows members & basket size · ${S.loyaltyMembers} members</div></div><div class="act"><button class="btn ${S.marketing.loyalty?'alt':''}" id="loyaltyToggle">${S.marketing.loyalty?'Stop':'Launch'}</button></div></div>`;
+  html+=`<div class="subhd">Reputation</div><div class="kv"><span class="k">Current</span><span class="v gold-t">${Math.round(S.rep)} / 100</span></div><div class="kv"><span class="k">Loyalty members</span><span class="v">${S.loyaltyMembers}</span></div>`;
+  if(S.rival){ html+=`<div class="subhd">Rival Store</div>`;
+    if(S.rival.closed) html+=`<div class="note">🏆 The rival has closed for good.</div>`;
+    else html+=`<div class="kv"><span class="k">Status</span><span class="v">Open · pulling ~${Math.round(rivalShare()*100)}% of traffic</span></div><div class="kv"><span class="k">Undercut streak</span><span class="v">${S.rival.undercutStreak}/7 days</span></div><div class="kv"><span class="k">Dominance</span><span class="v">${S.rival.dominateDays}/${C.RIVAL_CLOSE_DAYS} days</span></div>`;
+  }
+  return html;
+}
+
+function panelStaff(){
+  const t=tier();
+  let html=`<div class="note">Cashiers raise checkout capacity (fewer lost sales to long lines). Stockers cut spoilage and auto-toss rot. Wages are paid daily.</div>`;
+  html+=`<div class="kv"><span class="k">Payroll</span><span class="v">${S.staff.length} / ${t.maxEmp} staff</span></div>`;
+  html+=`<div class="kv"><span class="k">Checkout capacity</span><span class="v">${C.CUST_BASE_CAPACITY+countStaff('cashier')*C.CUST_PER_CASHIER} customers/day</span></div>`;
+  html+=`<div class="kv"><span class="k">Daily wages</span><span class="v bad-t">${money0(countStaff('cashier')*C.WAGE_CASHIER+countStaff('stocker')*C.WAGE_STOCKER)}</span></div>`;
+  html+=`<div style="display:flex;gap:8px;margin:10px 0;"><button class="btn" id="hireCashier" ${S.staff.length>=t.maxEmp?'disabled':''}>+ Cashier (${money0(C.WAGE_CASHIER)}/d)</button><button class="btn" id="hireStocker" ${S.staff.length>=t.maxEmp?'disabled':''}>+ Stocker (${money0(C.WAGE_STOCKER)}/d)</button></div>`;
+  if(S.staff.length){ html+=`<div class="subhd">Roster</div>`;
+    S.staff.forEach((e,i)=>{ html+=`<div class="itemRow"><div class="ic">${e.type==='cashier'?'🧑‍💼':'📦'}</div><div class="info"><div class="t">${e.type.charAt(0).toUpperCase()+e.type.slice(1)}</div><div class="d">Hired day ${e.hireDay} · ${S.day-e.hireDay} days tenure</div></div><div class="act"><button class="btn danger" data-fire="${i}">Fire</button></div></div>`; });
+  } else if(t.maxEmp===0){ html+=`<div class="note">Upgrade your store to unlock staff.</div>`; }
+
+  // finance
+  html+=`<div class="subhd">Finance</div>`;
+  html+=`<div class="kv"><span class="k">Cash</span><span class="v gold-t">${money(S.cash)}</span></div>`;
+  html+=`<div class="kv"><span class="k">Net worth</span><span class="v">${money(netWorth())}</span></div>`;
+  html+=`<div class="kv"><span class="k">Loan balance</span><span class="v ${S.loan>0?'bad-t':''}">${money(S.loan)}</span></div>`;
+  html+=`<div style="display:flex;gap:8px;margin-top:8px;"><button class="btn alt" id="loanBtn">Take ${money0(C.LOAN_INCREMENT)} loan</button><button class="btn" id="repayBtn" ${S.loan<=0||S.cash<=0?'disabled':''}>Repay loan</button></div>`;
+  html+=`<div class="note" style="margin-top:6px;">Interest: ${(C.LOAN_INTEREST*100).toFixed(1)}%/day. Bankruptcy is auto-covered by an emergency loan — no game over.</div>`;
+  // lifetime stats
+  html+=`<div class="subhd">Lifetime Stats</div>`;
+  const s=S.stats;
+  html+=statKV('Items sold',s.itemsSold.toLocaleString())+statKV('Items spoiled',s.itemsSpoiled.toLocaleString())+statKV('Customers served',s.customersTotal.toLocaleString())+statKV('Total revenue',money(s.revenue))+statKV('Total profit',money(s.profit))+statKV('Best day revenue',money(s.bestDayRev))+statKV('Best day profit',money(s.bestDayProfit))+statKV('Profit streak',s.profitStreak+' days')+statKV('Vegan items sold',s.veganSold.toLocaleString())+statKV('Banana revenue',money(s.bananaRevenue));
+  html+=`<hr class="sep"><button class="btn danger" id="resetBtn" style="width:100%;">🗑️ Reset Game</button>`;
+  html+=`<button class="btn alt" id="helpBtn" style="width:100%;margin-top:8px;">❔ How to Play</button>`;
+  return html;
+}
+function statKV(k,v){ return `<div class="kv"><span class="k">${k}</span><span class="v">${v}</span></div>`; }
+
+let achFilter='all';
+function panelAch(){
+  const total=ACH.length, un=unlockedCount(); const pct=Math.round(un/total*100);
+  let html=`<div id="achProgTop"><div id="achPct">${pct}%</div><div style="flex:1"><div class="kv" style="padding:0"><span class="k">${un} / ${total} unlocked</span><span class="v">${punUnlocked()} pun awards · ${Math.round(S.rep)} rep</span></div><div id="achProgBar"><div id="achProgFill" style="width:${pct}%"></div></div></div></div>`;
+  const cats=['Milestones','Inventory','Pricing','Freshness','Marketing','Supply','Staff','Events','Challenges','Green Thumb','Secret'];
+  html+=`<div class="achFilter"><button class="${achFilter==='all'?'on':''}" data-af="all">All</button><button class="${achFilter==='un'?'on':''}" data-af="un">Unlocked</button><button class="${achFilter==='lock'?'on':''}" data-af="lock">Locked</button></div>`;
+  cats.forEach(cat=>{
+    const list=ACH.filter(a=>a.cat===cat);
+    const visible=list.filter(a=>{ const u=S.ach[a.id]&&S.ach[a.id].un; return achFilter==='all'||(achFilter==='un'&&u)||(achFilter==='lock'&&!u); });
+    if(!visible.length) return;
+    const unc=list.filter(a=>S.ach[a.id]&&S.ach[a.id].un).length;
+    html+=`<div class="achCat"><div class="ch"><span>${cat}</span><span>${unc}/${list.length}</span></div>`;
+    visible.forEach(a=>{
+      const u=S.ach[a.id]&&S.ach[a.id].un;
+      const hidden=a.secret&&!u;
+      let prog=''; if(a.progress&&!u){ try{ const p=a.progress(); const pc=clamp(p.c/p.g,0,1); prog=`<div class="apb"><div class="apf" style="width:${Math.round(pc*100)}%"></div></div><div class="apt">${fmtNum(Math.min(p.c,p.g))} / ${fmtNum(p.g)}</div>`; }catch(e){} }
+      html+=`<div class="achItem ${u?'un':''} ${a.secret?'secret':''}"><div class="aic2">${u?achIcon(a):(hidden?'❓':'🔒')}</div><div class="ab"><div class="an">${hidden?'???':a.n}</div><div class="ad">${hidden?'Secret achievement — keep playing to reveal.':a.d}</div>${prog}</div><div class="when">${u?'Day '+S.ach[a.id].day:''}</div></div>`;
+    });
+    html+=`</div>`;
+  });
+  return html;
+}
+function fmtNum(n){ n=Math.floor(n); return n>=1000?n.toLocaleString():n; }
+
+/* ----- panel event binding ----- */
+function bindPanel(){
+  const b=document.getElementById('panelBody');
+  b.querySelectorAll('[data-rp]').forEach(el=>el.onclick=()=>{ restockState.pid=el.dataset.rp; renderPanel(); });
+  b.querySelectorAll('[data-rsup]').forEach(el=>el.onclick=()=>{ restockState.sup=el.dataset.rsup; const s=C.SUPPLIERS[restockState.sup]; if(restockState.qty<s.min) restockState.qty=s.min; renderPanel(); });
+  b.querySelectorAll('[data-rq]').forEach(el=>el.onclick=()=>{
+    const v=el.dataset.rq; const sup=C.SUPPLIERS[restockState.sup];
+    if(v==='max'){ const unit=effWholesale(restockState.pid,restockState.sup); restockState.qty=Math.max(sup.min,Math.min(sup.max||99999, Math.floor(S.cash/unit), capRemaining())); }
+    else if(v.startsWith('set:')) restockState.qty=parseInt(v.slice(4));
+    else restockState.qty=Math.max(1, restockState.qty+parseInt(v));
+    renderPanel();
+  });
+  const ob=b.querySelector('#orderBtn'); if(ob) ob.onclick=()=>{ if(restockState.sup==='quick') quickRestock(restockState.pid,restockState.qty); else supplierOrder(restockState.pid,restockState.qty,restockState.sup); };
+  const tu=b.querySelector('#tierUp'); if(tu) tu.onclick=upgradeTier;
+  const ru=b.querySelector('#refrigUp'); if(ru) ru.onclick=buyRefrig;
+  const sc=b.querySelector('#signCoop'); if(sc) sc.onclick=signCoop;
+  b.querySelectorAll('[data-supup]').forEach(el=>el.onclick=()=>buySupplyUp(el.dataset.supup));
+  b.querySelectorAll('[data-mkt]').forEach(el=>el.onclick=()=>runCampaign(el.dataset.mkt));
+  const lt=b.querySelector('#loyaltyToggle'); if(lt) lt.onclick=toggleLoyalty;
+  const hc=b.querySelector('#hireCashier'); if(hc) hc.onclick=()=>hire('cashier');
+  const hs=b.querySelector('#hireStocker'); if(hs) hs.onclick=()=>hire('stocker');
+  b.querySelectorAll('[data-fire]').forEach(el=>el.onclick=()=>fire(parseInt(el.dataset.fire)));
+  const lb=b.querySelector('#loanBtn'); if(lb) lb.onclick=takeLoan;
+  const rb=b.querySelector('#repayBtn'); if(rb) rb.onclick=repayLoan;
+  const rs=b.querySelector('#resetBtn'); if(rs) rs.onclick=()=>confirmModal('Reset everything?','This wipes your save and starts a brand-new fruit stand. This cannot be undone.', 'Reset', resetGame);
+  const hb=b.querySelector('#helpBtn'); if(hb) hb.onclick=showHelp;
+  b.querySelectorAll('[data-af]').forEach(el=>el.onclick=()=>{ achFilter=el.dataset.af; renderPanel(); });
+}
+
+/* ---- per-tile actions (storefront) ---- */
+document.getElementById('shelf').addEventListener('click', e=>{
+  const btn=e.target.closest('button[data-act]'); if(!btn) return;
+  const tile=e.target.closest('.tile'); const pid=tile.dataset.pid; const act=btn.dataset.act;
+  if(act==='buy'){ openTab('restock'); restockState.pid=pid; renderPanel(); }
+  else if(act==='mkdn'){ markdown(pid); }
+  else if(act==='price'){ priceModal(pid); }
+  else if(act==='toss'){ tossSpoiled(pid); }
+});
+
+/* ============================================================================
+   ============================  MODALS  ======================================
+   ============================================================================ */
+function openModal(html){ const m=document.getElementById('modal'); m.innerHTML=html; document.getElementById('modalWrap').classList.add('open'); }
+function closeModal(){ document.getElementById('modalWrap').classList.remove('open'); }
+document.getElementById('modalWrap').addEventListener('click',e=>{ if(e.target.id==='modalWrap') closeModal(); });
+
+function confirmModal(title,msg,okLabel,onOk){
+  openModal(`<h3>${title}</h3><p>${msg}</p><div class="modalBtns"><button class="btn alt" id="mCancel">Cancel</button><button class="btn danger" id="mOk">${okLabel}</button></div>`);
+  document.getElementById('mCancel').onclick=closeModal;
+  document.getElementById('mOk').onclick=()=>{ closeModal(); onOk(); };
+}
+
+function priceModal(pid){
+  const p=CAT[pid]; const pr=S.products[pid];
+  const opt=optimalPrice(p), mkt=marketPrice(p);
+  openModal(`<h3>${p.emoji} ${p.name} — set price</h3>
+    <p>Wholesale ${money(p.wholesale)} · Market ${money(mkt)} · Optimal ≈ <b class="gold-t">${money(opt)}</b></p>
+    <p>Higher price = more margin but fewer sales. ${S.rival&&S.rival.prices[pid]?'Rival sells at '+money(S.rival.prices[pid])+'.':''}</p>
+    <div style="display:flex;align-items:center;gap:10px;justify-content:center;margin:14px 0;">
+      <div class="stepper"><button id="pm10">−10¢</button><div class="qv" id="pmv">$${pr.price.toFixed(2)}</div><button id="pp10">+10¢</button></div>
+    </div>
+    <div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;">
+      <button class="pill" data-pset="${(p.wholesale).toFixed(2)}">cost</button>
+      <button class="pill" data-pset="${mkt.toFixed(2)}">market</button>
+      <button class="pill" data-pset="${opt.toFixed(2)}">optimal</button>
+      <button class="pill" data-pset="${(p.wholesale*3).toFixed(2)}">3× cost</button>
+      <button class="pill" data-pset="${(p.wholesale*5).toFixed(2)}">5× cost</button>
+    </div>
+    <div class="modalBtns"><button class="btn" id="pmDone" style="width:100%;">Done</button></div>`);
+  let v=pr.price;
+  const upd=()=>{ document.getElementById('pmv').textContent='$'+v.toFixed(2); };
+  document.getElementById('pm10').onclick=()=>{ v=Math.max(0.01,+(v-0.10).toFixed(2)); setPrice(pid,v); upd(); };
+  document.getElementById('pp10').onclick=()=>{ v=+(v+0.10).toFixed(2); setPrice(pid,v); upd(); };
+  document.querySelectorAll('[data-pset]').forEach(el=>el.onclick=()=>{ v=+(+el.dataset.pset).toFixed(2); if(v<0.01)v=0.01; setPrice(pid,v); upd(); });
+  document.getElementById('pmDone').onclick=closeModal;
+}
+
+function showHelp(){
+  openModal(`<h3>🛒 How to Play</h3>
+  <p><b>Goal:</b> grow a humble fruit stand into a hypermarket empire by maximizing daily profit — while fighting spoilage.</p>
+  <p><b>The day plays out in real time.</b> Use the speed controls (❚❚ / 1× / 2× / 4×) up top. Customers arrive based on your reputation, marketing & store size, and buy what's in stock.</p>
+  <p><b>📦 Restock</b> to buy produce. The counter is instant but pricey; suppliers are cheaper but slower & have minimums. Don't over-order — produce <b>spoils</b> (watch the freshness bar: green→yellow→brown).</p>
+  <p><b>$ on a tile</b> sets the price. <b>Markdown</b> clears aging stock fast at low margin.</p>
+  <p><b>🏪 Store</b> upgrades your tier (more slots & traffic), refrigeration (longer shelf life), and supply chain. <b>📣 Marketing</b> draws customers. <b>👥 Staff</b> adds cashiers (capacity) & stockers (less spoilage), plus loans & stats.</p>
+  <p>🏆 <b>110 achievements</b> to chase. The game autosaves. Have fun!</p>
+  <div class="modalBtns"><button class="btn" id="helpOk" style="width:100%;">Let's go!</button></div>`);
+  document.getElementById('helpOk').onclick=closeModal;
+}
+
+/* ============================================================================
+   ============================  TOASTS / FX  =================================
+   ============================================================================ */
+function toast(icon,msg,kind){
+  const t=document.createElement('div'); t.className='toast '+(kind||'');
+  t.innerHTML=`<span class="tic">${icon}</span><span>${msg}</span>`;
+  const wrap=document.getElementById('toasts'); wrap.appendChild(t);
+  setTimeout(()=>t.remove(),3600);
+  while(wrap.children.length>4) wrap.removeChild(wrap.firstChild);
+}
+const CONF_COLORS=['#ffd54d','#5fd273','#ff6b6b','#5db4ff','#c08bff','#ff9f43'];
+function fireConfetti(){
+  const wrap=document.getElementById('confetti');
+  for(let i=0;i<40;i++){
+    const c=document.createElement('div'); c.className='confo';
+    c.style.background=CONF_COLORS[i%CONF_COLORS.length];
+    c.style.left=(40+rnd()*20)+'%'; c.style.top='30%';
+    const dx=(rnd()*2-1)*220, dy=120+rnd()*260, rot=rnd()*720;
+    c.animate([{transform:'translate(0,0) rotate(0)',opacity:1},{transform:`translate(${dx}px,${dy}px) rotate(${rot}deg)`,opacity:0}],{duration:1100+rnd()*700,easing:'cubic-bezier(.2,.6,.4,1)'});
+    wrap.appendChild(c); setTimeout(()=>c.remove(),1900);
+  }
+}
+let actx=null;
+function beep(){
+  try{ actx=actx||new (window.AudioContext||window.webkitAudioContext)();
+    const o=actx.createOscillator(), g=actx.createGain();
+    o.connect(g); g.connect(actx.destination);
+    o.type='triangle'; o.frequency.setValueAtTime(660,actx.currentTime); o.frequency.exponentialRampToValueAtTime(990,actx.currentTime+0.12);
+    g.gain.setValueAtTime(0.0001,actx.currentTime); g.gain.exponentialRampToValueAtTime(0.12,actx.currentTime+0.02); g.gain.exponentialRampToValueAtTime(0.0001,actx.currentTime+0.25);
+    o.start(); o.stop(actx.currentTime+0.26);
+  }catch(e){}
+}
+
+/* ============================================================================
+   ============================  MAIN LOOP  ===================================
+   ============================================================================ */
+function setSpeed(s){
+  S.speed=s;
+  document.querySelectorAll('#speedCtl button').forEach(b=>b.classList.toggle('on', +b.dataset.spd===s));
+  if(s>0){ RT.pauseStart=0; } else { RT.pauseStart=performance.now(); }
+  queueSave();
+}
+document.getElementById('speedCtl').addEventListener('click',e=>{ const b=e.target.closest('button'); if(b) setSpeed(+b.dataset.spd); });
+
+function frame(now){
+  const dt=Math.min(120, now-(RT.lastFrame||now)); RT.lastFrame=now;
+  if(S.speed>0){
+    const dayMs=C.DAY_MS_1X/S.speed;
+    RT.dayClock+=dt;
+    const frac=clamp(RT.dayClock/dayMs,0,1);
+    // schedule customers proportional to elapsed fraction
+    const target=Math.floor(S.today.customers*frac);
+    let toProcess=target - S.today.processed;
+    if(toProcess>0){ processCustomers(Math.min(toProcess, C.CUSTOMER_BATCH_CAP)); }
+    document.getElementById('dayProg').style.width=(frac*100)+'%';
+    if(RT.dirtyTilesPending){ }
+    syncTiles(); syncTop();
+    // periodic mid-day achievement check (cheap)
+    RT.achTick=(RT.achTick||0)+dt; if(RT.achTick>500){ RT.achTick=0; checkAch(); }
+    if(RT.dayClock>=dayMs){ endDay(); }
+  } else {
+    // paused: idle hands achievement
+    if(RT.pauseStart && !RT.idleHands && (now-RT.pauseStart)>=300000){ RT.idleHands=true; checkAch(); }
+  }
+  requestAnimationFrame(frame);
+}
+
+/* ============================================================================
+   ============================  WIRE-UP / INIT  ==============================
+   ============================================================================ */
+document.querySelectorAll('#tabbar button').forEach(b=>{
+  b.addEventListener('click',()=>{ if(curTab===b.dataset.tab) closePanel(); else openTab(b.dataset.tab); });
+});
+document.getElementById('panelClose').onclick=closePanel;
+document.getElementById('panelScrim').onclick=closePanel;
+
+function fullRender(){ renderShelfStatic(); syncTop(); if(curTab) renderPanel(); }
+
+function init(){
+  RT={dirtyTiles:{}, sessionDays:0, dayClock:0, lastFrame:performance.now(),
+      everProfitDay:false, pauseStart:0};
+  const had=load();
+  if(!had){ S=freshState(); S.today=freshDay(); }
+  // restore speed UI
+  if(S.speed===undefined) S.speed=1;
+  document.querySelectorAll('#speedCtl button').forEach(bn=>bn.classList.toggle('on', +bn.dataset.spd===S.speed));
+  if(S.speed===0) RT.pauseStart=performance.now();   // arm Idle Hands timer if loaded paused
+  // re-evaluate any already-satisfied achievements silently-ish (avoid spamming on first load of existing save)
+  if(had){ for(const a of ACH){ if(!(S.ach[a.id]&&S.ach[a.id].un)){ try{ if(a.chk()){ S.ach[a.id]={un:true,day:S.day}; } }catch(e){} } } }
+  if(had) resumeDay(); else startDay(true);
+  fullRender();
+  // autosave heartbeat
+  setInterval(()=>{ save(); }, 3000);
+  // first-run help
+  if(!had) setTimeout(showHelp, 400);
+  requestAnimationFrame(frame);
+}
+init();
+</script>
+</body>
+</html>

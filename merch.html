@@ -1,0 +1,1122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Shirt designs for Token Maxxer's Anonymous Game Studio — an original pixel-art tee for every game. Browse the lineup and shop the store.">
+  <title>Shirt Designs · Token Maxxer's Anonymous Game Studio</title>
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Shirt Designs · Token Maxxer's Anonymous Game Studio">
+  <meta property="og:description" content="An original pixel-art tee for every game.">
+  <meta property="og:image" content="https://timothy8901.github.io/practice-games/assets/token-maxxers-banner.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="theme-color" content="#cc2222">
+  <link rel="icon" type="image/png" href="assets/token-maxxers.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Press+Start+2P&display=swap" rel="stylesheet">
+  <style>
+    :root{ --bg:#f4ecd8; --bg-deep:#ece2c9; --paper:#fffdf7; --ink:#1d1a17; --muted-c:#7a6e58;
+      --red:#cc2222; --red-dk:#9e1414; --line:#e3d7bb; --shadow:0 8px 28px rgba(60,44,18,0.12); }
+    *{box-sizing:border-box;}
+    body{ background:var(--bg); color:var(--ink); margin:0; line-height:1.55;
+      font-family:"Outfit",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
+    a{color:inherit;}
+    nav.topbar{ position:sticky; top:0; z-index:50; display:flex; align-items:center; gap:16px;
+      padding:10px clamp(14px,4vw,40px); background:rgba(255,253,247,0.92); backdrop-filter:blur(8px);
+      border-bottom:2px solid var(--line); }
+    nav .brand{display:flex;align-items:center;gap:11px;text-decoration:none;margin-right:auto;}
+    nav .brand img{width:38px;height:38px;border-radius:8px;image-rendering:pixelated;box-shadow:0 0 0 1px var(--line);}
+    nav .brand .mark{font-family:"Press Start 2P",monospace;font-size:0.72rem;line-height:1.5;color:var(--ink);}
+    nav .brand .mark b{color:var(--red);}
+    nav .brand .mark small{display:block;font-size:0.5rem;color:var(--muted-c);letter-spacing:0.04em;}
+    nav .links{display:flex;align-items:center;gap:clamp(8px,2vw,22px);}
+    nav .links a{text-decoration:none;font-weight:600;font-size:0.92rem;color:var(--ink);padding:6px 4px;}
+    nav .links a:hover{color:var(--red);}
+    nav .links a.shop{background:var(--red);color:#fff;padding:9px 18px;border-radius:9px;font-weight:800;box-shadow:0 4px 0 var(--red-dk);}
+    @media(max-width:560px){ nav .brand .mark{font-size:0.6rem;} nav .links a:not(.shop){display:none;} }
+    header.hero{ text-align:center; padding:48px 20px 26px;
+      background:radial-gradient(900px 320px at 50% -40%, rgba(204,34,34,0.08), transparent), linear-gradient(180deg,#fbf4e3 0%,var(--bg) 100%);
+      border-bottom:1px solid var(--line); }
+    header.hero .kicker{font-family:"Press Start 2P",monospace;font-size:0.62rem;color:var(--red);margin-bottom:16px;}
+    header.hero h1{margin:0 0 12px;font-size:clamp(1.9rem,6vw,3rem);font-weight:800;letter-spacing:-0.02em;}
+    header.hero h1 b{color:var(--red);}
+    header.hero p{margin:0 auto 22px;color:var(--muted-c);max-width:560px;font-size:1.05rem;}
+    .btn{display:inline-block;text-decoration:none;font-weight:800;font-size:0.95rem;padding:12px 24px;border-radius:11px;transition:transform .12s,box-shadow .12s;}
+    .btn-primary{background:var(--red);color:#fff;box-shadow:0 5px 0 var(--red-dk);}
+    .btn-primary:hover{transform:translateY(2px);box-shadow:0 3px 0 var(--red-dk);}
+    .btn-ghost{background:var(--paper);color:var(--ink);border:2px solid var(--ink);box-shadow:0 5px 0 rgba(29,26,23,0.18);}
+    main{max-width:1140px;margin:0 auto;padding:34px 16px 64px;}
+    .tee-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:20px;}
+    .tee-card{ background:var(--paper); border:2px solid var(--line); border-radius:18px; padding:14px 14px 20px;
+      box-shadow:var(--shadow); display:flex; flex-direction:column; transition:transform .14s,border-color .14s,box-shadow .14s; scroll-margin-top:80px; }
+    .tee-card:hover{transform:translateY(-3px);border-color:var(--red);box-shadow:0 14px 40px rgba(60,44,18,0.18);}
+    .tee-wrap{ background:repeating-linear-gradient(45deg,#f7f1e3 0 10px,#f2ead8 10px 20px); border-radius:12px; padding:6px; }
+    .tee{display:block;width:100%;height:auto;}
+    .tee-meta{padding:14px 6px 0;text-align:center;}
+    .tee-tag{font-family:"Press Start 2P",monospace;font-size:0.46rem;color:var(--red);letter-spacing:0.06em;}
+    .tee-meta h3{margin:8px 0 6px;font-size:1.12rem;font-weight:800;}
+    .tee-line{margin:0 0 14px;color:var(--muted-c);font-size:0.86rem;font-style:italic;min-height:2.4em;}
+    .tee-buy{display:inline-block;text-decoration:none;font-weight:800;font-size:0.82rem;color:#fff;background:var(--red);
+      padding:9px 16px;border-radius:9px;box-shadow:0 4px 0 var(--red-dk);}
+    .tee-buy:hover{transform:translateY(2px);box-shadow:0 2px 0 var(--red-dk);}
+    .note{ text-align:center; color:var(--muted-c); font-size:0.86rem; margin:30px auto 0; max-width:620px; }
+    footer{text-align:center;color:var(--muted-c);font-size:0.84rem;padding:34px 16px;border-top:2px solid var(--line);margin-top:44px;background:var(--bg-deep);}
+    footer a{color:var(--red);text-decoration:none;font-weight:600;}
+    footer .studio-banner{display:block;margin:0 auto 16px;width:min(420px,80vw);height:auto;border-radius:12px;box-shadow:var(--shadow);}
+    footer .foot-links{display:flex;gap:18px;justify-content:center;flex-wrap:wrap;margin-bottom:12px;}
+  </style>
+</head>
+<body>
+  <nav class="topbar">
+    <a class="brand" href="index.html" aria-label="Token Maxxer's Anonymous Game Studio — home">
+      <img src="assets/token-maxxers.png" alt="Token Maxxer's logo">
+      <span class="mark">TOKEN <b>MAXXER'S</b><small>ANONYMOUS GAME STUDIO</small></span>
+    </a>
+    <div class="links">
+      <a href="index.html#featured">Games</a>
+      <a href="merch.html">Shirt&nbsp;Designs</a>
+      <a class="shop" href="https://tims-store-12362.myshopify.com/" target="_blank" rel="noopener">Shop&nbsp;↗</a>
+    </div>
+  </nav>
+
+  <header class="hero">
+    <div class="kicker">★ OFFICIAL GAME TEES ★</div>
+    <h1>Shirt <b>Designs</b></h1>
+    <p>One original pixel-art tee per game — screen-print style, printed big on the chest. Drafts for the Token Maxxer's store. Tap one to grab it.</p>
+    <a class="btn btn-primary" href="https://tims-store-12362.myshopify.com/" target="_blank" rel="noopener">Shop the store ↗</a>
+  </header>
+
+  <main>
+    <div class="tee-grid">
+    <article class="tee-card" id="grocery-tycoon">
+      <div class="tee-wrap"><svg class="tee" viewBox="0 0 300 332" xmlns="http://www.w3.org/2000/svg" role="img"><defs><linearGradient id="tg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#f3eee2"/></linearGradient></defs><path d="M150 30 C170 30 185 36 198 46 L262 70 L292 128 L246 152 L232 132 L232 298 Q232 312 218 312 L82 312 Q68 312 68 298 L68 132 L54 152 L8 128 L38 70 L102 46 C115 36 130 30 150 30 Z" fill="url(#tg)" stroke="#d9ccae" stroke-width="2.5" stroke-linejoin="round"/><path d="M118 33 Q150 63 182 33 Q150 49 118 33 Z" fill="#efe7d2" stroke="#d9ccae" stroke-width="2"/><path d="M120 35 Q150 60 180 35" fill="none" stroke="#cdbf9f" stroke-width="2.5" opacity="0.7"/><svg x="78" y="96" width="144" height="144" viewBox="0 0 240 240" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg"><g stroke="#141414" stroke-width="3" stroke-linejoin="round"><rect x="34" y="150" width="172" height="62" fill="#e7a23a"/><rect x="34" y="150" width="172" height="10" fill="#cc1f1f"/><rect x="40" y="166" width="160" height="40" fill="#f3ecdb"/></g><g stroke="#141414" stroke-width="2.5" stroke-linejoin="round"><rect x="38" y="44" width="164" height="18" fill="#cc1f1f"/><rect x="38" y="44" width="20" height="18" fill="#f3ecdb"/><rect x="78" y="44" width="20" height="18" fill="#f3ecdb"/><rect x="118" y="44" width="20" height="18" fill="#f3ecdb"/><rect x="158" y="44" width="20" height="18" fill="#f3ecdb"/></g><g stroke="#141414" stroke-width="3" stroke-linejoin="round"><rect x="44" y="62" width="6" height="44" fill="#141414"/><rect x="190" y="62" width="6" height="44" fill="#141414"/></g><g stroke="#141414" stroke-width="2.5" stroke-linecap="round"><line x1="55" y1="108" x2="185" y2="108"/></g><g stroke="#141414" stroke-width="2.5" stroke-linejoin="round"><circle cx="64" cy="100" r="13" fill="#cc1f1f"/><circle cx="90" cy="100" r="13" fill="#cc1f1f"/><circle cx="118" cy="98" r="14" fill="#e7a23a"/><circle cx="146" cy="100" r="13" fill="#6cb24a"/><circle cx="172" cy="100" r="13" fill="#6cb24a"/><rect x="116" y="80" width="4" height="6" fill="#5a3b1a"/><path d="M120 84 l8 -3 -3 7 z" fill="#6cb24a"/><path d="M61 86 l5 -2 -1 6 z" fill="#6cb24a"/><path d="M143 86 l5 -2 -1 6 z" fill="#6cb24a"/></g><g stroke="#141414" stroke-width="3" stroke-linejoin="round"><rect x="120" y="122" width="44" height="20" fill="#141414"/><circle cx="146" cy="132" r="3.5" fill="#f3ecdb" stroke="none"/></g><g stroke="#141414" stroke-width="2.5"><line x1="124" y1="142" x2="124" y2="150"/><line x1="160" y1="142" x2="160" y2="150"/></g><g fill="#f3ecdb"><rect x="129" y="129" width="4" height="6"/><rect x="135" y="129" width="4" height="6"/><rect x="141" y="129" width="3" height="6"/><rect x="150" y="129" width="4" height="6"/><rect x="156" y="129" width="4" height="6"/></g><g stroke="#141414" stroke-width="2.5" stroke-linejoin="round"><path d="M56 174 l34 -14 8 8 -8 8 -34 14 z" fill="#e7a23a"/><circle cx="58" cy="178" r="4.5" fill="#141414"/></g><g fill="#141414"><rect x="74" y="170" width="3" height="3"/><rect x="80" y="167" width="3" height="3"/><rect x="86" y="172" width="3" height="3"/></g><g stroke="#141414" stroke-width="2.5" stroke-linejoin="round"><circle cx="68" cy="100" r="0" fill="none"/></g><g stroke="#141414" stroke-width="2.5" stroke-linejoin="round" fill="#f3ecdb"><circle cx="118" cy="50" r="0"/></g><g stroke="#141414" stroke-width="2.5" stroke-linejoin="round"><rect x="92" y="68" width="56" height="26" fill="#f3ecdb"/><rect x="92" y="68" width="56" height="8" fill="#cc1f1f"/></g><g fill="#141414"><rect x="98" y="80" width="3" height="9"/><rect x="98" y="80" width="9" height="3"/><rect x="98" y="84" width="7" height="3"/><rect x="111" y="80" width="3" height="9"/><rect x="111" y="80" width="8" height="3"/><rect x="111" y="84" width="7" height="3"/><rect x="111" y="80" width="3" height="9"/><rect x="116" y="80" width="3" height="9"/><rect x="124" y="80" width="3" height="9"/><rect x="124" y="80" width="8" height="3"/><rect x="129" y="80" width="3" height="5"/><rect x="124" y="84" width="8" height="3"/><rect x="137" y="80" width="3" height="9"/><rect x="137" y="80" width="8" height="3"/><rect x="142" y="84" width="3" height="5"/></g></svg></svg></div>
+      <div class="tee-meta">
+        <span class="tee-tag">GAME TEE</span>
+        <h3>Grocery Tycoon</h3>
+        <p class="tee-line">&ldquo;Buy low, stack high, sell ripe.&rdquo;</p>
+        <a class="tee-buy" href="https://tims-store-12362.myshopify.com/collections/all" target="_blank" rel="noopener">Coming soon · shop store ↗</a>
+      </div>
+    </article>
+    <article class="tee-card" id="theater-of-the-undead">
+      <div class="tee-wrap"><svg class="tee" viewBox="0 0 300 332" xmlns="http://www.w3.org/2000/svg" role="img"><defs><linearGradient id="tg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#f3eee2"/></linearGradient></defs><path d="M150 30 C170 30 185 36 198 46 L262 70 L292 128 L246 152 L232 132 L232 298 Q232 312 218 312 L82 312 Q68 312 68 298 L68 132 L54 152 L8 128 L38 70 L102 46 C115 36 130 30 150 30 Z" fill="url(#tg)" stroke="#d9ccae" stroke-width="2.5" stroke-linejoin="round"/><path d="M118 33 Q150 63 182 33 Q150 49 118 33 Z" fill="#efe7d2" stroke="#d9ccae" stroke-width="2"/><path d="M120 35 Q150 60 180 35" fill="none" stroke="#cdbf9f" stroke-width="2.5" opacity="0.7"/><svg x="78" y="96" width="144" height="144" viewBox="0 0 240 240" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg"><g stroke="#141414" stroke-width="4" stroke-linejoin="miter"><rect x="62" y="40" width="116" height="20" fill="#141414"/><rect x="50" y="60" width="140" height="116" fill="#5a9b3a"/><rect x="50" y="60" width="20" height="116" fill="#417a28"/><rect x="170" y="60" width="20" height="116" fill="#417a28"/><rect x="70" y="60" width="100" height="16" fill="#74b84e"/><rect x="74" y="94" width="34" height="30" fill="#f3ecdb"/><rect x="132" y="94" width="34" height="30" fill="#f3ecdb"/><rect x="82" y="102" width="18" height="16" fill="#cc1f1f"/><rect x="140" y="102" width="18" height="16" fill="#cc1f1f"/><rect x="86" y="106" width="6" height="6" fill="#ff6a4d" stroke="none"/><rect x="144" y="106" width="6" height="6" fill="#ff6a4d" stroke="none"/><rect x="110" y="128" width="20" height="14" fill="#417a28"/><rect x="62" y="150" width="116" height="22" fill="#f3ecdb"/></g><g stroke="#141414" stroke-width="3"><line x1="74" y1="150" x2="74" y2="172"/><line x1="90" y1="150" x2="90" y2="172"/><line x1="106" y1="150" x2="106" y2="172"/><line x1="122" y1="150" x2="122" y2="172"/><line x1="138" y1="150" x2="138" y2="172"/><line x1="154" y1="150" x2="154" y2="172"/><line x1="170" y1="150" x2="170" y2="172"/></g><g stroke="#141414" stroke-width="4" stroke-linejoin="miter"><rect x="78" y="74" width="14" height="10" fill="#141414" stroke="none"/><rect x="148" y="74" width="14" height="10" fill="#141414" stroke="none"/><polygon points="50,176 60,176 60,188 50,188" fill="#5a9b3a"/><polygon points="180,176 190,176 190,188 180,188" fill="#5a9b3a"/></g><g stroke="#141414" stroke-width="4"><rect x="40" y="188" width="160" height="14" fill="#cc1f1f"/></g><g fill="#f3ecdb" stroke="none"><rect x="50" y="192" width="8" height="6"/><rect x="62" y="192" width="8" height="6"/><rect x="74" y="192" width="8" height="6"/><rect x="86" y="192" width="8" height="6"/><rect x="98" y="192" width="8" height="6"/><rect x="110" y="192" width="8" height="6"/><rect x="122" y="192" width="8" height="6"/><rect x="134" y="192" width="8" height="6"/><rect x="146" y="192" width="8" height="6"/><rect x="158" y="192" width="8" height="6"/><rect x="170" y="192" width="8" height="6"/><rect x="182" y="192" width="8" height="6"/></g><g stroke="#141414" stroke-width="3" fill="#141414"><rect x="42" y="46" width="8" height="8"/><rect x="190" y="46" width="8" height="8"/><rect x="56" y="36" width="6" height="6"/><rect x="178" y="36" width="6" height="6"/></g></svg></svg></div>
+      <div class="tee-meta">
+        <span class="tee-tag">GAME TEE</span>
+        <h3>Theater of the Undead</h3>
+        <p class="tee-line">&ldquo;Round 100 or your money back.&rdquo;</p>
+        <a class="tee-buy" href="https://tims-store-12362.myshopify.com/collections/all" target="_blank" rel="noopener">Coming soon · shop store ↗</a>
+      </div>
+    </article>
+    <article class="tee-card" id="elder-story-rpg">
+      <div class="tee-wrap"><svg class="tee" viewBox="0 0 300 332" xmlns="http://www.w3.org/2000/svg" role="img"><defs><linearGradient id="tg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#f3eee2"/></linearGradient></defs><path d="M150 30 C170 30 185 36 198 46 L262 70 L292 128 L246 152 L232 132 L232 298 Q232 312 218 312 L82 312 Q68 312 68 298 L68 132 L54 152 L8 128 L38 70 L102 46 C115 36 130 30 150 30 Z" fill="url(#tg)" stroke="#d9ccae" stroke-width="2.5" stroke-linejoin="round"/><path d="M118 33 Q150 63 182 33 Q150 49 118 33 Z" fill="#efe7d2" stroke="#d9ccae" stroke-width="2"/><path d="M120 35 Q150 60 180 35" fill="none" stroke="#cdbf9f" stroke-width="2.5" opacity="0.7"/><svg x="78" y="96" width="144" height="144" viewBox="0 0 240 240" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+<rect width="240" height="240" fill="none"/>
+
+<!-- ===== SWORD (raised, behind/right of hero) ===== -->
+<!-- blade -->
+<g>
+<rect x="176" y="20" width="16" height="120" fill="#141414"/>
+<rect x="179" y="23" width="10" height="114" fill="#cfd6df"/>
+<rect x="179" y="23" width="4" height="114" fill="#f3ecdb"/>
+<!-- blade tip -->
+<polygon points="176,20 192,20 184,6" fill="#141414"/>
+<polygon points="179,18 189,18 184,9" fill="#f3ecdb"/>
+<!-- crossguard -->
+<rect x="160" y="138" width="48" height="14" fill="#141414"/>
+<rect x="163" y="141" width="42" height="8" fill="#e0a52a"/>
+<rect x="163" y="141" width="42" height="3" fill="#f3d27a"/>
+<!-- grip -->
+<rect x="178" y="152" width="12" height="26" fill="#141414"/>
+<rect x="181" y="155" width="6" height="20" fill="#7a4a22"/>
+<!-- pommel red gem -->
+<rect x="174" y="178" width="20" height="18" fill="#141414"/>
+<rect x="177" y="181" width="14" height="12" fill="#cc1f1f"/>
+<rect x="179" y="183" width="5" height="4" fill="#f3ecdb"/>
+</g>
+
+<!-- ===== HERO ===== -->
+<!-- back leg -->
+<rect x="92" y="178" width="20" height="40" fill="#141414"/>
+<rect x="95" y="181" width="14" height="32" fill="#3a6ea5"/>
+<rect x="95" y="181" width="5" height="32" fill="#5a8fc9"/>
+<!-- back boot -->
+<rect x="88" y="212" width="28" height="16" fill="#141414"/>
+<rect x="91" y="215" width="22" height="10" fill="#7a4a22"/>
+
+<!-- front leg -->
+<rect x="120" y="178" width="22" height="42" fill="#141414"/>
+<rect x="123" y="181" width="16" height="34" fill="#4a7ec0"/>
+<rect x="123" y="181" width="5" height="34" fill="#5a8fc9"/>
+<!-- front boot -->
+<rect x="118" y="214" width="30" height="16" fill="#141414"/>
+<rect x="121" y="217" width="24" height="10" fill="#8a5a2a"/>
+
+<!-- torso / armor -->
+<rect x="92" y="118" width="60" height="64" fill="#141414"/>
+<rect x="96" y="122" width="52" height="56" fill="#cc1f1f"/>
+<!-- armor shading -->
+<rect x="96" y="122" width="14" height="56" fill="#e34141"/>
+<rect x="138" y="122" width="10" height="56" fill="#9c1515"/>
+<!-- chest emblem (off-white shield) -->
+<rect x="112" y="132" width="20" height="22" fill="#141414"/>
+<rect x="115" y="135" width="14" height="13" fill="#f3ecdb"/>
+<polygon points="115,148 129,148 122,156" fill="#f3ecdb"/>
+<polygon points="115,148 129,148 122,155" fill="#141414" opacity="0.0"/>
+<rect x="119" y="138" width="6" height="12" fill="#cc1f1f"/>
+<rect x="116" y="141" width="12" height="5" fill="#cc1f1f"/>
+<!-- belt -->
+<rect x="92" y="170" width="60" height="12" fill="#141414"/>
+<rect x="96" y="173" width="52" height="6" fill="#e0a52a"/>
+<rect x="116" y="171" width="12" height="10" fill="#141414"/>
+<rect x="119" y="174" width="6" height="4" fill="#f3d27a"/>
+
+<!-- left pauldron (shield arm side) -->
+<rect x="78" y="116" width="24" height="22" fill="#141414"/>
+<rect x="81" y="119" width="18" height="16" fill="#b0b8c2"/>
+<rect x="81" y="119" width="6" height="16" fill="#d2d9e2"/>
+
+<!-- right pauldron (sword arm) -->
+<rect x="142" y="112" width="26" height="22" fill="#141414"/>
+<rect x="145" y="115" width="20" height="16" fill="#b0b8c2"/>
+<rect x="145" y="115" width="6" height="16" fill="#d2d9e2"/>
+
+<!-- ===== SHIELD (held in left hand) ===== -->
+<rect x="58" y="128" width="40" height="52" fill="#141414"/>
+<rect x="62" y="132" width="32" height="40" fill="#3a6ea5"/>
+<rect x="62" y="132" width="11" height="40" fill="#5a8fc9"/>
+<polygon points="58,180 98,180 78,196" fill="#141414"/>
+<polygon points="62,178 94,178 78,190" fill="#3a6ea5"/>
+<polygon points="62,178 78,178 78,190" fill="#5a8fc9"/>
+<!-- shield boss / cross -->
+<rect x="74" y="142" width="8" height="34" fill="#f3ecdb"/>
+<rect x="66" y="150" width="24" height="8" fill="#f3ecdb"/>
+<rect x="74" y="150" width="8" height="8" fill="#cc1f1f"/>
+
+<!-- left arm (to shield) -->
+<rect x="80" y="138" width="16" height="22" fill="#141414"/>
+<rect x="83" y="141" width="10" height="16" fill="#cc1f1f"/>
+
+<!-- right arm raised holding sword -->
+<rect x="150" y="120" width="16" height="34" fill="#141414"/>
+<rect x="153" y="123" width="10" height="28" fill="#e34141"/>
+<!-- gauntlet on hilt -->
+<rect x="168" y="146" width="18" height="16" fill="#141414"/>
+<rect x="171" y="149" width="12" height="10" fill="#b0b8c2"/>
+
+<!-- ===== HEAD / HELMET ===== -->
+<rect x="100" y="78" width="44" height="44" fill="#141414"/>
+<!-- helmet dome -->
+<rect x="104" y="82" width="36" height="20" fill="#b0b8c2"/>
+<rect x="104" y="82" width="12" height="20" fill="#d2d9e2"/>
+<rect x="132" y="82" width="8" height="20" fill="#8b939d"/>
+<!-- face opening -->
+<rect x="108" y="100" width="28" height="18" fill="#141414"/>
+<rect x="111" y="103" width="22" height="12" fill="#e6b58a"/>
+<!-- eyes -->
+<rect x="115" y="106" width="5" height="5" fill="#141414"/>
+<rect x="124" y="106" width="5" height="5" fill="#141414"/>
+<!-- nose guard -->
+<rect x="119" y="100" width="6" height="18" fill="#b0b8c2"/>
+<rect x="119" y="100" width="3" height="18" fill="#d2d9e2"/>
+<!-- helmet brow trim -->
+<rect x="104" y="98" width="36" height="5" fill="#e0a52a"/>
+
+<!-- ===== PLUME (bright crest) ===== -->
+<rect x="116" y="54" width="12" height="28" fill="#141414"/>
+<!-- plume body stacked feathers -->
+<rect x="110" y="40" width="24" height="20" fill="#141414"/>
+<rect x="113" y="43" width="18" height="16" fill="#e0a52a"/>
+<rect x="113" y="43" width="9" height="16" fill="#f3d27a"/>
+<rect x="106" y="28" width="32" height="16" fill="#141414"/>
+<rect x="109" y="31" width="26" height="12" fill="#cc1f1f"/>
+<rect x="109" y="31" width="13" height="12" fill="#e34141"/>
+<rect x="112" y="16" width="22" height="16" fill="#141414"/>
+<rect x="115" y="19" width="16" height="12" fill="#e0a52a"/>
+<rect x="115" y="19" width="8" height="12" fill="#f3d27a"/>
+<!-- plume tip flick -->
+<polygon points="131,8 145,12 134,20" fill="#141414"/>
+<polygon points="132,11 140,13 133,17" fill="#cc1f1f"/>
+
+<!-- ===== GROUND SHADOW ===== -->
+<rect x="78" y="228" width="86" height="8" fill="#141414"/>
+<rect x="84" y="230" width="74" height="4" fill="#3a6ea5" opacity="0.5"/>
+</svg></svg></div>
+      <div class="tee-meta">
+        <span class="tee-tag">GAME TEE</span>
+        <h3>Elder Story RPG</h3>
+        <p class="tee-line">&ldquo;Touch Grass? We Forged It.&rdquo;</p>
+        <a class="tee-buy" href="https://tims-store-12362.myshopify.com/products/pixel-knight-t-shirt-elder-quest" target="_blank" rel="noopener">In the store ↗</a>
+      </div>
+    </article>
+    <article class="tee-card" id="kirby-abilities">
+      <div class="tee-wrap"><svg class="tee" viewBox="0 0 300 332" xmlns="http://www.w3.org/2000/svg" role="img"><defs><linearGradient id="tg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#f3eee2"/></linearGradient></defs><path d="M150 30 C170 30 185 36 198 46 L262 70 L292 128 L246 152 L232 132 L232 298 Q232 312 218 312 L82 312 Q68 312 68 298 L68 132 L54 152 L8 128 L38 70 L102 46 C115 36 130 30 150 30 Z" fill="url(#tg)" stroke="#d9ccae" stroke-width="2.5" stroke-linejoin="round"/><path d="M118 33 Q150 63 182 33 Q150 49 118 33 Z" fill="#efe7d2" stroke="#d9ccae" stroke-width="2"/><path d="M120 35 Q150 60 180 35" fill="none" stroke="#cdbf9f" stroke-width="2.5" opacity="0.7"/><svg x="78" y="96" width="144" height="144" viewBox="0 0 240 240" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+  <g stroke="#141414" stroke-width="3" stroke-linejoin="round">
+
+    <!-- big back star (red brand accent) -->
+    <polygon points="150,18 167,62 214,62 176,90 190,135 150,108 110,135 124,90 86,62 133,62"
+             fill="#cc1f1f"/>
+    <polygon points="150,40 159,64 184,64 164,79 171,103 150,89 129,103 136,79 116,64 141,64"
+             fill="#ef6a4a" stroke-width="0"/>
+
+    <!-- impact burst behind fist -->
+    <polygon points="74,150 96,138 92,160 112,158 96,176 110,194 88,188 84,210 70,192 50,200 58,178 40,170 60,164"
+             fill="#ffd23f"/>
+    <polygon points="74,158 88,150 86,164 100,162 88,174 96,186 80,182 78,196 70,184 56,190 62,176 50,170 64,166"
+             fill="#f3ecdb" stroke-width="0"/>
+
+    <!-- body of the puffball -->
+    <path d="M104 96
+             a52 52 0 1 0 0.1 0 Z"
+          fill="#ff8fc7"/>
+    <!-- shading on lower-right of body -->
+    <path d="M156 122 a52 52 0 0 1 -52 78 a52 52 0 0 0 52 -78 Z"
+          fill="#e85fa6" stroke-width="0"/>
+
+    <!-- left foot -->
+    <ellipse cx="86" cy="196" rx="22" ry="13" fill="#cc1f1f"/>
+    <!-- right foot -->
+    <ellipse cx="138" cy="198" rx="22" ry="13" fill="#cc1f1f"/>
+
+    <!-- cheeks -->
+    <ellipse cx="86" cy="138" rx="11" ry="8" fill="#ff5fa0" stroke-width="0"/>
+    <ellipse cx="138" cy="138" rx="11" ry="8" fill="#ff5fa0" stroke-width="0"/>
+
+    <!-- eyes (tall pixel ovals) -->
+    <rect x="98" y="104" width="14" height="26" rx="6" fill="#141414"/>
+    <rect x="120" y="104" width="14" height="26" rx="6" fill="#141414"/>
+    <rect x="101" y="108" width="6" height="9" rx="2" fill="#f3ecdb" stroke-width="0"/>
+    <rect x="123" y="108" width="6" height="9" rx="2" fill="#f3ecdb" stroke-width="0"/>
+
+    <!-- determined mouth -->
+    <path d="M104 148 q12 12 24 0" fill="none" stroke="#141414" stroke-width="3" stroke-linecap="round"/>
+
+    <!-- back arm tucked in -->
+    <ellipse cx="58" cy="158" rx="13" ry="11" fill="#ff8fc7"/>
+
+    <!-- PUNCHING fist arm, thrust forward-left -->
+    <rect x="40" y="120" width="30" height="20" rx="9" fill="#ff8fc7"
+          transform="rotate(-18 55 130)"/>
+    <!-- the fist (big chunky knuckle) -->
+    <circle cx="40" cy="120" r="24" fill="#ff8fc7"/>
+    <!-- knuckle lines -->
+    <path d="M28 112 q12 -6 24 0 M28 122 q12 -6 24 0" fill="none"
+          stroke="#141414" stroke-width="2.5" stroke-linecap="round"/>
+
+    <!-- speed lines on the punch -->
+    <line x1="6" y1="106" x2="22" y2="110" stroke="#141414" stroke-width="3" stroke-linecap="round"/>
+    <line x1="4" y1="124" x2="20" y2="124" stroke="#141414" stroke-width="3" stroke-linecap="round"/>
+    <line x1="8" y1="142" x2="22" y2="138" stroke="#141414" stroke-width="3" stroke-linecap="round"/>
+
+    <!-- little spark stars near fist -->
+    <polygon points="20,90 23,98 31,98 25,103 27,111 20,106 13,111 15,103 9,98 17,98"
+             fill="#ffd23f" stroke-width="2"/>
+  </g>
+</svg></svg></div>
+      <div class="tee-meta">
+        <span class="tee-tag">GAME TEE</span>
+        <h3>Kirby Brawler</h3>
+        <p class="tee-line">&ldquo;Inhale your problems, punch the rest&rdquo;</p>
+        <a class="tee-buy" href="https://tims-store-12362.myshopify.com/collections/all" target="_blank" rel="noopener">Coming soon · shop store ↗</a>
+      </div>
+    </article>
+    <article class="tee-card" id="kirby-rumble">
+      <div class="tee-wrap"><svg class="tee" viewBox="0 0 300 332" xmlns="http://www.w3.org/2000/svg" role="img"><defs><linearGradient id="tg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#f3eee2"/></linearGradient></defs><path d="M150 30 C170 30 185 36 198 46 L262 70 L292 128 L246 152 L232 132 L232 298 Q232 312 218 312 L82 312 Q68 312 68 298 L68 132 L54 152 L8 128 L38 70 L102 46 C115 36 130 30 150 30 Z" fill="url(#tg)" stroke="#d9ccae" stroke-width="2.5" stroke-linejoin="round"/><path d="M118 33 Q150 63 182 33 Q150 49 118 33 Z" fill="#efe7d2" stroke="#d9ccae" stroke-width="2"/><path d="M120 35 Q150 60 180 35" fill="none" stroke="#cdbf9f" stroke-width="2.5" opacity="0.7"/><svg x="78" y="96" width="144" height="144" viewBox="0 0 240 240" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg"><g shape-rendering="crispEdges"><polygon points="36,150 120,114 204,150 120,186" fill="#141414"/><polygon points="48,150 120,119 192,150 120,181" fill="#cc1f1f"/><polygon points="60,150 120,124 180,150 120,176" fill="#e85a3a"/><polygon points="78,150 120,132 162,150 120,168" fill="#f3ecdb"/><polygon points="36,150 36,162 120,198 120,186" fill="#141414"/><polygon points="204,150 204,162 120,198 120,186" fill="#141414"/><polygon points="48,150 48,159 120,193 120,181" fill="#8a1414"/><polygon points="192,150 192,159 120,193 120,181" fill="#8a1414"/><rect x="84" y="42" width="72" height="12" fill="#141414"/><rect x="72" y="54" width="96" height="12" fill="#141414"/><rect x="60" y="66" width="120" height="12" fill="#141414"/><rect x="60" y="78" width="120" height="36" fill="#141414"/><rect x="60" y="114" width="120" height="12" fill="#141414"/><rect x="72" y="126" width="96" height="12" fill="#141414"/><rect x="84" y="138" width="72" height="12" fill="#141414"/><rect x="84" y="54" width="60" height="12" fill="#ff9ec4"/><rect x="72" y="66" width="96" height="12" fill="#ff9ec4"/><rect x="72" y="78" width="96" height="24" fill="#ff9ec4"/><rect x="72" y="102" width="96" height="12" fill="#f06ba0"/><rect x="84" y="114" width="72" height="12" fill="#f06ba0"/><rect x="96" y="126" width="48" height="12" fill="#f06ba0"/><rect x="84" y="60" width="24" height="12" fill="#f3ecdb"/><rect x="84" y="66" width="12" height="6" fill="#ff9ec4"/><rect x="96" y="78" width="12" height="18" fill="#141414"/><rect x="132" y="78" width="12" height="18" fill="#141414"/><rect x="96" y="78" width="6" height="6" fill="#f3ecdb"/><rect x="132" y="78" width="6" height="6" fill="#f3ecdb"/><rect x="108" y="102" width="24" height="6" fill="#cc1f1f"/><rect x="48" y="96" width="12" height="24" fill="#141414"/><rect x="54" y="96" width="12" height="24" fill="#ff9ec4"/><rect x="54" y="108" width="12" height="12" fill="#f06ba0"/><rect x="180" y="96" width="12" height="24" fill="#141414"/><rect x="174" y="96" width="12" height="24" fill="#ff9ec4"/><rect x="174" y="108" width="12" height="12" fill="#f06ba0"/><polygon points="172,30 178,46 196,46 182,56 188,74 172,62 156,74 162,56 148,46 166,46" fill="#141414"/><polygon points="172,38 176,48 188,48 178,55 182,66 172,59 162,66 166,55 156,48 168,48" fill="#ffcc1f"/><polygon points="172,42 175,49 184,49 177,54 180,62 172,57" fill="#fff0a8"/><rect x="40" y="200" width="160" height="12" fill="#141414"/><rect x="44" y="204" width="152" height="4" fill="#cc1f1f"/><rect x="36" y="56" width="8" height="8" fill="#141414"/><rect x="204" y="120" width="8" height="8" fill="#141414"/><rect x="46" y="176" width="8" height="8" fill="#141414"/></g></svg></svg></div>
+      <div class="tee-meta">
+        <span class="tee-tag">GAME TEE</span>
+        <h3>Kirby Brawler 2: Rumble Arena</h3>
+        <p class="tee-line">&ldquo;No tokens left unmaxxed.&rdquo;</p>
+        <a class="tee-buy" href="https://tims-store-12362.myshopify.com/collections/all" target="_blank" rel="noopener">Coming soon · shop store ↗</a>
+      </div>
+    </article>
+    <article class="tee-card" id="street-driver">
+      <div class="tee-wrap"><svg class="tee" viewBox="0 0 300 332" xmlns="http://www.w3.org/2000/svg" role="img"><defs><linearGradient id="tg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#f3eee2"/></linearGradient></defs><path d="M150 30 C170 30 185 36 198 46 L262 70 L292 128 L246 152 L232 132 L232 298 Q232 312 218 312 L82 312 Q68 312 68 298 L68 132 L54 152 L8 128 L38 70 L102 46 C115 36 130 30 150 30 Z" fill="url(#tg)" stroke="#d9ccae" stroke-width="2.5" stroke-linejoin="round"/><path d="M118 33 Q150 63 182 33 Q150 49 118 33 Z" fill="#efe7d2" stroke="#d9ccae" stroke-width="2"/><path d="M120 35 Q150 60 180 35" fill="none" stroke="#cdbf9f" stroke-width="2.5" opacity="0.7"/><svg x="78" y="96" width="144" height="144" viewBox="0 0 240 240" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg"><title>Street Cruiser t-shirt chest graphic</title><desc>A chunky pixel-art top-down red car on a dark asphalt road with yellow dashed center lines and headlights on.</desc><rect x="56" y="20" width="128" height="200" fill="#3a3f47" stroke="#141414" stroke-width="6"/><rect x="62" y="20" width="6" height="200" fill="#2c3036"/><rect x="172" y="20" width="6" height="200" fill="#2c3036"/><rect x="68" y="20" width="6" height="200" fill="#f3ecdb"/><rect x="166" y="20" width="6" height="200" fill="#f3ecdb"/><rect x="117" y="28" width="6" height="22" fill="#ffcf3f"/><rect x="117" y="66" width="6" height="22" fill="#ffcf3f"/><rect x="117" y="104" width="6" height="22" fill="#ffcf3f"/><rect x="117" y="152" width="6" height="22" fill="#ffcf3f"/><rect x="117" y="190" width="6" height="22" fill="#ffcf3f"/><polygon points="76,40 164,40 152,36 88,36" fill="#fff3b0" opacity="0.55"/><polygon points="70,52 170,52 158,40 82,40" fill="#fff3b0" opacity="0.35"/><rect x="84" y="92" width="72" height="100" fill="#141414"/><rect x="86" y="86" width="68" height="100" fill="#cc1f1f" stroke="#141414" stroke-width="6"/><rect x="92" y="100" width="56" height="6" fill="#e85a4f"/><rect x="92" y="100" width="6" height="60" fill="#e85a4f"/><rect x="98" y="98" width="44" height="26" fill="#9fd8e8" stroke="#141414" stroke-width="5"/><rect x="102" y="102" width="14" height="8" fill="#f3ecdb" opacity="0.7"/><rect x="98" y="150" width="44" height="22" fill="#163b4a" stroke="#141414" stroke-width="5"/><rect x="104" y="130" width="32" height="14" fill="#a8161c" stroke="#141414" stroke-width="4"/><rect x="80" y="100" width="10" height="20" fill="#141414"/><rect x="150" y="100" width="10" height="20" fill="#141414"/><rect x="80" y="158" width="10" height="20" fill="#141414"/><rect x="150" y="158" width="10" height="20" fill="#141414"/><rect x="90" y="78" width="14" height="10" fill="#fff7cc" stroke="#141414" stroke-width="4"/><rect x="136" y="78" width="14" height="10" fill="#fff7cc" stroke="#141414" stroke-width="4"/><polygon points="90,78 78,52 96,52 104,78" fill="#fff3b0" opacity="0.45"/><polygon points="150,78 162,52 144,52 136,78" fill="#fff3b0" opacity="0.45"/><rect x="94" y="188" width="8" height="8" fill="#ff5a3c"/><rect x="138" y="188" width="8" height="8" fill="#ff5a3c"/></svg></svg></div>
+      <div class="tee-meta">
+        <span class="tee-tag">GAME TEE</span>
+        <h3>Street Cruiser</h3>
+        <p class="tee-line">&ldquo;Real roads. Fake gas mileage.&rdquo;</p>
+        <a class="tee-buy" href="https://tims-store-12362.myshopify.com/collections/all" target="_blank" rel="noopener">Coming soon · shop store ↗</a>
+      </div>
+    </article>
+    <article class="tee-card" id="robo-revolution">
+      <div class="tee-wrap"><svg class="tee" viewBox="0 0 300 332" xmlns="http://www.w3.org/2000/svg" role="img"><defs><linearGradient id="tg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#f3eee2"/></linearGradient></defs><path d="M150 30 C170 30 185 36 198 46 L262 70 L292 128 L246 152 L232 132 L232 298 Q232 312 218 312 L82 312 Q68 312 68 298 L68 132 L54 152 L8 128 L38 70 L102 46 C115 36 130 30 150 30 Z" fill="url(#tg)" stroke="#d9ccae" stroke-width="2.5" stroke-linejoin="round"/><path d="M118 33 Q150 63 182 33 Q150 49 118 33 Z" fill="#efe7d2" stroke="#d9ccae" stroke-width="2"/><path d="M120 35 Q150 60 180 35" fill="none" stroke="#cdbf9f" stroke-width="2.5" opacity="0.7"/><svg x="78" y="96" width="144" height="144" viewBox="0 0 240 240" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg"><title>Robo Revolution mascot bot</title><desc>A blocky pixel-art battle robot with a glowing neon visor and an arm cannon firing an energy bolt.</desc><g shape-rendering="crispEdges"><rect x="36" y="200" width="168" height="12" fill="#141414"/><rect x="48" y="204" width="12" height="4" fill="#2bd6c6"/><rect x="84" y="204" width="12" height="4" fill="#2bd6c6"/><rect x="144" y="204" width="12" height="4" fill="#cc1f1f"/><rect x="180" y="204" width="12" height="4" fill="#2bd6c6"/><rect x="48" y="32" width="12" height="12" fill="#2bd6c6"/><rect x="48" y="44" width="12" height="12" fill="#141414"/><rect x="180" y="40" width="12" height="12" fill="#cc1f1f"/><rect x="180" y="52" width="12" height="12" fill="#141414"/><rect x="36" y="120" width="12" height="12" fill="#2bd6c6"/><rect x="84" y="20" width="48" height="8" fill="#141414"/><rect x="100" y="8" width="16" height="16" fill="#141414"/><rect x="104" y="12" width="8" height="8" fill="#cc1f1f"/><rect x="76" y="36" width="64" height="56" fill="#141414"/><rect x="80" y="40" width="56" height="48" fill="#7a8aa0"/><rect x="80" y="40" width="56" height="8" fill="#9fb0c4"/><rect x="80" y="80" width="56" height="8" fill="#5c6b80"/><rect x="84" y="52" width="48" height="20" fill="#141414"/><rect x="88" y="56" width="40" height="12" fill="#2bd6c6"/><rect x="88" y="56" width="40" height="4" fill="#9af3ea"/><rect x="92" y="60" width="8" height="6" fill="#0c3b39"/><rect x="116" y="60" width="8" height="6" fill="#0c3b39"/><rect x="88" y="76" width="6" height="6" fill="#141414"/><rect x="98" y="76" width="6" height="6" fill="#141414"/><rect x="108" y="76" width="6" height="6" fill="#141414"/><rect x="118" y="76" width="6" height="6" fill="#141414"/><rect x="100" y="92" width="16" height="12" fill="#141414"/><rect x="104" y="92" width="8" height="8" fill="#5c6b80"/><rect x="60" y="104" width="96" height="68" fill="#141414"/><rect x="64" y="108" width="88" height="60" fill="#7a8aa0"/><rect x="64" y="108" width="88" height="8" fill="#9fb0c4"/><rect x="64" y="160" width="88" height="8" fill="#5c6b80"/><rect x="92" y="116" width="32" height="44" fill="#141414"/><rect x="96" y="120" width="24" height="36" fill="#1a1f2b"/><rect x="100" y="124" width="16" height="12" fill="#cc1f1f"/><rect x="100" y="124" width="16" height="4" fill="#ff5b5b"/><rect x="100" y="140" width="16" height="4" fill="#2bd6c6"/><rect x="100" y="148" width="16" height="4" fill="#2bd6c6"/><rect x="72" y="120" width="14" height="14" fill="#cc1f1f"/><rect x="72" y="120" width="14" height="4" fill="#ff5b5b"/><rect x="130" y="120" width="14" height="14" fill="#2bd6c6"/><rect x="130" y="120" width="14" height="4" fill="#9af3ea"/><rect x="68" y="140" width="20" height="24" fill="#141414"/><rect x="72" y="144" width="12" height="4" fill="#5c6b80"/><rect x="72" y="152" width="12" height="4" fill="#5c6b80"/><rect x="128" y="140" width="20" height="24" fill="#141414"/><rect x="132" y="144" width="12" height="4" fill="#5c6b80"/><rect x="132" y="152" width="12" height="4" fill="#5c6b80"/><rect x="40" y="108" width="24" height="20" fill="#141414"/><rect x="44" y="112" width="16" height="12" fill="#5c6b80"/><rect x="44" y="112" width="16" height="4" fill="#7a8aa0"/><rect x="36" y="128" width="28" height="28" fill="#141414"/><rect x="40" y="132" width="20" height="20" fill="#7a8aa0"/><rect x="40" y="132" width="20" height="6" fill="#9fb0c4"/><rect x="20" y="134" width="20" height="16" fill="#141414"/><rect x="12" y="130" width="12" height="24" fill="#141414"/><rect x="16" y="134" width="6" height="16" fill="#1a1f2b"/><rect x="6" y="136" width="8" height="12" fill="#141414"/><circle cx="9" cy="142" r="6" fill="#141414"/><circle cx="9" cy="142" r="3" fill="#2bd6c6"/><rect x="0" y="139" width="9" height="6" fill="#9af3ea"/><rect x="16" y="124" width="8" height="8" fill="#2bd6c6"/><rect x="22" y="116" width="6" height="6" fill="#9af3ea"/><rect x="10" y="156" width="8" height="8" fill="#2bd6c6"/><rect x="24" y="160" width="6" height="6" fill="#9af3ea"/><rect x="152" y="108" width="22" height="20" fill="#141414"/><rect x="156" y="112" width="14" height="12" fill="#5c6b80"/><rect x="156" y="112" width="14" height="4" fill="#7a8aa0"/><rect x="160" y="128" width="28" height="28" fill="#141414"/><rect x="164" y="132" width="20" height="20" fill="#7a8aa0"/><rect x="164" y="132" width="20" height="6" fill="#9fb0c4"/><rect x="172" y="156" width="20" height="14" fill="#141414"/><rect x="176" y="160" width="12" height="6" fill="#cc1f1f"/><rect x="68" y="172" width="28" height="28" fill="#141414"/><rect x="72" y="176" width="20" height="24" fill="#5c6b80"/><rect x="72" y="176" width="20" height="6" fill="#7a8aa0"/><rect x="76" y="188" width="12" height="6" fill="#2bd6c6"/><rect x="60" y="194" width="36" height="10" fill="#141414"/><rect x="120" y="172" width="28" height="28" fill="#141414"/><rect x="124" y="176" width="20" height="24" fill="#5c6b80"/><rect x="124" y="176" width="20" height="6" fill="#7a8aa0"/><rect x="128" y="188" width="12" height="6" fill="#cc1f1f"/><rect x="120" y="194" width="36" height="10" fill="#141414"/><rect x="192" y="142" width="8" height="8" fill="#141414"/><rect x="204" y="138" width="10" height="16" fill="#141414"/><rect x="208" y="142" width="6" height="8" fill="#ffb02e"/><rect x="214" y="140" width="12" height="12" fill="#141414"/><rect x="218" y="144" width="8" height="4" fill="#ffd86b"/><rect x="228" y="138" width="8" height="6" fill="#ffb02e"/><rect x="228" y="148" width="8" height="6" fill="#ffb02e"/><rect x="232" y="144" width="8" height="4" fill="#ffd86b"/></g></svg></svg></div>
+      <div class="tee-meta">
+        <span class="tee-tag">GAME TEE</span>
+        <h3>Robo Revolution</h3>
+        <p class="tee-line">&ldquo;Some assembly required. Total domination included.&rdquo;</p>
+        <a class="tee-buy" href="https://tims-store-12362.myshopify.com/collections/all" target="_blank" rel="noopener">Coming soon · shop store ↗</a>
+      </div>
+    </article>
+    <article class="tee-card" id="punch-out-roguelike">
+      <div class="tee-wrap"><svg class="tee" viewBox="0 0 300 332" xmlns="http://www.w3.org/2000/svg" role="img"><defs><linearGradient id="tg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#f3eee2"/></linearGradient></defs><path d="M150 30 C170 30 185 36 198 46 L262 70 L292 128 L246 152 L232 132 L232 298 Q232 312 218 312 L82 312 Q68 312 68 298 L68 132 L54 152 L8 128 L38 70 L102 46 C115 36 130 30 150 30 Z" fill="url(#tg)" stroke="#d9ccae" stroke-width="2.5" stroke-linejoin="round"/><path d="M118 33 Q150 63 182 33 Q150 49 118 33 Z" fill="#efe7d2" stroke="#d9ccae" stroke-width="2"/><path d="M120 35 Q150 60 180 35" fill="none" stroke="#cdbf9f" stroke-width="2.5" opacity="0.7"/><svg x="78" y="96" width="144" height="144" viewBox="0 0 240 240" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+<title>Punch-Out Roguelike t-shirt graphic</title>
+<desc>A chunky pixel-art boxer throwing a giant red uppercut glove, surrounded by impact stars and sweat, with a die motif.</desc>
+
+<g shape-rendering="crispEdges">
+
+<g fill="#ffd23f" stroke="#141414" stroke-width="3">
+<polygon points="120,16 126,30 141,30 129,39 134,54 120,45 106,54 111,39 99,30 114,30"/>
+</g>
+<g fill="#ffd23f" stroke="#141414" stroke-width="3">
+<polygon points="40,52 44,62 55,62 46,69 50,80 40,73 30,80 34,69 25,62 36,62"/>
+</g>
+<g fill="#ffd23f" stroke="#141414" stroke-width="3">
+<polygon points="202,56 206,66 217,66 208,73 212,84 202,77 192,84 196,73 187,66 198,66"/>
+</g>
+
+<g fill="#3a6ea5" stroke="#141414" stroke-width="4">
+<rect x="44" y="64" width="152" height="120"/>
+</g>
+<rect x="52" y="72" width="136" height="104" fill="#52a0d8" stroke="#141414" stroke-width="2"/>
+
+<g fill="#f3ecdb" stroke="#141414" stroke-width="4">
+<rect x="96" y="86" width="48" height="44"/>
+</g>
+<rect x="100" y="78" width="40" height="12" fill="#3a2417" stroke="#141414" stroke-width="3"/>
+<rect x="100" y="84" width="40" height="6" fill="#3a2417"/>
+
+<rect x="92" y="98" width="8" height="20" fill="#f3ecdb" stroke="#141414" stroke-width="3"/>
+<rect x="140" y="98" width="8" height="20" fill="#f3ecdb" stroke="#141414" stroke-width="3"/>
+
+<rect x="104" y="100" width="10" height="10" fill="#141414"/>
+<rect x="126" y="100" width="10" height="10" fill="#141414"/>
+
+<rect x="100" y="118" width="40" height="8" fill="#cc1f1f" stroke="#141414" stroke-width="3"/>
+<rect x="108" y="120" width="6" height="4" fill="#141414"/>
+<rect x="118" y="120" width="6" height="4" fill="#141414"/>
+<rect x="128" y="120" width="6" height="4" fill="#141414"/>
+
+<g fill="#52a0d8" stroke="#141414" stroke-width="4">
+<rect x="80" y="132" width="80" height="40"/>
+</g>
+<rect x="112" y="132" width="16" height="40" fill="#3a6ea5" stroke="#141414" stroke-width="2"/>
+
+<g fill="#e3b08a" stroke="#141414" stroke-width="3">
+<rect x="64" y="140" width="20" height="16"/>
+</g>
+
+<g fill="#cc1f1f" stroke="#141414" stroke-width="4">
+<rect x="150" y="112" width="48" height="48"/>
+<rect x="158" y="100" width="34" height="16"/>
+</g>
+<rect x="150" y="138" width="48" height="14" fill="#9e1515" stroke="#141414" stroke-width="2"/>
+<rect x="142" y="148" width="16" height="20" fill="#e8e0cf" stroke="#141414" stroke-width="3"/>
+<rect x="160" y="120" width="14" height="10" fill="#f3ecdb"/>
+
+<polygon points="178,68 184,80 196,80 186,88 190,100 178,92 166,100 170,88 160,80 172,80" fill="#ffd23f" stroke="#141414" stroke-width="3"/>
+
+<g fill="#9bdcff" stroke="#141414" stroke-width="2">
+<rect x="86" y="84" width="6" height="14"/>
+<rect x="68" y="100" width="6" height="14"/>
+</g>
+
+<g fill="#141414">
+<rect x="52" y="176" width="136" height="8"/>
+</g>
+
+<g fill="#f3ecdb" stroke="#141414" stroke-width="3">
+<rect x="206" y="150" width="30" height="30" rx="4"/>
+</g>
+<rect x="213" y="157" width="6" height="6" fill="#141414"/>
+<rect x="223" y="167" width="6" height="6" fill="#141414"/>
+
+<g fill="#f3ecdb" stroke="#141414" stroke-width="3">
+<rect x="6" y="148" width="30" height="30" rx="4"/>
+</g>
+<rect x="11" y="153" width="6" height="6" fill="#cc1f1f"/>
+<rect x="25" y="153" width="6" height="6" fill="#cc1f1f"/>
+<rect x="18" y="160" width="6" height="6" fill="#cc1f1f"/>
+<rect x="11" y="167" width="6" height="6" fill="#cc1f1f"/>
+<rect x="25" y="167" width="6" height="6" fill="#cc1f1f"/>
+
+<rect x="58" y="196" width="124" height="34" fill="#cc1f1f" stroke="#141414" stroke-width="4"/>
+<text x="120" y="219" font-size="18" fill="#f3ecdb" text-anchor="middle" font-family="monospace" font-weight="bold" letter-spacing="2">ROGUE-OUT</text>
+
+</g>
+</svg></svg></div>
+      <div class="tee-meta">
+        <span class="tee-tag">GAME TEE</span>
+        <h3>Punch-Out Roguelike</h3>
+        <p class="tee-line">&ldquo;One Run, One Glass Jaw&rdquo;</p>
+        <a class="tee-buy" href="https://tims-store-12362.myshopify.com/collections/all" target="_blank" rel="noopener">Coming soon · shop store ↗</a>
+      </div>
+    </article>
+    <article class="tee-card" id="bottomless-quordle">
+      <div class="tee-wrap"><svg class="tee" viewBox="0 0 300 332" xmlns="http://www.w3.org/2000/svg" role="img"><defs><linearGradient id="tg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#f3eee2"/></linearGradient></defs><path d="M150 30 C170 30 185 36 198 46 L262 70 L292 128 L246 152 L232 132 L232 298 Q232 312 218 312 L82 312 Q68 312 68 298 L68 132 L54 152 L8 128 L38 70 L102 46 C115 36 130 30 150 30 Z" fill="url(#tg)" stroke="#d9ccae" stroke-width="2.5" stroke-linejoin="round"/><path d="M118 33 Q150 63 182 33 Q150 49 118 33 Z" fill="#efe7d2" stroke="#d9ccae" stroke-width="2"/><path d="M120 35 Q150 60 180 35" fill="none" stroke="#cdbf9f" stroke-width="2.5" opacity="0.7"/><svg x="78" y="96" width="144" height="144" viewBox="0 0 240 240" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+<rect x="44" y="20" width="40" height="40" fill="#6aaa64" stroke="#141414" stroke-width="5"/>
+<rect x="52" y="28" width="8" height="8" fill="#f3ecdb"/>
+<rect x="60" y="36" width="8" height="8" fill="#f3ecdb"/>
+<rect x="52" y="44" width="8" height="8" fill="#f3ecdb"/>
+<rect x="60" y="44" width="8" height="8" fill="#f3ecdb"/>
+<rect x="68" y="44" width="8" height="8" fill="#f3ecdb"/>
+
+<rect x="98" y="14" width="40" height="40" fill="#c9b458" stroke="#141414" stroke-width="5"/>
+<rect x="106" y="22" width="8" height="24" fill="#141414"/>
+<rect x="114" y="22" width="8" height="8" fill="#141414"/>
+<rect x="122" y="30" width="8" height="8" fill="#141414"/>
+<rect x="122" y="22" width="8" height="8" fill="#141414"/>
+
+<rect x="150" y="22" width="40" height="40" fill="#cc1f1f" stroke="#141414" stroke-width="5"/>
+<rect x="158" y="30" width="8" height="8" fill="#f3ecdb"/>
+<rect x="174" y="30" width="8" height="8" fill="#f3ecdb"/>
+<rect x="158" y="38" width="24" height="8" fill="#f3ecdb"/>
+<rect x="158" y="46" width="8" height="8" fill="#f3ecdb"/>
+<rect x="174" y="46" width="8" height="8" fill="#f3ecdb"/>
+
+<rect x="66" y="62" width="40" height="40" fill="#c9b458" stroke="#141414" stroke-width="5"/>
+<rect x="74" y="70" width="8" height="24" fill="#141414"/>
+<rect x="82" y="70" width="16" height="8" fill="#141414"/>
+<rect x="82" y="82" width="12" height="8" fill="#141414"/>
+
+<rect x="120" y="56" width="40" height="40" fill="#6aaa64" stroke="#141414" stroke-width="5"/>
+<rect x="128" y="64" width="8" height="24" fill="#f3ecdb"/>
+<rect x="136" y="80" width="8" height="8" fill="#f3ecdb"/>
+<rect x="144" y="64" width="8" height="24" fill="#f3ecdb"/>
+
+<rect x="94" y="104" width="40" height="40" fill="#cc1f1f" stroke="#141414" stroke-width="5"/>
+<rect x="102" y="112" width="8" height="24" fill="#f3ecdb"/>
+<rect x="110" y="112" width="16" height="8" fill="#f3ecdb"/>
+<rect x="110" y="124" width="12" height="8" fill="#f3ecdb"/>
+<rect x="118" y="132" width="8" height="4" fill="#f3ecdb"/>
+
+<rect x="148" y="100" width="34" height="34" fill="#c9b458" stroke="#141414" stroke-width="5"/>
+<rect x="156" y="108" width="8" height="18" fill="#141414"/>
+<rect x="164" y="108" width="10" height="8" fill="#141414"/>
+
+<rect x="78" y="148" width="30" height="30" fill="#6aaa64" stroke="#141414" stroke-width="4"/>
+<rect x="85" y="155" width="7" height="16" fill="#f3ecdb"/>
+<rect x="92" y="155" width="9" height="7" fill="#f3ecdb"/>
+
+<rect x="124" y="150" width="28" height="28" fill="#cc1f1f" stroke="#141414" stroke-width="4"/>
+<rect x="131" y="157" width="14" height="7" fill="#f3ecdb"/>
+<rect x="135" y="164" width="7" height="9" fill="#f3ecdb"/>
+
+<ellipse cx="120" cy="194" rx="80" ry="34" fill="#141414"/>
+<ellipse cx="120" cy="192" rx="64" ry="26" fill="#2a2a2a"/>
+<ellipse cx="120" cy="190" rx="48" ry="19" fill="#141414"/>
+<ellipse cx="120" cy="188" rx="32" ry="12" fill="#cc1f1f"/>
+<ellipse cx="120" cy="187" rx="17" ry="6" fill="#141414"/>
+
+<rect x="98" y="184" width="14" height="14" fill="#c9b458" stroke="#141414" stroke-width="3" transform="rotate(18 105 191)"/>
+<rect x="128" y="186" width="12" height="12" fill="#6aaa64" stroke="#141414" stroke-width="3" transform="rotate(-22 134 192)"/>
+
+<rect x="16" y="118" width="14" height="14" fill="#c9b458" stroke="#141414" stroke-width="3" transform="rotate(15 23 125)"/>
+<rect x="208" y="92" width="14" height="14" fill="#6aaa64" stroke="#141414" stroke-width="3" transform="rotate(-18 215 99)"/>
+<rect x="200" y="150" width="12" height="12" fill="#cc1f1f" stroke="#141414" stroke-width="3" transform="rotate(20 206 156)"/>
+<rect x="28" y="74" width="12" height="12" fill="#cc1f1f" stroke="#141414" stroke-width="3" transform="rotate(-14 34 80)"/>
+</svg></svg></div>
+      <div class="tee-meta">
+        <span class="tee-tag">GAME TEE</span>
+        <h3>Bottomless Quordle</h3>
+        <p class="tee-line">&ldquo;Six tries? Cute. Try forever.&rdquo;</p>
+        <a class="tee-buy" href="https://tims-store-12362.myshopify.com/collections/all" target="_blank" rel="noopener">Coming soon · shop store ↗</a>
+      </div>
+    </article>
+    <article class="tee-card" id="custom-uno-clone">
+      <div class="tee-wrap"><svg class="tee" viewBox="0 0 300 332" xmlns="http://www.w3.org/2000/svg" role="img"><defs><linearGradient id="tg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#f3eee2"/></linearGradient></defs><path d="M150 30 C170 30 185 36 198 46 L262 70 L292 128 L246 152 L232 132 L232 298 Q232 312 218 312 L82 312 Q68 312 68 298 L68 132 L54 152 L8 128 L38 70 L102 46 C115 36 130 30 150 30 Z" fill="url(#tg)" stroke="#d9ccae" stroke-width="2.5" stroke-linejoin="round"/><path d="M118 33 Q150 63 182 33 Q150 49 118 33 Z" fill="#efe7d2" stroke="#d9ccae" stroke-width="2"/><path d="M120 35 Q150 60 180 35" fill="none" stroke="#cdbf9f" stroke-width="2.5" opacity="0.7"/><svg x="78" y="96" width="144" height="144" viewBox="0 0 240 240" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg"><title>Custom UNO Clone t-shirt graphic</title><desc>A chunky 8-bit pixel-art fan of bold numbered colored cards with a grinning wild swap card on top, drawn in a retro screen-printed style.</desc>
+
+<g stroke="#141414" stroke-width="0" >
+
+<g transform="rotate(-22 120 130)">
+<rect x="44" y="74" width="56" height="92" fill="#141414"/>
+<rect x="48" y="78" width="48" height="84" fill="#1f8a3b"/>
+<rect x="54" y="84" width="36" height="20" fill="#f3ecdb"/>
+<rect x="54" y="138" width="36" height="20" fill="#f3ecdb"/>
+<rect x="62" y="108" width="20" height="28" fill="#f3ecdb"/>
+<rect x="62" y="108" width="8" height="28" fill="#1f8a3b"/>
+<rect x="74" y="108" width="8" height="20" fill="#1f8a3b"/>
+</g>
+
+<g transform="rotate(-7 120 130)">
+<rect x="76" y="62" width="56" height="92" fill="#141414"/>
+<rect x="80" y="66" width="48" height="84" fill="#f2b705"/>
+<rect x="86" y="72" width="36" height="16" fill="#f3ecdb"/>
+<rect x="86" y="128" width="36" height="16" fill="#f3ecdb"/>
+<rect x="94" y="94" width="20" height="28" fill="#f3ecdb"/>
+<rect x="94" y="94" width="20" height="8" fill="#f2b705"/>
+<rect x="106" y="102" width="8" height="20" fill="#f2b705"/>
+<rect x="94" y="106" width="20" height="6" fill="#f2b705"/>
+<rect x="94" y="116" width="14" height="6" fill="#f2b705"/>
+</g>
+
+<g transform="rotate(9 120 130)">
+<rect x="108" y="58" width="56" height="92" fill="#141414"/>
+<rect x="112" y="62" width="48" height="84" fill="#1f5fd6"/>
+<rect x="118" y="68" width="36" height="16" fill="#f3ecdb"/>
+<rect x="118" y="124" width="36" height="16" fill="#f3ecdb"/>
+<rect x="126" y="90" width="8" height="28" fill="#f3ecdb"/>
+<rect x="134" y="90" width="14" height="8" fill="#f3ecdb"/>
+<rect x="140" y="90" width="8" height="28" fill="#f3ecdb"/>
+<rect x="126" y="98" width="22" height="6" fill="#1f5fd6"/>
+</g>
+
+</g>
+
+<g transform="rotate(20 138 120)">
+<rect x="104" y="40" width="64" height="104" fill="#141414"/>
+<rect x="109" y="45" width="54" height="94" fill="#cc1f1f"/>
+
+<polygon points="136,52 156,72 136,92 116,72" fill="#f3ecdb" stroke="#141414" stroke-width="3"/>
+<rect x="118" y="70" width="36" height="4" fill="#cc1f1f"/>
+<rect x="134" y="54" width="4" height="36" fill="#cc1f1f"/>
+<polygon points="120,72 130,64 130,80" fill="#141414"/>
+<polygon points="152,72 142,64 142,80" fill="#141414"/>
+
+<rect x="113" y="98" width="46" height="36" fill="#f3ecdb"/>
+<rect x="120" y="106" width="8" height="8" fill="#141414"/>
+<rect x="144" y="106" width="8" height="8" fill="#141414"/>
+<rect x="122" y="108" width="3" height="3" fill="#f3ecdb"/>
+<rect x="146" y="108" width="3" height="3" fill="#f3ecdb"/>
+<rect x="118" y="122" width="36" height="6" fill="#cc1f1f"/>
+<rect x="118" y="122" width="36" height="3" fill="#141414"/>
+<rect x="124" y="120" width="4" height="4" fill="#141414"/>
+<rect x="132" y="120" width="4" height="4" fill="#141414"/>
+<rect x="140" y="120" width="4" height="4" fill="#141414"/>
+<rect x="148" y="120" width="4" height="4" fill="#141414"/>
+
+<rect x="116" y="48" width="6" height="6" fill="#f2b705"/>
+<rect x="150" y="48" width="6" height="6" fill="#1f8a3b"/>
+<rect x="116" y="132" width="6" height="6" fill="#1f5fd6"/>
+<rect x="150" y="132" width="6" height="6" fill="#f2b705"/>
+</g>
+
+<g>
+<polygon points="40,176 52,164 64,176 52,188" fill="#cc1f1f" stroke="#141414" stroke-width="3"/>
+<polygon points="184,52 196,40 208,52 196,64" fill="#f2b705" stroke="#141414" stroke-width="3"/>
+<rect x="196" y="150" width="12" height="12" fill="#1f5fd6" stroke="#141414" stroke-width="3"/>
+<rect x="40" y="44" width="11" height="11" fill="#1f8a3b" stroke="#141414" stroke-width="3"/>
+</g>
+
+</svg></svg></div>
+      <div class="tee-meta">
+        <span class="tee-tag">GAME TEE</span>
+        <h3>Custom UNO Clone</h3>
+        <p class="tee-line">&ldquo;Read &#x27;Em, Stack &#x27;Em, Swap &#x27;Em&rdquo;</p>
+        <a class="tee-buy" href="https://tims-store-12362.myshopify.com/collections/all" target="_blank" rel="noopener">Coming soon · shop store ↗</a>
+      </div>
+    </article>
+    <article class="tee-card" id="bakers-dozen">
+      <div class="tee-wrap"><svg class="tee" viewBox="0 0 300 332" xmlns="http://www.w3.org/2000/svg" role="img"><defs><linearGradient id="tg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#f3eee2"/></linearGradient></defs><path d="M150 30 C170 30 185 36 198 46 L262 70 L292 128 L246 152 L232 132 L232 298 Q232 312 218 312 L82 312 Q68 312 68 298 L68 132 L54 152 L8 128 L38 70 L102 46 C115 36 130 30 150 30 Z" fill="url(#tg)" stroke="#d9ccae" stroke-width="2.5" stroke-linejoin="round"/><path d="M118 33 Q150 63 182 33 Q150 49 118 33 Z" fill="#efe7d2" stroke="#d9ccae" stroke-width="2"/><path d="M120 35 Q150 60 180 35" fill="none" stroke="#cdbf9f" stroke-width="2.5" opacity="0.7"/><svg x="78" y="96" width="144" height="144" viewBox="0 0 240 240" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+<title>Baker's Dozen t-shirt graphic</title>
+<desc>A pixel-art chef hat over the number 13, sitting on a row of thirteen tidy card columns in warm bakery colors.</desc>
+<g>
+<rect x="16" y="206" width="208" height="12" fill="#8a4b22" stroke="#141414" stroke-width="2"/>
+<rect x="16" y="216" width="208" height="6" fill="#5e3216" stroke="#141414" stroke-width="2"/>
+</g>
+<g>
+<rect x="20" y="150" width="12" height="58" fill="#f3ecdb" stroke="#141414" stroke-width="2"/>
+<rect x="22" y="153" width="3" height="3" fill="#cc1f1f"/>
+<rect x="22" y="171" width="3" height="3" fill="#141414"/>
+<rect x="22" y="189" width="3" height="3" fill="#cc1f1f"/>
+</g>
+<g>
+<rect x="36" y="150" width="12" height="58" fill="#f3ecdb" stroke="#141414" stroke-width="2"/>
+<rect x="38" y="153" width="3" height="3" fill="#141414"/>
+<rect x="38" y="171" width="3" height="3" fill="#cc1f1f"/>
+<rect x="38" y="189" width="3" height="3" fill="#141414"/>
+</g>
+<g>
+<rect x="52" y="150" width="12" height="58" fill="#f3ecdb" stroke="#141414" stroke-width="2"/>
+<rect x="54" y="153" width="3" height="3" fill="#cc1f1f"/>
+<rect x="54" y="171" width="3" height="3" fill="#cc1f1f"/>
+<rect x="54" y="189" width="3" height="3" fill="#141414"/>
+</g>
+<g>
+<rect x="68" y="150" width="12" height="58" fill="#f3ecdb" stroke="#141414" stroke-width="2"/>
+<rect x="70" y="153" width="3" height="3" fill="#141414"/>
+<rect x="70" y="171" width="3" height="3" fill="#141414"/>
+<rect x="70" y="189" width="3" height="3" fill="#cc1f1f"/>
+</g>
+<g>
+<rect x="84" y="150" width="12" height="58" fill="#f3ecdb" stroke="#141414" stroke-width="2"/>
+<rect x="86" y="153" width="3" height="3" fill="#cc1f1f"/>
+<rect x="86" y="171" width="3" height="3" fill="#141414"/>
+<rect x="86" y="189" width="3" height="3" fill="#cc1f1f"/>
+</g>
+<g>
+<rect x="100" y="150" width="12" height="58" fill="#f3ecdb" stroke="#141414" stroke-width="2"/>
+<rect x="102" y="153" width="3" height="3" fill="#141414"/>
+<rect x="102" y="171" width="3" height="3" fill="#cc1f1f"/>
+<rect x="102" y="189" width="3" height="3" fill="#141414"/>
+</g>
+<g>
+<rect x="116" y="150" width="12" height="58" fill="#f3ecdb" stroke="#141414" stroke-width="2"/>
+<rect x="118" y="153" width="3" height="3" fill="#cc1f1f"/>
+<rect x="118" y="171" width="3" height="3" fill="#cc1f1f"/>
+<rect x="118" y="189" width="3" height="3" fill="#cc1f1f"/>
+</g>
+<g>
+<rect x="132" y="150" width="12" height="58" fill="#f3ecdb" stroke="#141414" stroke-width="2"/>
+<rect x="134" y="153" width="3" height="3" fill="#141414"/>
+<rect x="134" y="171" width="3" height="3" fill="#cc1f1f"/>
+<rect x="134" y="189" width="3" height="3" fill="#141414"/>
+</g>
+<g>
+<rect x="148" y="150" width="12" height="58" fill="#f3ecdb" stroke="#141414" stroke-width="2"/>
+<rect x="150" y="153" width="3" height="3" fill="#cc1f1f"/>
+<rect x="150" y="171" width="3" height="3" fill="#141414"/>
+<rect x="150" y="189" width="3" height="3" fill="#cc1f1f"/>
+</g>
+<g>
+<rect x="164" y="150" width="12" height="58" fill="#f3ecdb" stroke="#141414" stroke-width="2"/>
+<rect x="166" y="153" width="3" height="3" fill="#141414"/>
+<rect x="166" y="171" width="3" height="3" fill="#141414"/>
+<rect x="166" y="189" width="3" height="3" fill="#cc1f1f"/>
+</g>
+<g>
+<rect x="180" y="150" width="12" height="58" fill="#f3ecdb" stroke="#141414" stroke-width="2"/>
+<rect x="182" y="153" width="3" height="3" fill="#cc1f1f"/>
+<rect x="182" y="171" width="3" height="3" fill="#cc1f1f"/>
+<rect x="182" y="189" width="3" height="3" fill="#141414"/>
+</g>
+<g>
+<rect x="196" y="150" width="12" height="58" fill="#f3ecdb" stroke="#141414" stroke-width="2"/>
+<rect x="198" y="153" width="3" height="3" fill="#141414"/>
+<rect x="198" y="171" width="3" height="3" fill="#cc1f1f"/>
+<rect x="198" y="189" width="3" height="3" fill="#141414"/>
+</g>
+<g>
+<rect x="212" y="150" width="12" height="58" fill="#f3ecdb" stroke="#141414" stroke-width="2"/>
+<rect x="214" y="153" width="3" height="3" fill="#cc1f1f"/>
+<rect x="214" y="171" width="3" height="3" fill="#141414"/>
+<rect x="214" y="189" width="3" height="3" fill="#cc1f1f"/>
+</g>
+<rect x="62" y="78" width="116" height="70" fill="#e8a33d" stroke="#141414" stroke-width="3"/>
+<rect x="62" y="78" width="116" height="10" fill="#f2c45f" stroke="#141414" stroke-width="3"/>
+<g fill="#141414">
+<rect x="84" y="96" width="8" height="40"/>
+<rect x="76" y="96" width="8" height="8"/>
+<rect x="76" y="128" width="24" height="8"/>
+</g>
+<g fill="#cc1f1f" stroke="#141414" stroke-width="1.5">
+<rect x="116" y="96" width="32" height="8"/>
+<rect x="140" y="96" width="8" height="40"/>
+<rect x="124" y="112" width="24" height="8"/>
+<rect x="116" y="128" width="32" height="8"/>
+</g>
+<rect x="80" y="66" width="80" height="16" fill="#f3ecdb" stroke="#141414" stroke-width="3"/>
+<rect x="90" y="72" width="4" height="4" fill="#cc1f1f"/>
+<rect x="118" y="72" width="4" height="4" fill="#cc1f1f"/>
+<rect x="146" y="72" width="4" height="4" fill="#cc1f1f"/>
+<g fill="#f3ecdb" stroke="#141414" stroke-width="3">
+<rect x="84" y="48" width="72" height="20"/>
+</g>
+<g fill="#f3ecdb" stroke="#141414" stroke-width="3">
+<rect x="82" y="34" width="28" height="22"/>
+<rect x="106" y="26" width="30" height="30"/>
+<rect x="132" y="36" width="26" height="22"/>
+</g>
+<g fill="#ddd2b4">
+<rect x="88" y="54" width="64" height="6"/>
+<rect x="112" y="34" width="6" height="18"/>
+</g>
+<rect x="80" y="66" width="80" height="16" fill="#f3ecdb" stroke="#141414" stroke-width="3"/>
+<rect x="90" y="72" width="4" height="4" fill="#cc1f1f"/>
+<rect x="118" y="72" width="4" height="4" fill="#cc1f1f"/>
+<rect x="146" y="72" width="4" height="4" fill="#cc1f1f"/>
+<g fill="#f3ecdb" stroke="#141414" stroke-width="1.5">
+<rect x="48" y="92" width="6" height="6"/>
+<rect x="186" y="100" width="6" height="6"/>
+<rect x="42" y="120" width="5" height="5"/>
+<rect x="192" y="128" width="5" height="5"/>
+</g>
+</svg></svg></div>
+      <div class="tee-meta">
+        <span class="tee-tag">GAME TEE</span>
+        <h3>Baker&#x27;s Dozen</h3>
+        <p class="tee-line">&ldquo;Thirteen columns. Zero crumbs left behind.&rdquo;</p>
+        <a class="tee-buy" href="https://tims-store-12362.myshopify.com/collections/all" target="_blank" rel="noopener">Coming soon · shop store ↗</a>
+      </div>
+    </article>
+    <article class="tee-card" id="naruto-tic-tac-toe">
+      <div class="tee-wrap"><svg class="tee" viewBox="0 0 300 332" xmlns="http://www.w3.org/2000/svg" role="img"><defs><linearGradient id="tg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#f3eee2"/></linearGradient></defs><path d="M150 30 C170 30 185 36 198 46 L262 70 L292 128 L246 152 L232 132 L232 298 Q232 312 218 312 L82 312 Q68 312 68 298 L68 132 L54 152 L8 128 L38 70 L102 46 C115 36 130 30 150 30 Z" fill="url(#tg)" stroke="#d9ccae" stroke-width="2.5" stroke-linejoin="round"/><path d="M118 33 Q150 63 182 33 Q150 49 118 33 Z" fill="#efe7d2" stroke="#d9ccae" stroke-width="2"/><path d="M120 35 Q150 60 180 35" fill="none" stroke="#cdbf9f" stroke-width="2.5" opacity="0.7"/><svg x="78" y="96" width="144" height="144" viewBox="0 0 240 240" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+  <g stroke="#141414" stroke-width="4" stroke-linejoin="round">
+
+    <rect x="48" y="40" width="144" height="144" fill="#141414" stroke="none"/>
+    <rect x="50" y="42" width="140" height="140" fill="#2b3a4a" stroke="none"/>
+
+    <rect x="92" y="42" width="8" height="140" fill="#141414" stroke="none"/>
+    <rect x="140" y="42" width="8" height="140" fill="#141414" stroke="none"/>
+    <rect x="50" y="86" width="140" height="8" fill="#141414" stroke="none"/>
+    <rect x="50" y="130" width="140" height="8" fill="#141414" stroke="none"/>
+
+    <g stroke="none">
+      <polygon points="71,46 76,62 92,67 76,72 71,88 66,72 50,67 66,62" fill="#cc1f1f"/>
+      <polygon points="71,55 74,64 83,67 74,70 71,79 68,70 59,67 68,64" fill="#f3ecdb"/>
+      <rect x="68" y="64" width="6" height="6" fill="#141414"/>
+    </g>
+
+    <g stroke="none">
+      <polygon points="167,90 172,106 188,111 172,116 167,132 162,116 146,111 162,106" fill="#cc1f1f"/>
+      <polygon points="167,99 170,108 179,111 170,114 167,123 164,114 155,111 164,108" fill="#f3ecdb"/>
+      <rect x="164" y="108" width="6" height="6" fill="#141414"/>
+    </g>
+
+    <g stroke="none">
+      <polygon points="119,134 124,150 140,155 124,160 119,176 114,160 98,155 114,150" fill="#cc1f1f"/>
+      <polygon points="119,143 122,152 131,155 122,158 119,167 116,158 107,155 116,152" fill="#f3ecdb"/>
+      <rect x="116" y="152" width="6" height="6" fill="#141414"/>
+    </g>
+
+    <g fill="none" stroke="#3fa9c4" stroke-width="9" stroke-linecap="round">
+      <path d="M119 50 a17 17 0 1 0 14 8"/>
+    </g>
+    <g fill="none" stroke="#1c6e85" stroke-width="3" stroke-linecap="round">
+      <path d="M119 50 a17 17 0 1 0 14 8"/>
+    </g>
+
+    <g fill="none" stroke="#3fa9c4" stroke-width="9" stroke-linecap="round">
+      <path d="M71 94 a17 17 0 1 0 14 8"/>
+    </g>
+    <g fill="none" stroke="#1c6e85" stroke-width="3" stroke-linecap="round">
+      <path d="M71 94 a17 17 0 1 0 14 8"/>
+    </g>
+
+    <g fill="none" stroke="#3fa9c4" stroke-width="9" stroke-linecap="round">
+      <path d="M167 138 a17 17 0 1 0 14 8"/>
+    </g>
+    <g fill="none" stroke="#1c6e85" stroke-width="3" stroke-linecap="round">
+      <path d="M167 138 a17 17 0 1 0 14 8"/>
+    </g>
+
+    <g stroke="none">
+      <rect x="30" y="196" width="180" height="16" fill="#cc1f1f"/>
+      <rect x="30" y="196" width="180" height="5" fill="#e0463f"/>
+      <rect x="30" y="207" width="180" height="5" fill="#9a1414"/>
+      <rect x="40" y="200" width="10" height="8" fill="#141414"/>
+      <rect x="60" y="200" width="10" height="8" fill="#141414"/>
+      <rect x="80" y="200" width="10" height="8" fill="#141414"/>
+
+      <polygon points="210,196 234,188 234,204 210,212" fill="#cc1f1f"/>
+      <polygon points="210,196 234,188 234,194 210,202" fill="#e0463f"/>
+      <polygon points="210,204 234,212 234,220 210,212" fill="#cc1f1f"/>
+      <polygon points="210,204 234,218 234,212 210,212" fill="#9a1414"/>
+
+      <polygon points="30,196 6,188 6,204 30,212" fill="#cc1f1f"/>
+      <polygon points="30,196 6,188 6,194 30,202" fill="#e0463f"/>
+      <polygon points="30,204 6,212 6,220 30,212" fill="#cc1f1f"/>
+      <polygon points="30,204 6,218 6,212 30,212" fill="#9a1414"/>
+    </g>
+
+  </g>
+</svg></svg></div>
+      <div class="tee-meta">
+        <span class="tee-tag">GAME TEE</span>
+        <h3>Ninja Tic-Tac-Toe</h3>
+        <p class="tee-line">&ldquo;Three in a row, silent as a shadow.&rdquo;</p>
+        <a class="tee-buy" href="https://tims-store-12362.myshopify.com/collections/all" target="_blank" rel="noopener">Coming soon · shop store ↗</a>
+      </div>
+    </article>
+    <article class="tee-card" id="act-hunt-connect">
+      <div class="tee-wrap"><svg class="tee" viewBox="0 0 300 332" xmlns="http://www.w3.org/2000/svg" role="img"><defs><linearGradient id="tg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#f3eee2"/></linearGradient></defs><path d="M150 30 C170 30 185 36 198 46 L262 70 L292 128 L246 152 L232 132 L232 298 Q232 312 218 312 L82 312 Q68 312 68 298 L68 132 L54 152 L8 128 L38 70 L102 46 C115 36 130 30 150 30 Z" fill="url(#tg)" stroke="#d9ccae" stroke-width="2.5" stroke-linejoin="round"/><path d="M118 33 Q150 63 182 33 Q150 49 118 33 Z" fill="#efe7d2" stroke="#d9ccae" stroke-width="2"/><path d="M120 35 Q150 60 180 35" fill="none" stroke="#cdbf9f" stroke-width="2.5" opacity="0.7"/><svg x="78" y="96" width="144" height="144" viewBox="0 0 240 240" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg"><polygon points="28,30 44,30 44,40 54,40 54,30 70,30 70,40 80,40 80,30 96,30 96,40 96,52 86,52 86,42 76,42 76,52 62,52 62,42 52,42 52,52 38,52 38,42 28,42" fill="#141414"/><polygon points="30,32 42,32 42,42 56,42 56,32 68,32 68,42 82,42 82,32 94,32 94,50 88,50 88,40 74,40 74,50 60,50 60,40 46,40 46,50 30,50" fill="#f3ecdb"/><line x1="92" y1="30" x2="118" y2="22" stroke="#141414" stroke-width="3"/><polyline points="60,52 74,90 110,96 150,70 188,84" fill="none" stroke="#141414" stroke-width="6"/><polyline points="60,52 74,90 110,96 150,70 188,84" fill="none" stroke="#37c2c8" stroke-width="3" stroke-dasharray="6 4"/><line x1="74" y1="90" x2="44" y2="128" stroke="#141414" stroke-width="6"/><line x1="74" y1="90" x2="44" y2="128" stroke="#37c2c8" stroke-width="3" stroke-dasharray="6 4"/><line x1="110" y1="96" x2="128" y2="140" stroke="#141414" stroke-width="6"/><line x1="110" y1="96" x2="128" y2="140" stroke="#37c2c8" stroke-width="3" stroke-dasharray="6 4"/><g><rect x="46" y="38" width="28" height="28" fill="#141414"/><rect x="50" y="42" width="20" height="20" fill="#ffd23f"/><rect x="56" y="46" width="4" height="4" fill="#141414"/><rect x="60" y="50" width="4" height="4" fill="#141414"/><rect x="56" y="54" width="4" height="4" fill="#141414"/><rect x="60" y="46" width="4" height="4" fill="#141414"/></g><g><rect x="60" y="76" width="28" height="28" fill="#141414"/><rect x="64" y="80" width="20" height="20" fill="#37c2c8"/><rect x="68" y="84" width="4" height="12" fill="#141414"/><rect x="72" y="84" width="8" height="4" fill="#141414"/><rect x="76" y="88" width="4" height="4" fill="#141414"/><rect x="72" y="92" width="8" height="4" fill="#141414"/></g><g><rect x="96" y="82" width="28" height="28" fill="#141414"/><rect x="100" y="86" width="20" height="20" fill="#ffd23f"/><rect x="104" y="90" width="4" height="12" fill="#141414"/><rect x="108" y="90" width="8" height="4" fill="#141414"/><rect x="108" y="96" width="6" height="4" fill="#141414"/><rect x="108" y="102" width="8" height="4" fill="#141414"/></g><g><rect x="136" y="56" width="28" height="28" fill="#141414"/><rect x="140" y="60" width="20" height="20" fill="#cc1f1f"/><rect x="144" y="64" width="4" height="12" fill="#f3ecdb"/><rect x="152" y="64" width="4" height="12" fill="#f3ecdb"/><rect x="148" y="68" width="4" height="4" fill="#f3ecdb"/></g><g><rect x="174" y="70" width="28" height="28" fill="#141414"/><rect x="178" y="74" width="20" height="20" fill="#ffd23f"/><rect x="182" y="78" width="4" height="12" fill="#141414"/><rect x="186" y="78" width="4" height="8" fill="#141414"/><rect x="190" y="78" width="4" height="12" fill="#141414"/></g><g><rect x="30" y="114" width="28" height="28" fill="#141414"/><rect x="34" y="118" width="20" height="20" fill="#37c2c8"/><rect x="38" y="122" width="4" height="12" fill="#141414"/><rect x="46" y="122" width="4" height="12" fill="#141414"/><rect x="42" y="122" width="4" height="4" fill="#141414"/></g><g><rect x="114" y="126" width="28" height="28" fill="#141414"/><rect x="118" y="130" width="20" height="20" fill="#cc1f1f"/><rect x="122" y="134" width="12" height="4" fill="#f3ecdb"/><rect x="126" y="138" width="4" height="12" fill="#f3ecdb"/></g><g><circle cx="158" cy="150" r="40" fill="none" stroke="#141414" stroke-width="14"/><circle cx="158" cy="150" r="40" fill="none" stroke="#cc1f1f" stroke-width="6"/><circle cx="158" cy="150" r="33" fill="#37c2c8" opacity="0.22"/><rect x="146" y="138" width="8" height="8" fill="#f3ecdb" opacity="0.85"/><rect x="154" y="146" width="6" height="6" fill="#f3ecdb" opacity="0.7"/><polygon points="186,176 200,190 222,212 210,224 188,202 174,188" fill="#141414"/><polygon points="190,182 200,192 216,208 208,216 192,200 182,190" fill="#cc1f1f"/></g><g><rect x="118" y="186" width="28" height="28" fill="#141414"/><rect x="122" y="190" width="20" height="20" fill="#ffd23f"/><rect x="126" y="194" width="4" height="12" fill="#141414"/><rect x="130" y="194" width="8" height="4" fill="#141414"/><rect x="134" y="198" width="4" height="4" fill="#141414"/><rect x="130" y="202" width="8" height="4" fill="#141414"/></g><rect x="102" y="64" width="3" height="3" fill="#ffd23f"/><rect x="128" y="44" width="3" height="3" fill="#37c2c8"/><rect x="200" y="52" width="3" height="3" fill="#cc1f1f"/><rect x="40" y="92" width="3" height="3" fill="#ffd23f"/><rect x="92" y="160" width="3" height="3" fill="#37c2c8"/><rect x="210" y="120" width="3" height="3" fill="#ffd23f"/></svg></svg></div>
+      <div class="tee-meta">
+        <span class="tee-tag">GAME TEE</span>
+        <h3>A.C.T. Hunt &amp; Connect</h3>
+        <p class="tee-line">&ldquo;Connect the dots. Crush the curve.&rdquo;</p>
+        <a class="tee-buy" href="https://tims-store-12362.myshopify.com/collections/all" target="_blank" rel="noopener">Coming soon · shop store ↗</a>
+      </div>
+    </article>
+    <article class="tee-card" id="ap-hunt-connect">
+      <div class="tee-wrap"><svg class="tee" viewBox="0 0 300 332" xmlns="http://www.w3.org/2000/svg" role="img"><defs><linearGradient id="tg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#f3eee2"/></linearGradient></defs><path d="M150 30 C170 30 185 36 198 46 L262 70 L292 128 L246 152 L232 132 L232 298 Q232 312 218 312 L82 312 Q68 312 68 298 L68 132 L54 152 L8 128 L38 70 L102 46 C115 36 130 30 150 30 Z" fill="url(#tg)" stroke="#d9ccae" stroke-width="2.5" stroke-linejoin="round"/><path d="M118 33 Q150 63 182 33 Q150 49 118 33 Z" fill="#efe7d2" stroke="#d9ccae" stroke-width="2"/><path d="M120 35 Q150 60 180 35" fill="none" stroke="#cdbf9f" stroke-width="2.5" opacity="0.7"/><svg x="78" y="96" width="144" height="144" viewBox="0 0 240 240" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+<title>A.P. Hunt and Connect t-shirt graphic</title>
+<desc>Pixel-art graduation cap above a grid of connected letter tiles spelling A plus, with a red tassel and a glowing word-path line.</desc>
+<rect x="34" y="98" width="172" height="124" fill="#141414"/>
+<rect x="37" y="101" width="166" height="118" fill="#f3ecdb"/>
+<g>
+<rect x="40" y="104" width="38" height="38" fill="#141414"/><rect x="43" y="107" width="32" height="32" fill="#e8c84a"/>
+<rect x="82" y="104" width="38" height="38" fill="#141414"/><rect x="85" y="107" width="32" height="32" fill="#f3ecdb"/>
+<rect x="124" y="104" width="38" height="38" fill="#141414"/><rect x="127" y="107" width="32" height="32" fill="#f3ecdb"/>
+<rect x="166" y="104" width="38" height="38" fill="#141414"/><rect x="169" y="107" width="32" height="32" fill="#5aa9d6"/>
+</g>
+<g>
+<rect x="40" y="146" width="38" height="38" fill="#141414"/><rect x="43" y="149" width="32" height="32" fill="#f3ecdb"/>
+<rect x="82" y="146" width="38" height="38" fill="#141414"/><rect x="85" y="149" width="32" height="32" fill="#e8c84a"/>
+<rect x="124" y="146" width="38" height="38" fill="#141414"/><rect x="127" y="149" width="32" height="32" fill="#f3ecdb"/>
+<rect x="166" y="146" width="38" height="38" fill="#141414"/><rect x="169" y="149" width="32" height="32" fill="#f3ecdb"/>
+</g>
+<g>
+<rect x="40" y="188" width="38" height="38" fill="#141414"/><rect x="43" y="191" width="32" height="32" fill="#f3ecdb"/>
+<rect x="82" y="188" width="38" height="38" fill="#141414"/><rect x="85" y="191" width="32" height="32" fill="#f3ecdb"/>
+<rect x="124" y="188" width="38" height="38" fill="#141414"/><rect x="127" y="191" width="32" height="32" fill="#e8c84a"/>
+<rect x="166" y="188" width="38" height="38" fill="#141414"/><rect x="169" y="191" width="32" height="32" fill="#5aa9d6"/>
+</g>
+<g fill="#141414">
+<rect x="52" y="112" width="14" height="4"/><rect x="52" y="116" width="4" height="20"/><rect x="62" y="116" width="4" height="20"/><rect x="52" y="122" width="14" height="4"/>
+</g>
+<g fill="#141414">
+<rect x="178" y="112" width="4" height="24"/><rect x="178" y="112" width="13" height="4"/><rect x="187" y="112" width="4" height="12"/><rect x="178" y="120" width="13" height="4"/>
+</g>
+<g fill="#141414">
+<rect x="94" y="154" width="4" height="24"/><rect x="107" y="154" width="4" height="24"/><rect x="94" y="164" width="17" height="4"/>
+</g>
+<g fill="#141414">
+<rect x="136" y="196" width="16" height="4"/><rect x="136" y="196" width="4" height="24"/><rect x="136" y="216" width="16" height="4"/>
+</g>
+<g fill="#141414">
+<rect x="183" y="198" width="4" height="20"/><rect x="177" y="204" width="16" height="4"/>
+</g>
+<g fill="#b8ab8e">
+<rect x="98" y="112" width="4" height="24"/><rect x="98" y="112" width="11" height="4"/>
+<rect x="140" y="112" width="4" height="24"/><rect x="140" y="132" width="11" height="4"/>
+<rect x="52" y="154" width="11" height="4"/><rect x="52" y="154" width="4" height="24"/><rect x="52" y="174" width="11" height="4"/>
+<rect x="140" y="154" width="4" height="24"/><rect x="140" y="154" width="11" height="4"/><rect x="140" y="164" width="9" height="4"/>
+<rect x="182" y="154" width="11" height="4"/><rect x="186" y="154" width="4" height="24"/>
+<rect x="56" y="196" width="11" height="4"/><rect x="60" y="196" width="4" height="24"/>
+<rect x="94" y="196" width="4" height="24"/><rect x="94" y="196" width="11" height="4"/><rect x="94" y="206" width="9" height="4"/>
+</g>
+<g stroke="#cc1f1f" stroke-width="7" fill="none" stroke-linejoin="miter" stroke-linecap="square">
+<polyline points="59,126 102,166 146,208 185,208 185,126"/>
+</g>
+<g stroke="#141414" stroke-width="1.5" fill="#cc1f1f">
+<rect x="55" y="122" width="9" height="9"/>
+<rect x="98" y="162" width="9" height="9"/>
+<rect x="142" y="204" width="9" height="9"/>
+<rect x="181" y="204" width="9" height="9"/>
+<rect x="181" y="122" width="9" height="9"/>
+</g>
+<rect x="100" y="74" width="40" height="20" fill="#141414"/>
+<rect x="103" y="77" width="34" height="14" fill="#2b2b2b"/>
+<polygon points="120,40 168,60 120,80 72,60" fill="#141414"/>
+<polygon points="120,46 159,60 120,74 81,60" fill="#1f1f1f"/>
+<g fill="#3a3a3a">
+<rect x="108" y="54" width="8" height="4"/>
+<rect x="120" y="50" width="8" height="4"/>
+</g>
+<rect x="116" y="56" width="8" height="8" fill="#cc1f1f"/>
+<rect x="118" y="58" width="4" height="4" fill="#e8c84a"/>
+<g>
+<rect x="166" y="58" width="4" height="6" fill="#cc1f1f"/>
+<rect x="170" y="62" width="4" height="10" fill="#cc1f1f"/>
+<rect x="174" y="70" width="4" height="10" fill="#cc1f1f"/>
+<rect x="172" y="80" width="10" height="8" fill="#141414"/>
+<rect x="174" y="82" width="6" height="5" fill="#e8c84a"/>
+<rect x="171" y="88" width="3" height="14" fill="#cc1f1f"/>
+<rect x="175" y="88" width="3" height="16" fill="#a81818"/>
+<rect x="179" y="88" width="3" height="14" fill="#cc1f1f"/>
+</g>
+</svg></svg></div>
+      <div class="tee-meta">
+        <span class="tee-tag">GAME TEE</span>
+        <h3>A.P. Hunt &amp; Connect</h3>
+        <p class="tee-line">&ldquo;Connect the dots, ace the test.&rdquo;</p>
+        <a class="tee-buy" href="https://tims-store-12362.myshopify.com/collections/all" target="_blank" rel="noopener">Coming soon · shop store ↗</a>
+      </div>
+    </article>
+    <article class="tee-card" id="stem-hunt-connect">
+      <div class="tee-wrap"><svg class="tee" viewBox="0 0 300 332" xmlns="http://www.w3.org/2000/svg" role="img"><defs><linearGradient id="tg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#f3eee2"/></linearGradient></defs><path d="M150 30 C170 30 185 36 198 46 L262 70 L292 128 L246 152 L232 132 L232 298 Q232 312 218 312 L82 312 Q68 312 68 298 L68 132 L54 152 L8 128 L38 70 L102 46 C115 36 130 30 150 30 Z" fill="url(#tg)" stroke="#d9ccae" stroke-width="2.5" stroke-linejoin="round"/><path d="M118 33 Q150 63 182 33 Q150 49 118 33 Z" fill="#efe7d2" stroke="#d9ccae" stroke-width="2"/><path d="M120 35 Q150 60 180 35" fill="none" stroke="#cdbf9f" stroke-width="2.5" opacity="0.7"/><svg x="78" y="96" width="144" height="144" viewBox="0 0 240 240" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg"><title>STEM Hunt and Connect t-shirt graphic</title><desc>Pixel-art beaker mascot with bubbling teal liquid forming connected letter nodes, ringed by an atom orbit.</desc>
+
+<g stroke="#141414" stroke-width="3" stroke-linejoin="round">
+<ellipse cx="120" cy="120" rx="92" ry="50" fill="none" transform="rotate(28 120 120)"/>
+<ellipse cx="120" cy="120" rx="92" ry="50" fill="none" transform="rotate(-28 120 120)"/>
+</g>
+
+<g stroke="#141414" stroke-width="3">
+<rect x="34" y="58" width="14" height="14" fill="#cc1f1f"/>
+<rect x="192" y="62" width="14" height="14" fill="#f3ecdb"/>
+<rect x="40" y="168" width="14" height="14" fill="#f3ecdb"/>
+<rect x="190" y="166" width="14" height="14" fill="#cc1f1f"/>
+</g>
+
+<g stroke="#141414" stroke-width="4" stroke-linejoin="round">
+<rect x="88" y="38" width="64" height="14" fill="#3fd6c2"/>
+<rect x="98" y="52" width="44" height="10" fill="#2bb39f"/>
+<polygon points="98,62 142,62 168,196 72,196" fill="#1f8f80"/>
+</g>
+
+<polygon points="100,64 140,64 158,150 82,150" fill="#3fd6c2" stroke="#141414" stroke-width="3" stroke-linejoin="round"/>
+<polygon points="100,64 140,64 140,80 100,80" fill="#5fe6d4"/>
+
+<g stroke="#141414" stroke-width="3" stroke-linejoin="round">
+<rect x="72" y="190" width="96" height="18" fill="#cc1f1f"/>
+</g>
+
+<g stroke="#141414" stroke-width="3">
+<line x1="96" y1="108" x2="112" y2="92"/>
+<line x1="112" y1="92" x2="130" y2="116"/>
+<line x1="130" y1="116" x2="146" y2="100"/>
+<line x1="112" y1="92" x2="120" y2="132"/>
+<line x1="96" y1="108" x2="120" y2="132"/>
+</g>
+
+<g stroke="#141414" stroke-width="3" font-family="monospace" font-weight="bold" font-size="13" text-anchor="middle">
+<rect x="86" y="98" width="20" height="20" fill="#f3ecdb"/>
+<text x="96" y="113" stroke="none" fill="#141414">S</text>
+<rect x="102" y="82" width="20" height="20" fill="#f3ecdb"/>
+<text x="112" y="97" stroke="none" fill="#141414">T</text>
+<rect x="136" y="90" width="20" height="20" fill="#f3ecdb"/>
+<text x="146" y="105" stroke="none" fill="#141414">E</text>
+<rect x="110" y="122" width="20" height="20" fill="#f3ecdb"/>
+<text x="120" y="137" stroke="none" fill="#141414">M</text>
+</g>
+
+<g stroke="#141414" stroke-width="2.5">
+<circle cx="106" cy="160" r="6" fill="#5fe6d4"/>
+<circle cx="128" cy="170" r="5" fill="#f3ecdb"/>
+<circle cx="118" cy="150" r="4" fill="#5fe6d4"/>
+</g>
+
+<g stroke="#141414" stroke-width="3">
+<circle cx="46" cy="84" r="7" fill="#cc1f1f"/>
+<circle cx="196" cy="158" r="7" fill="#cc1f1f"/>
+<circle cx="200" cy="100" r="6" fill="#3fd6c2"/>
+<circle cx="42" cy="150" r="6" fill="#3fd6c2"/>
+</g>
+</svg></svg></div>
+      <div class="tee-meta">
+        <span class="tee-tag">GAME TEE</span>
+        <h3>STEM Hunt &amp; Connect</h3>
+        <p class="tee-line">&ldquo;Connect the dots, flex the smarts.&rdquo;</p>
+        <a class="tee-buy" href="https://tims-store-12362.myshopify.com/collections/all" target="_blank" rel="noopener">Coming soon · shop store ↗</a>
+      </div>
+    </article>
+    <article class="tee-card" id="falling-word-hunt">
+      <div class="tee-wrap"><svg class="tee" viewBox="0 0 300 332" xmlns="http://www.w3.org/2000/svg" role="img"><defs><linearGradient id="tg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#f3eee2"/></linearGradient></defs><path d="M150 30 C170 30 185 36 198 46 L262 70 L292 128 L246 152 L232 132 L232 298 Q232 312 218 312 L82 312 Q68 312 68 298 L68 132 L54 152 L8 128 L38 70 L102 46 C115 36 130 30 150 30 Z" fill="url(#tg)" stroke="#d9ccae" stroke-width="2.5" stroke-linejoin="round"/><path d="M118 33 Q150 63 182 33 Q150 49 118 33 Z" fill="#efe7d2" stroke="#d9ccae" stroke-width="2"/><path d="M120 35 Q150 60 180 35" fill="none" stroke="#cdbf9f" stroke-width="2.5" opacity="0.7"/><svg x="78" y="96" width="144" height="144" viewBox="0 0 240 240" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+<g stroke="#9aa6b2" stroke-width="3" stroke-linecap="round">
+<line x1="58" y1="16" x2="58" y2="34"/>
+<line x1="120" y1="12" x2="120" y2="32"/>
+<line x1="182" y1="18" x2="182" y2="36"/>
+<line x1="90" y1="40" x2="90" y2="56"/>
+<line x1="152" y1="44" x2="152" y2="60"/>
+</g>
+<g stroke="#141414" stroke-width="4" stroke-linejoin="round">
+<rect x="44" y="38" width="30" height="30" fill="#cc1f1f"/>
+<rect x="106" y="34" width="30" height="30" fill="#f2b705"/>
+<rect x="168" y="42" width="30" height="30" fill="#3a86c8"/>
+<rect x="76" y="74" width="30" height="30" fill="#5aa84b"/>
+<rect x="138" y="78" width="30" height="30" fill="#cc1f1f"/>
+</g>
+<g font-family="monospace" font-size="22" font-weight="bold" text-anchor="middle">
+<text x="59" y="61" fill="#f3ecdb">W</text>
+<text x="121" y="57" fill="#141414">O</text>
+<text x="183" y="65" fill="#f3ecdb">R</text>
+<text x="91" y="97" fill="#f3ecdb">D</text>
+<text x="153" y="101" fill="#f3ecdb">S</text>
+</g>
+<rect x="34" y="116" width="172" height="16" fill="#141414" stroke="#141414" stroke-width="4" stroke-linejoin="round"/>
+<rect x="38" y="120" width="164" height="6" fill="#f2b705"/>
+<polygon points="40,130 200,130 188,198 52,198" fill="#cc1f1f" stroke="#141414" stroke-width="5" stroke-linejoin="round"/>
+<polygon points="44,132 196,132 191,150 49,150" fill="#e24a4a"/>
+<g stroke="#9a1616" stroke-width="4">
+<line x1="62" y1="150" x2="68" y2="196"/>
+<line x1="86" y1="150" x2="90" y2="196"/>
+<line x1="110" y1="150" x2="112" y2="196"/>
+<line x1="134" y1="150" x2="134" y2="196"/>
+<line x1="158" y1="150" x2="156" y2="196"/>
+<line x1="182" y1="150" x2="178" y2="196"/>
+</g>
+<g stroke="#141414" stroke-width="4" stroke-linejoin="round">
+<rect x="86" y="96" width="26" height="26" fill="#7b5cc2"/>
+<rect x="128" y="98" width="26" height="26" fill="#f2b705"/>
+</g>
+<g font-family="monospace" font-size="18" font-weight="bold" text-anchor="middle">
+<text x="99" y="116" fill="#f3ecdb">A</text>
+<text x="141" y="118" fill="#141414">!</text>
+</g>
+<g stroke="#5aa84b" stroke-width="3" stroke-linecap="round">
+<line x1="30" y1="158" x2="20" y2="158"/>
+<line x1="210" y1="164" x2="220" y2="164"/>
+<line x1="30" y1="176" x2="22" y2="176"/>
+<line x1="210" y1="180" x2="218" y2="180"/>
+</g>
+<polygon points="120,204 124,213 134,213 126,219 129,229 120,223 111,229 114,219 106,213 116,213" fill="#f2b705" stroke="#141414" stroke-width="2.5" stroke-linejoin="round"/>
+</svg></svg></div>
+      <div class="tee-meta">
+        <span class="tee-tag">GAME TEE</span>
+        <h3>Falling Word Hunt</h3>
+        <p class="tee-line">&ldquo;Catch the words. Hoard the alphabet.&rdquo;</p>
+        <a class="tee-buy" href="https://tims-store-12362.myshopify.com/collections/all" target="_blank" rel="noopener">Coming soon · shop store ↗</a>
+      </div>
+    </article>
+    <article class="tee-card" id="shameless-game">
+      <div class="tee-wrap"><svg class="tee" viewBox="0 0 300 332" xmlns="http://www.w3.org/2000/svg" role="img"><defs><linearGradient id="tg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#f3eee2"/></linearGradient></defs><path d="M150 30 C170 30 185 36 198 46 L262 70 L292 128 L246 152 L232 132 L232 298 Q232 312 218 312 L82 312 Q68 312 68 298 L68 132 L54 152 L8 128 L38 70 L102 46 C115 36 130 30 150 30 Z" fill="url(#tg)" stroke="#d9ccae" stroke-width="2.5" stroke-linejoin="round"/><path d="M118 33 Q150 63 182 33 Q150 49 118 33 Z" fill="#efe7d2" stroke="#d9ccae" stroke-width="2"/><path d="M120 35 Q150 60 180 35" fill="none" stroke="#cdbf9f" stroke-width="2.5" opacity="0.7"/><svg x="78" y="96" width="144" height="144" viewBox="0 0 240 240" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+<g stroke="#141414" stroke-width="4" stroke-linejoin="round">
+<g transform="rotate(-22 120 150)">
+<rect x="44" y="58" width="60" height="92" fill="#f3ecdb"/>
+<rect x="52" y="66" width="44" height="76" fill="#cc1f1f"/>
+<rect x="62" y="78" width="24" height="52" fill="#f3ecdb" stroke-width="0"/>
+<rect x="68" y="78" width="12" height="20" fill="#141414" stroke-width="0"/>
+<polygon points="62,98 86,98 74,130" fill="#141414" stroke-width="0"/>
+<rect x="70" y="124" width="8" height="10" fill="#141414" stroke-width="0"/>
+</g>
+<g transform="rotate(-7 120 150)">
+<rect x="78" y="48" width="60" height="100" fill="#f3ecdb"/>
+<rect x="86" y="56" width="44" height="84" fill="#141414"/>
+<rect x="92" y="62" width="6" height="6" fill="#f3ecdb" stroke-width="0"/>
+<rect x="118" y="128" width="6" height="6" fill="#f3ecdb" stroke-width="0"/>
+<rect x="96" y="74" width="24" height="22" rx="3" fill="#f3ecdb" stroke="#141414" stroke-width="3"/>
+<rect x="100" y="80" width="6" height="7" fill="#141414" stroke-width="0"/>
+<rect x="110" y="80" width="6" height="7" fill="#141414" stroke-width="0"/>
+<rect x="96" y="98" width="24" height="10" rx="3" fill="#f3ecdb" stroke="#141414" stroke-width="3"/>
+<rect x="103" y="100" width="3" height="6" fill="#141414" stroke-width="0"/>
+<rect x="110" y="100" width="3" height="6" fill="#141414" stroke-width="0"/>
+<polygon points="108,112 118,124 98,124" fill="#cc1f1f" stroke-width="0"/>
+</g>
+<g transform="rotate(9 120 150)">
+<rect x="112" y="50" width="60" height="100" fill="#f3ecdb"/>
+<rect x="120" y="58" width="44" height="84" fill="#cc1f1f"/>
+<rect x="129" y="68" width="26" height="20" fill="#f3ecdb" stroke="#141414" stroke-width="3"/>
+<rect x="134" y="74" width="6" height="8" fill="#141414" stroke-width="0"/>
+<rect x="148" y="76" width="3" height="6" fill="#141414" stroke-width="0"/>
+<rect x="130" y="74" width="9" height="4" fill="#141414" stroke-width="0"/>
+<polygon points="142,96 154,118 130,118 130,108 136,108 136,102 142,102" fill="#f3ecdb" stroke-width="0"/>
+<polygon points="142,118 138,130 146,130" fill="#f3ecdb" stroke-width="0"/>
+</g>
+<g transform="rotate(26 122 152)">
+<rect x="146" y="58" width="58" height="92" fill="#f3ecdb"/>
+<rect x="154" y="66" width="42" height="76" fill="#141414"/>
+<polygon points="175,76 187,92 175,108 163,92" fill="#cc1f1f" stroke-width="0"/>
+<polygon points="175,114 183,126 167,126" fill="#cc1f1f" stroke-width="0"/>
+<rect x="160" y="72" width="6" height="6" fill="#f3ecdb" stroke-width="0"/>
+<rect x="184" y="130" width="6" height="6" fill="#f3ecdb" stroke-width="0"/>
+</g>
+</g>
+<g stroke="#141414" stroke-width="4" stroke-linejoin="round">
+<rect x="78" y="150" width="84" height="22" fill="#cc1f1f"/>
+<rect x="78" y="150" width="84" height="22" fill="none"/>
+</g>
+<g fill="#f3ecdb" stroke="none">
+<rect x="84" y="156" width="4" height="10"/>
+<rect x="88" y="160" width="4" height="6"/>
+<rect x="92" y="156" width="4" height="10"/>
+<rect x="100" y="156" width="4" height="10"/>
+<rect x="104" y="156" width="8" height="4"/>
+<rect x="100" y="160" width="8" height="2"/>
+<rect x="104" y="162" width="8" height="4"/>
+<rect x="116" y="156" width="4" height="10"/>
+<rect x="120" y="156" width="8" height="4"/>
+<rect x="124" y="160" width="4" height="6"/>
+<rect x="132" y="156" width="4" height="10"/>
+<rect x="136" y="156" width="6" height="4"/>
+<rect x="136" y="160" width="4" height="2"/>
+<rect x="146" y="156" width="4" height="10"/>
+<rect x="150" y="156" width="8" height="4"/>
+<rect x="154" y="160" width="4" height="2"/>
+<rect x="150" y="162" width="8" height="4"/>
+</g>
+<g stroke="#141414" stroke-width="3" stroke-linejoin="round">
+<polygon points="40,40 50,44 46,54 36,50" fill="#cc1f1f"/>
+<polygon points="196,44 206,40 210,50 200,54" fill="#141414"/>
+<rect x="204" y="158" width="9" height="9" fill="#cc1f1f"/>
+<rect x="28" y="150" width="9" height="9" fill="#141414"/>
+</g>
+</svg></svg></div>
+      <div class="tee-meta">
+        <span class="tee-tag">GAME TEE</span>
+        <h3>Shameless</h3>
+        <p class="tee-line">&ldquo;Bend every rule. Blink twice.&rdquo;</p>
+        <a class="tee-buy" href="https://tims-store-12362.myshopify.com/collections/all" target="_blank" rel="noopener">Coming soon · shop store ↗</a>
+      </div>
+    </article>
+    </div>
+    <p class="note">Mockups for preview. The <b>Elder Quest</b> tee is live in the store now &mdash; the rest are drafts ready to publish. Want any of these added to the store? Just say the word.</p>
+  </main>
+
+  <footer>
+    <img class="studio-banner" src="assets/token-maxxers-banner.png" alt="Token Maxxer's Anonymous Game Studio">
+    <div class="foot-links">
+      <a href="https://tims-store-12362.myshopify.com/" target="_blank" rel="noopener">Shop the store ↗</a>
+      <a href="index.html">All games</a>
+      <a href="https://github.com/timothy8901/practice-games">Source on GitHub</a>
+    </div>
+    <p>&copy; 2026 Token Maxxer's Anonymous Game Studio &middot; built by Tim Howley</p>
+  </footer>
+</body>
+</html>
