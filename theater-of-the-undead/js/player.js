@@ -29,6 +29,7 @@ export class Player {
     this.meleeCd = 0;
     this.down = false; this.bleed = 0; this.dead = false;
     this.hurtFlash = 0;
+    this.meleeSwing = 0; this.recoil = 0;
     this.interactTarget = null;
     this.model.group.position.copy(this.pos);
   }
@@ -46,6 +47,12 @@ export class Player {
     if (id === 'quickrevive') this.qrUses = 3;
     if (G.audio) G.audio.perk();
     G.hud && G.hud.flash(PERKS[id].name + '!');
+    // perk pickup flourish in the perk's signature color
+    if (G.fx) {
+      const col = PERKS[id].color;
+      G.fx.ring(this.pos, col, { r0: 0.4, r1: 2.6, dur: 0.5 });
+      G.fx.burst(_v.set(this.pos.x, 1.4, this.pos.z), col, { count: 16, speed: 5, life: 0.6, size: 0.26, up: 3, gravity: -4, drag: 1 });
+    }
   }
 
   giveWeapon(id, papped) {
@@ -74,7 +81,8 @@ export class Player {
     if (G.godmode) return;
     this.hp -= amount; this.regenT = 0; this.hurtFlash = 1;
     if (G.audio) G.audio.hurt();
-    G.fx.shake(0.18);
+    // shake scales with how big the hit was relative to max hp
+    G.fx.shake(0.16 + Math.min(0.3, amount / this.maxHp * 0.7));
     if (this.hp <= 0) this.goDown();
   }
 
@@ -105,7 +113,10 @@ export class Player {
     _dir.set(aim.x, 0, aim.y);
     const kind = fireKind(def);
     if (G.audio) G.audio.shot(kind);
-    G.fx.muzzle(_v, 0xffe08a);
+    // weighty muzzle flash + per-weapon recoil kick. Heavier guns = bigger flash/shake.
+    const kick = kind === 'shotgun' ? 1.6 : kind === 'rifle' ? 1.2 : kind === 'launcher' ? 1.8 : kind === 'smg' ? 0.7 : 1;
+    G.fx.muzzle(_v, def.fire ? 0xff8a3a : 0xffe08a, { x: _dir.x, z: _dir.z }, kick);
+    if (kind !== 'cone') G.fx.shake(0.04 + kick * 0.05);
     const dmg = G.instakill ? 100000 : def.dmg;
 
     if (def.type === 'projectile' || def.type === 'launcher') {
@@ -129,6 +140,8 @@ export class Player {
     }
 
     if (def.mag) w.mag--;
+    // recoil kick scales with weapon weight (shotguns/launchers kick hardest)
+    this.recoil = Math.min(1, this.recoil + (kind === 'shotgun' || kind === 'launcher' ? 0.6 : kind === 'rifle' ? 0.35 : 0.22));
     let rof = def.rof || 4;
     if (this.perks.has('doubletap')) rof *= 1.33;
     this.fireCd = 1 / rof;
@@ -137,9 +150,12 @@ export class Player {
   melee() {
     if (this.meleeCd > 0) return;
     this.meleeCd = 0.5;
+    this.meleeSwing = 1; // drives the arm-swing pose
     if (G.audio) G.audio.knife();
     const aim = G.cam.aimDir;
     _v.set(this.pos.x, 1.0, this.pos.z);
+    // slash spark out in front so the swing reads even when it whiffs
+    if (G.fx) G.fx.spark(_dir.set(this.pos.x + aim.x * 1.4, 1.1, this.pos.z + aim.y * 1.4), 0xcfd6e0, 4);
     G.weapons.hitscan(_v, { x: aim.x, z: aim.y }, 2.0, G.instakill ? 100000 : 200, { penetrate: 2, headMul: 1 });
   }
 
@@ -163,6 +179,9 @@ export class Player {
     const I = input.intent;
     this.fireCd -= dt; this.meleeCd -= dt;
     if (this.hurtFlash > 0) this.hurtFlash = Math.max(0, this.hurtFlash - dt * 2);
+    if (this.meleeSwing > 0) this.meleeSwing = Math.max(0, this.meleeSwing - dt * 5);
+    // brief gun-kick recoil that eases back, set in fire()
+    if (this.recoil > 0) this.recoil = Math.max(0, this.recoil - dt * 9);
 
     // facing follows aim
     const aim = G.cam.resolveAim(input, this);
@@ -194,7 +213,7 @@ export class Player {
       this.pos.x = r.x; this.pos.z = r.z;
     }
     this.model.group.position.set(this.pos.x, 0, this.pos.z);
-    poseSurvivor(this.model, dt, moving, true);
+    poseSurvivor(this.model, dt, moving, true, this.recoil, this.meleeSwing);
 
     // actions
     if (I.switchWeapon && this.weapons.length > 1) { this.slot = (this.slot + 1) % this.weapons.length; this.reloadT = 0; if (G.audio) G.audio.ui(); }
@@ -231,6 +250,8 @@ export class Player {
     this.hp = this.maxHp = MAX_HP; this.points = 500; this.perks.clear(); this.qrUses = 0;
     this.weapons = [makeWeapon('m1911')]; this.slot = 0;
     this.grenades = 4; this.tacticals = 0; this.down = false; this.dead = false;
+    this.hurtFlash = 0; this.meleeSwing = 0; this.recoil = 0;
     this.model.group.position.copy(this.pos); this.model.group.position.y = 0;
+    this.model.group.rotation.z = 0;
   }
 }

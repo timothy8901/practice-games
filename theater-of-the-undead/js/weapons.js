@@ -66,7 +66,14 @@ export class Weapons {
       if (n >= penetrate) break;
       const headshot = h.head;
       h.z.damage(headshot ? dmg * headMul : dmg, { headshot, source: G.player });
-      G.fx.blood(h.z.center());
+      if (headshot) {
+        // crunchier headshot: extra blood toward the head + a sharp spark
+        const c = h.z.center(); c.y = 1.6;
+        G.fx.blood(c, 8);
+        G.fx.spark(c, 0xff5a4a, 4);
+      } else {
+        G.fx.blood(h.z.center());
+      }
       n++;
     }
     return n > 0;

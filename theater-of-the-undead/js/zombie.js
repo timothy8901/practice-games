@@ -70,6 +70,9 @@ export class ZombieManager {
       z.state = 'approach';
     }
     z.model.group.position.copy(z.pos);
+    z.model.group.rotation.z = 0;
+    // spawn telegraph: a low dust/ground puff so the player can read the arrival point
+    if (G.fx) G.fx.burst(_t.set(z.pos.x, 0.2, z.pos.z), isDog ? 0x3a2a22 : 0x2a3a2a, { count: 6, speed: 2.5, life: 0.4, size: 0.3, up: 0.6, gravity: -2, drag: 2 });
     this.alive.push(z);
     return z;
   }
@@ -77,9 +80,13 @@ export class ZombieManager {
   kill(z, opts = {}) {
     if (z.dying) return;
     z.dying = true; z.dieT = 0.6; z.state = 'dead';
+    z.dieDir = Math.random() < 0.5 ? -1 : 1;
+    z.dieSpin = (Math.random() - 0.5) * 1.2;
     const pts = z.isDog ? PTS.dogKill : (opts.melee ? PTS.meleeKill : opts.headshot ? PTS.headshotKill : PTS.kill);
     if (G.player) G.player.addPoints(pts, opts.headshot);
     G.fx.gib(z.center());
+    // floating points popup at the kill so the reward reads clearly
+    if (G.hud && G.player) G.hud.popPoints(z.center(), pts * (G.doublePoints ? 2 : 1), opts.headshot);
     if (G.audio) G.audio.zdeath();
     if (!z.isDog && Math.random() < DROP_CHANCE && G.powerups) G.powerups.dropRandom(z.center());
     if (z.isDog && Math.random() < 0.4 && G.powerups) G.powerups.drop(z.center(), 'maxammo');
@@ -89,7 +96,8 @@ export class ZombieManager {
   killAll(give = true) {
     for (const z of this.alive.slice()) if (!z.dying) {
       if (give && G.player) G.player.addPoints(PTS.kill);
-      z.dying = true; z.dieT = 0.3; G.fx.gib(z.center());
+      z.dying = true; z.dieT = 0.3; z.dieDir = Math.random() < 0.5 ? -1 : 1; z.dieSpin = (Math.random() - 0.5) * 1.2;
+      G.fx.gib(z.center());
       if (this.onKill) this.onKill(z);
     }
   }
@@ -117,9 +125,18 @@ export class ZombieManager {
       if (z.dying) {
         z.dieT -= dt;
         const s = Math.max(0.001, z.dieT / 0.6);
-        z.model.group.scale.setScalar(s * (z.isDog ? 1 : 1));
-        z.model.group.position.y = -(1 - s) * 0.5;
-        if (z.dieT <= 0) { z.active = false; z.model.group.visible = false; z.model.group.position.y = 0; z.model.group.scale.setScalar(1); this.alive.splice(k, 1); }
+        const f = 1 - s; // 0 -> 1 over the death
+        // ragdoll-lite: topple over + a little spin + slight backward slide as it sinks
+        z.model.group.rotation.z = (z.dieDir || 1) * f * (Math.PI * 0.55);
+        z.model.group.rotation.y = z.yaw + (z.dieSpin || 0) * f;
+        z.model.group.scale.setScalar(0.6 + s * 0.4);
+        z.model.group.position.y = -(1 - s) * 0.7;
+        if (z.dieT <= 0) {
+          z.active = false; z.model.group.visible = false;
+          z.model.group.position.y = 0; z.model.group.scale.setScalar(1);
+          z.model.group.rotation.z = 0;
+          this.alive.splice(k, 1);
+        }
         continue;
       }
 

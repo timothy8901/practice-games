@@ -43,12 +43,51 @@ export class World {
 
   dispose() { this.scene.remove(this.group); }
 
+  // animate flickering lights + prop glows; called each frame from main loop
+  update(dt, time) {
+    if (this.flickers) {
+      for (const f of this.flickers) {
+        f.phase += dt * f.spd;
+        // layered sine flicker + occasional brown-out dropout
+        let v = f.base + Math.sin(f.phase) * f.amt * 0.4 + Math.sin(f.phase * 2.3) * f.amt * 0.25;
+        if (Math.random() < f.fail * dt * 60) v *= 0.25;
+        f.light.intensity = Math.max(0.05, v);
+      }
+    }
+    // pack-a-punch glow pulses once linked
+    if (this.papMesh && this._papLit) {
+      const pulse = 0.55 + Math.sin(time * 4) * 0.45;
+      this.papMesh.glow.material.color.setRGB(0.12 + pulse * 0.3, 0.8 * (0.5 + pulse * 0.5), 0.12 + pulse * 0.2);
+    }
+  }
+
   build() {
-    // lights — flat, even, no shadows (in group so dispose() removes them)
-    this.group.add(new THREE.HemisphereLight(0xb0b0c4, 0x2a2a32, 1.45));
-    const sun = new THREE.DirectionalLight(0xfff2e0, 0.7);
+    // lights — flat, no shadows (in group so dispose() removes them).
+    // Moodier theater: cooler dim ambient/hemi, warm key "stage" light + cold rim.
+    this.group.add(new THREE.HemisphereLight(0x8c8ca8, 0x1c1c26, 1.15));
+    const sun = new THREE.DirectionalLight(0xffe6c2, 0.62);
     sun.position.set(8, 22, 6); this.group.add(sun);
-    this.group.add(new THREE.AmbientLight(0x404048, 0.6));
+    // cold backlight for rim separation on models against the dark
+    const rim = new THREE.DirectionalLight(0x5a6cff, 0.28);
+    rim.position.set(-10, 14, -16); this.group.add(rim);
+    this.group.add(new THREE.AmbientLight(0x2c2c3a, 0.55));
+
+    // flickering point lights — a stage spot + scattered failing bulbs.
+    // PointLights are cheap here (no shadows) and sell the creepy mood.
+    this.flickers = [];
+    const stageSpot = new THREE.PointLight(0xffd9a0, 1.1, 26, 1.4);
+    stageSpot.position.set(0, 5.2, 4);
+    this.group.add(stageSpot);
+    this.flickers.push({ light: stageSpot, base: 1.1, amt: 0.28, spd: 7, phase: 0, fail: 0.04 });
+    const bulbSpots = [
+      [-17, 7], [17, 7], [0, 24], [16, -10], [0, 40], [-6, 18],
+    ];
+    for (const [x, z] of bulbSpots) {
+      const l = new THREE.PointLight(0xc9b894, 0.7, 16, 1.6);
+      l.position.set(x, 3.6, z);
+      this.group.add(l);
+      this.flickers.push({ light: l, base: 0.7, amt: 0.4, spd: 4 + Math.random() * 6, phase: Math.random() * 6, fail: 0.08 });
+    }
 
     // outside ground (so approaching zombies have a floor; fog hides the edge)
     const b = MAP.bounds;
@@ -253,5 +292,6 @@ export class World {
   setPapLinked() {
     if (this.papMesh) this.papMesh.glow.material.color.set(0x6cff5a);
     if (this.telePad) this.telePad.material.color.set(0x6cff5a);
+    this._papLit = true;
   }
 }

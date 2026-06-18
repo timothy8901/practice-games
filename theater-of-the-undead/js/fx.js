@@ -71,6 +71,19 @@ export class FX {
       this.bolts.push({ mesh, arr, t: 1, dur: 1, paths: [], c: new THREE.Color() });
     }
 
+    // muzzle flash sprites (additive billboard quads) + a shared flash light
+    this.flashes = [];
+    const flashGeo = new THREE.PlaneGeometry(1, 1);
+    const flashTex = squareTex();
+    for (let i = 0; i < 6; i++) {
+      const m = new THREE.Mesh(flashGeo, new THREE.MeshBasicMaterial({ color: 0xffe08a, map: flashTex, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, side: THREE.DoubleSide }));
+      m.visible = false; m.renderOrder = 33; scene.add(m);
+      this.flashes.push({ mesh: m, t: 1, dur: 0.06 });
+    }
+    this.flashLight = new THREE.PointLight(0xffd9a0, 0, 9, 2);
+    this.flashLight.visible = false; scene.add(this.flashLight);
+    this._flashLightT = 0;
+
     // expanding rings (power-up pickups, nuke)
     this.rings = [];
     const ringGeo = new THREE.RingGeometry(0.9, 1.0, 32);
@@ -114,7 +127,25 @@ export class FX {
   }
   splinter(p) { this.burst(p, 0x6e5c42, { count: 8, speed: 4, life: 0.5, size: 0.22, up: 2, gravity: -16, drag: 1 }); }
   spark(p, color = 0xffd23f, n = 6) { this.burst(p, color, { count: n, speed: 8, life: 0.25, size: 0.16, up: 1, gravity: -20, drag: 0.6 }); }
-  muzzle(p, color = 0xffe08a) { this.burst(p, color, { count: 4, speed: 3, life: 0.1, size: 0.3, up: 0.2, gravity: 0, drag: 6 }); }
+  muzzle(p, color = 0xffe08a, dir = null, scale = 1) {
+    // tiny smoke/spark puff
+    this.burst(p, color, { count: 4, speed: 3, life: 0.1, size: 0.3 * scale, up: 0.2, gravity: 0, drag: 6 });
+    // additive flash quad oriented to the shot, plus a brief light flick
+    const slot = this.flashes.find((f) => f.t >= f.dur) || this.flashes[0];
+    slot.t = 0; slot.dur = 0.055;
+    const m = slot.mesh;
+    m.material.color.set(color);
+    const sz = (0.9 + Math.random() * 0.5) * scale;
+    m.scale.set(sz, sz, sz);
+    m.position.set(p.x, p.y, p.z);
+    if (dir) { m.rotation.set(0, Math.atan2(dir.x, dir.z), Math.random() * Math.PI); }
+    else m.rotation.set(0, 0, Math.random() * Math.PI);
+    m.material.opacity = 0.95; m.visible = true;
+    this.flashLight.color.set(color);
+    this.flashLight.position.set(p.x, p.y, p.z);
+    this.flashLight.intensity = 1.2 * scale; this.flashLight.visible = true;
+    this._flashLightT = 0.05;
+  }
 
   bolts(p, color = 0x9fdcff, { count = 5, radius = 3, dur = 0.26 } = {}) {
     const slot = this.bolts.find((b) => b.t >= b.dur) || this.bolts[0];
@@ -202,12 +233,28 @@ export class FX {
       r.mesh.material.opacity = r.op * (1 - k);
       r.mesh.visible = true;
     }
+
+    // muzzle flash quads decay fast
+    for (const f of this.flashes) {
+      if (f.t >= f.dur) { if (f.mesh.visible) f.mesh.visible = false; continue; }
+      f.t += dt;
+      const k = Math.min(1, f.t / f.dur);
+      f.mesh.material.opacity = (1 - k) * 0.95;
+      f.mesh.visible = true;
+    }
+    if (this._flashLightT > 0) {
+      this._flashLightT -= dt;
+      this.flashLight.intensity *= Math.max(0, 1 - dt * 22);
+      if (this._flashLightT <= 0) { this.flashLight.visible = false; this.flashLight.intensity = 0; }
+    }
   }
 
   clear() {
     this.life.fill(0); this.alpha.fill(0);
     for (const b of this.bolts) { b.t = b.dur; b.mesh.visible = false; }
     for (const r of this.rings) { r.t = r.dur; r.mesh.visible = false; }
+    for (const f of this.flashes) { f.t = f.dur; f.mesh.visible = false; }
+    this.flashLight.visible = false; this.flashLight.intensity = 0; this._flashLightT = 0;
     this.trauma = 0;
   }
 }

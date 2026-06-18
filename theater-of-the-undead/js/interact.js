@@ -24,8 +24,11 @@ export class Interact {
           door.open = true;
           MAP.rooms[door.a].open = true; MAP.rooms[door.b].open = true;
           G.world.openDoor(door.id); G.nav.rebuild();
-          if (G.audio) G.audio.purchase();
+          if (G.audio) { G.audio.purchase(); G.audio.boardBreak(); }
           G.hud && G.hud.flash('AREA OPENED');
+          // boards burst as the door is torn open
+          const dm = this._mid(door.rect); dm.y = 1.2;
+          if (G.fx) { G.fx.splinter(dm); G.fx.splinter(dm); G.fx.shake(0.18); }
         },
       });
     }
@@ -71,7 +74,13 @@ export class Interact {
     this.items.push({
       pos: new THREE.Vector3(MAP.power.at[0], 0, MAP.power.at[1]), range: 2.4,
       prompt: () => G.powerOn ? null : '[F] TURN ON POWER',
-      action: () => { if (G.powerOn) return; G.powerOn = true; G.world.setPowerOn(); if (G.audio) G.audio.power(); G.hud && G.hud.flash('POWER ON'); },
+      action: () => {
+        if (G.powerOn) return; G.powerOn = true; G.world.setPowerOn();
+        if (G.audio) G.audio.power(); G.hud && G.hud.flash('POWER ON');
+        // power surge flourish at the lever
+        const lp = new THREE.Vector3(MAP.power.at[0], 0.4, MAP.power.at[1]);
+        if (G.fx) { G.fx.bolts(lp, 0x9fdcff, { count: 6, radius: 3, dur: 0.5 }); G.fx.ring(lp, 0x9fdcff, { r0: 0.4, r1: 4, dur: 0.6 }); G.fx.shake(0.25); }
+      },
     });
     // teleporter mainframe (link -> enables PaP; once linked -> teleport back)
     this.items.push({
@@ -101,9 +110,19 @@ export class Interact {
       action: () => {
         const w = P().weapon();
         if (!G.papLinked || !w.def.pap) return;
+        let upgraded = false;
         if (w.papped) { if (!P().spend(2500)) return; const f = makeWeapon(w.id, true); w.reserve = f.reserve; w.mag = w.def.mag; }
-        else { if (!P().spend(PAP_COST)) return; const nw = makeWeapon(w.id, true); P().weapons[P().slot] = nw; }
-        if (G.audio) G.audio.purchase(); G.hud && G.hud.flash('WEAPON UPGRADED');
+        else { if (!P().spend(PAP_COST)) return; const nw = makeWeapon(w.id, true); P().weapons[P().slot] = nw; upgraded = true; }
+        if (G.audio) G.audio.purchase();
+        // PaP flourish: green energy burst, ring + shake at the machine
+        const pp = new THREE.Vector3(MAP.pap.at[0], 1.0, MAP.pap.at[1]);
+        if (G.fx) {
+          G.fx.burst(pp, 0x6cff5a, { count: 22, speed: 7, life: 0.7, size: 0.3, up: 4, gravity: -4, drag: 1 });
+          G.fx.ring(pp, 0x6cff5a, { r0: 0.4, r1: 3.2, dur: 0.6 });
+          G.fx.bolts(pp, 0x9fff9f, { count: 5, radius: 2.2, dur: 0.4 });
+          G.fx.shake(0.25);
+        }
+        G.hud && G.hud.flash(upgraded ? 'WEAPON UPGRADED' : 'AMMO RESTOCKED');
       },
     });
     // traps

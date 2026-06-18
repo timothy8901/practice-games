@@ -42,15 +42,19 @@ export function buildSurvivor(def) {
   return { group: g, parts: { legL, legR, armL, armR, torso, head, gun, muzzle }, phase: 0 };
 }
 
-export function poseSurvivor(s, dt, moving, aiming) {
+export function poseSurvivor(s, dt, moving, aiming, recoil = 0, meleeSwing = 0) {
   s.phase += dt * (moving ? 9 : 2);
   const sw = Math.sin(s.phase) * 0.7 * (moving ? 1 : 0.12);
   const p = s.parts;
   p.legL.rotation.x = sw; p.legR.rotation.x = -sw;
   p.armL.rotation.x = -sw * 0.7;
-  // right arm points the gun forward when aiming
-  const target = aiming ? -1.45 : -sw * 0.7;
-  p.armR.rotation.x += (target - p.armR.rotation.x) * Math.min(1, dt * 18);
+  // right arm points the gun forward when aiming; recoil snaps it up, melee jabs it out
+  let target = aiming ? -1.45 : -sw * 0.7;
+  if (meleeSwing > 0) target = -1.45 - meleeSwing * 0.9;       // forward jab
+  else target += recoil * 0.45;                                // muzzle climb
+  p.armR.rotation.x += (target - p.armR.rotation.x) * Math.min(1, dt * 24);
+  // gun nudges back along its barrel on recoil for a touch of kick
+  if (p.gun) p.gun.position.z = 0.12 - recoil * 0.12;
 }
 
 // ---- zombie (own materials so we can flash on hit) ----
@@ -64,6 +68,11 @@ export function buildZombie() {
 
   const torso = new THREE.Mesh(box('torso', 0.58, 0.62, 0.32), clothMat); torso.position.y = 1.18; g.add(torso);
   const head = new THREE.Mesh(box('zhead', 0.32, 0.34, 0.32), skinMat); head.position.set(0, 1.6, 0.02); head.rotation.z = 0.12; g.add(head);
+  // faintly glowing dead eyes for atmosphere (own material, kept dim).
+  // children of head -> positions are local to the head's center.
+  const zeyeMat = new THREE.MeshBasicMaterial({ color: 0x7a3022, fog: false });
+  const eL = new THREE.Mesh(box('zeye', 0.06, 0.05, 0.03), zeyeMat); eL.position.set(-0.08, 0.02, 0.17); head.add(eL);
+  const eR = new THREE.Mesh(box('zeye', 0.06, 0.05, 0.03), zeyeMat); eR.position.set(0.08, 0.02, 0.17); head.add(eR);
 
   const mkLeg = (x) => {
     const leg = new THREE.Group(); leg.position.set(x, 0.9, 0);
@@ -99,6 +108,7 @@ export function buildDog() {
   const fur = new THREE.MeshLambertMaterial({ color: 0x2a2622 });
   const eye = new THREE.MeshBasicMaterial({ color: 0xff5a2a, fog: false });
   const flash = [fur];
+  const eyeMat = eye;
 
   const body = new THREE.Mesh(box('dbody', 0.4, 0.4, 0.9), fur); body.position.y = 0.5; g.add(body);
   const head = new THREE.Mesh(box('dhead', 0.34, 0.34, 0.34), fur); head.position.set(0, 0.6, 0.6); g.add(head);
@@ -114,7 +124,7 @@ export function buildDog() {
   };
   const lFL = mkLeg(-0.15, 0.32), lFR = mkLeg(0.15, 0.32), lBL = mkLeg(-0.15, -0.32), lBR = mkLeg(0.15, -0.32);
 
-  return { group: g, parts: { lFL, lFR, lBL, lBR }, flash, phase: Math.random() * 6 };
+  return { group: g, parts: { lFL, lFR, lBL, lBR }, flash, eyeMat, phase: Math.random() * 6 };
 }
 
 export function poseDog(d, dt, speed) {
@@ -123,4 +133,6 @@ export function poseDog(d, dt, speed) {
   const p = d.parts;
   p.lFL.rotation.x = sw; p.lBR.rotation.x = sw;
   p.lFR.rotation.x = -sw; p.lBL.rotation.x = -sw;
+  // menacing eye flicker — telegraphs the fast threat
+  if (d.eyeMat) { const f = 0.6 + Math.abs(Math.sin(d.phase * 1.7)) * 0.5; d.eyeMat.color.setRGB(f, f * 0.28, f * 0.12); }
 }

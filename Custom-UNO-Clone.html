@@ -7,258 +7,460 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --c-red: #e3342f;
+            --c-red-d: #a91d18;
+            --c-blue: #2563eb;
+            --c-blue-d: #1741a6;
+            --c-green: #16a34a;
+            --c-green-d: #0c6b30;
+            --c-yellow: #f5b301;
+            --c-yellow-d: #b88600;
+            --felt: #0b6e3b;
+            --felt-d: #074a27;
+        }
+        * { box-sizing: border-box; }
+        html, body { height: 100%; }
         body {
             font-family: 'Inter', sans-serif;
+            margin: 0;
+            color: #f8fafc;
+            overflow: hidden;
+            background:
+                radial-gradient(ellipse at 50% 38%, #128a4c 0%, var(--felt) 45%, var(--felt-d) 100%);
+        }
+        body::before {
+            /* subtle felt texture */
+            content: '';
+            position: fixed; inset: 0; pointer-events: none; z-index: 0;
             background-image:
-                radial-gradient(circle at center, rgba(0,0,0,0.05) 5%, transparent 5.5%),
-                radial-gradient(circle at center, rgba(0,0,0,0.05) 5%, transparent 5.5%);
-            background-size: 1em 1em;
-            background-color: #f5f3e6; /* Off-white comic paper color */
+                radial-gradient(rgba(255,255,255,0.04) 1px, transparent 1.4px);
+            background-size: 6px 6px;
+            opacity: 0.6;
         }
-        .font-bangers {
-            font-family: 'Bangers', cursive;
-        }
+        .font-bangers { font-family: 'Bangers', cursive; letter-spacing: 1px; }
+
+        /* ---------------- CARD ---------------- */
         .card {
-            width: 80px;
-            height: 120px;
-            border: 3px solid #1f2937;
-            border-radius: 8px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            font-weight: bold;
-            font-size: 2rem;
-            cursor: pointer;
-            transition: all 0.2s ease-in-out;
-            box-shadow: 3px 3px 0px #1f2937;
+            width: 76px;
+            height: 112px;
+            border-radius: 11px;
             position: relative;
+            cursor: default;
             user-select: none;
+            flex: 0 0 auto;
+            background: #fff;
+            padding: 5px;
+            box-shadow: 0 4px 9px rgba(0,0,0,0.45);
+            transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
         }
-        .card.playable:hover {
-            transform: translateY(-10px) rotate(2deg);
-            box-shadow: 5px 15px 10px rgba(0,0,0,0.2);
+        .card .face {
+            position: absolute;
+            inset: 5px;
+            border-radius: 8px;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
+        .card .face::after {
+            /* glossy highlight sweep */
+            content: '';
+            position: absolute;
+            top: -40%; left: -30%;
+            width: 80%; height: 180%;
+            background: linear-gradient(115deg, rgba(255,255,255,0.45), rgba(255,255,255,0) 60%);
+            transform: rotate(18deg);
+            pointer-events: none;
+        }
+        .card .oval {
+            position: absolute;
+            top: 50%; left: 50%;
+            width: 84px; height: 56px;
+            transform: translate(-50%,-50%) rotate(-32deg);
+            background: #fff;
+            border-radius: 50%;
+            box-shadow: inset 0 0 0 2px rgba(0,0,0,0.05);
+        }
+        .card .center {
+            position: relative;
+            z-index: 2;
+            font-family: 'Bangers', cursive;
+            font-size: 2.6rem;
+            line-height: 1;
+            text-shadow: 1.5px 1.5px 0 rgba(0,0,0,0.18);
+        }
+        .card .center.sym { font-size: 1.9rem; }
         .card .corner {
             position: absolute;
-            font-size: 1rem;
-            font-weight: bold;
+            z-index: 3;
+            font-family: 'Bangers', cursive;
+            font-size: 1.05rem;
+            line-height: 1;
+            color: #fff;
+            text-shadow: 1px 1px 0 rgba(0,0,0,0.35);
         }
-        .card .top-left { top: 5px; left: 8px; }
-        .card .bottom-right { bottom: 5px; right: 8px; transform: rotate(180deg); }
-        .card-back {
-            background-color: #1f2937;
-            color: #facc15;
-            font-size: 1.5rem;
+        .card .corner.tl { top: 8px; left: 9px; }
+        .card .corner.br { bottom: 8px; right: 9px; transform: rotate(180deg); }
+
+        .card-red   .face { background: var(--c-red); }   .card-red   .center { color: var(--c-red); }
+        .card-blue  .face { background: var(--c-blue); }  .card-blue  .center { color: var(--c-blue); }
+        .card-green .face { background: var(--c-green); } .card-green .center { color: var(--c-green); }
+        .card-yellow .face { background: var(--c-yellow); } .card-yellow .center { color: var(--c-yellow-d); }
+        .card-wild .face {
+            background:
+                conic-gradient(var(--c-red) 0deg 90deg, var(--c-blue) 90deg 180deg,
+                               var(--c-yellow) 180deg 270deg, var(--c-green) 270deg 360deg);
         }
-        .card-back .inner-border {
-            width: 90%;
-            height: 90%;
-            border: 3px solid #facc15;
-            border-radius: 4px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
+        .card-wild .center { color: #1f2937; }
+        .card-wild .oval { background: rgba(255,255,255,0.92); }
+
+        /* card back */
+        .card-back .face {
+            background: radial-gradient(circle at 50% 38%, #1e293b 0%, #0f172a 100%);
         }
-        .bg-card-red { background-color: #ef4444; color: white; }
-        .bg-card-blue { background-color: #3b82f6; color: white; }
-        .bg-card-green { background-color: #22c55e; color: white; }
-        .bg-card-yellow { background-color: #eab308; color: white; }
-        .bg-card-wild { background: linear-gradient(135deg, #ef4444 25%, #3b82f6 25%, #3b82f6 50%, #22c55e 50%, #22c55e 75%, #eab308 75%); color: white; }
-        
+        .card-back .oval {
+            background:
+                conic-gradient(var(--c-red) 0deg 90deg, var(--c-blue) 90deg 180deg,
+                               var(--c-yellow) 180deg 270deg, var(--c-green) 270deg 360deg);
+            box-shadow: 0 0 0 3px #0f172a, inset 0 0 0 3px rgba(255,255,255,0.15);
+        }
+        .card-back .center { color: #facc15; font-size: 1.05rem; letter-spacing: 0.5px; }
+
+        /* playable / dim */
+        .card.playable { cursor: pointer; }
+        .card.playable {
+            animation: cardGlow 1.6s ease-in-out infinite;
+        }
+        @keyframes cardGlow {
+            0%,100% { box-shadow: 0 4px 9px rgba(0,0,0,0.45), 0 0 0 0 rgba(250,204,21,0.0); }
+            50% { box-shadow: 0 6px 14px rgba(0,0,0,0.45), 0 0 16px 3px rgba(250,204,21,0.75); }
+        }
+        .card.playable:hover {
+            transform: translateY(-22px) scale(1.06);
+            box-shadow: 0 18px 24px rgba(0,0,0,0.4), 0 0 18px 4px rgba(250,204,21,0.8);
+            z-index: 20;
+        }
+        .card.dim { filter: brightness(0.6) saturate(0.6); }
+
+        /* deal/play animations */
+        @keyframes dealIn {
+            0% { transform: translate(var(--dx,0), var(--dy,-220px)) scale(0.6) rotate(-12deg); opacity: 0; }
+            100% { transform: none; opacity: 1; }
+        }
+        .card.dealing { animation: dealIn 0.4s cubic-bezier(.2,.7,.3,1) both; }
+
+        .fly-card {
+            position: fixed;
+            z-index: 200;
+            pointer-events: none;
+            transition: transform 0.45s cubic-bezier(.3,.7,.3,1), opacity 0.45s ease;
+        }
+
+        @keyframes colorFlash {
+            0% { box-shadow: 0 0 0 0 var(--flash, #fff); }
+            40% { box-shadow: 0 0 40px 16px var(--flash, #fff); }
+            100% { box-shadow: 0 4px 9px rgba(0,0,0,0.45); }
+        }
+        .card.flash { animation: colorFlash 0.8s ease-out; }
+
+        /* ---------------- HANDS / LAYOUT ---------------- */
+        #game-board { position: relative; z-index: 1; }
+
         .player-hand {
             display: flex;
             justify-content: center;
             align-items: flex-end;
-            padding: 10px;
-            min-height: 150px;
         }
-        .player-hand .card {
-            margin: 0 -20px;
+        #player-0-hand {
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            overflow-y: visible;
+            padding: 28px 12px 14px;
+            max-width: 96vw;
+            scrollbar-width: thin;
         }
+        #player-0-hand .card { margin: 0 -16px; }
+        #player-0-hand::-webkit-scrollbar { height: 8px; }
+        #player-0-hand::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.3); border-radius: 4px; }
 
         .ai-hand .card {
-            margin: 0 -50px;
+            width: 46px; height: 68px; padding: 3px;
         }
-        
-        #player-1-hand, #player-3-hand { /* Left and Right AI */
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            height: 100%;
-            position: absolute;
-        }
-        #player-1-hand { left: 20px; top: 50%; transform: translateY(-50%) rotate(90deg); }
-        #player-3-hand { right: 20px; top: 50%; transform: translateY(-50%) rotate(-90deg); }
-        #player-1-hand .card, #player-3-hand .card {
-            margin: -40px 0;
-        }
-        
-        .action-effect {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            font-size: 8rem;
-            font-weight: bold;
-            color: rgba(255, 255, 0, 0.8);
-            -webkit-text-stroke: 4px black;
-            z-index: 100;
-            pointer-events: none;
-            opacity: 0;
-            animation: pop-out 1s ease-out;
-        }
+        .ai-hand .card .oval { width: 50px; height: 34px; }
+        .ai-hand .card .center { font-size: 0.7rem; }
 
-        @keyframes pop-out {
-            0% { transform: translate(-50%, -50%) scale(0.5); opacity: 1; }
-            80% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
-            100% { transform: translate(-50%, -50%) scale(1.2); opacity: 0; }
+        #player-2-hand { margin: 0 -28px; }
+        #player-2-hand .card { margin: 0 -22px; }
+
+        #player-1-hand, #player-3-hand {
+            flex-direction: column;
+            align-items: center;
         }
-        
+        #player-1-hand .card, #player-3-hand .card { margin: -28px 0; }
+
+        /* active player highlight */
+        .player-area { transition: filter 0.3s ease, transform 0.3s ease; }
+        .player-area.active { filter: drop-shadow(0 0 14px rgba(250,204,21,0.85)); }
         .player-area.active .player-name {
-            background-color: #facc15;
+            background: linear-gradient(180deg,#fde047,#f59e0b);
             color: #1f2937;
-            transform: scale(1.1);
+            transform: scale(1.08);
+            box-shadow: 0 0 18px rgba(250,204,21,0.9);
         }
+        .player-area.active.bump-0 { transform: translateY(-8px); }
         .player-name {
             transition: all 0.3s ease;
+            white-space: nowrap;
         }
-        
-        #water-cup {
-            width: 80px;
-            height: 90px;
-            background-color: #e0f2fe;
-            border: 3px solid #075985;
-            border-top: none;
-            border-radius: 0 0 20px 20px;
+
+        /* center pile zone */
+        .pile-slot {
             position: relative;
-            cursor: pointer;
-            transition: transform 0.2s;
+            width: 86px; height: 124px;
         }
-        #water-cup:hover {
-            transform: scale(1.05);
+        .pile-slot .card { position: absolute; top: 0; left: 0; }
+        #deck:hover { transform: translateY(-4px) scale(1.03); }
+        #deck { cursor: pointer; transition: transform 0.15s ease; }
+        .deck-count {
+            position: absolute; bottom: -22px; left: 50%; transform: translateX(-50%);
+            font-family:'Bangers',cursive; font-size: 0.9rem; color:#e2e8f0;
+            text-shadow: 1px 1px 0 #000;
         }
-        #water-cup::before {
-            content: '';
+
+        /* current color indicator */
+        #color-indicator {
+            width: 40px; height: 40px; border-radius: 50%;
+            border: 3px solid #0f172a;
+            box-shadow: 0 0 0 3px rgba(255,255,255,0.4), inset 0 2px 6px rgba(255,255,255,0.5);
+            transition: background 0.4s ease, box-shadow 0.4s ease;
+        }
+        #color-indicator.red { background: var(--c-red); }
+        #color-indicator.blue { background: var(--c-blue); }
+        #color-indicator.green { background: var(--c-green); }
+        #color-indicator.yellow { background: var(--c-yellow); }
+
+        /* direction indicator */
+        #direction-indicator {
+            font-size: 1.8rem;
+            transition: transform 0.5s ease;
+            filter: drop-shadow(0 1px 2px rgba(0,0,0,0.6));
+        }
+        #direction-indicator.reversed { transform: scaleX(-1); }
+
+        /* ---------------- EFFECTS ---------------- */
+        .action-effect {
             position: absolute;
-            top: 0;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 90%;
-            height: 10px;
-            background-color: #7dd3fc;
-            border: 3px solid #075985;
-            border-radius: 5px;
+            top: 50%; left: 50%;
+            transform: translate(-50%,-50%);
+            font-family: 'Bangers', cursive;
+            font-size: 7rem;
+            color: #fde047;
+            -webkit-text-stroke: 4px #0f172a;
+            text-stroke: 4px #0f172a;
+            z-index: 120;
+            pointer-events: none;
+            opacity: 0;
+            white-space: nowrap;
+            animation: popOut 1.1s ease-out forwards;
+        }
+        @keyframes popOut {
+            0% { transform: translate(-50%,-50%) scale(0.4) rotate(-8deg); opacity: 1; }
+            55% { transform: translate(-50%,-50%) scale(1.15) rotate(3deg); opacity: 1; }
+            100% { transform: translate(-50%,-50%) scale(1.25) rotate(0); opacity: 0; }
         }
 
-        #slap-button {
-            animation: shake 0.5s infinite;
+        /* UNO callout */
+        #uno-callout {
+            position: fixed; top: 38%; left: 50%;
+            transform: translate(-50%,-50%) scale(0);
+            font-family:'Bangers',cursive; font-size: 9rem;
+            color:#ef4444; -webkit-text-stroke: 6px #fff;
+            z-index: 250; pointer-events: none; opacity: 0;
+        }
+        #uno-callout.show { animation: unoPop 1.4s ease-out forwards; }
+        @keyframes unoPop {
+            0% { transform: translate(-50%,-50%) scale(0) rotate(-20deg); opacity: 0; }
+            25% { transform: translate(-50%,-50%) scale(1.2) rotate(8deg); opacity: 1; }
+            60% { transform: translate(-50%,-50%) scale(1) rotate(-3deg); opacity: 1; }
+            100% { transform: translate(-50%,-50%) scale(1.1) rotate(0); opacity: 0; }
         }
 
-        @keyframes shake {
-            0%, 100% { transform: translate(-50%, -50%) rotate(0deg); }
-            25% { transform: translate(-50%, -50%) rotate(-5deg); }
-            75% { transform: translate(-50%, -50%) rotate(5deg); }
+        /* status line */
+        #status-line {
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, 96px);
+            font-family:'Bangers',cursive; font-size: 1.4rem;
+            background: rgba(15,23,42,0.78);
+            border: 2px solid rgba(255,255,255,0.25);
+            padding: 6px 18px; border-radius: 999px;
+            min-width: 220px; text-align: center;
+            color:#fde047;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+            z-index: 30;
+            transition: opacity 0.2s ease;
         }
+
+        /* confetti */
+        .confetti {
+            position: fixed; top: -20px; width: 10px; height: 16px;
+            z-index: 300; pointer-events: none;
+            animation: confettiFall linear forwards;
+        }
+        @keyframes confettiFall {
+            0% { transform: translateY(-20px) rotate(0); opacity: 1; }
+            100% { transform: translateY(105vh) rotate(720deg); opacity: 0.9; }
+        }
+
+        /* slap */
+        #slap-button { animation: slapShake 0.4s infinite; }
+        @keyframes slapShake {
+            0%,100% { transform: translate(-50%,-50%) rotate(0); }
+            25% { transform: translate(-50%,-50%) rotate(-6deg) scale(1.04); }
+            75% { transform: translate(-50%,-50%) rotate(6deg) scale(1.04); }
+        }
+
+        /* water cup */
+        #water-cup {
+            width: 64px; height: 78px;
+            background: linear-gradient(180deg,#e0f2fe,#bae6fd);
+            border: 3px solid #075985; border-top: none;
+            border-radius: 0 0 16px 16px;
+            position: relative; cursor: pointer;
+            transition: transform 0.2s; margin: 0 auto;
+        }
+        #water-cup:hover { transform: scale(1.06); }
+        #water-cup::before {
+            content:''; position:absolute; top:0; left:50%; transform:translateX(-50%);
+            width:90%; height:9px; background:#7dd3fc; border:3px solid #075985; border-radius:5px;
+        }
+
+        .log-line.error { color:#fca5a5; }
+        #game-log p { margin: 0 0 2px; line-height: 1.2; }
     </style>
 </head>
-<body class="bg-gray-100 text-gray-800">
+<body>
 
     <!-- Main Game Board -->
-    <div id="game-board" class="w-full h-screen flex flex-col items-center justify-between p-4 relative overflow-hidden">
+    <div id="game-board" class="w-full h-screen flex flex-col items-center justify-between p-3 relative overflow-hidden">
 
-        <div class="absolute top-4 right-4 z-30 flex flex-col items-end space-y-2">
-            <button id="toggle-rules-btn" class="font-bangers text-xl bg-yellow-400 text-black px-4 py-2 rounded-lg border-2 border-black shadow-md">RULES</button>
-            <button id="silent-uno-button" class="hidden font-bangers text-lg bg-purple-500 text-white px-4 py-2 rounded-lg border-2 border-black shadow-md">Someone Talked!</button>
+        <!-- Top-right controls -->
+        <div class="absolute top-3 right-3 z-30 flex flex-col items-end space-y-2">
+            <div class="flex space-x-2">
+                <button id="sound-btn" title="Toggle sound" class="font-bangers text-lg bg-slate-800/80 text-yellow-300 px-3 py-2 rounded-lg border-2 border-yellow-300/50 shadow-md">🔊</button>
+                <button id="help-btn" class="font-bangers text-lg bg-yellow-400 text-black px-3 py-2 rounded-lg border-2 border-black shadow-md">HELP</button>
+                <button id="toggle-rules-btn" class="font-bangers text-lg bg-yellow-400 text-black px-3 py-2 rounded-lg border-2 border-black shadow-md">RULES</button>
+            </div>
+            <button id="silent-uno-button" class="hidden font-bangers text-base bg-purple-500 text-white px-3 py-2 rounded-lg border-2 border-black shadow-md">Someone Talked!</button>
+        </div>
+
+        <!-- Scoreboard -->
+        <div class="absolute top-3 left-3 z-30 bg-slate-900/75 border-2 border-yellow-300/40 rounded-lg px-3 py-2 text-sm shadow-lg">
+            <div class="font-bangers text-yellow-300 text-lg leading-none mb-1">SCORES <span id="round-label" class="text-xs text-slate-300 font-sans">Round 1</span></div>
+            <div id="scoreboard" class="space-y-0.5"></div>
         </div>
 
         <!-- Top Player (AI) -->
-        <div id="player-2-area" class="player-area text-center">
-            <div id="player-2-name" class="player-name font-bangers text-2xl bg-white border-2 border-black px-4 py-1 rounded-lg shadow-md">CPU 2</div>
-            <div id="player-2-hand" class="player-hand ai-hand mt-2"></div>
+        <div id="player-2-area" class="player-area text-center mt-1">
+            <div id="player-2-name" class="player-name font-bangers text-xl bg-white text-slate-800 border-2 border-black px-4 py-0.5 rounded-lg shadow-md inline-block">CPU 2</div>
+            <div id="player-2-hand" class="player-hand ai-hand mt-1"></div>
         </div>
 
-        <!-- Middle Area (Deck, Discard, and Side AIs) -->
-        <div class="w-full flex-grow flex items-center justify-around">
+        <!-- Middle Area -->
+        <div class="w-full flex-grow flex items-center justify-between px-2 relative">
             <!-- Left Player (AI) -->
-            <div id="player-1-area" class="player-area h-full flex items-center">
-                 <div id="player-1-name" class="player-name font-bangers text-2xl bg-white border-2 border-black px-4 py-1 rounded-lg shadow-md" style="transform: rotate(-90deg);">CPU 1</div>
+            <div id="player-1-area" class="player-area h-full flex flex-col items-center justify-center" style="width:120px;">
+                 <div id="player-1-name" class="player-name font-bangers text-xl bg-white text-slate-800 border-2 border-black px-3 py-0.5 rounded-lg shadow-md mb-2">CPU 1</div>
                 <div id="player-1-hand" class="player-hand ai-hand"></div>
             </div>
 
-            <!-- Deck and Discard Pile -->
-            <div class="flex items-center space-x-8">
-                <div id="water-cup-container" class="w-24 h-36 flex-col items-center justify-center hidden">
-                    <div id="water-cup"></div>
-                    <div class="font-bangers text-center text-sm mt-1">Stay Hydrated!</div>
-                </div>
-                <div id="deck-pile" class="w-24 h-36 flex items-center justify-center">
-                    <div id="deck" class="card card-back font-bangers">
-                        <div class="inner-border">COSMIC CLASH</div>
+            <!-- Center: color/dir, deck, discard, cup -->
+            <div class="flex flex-col items-center">
+                <div class="flex items-center space-x-4 mb-4">
+                    <div class="flex flex-col items-center">
+                        <div id="color-indicator" class="red"></div>
+                        <div class="font-bangers text-xs mt-1 text-slate-200">COLOR</div>
+                    </div>
+                    <div class="flex flex-col items-center">
+                        <div id="direction-indicator">🔄</div>
+                        <div class="font-bangers text-xs mt-1 text-slate-200">ORDER</div>
                     </div>
                 </div>
-                <div id="discard-pile" class="w-24 h-36 flex items-center justify-center">
-                    <!-- Top card of discard pile goes here -->
+                <div class="flex items-center space-x-6">
+                    <div id="water-cup-container" class="flex-col items-center justify-center hidden">
+                        <div id="water-cup"></div>
+                        <div class="font-bangers text-center text-xs mt-1 text-slate-200">Hydrate!</div>
+                    </div>
+                    <div id="deck-pile" class="pile-slot">
+                        <div id="deck" class="card card-back">
+                            <div class="face">
+                                <div class="oval"></div>
+                                <span class="center">COSMIC</span>
+                            </div>
+                        </div>
+                        <div class="deck-count" id="deck-count"></div>
+                    </div>
+                    <div id="discard-pile" class="pile-slot"></div>
                 </div>
             </div>
 
             <!-- Right Player (AI) -->
-            <div id="player-3-area" class="player-area h-full flex items-center">
+            <div id="player-3-area" class="player-area h-full flex flex-col items-center justify-center" style="width:120px;">
+                <div id="player-3-name" class="player-name font-bangers text-xl bg-white text-slate-800 border-2 border-black px-3 py-0.5 rounded-lg shadow-md mb-2">CPU 3</div>
                 <div id="player-3-hand" class="player-hand ai-hand"></div>
-                <div id="player-3-name" class="player-name font-bangers text-2xl bg-white border-2 border-black px-4 py-1 rounded-lg shadow-md" style="transform: rotate(90deg);">CPU 3</div>
             </div>
         </div>
 
         <!-- Bottom Player (Human) -->
-        <div id="player-0-area" class="player-area text-center">
-            <div id="player-0-hand" class="player-hand mb-2"></div>
-            <div id="player-0-name" class="player-name font-bangers text-2xl bg-white border-2 border-black px-4 py-1 rounded-lg shadow-md">You</div>
+        <div id="player-0-area" class="player-area text-center w-full">
+            <div id="player-0-hand" class="player-hand"></div>
+            <div id="player-0-name" class="player-name font-bangers text-xl bg-white text-slate-800 border-2 border-black px-4 py-0.5 rounded-lg shadow-md inline-block">You</div>
         </div>
-        
-        <!-- Action Effect Text -->
+
+        <!-- Effects -->
         <div id="action-effect-container"></div>
-        
+        <div id="status-line" class="font-bangers">Welcome to Cosmic Clash!</div>
+        <div id="uno-callout">UNO!</div>
+
         <!-- Game Log -->
-        <div id="game-log" class="absolute bottom-4 left-4 font-bangers text-xl bg-white/80 p-2 border-2 border-black rounded w-64 h-40 overflow-y-auto text-gray-700">
-            <p>Game Started!</p>
+        <div id="game-log" class="absolute bottom-3 left-3 text-sm bg-slate-900/75 p-2 border-2 border-yellow-300/40 rounded-lg w-56 h-32 overflow-y-auto text-slate-100 z-20">
         </div>
 
         <!-- Slap Button -->
-        <button id="slap-button" class="hidden absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 font-bangers text-7xl bg-red-600 text-white p-8 rounded-full border-8 border-black shadow-lg z-50">SLAP!</button>
-
+        <button id="slap-button" class="hidden absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 font-bangers text-6xl bg-red-600 text-white p-8 rounded-full border-8 border-black shadow-lg z-50">SLAP!</button>
     </div>
 
     <!-- Modals -->
     <div id="color-choice-modal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50">
-        <div class="bg-yellow-50 p-8 rounded-lg shadow-2xl border-4 border-black text-center">
+        <div class="bg-slate-100 text-slate-800 p-8 rounded-2xl shadow-2xl border-4 border-black text-center">
             <h2 class="text-4xl font-bangers mb-6">CHOOSE A COLOR!</h2>
             <div class="flex space-x-4">
-                <button data-color="red" class="color-choice-btn w-20 h-20 bg-card-red rounded-full border-4 border-black transform hover:scale-110 transition-transform"></button>
-                <button data-color="blue" class="color-choice-btn w-20 h-20 bg-card-blue rounded-full border-4 border-black transform hover:scale-110 transition-transform"></button>
-                <button data-color="green" class="color-choice-btn w-20 h-20 bg-card-green rounded-full border-4 border-black transform hover:scale-110 transition-transform"></button>
-                <button data-color="yellow" class="color-choice-btn w-20 h-20 bg-card-yellow rounded-full border-4 border-black transform hover:scale-110 transition-transform"></button>
+                <button data-color="red" class="color-choice-btn w-20 h-20 rounded-full border-4 border-black transform hover:scale-110 transition-transform" style="background:var(--c-red)"></button>
+                <button data-color="blue" class="color-choice-btn w-20 h-20 rounded-full border-4 border-black transform hover:scale-110 transition-transform" style="background:var(--c-blue)"></button>
+                <button data-color="green" class="color-choice-btn w-20 h-20 rounded-full border-4 border-black transform hover:scale-110 transition-transform" style="background:var(--c-green)"></button>
+                <button data-color="yellow" class="color-choice-btn w-20 h-20 rounded-full border-4 border-black transform hover:scale-110 transition-transform" style="background:var(--c-yellow)"></button>
             </div>
         </div>
     </div>
-    
+
     <div id="player-choice-modal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50">
-        <div class="bg-yellow-50 p-8 rounded-lg shadow-2xl border-4 border-black text-center">
+        <div class="bg-slate-100 text-slate-800 p-8 rounded-2xl shadow-2xl border-4 border-black text-center">
             <h2 id="player-choice-title" class="text-4xl font-bangers mb-6">CHOOSE A PLAYER</h2>
             <div id="player-choice-buttons" class="flex space-x-4"></div>
         </div>
     </div>
-    
+
     <div id="hydration-modal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50">
-        <div class="bg-blue-200 p-8 rounded-lg shadow-2xl border-4 border-black text-center">
+        <div class="bg-blue-200 text-slate-800 p-8 rounded-2xl shadow-2xl border-4 border-black text-center">
             <h2 class="text-6xl font-bangers mb-2">DRINK!</h2>
             <p class="text-lg">Click the cup to continue!</p>
         </div>
     </div>
 
     <div id="mad-libs-modal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50">
-        <div class="bg-pink-100 p-8 rounded-lg shadow-2xl border-4 border-black text-center w-1/3">
+        <div class="bg-pink-100 text-slate-800 p-8 rounded-2xl shadow-2xl border-4 border-black text-center w-11/12 max-w-md">
             <h2 class="text-4xl font-bangers mb-4">COSMIC MAD LIBS!</h2>
             <p class="mb-4">The player who played the '8' must provide the words!</p>
             <div class="space-y-4 text-left">
@@ -270,8 +472,8 @@
         </div>
     </div>
 
-     <div id="charades-modal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50">
-        <div class="bg-orange-100 p-8 rounded-lg shadow-2xl border-4 border-black text-center">
+    <div id="charades-modal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50">
+        <div class="bg-orange-100 text-slate-800 p-8 rounded-2xl shadow-2xl border-4 border-black text-center">
             <h2 class="text-4xl font-bangers mb-4">COSMIC CHARADES!</h2>
             <p class="mb-2">Only the current player should see this!</p>
             <p class="text-2xl font-bold mb-4">Your word to act out is:</p>
@@ -280,70 +482,75 @@
         </div>
     </div>
 
-    <div id="game-over-modal" class="hidden fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50">
-        <div class="text-center text-white p-10 bg-blue-600 border-8 border-yellow-400 rounded-lg" style="background-image: url('data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%23ffffff\' fill-opacity=\'0.1\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm-2-20a6 6 0 1 0 0 12 6 6 0 0 0 0-12zm0 10a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm-20 2a6 6 0 1 0 0 12 6 6 0 0 0 0-12zm0 10a4 4 0 1 1 0-8 4 4 0 0 1 0 8z\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E');">
-            <h2 id="winner-message" class="text-8xl font-bangers mb-4" style="-webkit-text-stroke: 4px black;"></h2>
-            <button id="restart-game-btn" class="font-bangers text-3xl bg-yellow-400 text-blue-800 px-8 py-3 rounded-lg border-4 border-black hover:bg-yellow-300 transition-colors">Play Again!</button>
+    <!-- Help / Rules reference modal -->
+    <div id="help-modal" class="hidden fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50 p-4">
+        <div class="bg-slate-100 text-slate-800 p-6 rounded-2xl shadow-2xl border-4 border-black text-left w-11/12 max-w-lg max-h-[85vh] overflow-y-auto">
+            <h2 class="text-4xl font-bangers mb-3 text-center">HOW TO PLAY</h2>
+            <p class="mb-2">Match the top discard by <b>color</b>, <b>number</b>, or <b>symbol</b>. Play all your cards first to win the round!</p>
+            <ul class="list-disc pl-5 space-y-1 text-sm mb-3">
+                <li><b>Skip 🚫</b> — next player loses their turn.</li>
+                <li><b>Reverse 🔄</b> — flips the play direction.</li>
+                <li><b>+2</b> — next player draws 2 and is skipped.</li>
+                <li><b>Wild 🎨</b> — choose any color.</li>
+                <li><b>+4</b> — choose a color; next player draws 4 and is skipped.</li>
+            </ul>
+            <h3 class="font-bangers text-2xl mb-1">HOUSE RULES</h3>
+            <ul class="list-disc pl-5 space-y-1 text-sm">
+                <li><b>Stacking +2</b> — pile +2s; the player who can't stack draws the total.</li>
+                <li><b>Draw Until Playable</b> — keep drawing until you get a playable card.</li>
+                <li><b>Jump-In</b> — play an identical card out of turn to cut in.</li>
+                <li><b>0/7 Hand Swaps</b> — 0 rotates all hands; 7 lets you swap with one player.</li>
+                <li><b>Swap Hands Wild</b> — adds a wild that swaps hands with a chosen player.</li>
+                <li><b>Stay Hydrated</b> — sometimes you must drink after drawing.</li>
+                <li><b>Slap (on 9)</b> — last to slap draws 2.</li>
+                <li><b>Mad Libs (on 8)</b> / <b>Charades (on 7)</b> — party prompts.</li>
+                <li><b>Silent Uno</b> — honor-system silence; tap "Someone Talked!" to penalize.</li>
+            </ul>
+            <button id="help-close" class="font-bangers text-2xl bg-green-500 text-white w-full mt-5 py-2 rounded-lg border-2 border-black hover:bg-green-600">Got it!</button>
+        </div>
+    </div>
+
+    <div id="game-over-modal" class="hidden fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-[60]">
+        <div class="text-center text-white p-10 bg-blue-600 border-8 border-yellow-400 rounded-2xl">
+            <h2 id="winner-message" class="text-7xl font-bangers mb-2" style="-webkit-text-stroke: 4px black;"></h2>
+            <p id="round-summary" class="font-bangers text-2xl text-yellow-200 mb-6"></p>
+            <button id="restart-game-btn" class="font-bangers text-3xl bg-yellow-400 text-blue-800 px-8 py-3 rounded-lg border-4 border-black hover:bg-yellow-300 transition-colors">Next Round!</button>
         </div>
     </div>
 
     <!-- House Rules Panel -->
-    <div id="house-rules-panel" class="fixed top-1/2 -right-80 transform -translate-y-1/2 bg-yellow-50 border-4 border-black rounded-l-lg p-6 transition-all duration-300 ease-in-out z-40 w-80 overflow-y-auto max-h-screen">
+    <div id="house-rules-panel" class="fixed top-1/2 -right-80 transform -translate-y-1/2 bg-slate-100 text-slate-800 border-4 border-black rounded-l-2xl p-6 transition-all duration-300 ease-in-out z-40 w-80 overflow-y-auto max-h-screen">
         <h3 class="font-bangers text-3xl text-center mb-4">House Rules</h3>
-        <div class="space-y-4">
-            <label class="flex items-center space-x-3">
-                <input type="checkbox" id="stack-plus-two" class="h-6 w-6 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-                <span class="text-lg">Stacking "+2" Cards</span>
-            </label>
-            <label class="flex items-center space-x-3">
-                <input type="checkbox" id="draw-until-playable" class="h-6 w-6 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-                <span class="text-lg">Draw Until You Can Play</span>
-            </label>
-             <label class="flex items-center space-x-3">
-                <input type="checkbox" id="jump-in" class="h-6 w-6 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-                <span class="text-lg">Jump-In Rule</span>
-            </label>
-             <label class="flex items-center space-x-3">
-                <input type="checkbox" id="seven-zero-rule" class="h-6 w-6 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-                <span class="text-lg">0/7 Hand Swaps</span>
-            </label>
-            <label class="flex items-center space-x-3">
-                <input type="checkbox" id="swap-hands-wild" class="h-6 w-6 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-                <span class="text-lg">Swap Hands Wild Card</span>
-            </label>
-             <label class="flex items-center space-x-3">
-                <input type="checkbox" id="stay-hydrated" class="h-6 w-6 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-                <span class="text-lg">Stay Hydrated! (Draw)</span>
-            </label>
+        <div class="space-y-3">
+            <label class="flex items-center space-x-3"><input type="checkbox" id="stack-plus-two" class="h-6 w-6"><span class="text-lg">Stacking "+2" Cards</span></label>
+            <label class="flex items-center space-x-3"><input type="checkbox" id="draw-until-playable" class="h-6 w-6"><span class="text-lg">Draw Until You Can Play</span></label>
+            <label class="flex items-center space-x-3"><input type="checkbox" id="jump-in" class="h-6 w-6"><span class="text-lg">Jump-In Rule</span></label>
+            <label class="flex items-center space-x-3"><input type="checkbox" id="seven-zero-rule" class="h-6 w-6"><span class="text-lg">0/7 Hand Swaps</span></label>
+            <label class="flex items-center space-x-3"><input type="checkbox" id="swap-hands-wild" class="h-6 w-6"><span class="text-lg">Swap Hands Wild Card</span></label>
+            <label class="flex items-center space-x-3"><input type="checkbox" id="stay-hydrated" class="h-6 w-6"><span class="text-lg">Stay Hydrated! (Draw)</span></label>
             <hr class="border-gray-400 border-dashed">
-             <label class="flex items-center space-x-3">
-                <input type="checkbox" id="slap-rule" class="h-6 w-6 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-                <span class="text-lg">Slap Rule (on '9')</span>
-            </label>
-            <label class="flex items-center space-x-3">
-                <input type="checkbox" id="mad-libs-rule" class="h-6 w-6 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-                <span class="text-lg">Mad Libs (on '8')</span>
-            </label>
-            <label class="flex items-center space-x-3">
-                <input type="checkbox" id="charades-rule" class="h-6 w-6 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-                <span class="text-lg">Charades (on '7')</span>
-            </label>
-            <label class="flex items-center space-x-3">
-                <input type="checkbox" id="silent-uno-rule" class="h-6 w-6 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-                <span class="text-lg">Silent Uno (Honor System)</span>
-            </label>
+            <label class="flex items-center space-x-3"><input type="checkbox" id="slap-rule" class="h-6 w-6"><span class="text-lg">Slap Rule (on '9')</span></label>
+            <label class="flex items-center space-x-3"><input type="checkbox" id="mad-libs-rule" class="h-6 w-6"><span class="text-lg">Mad Libs (on '8')</span></label>
+            <label class="flex items-center space-x-3"><input type="checkbox" id="charades-rule" class="h-6 w-6"><span class="text-lg">Charades (on '7')</span></label>
+            <label class="flex items-center space-x-3"><input type="checkbox" id="silent-uno-rule" class="h-6 w-6"><span class="text-lg">Silent Uno (Honor System)</span></label>
         </div>
         <button id="apply-rules-btn" class="font-bangers text-xl bg-green-500 text-white w-full mt-6 py-2 rounded-lg border-2 border-black hover:bg-green-600">Apply & Restart</button>
     </div>
-
 
     <script>
         // --- DOM Elements ---
         const gameBoard = document.getElementById('game-board');
         const deckElement = document.getElementById('deck');
+        const deckCountEl = document.getElementById('deck-count');
         const discardPileElement = document.getElementById('discard-pile');
         const gameLog = document.getElementById('game-log');
         const actionEffectContainer = document.getElementById('action-effect-container');
+        const statusLine = document.getElementById('status-line');
+        const colorIndicator = document.getElementById('color-indicator');
+        const directionIndicator = document.getElementById('direction-indicator');
+        const unoCallout = document.getElementById('uno-callout');
+        const scoreboardEl = document.getElementById('scoreboard');
+        const roundLabel = document.getElementById('round-label');
 
         const colorChoiceModal = document.getElementById('color-choice-modal');
         const playerChoiceModal = document.getElementById('player-choice-modal');
@@ -353,19 +560,23 @@
         const gameOverModal = document.getElementById('game-over-modal');
         const madLibsModal = document.getElementById('mad-libs-modal');
         const charadesModal = document.getElementById('charades-modal');
+        const helpModal = document.getElementById('help-modal');
 
         const winnerMessage = document.getElementById('winner-message');
+        const roundSummary = document.getElementById('round-summary');
         const restartGameBtn = document.getElementById('restart-game-btn');
         const colorButtons = document.querySelectorAll('.color-choice-btn');
         const waterCupContainer = document.getElementById('water-cup-container');
         const waterCup = document.getElementById('water-cup');
         const slapButton = document.getElementById('slap-button');
         const silentUnoButton = document.getElementById('silent-uno-button');
-        
+        const soundBtn = document.getElementById('sound-btn');
+        const helpBtn = document.getElementById('help-btn');
+        const helpClose = document.getElementById('help-close');
+
         const madLibsSubmit = document.getElementById('mad-libs-submit');
         const charadesDone = document.getElementById('charades-done');
         const charadesWord = document.getElementById('charades-word');
-
 
         // House Rules Elements
         const houseRulesPanel = document.getElementById('house-rules-panel');
@@ -382,20 +593,20 @@
         const charadesRuleCheckbox = document.getElementById('charades-rule');
         const silentUnoRuleCheckbox = document.getElementById('silent-uno-rule');
 
-
         // --- Game Constants ---
         const COLORS = ['red', 'green', 'blue', 'yellow'];
         const VALUES = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'skip', 'reverse', '+2'];
         const WILD_VALUES = ['wild', '+4', 'swap'];
         const PLAYER_COUNT = 4;
         const CHARADE_WORDS = ['Planet', 'Alien', 'Rocket Ship', 'Black Hole', 'Gravity', 'Comet', 'Galaxy', 'Astronaut'];
+        const SYMBOLS = { skip: '🚫', reverse: '🔄', '+2': '+2', '+4': '+4', wild: '🎨', swap: '🤝' };
 
         // --- Game State ---
         let deck = [];
         let discardPile = [];
         let players = [];
         let currentPlayerIndex = 0;
-        let gameDirection = 1; 
+        let gameDirection = 1;
         let wildCardToPlay = null;
         let drawTwoStack = 0;
         let blockNextTurn = false;
@@ -403,6 +614,9 @@
         let hydratingPlayerId = null;
         let actionAfterPlayerChoice = null;
         let slapState = { active: false, slappers: [] };
+        let scores = [0, 0, 0, 0];
+        let roundNumber = 1;
+        let canRender = true;
 
         // --- House Rules State ---
         let houseRules = {
@@ -411,8 +625,71 @@
             slap: false, madLibs: false, charades: false, silentUno: false,
         };
 
-        // --- Game Logic ---
+        // ============================================================
+        //  AUDIO (WebAudio, inline, wrapped in try/catch)
+        // ============================================================
+        let audioCtx = null;
+        let soundEnabled = true;
+        function getAudio() {
+            try {
+                if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+                return audioCtx;
+            } catch (e) { return null; }
+        }
+        function tone(freq, dur, type, vol, when) {
+            try {
+                if (!soundEnabled) return;
+                const ctx = getAudio();
+                if (!ctx) return;
+                const t = ctx.currentTime + (when || 0);
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = type || 'sine';
+                osc.frequency.setValueAtTime(freq, t);
+                gain.gain.setValueAtTime(0.0001, t);
+                gain.gain.exponentialRampToValueAtTime(vol || 0.18, t + 0.01);
+                gain.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+                osc.connect(gain); gain.connect(ctx.destination);
+                osc.start(t); osc.stop(t + dur + 0.02);
+            } catch (e) { /* ignore */ }
+        }
+        function sfxPlay()  { tone(520, 0.12, 'triangle', 0.18); tone(780, 0.10, 'triangle', 0.12, 0.04); }
+        function sfxDraw()  { tone(300, 0.10, 'sine', 0.16); tone(220, 0.12, 'sine', 0.12, 0.03); }
+        function sfxUno()   { [660,880,1175].forEach((f,i)=>tone(f,0.18,'square',0.16,i*0.09)); }
+        function sfxWin()   { [523,659,784,1047].forEach((f,i)=>tone(f,0.3,'triangle',0.2,i*0.12)); }
+        function sfxError() { tone(160, 0.18, 'sawtooth', 0.14); }
+        function sfxSpecial(){ tone(440,0.10,'square',0.14); tone(330,0.14,'square',0.12,0.06); }
 
+        // ============================================================
+        //  PERSISTENCE
+        // ============================================================
+        function loadScores() {
+            try {
+                const raw = localStorage.getItem('cosmicClashScores');
+                if (raw) {
+                    const data = JSON.parse(raw);
+                    if (Array.isArray(data.scores) && data.scores.length === PLAYER_COUNT) scores = data.scores;
+                    if (typeof data.round === 'number') roundNumber = data.round;
+                }
+            } catch (e) { /* ignore */ }
+        }
+        function saveScores() {
+            try {
+                localStorage.setItem('cosmicClashScores', JSON.stringify({ scores, round: roundNumber }));
+            } catch (e) { /* ignore */ }
+        }
+        function renderScoreboard() {
+            const names = ['You', 'CPU 1', 'CPU 2', 'CPU 3'];
+            scoreboardEl.innerHTML = names.map((n, i) =>
+                `<div class="flex justify-between gap-4"><span class="${i===0?'text-yellow-300 font-bold':''}">${n}</span><span class="font-bangers">${scores[i]}</span></div>`
+            ).join('');
+            roundLabel.textContent = `Round ${roundNumber}`;
+        }
+
+        // ============================================================
+        //  DECK / SETUP
+        // ============================================================
         function createDeck() {
             const newDeck = [];
             COLORS.forEach(color => {
@@ -446,12 +723,17 @@
             blockNextTurn = false;
             isAwaitingHydration = false;
             hydratingPlayerId = null;
-            
+            slapState = { active: false, slappers: [] };
+
             document.querySelectorAll('.fixed.inset-0').forEach(modal => modal.classList.add('hidden'));
-            
+            slapButton.classList.add('hidden');
+
             waterCupContainer.classList.toggle('hidden', !houseRules.stayHydrated);
             waterCupContainer.classList.toggle('flex', houseRules.stayHydrated);
             silentUnoButton.classList.toggle('hidden', !houseRules.silentUno);
+
+            gameLog.innerHTML = '';
+            logMessage(`Round ${roundNumber} — Game Started!`);
 
             for (let i = 0; i < PLAYER_COUNT; i++) {
                 players.push({ id: i, name: i === 0 ? 'You' : `CPU ${i}`, hand: [], isAI: i !== 0 });
@@ -460,14 +742,14 @@
             for (let i = 0; i < 7; i++) {
                 for (let j = 0; j < PLAYER_COUNT; j++) players[j].hand.push(deck.pop());
             }
-            
+
             let firstCard = deck.pop();
             while (WILD_VALUES.includes(firstCard.value) || ['7','8','9'].includes(firstCard.value)) {
                 deck.push(firstCard);
                 shuffle(deck);
                 firstCard = deck.pop();
             }
-            
+
             discardPile.push(firstCard);
             logMessage(`First card is a ${firstCard.color} ${firstCard.value}.`);
 
@@ -481,40 +763,50 @@
                 currentPlayerIndex = (currentPlayerIndex + gameDirection + PLAYER_COUNT) % PLAYER_COUNT;
             } else if (firstCard.value === '+2') {
                 handleDrawTwoStack(players[currentPlayerIndex]);
-            } 
+            }
 
-            renderGame();
+            renderScoreboard();
+            renderGame(true);
+            setStatus("Game on! Match color, number, or symbol.");
             setTimeout(gameLoop, 1000);
         }
-        
-        function renderGame() {
+
+        // ============================================================
+        //  RENDER
+        // ============================================================
+        function renderGame(deal) {
             players.forEach((player, index) => {
                 const handElement = document.getElementById(`player-${index}-hand`);
                 const nameElement = document.getElementById(`player-${index}-name`);
                 const areaElement = document.getElementById(`player-${index}-area`);
                 handElement.innerHTML = '';
-                
+
                 if (player.isAI) {
-                    player.hand.forEach(() => {
+                    player.hand.forEach((c, i) => {
                         const cardElement = createCardElement(null, true);
+                        if (deal) { cardElement.classList.add('dealing'); cardElement.style.animationDelay = (i * 0.03) + 's'; }
                         handElement.appendChild(cardElement);
                     });
-                     nameElement.textContent = `${player.name} (${player.hand.length})`;
+                    nameElement.textContent = `${player.name} (${player.hand.length})`;
                 } else {
                     player.hand.sort((a, b) => (a.color.localeCompare(b.color) || a.value.localeCompare(b.value)));
-                    player.hand.forEach(card => {
+                    player.hand.forEach((card, i) => {
                         const cardElement = createCardElement(card);
                         const {isValid} = isValidPlay(card, player);
                         if (isValid) {
                             cardElement.classList.add('playable');
                             cardElement.addEventListener('click', () => handleCardClick(card));
+                        } else {
+                            cardElement.classList.add('dim');
                         }
+                        if (deal) { cardElement.classList.add('dealing'); cardElement.style.animationDelay = (i * 0.03) + 's'; }
                         handElement.appendChild(cardElement);
                     });
                     nameElement.textContent = `You (${player.hand.length})`;
                 }
 
                 areaElement.classList.toggle('active', index === currentPlayerIndex);
+                areaElement.classList.toggle('bump-0', index === 0);
             });
 
             discardPileElement.innerHTML = '';
@@ -522,76 +814,123 @@
                 const topCard = discardPile[discardPile.length - 1];
                 const cardElement = createCardElement(topCard);
                 cardElement.style.cursor = 'default';
+                cardElement.style.transform = `rotate(${(discardPile.length % 5 - 2) * 4}deg)`;
                 discardPileElement.appendChild(cardElement);
             }
+
+            updateColorIndicator();
+            updateDirectionIndicator();
+            deckCountEl.textContent = `${deck.length}`;
         }
-        
+
+        function updateColorIndicator() {
+            const top = discardPile[discardPile.length - 1];
+            const color = (top && top.color !== 'wild') ? top.color : 'wild';
+            colorIndicator.className = '';
+            if (COLORS.includes(color)) colorIndicator.classList.add(color);
+            else colorIndicator.style.background = 'conic-gradient(var(--c-red) 0deg 90deg, var(--c-blue) 90deg 180deg, var(--c-yellow) 180deg 270deg, var(--c-green) 270deg 360deg)';
+            if (COLORS.includes(color)) colorIndicator.style.background = '';
+        }
+
+        function updateDirectionIndicator() {
+            directionIndicator.classList.toggle('reversed', gameDirection === -1);
+        }
+
         function createCardElement(card, isBack = false) {
             const cardElement = document.createElement('div');
             if (isBack) {
-                cardElement.className = 'card card-back font-bangers';
-                cardElement.innerHTML = `<div class="inner-border">COSMIC CLASH</div>`;
+                cardElement.className = 'card card-back';
+                cardElement.innerHTML = `<div class="face"><div class="oval"></div><span class="center">COSMIC</span></div>`;
                 return cardElement;
             }
 
-            cardElement.className = `card bg-card-${card.color}`;
+            cardElement.className = `card card-${card.color}`;
             let valueDisplay = card.value.startsWith('+') ? card.value : card.value.charAt(0).toUpperCase() + card.value.slice(1);
             if (card.value === 'swap') valueDisplay = 'Swap';
-            
-            let symbol;
-            switch(card.value) {
-                case 'skip': symbol = '🚫'; break;
-                case 'reverse': symbol = '🔄'; break;
-                case '+2': symbol = '+2'; break;
-                case '+4': symbol = '+4'; break;
-                case 'wild': symbol = '🎨'; break;
-                case 'swap': symbol = '🤝'; break;
-                default: symbol = card.value;
+
+            let symbol = SYMBOLS[card.value] !== undefined ? SYMBOLS[card.value] : card.value;
+            let cornerSym;
+            switch (card.value) {
+                case 'skip': cornerSym = '🚫'; break;
+                case 'reverse': cornerSym = '🔄'; break;
+                case 'wild': cornerSym = '🎨'; break;
+                case 'swap': cornerSym = '🤝'; break;
+                default: cornerSym = valueDisplay;
             }
+            const isSym = ['skip','reverse','wild','swap','+2','+4'].includes(card.value);
 
             cardElement.innerHTML = `
-                <span class="corner top-left">${valueDisplay}</span>
-                <span class="text-5xl">${symbol}</span>
-                <span class="corner bottom-right">${valueDisplay}</span>
+                <div class="face">
+                    <div class="oval"></div>
+                    <span class="center ${isSym ? 'sym' : ''}">${symbol}</span>
+                </div>
+                <span class="corner tl">${cornerSym}</span>
+                <span class="corner br">${cornerSym}</span>
             `;
             return cardElement;
         }
 
+        // ============================================================
+        //  FLY ANIMATION (hand -> discard, deck -> hand)
+        // ============================================================
+        function flyCardTo(card, fromEl, toEl, cb) {
+            try {
+                if (!fromEl || !toEl) { if (cb) cb(); return; }
+                const fromRect = fromEl.getBoundingClientRect();
+                const toRect = toEl.getBoundingClientRect();
+                const ghost = card ? createCardElement(card) : createCardElement(null, true);
+                ghost.classList.add('fly-card');
+                ghost.style.left = fromRect.left + 'px';
+                ghost.style.top = fromRect.top + 'px';
+                ghost.style.width = '76px';
+                ghost.style.height = '112px';
+                ghost.style.margin = '0';
+                document.body.appendChild(ghost);
+                const dx = toRect.left + toRect.width/2 - (fromRect.left + 38);
+                const dy = toRect.top + toRect.height/2 - (fromRect.top + 56);
+                requestAnimationFrame(() => {
+                    ghost.style.transform = `translate(${dx}px, ${dy}px) rotate(${(Math.random()*20-10)|0}deg)`;
+                });
+                setTimeout(() => { ghost.remove(); if (cb) cb(); }, 460);
+            } catch (e) { if (cb) cb(); }
+        }
+
+        // ============================================================
+        //  TURN FLOW
+        // ============================================================
         function gameLoop() {
             if (blockNextTurn) return;
-
             const player = players[currentPlayerIndex];
 
-            // Handle forced draw from stack
             if (drawTwoStack > 0 && houseRules.stackPlusTwo) {
                  const canStack = player.hand.some(c => c.value === '+2');
                  if (!canStack) {
                     logMessage(`${player.name} must draw ${drawTwoStack} cards.`);
+                    setStatus(`${player.name} draws ${drawTwoStack}!`);
                     drawCards(player, drawTwoStack);
                     drawTwoStack = 0;
-                    nextTurn(); // Skips turn
+                    nextTurn();
                     return;
                  }
             }
 
             if (player.isAI) {
-                setTimeout(aiTurn, 1500);
+                setStatus(`${player.name} is thinking...`);
+                setTimeout(aiTurn, 1300);
             } else {
                 logMessage("It's your turn!");
+                setStatus("Your turn — play a glowing card or draw.");
             }
         }
 
         function aiTurn() {
             const player = players[currentPlayerIndex];
-            
+
             if (drawTwoStack > 0 && houseRules.stackPlusTwo) {
                 const plusTwoCard = player.hand.find(c => c.value === '+2');
-                if (plusTwoCard) {
-                    playCard(plusTwoCard, player);
-                    return;
-                }
-                // This case is handled in gameLoop, but as a fallback:
+                if (plusTwoCard) { playCard(plusTwoCard, player); return; }
                 logMessage(`${player.name} draws ${drawTwoStack} cards.`);
+                setStatus(`${player.name} draws ${drawTwoStack}.`);
                 drawCards(player, drawTwoStack);
                 drawTwoStack = 0;
                 nextTurn();
@@ -601,17 +940,39 @@
             const playableCards = player.hand.filter(card => isValidPlay(card, player).isValid);
 
             if (playableCards.length > 0) {
-                let cardToPlay = playableCards[Math.floor(Math.random() * playableCards.length)];
+                const cardToPlay = chooseAICard(player, playableCards);
                 playCard(cardToPlay, player);
             } else {
                 logMessage(`${player.name} has to draw.`);
+                setStatus(`${player.name} draws a card.`);
                 drawAndPlayForAI();
             }
         }
-        
+
+        // Smarter-ish AI: prefer action/wild when opponents are low; otherwise dump high-count color.
+        function chooseAICard(player, playable) {
+            const nextP = getNextPlayer();
+            // If next opponent is close to winning, prioritise punishing cards.
+            if (nextP && nextP.hand.length <= 2) {
+                const punish = playable.find(c => c.value === '+4') || playable.find(c => c.value === '+2')
+                            || playable.find(c => c.value === 'skip') || playable.find(c => c.value === 'reverse');
+                if (punish) return punish;
+            }
+            // Otherwise prefer a numbered card matching its most-common color (save wilds).
+            const colorCounts = {};
+            player.hand.forEach(c => { if (c.color !== 'wild') colorCounts[c.color] = (colorCounts[c.color]||0)+1; });
+            const numbered = playable.filter(c => c.color !== 'wild' && !isNaN(parseInt(c.value, 10)));
+            if (numbered.length) {
+                numbered.sort((a,b) => (colorCounts[b.color]||0) - (colorCounts[a.color]||0));
+                return numbered[0];
+            }
+            const nonWild = playable.filter(c => c.color !== 'wild');
+            if (nonWild.length) return nonWild[Math.floor(Math.random()*nonWild.length)];
+            return playable[Math.floor(Math.random() * playable.length)];
+        }
+
         function handleCardClick(card) {
             if (blockNextTurn) return;
-            
             const player = players[0];
             const {isValid, isJumpIn} = isValidPlay(card, player);
 
@@ -622,49 +983,66 @@
                 }
                 playCard(card, player);
             } else {
-                logMessage("You can't play that card!", 'error');
+                logMessage("You can't play that card!");
+                setStatus("That card doesn't match!");
+                sfxError();
             }
         }
-        
+
         function isValidPlay(card, player) {
             const topCard = discardPile[discardPile.length - 1];
-            
+
             if (houseRules.jumpIn && card.color !== 'wild' && card.color === topCard.color && card.value === topCard.value && player.id !== currentPlayerIndex) {
                  return {isValid: true, isJumpIn: true};
             }
-
             if (player.id !== currentPlayerIndex) return {isValid: false, isJumpIn: false};
-            
             if (drawTwoStack > 0 && houseRules.stackPlusTwo) {
                 return {isValid: card.value === '+2', isJumpIn: false};
             }
-
             return {isValid: card.color === 'wild' || card.color === topCard.color || card.value === topCard.value, isJumpIn: false};
         }
 
         function playCard(card, player) {
+            // Animate the card flying from its owner's hand to the discard pile.
+            const handEl = document.getElementById(`player-${player.id}-hand`);
+            const ownerCardEls = handEl ? handEl.querySelectorAll('.card') : [];
+            // pick a source element (a card from that hand) for the fly origin
+            let sourceEl = null;
+            if (!player.isAI) {
+                sourceEl = Array.from(ownerCardEls).find(el => el.querySelector('.center') && el.classList.contains('playable')) || ownerCardEls[0];
+            } else {
+                sourceEl = ownerCardEls[0];
+            }
+
             if (card.color === 'wild') logMessage(`${player.name} plays a ${card.value} card.`);
             else logMessage(`${player.name} plays a ${card.color} ${card.value}.`);
-            
+            setStatus(`${player.name} plays ${card.color === 'wild' ? '' : capitalize(card.color)+' '}${prettyValue(card)}`.trim());
+            sfxPlay();
+
+            flyCardTo(card, sourceEl, discardPileElement);
+
             player.hand = player.hand.filter(c => c !== card);
             discardPile.push(card);
             showActionEffect(card.value);
 
             if (player.hand.length === 0) {
-                endGame(player);
+                renderGame();
+                setTimeout(() => endGame(player), 350);
                 return;
             }
-            if (player.hand.length === 1) logMessage(`${player.name} shouts UNO!`);
+            if (player.hand.length === 1) {
+                logMessage(`${player.name} shouts UNO!`);
+                triggerUnoCallout();
+            }
 
             let skipNextPlayer = false;
             let postAction = () => nextTurn();
 
-            // Handle special card values
             switch (card.value) {
-                case 'skip': skipNextPlayer = true; break;
-                case 'reverse': gameDirection *= -1; logMessage(`Game direction reversed!`); break;
-                case '+2': drawTwoStack += 2; logMessage(`Draw stack is now ${drawTwoStack}!`); skipNextPlayer = true; break;
-                case '+4': logMessage(`Next player must draw 4 and is skipped!`); drawCards(getNextPlayer(), 4); skipNextPlayer = true; // Fallthrough
+                case 'skip': skipNextPlayer = true; sfxSpecial(); break;
+                case 'reverse': gameDirection *= -1; logMessage(`Game direction reversed!`); sfxSpecial(); break;
+                case '+2': drawTwoStack += 2; logMessage(`Draw stack is now ${drawTwoStack}!`); skipNextPlayer = true; sfxSpecial(); break;
+                case '+4': logMessage(`Next player must draw 4 and is skipped!`); drawCards(getNextPlayer(), 4); skipNextPlayer = true; sfxSpecial();
                 case 'wild':
                 case 'swap':
                     blockNextTurn = true;
@@ -677,30 +1055,33 @@
                     postAction = () => {};
                     break;
                 case '0': if (houseRules.sevenZero) { logMessage(`0 played! All hands rotate!`); showActionEffect('ROTATE!'); rotateHands(); } break;
-                case '7': 
+                case '7':
                     if (houseRules.charades) {
-                        blockNextTurn = true;
-                        triggerCharades();
-                        postAction = () => {};
+                        blockNextTurn = true; triggerCharades(); postAction = () => {};
                     } else if (houseRules.sevenZero) {
                         blockNextTurn = true;
                         actionAfterPlayerChoice = () => nextTurn();
-                        promptPlayerChoice('SWAP HANDS WITH...', (targetIndex) => handlePlayerChoice(targetIndex));
+                        if (player.isAI) {
+                            const target = getAITargetPlayer(player);
+                            setTimeout(() => handlePlayerChoice(target), 900);
+                        } else {
+                            promptPlayerChoice('SWAP HANDS WITH...', (targetIndex) => handlePlayerChoice(targetIndex));
+                        }
                         postAction = () => {};
                     }
                     break;
                 case '8': if (houseRules.madLibs) { blockNextTurn = true; triggerMadLibs(); postAction = () => {}; } break;
                 case '9': if (houseRules.slap) { blockNextTurn = true; triggerSlap(); postAction = () => {}; } break;
             }
-            
+
             if (skipNextPlayer) {
                 currentPlayerIndex = (currentPlayerIndex + gameDirection + PLAYER_COUNT) % PLAYER_COUNT;
             }
 
-            renderGame(); // Render immediately after card is played
+            renderGame();
             if (!blockNextTurn) postAction();
         }
-        
+
         function handleDrawTwoStack(player) {
             if (drawTwoStack > 0 && houseRules.stackPlusTwo) {
                 const hasPlusTwo = player.hand.some(c => c.value === '+2');
@@ -708,7 +1089,7 @@
                     logMessage(`${player.name} must draw ${drawTwoStack} cards.`);
                     drawCards(player, drawTwoStack);
                     drawTwoStack = 0;
-                    return true; // Turn is skipped
+                    return true;
                 }
             }
             return false;
@@ -717,9 +1098,10 @@
         function promptColorChoice(player) {
             if (player.isAI) {
                 const bestColor = getAIBestColor(player);
-                setTimeout(() => handleColorChoice(bestColor), 1000);
+                setTimeout(() => handleColorChoice(bestColor), 900);
             } else {
                 colorChoiceModal.classList.remove('hidden');
+                setStatus("Pick the next color!");
             }
         }
 
@@ -738,7 +1120,7 @@
                 if (p.id === currentPlayerIndex) return;
                 const btn = document.createElement('button');
                 btn.className = 'font-bangers text-2xl bg-blue-500 text-white px-6 py-2 rounded-lg border-2 border-black hover:bg-blue-600';
-                btn.textContent = p.name;
+                btn.textContent = `${p.name} (${p.hand.length})`;
                 btn.onclick = () => {
                     playerChoiceModal.classList.add('hidden');
                     callback(index);
@@ -753,58 +1135,77 @@
             const targetPlayer = players[targetIndex];
             logMessage(`${currentPlayer.name} swaps hands with ${targetPlayer.name}.`);
             showActionEffect('SWAP!');
+            sfxSpecial();
             [currentPlayer.hand, targetPlayer.hand] = [targetPlayer.hand, currentPlayer.hand];
-            if (actionAfterPlayerChoice) actionAfterPlayerChoice();
+            renderGame();
+            if (actionAfterPlayerChoice) { const a = actionAfterPlayerChoice; actionAfterPlayerChoice = null; a(); }
         }
-        
+
         function handleColorChoice(color) {
             logMessage(`Color is now ${color}.`);
+            setStatus(`Color is now ${capitalize(color)}!`);
             const topCard = discardPile[discardPile.length - 1];
             topCard.color = color;
             colorChoiceModal.classList.add('hidden');
+            // color flash on the pile
+            const pileCard = discardPileElement.querySelector('.card');
+            if (pileCard) {
+                const cssColor = ({red:'#e3342f',blue:'#2563eb',green:'#16a34a',yellow:'#f5b301'})[color] || '#fff';
+                pileCard.style.setProperty('--flash', cssColor);
+                pileCard.classList.add('flash');
+            }
+            updateColorIndicator();
             blockNextTurn = false;
+            renderGame();
             nextTurn();
         }
 
         function handleDeckClick() {
             if (blockNextTurn) return;
+            if (currentPlayerIndex !== 0) return; // only the human draws from clicking
             const player = players[currentPlayerIndex];
 
-            if (handleDrawTwoStack(player)) return;
-            
+            if (handleDrawTwoStack(player)) { renderGame(); nextTurn(); return; }
+
             logMessage("You draw a card.");
+            setStatus("You drew a card.");
+            sfxDraw();
+            flyCardTo(null, deckElement, document.getElementById('player-0-hand'));
 
             if (houseRules.drawUntilPlayable) {
                 let canPlay = false, drawnCard;
                 do {
                     drawnCard = drawCards(player, 1)[0];
-                    if (!drawnCard) break; // No cards left
+                    if (!drawnCard) break;
                     logMessage(`You drew a ${drawnCard.color} ${drawnCard.value}.`);
                     canPlay = isValidPlay(drawnCard, player).isValid;
                     renderGame();
                 } while (!canPlay && deck.length > 0);
-                
+
                 if (canPlay) {
                     logMessage(`You can play the ${drawnCard.color} ${drawnCard.value}!`);
-                    setTimeout(() => playCard(drawnCard, player), 1000);
+                    setTimeout(() => playCard(drawnCard, player), 800);
                 } else {
                     logMessage("No playable cards drawn. Turn passes.");
-                    setTimeout(nextTurn, 1000);
+                    setTimeout(nextTurn, 800);
                 }
             } else {
                 const drawnCard = drawCards(player, 1)[0];
                 renderGame();
-                if (isValidPlay(drawnCard, player).isValid) {
+                if (drawnCard && isValidPlay(drawnCard, player).isValid) {
                     logMessage(`You drew a playable card. Play it or pass.`);
+                    setStatus("You can play the card you drew!");
                 } else {
                     logMessage("You can't play the drawn card. Turn passes.");
-                    if (!isAwaitingHydration) setTimeout(nextTurn, 1000);
+                    if (!isAwaitingHydration) setTimeout(nextTurn, 800);
                 }
             }
         }
-        
+
         function drawAndPlayForAI() {
             const player = players[currentPlayerIndex];
+            sfxDraw();
+            flyCardTo(null, deckElement, document.getElementById(`player-${player.id}-hand`));
             if (houseRules.drawUntilPlayable) {
                 let canPlay = false, drawnCard;
                 do {
@@ -814,21 +1215,21 @@
                     canPlay = isValidPlay(drawnCard, player).isValid;
                     renderGame();
                 } while (!canPlay && deck.length > 0);
-                
+
                 if (canPlay) {
                     logMessage(`${player.name} plays the drawn card.`);
-                    setTimeout(() => playCard(drawnCard, player), 1000);
+                    setTimeout(() => playCard(drawnCard, player), 900);
                 } else {
                     logMessage(`${player.name}'s turn passes.`);
-                    setTimeout(nextTurn, 1000);
+                    setTimeout(nextTurn, 900);
                 }
             } else {
                 const drawnCard = drawCards(player, 1)[0];
                 renderGame();
-                if (isValidPlay(drawnCard, player).isValid) {
-                     setTimeout(() => playCard(drawnCard, player), 1000);
+                if (drawnCard && isValidPlay(drawnCard, player).isValid) {
+                     setTimeout(() => playCard(drawnCard, player), 900);
                 } else {
-                    if (!isAwaitingHydration) setTimeout(nextTurn, 1000);
+                    if (!isAwaitingHydration) setTimeout(nextTurn, 900);
                 }
             }
         }
@@ -837,17 +1238,14 @@
             if (blockNextTurn) return;
             currentPlayerIndex = (currentPlayerIndex + gameDirection + PLAYER_COUNT) % PLAYER_COUNT;
             renderGame();
-            setTimeout(gameLoop, 1000);
+            setTimeout(gameLoop, 900);
         }
 
         function drawCards(player, count) {
             const drawnCards = [];
             for (let i = 0; i < count; i++) {
                 if (deck.length === 0) reshuffleDiscardPile();
-                if (deck.length === 0) {
-                    logMessage("No cards left to draw!");
-                    break;
-                }
+                if (deck.length === 0) { logMessage("No cards left to draw!"); break; }
                 const card = deck.pop();
                 player.hand.push(card);
                 drawnCards.push(card);
@@ -863,53 +1261,139 @@
             shuffle(deck);
             discardPile = [topCard];
         }
-        
+
         function getNextPlayer() {
             const nextIndex = (currentPlayerIndex + gameDirection + PLAYER_COUNT) % PLAYER_COUNT;
             return players[nextIndex];
         }
-        
-        function getAIBestColor(player) { /* ... */ return COLORS[Math.floor(Math.random() * 4)]; }
-        function getAITargetPlayer(player) { /* ... */ return (player.id + 1) % PLAYER_COUNT; }
+
+        // Pick the color the AI holds most of (saving it ammo). Falls back to random.
+        function getAIBestColor(player) {
+            const counts = { red: 0, green: 0, blue: 0, yellow: 0 };
+            player.hand.forEach(c => { if (counts[c.color] !== undefined) counts[c.color]++; });
+            let best = null, bestN = -1;
+            COLORS.forEach(c => { if (counts[c] > bestN) { bestN = counts[c]; best = c; } });
+            return (bestN > 0) ? best : COLORS[Math.floor(Math.random() * 4)];
+        }
+        // Swap with the player holding the fewest cards (steal a strong hand).
+        function getAITargetPlayer(player) {
+            let target = null, fewest = Infinity;
+            players.forEach(p => {
+                if (p.id === player.id) return;
+                if (p.hand.length < fewest) { fewest = p.hand.length; target = p.id; }
+            });
+            return (target !== null) ? target : (player.id + 1) % PLAYER_COUNT;
+        }
 
         function endGame(winner) {
+            // Score the round: winner gains the sum of everyone else's hand points.
+            let roundPoints = 0;
+            players.forEach(p => { if (p.id !== winner.id) roundPoints += handPoints(p.hand); });
+            scores[winner.id] += roundPoints;
+            saveScores();
+            renderScoreboard();
+
+            sfxWin();
+            launchConfetti();
             winnerMessage.textContent = `${winner.name} Wins!`;
+            roundSummary.textContent = `+${roundPoints} points  •  Round ${roundNumber} complete`;
             gameOverModal.classList.remove('hidden');
             blockNextTurn = true;
+            roundNumber += 1;
+            saveScores();
         }
+
+        function handPoints(hand) {
+            return hand.reduce((sum, c) => {
+                if (c.value === '+4' || c.value === 'wild' || c.value === 'swap') return sum + 50;
+                if (['skip','reverse','+2'].includes(c.value)) return sum + 20;
+                const n = parseInt(c.value, 10);
+                return sum + (isNaN(n) ? 0 : n);
+            }, 0);
+        }
+
+        // ============================================================
+        //  EFFECTS / UI HELPERS
+        // ============================================================
+        function capitalize(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
+        function prettyValue(card) {
+            if (card.value.startsWith('+')) return card.value;
+            if (card.value === 'swap') return 'Swap';
+            return capitalize(card.value);
+        }
+
+        function setStatus(msg) { statusLine.textContent = msg; }
 
         function logMessage(message) {
             const p = document.createElement('p');
+            p.className = 'log-line';
             p.textContent = message;
             gameLog.appendChild(p);
             gameLog.scrollTop = gameLog.scrollHeight;
+            while (gameLog.children.length > 40) gameLog.removeChild(gameLog.firstChild);
         }
 
-        function showActionEffect(value) { /* ... */ }
-        
-        // --- Mini-Game Triggers & Handlers ---
+        function showActionEffect(value) {
+            const map = {
+                skip: 'SKIP!', reverse: 'REVERSE!', '+2': '+2!', '+4': '+4!',
+                wild: 'WILD!', swap: 'SWAP!'
+            };
+            const text = map[value] || value;
+            if (!map[value] && value !== 'ROTATE!' && value !== 'SWAP!') return; // only for specials/custom
+            const el = document.createElement('div');
+            el.className = 'action-effect';
+            el.textContent = (value === 'ROTATE!' || value === 'SWAP!') ? value : text;
+            actionEffectContainer.appendChild(el);
+            setTimeout(() => el.remove(), 1200);
+        }
 
+        function triggerUnoCallout() {
+            sfxUno();
+            unoCallout.classList.remove('show');
+            void unoCallout.offsetWidth; // restart animation
+            unoCallout.classList.add('show');
+        }
+
+        function launchConfetti() {
+            const colors = ['#e3342f', '#2563eb', '#16a34a', '#f5b301', '#a855f7', '#fff'];
+            for (let i = 0; i < 80; i++) {
+                const c = document.createElement('div');
+                c.className = 'confetti';
+                c.style.left = Math.random() * 100 + 'vw';
+                c.style.background = colors[Math.floor(Math.random() * colors.length)];
+                c.style.animationDuration = (2 + Math.random() * 2) + 's';
+                c.style.animationDelay = (Math.random() * 0.6) + 's';
+                c.style.transform = `rotate(${Math.random()*360}deg)`;
+                document.body.appendChild(c);
+                setTimeout(() => c.remove(), 4600);
+            }
+        }
+
+        // ============================================================
+        //  MINI-GAMES
+        // ============================================================
         function triggerSlap() {
             logMessage("9 played! Get ready to SLAP!");
+            setStatus("SLAP the button — last one draws 2!");
             slapState = { active: true, slappers: [] };
             slapButton.classList.remove('hidden');
-            
-            // AI slapping logic
+
             players.forEach(p => {
                 if (p.isAI) {
                     setTimeout(() => {
                         if (slapState.active) slapState.slappers.push(p.id);
-                    }, 500 + Math.random() * 2000); // AI slaps between 0.5 and 2.5 seconds
+                    }, 500 + Math.random() * 2000);
                 }
             });
 
-            setTimeout(endSlap, 3000); // End slap after 3 seconds
+            setTimeout(endSlap, 3000);
         }
 
         function handleSlapClick() {
             if (slapState.active && !slapState.slappers.includes(0)) {
-                slapState.slappers.push(0); // Player 0 is human
+                slapState.slappers.push(0);
                 logMessage("You slapped!");
+                sfxSpecial();
             }
         }
 
@@ -917,11 +1401,11 @@
             if (!slapState.active) return;
             slapState.active = false;
             slapButton.classList.add('hidden');
-            
+
             let loser = null;
             if (slapState.slappers.length < PLAYER_COUNT) {
                 const nonSlappers = players.filter(p => !slapState.slappers.includes(p.id));
-                loser = nonSlappers[0]; // First one who didn't slap
+                loser = nonSlappers[0];
             } else {
                 const lastSlapperId = slapState.slappers[slapState.slappers.length - 1];
                 loser = players.find(p => p.id === lastSlapperId);
@@ -945,7 +1429,6 @@
             madLibsModal.classList.remove('hidden');
 
             if (players[currentPlayerIndex].isAI) {
-                // Auto-fill for AI
                 setTimeout(() => {
                     document.getElementById('mad-libs-noun').value = 'alien';
                     document.getElementById('mad-libs-verb').value = 'flying';
@@ -964,16 +1447,13 @@
             blockNextTurn = false;
             nextTurn();
         }
-        
+
         function triggerCharades() {
             logMessage("7 played! Time for Charades!");
             const word = CHARADE_WORDS[Math.floor(Math.random() * CHARADE_WORDS.length)];
             charadesWord.textContent = word;
             charadesModal.classList.remove('hidden');
-
-            if (players[currentPlayerIndex].isAI) {
-                setTimeout(handleCharadesDone, 2000);
-            }
+            if (players[currentPlayerIndex].isAI) setTimeout(handleCharadesDone, 2000);
         }
 
         function handleCharadesDone() {
@@ -981,7 +1461,7 @@
             blockNextTurn = false;
             nextTurn();
         }
-        
+
         function handleSilentUnoClick() {
             promptPlayerChoice("Who Talked?", (targetIndex) => {
                 const player = players[targetIndex];
@@ -990,7 +1470,7 @@
                 renderGame();
             });
         }
-        
+
         function checkForHydration(player) {
             if (houseRules.stayHydrated && Math.random() < 0.20) {
                  logMessage(`${player.name} needs to hydrate!`);
@@ -998,27 +1478,23 @@
                 isAwaitingHydration = true;
                 hydratingPlayerId = player.id;
                 hydrationModal.classList.remove('hidden');
-
-                if (player.isAI) {
-                    setTimeout(handleHydration, 1500);
-                }
+                if (player.isAI) setTimeout(handleHydration, 1500);
              }
         }
-        function handleHydration() { 
+        function handleHydration() {
             if (!isAwaitingHydration) return;
-            
             const player = players[hydratingPlayerId];
             logMessage(`${player.name} is hydrated!`);
-            
             hydrationModal.classList.add('hidden');
             isAwaitingHydration = false;
             hydratingPlayerId = null;
             blockNextTurn = false;
-
             nextTurn();
          }
 
-        // --- Event Listeners ---
+        // ============================================================
+        //  EVENT LISTENERS
+        // ============================================================
         deckElement.addEventListener('click', handleDeckClick);
         restartGameBtn.addEventListener('click', setupGame);
         waterCup.addEventListener('click', handleHydration);
@@ -1027,10 +1503,17 @@
         madLibsSubmit.addEventListener('click', handleMadLibsSubmit);
         charadesDone.addEventListener('click', handleCharadesDone);
 
+        helpBtn.addEventListener('click', () => helpModal.classList.remove('hidden'));
+        helpClose.addEventListener('click', () => helpModal.classList.add('hidden'));
+
+        soundBtn.addEventListener('click', () => {
+            soundEnabled = !soundEnabled;
+            soundBtn.textContent = soundEnabled ? '🔊' : '🔇';
+            if (soundEnabled) { getAudio(); tone(660, 0.1, 'triangle', 0.15); }
+        });
+
         colorButtons.forEach(button => {
-            button.addEventListener('click', () => {
-                handleColorChoice(button.dataset.color);
-            });
+            button.addEventListener('click', () => handleColorChoice(button.dataset.color));
         });
 
         toggleRulesBtn.addEventListener('click', () => {
@@ -1049,8 +1532,7 @@
             houseRules.madLibs = madLibsRuleCheckbox.checked;
             houseRules.charades = charadesRuleCheckbox.checked;
             houseRules.silentUno = silentUnoRuleCheckbox.checked;
-            
-            // Special case for Charades rule, as it conflicts with 7-0 swap rule on the same card
+
             if (houseRules.charades) {
                 sevenZeroRuleCheckbox.checked = false;
                 houseRules.sevenZero = false;
@@ -1062,9 +1544,13 @@
             setupGame();
         });
 
+        // resume audio on first interaction (browsers require a gesture)
+        document.addEventListener('pointerdown', () => getAudio(), { once: true });
+
         // --- Initial Setup ---
+        loadScores();
+        renderScoreboard();
         setupGame();
     </script>
 </body>
 </html>
-```eof

@@ -604,6 +604,47 @@
     box-shadow: 0 0 0 2px rgba(255, 213, 77, 0.3);
   }
 
+  /* Current-ability move readout — updates live with the picker */
+  .move-info {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    background: var(--card-inner);
+    border: 1px solid #3a3a52;
+    border-left: 4px solid var(--mi-accent, #ffd54d);
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 0.74rem;
+    color: var(--muted);
+  }
+  .move-info .mi-name {
+    font-weight: 800;
+    color: var(--mi-accent, #ffd54d);
+    letter-spacing: 0.03em;
+    font-size: 0.82rem;
+  }
+  .move-info .mi-move {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: #2b2b40;
+    border: 1px solid #3a3a52;
+    border-radius: 6px;
+    padding: 2px 8px;
+    color: var(--text);
+  }
+  .move-info .mi-move kbd {
+    font-size: 0.66rem;
+    padding: 0 4px;
+    min-width: 14px;
+  }
+  .move-info .mi-tag {
+    color: #9090a8;
+    font-size: 0.68rem;
+    font-style: italic;
+  }
+
   .play-overlay {
     position: relative;
     border-radius: 12px;
@@ -725,21 +766,41 @@
     border: 2px solid #3a3a52;
     border-left: 5px solid var(--ab-accent, #ffd54d);
     color: var(--text);
-    padding: 12px 6px;
+    padding: 8px 6px 9px;
     border-radius: 8px;
     cursor: pointer;
     font-family: inherit;
     font-weight: 700;
     font-size: 0.82rem;
     letter-spacing: 0.04em;
-    transition: transform 0.1s, background 0.15s, border-color 0.15s;
+    transition: transform 0.1s, background 0.15s, border-color 0.15s, box-shadow 0.15s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
   }
   .overlay-ability:hover {
     background: #2b2b40;
     border-color: #ffd54d;
-    transform: translateY(-1px);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 14px rgba(0,0,0,0.4), 0 0 0 2px var(--ab-accent, #ffd54d);
   }
+  .overlay-ability .oa-portrait {
+    width: 40px;
+    height: 40px;
+    display: block;
+    filter: drop-shadow(0 2px 2px rgba(0,0,0,0.4));
+  }
+  .overlay-ability .oa-portrait svg { width: 100%; height: 100%; }
   .overlay-ability-name { display: block; }
+  .overlay-ability .oa-type {
+    font-size: 0.6rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ab-accent, #ffd54d);
+    opacity: 0.85;
+  }
 
   /* Ability picker locked-state during gauntlet runs */
   .ability-picker.locked {
@@ -837,6 +898,18 @@
     font-family: ui-monospace, "SF Mono", Menlo, monospace;
     text-transform: uppercase;
   }
+
+  /* Pause-screen control reminder */
+  .pause-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 14px;
+    justify-content: center;
+    font-size: 0.75rem;
+    color: #b0b0c0;
+    padding: 4px 0;
+  }
+  .pause-controls span { display: inline-flex; align-items: center; gap: 5px; }
 
   /* Run summary (victory / game-over) */
   .run-summary {
@@ -942,7 +1015,35 @@
 
   /* Smooth shake — the JS applies the translate, but a transition would
      fight the per-frame updates, so we keep it instant */
-  .play-arena-wrap { will-change: transform; }
+  .play-arena-wrap { will-change: transform; transform-origin: center center; }
+
+  /* Impact flash — a full-arena white pulse on big hits / KOs. JS toggles
+     the 'flash' class and sets --flash-color / --flash-alpha. */
+  .play-flash {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 4;
+    border-radius: 12px;
+    opacity: 0;
+    mix-blend-mode: screen;
+    background: radial-gradient(circle at center,
+      var(--flash-color, #ffffff) 0%,
+      transparent 75%);
+    transition: opacity 0.18s ease-out;
+  }
+  .play-flash.flash { opacity: var(--flash-alpha, 0.6); transition: opacity 0.04s ease-out; }
+
+  /* Soft vignette over the arena for depth/focus (purely cosmetic) */
+  .play-vignette {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 3;
+    border-radius: 12px;
+    background: radial-gradient(ellipse 78% 78% at center,
+      transparent 55%, rgba(0,0,0,0.28) 100%);
+  }
 
   /* ============ TOUCH CONTROLS (visible only on coarse pointers) ============ */
   .touch-pad {
@@ -1257,8 +1358,11 @@
         </div>
         <div class="ability-picker" id="ability-picker"></div>
       </div>
+      <div class="move-info" id="move-info" aria-live="polite"></div>
       <div class="play-overlay">
         <div class="play-arena-wrap" id="play-arena-wrap" tabindex="0"></div>
+        <div class="play-vignette" aria-hidden="true"></div>
+        <div class="play-flash" id="play-flash" aria-hidden="true"></div>
         <div class="click-to-play" id="click-to-play">
           &#9654; Click to Play
           <span class="play-hint">Keyboard takes over inside the arena</span>
@@ -2829,6 +2933,7 @@ document.addEventListener('click', (e) => {
       // arena cleanup
       game.projectiles.length = 0;
       game.effects.length = 0;
+      clearArenaFx();
       // resync HUD entries so the enemy slot shows its new ability
       syncEnemyHud();
     }
@@ -2966,9 +3071,188 @@ const fx = {
   shakeMag: 0,
   shakeDecay: 0.85,
   stopFrames: 0,    // skip this many ticks (hit-stop pause for impact)
+  flashTimer: 0,    // frames remaining on the screen flash
+  flashColor: '#ffffff',
+  flashAlpha: 0,
+  zoom: 0,          // transient scale punch (decays toward 0)
 };
 function shake(amount) { fx.shakeMag = Math.max(fx.shakeMag, amount); }
+function zoomPunch(amount) { fx.zoom = Math.max(fx.zoom, amount); }
 function hitStop(ms) { fx.stopFrames = Math.max(fx.stopFrames, Math.round(ms / (1000 / 60))); }
+// Full-arena impact flash — alpha 0..1, duration in frames
+function flash(alpha, color, frames) {
+  fx.flashAlpha = Math.max(fx.flashAlpha, alpha);
+  fx.flashColor = color || '#ffffff';
+  fx.flashTimer = Math.max(fx.flashTimer, frames || 6);
+}
+
+// ---------- Dust puffs (landing + dash kick-up) ----------
+// Soft expanding ground/air puffs, separate channel from spark particles
+// so they can have their own look (translucent, growing, slow).
+function spawnDust(x, y, dir, count, tint) {
+  game.dust = game.dust || [];
+  const n = count || 4;
+  for (let i = 0; i < n; i++) {
+    const spread = (Math.random() - 0.5) * 1.6;
+    game.dust.push({
+      x: x + spread * 4,
+      y: y + (Math.random() - 0.5) * 2,
+      vx: (dir || 0) * (0.4 + Math.random() * 0.9) + spread,
+      vy: -(0.2 + Math.random() * 0.7),
+      r: 2 + Math.random() * 2.5,
+      grow: 0.18 + Math.random() * 0.12,
+      life: 16 + Math.floor(Math.random() * 8),
+      maxLife: 24,
+      tint: tint || '#e8e8f0',
+    });
+  }
+}
+function updateDust() {
+  if (!game.dust || game.dust.length === 0) return;
+  for (const d of game.dust) {
+    d.x += d.vx;
+    d.y += d.vy;
+    d.vy += 0.04;
+    d.vx *= 0.9;
+    d.r += d.grow;
+    d.life--;
+  }
+  game.dust = game.dust.filter(d => d.life > 0);
+}
+function renderDust() {
+  if (!game.dust || game.dust.length === 0) return '';
+  return game.dust.map(d => {
+    const op = Math.min(0.5, (d.life / d.maxLife) * 0.5);
+    return `<circle cx="${d.x.toFixed(1)}" cy="${d.y.toFixed(1)}" r="${d.r.toFixed(1)}"
+      fill="${d.tint}" opacity="${op.toFixed(2)}"/>`;
+  }).join('');
+}
+
+// ---------- Afterimages (motion ghosts on fast moves) ----------
+// Each ghost stores a transform string + the innerHTML at capture time so it
+// renders identically to the live fighter, just faded. Cheap ring of frames.
+function pushAfterimage(x, y, scaleX, scaleY, rot, html, tint) {
+  game.ghosts = game.ghosts || [];
+  game.ghosts.push({ x, y, scaleX, scaleY, rot, html, tint, life: 8, maxLife: 8 });
+  if (game.ghosts.length > 24) game.ghosts.shift();
+}
+function updateAfterimages() {
+  if (!game.ghosts || game.ghosts.length === 0) return;
+  for (const g of game.ghosts) g.life--;
+  game.ghosts = game.ghosts.filter(g => g.life > 0);
+}
+function renderAfterimages() {
+  if (!game.ghosts || game.ghosts.length === 0) return '';
+  return game.ghosts.map(g => {
+    const op = (g.life / g.maxLife) * 0.32;
+    return `<g transform="translate(${g.x.toFixed(1)}, ${g.y.toFixed(1)}) scale(${g.scaleX.toFixed(3)}, ${g.scaleY.toFixed(3)}) rotate(${g.rot.toFixed(1)}) translate(-100,-100)"
+      opacity="${op.toFixed(2)}" style="filter:saturate(1.6) brightness(1.3)">${g.html}</g>`;
+  }).join('');
+}
+
+// ---------- KO star-burst (Smash-style ring of stars on knockout) ----------
+function spawnKOBurst(x, y, color) {
+  game.koStars = game.koStars || [];
+  const n = 9;
+  for (let i = 0; i < n; i++) {
+    const ang = (Math.PI * 2 * i / n) - Math.PI / 2;
+    const speed = 2.4 + Math.random() * 1.8;
+    game.koStars.push({
+      x, y,
+      vx: Math.cos(ang) * speed,
+      vy: Math.sin(ang) * speed - 0.6,
+      spin: Math.random() * 360,
+      spinVel: (Math.random() - 0.5) * 30,
+      size: 4 + Math.random() * 3,
+      life: 30 + Math.floor(Math.random() * 14),
+      maxLife: 44,
+      color: color || '#ffd54d',
+    });
+  }
+}
+function updateKOStars() {
+  if (!game.koStars || game.koStars.length === 0) return;
+  for (const s of game.koStars) {
+    s.x += s.vx;
+    s.y += s.vy;
+    s.vy += 0.12;
+    s.vx *= 0.98;
+    s.spin += s.spinVel;
+    s.life--;
+  }
+  game.koStars = game.koStars.filter(s => s.life > 0);
+}
+// ---------- Stage ambiance (drifting motes tinted per stage) ----------
+// A slow background particle layer that gives each backdrop a little life:
+// leaves on Whispy, confetti sparkle in the stadium, wind streaks on the
+// Halberd deck, twinkling stardust in the Galactic arena.
+const AMBIANCE = {
+  whispy:   { rate: 0.10, color: ['#6dd64d', '#5fc242', '#a8d8ee'], rise: false, size: [1.5, 3] },
+  dedede:   { rate: 0.08, color: ['#ffd54d', '#d63131', '#fff5a0'], rise: true,  size: [1, 2] },
+  halberd:  { rate: 0.07, color: ['#a8c0e0', '#ffffff', '#5a6ec8'], rise: false, size: [1, 2] },
+  galactic: { rate: 0.12, color: ['#c8a4ff', '#ec4899', '#fff5a0'], rise: true,  size: [1, 2.5] },
+};
+function updateAmbiance() {
+  const cfg = AMBIANCE[game.stage] || AMBIANCE.whispy;
+  if (Math.random() < cfg.rate) {
+    game.ambiance = game.ambiance || [];
+    const fromTop = !cfg.rise;
+    const x = Math.random() * PLAY.W;
+    const y = fromTop ? -6 : PLAY.GROUND_Y + Math.random() * 50;
+    game.ambiance.push({
+      x, y,
+      vx: (Math.random() - 0.5) * 0.5,
+      vy: fromTop ? (0.4 + Math.random() * 0.6) : -(0.3 + Math.random() * 0.5),
+      sway: Math.random() * Math.PI * 2,
+      swaySpd: 0.02 + Math.random() * 0.03,
+      r: cfg.size[0] + Math.random() * (cfg.size[1] - cfg.size[0]),
+      color: cfg.color[Math.floor(Math.random() * cfg.color.length)],
+      life: 200 + Math.floor(Math.random() * 120),
+      maxLife: 320,
+    });
+  }
+  if (!game.ambiance || game.ambiance.length === 0) return;
+  for (const a of game.ambiance) {
+    a.sway += a.swaySpd;
+    a.x += a.vx + Math.sin(a.sway) * 0.3;
+    a.y += a.vy;
+    a.life--;
+  }
+  game.ambiance = game.ambiance.filter(a => a.life > 0 && a.y > -12 && a.y < PLAY.H + 12);
+}
+function renderAmbiance() {
+  if (!game.ambiance || game.ambiance.length === 0) return '';
+  return game.ambiance.map(a => {
+    const op = Math.min(0.5, (a.life / a.maxLife) * 0.6);
+    return `<circle cx="${a.x.toFixed(1)}" cy="${a.y.toFixed(1)}" r="${a.r.toFixed(1)}"
+      fill="${a.color}" opacity="${op.toFixed(2)}"/>`;
+  }).join('');
+}
+
+// Clear all transient juice channels (called on resets so the arena starts clean)
+function clearArenaFx() {
+  game.particles = [];
+  game.dust = [];
+  game.ghosts = [];
+  game.koStars = [];
+  game.popups = [];
+  game.ambiance = [];
+  fx.shakeMag = 0;
+  fx.flashTimer = 0;
+  fx.flashAlpha = 0;
+  fx.zoom = 0;
+}
+function renderKOStars() {
+  if (!game.koStars || game.koStars.length === 0) return '';
+  return game.koStars.map(s => {
+    const op = Math.min(1, s.life / 18);
+    const r = s.size;
+    return `<g transform="translate(${s.x.toFixed(1)}, ${s.y.toFixed(1)}) rotate(${s.spin.toFixed(0)})" opacity="${op.toFixed(2)}">
+      <path d="M 0 ${-r} L ${(r*0.3).toFixed(1)} ${(-r*0.3).toFixed(1)} L ${r} ${(-r*0.2).toFixed(1)} L ${(r*0.4).toFixed(1)} ${(r*0.3).toFixed(1)} L ${(r*0.6).toFixed(1)} ${r} L 0 ${(r*0.5).toFixed(1)} L ${(-r*0.6).toFixed(1)} ${r} L ${(-r*0.4).toFixed(1)} ${(r*0.3).toFixed(1)} L ${-r} ${(-r*0.2).toFixed(1)} L ${(-r*0.3).toFixed(1)} ${(-r*0.3).toFixed(1)} Z"
+        fill="${s.color}" stroke="#7a5018" stroke-width="0.8"/>
+    </g>`;
+  }).join('');
+}
 
 // ---------- Heart pickup (drops between gauntlet waves) ----------
 function spawnHeartPickup() {
@@ -3642,6 +3926,8 @@ function buildPlayScene(stageKey) {
 <svg viewBox="0 0 600 300" id="play-arena-svg" xmlns="http://www.w3.org/2000/svg">
   <defs>${stageDefs(game.stage)}</defs>
   ${stageScenery(game.stage)}
+  <g id="play-ambiance"></g>
+  <g id="play-ghosts"></g>
   <g id="play-dummy"></g>
   <g id="play-player"></g>
   <g id="play-pickups"></g>
@@ -3759,8 +4045,17 @@ function kirbyChargeFor(ab, ratio) {
          <path d="M 100 38 L 103 46 L 110 48 L 103 50 L 100 58 L 97 50 L 90 48 L 97 46 Z" fill="#fff5a0"/>
        </g>`
     : '';
+  // electric crackle arcs once charge passes ~60% — sells the building power
+  const crackle = r > 0.6
+    ? `<g stroke="#fff5a0" stroke-width="1.6" fill="none" opacity="${(r * 0.8).toFixed(2)}" stroke-linecap="round">
+         <path d="M ${100 - glowR} 110 l 8 -6 l -4 -3 l 9 -7"/>
+         <path d="M ${100 + glowR} 110 l -8 6 l 4 3 l -9 7"/>
+         <path d="M 100 ${110 - glowR} l 6 8 l 3 -4 l 7 9"/>
+       </g>`
+    : '';
   return svg(
-    `<circle cx="100" cy="110" r="${glowR}" fill="${accent}" opacity="${0.15 + r * 0.35}"/>
+    `<circle cx="100" cy="110" r="${glowR + 4}" fill="${accent}" opacity="${(0.08 + r * 0.18).toFixed(2)}"/>
+     <circle cx="100" cy="110" r="${glowR}" fill="${accent}" opacity="${0.15 + r * 0.35}"/>
      <circle cx="100" cy="110" r="${glowR - 8}" fill="${accent}" opacity="${0.1 + r * 0.25}"/>` +
     kirbyFeet({ leftRot: -10, rightRot: 10, leftX: 86, rightX: 114, y: 158 }) +
     kirbyBody() +
@@ -3769,8 +4064,10 @@ function kirbyChargeFor(ab, ratio) {
     ABILITY_ACCESSORY[ab.key]() +
     kirbyFace({ mouth: 'open', eyesY: 100 }) +
     sparkles +
+    crackle +
     (r > 0.98
-      ? `<circle cx="100" cy="110" r="${glowR + 6}" fill="none" stroke="#ffd54d" stroke-width="2.5" opacity="0.9"/>`
+      ? `<circle cx="100" cy="110" r="${glowR + 6}" fill="none" stroke="#ffd54d" stroke-width="2.5" opacity="0.9"/>
+         <circle cx="100" cy="110" r="${glowR + 11}" fill="none" stroke="#fff5a0" stroke-width="1.2" opacity="0.6"/>`
       : '')
   );
 }
@@ -3833,6 +4130,16 @@ function randomAbility(exclude) {
   const pool = ABILITIES.filter(a => !exclude || a.key !== exclude.key);
   return pool[Math.floor(Math.random() * pool.length)];
 }
+
+// Trail color per projectile kind — matched to each sprite's glow
+const PROJ_TRAIL_TINT = {
+  arrow: '#d6b06a',
+  cutter: '#7fe25c',
+  swordbeam: '#fffacc',
+  beamshot: '#fff04a',
+  fireball: '#ff9a42',
+  starshot: '#c8a4ff',
+};
 
 // Compact projectile sprites (drawn around origin, arena-scale units)
 const PROJECTILE_SPRITES = {
@@ -3910,23 +4217,46 @@ function spawnProjectile(kind, x, y, angleDeg, speed, move, owner) {
   });
 }
 
-function spawnHitEffect(x, y, color) {
-  game.effects.push({ x, y, life: 16, maxLife: 16, color: color || '#fff5a0' });
-  // Also spawn a burst of small particles fanning out
-  const count = 8;
+function spawnHitEffect(x, y, color, dir, heavy) {
+  const c = color || '#fff5a0';
+  // Core impact star — bigger/brighter on heavy hits
+  game.effects.push({ x, y, life: heavy ? 20 : 16, maxLife: heavy ? 20 : 16, color: c, heavy: !!heavy });
+  // White-hot flash burst right at the impact point
+  game.particles = game.particles || [];
+  game.particles.push({ x, y, vx: 0, vy: 0, life: heavy ? 8 : 6, maxLife: 8, color: '#ffffff', size: heavy ? 6 : 4, flash: true });
+  // Radial fan of small sparks
+  const count = heavy ? 11 : 8;
   for (let i = 0; i < count; i++) {
     const ang = (Math.PI * 2 * i / count) + Math.random() * 0.6;
-    const speed = 1.5 + Math.random() * 2.5;
-    game.particles = game.particles || [];
+    const speed = (heavy ? 2.2 : 1.5) + Math.random() * 2.5;
     game.particles.push({
       x, y,
       vx: Math.cos(ang) * speed,
       vy: Math.sin(ang) * speed - 0.4,
       life: 18 + Math.floor(Math.random() * 10),
       maxLife: 28,
-      color: color || '#fff5a0',
+      color: c,
       size: 1.5 + Math.random() * 1.5,
     });
+  }
+  // Directional knockback streaks — long, fast sparks shot along the hit
+  // direction so the impact reads as a launch, not just a poof.
+  if (dir) {
+    const streaks = heavy ? 5 : 3;
+    for (let i = 0; i < streaks; i++) {
+      const jitter = (Math.random() - 0.5) * 0.8;
+      const speed = (heavy ? 5 : 3.5) + Math.random() * 2.5;
+      game.particles.push({
+        x, y,
+        vx: dir * speed,
+        vy: jitter * 2 - 1,
+        life: 12 + Math.floor(Math.random() * 6),
+        maxLife: 18,
+        color: '#fff5a0',
+        size: 2.2 + Math.random() * 1.4,
+        streak: true,
+      });
+    }
   }
 }
 function updateParticles() {
@@ -3934,19 +4264,57 @@ function updateParticles() {
   for (const p of game.particles) {
     p.x += p.vx;
     p.y += p.vy;
-    p.vy += 0.18; // gravity on sparks
+    if (!p.noGravity) p.vy += 0.18; // gravity on sparks (trails float)
     p.vx *= 0.94;
     p.life--;
   }
   game.particles = game.particles.filter(p => p.life > 0);
 }
+
+// Faint glowing dot left behind a projectile so fast shots leave a trail
+function spawnProjTrail(x, y, color, size) {
+  game.particles = game.particles || [];
+  game.particles.push({
+    x, y, vx: 0, vy: 0,
+    life: 8, maxLife: 8,
+    color: color || '#fff5a0',
+    size: size || 2,
+    noGravity: true,
+  });
+}
 function renderParticles() {
   if (!game.particles || game.particles.length === 0) return '';
   return game.particles.map(p => {
     const op = Math.min(1, p.life / 14);
+    if (p.flash) {
+      // brief white-hot impact core
+      const fr = p.size * (1 + (1 - p.life / p.maxLife) * 1.4);
+      return `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${fr.toFixed(1)}"
+        fill="#ffffff" opacity="${(op * 0.9).toFixed(2)}"/>`;
+    }
+    if (p.streak) {
+      // motion-blurred streak drawn along its velocity
+      const len = Math.hypot(p.vx, p.vy) * 2.4;
+      const ang = Math.atan2(p.vy, p.vx) * 180 / Math.PI;
+      return `<g transform="translate(${p.x.toFixed(1)}, ${p.y.toFixed(1)}) rotate(${ang.toFixed(0)})" opacity="${op.toFixed(2)}">
+        <rect x="${(-len).toFixed(1)}" y="${(-p.size/2).toFixed(1)}" width="${len.toFixed(1)}" height="${p.size.toFixed(1)}"
+          rx="${(p.size/2).toFixed(1)}" fill="${p.color}"/>
+      </g>`;
+    }
     return `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${p.size.toFixed(1)}"
       fill="${p.color}" opacity="${op.toFixed(2)}"/>`;
   }).join('');
+}
+
+// Charged-release shockwave — a fast expanding ring tinted to the ability,
+// scaled by how full the charge was. Pure flair on a charged attack firing.
+function spawnReleaseRing(x, y, color, power) {
+  const p = Math.max(0.3, Math.min(1, power || 0.5));
+  game.effects.push({
+    x, y, life: 14, maxLife: 14,
+    color: color || '#ffd54d',
+    ring: true, ringMax: 22 + p * 30,
+  });
 }
 
 // Damage popup — floating number that drifts up and fades
@@ -3989,6 +4357,12 @@ function executeMove(actor, slot, power) {
   actor.activeMove = move;
   actor.moveFrame = 0;
   actor.attackConnected = false;
+  // Charged release: a tinted shockwave ring + ground dust burst for impact feel
+  if (slot === 'charged') {
+    spawnReleaseRing(actor.x + actor.facing * 8, actor.y - 4, actor.ability.accent, power);
+    spawnDust(actor.x, PLAY.GROUND_Y, -actor.facing, 4);
+    if (power > 0.85) { shake(4); flash(0.25, actor.ability.accent, 4); }
+  }
   if (move.type === 'projectile') {
     let angle = (slot === 'charged') ? actor.aimAngle : (actor.facing > 0 ? 0 : 180);
     if (move.arc && slot !== 'charged') angle = actor.facing > 0 ? -38 : -142; // default lob
@@ -4022,9 +4396,11 @@ function applyDamage(target, dmg, kbx, kby, attackerAccent) {
     sfx.block();
     return;
   }
+  const heavy = dmg >= 2;
+  const hitDir = Math.sign(kbx) || (target === game.player ? -1 : 1);
   // SFX + game-feel: heavy hits get the bigger thud + screen shake + hit-stop
-  if (dmg >= 2) { sfx.hitHeavy(); shake(8); hitStop(80); }
-  else          { sfx.hitLight(); shake(3); }
+  if (heavy) { sfx.hitHeavy(); shake(8); hitStop(90); flash(0.5, '#ffffff', 5); zoomPunch(0.02); }
+  else       { sfx.hitLight(); shake(3); hitStop(28); }
   // Floating damage number above the target
   spawnDamagePopup(target.x, target.y, dmg, target);
   target.hearts = Math.max(0, target.hearts - dmg);
@@ -4037,7 +4413,7 @@ function applyDamage(target, dmg, kbx, kby, attackerAccent) {
   target.charging = false; target.chargeTime = 0;
   target.comboCount = 0; target.comboTimer = 0;
   target.activeMove = null;
-  spawnHitEffect(target.x, target.y - 6, attackerAccent || '#fff5a0');
+  spawnHitEffect(target.x, target.y - 6, attackerAccent || '#fff5a0', hitDir, heavy);
   // HUD sync: player → P1, enemy → P2
   const hudId = (target === game.player) ? 1 : 2;
   const hud = players.find(pl => pl.id === hudId);
@@ -4050,7 +4426,11 @@ function applyDamage(target, dmg, kbx, kby, attackerAccent) {
   if (target.hearts <= 0) {
     target.koTimer = PLAY.RESPAWN_DUR;
     sfx.ko();
-    shake(14);
+    shake(16);
+    hitStop(140);
+    flash(0.75, '#ffd54d', 8);
+    zoomPunch(0.05);
+    spawnKOBurst(target.x, target.y - 6, attackerAccent || '#ffd54d');
   }
 }
 
@@ -4117,6 +4497,11 @@ function updateProjectiles() {
     }
     pr.x += pr.vx;
     pr.y += pr.vy;
+    // glowing motion trail (skip bombs/arcs — they read fine without it)
+    if (!pr.arc && pr.age % 2 === 0) {
+      const tint = PROJ_TRAIL_TINT[pr.kind] || '#fff5a0';
+      spawnProjTrail(pr.x, pr.y, tint, pr.big ? 3 : 2);
+    }
     // bomb detonates on ground
     if (pr.arc && pr.y >= PLAY.GROUND_Y) { explodeBomb(pr); pr.life = 0; continue; }
     // off-screen cull
@@ -4364,8 +4749,10 @@ function tickEnemy() {
 
   const groundY = PLAY.GROUND_Y - PLAY.PLAYER_RADIUS;
   if (e.y >= groundY) {
+    const wasFalling = !e.onGround && e.vy > 1.5;
     e.y = groundY; e.vy = 0;
     if (!e.onGround) e.canDoubleJump = true;
+    if (wasFalling) spawnDust(e.x, PLAY.GROUND_Y, 0, 5, '#f0e8c0');
     e.onGround = true;
     e.flipTime = 0;
   } else {
@@ -4474,6 +4861,7 @@ function startGauntlet(chosenAbility) {
   const p1 = players.find(pl => pl.id === 1);
   if (p1) { p1.ability = chosenAbility; p1.hearts = MAX_HEARTS; }
   updateHud();
+  updateMoveInfo();
   updateAbilityPickerLock();
   // banner for the first wave — include stage name
   const stage1 = STAGES[game.stage]?.name || '';
@@ -4546,6 +4934,7 @@ function retryGauntlet() {
   game.active = false;
   game.projectiles.length = 0;
   game.effects.length = 0;
+  clearArenaFx();
   updateOverlay();
 }
 
@@ -4566,6 +4955,7 @@ function returnToMenu() {
   game.player.vx = 0; game.player.vy = 0;
   game.projectiles.length = 0;
   game.effects.length = 0;
+  clearArenaFx();
   syncEnemyHud();
   const p1 = players.find(pl => pl.id === 1);
   if (p1) { p1.hearts = MAX_HEARTS; }
@@ -4591,6 +4981,7 @@ function startFreePlay() {
   game.enemy.state = 'idle'; game.enemy.koTimer = 0; game.enemy.invulnTime = 30;
   game.projectiles.length = 0;
   game.effects.length = 0;
+  clearArenaFx();
   syncEnemyHud();
   const p1 = players.find(pl => pl.id === 1);
   if (p1) { p1.hearts = MAX_HEARTS; }
@@ -4678,10 +5069,16 @@ function renderOverlayContent() {
         <div class="overlay-card">
           <div class="overlay-title">Choose Your Kirby</div>
           <div class="overlay-sub">Locked for the whole gauntlet. 8 opponents in random order, then a final challenge.</div>
-          <div class="overlay-picker">${ABILITIES.map(ab => `
+          <div class="overlay-picker">${ABILITIES.map(ab => {
+            const set = MOVESETS[ab.key] || {};
+            const nType = set.neutral && set.neutral.type === 'melee' ? 'Melee' : 'Ranged';
+            return `
             <button class="overlay-ability" data-pick="${ab.key}" style="--ab-accent:${ab.accent}">
+              <span class="oa-portrait">${miniPortrait(ab)}</span>
               <span class="overlay-ability-name">${ab.name}</span>
-            </button>`).join('')}</div>
+              <span class="oa-type">${nType}</span>
+            </button>`;
+          }).join('')}</div>
           <button class="overlay-btn ghost" data-action="menu">Back</button>
         </div>`;
     case 'victory': {
@@ -4734,6 +5131,44 @@ function renderAbilityPicker() {
       class="${ab.key === game.player.ability.key ? 'active' : ''}">${ab.name}</button>`).join('');
 }
 
+// Short, human-readable descriptor for a move row in the move-info strip.
+function describeMove(m) {
+  if (!m) return '—';
+  let kind, tag;
+  if (m.type === 'melee') {
+    kind = m.down ? 'Down Smash' : 'Melee';
+    tag = `${m.damage} dmg`;
+  } else {
+    const projName = ({
+      swordbeam: 'Sword Beam', cutter: 'Cutter', beamshot: 'Beam', arrow: 'Arrow',
+      fireball: 'Fireball', bomb: 'Bomb', starshot: 'Star Shot',
+    })[m.proj] || 'Shot';
+    kind = projName;
+    const extras = [];
+    if (m.boomerang) extras.push('returns');
+    if (m.arc) extras.push('lobbed');
+    if (m.piercing) extras.push('pierces');
+    if (m.big) extras.push('big');
+    tag = `${m.damage} dmg${extras.length ? ' · ' + extras.join(', ') : ''}`;
+  }
+  return { kind, tag };
+}
+
+function updateMoveInfo() {
+  const el = document.getElementById('move-info');
+  if (!el) return;
+  const ab = game.player.ability;
+  const set = MOVESETS[ab.key] || {};
+  const n = describeMove(set.neutral);
+  const c = describeMove(set.charged);
+  el.style.setProperty('--mi-accent', ab.accent);
+  el.innerHTML = `
+    <span class="mi-name">${ab.name} Kirby</span>
+    <span class="mi-move"><kbd>X</kbd> ${n.kind} <span class="mi-tag">${n.tag}</span></span>
+    <span class="mi-move"><kbd>Z</kbd> ${c.kind} <span class="mi-tag">${c.tag}</span></span>
+    <span class="mi-tag">hold Z to charge · aim with arrows</span>`;
+}
+
 function setAbility(key) {
   // Locked during a gauntlet run — must finish the current attempt first
   if (game.mode === 'gauntlet' && game.phase === 'fighting') return;
@@ -4749,6 +5184,7 @@ function setAbility(key) {
   const p1 = players.find(pl => pl.id === 1);
   if (p1) { p1.ability = ab; updateHud(); }
   document.getElementById('ability-picker').innerHTML = renderAbilityPicker();
+  updateMoveInfo();
 }
 
 const KEY_MAP = {
@@ -4776,10 +5212,22 @@ window.addEventListener('keydown', (e) => {
       Object.keys(game.input).forEach(k => game.input[k] = false);
       const ov = document.getElementById('click-to-play');
       if (ov) {
+        const ab = game.player.ability;
+        const ctx = (game.mode === 'gauntlet')
+          ? `<strong>${ab.name} Kirby</strong> · Wave ${Math.min(game.gauntlet.waveIndex + 1, 9)} / 9`
+          : `<strong>${ab.name} Kirby</strong> · Free Play`;
         ov.classList.remove('hidden');
         ov.innerHTML = `
           <div class="overlay-card">
             <div class="overlay-title">Paused</div>
+            <div class="overlay-sub">${ctx}</div>
+            <div class="pause-controls">
+              <span><kbd>&larr;&rarr;</kbd> Move</span>
+              <span><kbd>&uarr;</kbd> Jump</span>
+              <span><kbd>&darr;</kbd> Guard</span>
+              <span><kbd>X</kbd> Attack</span>
+              <span><kbd>Z</kbd> Charge</span>
+            </div>
             <div class="overlay-buttons">
               <button class="overlay-btn primary" data-action="resume">Resume</button>
               <button class="overlay-btn ghost" data-action="menu">Back to Menu</button>
@@ -4875,6 +5323,7 @@ function tick() {
     p.charging = true;
     p.chargeTime = 0;
     p.state = 'charge';
+    sfx.chargeStart();
   }
   if (p.charging) {
     p.chargeTime = Math.min(PLAY.CHARGE_MAX, p.chargeTime + 1);
@@ -4963,9 +5412,15 @@ function tick() {
 
   const groundY = PLAY.GROUND_Y - PLAY.PLAYER_RADIUS;
   if (p.y >= groundY) {
+    const wasFalling = !p.onGround && p.vy > 1.5;
     p.y = groundY;
     p.vy = 0;
     if (!p.onGround) p.canDoubleJump = true;
+    // landing impact: dust puff + soft thud (only on a real fall, not a step)
+    if (wasFalling) {
+      spawnDust(p.x, PLAY.GROUND_Y, 0, 5);
+      sfx.land();
+    }
     p.onGround = true;
     p.flipTime = 0;
   } else {
@@ -4973,6 +5428,15 @@ function tick() {
     // guarding requires being grounded — drop guard if we're airborne
     if (p.guarding) { p.guarding = false; if (p.state === 'guard') p.state = 'fall'; }
   }
+
+  // dash dust — kick up a small puff when changing direction at speed on ground
+  if (p.onGround && Math.abs(p.vx) > 0.1) {
+    if (p._lastVx !== undefined && Math.sign(p.vx) !== 0 &&
+        Math.sign(p._lastVx) !== 0 && Math.sign(p.vx) !== Math.sign(p._lastVx)) {
+      spawnDust(p.x - Math.sign(p.vx) * 4, PLAY.GROUND_Y, -Math.sign(p.vx), 3);
+    }
+  }
+  p._lastVx = p.vx;
 
   if (p.x < PLAY.PLAYER_RADIUS) { p.x = PLAY.PLAYER_RADIUS; p.vx = 0; }
   if (p.x > PLAY.W - PLAY.PLAYER_RADIUS) { p.x = PLAY.W - PLAY.PLAYER_RADIUS; p.vx = 0; }
@@ -5009,7 +5473,19 @@ function tick() {
   updateEffects();
 }
 
+let __renderFrame = 0;
+// Does this fighter warrant a motion ghost this frame? (fast launch, big
+// charged swing, KO spin-out — the moments that benefit from a trail)
+function wantsAfterimage(c) {
+  if (c.state === 'hit' && Math.hypot(c.vx, c.vy) > 4.5) return true;
+  if (c.state === 'attack' && c.attackType === 'charged') return true;
+  if (c.koTimer > 0) return true;
+  if (c.state === 'flip') return true;
+  return false;
+}
+
 function render() {
+  __renderFrame++;
   const p = game.player;
   const el = document.getElementById('play-player');
   if (!el) return;
@@ -5022,20 +5498,37 @@ function render() {
   el.setAttribute('transform',
     `translate(${p.x}, ${p.y}) scale(${sx}, ${sy}) rotate(${flipDeg}) translate(-100, -100)`);
   el.style.opacity = (p.invulnTime > 0 && Math.floor(p.invulnTime / 4) % 2 === 0) ? 0.4 : 1;
-  el.innerHTML = playerInnerSvg(p);
+  const pHtml = playerInnerSvg(p);
+  el.innerHTML = pHtml;
+  if ((__renderFrame % 2 === 0) && wantsAfterimage(p)) {
+    pushAfterimage(p.x, p.y, sx, sy, flipDeg, pHtml, p.ability.accent);
+  }
 
   // dummy
   const dEl = document.getElementById('play-dummy');
   if (dEl) {
     const d = game.enemy;
     const dRot = d.koTimer > 0 ? (PLAY.RESPAWN_DUR - d.koTimer) * 12 : 0;
+    const dsx = d.facing * PLAY.PLAYER_SCALE;
     dEl.setAttribute('transform',
-      `translate(${d.x}, ${d.y}) scale(${d.facing * PLAY.PLAYER_SCALE}, ${PLAY.PLAYER_SCALE}) rotate(${dRot}) translate(-100,-100)`);
+      `translate(${d.x}, ${d.y}) scale(${dsx}, ${PLAY.PLAYER_SCALE}) rotate(${dRot}) translate(-100,-100)`);
     dEl.style.opacity = (d.invulnTime > 0 && Math.floor(d.invulnTime / 3) % 2 === 0)
       ? 0.5
       : (d.koTimer > 0 ? 0.7 : 1);
-    dEl.innerHTML = enemyInnerSvg(d);
+    const dHtml = enemyInnerSvg(d);
+    dEl.innerHTML = dHtml;
+    if ((__renderFrame % 2 === 0) && wantsAfterimage(d)) {
+      pushAfterimage(d.x, d.y, dsx, PLAY.PLAYER_SCALE, dRot, dHtml, d.ability ? d.ability.accent : '#ffd54d');
+    }
   }
+
+  // ambient stage motes (behind fighters)
+  const ambEl = document.getElementById('play-ambiance');
+  if (ambEl) ambEl.innerHTML = renderAmbiance();
+
+  // motion ghosts (drawn in their own layer behind the fighters)
+  const ghostEl = document.getElementById('play-ghosts');
+  if (ghostEl) ghostEl.innerHTML = renderAfterimages();
 
   // projectiles
   const projEl = document.getElementById('play-projectiles');
@@ -5051,19 +5544,33 @@ function render() {
   const puEl = document.getElementById('play-pickups');
   if (puEl) puEl.innerHTML = renderPickups();
 
-  // hit-spark effects
+  // hit-spark effects + dust puffs
   const fxEl = document.getElementById('play-effects');
   if (fxEl) {
-    fxEl.innerHTML = game.effects.map(fx => {
+    const dust = renderDust();
+    const sparks = game.effects.map(fx => {
       const t = 1 - fx.life / fx.maxLife;
-      const r = 6 + t * 22;
+      if (fx.ring) {
+        // charged-release shockwave: thin expanding ring that fades fast
+        const rr = 4 + t * (fx.ringMax || 40);
+        const rop = (1 - t) * 0.85;
+        return `<circle cx="${fx.x.toFixed(1)}" cy="${fx.y.toFixed(1)}" r="${rr.toFixed(1)}"
+          fill="none" stroke="${fx.color}" stroke-width="${(2.4 * (1 - t * 0.6)).toFixed(1)}" opacity="${rop.toFixed(2)}"/>`;
+      }
+      const r = (fx.heavy ? 8 : 6) + t * (fx.heavy ? 30 : 22);
       const op = 1 - t;
+      // expanding shock ring + a bright impact burst star
+      const ring2 = fx.heavy
+        ? `<circle r="${(r*0.6).toFixed(1)}" fill="none" stroke="#ffffff" stroke-width="1.6" opacity="${(op*0.8).toFixed(2)}"/>`
+        : '';
       return `<g transform="translate(${fx.x}, ${fx.y})" opacity="${op}">
-        <circle r="${r}" fill="none" stroke="${fx.color}" stroke-width="2.5"/>
+        <circle r="${r}" fill="none" stroke="${fx.color}" stroke-width="${fx.heavy ? 3.2 : 2.5}"/>
+        ${ring2}
         <path d="M 0 ${-r} L ${r*0.3} ${-r*0.3} L ${r} 0 L ${r*0.3} ${r*0.3} L 0 ${r} L ${-r*0.3} ${r*0.3} L ${-r} 0 L ${-r*0.3} ${-r*0.3} Z"
           fill="${fx.color}" opacity="0.55"/>
       </g>`;
     }).join('');
+    fxEl.innerHTML = dust + sparks;
   }
 
   // overlay (charge meter, combo badge, aim arrow, dummy hearts) — sits in screen-aligned space
@@ -5076,25 +5583,39 @@ function renderOverlay(p) {
   // charge meter above head
   if (p.charging) {
     const ratio = p.chargeTime / PLAY.CHARGE_MAX;
+    const maxed = ratio > 0.98;
     const w = 36, h = 5;
     const x = p.x - w / 2;
     const y = p.y - 32;
-    const fillColor = ratio > 0.98 ? '#ffd54d' : p.ability.accent;
-    out += `
-      <rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#1a1a2e" stroke="#000" stroke-width="0.8" rx="2"/>
-      <rect x="${x}" y="${y}" width="${w * ratio}" height="${h}" fill="${fillColor}" rx="2"/>
-      <rect x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="#ffffff" stroke-width="0.4" rx="2" opacity="0.6"/>`;
-    if (ratio > 0.98) {
-      out += `<text x="${p.x}" y="${y - 2}" text-anchor="middle" font-size="6" font-weight="900" fill="#ffd54d" stroke="#7a1818" stroke-width="0.4">MAX</text>`;
+    // tiered fill color: red (low) → orange (mid) → gold (max)
+    const fillColor = maxed ? '#ffd54d' : (ratio > 0.6 ? '#ff9a42' : (ratio > 0.3 ? '#ff7a3a' : '#e85a6e'));
+    // pulsing MAX-charge ring around Kirby so a primed shot reads instantly
+    if (maxed) {
+      const pulse = 44 + Math.sin(performance.now() / 70) * 4;
+      out += `<circle cx="${p.x}" cy="${p.y - 4}" r="${pulse.toFixed(1)}" fill="none"
+        stroke="#ffd54d" stroke-width="1.6" stroke-dasharray="4 3" opacity="0.7"/>`;
     }
-    // aim arrow projecting from player
-    const len = 18 + ratio * 22;
+    out += `
+      <rect x="${(x-1).toFixed(1)}" y="${(y-1).toFixed(1)}" width="${w+2}" height="${h+2}" fill="#1a1a2e" stroke="#000" stroke-width="0.8" rx="2.5" opacity="0.9"/>
+      <rect x="${x}" y="${y}" width="${(w * ratio).toFixed(1)}" height="${h}" fill="${fillColor}" rx="2"/>
+      <rect x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="#ffffff" stroke-width="0.4" rx="2" opacity="0.6"/>`;
+    // segment ticks at the 1/3 and 2/3 marks for a tunable feel
+    out += `<line x1="${(x + w/3).toFixed(1)}" y1="${y}" x2="${(x + w/3).toFixed(1)}" y2="${y+h}" stroke="#1a1a2e" stroke-width="0.6" opacity="0.6"/>
+            <line x1="${(x + 2*w/3).toFixed(1)}" y1="${y}" x2="${(x + 2*w/3).toFixed(1)}" y2="${y+h}" stroke="#1a1a2e" stroke-width="0.6" opacity="0.6"/>`;
+    if (maxed) {
+      const blink = Math.floor(performance.now() / 120) % 2 === 0;
+      out += `<text x="${p.x}" y="${y - 2}" text-anchor="middle" font-size="6.5" font-weight="900"
+        fill="${blink ? '#fff5a0' : '#ffd54d'}" stroke="#7a1818" stroke-width="0.5" paint-order="stroke">MAX!</text>`;
+    }
+    // aim arrow projecting from player — brightens with charge
+    const len = 18 + ratio * 24;
     const rad = p.aimAngle * Math.PI / 180;
     const ax = p.x + Math.cos(rad) * len;
-    const ay = p.y + Math.sin(rad) * len;
+    const ay = p.y - 4 + Math.sin(rad) * len;
+    const aimCol = maxed ? '#ffd54d' : '#fff5a0';
     out += `
-      <line x1="${p.x}" y1="${p.y - 4}" x2="${ax}" y2="${ay}" stroke="#ffd54d" stroke-width="2" stroke-dasharray="3 2" opacity="0.85"/>
-      <circle cx="${ax}" cy="${ay}" r="3" fill="#ffd54d" stroke="#7a1818" stroke-width="0.8"/>`;
+      <line x1="${p.x}" y1="${p.y - 4}" x2="${ax.toFixed(1)}" y2="${ay.toFixed(1)}" stroke="${aimCol}" stroke-width="${(1.6 + ratio).toFixed(1)}" stroke-dasharray="3 2" opacity="0.9"/>
+      <circle cx="${ax.toFixed(1)}" cy="${ay.toFixed(1)}" r="${(2.4 + ratio * 1.4).toFixed(1)}" fill="${aimCol}" stroke="#7a1818" stroke-width="0.8"/>`;
   }
   // combo badge during/after a chained X attack
   if (p.comboCount >= 2 && (p.state === 'attack' || p.comboTimer > 0)) {
@@ -5135,8 +5656,9 @@ function renderOverlay(p) {
       }
     }
   }
-  // particle sparks + damage popup numbers (drawn before confetti)
+  // particle sparks + KO stars + damage popup numbers (drawn before confetti)
   out += renderParticles();
+  out += renderKOStars();
   out += renderDamagePopups();
   // victory confetti — drawn before banner so banner sits on top of it
   out += renderConfetti();
@@ -5183,12 +5705,19 @@ function gameLoop(now) {
     updateConfetti();
     updateDamagePopups();
     updateParticles();
+    updateDust();
+    updateAfterimages();
+    updateKOStars();
+    updateAmbiance();
     // wave banner ticks down regardless of game.active so the intro plays
     // even during the brief pause between waves
     if (game.gauntlet.bannerTimer > 0) game.gauntlet.bannerTimer--;
     // shake decays each frame whether or not the sim is paused
     fx.shakeMag *= fx.shakeDecay;
     if (fx.shakeMag < 0.1) fx.shakeMag = 0;
+    fx.zoom *= 0.82;
+    if (fx.zoom < 0.0005) fx.zoom = 0;
+    if (fx.flashTimer > 0) fx.flashTimer--;
     lastTickAt += 1000 / 60;
   }
   if (safety <= 0) lastTickAt = now;
@@ -5196,12 +5725,27 @@ function gameLoop(now) {
   // apply shake to the arena wrap via CSS transform (cheap)
   const wrap = document.getElementById('play-arena-wrap');
   if (wrap) {
-    if (fx.shakeMag > 0.1) {
-      const dx = (Math.random() - 0.5) * fx.shakeMag;
-      const dy = (Math.random() - 0.5) * fx.shakeMag;
-      wrap.style.transform = `translate(${dx.toFixed(1)}px, ${dy.toFixed(1)}px)`;
+    const hasShake = fx.shakeMag > 0.1;
+    const hasZoom = fx.zoom > 0.0005;
+    if (hasShake || hasZoom) {
+      const dx = hasShake ? (Math.random() - 0.5) * fx.shakeMag : 0;
+      const dy = hasShake ? (Math.random() - 0.5) * fx.shakeMag : 0;
+      const sc = (1 + fx.zoom).toFixed(4);
+      wrap.style.transform = `translate(${dx.toFixed(1)}px, ${dy.toFixed(1)}px) scale(${sc})`;
     } else if (wrap.style.transform) {
       wrap.style.transform = '';
+    }
+  }
+  // apply impact flash to the overlay element (driven by CSS opacity)
+  const flashEl = document.getElementById('play-flash');
+  if (flashEl) {
+    if (fx.flashTimer > 0) {
+      flashEl.style.setProperty('--flash-color', fx.flashColor);
+      flashEl.style.setProperty('--flash-alpha', fx.flashAlpha.toFixed(2));
+      flashEl.classList.add('flash');
+    } else {
+      flashEl.classList.remove('flash');
+      fx.flashAlpha = 0;
     }
   }
   requestAnimationFrame(gameLoop);
@@ -5210,6 +5754,7 @@ function gameLoop(now) {
 function initPlayArena() {
   document.getElementById('play-arena-wrap').innerHTML = buildPlayScene();
   document.getElementById('ability-picker').innerHTML = renderAbilityPicker();
+  updateMoveInfo();
 
   document.getElementById('ability-picker').addEventListener('click', (e) => {
     const btn = e.target.closest('button[data-ability]');

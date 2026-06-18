@@ -26,9 +26,10 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.shadowMap.enabled = false;
 
 const scene = new THREE.Scene();
-const FOGCOL = 0x14141e;
+const FOGCOL = 0x10101a;
 scene.background = new THREE.Color(FOGCOL);
-scene.fog = new THREE.Fog(FOGCOL, 20, 64);
+// pulled the fog wall in a touch + darker tint for a creepier, more enclosed theater
+scene.fog = new THREE.Fog(FOGCOL, 16, 58);
 
 const camera = new THREE.PerspectiveCamera(48, innerWidth / innerHeight, 0.1, 220);
 
@@ -156,6 +157,7 @@ function updatePlaying(dt) {
   G.weapons.update(dt);
   G.powerups.update(dt, G.player);
   G.box.update(dt);
+  if (G.world) G.world.update(dt, G.time);
   G.interact.update(dt, input);
   // monkey-bomb lure
   if (G.lure) { G.lure.t -= dt; if (G.lure.t <= 0) { G.weapons.splashDamage(G.lure.pos, 5, 3000); G.lure = null; } }
@@ -170,6 +172,7 @@ function updateTitleCam(dt) {
   const cx = 0, cz = 6;
   camera.position.set(cx + Math.sin(titleClock.t * 0.1) * 26, 20, cz + Math.cos(titleClock.t * 0.1) * 26);
   camera.lookAt(cx, 0, cz);
+  if (G.world) G.world.update(dt, titleClock.t);
   G.fx.update(dt);
 }
 

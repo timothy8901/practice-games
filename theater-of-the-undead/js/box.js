@@ -28,6 +28,18 @@ export class MysteryBox {
     this.lid.geometry.translate(0, 0, 0.47); this.lid.position.set(0, 0.8, -0.47); this.group.add(this.lid);
     const glow = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.1, 0.6), new THREE.MeshBasicMaterial({ color: 0x3a4a5e, fog: false }));
     glow.position.set(0, 0.06, 0); this.group.add(glow);
+    this.glow = glow;
+
+    // golden "found the box" beam — a tall translucent cone, additive-blended,
+    // gently rotating; intensity is animated in update()
+    this.beam = new THREE.Mesh(
+      new THREE.ConeGeometry(0.9, 7, 12, 1, true),
+      new THREE.MeshBasicMaterial({ color: 0xffcf5a, transparent: true, opacity: 0.16, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending, fog: false })
+    );
+    this.beam.position.y = 3.6; this.beam.renderOrder = 20; this.group.add(this.beam);
+    // soft point light so the box actually lights the room when found
+    this.boxLight = new THREE.PointLight(0xffcf5a, 0.6, 12, 1.8);
+    this.boxLight.position.y = 1.4; this.group.add(this.boxLight);
 
     this.icon = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.25, 0.15), new THREE.MeshBasicMaterial({ color: 0xffffff, fog: false }));
     this.icon.visible = false; this.group.add(this.icon);
@@ -76,6 +88,14 @@ export class MysteryBox {
   }
 
   update(dt) {
+    // animated beam: stronger while active, gentle idle shimmer otherwise
+    this._bt = (this._bt || 0) + dt;
+    this.beam.rotation.y += dt * 0.6;
+    const active = this.state === 'rolling' || this.state === 'await';
+    const target = active ? 0.42 : 0.14;
+    this.beam.material.opacity += (target - this.beam.material.opacity) * Math.min(1, dt * 4);
+    this.beam.material.opacity *= 0.85 + Math.sin(this._bt * 5) * 0.15;
+    this.boxLight.intensity = (active ? 1.3 : 0.55) * (0.85 + Math.sin(this._bt * 5) * 0.15);
     this.lid.rotation.x += ((this.state === 'await' || this.state === 'rolling') ? -1.2 : 0 - this.lid.rotation.x) * Math.min(1, dt * 6);
     if (this.state === 'rolling') {
       this.rollT -= dt; this.cycle += dt;
@@ -83,7 +103,12 @@ export class MysteryBox {
       this.icon.rotation.y += dt * 12;
       const flicker = pick(BOX_POOL).id;
       this.icon.material.color.set(WEAPONS[flicker].color || 0xffffff);
-      if (this.rollT <= 0) { this.state = 'await'; this.awaitT = 10; this.icon.material.color.set(WEAPONS[this.finalId].color || 0xffd23f); }
+      if (this.rollT <= 0) {
+        this.state = 'await'; this.awaitT = 10; this.icon.material.color.set(WEAPONS[this.finalId].color || 0xffd23f);
+        // reveal flourish: golden burst + ring + ping
+        if (G.fx) { G.fx.burst(this.pos.clone().setY(1.3), 0xffd23f, { count: 18, speed: 6, life: 0.6, size: 0.3, up: 3, gravity: -6, drag: 1 }); G.fx.ring(this.pos, 0xffd23f, { r0: 0.3, r1: 3, dur: 0.5 }); }
+        if (G.audio) G.audio.purchase();
+      }
     } else if (this.state === 'await') {
       this.awaitT -= dt;
       this.icon.position.set(0, 1.3, 0); this.icon.rotation.y += dt * 3;

@@ -5,116 +5,341 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Naruto Trivia Tac Toe</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter&family=Bungee&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Bungee&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --leaf-orange: #f97316;
+            --leaf-orange-deep: #c2410c;
+            --scroll-paper: #f5e9cf;
+            --scroll-paper-dark: #e9d8b0;
+            --ink: #2b2113;
+            --x-red: #e23b3b;
+            --o-blue: #2f7fe0;
+            --green-good: #2f9e58;
+            --red-bad: #d64545;
+        }
+
+        * { box-sizing: border-box; }
+
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #1a202c; /* Equivalent to bg-gray-900 */
+            color: var(--ink);
+            min-height: 100vh;
+            margin: 0;
+            background-color: #20140a;
+            /* Layered ninja-scroll / Hidden Leaf themed background, pure CSS */
+            background-image:
+                radial-gradient(circle at 50% -10%, rgba(249,115,22,0.35), transparent 55%),
+                radial-gradient(circle at 0% 100%, rgba(194,65,12,0.30), transparent 45%),
+                radial-gradient(circle at 100% 100%, rgba(120,53,15,0.30), transparent 45%),
+                repeating-linear-gradient(45deg, rgba(255,255,255,0.02) 0 2px, transparent 2px 22px),
+                linear-gradient(160deg, #2a1a0c 0%, #1a1006 60%, #120a04 100%);
+            background-attachment: fixed;
         }
-        .bungee-font {
-            font-family: 'Bungee', cursive;
+
+        .bungee-font { font-family: 'Bungee', cursive; }
+
+        /* ----- Title ----- */
+        .title-naruto {
+            color: var(--leaf-orange);
+            text-shadow: 0 2px 0 var(--leaf-orange-deep), 0 5px 14px rgba(0,0,0,0.6);
+            letter-spacing: 1px;
         }
+        .title-sub {
+            color: var(--scroll-paper);
+            text-shadow: 0 2px 8px rgba(0,0,0,0.6);
+        }
+        /* Hidden Leaf swirl emblem */
+        .leaf-emblem {
+            width: 46px; height: 46px; flex: 0 0 auto;
+            border-radius: 50%;
+            background:
+                conic-gradient(from 200deg, var(--leaf-orange), var(--leaf-orange-deep) 70%, var(--leaf-orange));
+            position: relative;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.5), inset 0 0 0 3px rgba(0,0,0,0.25);
+        }
+        .leaf-emblem::before {
+            content: ""; position: absolute; inset: 0;
+            border-radius: 50%;
+            background:
+                radial-gradient(circle at 50% 50%, transparent 0 6px, #1a1006 6px 9px, transparent 9px),
+                conic-gradient(from 0deg, transparent 0 50%, rgba(0,0,0,0.18) 50% 100%);
+            mask: radial-gradient(circle at 50% 50%, transparent 5px, #000 6px);
+        }
+        .leaf-emblem::after {
+            content: ""; position: absolute; left: 50%; top: 50%;
+            width: 4px; height: 4px; border-radius: 50%;
+            background: #1a1006; transform: translate(-50%, -50%);
+        }
+
+        /* ----- Scoreboard ----- */
+        .panel {
+            background: linear-gradient(180deg, var(--scroll-paper), var(--scroll-paper-dark));
+            border: 2px solid var(--leaf-orange-deep);
+            border-radius: 14px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.45), inset 0 0 0 2px rgba(255,255,255,0.4);
+            color: var(--ink);
+        }
+        .score-box { text-align: center; padding: 0.4rem 0.9rem; border-radius: 10px; }
+        .score-box .label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; opacity: 0.75; }
+        .score-box .num { font-size: 1.6rem; line-height: 1; font-weight: 700; }
+        .score-x .num { color: var(--x-red); }
+        .score-o .num { color: var(--o-blue); }
+        .score-d .num { color: var(--ink); }
+
+        /* ----- Turn banner ----- */
+        .turn-banner {
+            display: inline-flex; align-items: center; gap: 0.6rem;
+            padding: 0.55rem 1.3rem; border-radius: 999px;
+            font-weight: 700; font-size: 1.05rem;
+            background: linear-gradient(180deg, var(--scroll-paper), var(--scroll-paper-dark));
+            border: 2px solid var(--ink);
+            box-shadow: 0 6px 16px rgba(0,0,0,0.4);
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+        .turn-banner.turn-x { border-color: var(--x-red); box-shadow: 0 0 18px rgba(226,59,59,0.45); }
+        .turn-banner.turn-o { border-color: var(--o-blue); box-shadow: 0 0 18px rgba(47,127,224,0.45); }
+        .turn-dot { width: 16px; height: 16px; border-radius: 50%; flex: 0 0 auto; }
+        .turn-x .turn-dot { background: var(--x-red); }
+        .turn-o .turn-dot { background: var(--o-blue); }
+
+        /* ----- Mode toggle ----- */
+        .seg { display: inline-flex; background: rgba(0,0,0,0.25); border-radius: 999px; padding: 4px; gap: 4px; border: 1px solid rgba(255,255,255,0.12); }
+        .seg button {
+            border: none; cursor: pointer; font-weight: 700; font-size: 0.85rem;
+            padding: 0.4rem 1rem; border-radius: 999px; color: var(--scroll-paper);
+            background: transparent; transition: all 0.2s;
+        }
+        .seg button.active { background: var(--leaf-orange); color: #1a1006; box-shadow: 0 2px 8px rgba(0,0,0,0.4); }
+
+        /* ----- Board ----- */
         .game-board {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: 1rem;
+            gap: 0.85rem;
             width: 100%;
-            max-width: 400px;
+            max-width: 420px;
         }
         .cell {
             aspect-ratio: 1 / 1;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-size: 3rem;
-            font-weight: bold;
+            display: flex; justify-content: center; align-items: center;
+            font-size: 3rem; font-weight: bold;
             cursor: pointer;
-            transition: background-color 0.3s;
-            border-radius: 0.5rem;
-            background-color: #2d3748; /* bg-gray-800 */
+            border-radius: 12px;
+            position: relative;
+            color: var(--ink);
+            background:
+                repeating-linear-gradient(90deg, rgba(0,0,0,0.025) 0 1px, transparent 1px 14px),
+                linear-gradient(180deg, var(--scroll-paper), var(--scroll-paper-dark));
+            border: 2px solid var(--leaf-orange-deep);
+            box-shadow: 0 6px 14px rgba(0,0,0,0.4), inset 0 0 0 2px rgba(255,255,255,0.35);
+            transition: transform 0.12s ease, box-shadow 0.2s ease, filter 0.2s ease;
+            -webkit-tap-highlight-color: transparent;
+            overflow: hidden;
         }
         .cell:hover {
-            background-color: #4a5568; /* bg-gray-700 */
+            transform: translateY(-3px);
+            box-shadow: 0 10px 22px rgba(0,0,0,0.5), 0 0 18px rgba(249,115,22,0.55), inset 0 0 0 2px rgba(255,255,255,0.4);
+            filter: brightness(1.03);
         }
-        .cell.x {
-            color: #f56565; /* text-red-500 */
+        .cell.filled { cursor: pointer; }
+        .cell .mark {
+            display: flex; align-items: center; justify-content: center;
+            width: 100%; height: 100%;
+            animation: pop-in 0.32s cubic-bezier(0.18, 1.4, 0.4, 1) both;
         }
-        .cell.o {
-            color: #4299e1; /* text-blue-500 */
+        @keyframes pop-in {
+            0% { transform: scale(0) rotate(-90deg); opacity: 0; }
+            70% { transform: scale(1.18) rotate(8deg); }
+            100% { transform: scale(1) rotate(0); opacity: 1; }
         }
+        /* X mark = red spiral / shuriken */
+        .mark svg { width: 64%; height: 64%; filter: drop-shadow(0 3px 4px rgba(0,0,0,0.35)); }
+        .x-shuriken { color: var(--x-red); }
+        .o-spiral { color: var(--o-blue); }
+
+        /* Winning cells */
+        .cell.win {
+            animation: win-pulse 0.9s ease-in-out infinite;
+            border-color: #ffcf3f;
+            z-index: 2;
+        }
+        @keyframes win-pulse {
+            0%,100% { box-shadow: 0 0 12px rgba(255,207,63,0.7), inset 0 0 0 2px rgba(255,255,255,0.4); transform: scale(1); }
+            50% { box-shadow: 0 0 30px rgba(255,207,63,1), 0 0 50px rgba(249,115,22,0.7), inset 0 0 0 2px rgba(255,255,255,0.5); transform: scale(1.05); }
+        }
+
+        /* steal hint */
+        .cell.contested { outline: 3px dashed #ffcf3f; outline-offset: -6px; }
+
+        /* ----- Buttons ----- */
+        .btn-leaf {
+            background: linear-gradient(180deg, var(--leaf-orange), var(--leaf-orange-deep));
+            color: #fff; font-weight: 700;
+            border: 2px solid #7c2d12;
+            border-radius: 12px;
+            padding: 0.6rem 1.5rem;
+            box-shadow: 0 6px 14px rgba(0,0,0,0.4);
+            cursor: pointer; transition: transform 0.1s, filter 0.2s;
+        }
+        .btn-leaf:hover { filter: brightness(1.08); transform: translateY(-2px); }
+        .btn-leaf:active { transform: translateY(0); }
+
+        /* ----- Modals ----- */
         .modal {
             display: none;
-            position: fixed;
-            z-index: 10;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
+            position: fixed; z-index: 50; inset: 0;
+            width: 100%; height: 100%;
             overflow: auto;
-            background-color: rgba(0,0,0,0.7);
-            justify-content: center;
-            align-items: center;
+            background-color: rgba(10,6,2,0.78);
+            justify-content: center; align-items: center;
+            padding: 1rem;
         }
+        .modal.show { display: flex; animation: fade-in 0.2s ease both; }
+        @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
         .modal-content {
-            background-color: #2d3748; /* bg-gray-800 */
-            padding: 2rem;
-            border-radius: 0.5rem;
-            width: 90%;
-            max-width: 500px;
+            background: linear-gradient(180deg, var(--scroll-paper), var(--scroll-paper-dark));
+            color: var(--ink);
+            padding: 1.8rem;
+            border-radius: 16px;
+            width: 100%; max-width: 520px;
             text-align: center;
-            border: 2px solid #f97316; /* orange-500 */
+            border: 3px solid var(--leaf-orange);
+            box-shadow: 0 18px 50px rgba(0,0,0,0.6), inset 0 0 0 2px rgba(255,255,255,0.4);
+            animation: scale-in 0.28s cubic-bezier(0.18, 1.2, 0.4, 1) both;
         }
+        @keyframes scale-in {
+            from { transform: scale(0.85) translateY(10px); opacity: 0; }
+            to { transform: scale(1) translateY(0); opacity: 1; }
+        }
+        .modal-content.flash-good { animation: flash-good 0.5s ease; }
+        .modal-content.flash-bad { animation: flash-bad 0.5s ease; }
+        @keyframes flash-good { 0%,100% { background-image: linear-gradient(180deg, var(--scroll-paper), var(--scroll-paper-dark)); } 30% { background-image: linear-gradient(180deg, #b7f0c6, #8fe0a6); } }
+        @keyframes flash-bad  { 0%,100% { background-image: linear-gradient(180deg, var(--scroll-paper), var(--scroll-paper-dark)); } 30% { background-image: linear-gradient(180deg, #f6b9b9, #ef9595); } }
+
+        .difficulty-badge {
+            display: inline-block; font-size: 0.72rem; font-weight: 700;
+            text-transform: uppercase; letter-spacing: 1px;
+            padding: 0.25rem 0.8rem; border-radius: 999px;
+            background: var(--ink); color: var(--scroll-paper);
+        }
+        .difficulty-badge.hard { background: var(--leaf-orange-deep); }
+
         .answer-btn {
-            display: block;
-            width: 100%;
-            padding: 0.75rem;
-            margin-top: 0.75rem;
-            border-radius: 0.375rem;
-            font-weight: bold;
-            transition: background-color 0.3s;
-            background-color: #4a5568; /* bg-gray-700 */
-            border: 1px solid #718096; /* bg-gray-500 */
+            display: block; width: 100%;
+            padding: 0.8rem 1rem; margin-top: 0.6rem;
+            border-radius: 10px; font-weight: 600; font-size: 1rem;
+            background: #fff;
+            color: var(--ink);
+            border: 2px solid var(--leaf-orange-deep);
+            cursor: pointer; text-align: center;
+            transition: transform 0.08s, background 0.2s, color 0.2s;
+            -webkit-tap-highlight-color: transparent;
         }
-        .answer-btn:hover {
-            background-color: #718096; /* bg-gray-600 */
+        .answer-btn:hover { background: var(--leaf-orange); color: #1a1006; transform: translateY(-2px); }
+        .answer-btn:disabled { cursor: default; transform: none; }
+        .answer-btn.correct { background: var(--green-good); color: #fff; border-color: #1f6e3c; }
+        .answer-btn.wrong { background: var(--red-bad); color: #fff; border-color: #962f2f; }
+
+        /* timer bar */
+        .timer-wrap { height: 12px; border-radius: 999px; background: rgba(0,0,0,0.15); overflow: hidden; border: 1px solid rgba(0,0,0,0.2); }
+        .timer-bar { height: 100%; width: 100%; border-radius: 999px; background: linear-gradient(90deg, #2f9e58, #f9c23c 55%, var(--red-bad)); transform-origin: left; transition: transform 0.1s linear; }
+
+        .contest-note { font-size: 0.85rem; font-weight: 600; opacity: 0.8; margin-top: 0.4rem; }
+
+        /* confetti / chakra burst */
+        #fx-layer { position: fixed; inset: 0; pointer-events: none; z-index: 80; overflow: hidden; }
+        .confetti {
+            position: absolute; width: 10px; height: 14px; top: -20px;
+            opacity: 0.95; border-radius: 2px;
+            animation: fall linear forwards;
         }
-        .status-message {
-            min-height: 50px; /* Reserve space to prevent layout shifts */
+        @keyframes fall {
+            to { transform: translateY(110vh) rotate(720deg); opacity: 0.9; }
         }
+
+        .status-message { min-height: 28px; }
     </style>
 </head>
-<body class="bg-gray-900 text-white flex flex-col items-center justify-center min-h-screen p-4">
+<body class="text-white flex flex-col items-center min-h-screen p-4">
 
-    <div class="text-center mb-8">
-        <h1 class="text-4xl md:text-6xl font-bold bungee-font text-orange-500">Naruto</h1>
-        <h2 class="text-2xl md:text-4xl font-bold bungee-font text-gray-300">Trivia Tac Toe</h2>
+    <div class="text-center mb-4 mt-2">
+        <div class="flex items-center justify-center gap-3">
+            <span class="leaf-emblem" aria-hidden="true"></span>
+            <h1 class="text-4xl md:text-6xl font-bold bungee-font title-naruto">Naruto</h1>
+            <span class="leaf-emblem" aria-hidden="true"></span>
+        </div>
+        <h2 class="text-2xl md:text-4xl font-bold bungee-font title-sub mt-1">Trivia Tac Toe</h2>
+    </div>
+
+    <!-- Scoreboard -->
+    <div class="panel flex items-stretch gap-2 px-3 py-2 mb-3">
+        <div class="score-box score-x">
+            <div class="label">X Wins</div>
+            <div class="num" id="score-x">0</div>
+        </div>
+        <div class="score-box score-d" style="border-left:2px solid rgba(0,0,0,0.15); border-right:2px solid rgba(0,0,0,0.15);">
+            <div class="label">Draws</div>
+            <div class="num" id="score-d">0</div>
+        </div>
+        <div class="score-box score-o">
+            <div class="label">O Wins</div>
+            <div class="num" id="score-o">0</div>
+        </div>
+    </div>
+
+    <!-- Mode toggle -->
+    <div class="flex items-center gap-3 mb-3 flex-wrap justify-center">
+        <div class="seg" role="tablist" aria-label="Game mode">
+            <button id="mode-2p" class="active" type="button">2 Player</button>
+            <button id="mode-cpu" type="button">vs CPU</button>
+        </div>
+        <label class="flex items-center gap-2 text-sm font-semibold" style="color:var(--scroll-paper);">
+            <input type="checkbox" id="timer-toggle" checked style="width:18px;height:18px;accent-color:var(--leaf-orange);">
+            15s Timer
+        </label>
     </div>
 
     <div id="game-container" class="w-full flex flex-col items-center">
-        <div id="status-message" class="status-message text-xl mb-4 font-semibold">Player X's Turn</div>
-        <div id="game-board" class="game-board mb-6"></div>
-        <button id="reset-button" class="bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 px-6 rounded-lg transition-colors">
-            Reset Game
-        </button>
+        <div id="turn-banner" class="turn-banner turn-x mb-4">
+            <span class="turn-dot"></span>
+            <span id="status-message" class="status-message" style="min-height:auto;">Player X's Turn</span>
+        </div>
+        <div id="game-board" class="game-board mb-5"></div>
+        <button id="reset-button" class="btn-leaf">New Match</button>
+        <p class="text-xs mt-3 text-center max-w-sm" style="color:rgba(245,233,207,0.7);">
+            Tap an empty tile to claim it by answering a question.
+            Tap an <strong>enemy</strong> tile to <strong>steal</strong> it with a hard question!
+        </p>
     </div>
 
     <!-- Trivia Modal -->
-    <div id="trivia-modal" class="modal">
-        <div class="modal-content">
-            <h3 id="question-difficulty" class="text-lg font-bold mb-2 text-orange-400">Question</h3>
-            <p id="question-text" class="text-xl mb-6"></p>
+    <div id="trivia-modal" class="modal" role="dialog" aria-modal="true">
+        <div class="modal-content" id="trivia-modal-content">
+            <div class="flex items-center justify-between mb-3">
+                <span id="question-difficulty" class="difficulty-badge">Standard Question</span>
+                <span id="trivia-turn" class="text-sm font-bold" style="opacity:0.8;">X's turn</span>
+            </div>
+            <p id="contest-note" class="contest-note"></p>
+            <p id="question-text" class="text-lg md:text-xl font-semibold my-4"></p>
+            <div id="timer-row" class="mb-4">
+                <div class="timer-wrap"><div id="timer-bar" class="timer-bar"></div></div>
+            </div>
             <div id="answers-container"></div>
         </div>
     </div>
-    
+
     <!-- Result Modal -->
-    <div id="result-modal" class="modal">
+    <div id="result-modal" class="modal" role="dialog" aria-modal="true">
         <div class="modal-content" id="result-modal-content">
-             <p id="result-text" class="text-2xl font-bold mb-4"></p>
-             <button id="close-result-modal" class="bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 px-6 rounded-lg">Continue</button>
+             <p id="result-emoji" class="text-5xl mb-2"></p>
+             <p id="result-text" class="text-2xl font-bold mb-1"></p>
+             <p id="result-sub" class="text-sm mb-4" style="opacity:0.8;"></p>
+             <button id="close-result-modal" class="btn-leaf">Continue</button>
         </div>
     </div>
 
+    <div id="fx-layer" aria-hidden="true"></div>
 
     <script>
         const regularQuestions = [
@@ -150,28 +375,126 @@
         let availableRegularQuestions = [...regularQuestions];
         let availableHardQuestions = [...hardQuestions];
 
+        // ---- SVG marks ----
+        const X_SVG = '<svg viewBox="0 0 100 100" class="x-shuriken"><g fill="currentColor"><path d="M50 8 L62 38 L50 50 L38 38 Z"/><path d="M92 50 L62 62 L50 50 L62 38 Z"/><path d="M50 92 L38 62 L50 50 L62 62 Z"/><path d="M8 50 L38 38 L50 50 L38 62 Z"/><circle cx="50" cy="50" r="9" fill="#1a1006"/></g></svg>';
+        const O_SVG = '<svg viewBox="0 0 100 100" class="o-spiral"><g fill="none" stroke="currentColor" stroke-width="9" stroke-linecap="round"><path d="M50 50 m0 0 a6 6 0 1 1 -0.1 0 M50 50 a14 14 0 1 1 -10 -3 M50 50 a26 26 0 1 0 22 -10 M50 50 a36 36 0 1 1 -28 -8"/></g></svg>';
+
+        // ---- DOM refs ----
         const gameBoard = document.getElementById('game-board');
         const statusMessage = document.getElementById('status-message');
+        const turnBanner = document.getElementById('turn-banner');
         const resetButton = document.getElementById('reset-button');
         const triviaModal = document.getElementById('trivia-modal');
+        const triviaModalContent = document.getElementById('trivia-modal-content');
         const resultModal = document.getElementById('result-modal');
+        const resultModalContent = document.getElementById('result-modal-content');
         const resultText = document.getElementById('result-text');
+        const resultSub = document.getElementById('result-sub');
+        const resultEmoji = document.getElementById('result-emoji');
         const closeResultModalBtn = document.getElementById('close-result-modal');
-        
+        const contestNote = document.getElementById('contest-note');
+        const triviaTurn = document.getElementById('trivia-turn');
+        const timerBar = document.getElementById('timer-bar');
+        const timerRow = document.getElementById('timer-row');
+        const timerToggle = document.getElementById('timer-toggle');
+        const modeBtn2p = document.getElementById('mode-2p');
+        const modeBtnCpu = document.getElementById('mode-cpu');
+        const fxLayer = document.getElementById('fx-layer');
+
+        // ---- Game state ----
         let currentPlayer = 'X';
         let boardState = Array(9).fill(null);
         let gameActive = true;
         let selectedCellIndex = null;
         let isStealAttempt = false;
+        let vsCpu = false;
+        let useTimer = true;
+        let timerId = null;
+        let timerDeadline = 0;
+        const TIMER_SECONDS = 15;
 
+        // ---- Scoreboard (persisted) ----
+        let scores = { x: 0, o: 0, d: 0 };
+        function loadScores() {
+            try {
+                const raw = localStorage.getItem('nttt-scores');
+                if (raw) {
+                    const s = JSON.parse(raw);
+                    scores = { x: s.x|0, o: s.o|0, d: s.d|0 };
+                }
+            } catch (e) { /* ignore */ }
+            renderScores();
+        }
+        function saveScores() {
+            try { localStorage.setItem('nttt-scores', JSON.stringify(scores)); } catch (e) { /* ignore */ }
+        }
+        function renderScores() {
+            document.getElementById('score-x').textContent = scores.x;
+            document.getElementById('score-o').textContent = scores.o;
+            document.getElementById('score-d').textContent = scores.d;
+        }
+
+        // ---- WebAudio (created inline, never throws) ----
+        let audioCtx = null;
+        function getAudio() {
+            if (audioCtx) return audioCtx;
+            try {
+                const AC = window.AudioContext || window.webkitAudioContext;
+                if (!AC) return null;
+                audioCtx = new AC();
+            } catch (e) { audioCtx = null; }
+            return audioCtx;
+        }
+        function beep(freq, duration, type, gainVal) {
+            try {
+                const ctx = getAudio();
+                if (!ctx) return;
+                if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = type || 'sine';
+                osc.frequency.value = freq;
+                gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(gainVal || 0.18, ctx.currentTime + 0.01);
+                gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + (duration || 0.15));
+                osc.connect(gain); gain.connect(ctx.destination);
+                osc.start();
+                osc.stop(ctx.currentTime + (duration || 0.15) + 0.02);
+            } catch (e) { /* audio blocked - ignore */ }
+        }
+        function sndPlace()   { beep(440, 0.12, 'triangle', 0.16); }
+        function sndCorrect() { beep(660, 0.1, 'sine', 0.18); setTimeout(() => beep(880, 0.14, 'sine', 0.18), 90); }
+        function sndWrong()   { beep(200, 0.22, 'sawtooth', 0.16); }
+        function sndWin()     { [523,659,784,1046].forEach((f,i) => setTimeout(() => beep(f, 0.18, 'square', 0.16), i*120)); }
+
+        // ---- Turn / status UI ----
+        function updateTurnUI() {
+            const isX = currentPlayer === 'X';
+            turnBanner.classList.toggle('turn-x', isX);
+            turnBanner.classList.toggle('turn-o', !isX);
+            let label;
+            if (currentPlayer === 'O' && vsCpu) {
+                label = "CPU's Turn (O)";
+            } else {
+                label = `Player ${currentPlayer}'s Turn`;
+            }
+            statusMessage.textContent = label;
+        }
+
+        // ---- Init / reset board (keeps scoreboard) ----
         function initializeGame() {
+            stopTimer();
+            triviaModal.classList.remove('show');
+            resultModal.classList.remove('show');
             gameBoard.innerHTML = '';
             boardState = Array(9).fill(null);
             currentPlayer = 'X';
             gameActive = true;
-            statusMessage.textContent = `Player ${currentPlayer}'s Turn`;
+            selectedCellIndex = null;
+            isStealAttempt = false;
             availableRegularQuestions = [...regularQuestions];
             availableHardQuestions = [...hardQuestions];
+            updateTurnUI();
 
             for (let i = 0; i < 9; i++) {
                 const cell = document.createElement('div');
@@ -182,29 +505,35 @@
             }
         }
 
+        // ---- Cell click ----
         function handleCellClick(event) {
             if (!gameActive) return;
+            // Block human clicks while it's the CPU's turn
+            if (vsCpu && currentPlayer === 'O') return;
 
-            const clickedCell = event.target;
+            const clickedCell = event.currentTarget;
             const clickedCellIndex = parseInt(clickedCell.dataset.index);
 
             if (boardState[clickedCellIndex] === null) {
-                // Regular move
                 isStealAttempt = false;
                 selectedCellIndex = clickedCellIndex;
                 askQuestion(false);
             } else if (boardState[clickedCellIndex] !== currentPlayer) {
-                // Steal attempt
                 isStealAttempt = true;
                 selectedCellIndex = clickedCellIndex;
                 askQuestion(true);
             }
         }
 
+        function setContestHighlight(on) {
+            const cell = gameBoard.children[selectedCellIndex];
+            if (cell) cell.classList.toggle('contested', !!on);
+        }
+
+        // ---- Ask a question ----
         function askQuestion(isHard) {
             let questionPool = isHard ? availableHardQuestions : availableRegularQuestions;
             if (questionPool.length === 0) {
-                // Refill pool if empty
                 questionPool = isHard ? [...hardQuestions] : [...regularQuestions];
                 if (isHard) availableHardQuestions = questionPool;
                 else availableRegularQuestions = questionPool;
@@ -212,16 +541,27 @@
 
             const questionIndex = Math.floor(Math.random() * questionPool.length);
             const questionData = questionPool.splice(questionIndex, 1)[0];
-            
-            document.getElementById('question-difficulty').textContent = isHard ? 'Steal Question! (Hard)' : 'Standard Question';
+
+            const diffBadge = document.getElementById('question-difficulty');
+            diffBadge.textContent = isHard ? 'Steal Question (Hard)' : 'Standard Question';
+            diffBadge.classList.toggle('hard', isHard);
+
+            triviaTurn.textContent = (currentPlayer === 'O' && vsCpu) ? "CPU (O)" : `${currentPlayer}'s turn`;
+
+            if (isHard) {
+                contestNote.textContent = `Contesting tile #${selectedCellIndex + 1} — answer right to steal it!`;
+                setContestHighlight(true);
+            } else {
+                contestNote.textContent = '';
+                setContestHighlight(false);
+            }
+
             document.getElementById('question-text').textContent = questionData.question;
-            
+
             const answersContainer = document.getElementById('answers-container');
             answersContainer.innerHTML = '';
 
-            // Shuffle answers
             const shuffledAnswers = [...questionData.answers].sort(() => Math.random() - 0.5);
-
             shuffledAnswers.forEach(answer => {
                 const button = document.createElement('button');
                 button.textContent = answer;
@@ -230,46 +570,176 @@
                 answersContainer.appendChild(button);
             });
 
-            triviaModal.style.display = 'flex';
+            triviaModal.classList.add('show');
+
+            // CPU auto-answers; otherwise start timer for human
+            if (currentPlayer === 'O' && vsCpu) {
+                timerRow.style.display = 'none';
+                cpuAnswer(questionData, isHard);
+            } else {
+                timerRow.style.display = useTimer ? 'block' : 'none';
+                if (useTimer) startTimer(questionData.correct);
+                else stopTimer();
+            }
         }
 
-        function checkAnswer(selectedAnswer, correctAnswer) {
-            triviaModal.style.display = 'none';
-            if (selectedAnswer === correctAnswer) {
-                showResult(true);
-                updateBoard();
-            } else {
-                showResult(false);
+        // ---- Timer ----
+        function startTimer(correctAnswer) {
+            stopTimer();
+            timerBar.style.transition = 'none';
+            timerBar.style.transform = 'scaleX(1)';
+            timerDeadline = Date.now() + TIMER_SECONDS * 1000;
+            // force reflow then animate
+            void timerBar.offsetWidth;
+            timerId = setInterval(() => {
+                const remain = timerDeadline - Date.now();
+                const frac = Math.max(0, remain / (TIMER_SECONDS * 1000));
+                timerBar.style.transition = 'transform 0.1s linear';
+                timerBar.style.transform = `scaleX(${frac})`;
+                if (remain <= 0) {
+                    stopTimer();
+                    // time out = wrong answer
+                    timeOut(correctAnswer);
+                }
+            }, 100);
+        }
+        function stopTimer() {
+            if (timerId) { clearInterval(timerId); timerId = null; }
+        }
+        function timeOut(correctAnswer) {
+            // reveal correct, count as wrong
+            const buttons = document.querySelectorAll('#answers-container .answer-btn');
+            buttons.forEach(b => {
+                b.disabled = true;
+                if (b.textContent === correctAnswer) b.classList.add('correct');
+            });
+            sndWrong();
+            setTimeout(() => {
+                triviaModal.classList.remove('show');
+                showResult(false, true);
                 switchPlayer();
-            }
+            }, 700);
         }
-        
-        function showResult(isCorrect) {
-            const modalContent = document.getElementById('result-modal-content');
+
+        // ---- Check answer (human) ----
+        function checkAnswer(selectedAnswer, correctAnswer) {
+            stopTimer();
+            const isCorrect = selectedAnswer === correctAnswer;
+            // visual feedback on buttons
+            const buttons = document.querySelectorAll('#answers-container .answer-btn');
+            buttons.forEach(b => {
+                b.disabled = true;
+                if (b.textContent === correctAnswer) b.classList.add('correct');
+                else if (b.textContent === selectedAnswer) b.classList.add('wrong');
+            });
+            triviaModalContent.classList.remove('flash-good', 'flash-bad');
+            void triviaModalContent.offsetWidth;
+            triviaModalContent.classList.add(isCorrect ? 'flash-good' : 'flash-bad');
+            if (isCorrect) sndCorrect(); else sndWrong();
+
+            setTimeout(() => {
+                triviaModal.classList.remove('show');
+                setContestHighlight(false);
+                if (isCorrect) {
+                    showResult(true, false);
+                    updateBoard();
+                } else {
+                    showResult(false, false);
+                    switchPlayer();
+                }
+            }, 650);
+        }
+
+        // ---- CPU answer (auto) ----
+        function cpuAnswer(questionData, isHard) {
+            // realistic accuracy: ~75% on standard, ~55% on hard steals
+            const accuracy = isHard ? 0.55 : 0.75;
+            const willBeCorrect = Math.random() < accuracy;
+            const buttons = Array.from(document.querySelectorAll('#answers-container .answer-btn'));
+
+            setTimeout(() => {
+                let chosen;
+                if (willBeCorrect) {
+                    chosen = questionData.correct;
+                } else {
+                    const wrongOpts = questionData.answers.filter(a => a !== questionData.correct);
+                    chosen = wrongOpts[Math.floor(Math.random() * wrongOpts.length)];
+                }
+                // highlight CPU's pick briefly
+                buttons.forEach(b => {
+                    b.disabled = true;
+                    if (b.textContent === questionData.correct) b.classList.add('correct');
+                    else if (b.textContent === chosen) b.classList.add('wrong');
+                });
+                const isCorrect = chosen === questionData.correct;
+                triviaModalContent.classList.remove('flash-good', 'flash-bad');
+                void triviaModalContent.offsetWidth;
+                triviaModalContent.classList.add(isCorrect ? 'flash-good' : 'flash-bad');
+                if (isCorrect) sndCorrect(); else sndWrong();
+
+                setTimeout(() => {
+                    triviaModal.classList.remove('show');
+                    setContestHighlight(false);
+                    if (isCorrect) {
+                        showResult(true, false);
+                        updateBoard();
+                    } else {
+                        showResult(false, false);
+                        switchPlayer();
+                    }
+                }, 700);
+            }, 900);
+        }
+
+        // ---- Result modal ----
+        function showResult(isCorrect, timedOut) {
+            const actor = (currentPlayer === 'O' && vsCpu) ? 'CPU' : `Player ${currentPlayer}`;
+            resultModalContent.style.borderColor = isCorrect ? 'var(--green-good)' : 'var(--red-bad)';
             if (isCorrect) {
-                resultText.textContent = "Correct!";
-                modalContent.style.borderColor = '#48bb78'; // green-500
+                resultEmoji.textContent = '🍥';
+                resultText.textContent = 'Correct!';
+                resultText.style.color = 'var(--green-good)';
+                resultSub.textContent = isStealAttempt ? `${actor} stole the tile!` : `${actor} claims the tile.`;
             } else {
-                resultText.textContent = "Wrong Answer!";
-                modalContent.style.borderColor = '#f56565'; // red-500
+                resultEmoji.textContent = '💥';
+                resultText.textContent = timedOut ? "Time's Up!" : 'Wrong Answer!';
+                resultText.style.color = 'var(--red-bad)';
+                resultSub.textContent = `${actor} loses the turn.`;
             }
-            resultModal.style.display = 'flex';
+            resultModal.classList.add('show');
+
+            // Auto-advance the result modal on the CPU's turn so it keeps playing
+            if (currentPlayer === 'O' && vsCpu) {
+                setTimeout(() => {
+                    if (resultModal.classList.contains('show')) closeResult();
+                }, 1100);
+            }
         }
 
-        closeResultModalBtn.addEventListener('click', () => {
-             resultModal.style.display = 'none';
-        });
+        function closeResult() {
+            resultModal.classList.remove('show');
+            maybeCpuMove();
+        }
+        closeResultModalBtn.addEventListener('click', closeResult);
 
+        // ---- Place mark / resolve ----
         function updateBoard() {
             boardState[selectedCellIndex] = currentPlayer;
             const cell = gameBoard.children[selectedCellIndex];
-            cell.textContent = currentPlayer;
-            cell.classList.add(currentPlayer.toLowerCase());
+            cell.classList.remove('contested');
+            cell.classList.add('filled', currentPlayer.toLowerCase());
+            const wrap = document.createElement('div');
+            wrap.className = 'mark';
+            wrap.innerHTML = currentPlayer === 'X' ? X_SVG : O_SVG;
+            cell.innerHTML = '';
+            cell.appendChild(wrap);
+            sndPlace();
 
-            if (checkWin()) {
-                endGame(false);
-            } else if (boardState.every(cell => cell !== null)) {
-                endGame(true);
+            const winCombo = getWinningCombo();
+            if (winCombo) {
+                endGame(false, winCombo);
+            } else if (boardState.every(c => c !== null)) {
+                endGame(true, null);
             } else {
                 switchPlayer();
             }
@@ -277,35 +747,134 @@
 
         function switchPlayer() {
             currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
-            statusMessage.textContent = `Player ${currentPlayer}'s Turn`;
+            updateTurnUI();
         }
 
-        function checkWin() {
+        function getWinningCombo() {
             const winningCombos = [
-                [0, 1, 2], [3, 4, 5], [6, 7, 8], // Rows
-                [0, 3, 6], [1, 4, 7], [2, 5, 8], // Columns
-                [0, 4, 8], [2, 4, 6]  // Diagonals
+                [0,1,2],[3,4,5],[6,7,8],
+                [0,3,6],[1,4,7],[2,5,8],
+                [0,4,8],[2,4,6]
             ];
-
-            return winningCombos.some(combination => {
-                return combination.every(index => {
-                    return boardState[index] === currentPlayer;
-                });
-            });
+            for (const combo of winningCombos) {
+                if (combo.every(i => boardState[i] === currentPlayer)) return combo;
+            }
+            return null;
         }
 
-        function endGame(isDraw) {
+        function endGame(isDraw, winCombo) {
             gameActive = false;
+            stopTimer();
             if (isDraw) {
-                statusMessage.textContent = "It's a draw!";
+                statusMessage.textContent = "It's a Draw!";
+                scores.d++;
+                saveScores(); renderScores();
             } else {
-                statusMessage.textContent = `Player ${currentPlayer} wins!`;
+                const actor = (currentPlayer === 'O' && vsCpu) ? 'CPU' : `Player ${currentPlayer}`;
+                statusMessage.textContent = `${actor} Wins!`;
+                if (currentPlayer === 'X') scores.x++; else scores.o++;
+                saveScores(); renderScores();
+                if (winCombo) {
+                    winCombo.forEach(i => gameBoard.children[i].classList.add('win'));
+                }
+                sndWin();
+                launchConfetti(currentPlayer);
             }
         }
 
+        // ---- CPU move logic ----
+        function maybeCpuMove() {
+            if (!gameActive) return;
+            if (!(vsCpu && currentPlayer === 'O')) return;
+            setTimeout(cpuChooseCell, 650);
+        }
+
+        function cpuChooseCell() {
+            if (!gameActive || !(vsCpu && currentPlayer === 'O')) return;
+
+            const empties = boardState.map((v, i) => v === null ? i : -1).filter(i => i >= 0);
+            // 1) win, 2) block, 3) center, 4) corner, 5) any empty, else steal
+            let target = findStrategicCell('O');        // winning move for O
+            if (target === null) target = findStrategicCell('X'); // block X
+            if (target === null && boardState[4] === null) target = 4;
+            if (target === null) {
+                const corners = [0,2,6,8].filter(i => boardState[i] === null);
+                if (corners.length) target = corners[Math.floor(Math.random()*corners.length)];
+            }
+            if (target === null && empties.length) {
+                target = empties[Math.floor(Math.random()*empties.length)];
+            }
+
+            if (target !== null) {
+                isStealAttempt = false;
+                selectedCellIndex = target;
+                askQuestion(false);
+                return;
+            }
+
+            // No empty cells left -> attempt a steal of an X tile
+            const xCells = boardState.map((v,i) => v === 'X' ? i : -1).filter(i => i >= 0);
+            if (xCells.length) {
+                isStealAttempt = true;
+                selectedCellIndex = xCells[Math.floor(Math.random()*xCells.length)];
+                askQuestion(true);
+            }
+        }
+
+        // returns index that completes a line for `mark`, else null
+        function findStrategicCell(mark) {
+            const lines = [
+                [0,1,2],[3,4,5],[6,7,8],
+                [0,3,6],[1,4,7],[2,5,8],
+                [0,4,8],[2,4,6]
+            ];
+            for (const line of lines) {
+                const vals = line.map(i => boardState[i]);
+                const markCount = vals.filter(v => v === mark).length;
+                const emptyIdx = line.find(i => boardState[i] === null);
+                if (markCount === 2 && emptyIdx !== undefined) return emptyIdx;
+            }
+            return null;
+        }
+
+        // ---- Confetti / chakra burst ----
+        function launchConfetti(player) {
+            const colors = player === 'X'
+                ? ['#e23b3b', '#f97316', '#ffcf3f', '#ff7a7a']
+                : ['#2f7fe0', '#5aa9ff', '#ffcf3f', '#a7d3ff'];
+            const count = 90;
+            for (let i = 0; i < count; i++) {
+                const c = document.createElement('div');
+                c.className = 'confetti';
+                c.style.left = Math.random() * 100 + 'vw';
+                c.style.background = colors[Math.floor(Math.random() * colors.length)];
+                const dur = 2.2 + Math.random() * 1.8;
+                c.style.animationDuration = dur + 's';
+                c.style.animationDelay = (Math.random() * 0.5) + 's';
+                c.style.width = (6 + Math.random() * 8) + 'px';
+                c.style.height = (8 + Math.random() * 12) + 'px';
+                if (Math.random() < 0.5) c.style.borderRadius = '50%';
+                fxLayer.appendChild(c);
+                setTimeout(() => c.remove(), (dur + 1) * 1000);
+            }
+        }
+
+        // ---- Mode + timer toggles ----
+        function setMode(cpu) {
+            vsCpu = cpu;
+            modeBtnCpu.classList.toggle('active', cpu);
+            modeBtn2p.classList.toggle('active', !cpu);
+            initializeGame();
+        }
+        modeBtn2p.addEventListener('click', () => setMode(false));
+        modeBtnCpu.addEventListener('click', () => setMode(true));
+        timerToggle.addEventListener('change', () => { useTimer = timerToggle.checked; });
+
         resetButton.addEventListener('click', initializeGame);
 
-        // Initial game start
+        // ---- Boot ----
+        loadScores();
+        useTimer = timerToggle.checked;
         initializeGame();
     </script>
 </body>

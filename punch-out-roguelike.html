@@ -11,7 +11,8 @@
     <style>
         body {
             font-family: 'Press Start 2P', cursive;
-            background-color: #1a1a1a;
+            background:
+                radial-gradient(circle at 50% 30%, #2a2233 0%, #14101c 60%, #0a0810 100%);
             color: #fff;
             overflow: hidden;
             display: flex;
@@ -33,6 +34,19 @@
             overflow: hidden;
             display: flex;
             flex-direction: column;
+        }
+        /* Screen-shake wrapper applied to the whole machine on big hits */
+        .game-container.shake { animation: screen-shake 0.32s cubic-bezier(.36,.07,.19,.97); }
+        .game-container.shake-big { animation: screen-shake-big 0.45s cubic-bezier(.36,.07,.19,.97); }
+        @keyframes screen-shake {
+            10%,90% { transform: translate(-2px,1px); }
+            30%,70% { transform: translate(3px,-2px); }
+            50% { transform: translate(-3px,2px); }
+        }
+        @keyframes screen-shake-big {
+            10%,90% { transform: translate(-5px,2px) rotate(-0.4deg); }
+            30%,70% { transform: translate(6px,-3px) rotate(0.5deg); }
+            50% { transform: translate(-7px,4px) rotate(-0.5deg); }
         }
 
         /* Screen styles */
@@ -67,8 +81,19 @@
             z-index: 100;
         }
 
-        h1 { font-size: 2.5rem; margin-bottom: 20px; color: #ffcc00; text-align: center; line-height: 1.2; }
-        h2 { font-size: 1.8rem; margin-bottom: 15px; color: #00ffff; }
+        h1 {
+            font-size: 2.5rem; margin-bottom: 20px; color: #ffcc00; text-align: center; line-height: 1.2;
+            text-shadow: 3px 3px #000, 0 0 18px rgba(255,204,0,0.45);
+            animation: title-glow 2.4s ease-in-out infinite;
+        }
+        @keyframes title-glow {
+            0%,100% { text-shadow: 3px 3px #000, 0 0 14px rgba(255,204,0,0.35); }
+            50% { text-shadow: 3px 3px #000, 0 0 26px rgba(255,204,0,0.7); }
+        }
+        h2 { font-size: 1.8rem; margin-bottom: 15px; color: #00ffff; text-shadow: 2px 2px #000, 0 0 12px rgba(0,255,255,0.4); }
+        .subtitle { font-size: 0.65rem; color: #ffae5c; margin: -8px 0 16px; letter-spacing: 1px; opacity: 0.9; }
+        .best-run { font-size: 0.7rem; color: #ffcc00; margin-bottom: 14px; }
+        .best-run span { color: #fff; }
 
         /* Card Selection Screen */
         .card-grid-container {
@@ -86,24 +111,38 @@
             gap: 20px;
         }
         .card {
-            background-color: #444;
+            background: linear-gradient(160deg, #4a4a52, #353539);
             border: 4px solid #666;
             border-radius: 10px;
             padding: 15px;
             cursor: pointer;
-            transition: all 0.2s ease;
+            transition: all 0.18s ease;
             text-align: center;
+            position: relative;
         }
         .card:hover {
-            transform: translateY(-5px);
+            transform: translateY(-5px) scale(1.02);
             border-color: #00ffff;
+            box-shadow: 0 6px 18px rgba(0,255,255,0.25);
         }
         .card.selected {
             border-color: #ffcc00;
-            box-shadow: 0 0 15px #ffcc00;
+            box-shadow: 0 0 18px #ffcc00;
+            background: linear-gradient(160deg, #5a5340, #3a3528);
         }
+        .card.selected::after {
+            content: '\2713';
+            position: absolute; top: -10px; right: -10px;
+            width: 26px; height: 26px; line-height: 26px;
+            background: #ffcc00; color: #000; border-radius: 50%;
+            font-size: 0.8rem; box-shadow: 0 0 10px #ffcc00;
+        }
+        /* curse cards read as red */
+        .card.curse { border-color: #aa3344; }
+        .card.curse .card-title { color: #ff6688; }
         .card-title { font-size: 1rem; color: #ffcc00; margin-bottom: 10px; }
         .card-desc { font-size: 0.7rem; line-height: 1.4; }
+        .select-counter { font-size: 0.7rem; color: #00ffff; margin-bottom: 10px; }
         
         .button-container {
             display: flex;
@@ -114,24 +153,38 @@
             padding: 15px 30px;
             font-size: 1.2rem;
             font-family: 'Press Start 2P', cursive;
-            background-color: #ff3333;
-            border: 4px solid #ff6666;
+            color: #fff;
+            background: linear-gradient(#ff4444, #cc1f1f);
+            border: 4px solid #ff8080;
             border-radius: 10px;
             cursor: pointer;
-            transition: background-color 0.2s;
+            transition: transform 0.12s, box-shadow 0.2s, filter 0.2s;
             text-shadow: 2px 2px #000;
+            box-shadow: 0 5px 0 #7a0f0f, 0 8px 16px rgba(0,0,0,0.5);
         }
         .start-button:hover, .restart-button:hover, .next-level-button:hover, .achievements-button:hover {
-            background-color: #ff0000;
+            filter: brightness(1.12);
+            transform: translateY(-2px);
+            box-shadow: 0 7px 0 #7a0f0f, 0 12px 20px rgba(0,0,0,0.55);
+        }
+        .start-button:active, .restart-button:active, .next-level-button:active, .achievements-button:active {
+            transform: translateY(3px);
+            box-shadow: 0 2px 0 #7a0f0f, 0 4px 8px rgba(0,0,0,0.5);
         }
 
         .achievements-button {
-            background-color: #00aaff;
-            border-color: #0077bb;
+            background: linear-gradient(#33bbff, #0077cc);
+            border-color: #66ccff;
+            box-shadow: 0 5px 0 #004f8a, 0 8px 16px rgba(0,0,0,0.5);
         }
-        .achievements-button:hover {
-            background-color: #0088cc;
+        .achievements-button:hover { filter: brightness(1.12); }
+        .achievements-button:active { box-shadow: 0 2px 0 #004f8a, 0 4px 8px rgba(0,0,0,0.5); }
+        .next-level-button {
+            background: linear-gradient(#5ad65a, #2f9f2f);
+            border-color: #8fe88f;
+            box-shadow: 0 5px 0 #1d6b1d, 0 8px 16px rgba(0,0,0,0.5);
         }
+        .next-level-button:active { box-shadow: 0 2px 0 #1d6b1d, 0 4px 8px rgba(0,0,0,0.5); }
         
         /* Achievements Screen */
         .achievements-list {
@@ -181,15 +234,57 @@
         .fight-area {
             width: 100%;
             height: 65%;
-            background-image:
-                linear-gradient(rgba(0,0,0,0.3) 2px, transparent 2px),
-                linear-gradient(90deg, rgba(0,0,0,0.3) 2px, transparent 2px);
-            background-size: 40px 40px;
-            background-color: #777;
+            background:
+                radial-gradient(ellipse 70% 55% at 50% 40%, rgba(120,140,200,0.25), transparent 70%),
+                linear-gradient(180deg, #2b3358 0%, #3a4470 45%, #5a6088 46%, #8a8fa8 100%);
             border-bottom: 8px solid #555;
             position: relative;
             overflow: hidden;
         }
+        /* Crowd backdrop */
+        .crowd {
+            position: absolute; top: 0; left: 0; width: 100%; height: 46%;
+            background-image:
+                radial-gradient(circle, rgba(255,255,255,0.10) 1.5px, transparent 2px),
+                radial-gradient(circle, rgba(255,220,150,0.08) 1.5px, transparent 2px);
+            background-size: 18px 16px, 26px 22px;
+            background-position: 0 0, 9px 8px;
+            opacity: 0.8;
+            pointer-events: none;
+        }
+        .crowd::after {
+            content: ''; position: absolute; inset: 0;
+            background: linear-gradient(180deg, rgba(0,0,0,0.45), transparent);
+        }
+        /* Spotlights */
+        .spotlight {
+            position: absolute; top: -10%; width: 0; height: 0;
+            border-left: 90px solid transparent;
+            border-right: 90px solid transparent;
+            border-bottom: 240px solid rgba(255,255,210,0.07);
+            pointer-events: none;
+            filter: blur(4px);
+        }
+        .spotlight.left { left: 12%; transform: rotate(8deg); }
+        .spotlight.right { right: 12%; transform: rotate(-8deg); }
+        /* Ring canvas / floor mat */
+        .ring-floor {
+            position: absolute; bottom: 0; left: 0; width: 100%; height: 30%;
+            background:
+                repeating-linear-gradient(90deg, rgba(0,0,0,0.18) 0 2px, transparent 2px 46px),
+                linear-gradient(180deg, #6f6048, #4a3f30);
+            box-shadow: inset 0 6px 14px rgba(0,0,0,0.4);
+            pointer-events: none;
+        }
+        /* Ring ropes */
+        .ring-rope {
+            position: absolute; left: 0; width: 100%; height: 5px;
+            background: linear-gradient(180deg, #fff, #cc3344);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+            pointer-events: none;
+        }
+        .ring-rope.r1 { bottom: 32%; }
+        .ring-rope.r2 { bottom: 40%; opacity: 0.85; }
         
         .robot {
             width: 120px;
@@ -197,29 +292,68 @@
             position: absolute;
             bottom: 20px;
             transition: transform 0.1s ease-out;
+            filter: drop-shadow(0 8px 6px rgba(0,0,0,0.45));
+        }
+        /* Ground shadow under each robot */
+        .robot::before {
+            content: ''; position: absolute; bottom: -6px; left: 50%;
+            width: 100px; height: 18px; transform: translateX(-50%);
+            background: radial-gradient(ellipse, rgba(0,0,0,0.45), transparent 70%);
+            z-index: -1;
         }
         .robot-body {
             width: 100%;
             height: 120px;
-            border-radius: 10px;
+            border-radius: 14px 14px 10px 10px;
             position: absolute;
             bottom: 40px;
+            box-shadow: inset -10px 0 16px rgba(0,0,0,0.35), inset 8px 0 10px rgba(255,255,255,0.12);
+        }
+        /* Chest core light */
+        .robot-body::after {
+            content: ''; position: absolute; top: 30px; left: 50%; transform: translateX(-50%);
+            width: 26px; height: 26px; border-radius: 50%;
+            background: radial-gradient(circle, #fff, #5ff 60%, transparent 75%);
+            box-shadow: 0 0 12px #5ff;
+            opacity: 0.85;
         }
         .robot-head {
             width: 80px;
             height: 80px;
-            border-radius: 50%;
+            border-radius: 50% 50% 45% 45%;
             position: absolute;
             top: 0;
             left: 20px;
             display: flex;
             align-items: center;
             justify-content: center;
+            box-shadow: inset -8px -4px 12px rgba(0,0,0,0.35), inset 6px 4px 8px rgba(255,255,255,0.18);
         }
+        /* Robot eyes: two glowing dots drawn with a single ::before + box-shadow twin */
+        .robot-head::before {
+            content: ''; position: absolute; top: 28px; left: 18px;
+            width: 12px; height: 12px; border-radius: 50%;
+            background: radial-gradient(circle, #fff, #ffe14d 60%, #b87f00 80%);
+            box-shadow:
+                0 0 8px #ffd633,
+                32px 0 0 0 #fff,
+                32px 0 8px 0 #ffd633;
+        }
+        /* angry brow line for a menacing read during tells */
+        .robot-head::after {
+            content: ''; position: absolute; top: 22px; left: 14px;
+            width: 52px; height: 5px; border-radius: 3px;
+            background: rgba(0,0,0,0.35);
+            transform: rotate(0deg);
+            opacity: 0;
+            transition: opacity 0.15s;
+        }
+        .robot.telegraph .robot-head::after,
+        .robot.telegraph-strong .robot-head::after { opacity: 1; }
         .robot-arm {
             width: 40px;
             height: 100px;
-            background-color: #999;
+            background: linear-gradient(90deg, #b5b5b5, #888);
             border: 4px solid #555;
             border-radius: 20px;
             position: absolute;
@@ -227,35 +361,146 @@
             transform-origin: 20px 20px;
             transition: transform 0.15s ease;
         }
+        /* Glove caps on the fists */
+        .robot-arm::after {
+            content: ''; position: absolute; bottom: -6px; left: 50%; transform: translateX(-50%);
+            width: 38px; height: 30px; border-radius: 12px;
+            background: radial-gradient(circle at 40% 35%, #ff6666, #cc2222);
+            border: 3px solid #8e1d1d;
+            box-shadow: inset -4px -4px 6px rgba(0,0,0,0.3);
+        }
+        #opponent .robot-arm::after {
+            background: radial-gradient(circle at 40% 35%, #6699ff, #2244cc);
+            border-color: #1d3f8e;
+        }
+        #opponent.golden .robot-arm::after {
+            background: radial-gradient(circle at 40% 35%, #ffe680, #d4a900);
+            border-color: #b89b00;
+        }
 
         /* Player Robot */
         #player { left: 15%; }
-        #player .robot-body { background-color: #c42929; border: 4px solid #8e1d1d; }
-        #player .robot-head { background-color: #e54545; border: 4px solid #a73232; }
+        #player .robot-body { background: linear-gradient(90deg,#e23636,#a31d1d); border: 4px solid #8e1d1d; }
+        #player .robot-head { background: radial-gradient(circle at 38% 32%, #ff6b6b, #c42929); border: 4px solid #a73232; color: #6cf; }
         #player .left-arm { left: -30px; }
         #player .right-arm { right: -30px; }
-        
-        /* Opponent Robot */
+        /* Player gloves stay red (already default), keep distinct */
+
+        /* Opponent Robot (base; per-fight skin set via inline style from JS) */
         #opponent { right: 15%; }
-        #opponent .robot-body { background-color: #295ac4; border: 4px solid #1d3f8e; }
-        #opponent .robot-head { background-color: #4578e5; border: 4px solid #3256a7; }
+        #opponent .robot-body { background: linear-gradient(90deg,#3a6fe0,#1d3f8e); border: 4px solid #1d3f8e; }
+        #opponent .robot-head { background: radial-gradient(circle at 38% 32%, #6699ff, #295ac4); border: 4px solid #3256a7; color: #fdd; }
         #opponent .left-arm { left: -30px; }
         #opponent .right-arm { right: -30px; }
+        #opponent .robot-body, #opponent .robot-head { transition: background 0.2s; }
 
         /* Golden Robot Style */
-        #opponent.golden .robot-body { background-color: #e5c100; border: 4px solid #b89b00; }
-        #opponent.golden .robot-head { background-color: #ffd700; border: 4px solid #cca300; }
+        #opponent.golden .robot-body { background: linear-gradient(90deg,#ffe680,#d4a900); border: 4px solid #b89b00; }
+        #opponent.golden .robot-head { background: radial-gradient(circle at 38% 32%, #fff0a0, #e5c100); border: 4px solid #cca300; color:#fff; }
+        #opponent.golden { filter: drop-shadow(0 0 12px rgba(255,215,0,0.6)); }
 
         /* Robot Animations */
         .punch-regular { transform: rotate(70deg) translateY(-20px); }
-        .punch-strong { transform: rotate(90deg) translateY(-40px) scale(1.1); }
+        .punch-strong { transform: rotate(90deg) translateY(-40px) scale(1.15); }
         .block-pose { transform: translateY(-40px) scaleX(1.2); }
-        .hit { animation: hit-shake 0.2s; }
+
+        /* Wind-up TELLS: arm cocks back + telegraph color so the player can read & counter */
+        .windup-regular {
+            transform: rotate(-28deg) translateY(8px) scale(0.95);
+            animation: tell-pulse 0.28s ease-in-out infinite alternate;
+        }
+        .windup-strong {
+            transform: rotate(-50deg) translateY(18px) scale(1.05);
+            animation: tell-pulse-strong 0.22s ease-in-out infinite alternate;
+        }
+        @keyframes tell-pulse {
+            from { filter: brightness(1); }
+            to { filter: brightness(1.6) drop-shadow(0 0 8px #fff36b); }
+        }
+        @keyframes tell-pulse-strong {
+            from { filter: brightness(1); }
+            to { filter: brightness(1.9) drop-shadow(0 0 14px #ff5252); }
+        }
+        /* Telegraph ring around the head during a tell */
+        .robot.telegraph .robot-head {
+            animation: head-warn 0.3s ease-in-out infinite alternate;
+        }
+        @keyframes head-warn {
+            from { box-shadow: inset -8px -4px 12px rgba(0,0,0,0.35), 0 0 0 rgba(255,255,255,0); }
+            to { box-shadow: inset -8px -4px 12px rgba(0,0,0,0.35), 0 0 16px 4px rgba(255,80,80,0.85); }
+        }
+        .robot.telegraph-strong .robot-head {
+            animation: head-warn-strong 0.24s ease-in-out infinite alternate;
+        }
+        @keyframes head-warn-strong {
+            from { box-shadow: inset -8px -4px 12px rgba(0,0,0,0.35), 0 0 0 rgba(255,40,40,0); }
+            to { box-shadow: inset -8px -4px 12px rgba(0,0,0,0.35), 0 0 26px 8px rgba(255,40,40,0.95); }
+        }
+
+        .hit { animation: hit-shake 0.22s; }
         @keyframes hit-shake {
             0%, 100% { transform: translateX(0); }
-            25% { transform: translateX(-10px); }
-            75% { transform: translateX(10px); }
+            20% { transform: translateX(-12px) rotate(-2deg); }
+            40% { transform: translateX(9px) rotate(1.5deg); }
+            65% { transform: translateX(-7px); }
+            85% { transform: translateX(4px); }
         }
+        .hit-flash { animation: hit-white 0.18s; }
+        @keyframes hit-white {
+            0% { filter: brightness(4) saturate(0); }
+            100% { filter: brightness(1) saturate(1); }
+        }
+        /* KO stagger */
+        .ko-fall { animation: ko-fall 1.1s forwards; }
+        @keyframes ko-fall {
+            0% { transform: translateY(0) rotate(0); }
+            30% { transform: translateY(-6px) rotate(-8deg); }
+            100% { transform: translateY(120px) rotate(-82deg); opacity: 0.2; }
+        }
+
+        #fx-layer {
+            position: absolute; inset: 0; pointer-events: none; z-index: 60;
+        }
+        /* Impact spark / star */
+        .spark {
+            position: absolute; width: 70px; height: 70px;
+            pointer-events: none; z-index: 60;
+            transform: translate(-50%, -50%) scale(0.2);
+            animation: spark-pop 0.35s ease-out forwards;
+        }
+        @keyframes spark-pop {
+            0% { transform: translate(-50%,-50%) scale(0.2) rotate(0deg); opacity: 1; }
+            60% { transform: translate(-50%,-50%) scale(1.15) rotate(40deg); opacity: 1; }
+            100% { transform: translate(-50%,-50%) scale(1.4) rotate(70deg); opacity: 0; }
+        }
+        /* Floating combat numbers */
+        .dmg-float {
+            position: absolute; z-index: 61; pointer-events: none;
+            font-size: 1.3rem; color: #fff; text-shadow: 2px 2px #000;
+            transform: translate(-50%, -50%);
+            animation: dmg-rise 0.8s ease-out forwards;
+        }
+        .dmg-float.crit { color: #ff4040; font-size: 1.7rem; text-shadow: 2px 2px #000, 0 0 10px #ff6060; }
+        .dmg-float.self { color: #ffdd44; }
+        @keyframes dmg-rise {
+            0% { transform: translate(-50%,-50%) scale(0.4); opacity: 0; }
+            25% { transform: translate(-50%,-90%) scale(1.1); opacity: 1; }
+            100% { transform: translate(-50%,-160%) scale(0.9); opacity: 0; }
+        }
+        /* Full-screen impact flash */
+        .impact-flash {
+            position: absolute; inset: 0; z-index: 70; pointer-events: none;
+            background: rgba(255,255,255,0.85); opacity: 0;
+        }
+        .impact-flash.go { animation: flash-out 0.22s ease-out; }
+        @keyframes flash-out { 0% { opacity: 0.7; } 100% { opacity: 0; } }
+        /* KO slow-mo vignette */
+        .ko-vignette {
+            position: absolute; inset: 0; z-index: 65; pointer-events: none;
+            background: radial-gradient(circle at 50% 55%, transparent 35%, rgba(0,0,0,0.78) 100%);
+            opacity: 0; transition: opacity 0.4s;
+        }
+        .ko-vignette.go { opacity: 1; }
 
         .status-display {
             width: 100%;
@@ -268,35 +513,77 @@
         }
         .health-bar-container {
             width: 40%;
-            background: #222;
+            background: #161616;
             border: 4px solid #000;
             border-radius: 10px;
             padding: 4px;
+            position: relative;
+            box-shadow: inset 0 2px 5px rgba(0,0,0,0.6);
+        }
+        /* delayed "ghost" damage bar behind the real one */
+        .health-ghost {
+            position: absolute; top: 4px; left: 4px; height: 20px;
+            width: 100%; background: #ff9a4d; border-radius: 5px;
+            transition: width 0.55s ease 0.15s;
+            z-index: 0;
         }
         .health-bar {
             height: 20px;
-            background-color: #33ff33;
+            background: linear-gradient(180deg, #7fff7f, #1fbf1f);
             border-radius: 5px;
-            transition: width 0.3s ease;
+            transition: width 0.25s ease;
+            position: relative; z-index: 1;
+            box-shadow: 0 0 8px rgba(80,255,80,0.4);
         }
-        .health-bar.low { background-color: #ffcc00; }
-        .health-bar.critical { background-color: #ff3333; }
-        .name-tag { font-size: 1rem; margin-bottom: 5px; }
+        .health-bar.low { background: linear-gradient(180deg,#ffe066,#e0a800); box-shadow: 0 0 8px rgba(255,200,0,0.4); }
+        .health-bar.critical {
+            background: linear-gradient(180deg,#ff6b6b,#cc1f1f);
+            box-shadow: 0 0 10px rgba(255,40,40,0.6);
+            animation: hp-crit 0.6s ease-in-out infinite alternate;
+        }
+        @keyframes hp-crit { from { filter: brightness(1); } to { filter: brightness(1.4); } }
+        .name-tag { font-size: 0.9rem; margin-bottom: 5px; }
         #player-name { text-align: left; }
         #opponent-name { text-align: right; }
 
         .level-indicator {
             position: absolute;
-            top: 15px;
+            top: 12px;
             left: 50%;
             transform: translateX(-50%);
-            font-size: 1.5rem;
-            color: #fff;
-            background-color: #000;
-            padding: 5px 15px;
-            border-radius: 5px;
+            font-size: 1.1rem;
+            color: #ffcc00;
+            background: linear-gradient(#000,#1a1a1a);
+            padding: 6px 14px 4px;
+            border-radius: 8px;
+            border: 2px solid #555;
             z-index: 51;
+            text-align: center;
         }
+        /* Run progress pips under the level label */
+        .run-pips {
+            display: flex; gap: 5px; justify-content: center; margin-top: 5px;
+        }
+        .run-pip {
+            width: 12px; height: 12px; border-radius: 3px;
+            background: #444; border: 1px solid #222;
+        }
+        .run-pip.done { background: #33ff33; box-shadow: 0 0 6px #33ff33; }
+        .run-pip.current { background: #ffcc00; box-shadow: 0 0 8px #ffcc00; animation: pip-blink 0.8s infinite alternate; }
+        .run-pip.golden { background: #ffd700; box-shadow: 0 0 8px #ffd700; }
+        @keyframes pip-blink { from { opacity: 0.55; } to { opacity: 1; } }
+        /* Active modifiers strip */
+        .modifier-strip {
+            position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%);
+            display: flex; gap: 6px; z-index: 51; flex-wrap: wrap; justify-content: center;
+            max-width: 90%;
+        }
+        .mod-chip {
+            font-size: 0.5rem; padding: 3px 6px; border-radius: 6px;
+            background: rgba(0,0,0,0.6); border: 1px solid #ffcc00; color: #ffcc00;
+            white-space: nowrap;
+        }
+        .mod-chip.curse { border-color: #ff5577; color: #ff7799; }
 
         /* Player Controls */
         .controls {
@@ -320,10 +607,25 @@
             cursor: pointer;
             position: relative;
             overflow: hidden;
-            transition: transform 0.1s;
+            transition: transform 0.08s, box-shadow 0.12s;
+            box-shadow: 0 6px 0 rgba(0,0,0,0.45), inset 0 4px 8px rgba(255,255,255,0.2);
+            color: #fff;
         }
+        .control-btn:not(.disabled):hover { filter: brightness(1.1); }
         .control-btn:active {
-            transform: scale(0.95);
+            transform: scale(0.93) translateY(3px);
+            box-shadow: 0 2px 0 rgba(0,0,0,0.45), inset 0 4px 8px rgba(255,255,255,0.2);
+        }
+        /* punch-press feedback flash */
+        .control-btn.pressed { animation: btn-press 0.18s; }
+        @keyframes btn-press {
+            0% { box-shadow: 0 0 0 0 rgba(255,255,255,0.9), 0 2px 0 rgba(0,0,0,0.45); }
+            100% { box-shadow: 0 0 0 14px rgba(255,255,255,0), 0 6px 0 rgba(0,0,0,0.45); }
+        }
+        .key-hint {
+            position: absolute; top: 6px; right: 10px;
+            font-size: 0.5rem; color: rgba(255,255,255,0.85);
+            background: rgba(0,0,0,0.35); padding: 2px 4px; border-radius: 4px;
         }
         .control-btn.disabled {
             filter: grayscale(80%);
@@ -357,10 +659,52 @@
             color: #ffcc00;
             padding: 20px;
             background: rgba(0,0,0,0.8);
+            border: 3px solid #ffcc00;
             border-radius: 10px;
             z-index: 99;
             display: none;
             text-align: center;
+            box-shadow: 0 0 24px rgba(255,204,0,0.4);
+        }
+        .message-popup.show { animation: msg-pop 0.3s cubic-bezier(.18,1.5,.5,1); }
+        @keyframes msg-pop {
+            0% { transform: translate(-50%,-50%) scale(0.3); opacity: 0; }
+            70% { transform: translate(-50%,-50%) scale(1.1); }
+            100% { transform: translate(-50%,-50%) scale(1); opacity: 1; }
+        }
+
+        /* Counter / combo popup (separate, near top of arena) */
+        .combo-popup {
+            position: absolute; top: 22%; left: 50%; transform: translateX(-50%);
+            z-index: 80; pointer-events: none; text-align: center;
+            display: none;
+        }
+        .combo-popup.show { display: block; animation: combo-in 0.5s ease-out; }
+        .combo-label { font-size: 1.6rem; color: #ff4040; text-shadow: 2px 2px #000, 0 0 14px #ff6060; }
+        .combo-count { font-size: 1rem; color: #ffcc00; margin-top: 4px; }
+        @keyframes combo-in {
+            0% { transform: translateX(-50%) scale(0.4) rotate(-6deg); opacity: 0; }
+            50% { transform: translateX(-50%) scale(1.2) rotate(3deg); opacity: 1; }
+            100% { transform: translateX(-50%) scale(1) rotate(0); opacity: 1; }
+        }
+
+        /* Responsive: phone layout */
+        @media (max-width: 640px) {
+            .game-container { height: 100vh; max-height: 600px; border-width: 4px; }
+            h1 { font-size: 1.6rem; }
+            h2 { font-size: 1.1rem; }
+            .control-btn { width: 88px; height: 88px; border-width: 6px; }
+            .btn-text { font-size: 0.8rem; }
+            .btn-subtext { font-size: 0.5rem; }
+            .controls { padding: 10px; }
+            .robot { width: 90px; height: 160px; }
+            .robot-head { width: 60px; height: 60px; left: 15px; }
+            .robot-body { height: 95px; bottom: 30px; }
+            .robot-arm { height: 78px; width: 32px; }
+            .name-tag { font-size: 0.65rem; }
+            .message-popup { font-size: 1.6rem; }
+            .card-grid { grid-template-columns: repeat(auto-fill, minmax(135px,1fr)); gap: 12px; }
+            .key-hint { display: none; }
         }
 
     </style>
@@ -373,7 +717,10 @@
         <!-- Card Selection Screen -->
         <div id="card-select-screen" class="screen active">
             <h1>Rock'Em Sock'Em<br>Rogues</h1>
-            <h2>Choose up to 3 cards</h2>
+            <div class="subtitle">READ THE TELL &middot; DODGE &middot; COUNTER</div>
+            <div class="best-run" id="best-run-display">BEST RUN: <span>Level 0</span></div>
+            <h2>Loadout</h2>
+            <div class="select-counter" id="select-counter">Selected 0 / 3 cards</div>
             <div class="card-grid-container">
                 <div id="card-grid" class="card-grid"></div>
             </div>
@@ -394,23 +741,34 @@
 
         <!-- Game Screen -->
         <div id="game-screen" class="screen">
-            <div class="level-indicator" id="level-text">LEVEL 1</div>
+            <div class="level-indicator" id="level-text">
+                <div id="level-label">LEVEL 1</div>
+                <div class="run-pips" id="run-pips"></div>
+            </div>
             <div class="status-display">
                 <div class="player-status">
                     <div class="name-tag" id="player-name">PLAYER</div>
                     <div class="health-bar-container">
+                        <div id="player-health-ghost" class="health-ghost"></div>
                         <div id="player-health" class="health-bar"></div>
                     </div>
                 </div>
                 <div class="opponent-status">
                     <div class="name-tag" id="opponent-name">ROBO-PUNCHO</div>
                     <div class="health-bar-container">
+                        <div id="opponent-health-ghost" class="health-ghost"></div>
                         <div id="opponent-health" class="health-bar"></div>
                     </div>
                 </div>
             </div>
 
             <div class="fight-area">
+                <div class="crowd"></div>
+                <div class="spotlight left"></div>
+                <div class="spotlight right"></div>
+                <div class="ring-floor"></div>
+                <div class="ring-rope r1"></div>
+                <div class="ring-rope r2"></div>
                 <div id="player" class="robot">
                     <div class="robot-head"></div>
                     <div class="robot-body"></div>
@@ -423,21 +781,32 @@
                     <div class="robot-arm left-arm"></div>
                     <div class="robot-arm right-arm"></div>
                 </div>
+                <div id="fx-layer"></div>
+                <div id="combo-popup" class="combo-popup">
+                    <div class="combo-label" id="combo-label">COUNTER!</div>
+                    <div class="combo-count" id="combo-count"></div>
+                </div>
                 <div id="message-popup" class="message-popup"></div>
+                <div class="modifier-strip" id="modifier-strip"></div>
+                <div id="impact-flash" class="impact-flash"></div>
+                <div id="ko-vignette" class="ko-vignette"></div>
             </div>
 
             <div class="controls">
                 <button id="regular-punch-btn" class="control-btn">
+                    <span class="key-hint">J / &larr;</span>
                     <div class="btn-text">PUNCH</div>
                     <div class="btn-subtext">QUICK</div>
                     <div class="cooldown-overlay"></div>
                 </button>
                 <button id="strong-punch-btn" class="control-btn">
+                    <span class="key-hint">K / &uarr;</span>
                     <div class="btn-text">MEGA</div>
                     <div class="btn-subtext">PUNCH</div>
                     <div class="cooldown-overlay"></div>
                 </button>
                 <button id="block-btn" class="control-btn">
+                    <span class="key-hint">L / &darr;</span>
                     <div class="btn-text">BLOCK</div>
                     <div class="btn-subtext">DEFEND</div>
                     <div class="cooldown-overlay"></div>
@@ -456,7 +825,11 @@
         <div id="level-victory-screen" class="screen">
             <h1>VICTORY!</h1>
             <h2 id="victory-level-text"></h2>
-            <button id="next-level-btn" class="next-level-button">Next Opponent</button>
+            <div class="subtitle" id="victory-reward-prompt">Pick ONE upgrade for the rest of your run</div>
+            <div class="card-grid-container" style="max-height:230px;">
+                <div id="reward-grid" class="card-grid"></div>
+            </div>
+            <button id="next-level-btn" class="next-level-button" disabled style="opacity:0.5;">Choose a reward</button>
         </div>
     </div>
 
@@ -479,7 +852,22 @@
             const nextLevelBtn = document.getElementById('next-level-btn');
             const playerHealthBar = document.getElementById('player-health');
             const opponentHealthBar = document.getElementById('opponent-health');
-            const levelText = document.getElementById('level-text');
+            const playerHealthGhost = document.getElementById('player-health-ghost');
+            const opponentHealthGhost = document.getElementById('opponent-health-ghost');
+            const levelText = document.getElementById('level-label');
+            const runPips = document.getElementById('run-pips');
+            const modifierStrip = document.getElementById('modifier-strip');
+            const selectCounter = document.getElementById('select-counter');
+            const bestRunDisplay = document.getElementById('best-run-display');
+            const rewardGrid = document.getElementById('reward-grid');
+            const fxLayer = document.getElementById('fx-layer');
+            const comboPopup = document.getElementById('combo-popup');
+            const comboLabel = document.getElementById('combo-label');
+            const comboCount = document.getElementById('combo-count');
+            const impactFlash = document.getElementById('impact-flash');
+            const koVignette = document.getElementById('ko-vignette');
+            const gameContainer = document.querySelector('.game-container');
+            const fightArea = document.querySelector('.fight-area');
             const victoryLevelText = document.getElementById('victory-level-text');
             const messagePopup = document.getElementById('message-popup');
 
@@ -549,11 +937,36 @@
                 riposteActive: false,
                 opponentAITimer: null,
                 isGameOver: false,
+                comboCount: 0,
+                comboTimer: null,
+                runRewards: [],          // labels of mid-run rewards picked
+                opponentSkin: null,      // {body, head, eye} per fight
+                pendingTell: null,       // queued opponent attack {type, fireAt}
+                hitWindow: false,        // true during a brief player-vulnerable window
             };
+
+            // Per-fight opponent color skins so each opponent looks distinct
+            const OPPONENT_SKINS = [
+                { body: 'linear-gradient(90deg,#3a6fe0,#1d3f8e)', head: 'radial-gradient(circle at 38% 32%,#6699ff,#295ac4)', eye: '#fdd', border:'#1d3f8e' },
+                { body: 'linear-gradient(90deg,#7a3ae0,#4a1d8e)', head: 'radial-gradient(circle at 38% 32%,#b066ff,#6a29c4)', eye: '#fdf', border:'#4a1d8e' },
+                { body: 'linear-gradient(90deg,#2ea36b,#176b45)', head: 'radial-gradient(circle at 38% 32%,#5fd9a0,#22945f)', eye: '#dff', border:'#176b45' },
+                { body: 'linear-gradient(90deg,#e08a2e,#8e5217)', head: 'radial-gradient(circle at 38% 32%,#ffb45f,#c47029)', eye: '#ffe', border:'#8e5217' },
+                { body: 'linear-gradient(90deg,#9b9ba6,#55555f)', head: 'radial-gradient(circle at 38% 32%,#d0d0dc,#6a6a78)', eye: '#fff', border:'#444' },
+            ];
+
+            // Mid-run reward pool (permanent buffs that stack for the rest of the run)
+            const RUN_REWARDS = [
+                { id:'armor', title:'Repair Bay', desc:'+10 armor at the start of every fight.', apply:(s)=>{ s.armor += 10; }, tag:'+ARMOR' },
+                { id:'rdmg', title:'Sharper Jab', desc:'+3 quick punch damage.', apply:(s)=>{ s.regularDamage += 3; }, tag:'+JAB' },
+                { id:'sdmg', title:'Heavier Hook', desc:'+6 mega punch damage.', apply:(s)=>{ s.strongDamage += 6; }, tag:'+HOOK' },
+                { id:'maxhp', title:'Bolt-On Plating', desc:'+15 max health.', apply:(s)=>{ s.maxHealth += 15; }, tag:'+MAXHP' },
+                { id:'cdr', title:'Oiled Gears', desc:'-12% all cooldowns.', apply:(s)=>{ s.regularCooldown*=0.88; s.strongCooldown*=0.88; s.blockCooldown*=0.88; }, tag:'FASTER' },
+            ];
             
             // --- PERSISTENT DATA ---
             let unlockedCards = {};
             let achievementProgress = {};
+            let bestRun = 0; // highest level reached/cleared
 
             function loadGameData() {
                 const savedCards = localStorage.getItem('rockem_unlockedCards');
@@ -574,11 +987,27 @@
                 } else {
                     achievementProgress = { totalKills: 0, totalBlocks: 0, flawlessVictories: 0, totalLosses: 0 };
                 }
+
+                bestRun = parseInt(localStorage.getItem('rockem_bestRun') || '0', 10) || 0;
             }
 
             function saveGameData() {
                 localStorage.setItem('rockem_unlockedCards', JSON.stringify(unlockedCards));
                 localStorage.setItem('rockem_achievementProgress', JSON.stringify(achievementProgress));
+                localStorage.setItem('rockem_bestRun', String(bestRun));
+            }
+
+            function recordBestRun(levelReached) {
+                if (levelReached > bestRun) {
+                    bestRun = levelReached;
+                    saveGameData();
+                }
+            }
+
+            function updateBestRunDisplay() {
+                if (bestRunDisplay) {
+                    bestRunDisplay.innerHTML = `BEST RUN: <span>Level ${bestRun}${bestRun >= OPPONENTS.length ? ' (CHAMP!)' : ''}</span>`;
+                }
             }
 
             function unlockCard(cardId) {
@@ -596,7 +1025,7 @@
                 Object.values(screens).forEach(s => s.classList.remove('active'));
                 screens[screenName].classList.add('active');
                 gameState.currentScreen = screenName;
-                if(screenName === 'cardSelect') renderCards();
+                if(screenName === 'cardSelect') { renderCards(); updateBestRunDisplay(); }
                 if(screenName === 'achievements') renderAchievements();
             }
 
@@ -605,13 +1034,20 @@
                 cardGrid.innerHTML = '';
                 Object.keys(unlockedCards).forEach(cardId => {
                     const cardData = ALL_CARDS[cardId];
+                    if (!cardData) return;
+                    const isCurse = /Cursed:/i.test(cardData.desc);
                     const cardEl = document.createElement('div');
-                    cardEl.className = 'card';
+                    cardEl.className = 'card' + (isCurse ? ' curse' : '') + (gameState.selectedCards.includes(cardId) ? ' selected' : '');
                     cardEl.dataset.cardId = cardId;
                     cardEl.innerHTML = `<div class="card-title">${cardData.title}</div><div class="card-desc">${cardData.desc}</div>`;
                     cardEl.addEventListener('click', () => toggleCardSelection(cardId, cardEl));
                     cardGrid.appendChild(cardEl);
                 });
+                updateSelectCounter();
+            }
+
+            function updateSelectCounter() {
+                if (selectCounter) selectCounter.textContent = `Selected ${gameState.selectedCards.length} / 3 cards`;
             }
 
             function renderAchievements() {
@@ -647,6 +1083,7 @@
                         cardEl.classList.add('selected');
                     }
                 }
+                updateSelectCounter();
             }
             
             // Game Initialization
@@ -677,9 +1114,9 @@
             function loadLevel(levelIndex) {
                 gameState.currentLevel = levelIndex;
                 const opponentData = OPPONENTS[levelIndex] || OPPONENTS[OPPONENTS.length - 1];
-                
+
                 gameState.isGoldenOpponent = !gameState.isGameOver && Math.random() < 0.10; // 10% chance
-                
+
                 if (gameState.isGoldenOpponent) {
                     opponentRobot.classList.add('golden');
                     gameState.opponentStats = {
@@ -694,32 +1131,109 @@
                     opponentRobot.classList.remove('golden');
                     gameState.opponentStats = { ...opponentData, health: opponentData.maxHealth };
                 }
-                
+
+                applyOpponentSkin(levelIndex);
+
                 gameState.playerStats.health = gameState.playerStats.maxHealth;
                 if(gameState.playerStats.armor) gameState.playerStats.health += gameState.playerStats.armor;
+
+                // Reset per-fight visual/combat state
+                gameState.comboCount = 0;
+                gameState.riposteActive = false;
+                gameState.pendingTell = null;
+                clearTells();
+                hideCombo();
+                koVignette.classList.remove('go');
+                playerRobot.classList.remove('ko-fall', 'hit');
+                opponentRobot.classList.remove('ko-fall', 'hit');
+
+                // sync ghost bars instantly to full
+                playerHealthGhost.style.width = '100%';
+                opponentHealthGhost.style.width = '100%';
 
                 updateUI();
                 levelText.textContent = `LEVEL ${levelIndex + 1}`;
                 document.getElementById('opponent-name').textContent = gameState.opponentStats.name;
+                renderRunPips();
+                renderModifierStrip();
+            }
+
+            function applyOpponentSkin(levelIndex) {
+                const head = opponentRobot.querySelector('.robot-head');
+                const body = opponentRobot.querySelector('.robot-body');
+                if (gameState.isGoldenOpponent) {
+                    // let CSS .golden rule handle visuals
+                    head.style.background = '';
+                    body.style.background = '';
+                    head.style.color = '';
+                    head.style.borderColor = '';
+                    body.style.borderColor = '';
+                    return;
+                }
+                const skin = OPPONENT_SKINS[levelIndex % OPPONENT_SKINS.length];
+                gameState.opponentSkin = skin;
+                body.style.background = skin.body;
+                head.style.background = skin.head;
+                head.style.color = skin.eye;
+                head.style.borderColor = skin.border;
+                body.style.borderColor = skin.border;
+            }
+
+            function renderRunPips() {
+                if (!runPips) return;
+                runPips.innerHTML = '';
+                for (let i = 0; i < OPPONENTS.length; i++) {
+                    const pip = document.createElement('div');
+                    pip.className = 'run-pip';
+                    if (i < gameState.currentLevel) pip.classList.add('done');
+                    else if (i === gameState.currentLevel) pip.classList.add(gameState.isGoldenOpponent ? 'golden' : 'current');
+                    runPips.appendChild(pip);
+                }
+            }
+
+            function renderModifierStrip() {
+                if (!modifierStrip) return;
+                modifierStrip.innerHTML = '';
+                const chips = [];
+                // Loadout cards
+                gameState.selectedCards.forEach(id => {
+                    const c = ALL_CARDS[id];
+                    if (c) chips.push({ text: c.title, curse: /Cursed:/i.test(c.desc) });
+                });
+                // Mid-run rewards
+                gameState.runRewards.forEach(r => chips.push({ text: r, curse: false }));
+                if (gameState.isGoldenOpponent) chips.push({ text: 'GOLD FOE x1.5', curse: false });
+                chips.forEach(ch => {
+                    const el = document.createElement('div');
+                    el.className = 'mod-chip' + (ch.curse ? ' curse' : '');
+                    el.textContent = ch.text;
+                    modifierStrip.appendChild(el);
+                });
             }
 
             function startGame() {
                 initializePlayerStats();
-                loadLevel(0);
+                gameState.runRewards = [];
                 gameState.isGameOver = false;
+                loadLevel(0);
                 showScreen('game');
                 startOpponentAI();
-                gameLoop();
+                lastTime = performance.now();
+                gameLoop(lastTime);
             }
 
             // UI Updates
             function updateHealthBars() {
-                const playerHealthPercent = (gameState.playerStats.health / gameState.playerStats.maxHealth) * 100;
-                playerHealthBar.style.width = `${playerHealthPercent}%`;
+                const playerHealthPercent = Math.max(0, (gameState.playerStats.health / gameState.playerStats.maxHealth) * 100);
+                const pClamped = Math.min(100, playerHealthPercent);
+                playerHealthBar.style.width = `${pClamped}%`;
+                playerHealthGhost.style.width = `${pClamped}%`;
                 updateHealthBarColor(playerHealthBar, playerHealthPercent);
-                
-                const opponentHealthPercent = (gameState.opponentStats.health / gameState.opponentStats.maxHealth) * 100;
-                opponentHealthBar.style.width = `${opponentHealthPercent}%`;
+
+                const opponentHealthPercent = Math.max(0, (gameState.opponentStats.health / gameState.opponentStats.maxHealth) * 100);
+                const oClamped = Math.min(100, opponentHealthPercent);
+                opponentHealthBar.style.width = `${oClamped}%`;
+                opponentHealthGhost.style.width = `${oClamped}%`;
                 updateHealthBarColor(opponentHealthBar, opponentHealthPercent);
             }
             
@@ -737,16 +1251,19 @@
             function playerAction(type) {
                 if (gameState.isGameOver || gameState.playerCooldowns[type] > 0) return;
 
+                // input feedback flash on the button
+                flashButton(type);
+
                 let baseDamage = 0;
                 switch (type) {
                     case 'regular':
                         baseDamage = gameState.playerStats.regularDamage;
-                        performPunch(playerRobot.querySelector('.right-arm'), 'punch-regular', () => handlePlayerHit(baseDamage));
+                        performPunch(playerRobot.querySelector('.right-arm'), 'punch-regular', () => handlePlayerHit(baseDamage), 60);
                         setCooldown('regular', gameState.playerStats.regularCooldown);
                         break;
                     case 'strong':
                         baseDamage = gameState.playerStats.strongDamage;
-                        performPunch(playerRobot.querySelector('.left-arm'), 'punch-strong', () => handlePlayerHit(baseDamage), 200);
+                        performPunch(playerRobot.querySelector('.left-arm'), 'punch-strong', () => handlePlayerHit(baseDamage, true), 120);
                         setCooldown('strong', gameState.playerStats.strongCooldown);
                         break;
                     case 'block':
@@ -761,35 +1278,90 @@
                 }
             }
 
-            function handlePlayerHit(baseDamage) {
+            function flashButton(type) {
+                const btn = controlBtns[type];
+                if (!btn) return;
+                btn.classList.remove('pressed');
+                void btn.offsetWidth; // restart animation
+                btn.classList.add('pressed');
+                setTimeout(() => btn.classList.remove('pressed'), 200);
+            }
+
+            function handlePlayerHit(baseDamage, isStrong) {
                 let finalDamage = baseDamage;
+                let isCrit = false;
                 // Check for Riposte
                 if(gameState.riposteActive) {
                     finalDamage *= 2;
                     gameState.riposteActive = false;
+                    isCrit = true;
                 }
                 // Check for Last Stand
-                if (gameState.playerStats.conditionalEffects.some(e => e.type === 'last_stand') && 
+                if (gameState.playerStats.conditionalEffects.some(e => e.type === 'last_stand') &&
                     (gameState.playerStats.health / gameState.playerStats.maxHealth) <= 0.30) {
                     finalDamage *= 1.5;
+                    isCrit = true;
                 }
 
                 if (!gameState.isOpponentBlocking) {
-                    dealDamage('opponent', Math.round(finalDamage));
-                } else { 
-                    showMessage("BLOCKED!", 800); 
+                    const dmg = Math.round(finalDamage);
+                    dealDamage('opponent', dmg, { crit: isCrit, strong: isStrong });
+                    registerCombo(isCrit);
+                } else {
+                    showBlockedAt(opponentRobot);
+                    resetCombo();
                 }
             }
-            
+
+            // --- COMBO / COUNTER popups ---
+            function registerCombo(isCrit) {
+                gameState.comboCount++;
+                if (isCrit) {
+                    showCombo('COUNTER!', gameState.comboCount);
+                } else if (gameState.comboCount >= 2) {
+                    showCombo(comboWord(gameState.comboCount), gameState.comboCount);
+                }
+                clearTimeout(gameState.comboTimer);
+                gameState.comboTimer = setTimeout(resetCombo, 1600);
+            }
+            function comboWord(n) {
+                if (n >= 6) return 'UNSTOPPABLE!';
+                if (n >= 4) return 'RAMPAGE!';
+                return 'COMBO!';
+            }
+            function resetCombo() { gameState.comboCount = 0; }
+            function showCombo(label, count) {
+                comboLabel.textContent = label;
+                comboCount.textContent = count >= 2 ? `${count} HITS` : '';
+                comboPopup.classList.remove('show');
+                void comboPopup.offsetWidth;
+                comboPopup.classList.add('show');
+                clearTimeout(comboPopup._t);
+                comboPopup._t = setTimeout(hideCombo, 900);
+            }
+            function hideCombo() { comboPopup.classList.remove('show'); }
+
+            // --- OPPONENT AI with readable TELLS (the missing function, now implemented) ---
+            function startOpponentAI() {
+                clearInterval(gameState.opponentAITimer);
+                const interval = Math.max(700, gameState.opponentStats.attackInterval || 1500);
+                // first action a touch after the bell so the player can orient
+                gameState.opponentAITimer = setInterval(() => {
+                    if (!gameState.isGameOver) opponentAction();
+                }, interval);
+            }
+
             function opponentAction() {
-                if(gameState.isGameOver) return;
-                
+                if (gameState.isGameOver || gameState.isOpponentBlocking) return;
+                // don't stack tells
+                if (gameState.pendingTell) return;
+
                 const actionRoll = Math.random();
-                if (actionRoll < 0.6) { // Regular punch
-                    performPunch(opponentRobot.querySelector('.right-arm'), 'punch-regular', () => handleOpponentHit(gameState.opponentStats.regularDamage));
-                } else if (actionRoll < 0.85) { // Strong punch
-                    performPunch(opponentRobot.querySelector('.left-arm'), 'punch-strong', () => handleOpponentHit(gameState.opponentStats.strongDamage), 200);
-                } else { // Block
+                if (actionRoll < 0.6) { // Regular punch — short, readable tell
+                    telegraphAndPunch('regular');
+                } else if (actionRoll < 0.85) { // Strong punch — bigger, slower tell
+                    telegraphAndPunch('strong');
+                } else { // Block / juke
                     gameState.isOpponentBlocking = true;
                     opponentRobot.classList.add('block-pose');
                     setTimeout(() => {
@@ -799,36 +1371,152 @@
                 }
             }
 
-            function handleOpponentHit(damage) {
+            // Telegraph (wind-up the player can read), then commit to the punch.
+            function telegraphAndPunch(kind) {
+                const isStrong = kind === 'strong';
+                const arm = opponentRobot.querySelector(isStrong ? '.left-arm' : '.right-arm');
+                const windupCls = isStrong ? 'windup-strong' : 'windup-regular';
+                const punchCls = isStrong ? 'punch-strong' : 'punch-regular';
+                const headCls = isStrong ? 'telegraph-strong' : 'telegraph';
+                // strong punches telegraph LONGER -> harder hit but easier to read & block
+                const tellTime = isStrong ? 620 : 380;
+
+                gameState.pendingTell = kind;
+                arm.classList.add(windupCls);
+                opponentRobot.classList.add(headCls);
+
+                setTimeout(() => {
+                    arm.classList.remove(windupCls);
+                    opponentRobot.classList.remove(headCls);
+                    if (gameState.isGameOver) { gameState.pendingTell = null; return; }
+                    // commit: quick strike
+                    arm.classList.add(punchCls);
+                    setTimeout(() => {
+                        const dmg = isStrong ? gameState.opponentStats.strongDamage : gameState.opponentStats.regularDamage;
+                        handleOpponentHit(Math.round(dmg), isStrong);
+                        setTimeout(() => arm.classList.remove(punchCls), 150);
+                        gameState.pendingTell = null;
+                    }, 130);
+                }, tellTime);
+            }
+
+            function clearTells() {
+                ['windup-regular','windup-strong'].forEach(c => {
+                    opponentRobot.querySelectorAll('.' + c).forEach(el => el.classList.remove(c));
+                });
+                opponentRobot.classList.remove('telegraph', 'telegraph-strong');
+                gameState.pendingTell = null;
+            }
+
+            function handleOpponentHit(damage, isStrong) {
                 if (!gameState.isPlayerBlocking) {
-                    dealDamage('player', damage);
+                    dealDamage('player', damage, { strong: isStrong });
                 } else {
-                    showMessage("BLOCKED!", 800);
+                    showBlockedAt(playerRobot);
                     achievementProgress.totalBlocks = (achievementProgress.totalBlocks || 0) + 1;
 
                     if (gameState.playerStats.blockReflection > 0) {
-                        dealDamage('opponent', gameState.playerStats.blockReflection);
+                        dealDamage('opponent', gameState.playerStats.blockReflection, {});
                     }
                     if(gameState.playerStats.specialEffects.some(e => e.type === 'riposte')) {
                         gameState.riposteActive = true;
+                        showCombo('RIPOSTE READY', 1);
                     }
                 }
             }
 
-            function dealDamage(target, amount) {
+            function dealDamage(target, amount, opts) {
+                opts = opts || {};
+                const robot = (target === 'player') ? playerRobot : opponentRobot;
                 if (target === 'player') {
                     gameState.playerStats.health -= amount;
-                    playerRobot.classList.add('hit');
-                    setTimeout(() => playerRobot.classList.remove('hit'), 200);
                 } else {
                     gameState.opponentStats.health -= amount;
-                    opponentRobot.classList.add('hit');
-                     setTimeout(() => opponentRobot.classList.remove('hit'), 200);
                 }
                 gameState.playerStats.health = Math.max(0, gameState.playerStats.health);
                 gameState.opponentStats.health = Math.max(0, gameState.opponentStats.health);
+
+                // Hit reaction
+                robot.classList.add('hit');
+                robot.classList.add('hit-flash');
+                setTimeout(() => { robot.classList.remove('hit'); robot.classList.remove('hit-flash'); }, 220);
+
+                // Juice: spark, damage number, screen shake
+                spawnSpark(robot, opts.crit);
+                spawnDamageNumber(robot, amount, { crit: opts.crit, self: target === 'player' });
+                if (opts.strong || opts.crit) {
+                    screenShake(true);
+                    impactFlashGo();
+                } else {
+                    screenShake(false);
+                }
+
                 updateHealthBars();
                 checkWinLoss();
+            }
+
+            // --- VISUAL FX ---
+            function robotCenter(robot) {
+                const ar = fightArea.getBoundingClientRect();
+                const rr = robot.getBoundingClientRect();
+                return {
+                    x: rr.left - ar.left + rr.width / 2,
+                    y: rr.top - ar.top + rr.height * 0.35,
+                };
+            }
+
+            function spawnSpark(robot, big) {
+                const c = robotCenter(robot);
+                const el = document.createElement('div');
+                el.className = 'spark';
+                el.style.left = c.x + 'px';
+                el.style.top = c.y + 'px';
+                const col = big ? '#ff5252' : '#fff36b';
+                el.innerHTML = `<svg viewBox="0 0 100 100" width="100%" height="100%">
+                    <polygon points="50,2 60,38 96,40 64,60 78,96 50,72 22,96 36,60 4,40 40,38"
+                        fill="${col}" stroke="#fff" stroke-width="3" />
+                    <circle cx="50" cy="50" r="${big?20:12}" fill="#fff" opacity="0.9"/>
+                </svg>`;
+                fxLayer.appendChild(el);
+                setTimeout(() => el.remove(), 360);
+            }
+
+            function spawnDamageNumber(robot, amount, opts) {
+                opts = opts || {};
+                const c = robotCenter(robot);
+                const el = document.createElement('div');
+                el.className = 'dmg-float' + (opts.crit ? ' crit' : '') + (opts.self ? ' self' : '');
+                el.style.left = (c.x + (Math.random()*30-15)) + 'px';
+                el.style.top = c.y + 'px';
+                el.textContent = (opts.crit ? '' : '') + amount;
+                fxLayer.appendChild(el);
+                setTimeout(() => el.remove(), 800);
+            }
+
+            function screenShake(big) {
+                const cls = big ? 'shake-big' : 'shake';
+                gameContainer.classList.remove('shake', 'shake-big');
+                void gameContainer.offsetWidth;
+                gameContainer.classList.add(cls);
+                setTimeout(() => gameContainer.classList.remove(cls), big ? 460 : 330);
+            }
+
+            function impactFlashGo() {
+                impactFlash.classList.remove('go');
+                void impactFlash.offsetWidth;
+                impactFlash.classList.add('go');
+                setTimeout(() => impactFlash.classList.remove('go'), 230);
+            }
+
+            function showBlockedAt(robot) {
+                const c = robotCenter(robot);
+                const el = document.createElement('div');
+                el.className = 'dmg-float self';
+                el.style.left = c.x + 'px';
+                el.style.top = c.y + 'px';
+                el.textContent = 'BLOCK';
+                fxLayer.appendChild(el);
+                setTimeout(() => el.remove(), 800);
             }
 
             function checkWinLoss() {
@@ -842,31 +1530,91 @@
             function endLevel(didPlayerWin) {
                 gameState.isGameOver = true;
                 clearInterval(gameState.opponentAITimer);
+                clearTells();
+
+                // KO juice — slow-mo flash + the loser staggers and falls
+                koVignette.classList.add('go');
+                impactFlashGo();
+                screenShake(true);
+                const loser = didPlayerWin ? opponentRobot : playerRobot;
+                loser.classList.add('ko-fall');
 
                 if (didPlayerWin) {
                     processVictory();
                     if (gameState.currentLevel >= OPPONENTS.length - 1) {
+                         recordBestRun(OPPONENTS.length);
                          showMessage("YOU WIN!", 999999);
                          setTimeout(() => {
+                           koVignette.classList.remove('go');
                            showScreen('gameOver');
                            document.querySelector('#game-over-screen h1').textContent = "CHAMPION!";
                            document.querySelector('#game-over-screen h2').textContent = "You defeated all opponents!";
-                         }, 2000);
+                         }, 2200);
                     } else {
+                        recordBestRun(gameState.currentLevel + 1);
                         victoryLevelText.textContent = `LEVEL ${gameState.currentLevel + 1} CLEARED!`;
-                        setTimeout(() => showScreen('levelVictory'), 2600); // Increased delay for unlock message
+                        setTimeout(() => { koVignette.classList.remove('go'); showLevelVictory(); }, 2600);
                     }
                 } else {
+                    recordBestRun(gameState.currentLevel);
                     achievementProgress.totalLosses = (achievementProgress.totalLosses || 0) + 1;
                     checkForUnlocks(); // Check for loss-based achievements
                     saveGameData();
                     showMessage("KNOCK OUT!", 999999);
                     setTimeout(() => {
+                        koVignette.classList.remove('go');
                         document.querySelector('#game-over-screen h1').textContent = "GAME OVER";
-                        document.querySelector('#game-over-screen h2').textContent = "You were knocked out!";
+                        document.querySelector('#game-over-screen h2').textContent =
+                            `You reached Level ${gameState.currentLevel + 1}. Best: Level ${bestRun}.`;
                         showScreen('gameOver');
                     }, 2000);
                 }
+            }
+
+            // --- BETWEEN-FIGHT REWARD PICK (roguelike loop clarity) ---
+            function showLevelVictory() {
+                renderRewardChoices();
+                showScreen('levelVictory');
+            }
+
+            function renderRewardChoices() {
+                rewardGrid.innerHTML = '';
+                nextLevelBtn.disabled = true;
+                nextLevelBtn.style.opacity = '0.5';
+                nextLevelBtn.textContent = 'Choose a reward';
+                gameState._chosenReward = null;
+
+                // pick 3 distinct rewards at random
+                const pool = RUN_REWARDS.slice();
+                for (let i = pool.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [pool[i], pool[j]] = [pool[j], pool[i]];
+                }
+                const choices = pool.slice(0, 3);
+                choices.forEach(rw => {
+                    const el = document.createElement('div');
+                    el.className = 'card';
+                    el.innerHTML = `<div class="card-title">${rw.title}</div><div class="card-desc">${rw.desc}</div>`;
+                    el.addEventListener('click', () => {
+                        rewardGrid.querySelectorAll('.card').forEach(c => c.classList.remove('selected'));
+                        el.classList.add('selected');
+                        gameState._chosenReward = rw;
+                        nextLevelBtn.disabled = false;
+                        nextLevelBtn.style.opacity = '1';
+                        nextLevelBtn.textContent = 'Next Opponent';
+                    });
+                    rewardGrid.appendChild(el);
+                });
+            }
+
+            function applyChosenReward() {
+                const rw = gameState._chosenReward;
+                if (!rw) return;
+                rw.apply(gameState.playerStats);
+                // keep current health within new max
+                gameState.playerStats.health = Math.min(gameState.playerStats.health, gameState.playerStats.maxHealth);
+                gameState.runRewards.push(rw.tag);
+                gameState._chosenReward = null;
             }
 
             function processVictory() {
@@ -907,10 +1655,15 @@
                 }, windup);
             }
 
+            let _msgTimer = null;
             function showMessage(text, duration = 1000) {
                 messagePopup.innerHTML = text;
                 messagePopup.style.display = 'block';
-                setTimeout(() => messagePopup.style.display = 'none', duration);
+                messagePopup.classList.remove('show');
+                void messagePopup.offsetWidth;
+                messagePopup.classList.add('show');
+                clearTimeout(_msgTimer);
+                _msgTimer = setTimeout(() => messagePopup.style.display = 'none', duration);
             }
 
             // Cooldowns & Game Loop
@@ -963,22 +1716,44 @@
             achievementsBtn.addEventListener('click', () => showScreen('achievements'));
             backToStartBtn.addEventListener('click', () => showScreen('cardSelect'));
             nextLevelBtn.addEventListener('click', () => {
+                if (nextLevelBtn.disabled) return;
+                applyChosenReward();
+                gameState.isGameOver = false;          // reset BEFORE loadLevel so golden can roll
                 loadLevel(gameState.currentLevel + 1);
-                gameState.isGameOver = false;
                 showScreen('game');
                 startOpponentAI();
                 lastTime = performance.now(); // Reset time for game loop
                 gameLoop(lastTime);
             });
-            
+
             controlBtns.regular.addEventListener('click', () => playerAction('regular'));
             controlBtns.strong.addEventListener('click', () => playerAction('strong'));
             controlBtns.block.addEventListener('click', () => playerAction('block'));
-            
+
+            // --- KEYBOARD CONTROLS ---
+            const keyMap = {
+                'j': 'regular', 'arrowleft': 'regular', 'a': 'regular',
+                'k': 'strong',  'arrowup': 'strong',   'w': 'strong', ' ': 'strong',
+                'l': 'block',   'arrowdown': 'block',  's': 'block', 'd': 'block',
+            };
+            document.addEventListener('keydown', (e) => {
+                const key = e.key.toLowerCase();
+                if (gameState.currentScreen === 'game' && keyMap[key]) {
+                    e.preventDefault();
+                    playerAction(keyMap[key]);
+                } else if (key === 'enter') {
+                    // Enter advances start / victory / restart
+                    if (gameState.currentScreen === 'cardSelect') startGame();
+                    else if (gameState.currentScreen === 'levelVictory' && !nextLevelBtn.disabled) nextLevelBtn.click();
+                    else if (gameState.currentScreen === 'gameOver') showScreen('cardSelect');
+                }
+            });
+
             // --- INITIALIZE ---
             function init() {
                 loadGameData();
                 renderCards();
+                updateBestRunDisplay();
                 showScreen('cardSelect');
             }
 
