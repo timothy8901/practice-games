@@ -3,261 +3,318 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Tim Howley's collection of practice web games — playable in the browser. Featured: Elder Story RPG, a 2D side-scroller with MapleStory platforming and Skyrim-style progression.">
-  <title>Tim's Games</title>
+  <meta name="description" content="Token Maxxer's Anonymous Game Studio — a collection of browser games you can play instantly, plus official pixel-art game tees. Featured: Grocery Tycoon, Theater of the Undead, Elder Story RPG.">
+  <title>Token Maxxer's Anonymous Game Studio</title>
+
+  <!-- ===== Social share / OpenGraph ===== -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Token Maxxer's Anonymous Game Studio">
+  <meta property="og:title" content="Token Maxxer's Anonymous Game Studio">
+  <meta property="og:description" content="Play browser games instantly — then grab the shirt. Official pixel-art game tees in the store.">
+  <meta property="og:image" content="https://timothy8901.github.io/practice-games/assets/token-maxxers-banner.png">
+  <meta property="og:url" content="https://timothy8901.github.io/practice-games/">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Token Maxxer's Anonymous Game Studio">
+  <meta name="twitter:description" content="Play browser games instantly — then grab the shirt.">
+  <meta name="twitter:image" content="https://timothy8901.github.io/practice-games/assets/token-maxxers-banner.png">
+  <meta name="theme-color" content="#cc2222">
+  <link rel="icon" type="image/png" href="assets/token-maxxers.png">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Press+Start+2P&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg: #1a1a2e;
-      --card: #2b2b40;
-      --card-hover: #3a3a52;
-      --text: #f0f0f5;
-      --muted: #9090a8;
-      --accent: #ffd54d;
-      --pink: #ffc0d3;
-      --green: #6dd64d;
+      --bg: #f4ecd8;          /* cream paper */
+      --bg-deep: #ece2c9;     /* section bands */
+      --paper: #fffdf7;       /* cards */
+      --ink: #1d1a17;         /* near-black */
+      --muted-c: #7a6e58;
+      --red: #cc2222;
+      --red-dk: #9e1414;
+      --line: #e3d7bb;
+      --shadow: 0 8px 28px rgba(60, 44, 18, 0.12);
+      /* per-game signature accents */
+      --c-grocer: #2f8c46;
+      --c-undead: #9b2f2f;
+      --c-elder:  #3f6fc0;
+      --c-kirby:  #d96e8a;
+      --c-sequel: #3a8fd0;
+      --c-driver: #c9971a;
     }
 
     * { box-sizing: border-box; }
 
     body {
       background: var(--bg);
-      color: var(--text);
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      color: var(--ink);
+      font-family: "Outfit", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       margin: 0;
       line-height: 1.55;
       min-height: 100vh;
     }
+    .pixel { font-family: "Press Start 2P", monospace; }
 
+    a { color: inherit; }
+
+    /* ============ TOP NAV ============ */
+    nav.topbar {
+      position: sticky; top: 0; z-index: 50;
+      display: flex; align-items: center; gap: 16px;
+      padding: 10px clamp(14px, 4vw, 40px);
+      background: rgba(255, 253, 247, 0.92);
+      backdrop-filter: blur(8px);
+      border-bottom: 2px solid var(--line);
+    }
+    nav .brand { display: flex; align-items: center; gap: 11px; text-decoration: none; margin-right: auto; }
+    nav .brand img { width: 38px; height: 38px; border-radius: 8px; image-rendering: pixelated; box-shadow: 0 0 0 1px var(--line); }
+    nav .brand .mark { font-family: "Press Start 2P", monospace; font-size: 0.72rem; line-height: 1.5; color: var(--ink); }
+    nav .brand .mark b { color: var(--red); }
+    nav .brand .mark small { display: block; font-size: 0.5rem; color: var(--muted-c); letter-spacing: 0.04em; }
+    nav .links { display: flex; align-items: center; gap: clamp(8px, 2vw, 22px); }
+    nav .links a { text-decoration: none; font-weight: 600; font-size: 0.92rem; color: var(--ink); padding: 6px 4px; }
+    nav .links a:hover { color: var(--red); }
+    nav .links a.shop {
+      background: var(--red); color: #fff; padding: 9px 18px; border-radius: 9px;
+      font-weight: 800; box-shadow: 0 4px 0 var(--red-dk);
+    }
+    nav .links a.shop:hover { color: #fff; transform: translateY(1px); box-shadow: 0 3px 0 var(--red-dk); }
+    @media (max-width: 560px) {
+      nav .brand .mark { font-size: 0.6rem; }
+      nav .links a:not(.shop) { display: none; }
+    }
+
+    /* ============ HERO ============ */
     header.hero {
       text-align: center;
-      padding: 56px 20px 24px;
-      background: linear-gradient(180deg, #2b2b40 0%, var(--bg) 100%);
-      border-bottom: 1px solid #44445c;
+      padding: 54px 20px 30px;
+      background:
+        radial-gradient(900px 320px at 50% -40%, rgba(204, 34, 34, 0.08), transparent),
+        linear-gradient(180deg, #fbf4e3 0%, var(--bg) 100%);
+      border-bottom: 1px solid var(--line);
+    }
+    header.hero .kicker {
+      font-family: "Press Start 2P", monospace; font-size: 0.62rem; letter-spacing: 0.06em;
+      color: var(--red); margin-bottom: 18px;
     }
     header.hero h1 {
-      margin: 0 0 8px;
-      font-size: 2.6rem;
-      background: linear-gradient(90deg, #ffc0d3, #ffd54d, #6dd64d, #ec4899);
-      -webkit-background-clip: text;
-      background-clip: text;
-      color: transparent;
-      -webkit-text-fill-color: transparent;
-      letter-spacing: -0.02em;
+      margin: 0 0 12px; font-size: clamp(2rem, 6vw, 3.2rem); font-weight: 800; letter-spacing: -0.02em;
+      color: var(--ink);
     }
-    header.hero p { margin: 0; color: var(--muted); font-size: 1.05rem; }
+    header.hero h1 b { color: var(--red); }
+    header.hero p { margin: 0 auto 22px; color: var(--muted-c); font-size: 1.06rem; max-width: 560px; }
+    .hero-cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+    .btn {
+      display: inline-block; text-decoration: none; font-weight: 800; font-size: 0.96rem;
+      padding: 12px 24px; border-radius: 11px; transition: transform 0.12s, box-shadow 0.12s;
+    }
+    .btn-primary { background: var(--red); color: #fff; box-shadow: 0 5px 0 var(--red-dk); }
+    .btn-primary:hover { transform: translateY(2px); box-shadow: 0 3px 0 var(--red-dk); }
+    .btn-ghost { background: var(--paper); color: var(--ink); border: 2px solid var(--ink); box-shadow: 0 5px 0 rgba(29,26,23,0.18); }
+    .btn-ghost:hover { transform: translateY(2px); box-shadow: 0 3px 0 rgba(29,26,23,0.18); }
 
-    main { max-width: 1100px; margin: 0 auto; padding: 32px 16px 64px; }
+    main { max-width: 1100px; margin: 0 auto; padding: 30px 16px 60px; }
 
     .section-title {
-      font-size: 0.85rem;
-      text-transform: uppercase;
-      letter-spacing: 0.12em;
-      color: var(--muted);
-      margin: 0 0 14px;
-      font-weight: 700;
+      font-family: "Press Start 2P", monospace;
+      font-size: 0.72rem; letter-spacing: 0.04em; color: var(--ink);
+      margin: 0 0 16px; display: flex; align-items: center; gap: 10px;
     }
+    .section-title::after { content: ''; flex: 1; height: 3px; background: var(--line); border-radius: 2px; }
 
-    /* ============ FEATURED CARD ============ */
+    /* ============ MERCH BAND ============ */
+    .merch-band {
+      display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 22px; align-items: center;
+      background: var(--paper); border: 2px solid var(--line); border-radius: 18px;
+      padding: 22px 26px; margin: 4px 0 38px; box-shadow: var(--shadow);
+    }
+    .merch-band img { width: 100%; height: auto; border-radius: 12px; border: 1px solid var(--line); }
+    .merch-band .mb-eyebrow { font-family: "Press Start 2P", monospace; font-size: 0.58rem; color: var(--red); margin-bottom: 10px; }
+    .merch-band h3 { margin: 0 0 8px; font-size: 1.5rem; font-weight: 800; }
+    .merch-band p { margin: 0 0 16px; color: var(--muted-c); font-size: 0.98rem; }
+    .merch-band .mb-cta { display: flex; gap: 10px; flex-wrap: wrap; }
+    @media (max-width: 720px) { .merch-band { grid-template-columns: 1fr; } .merch-band .mb-art { order: -1; } }
+
+    /* ============ FEATURED CARDS ============ */
     .featured {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      gap: 24px;
-      align-items: center;
-      background: linear-gradient(135deg, #2b2b40 0%, #3a2b4a 100%);
-      border-radius: 18px;
-      padding: 28px;
-      border: 2px solid #44445c;
-      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
-      text-decoration: none;
-      color: inherit;
+      position: relative;
+      display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 24px; align-items: center;
+      background: var(--paper); border-radius: 18px; padding: 26px; border: 2px solid var(--line);
+      box-shadow: var(--shadow); margin-bottom: 18px;
       transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
-      margin-bottom: 36px;
+      --accent: var(--red);
     }
-    .featured:hover {
-      transform: translateY(-3px);
-      border-color: var(--accent);
-      box-shadow: 0 14px 48px rgba(255, 213, 77, 0.18);
-    }
+    .featured:hover { transform: translateY(-3px); border-color: var(--accent); box-shadow: 0 14px 40px rgba(60,44,18,0.18); }
     .featured .label {
-      display: inline-block;
-      font-size: 0.7rem;
-      text-transform: uppercase;
-      letter-spacing: 0.14em;
-      color: var(--accent);
-      background: rgba(255, 213, 77, 0.12);
-      padding: 4px 10px;
-      border-radius: 999px;
-      margin-bottom: 8px;
+      display: inline-block; font-family: "Press Start 2P", monospace; font-size: 0.52rem; letter-spacing: 0.04em;
+      color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent);
+      padding: 6px 10px; border-radius: 999px; margin-bottom: 12px;
     }
-    .featured h2 {
-      margin: 0 0 8px;
-      font-size: 2rem;
-      color: var(--pink);
-      letter-spacing: -0.01em;
-    }
-    .featured p { margin: 0 0 14px; color: #c5c5d8; font-size: 1.02rem; }
-    .featured .meta {
-      display: flex; gap: 14px; flex-wrap: wrap;
-      font-size: 0.82rem; color: var(--muted);
-    }
-    .featured .meta span::before { content: '•  '; color: #555; }
+    .featured h2 { margin: 0 0 8px; font-size: 1.9rem; font-weight: 800; letter-spacing: -0.01em; }
+    .featured h2 a { text-decoration: none; color: var(--accent); }
+    .featured h2 a::after { content: ''; position: absolute; inset: 0; border-radius: 18px; }
+    .featured p { margin: 0 0 14px; color: #4f4636; font-size: 1.0rem; }
+    .featured .meta { display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.8rem; color: var(--muted-c); }
+    .featured .meta span::before { content: '•  '; color: var(--line); }
     .featured .meta span:first-child::before { content: ''; }
-    .featured .play-cta {
-      display: inline-block;
-      margin-top: 16px;
-      background: var(--accent);
-      color: #2b2b40;
-      padding: 10px 22px;
-      border-radius: 8px;
-      font-weight: 800;
-      font-size: 0.95rem;
-      letter-spacing: 0.03em;
+    .cta-row { display: flex; gap: 10px; align-items: center; margin-top: 18px; flex-wrap: wrap; }
+    .play-cta { display: inline-block; background: var(--accent); color: #fff; padding: 10px 22px; border-radius: 9px; font-weight: 800; font-size: 0.92rem; box-shadow: 0 4px 0 color-mix(in srgb, var(--accent) 60%, #000); }
+    .shirt-chip {
+      position: relative; z-index: 2; display: inline-flex; align-items: center; gap: 6px;
+      text-decoration: none; font-weight: 700; font-size: 0.84rem; color: var(--ink);
+      background: var(--bg-deep); border: 2px solid var(--line); padding: 8px 14px; border-radius: 9px;
     }
-    .featured .preview {
-      flex-shrink: 0;
-      width: 180px;
-      height: 180px;
-      background: radial-gradient(circle at 50% 60%, #c8e8c0 0%, #5fc242 70%, #1f6628 100%);
-      border-radius: 14px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      overflow: hidden;
-    }
+    .shirt-chip:hover { border-color: var(--accent); color: var(--accent); }
+    .featured .preview { flex-shrink: 0; width: 180px; height: 180px; border-radius: 14px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
     .featured .preview svg { width: 130px; height: 130px; }
 
-    /* sequel variant — cool blue, 3D vibe */
-    .featured.sequel {
-      background: linear-gradient(135deg, #2b2b40 0%, #1f3a52 100%);
-      margin-top: -16px;
-    }
-    .featured.sequel:hover {
-      border-color: #8fd4ff;
-      box-shadow: 0 14px 48px rgba(143, 212, 255, 0.18);
-    }
-    .featured.sequel .label { color: #8fd4ff; background: rgba(143, 212, 255, 0.12); }
-    .featured.sequel h2 { color: #8fd4ff; }
-    .featured.sequel .play-cta { background: #8fd4ff; }
-    .featured.sequel .preview {
-      background: radial-gradient(circle at 50% 35%, #bfe4ff 0%, #ffd1e3 55%, #e8a8c8 100%);
-    }
-
-    /* driver variant — asphalt + headlight yellow */
-    .featured.driver {
-      background: linear-gradient(135deg, #2b2b40 0%, #3a2f1f 100%);
-    }
-    .featured.driver:hover {
-      border-color: #ffe14d;
-      box-shadow: 0 14px 48px rgba(255, 225, 77, 0.18);
-    }
-    .featured.driver .label { color: #ffe14d; background: rgba(255, 225, 77, 0.12); }
-    .featured.driver h2 { color: #ffe14d; }
-    .featured.driver .play-cta { background: #ffe14d; }
-    .featured.driver .preview {
-      background: linear-gradient(160deg, #5a6b3f 0%, #46566a 45%, #52555c 100%);
-    }
-
-    /* undead variant — dark theater + blood red */
-    .featured.undead {
-      background: linear-gradient(135deg, #2b2b40 0%, #2a1d1d 100%);
-    }
-    .featured.undead:hover {
-      border-color: #9b2f2f;
-      box-shadow: 0 14px 48px rgba(155, 47, 47, 0.22);
-    }
-    .featured.undead .label { color: #e0b35a; background: rgba(224, 179, 90, 0.12); }
-    .featured.undead h2 { color: #cc4444; }
-    .featured.undead .play-cta { background: #9b2f2f; color: #f0f0f5; }
-    .featured.undead .preview {
-      background: radial-gradient(circle at 50% 38%, #3c5036 0%, #20281c 60%, #11140d 100%);
-    }
+    .featured.grocer { --accent: var(--c-grocer); }
+    .featured.grocer .preview { background: radial-gradient(circle at 50% 42%, #d8f0c0 0%, #6dd64d 62%, #2f8c46 100%); }
+    .featured.undead { --accent: var(--c-undead); }
+    .featured.undead .preview { background: radial-gradient(circle at 50% 38%, #3c5036 0%, #20281c 60%, #11140d 100%); }
+    .featured.elder { --accent: var(--c-elder); }
+    .featured.elder .preview { background: radial-gradient(circle at 50% 60%, #cfe0ff 0%, #6f9ee0 70%, #2f5aa0 100%); }
+    .featured.kirby { --accent: var(--c-kirby); }
+    .featured.kirby .preview { background: radial-gradient(circle at 50% 50%, #ffe3ec 0%, #ffc0d3 60%, #e89ab4 100%); }
+    .featured.sequel { --accent: var(--c-sequel); }
+    .featured.sequel .preview { background: radial-gradient(circle at 50% 35%, #bfe4ff 0%, #ffd1e3 55%, #e8a8c8 100%); }
+    .featured.driver { --accent: var(--c-driver); }
+    .featured.driver .preview { background: linear-gradient(160deg, #5a6b3f 0%, #46566a 45%, #52555c 100%); }
 
     @media (max-width: 640px) {
       .featured { grid-template-columns: 1fr; text-align: center; }
       .featured .preview { margin: 0 auto; width: 140px; height: 140px; }
       .featured h2 { font-size: 1.5rem; }
-      header.hero h1 { font-size: 2rem; }
+      .cta-row { justify-content: center; }
     }
 
     /* ============ GAMES GRID ============ */
-    .games-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
-      gap: 14px;
-    }
+    .games-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; }
     .game-card {
-      background: var(--card);
-      border-radius: 12px;
-      padding: 18px;
-      text-decoration: none;
-      color: inherit;
-      border: 1px solid #3a3a52;
-      transition: transform 0.12s, background 0.12s, border-color 0.12s;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
+      background: var(--paper); border-radius: 12px; padding: 18px; text-decoration: none; color: inherit;
+      border: 2px solid var(--line); transition: transform 0.12s, border-color 0.12s, box-shadow 0.12s;
+      display: flex; flex-direction: column; gap: 6px;
     }
-    .game-card:hover {
-      background: var(--card-hover);
-      transform: translateY(-2px);
-      border-color: var(--accent);
-    }
-    .game-card .game-name {
-      font-weight: 700;
-      font-size: 1rem;
-      color: var(--text);
-    }
-    .game-card .game-tag {
-      font-size: 0.74rem;
-      color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-    }
-    .game-card .game-desc {
-      font-size: 0.82rem;
-      color: #b0b0c0;
-      margin-top: 4px;
-    }
+    .game-card:hover { transform: translateY(-2px); border-color: var(--red); box-shadow: var(--shadow); }
+    .game-card .game-tag { font-family: "Press Start 2P", monospace; font-size: 0.48rem; color: var(--red); letter-spacing: 0.03em; }
+    .game-card .game-name { font-weight: 800; font-size: 1.02rem; color: var(--ink); }
+    .game-card .game-desc { font-size: 0.84rem; color: var(--muted-c); margin-top: 2px; }
+    .game-card .shirt-link { margin-top: 8px; font-size: 0.76rem; font-weight: 700; color: var(--red); }
 
-    footer {
-      text-align: center;
-      color: var(--muted);
-      font-size: 0.82rem;
-      padding: 28px 16px;
-      border-top: 1px solid #44445c;
-      margin-top: 40px;
-    }
-    footer a { color: var(--accent); text-decoration: none; }
+    /* ============ FOOTER ============ */
+    footer { text-align: center; color: var(--muted-c); font-size: 0.84rem; padding: 36px 16px; border-top: 2px solid var(--line); margin-top: 44px; background: var(--bg-deep); }
+    footer a { color: var(--red); text-decoration: none; font-weight: 600; }
     footer a:hover { text-decoration: underline; }
-    footer .studio-banner {
-      display: block; margin: 0 auto 18px; width: min(360px, 72vw); height: auto;
-      border-radius: 10px; image-rendering: auto;
-      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 12px 36px rgba(0, 0, 0, 0.5);
-    }
-    footer .studio-hint { color: var(--muted); font-size: 0.78rem; letter-spacing: 0.12em; text-transform: uppercase; margin: 0 0 14px; }
+    footer .studio-banner { display: block; margin: 0 auto 16px; width: min(420px, 80vw); height: auto; border-radius: 12px; box-shadow: var(--shadow); }
+    footer .foot-links { display: flex; gap: 18px; justify-content: center; flex-wrap: wrap; margin-bottom: 12px; }
+    footer .studio-hint { font-family: "Press Start 2P", monospace; color: var(--muted-c); font-size: 0.56rem; letter-spacing: 0.06em; margin: 0 0 16px; }
   </style>
 </head>
 <body>
 
+  <nav class="topbar">
+    <a class="brand" href="index.html" aria-label="Token Maxxer's Anonymous Game Studio — home">
+      <img src="assets/token-maxxers.png" alt="Token Maxxer's logo">
+      <span class="mark">TOKEN <b>MAXXER'S</b><small>ANONYMOUS GAME STUDIO</small></span>
+    </a>
+    <div class="links">
+      <a href="#featured">Games</a>
+      <a href="merch.html">Shirt&nbsp;Designs</a>
+      <a class="shop" href="https://tims-store-12362.myshopify.com/" target="_blank" rel="noopener">Shop&nbsp;↗</a>
+    </div>
+  </nav>
+
   <header class="hero">
-    <h1>Tim's Games</h1>
-    <p>MVPs of games I'm building. Play them, test them, tell me what you think.</p>
+    <div class="kicker">▸ TOKEN MAXXER'S ANONYMOUS ◂</div>
+    <h1>Play the games. <b>Wear the merch.</b></h1>
+    <p>MVPs of games I'm building — playable in the browser, no install. Like one? There's a shirt for that.</p>
+    <div class="hero-cta">
+      <a class="btn btn-ghost" href="#featured">▾ Browse games</a>
+      <a class="btn btn-primary" href="https://tims-store-12362.myshopify.com/" target="_blank" rel="noopener">Shop the merch ↗</a>
+    </div>
   </header>
 
   <main>
-    <h2 class="section-title">Featured</h2>
-    <a class="featured undead" href="theater-of-the-undead/index.html" aria-label="Play Theater of the Undead">
+
+    <!-- ===== MERCH BAND ===== -->
+    <section class="merch-band" aria-label="Official game tees">
+      <div class="mb-text">
+        <div class="mb-eyebrow">★ NOW IN THE STORE</div>
+        <h3>Official pixel-art game tees</h3>
+        <p>Every game gets its own shirt, screen-print style. Browse the full lineup of designs, then pick yours up from the Token Maxxer's store.</p>
+        <div class="mb-cta">
+          <a class="btn btn-primary" href="https://tims-store-12362.myshopify.com/" target="_blank" rel="noopener">Shop now ↗</a>
+          <a class="btn btn-ghost" href="merch.html">See all shirt designs</a>
+        </div>
+      </div>
+      <div class="mb-art">
+        <a href="merch.html" aria-label="View shirt designs"><img src="assets/token-maxxers-banner.png" alt="Token Maxxer's Anonymous Game Studio"></a>
+      </div>
+    </section>
+
+    <h2 class="section-title" id="featured">Featured</h2>
+
+    <article class="featured grocer">
       <div>
-        <span class="label">New &middot; Top-down Zombies</span>
-        <h2>Theater of the Undead</h2>
+        <span class="label">New · Tycoon / Sim</span>
+        <h2><a href="grocery-tycoon.html">Grocery Tycoon</a></h2>
+        <p>Grow a humble fruit stand into a sprawling <b>hypermarket empire</b> — in the spirit of <b>RollerCoaster&nbsp;Tycoon</b>, but with the tension of perishable goods. Set prices against a demand curve, fight <b>spoilage</b>, juggle supply chains, marketing, seasons &amp; staff, react to heatwaves, festivals &amp; health inspections, and chase <b>110 achievements</b>. Point-and-click, autosaves, plays in portrait on a phone or wide on desktop.</p>
+        <div class="meta">
+          <span>Touch / click only</span>
+          <span>110 achievements</span>
+          <span>Freshness &amp; spoilage</span>
+          <span>Saves your progress</span>
+        </div>
+        <div class="cta-row">
+          <span class="play-cta">Play now &rarr;</span>
+          <a class="shirt-chip" href="merch.html#grocery-tycoon">👕 Shirt</a>
+        </div>
+      </div>
+      <div class="preview" aria-hidden="true">
+        <!-- market produce stand (original art) -->
+        <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+          <ellipse cx="100" cy="181" rx="62" ry="9" fill="#000000" opacity="0.25"/>
+          <!-- striped awning -->
+          <path d="M26 34 L174 34 L168 60 L32 60 Z" fill="#2f8c46"/>
+          <path d="M30 34 L52 34 L48 60 L34 60 Z" fill="#eafff0" opacity="0.9"/>
+          <path d="M74 34 L96 34 L92 60 L70 60 Z" fill="#eafff0" opacity="0.9"/>
+          <path d="M118 34 L140 34 L136 60 L114 60 Z" fill="#eafff0" opacity="0.9"/>
+          <path d="M158 34 L170 34 L166 60 L154 60 Z" fill="#eafff0" opacity="0.9"/>
+          <!-- scalloped edge -->
+          <path d="M32 60 q9 13 18 0 q9 13 18 0 q9 13 18 0 q9 13 18 0 q9 13 18 0 q9 13 18 0 q9 13 18 0 L168 60 Z" fill="#247a3a"/>
+          <!-- crate -->
+          <path d="M44 134 L156 134 L168 177 L32 177 Z" fill="#a8702c" stroke="#7a4e1c" stroke-width="3"/>
+          <path d="M44 134 L156 134 L154 149 L46 149 Z" fill="#c2894a"/>
+          <line x1="100" y1="134" x2="100" y2="177" stroke="#7a4e1c" stroke-width="2.5"/>
+          <!-- produce mound -->
+          <ellipse cx="96" cy="104" rx="27" ry="15" fill="#ffd54d" transform="rotate(-16 96 104)"/>
+          <circle cx="72" cy="120" r="20" fill="#e23b3b"/>
+          <circle cx="124" cy="118" r="22" fill="#ff9f43"/>
+          <circle cx="100" cy="128" r="18" fill="#6dd64d"/>
+          <circle cx="142" cy="132" r="13" fill="#c08bff"/>
+          <circle cx="56" cy="132" r="13" fill="#ff6b6b"/>
+          <circle cx="66" cy="113" r="5" fill="#ffffff" opacity="0.45"/>
+          <circle cx="118" cy="110" r="5" fill="#ffffff" opacity="0.45"/>
+          <path d="M90 90 q8 -10 16 -2" fill="none" stroke="#3c8c2e" stroke-width="4" stroke-linecap="round"/>
+        </svg>
+      </div>
+    </article>
+
+    <article class="featured undead">
+      <div>
+        <span class="label">New · Top-down Zombies</span>
+        <h2><a href="theater-of-the-undead/index.html">Theater of the Undead</a></h2>
         <p>A top-down twin-stick <b>Call of Duty Zombies</b> clone of <b>Kino der Toten</b> — rendered in the chunky low-poly look of classic <b>RuneScape</b>. Survive escalating hordes, buy doors &amp; perks, hit the moving Mystery Box and Pack-a-Punch, and outrun hellhound rounds. Keyboard + mouse or controller.</p>
         <div class="meta">
-          <span>WebGL 3D &middot; RuneScape look</span>
+          <span>WebGL 3D · RuneScape look</span>
           <span>Perks, box &amp; Pack-a-Punch</span>
           <span>Keyboard / mouse + gamepad</span>
           <span>Round-based survival</span>
         </div>
-        <span class="play-cta">Play now &rarr;</span>
+        <div class="cta-row">
+          <span class="play-cta">Play now &rarr;</span>
+          <a class="shirt-chip" href="merch.html#theater-of-the-undead">👕 Shirt</a>
+        </div>
       </div>
       <div class="preview" aria-hidden="true">
         <!-- blocky low-poly zombie (original art) -->
@@ -286,12 +343,12 @@
           <path d="M122 149 q5 15 0 22 q-5 -7 0 -22" fill="#9b2f2f"/>
         </svg>
       </div>
-    </a>
+    </article>
 
-    <a class="featured" href="https://timothy8901.github.io/elder-story-rpg/" aria-label="Play Elder Story RPG">
+    <article class="featured elder">
       <div>
-        <span class="label">New &middot; Side-scrolling RPG</span>
-        <h2>Elder Story RPG</h2>
+        <span class="label">New · Side-scrolling RPG</span>
+        <h2><a href="https://timothy8901.github.io/elder-story-rpg/">Elder Story RPG</a></h2>
         <p>A 2D side-scroller with MapleStory-style platforming and Skyrim-style progression: use-to-level skills &amp; perks, modular loot, eight joinable guilds, a dragon-slaying main quest with Thu'um shouts, animated pixel art, and auto-saving — all in the browser, no install.</p>
         <div class="meta">
           <span>Keyboard controls</span>
@@ -299,7 +356,10 @@
           <span>Dragons &amp; Thu'um</span>
           <span>Saves your progress</span>
         </div>
-        <span class="play-cta">Play now &rarr;</span>
+        <div class="cta-row">
+          <span class="play-cta">Play now &rarr;</span>
+          <a class="shirt-chip" href="https://tims-store-12362.myshopify.com/products/pixel-knight-t-shirt-elder-quest" target="_blank" rel="noopener">👕 Get the shirt ↗</a>
+        </div>
       </div>
       <div class="preview" aria-hidden="true">
         <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
@@ -322,19 +382,22 @@
           <path d="M94 89 Q100 94 106 89" fill="none" stroke="#9c5a3c" stroke-width="2.4" stroke-linecap="round"/>
         </svg>
       </div>
-    </a>
+    </article>
 
-    <a class="featured" href="kirby-abilities.html" aria-label="Play Kirby Brawler">
+    <article class="featured kirby">
       <div>
-        <span class="label">New &middot; Single-page game</span>
-        <h2>Kirby Brawler</h2>
+        <span class="label">New · Single-page game</span>
+        <h2><a href="kirby-abilities.html">Kirby Brawler</a></h2>
         <p>A Smash-style fighter built around 8 Kirby copy abilities. Real moveset per ability, charged attacks with aimable projectiles, a training-dummy Keeby that respawns, and 4 stage backdrops.</p>
         <div class="meta">
           <span>Keyboard controls</span>
           <span>8 abilities</span>
           <span>Inline-SVG art</span>
         </div>
-        <span class="play-cta">Play now &rarr;</span>
+        <div class="cta-row">
+          <span class="play-cta">Play now &rarr;</span>
+          <a class="shirt-chip" href="merch.html#kirby-abilities">👕 Shirt</a>
+        </div>
       </div>
       <div class="preview" aria-hidden="true">
         <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
@@ -354,19 +417,22 @@
           <path d="M 96 117 Q 100 120 104 117" fill="none" stroke="#8b2c3b" stroke-width="2" stroke-linecap="round"/>
         </svg>
       </div>
-    </a>
+    </article>
 
-    <a class="featured sequel" href="kirby-rumble.html" aria-label="Play Kirby Brawler 2 — Rumble Arena">
+    <article class="featured sequel">
       <div>
-        <span class="label">New &middot; 3D Sequel</span>
-        <h2>Kirby Brawler 2: Rumble Arena</h2>
+        <span class="label">New · 3D Sequel</span>
+        <h2><a href="kirby-rumble.html">Kirby Brawler 2: Rumble Arena</a></h2>
         <p>Top-down 3D duel on one circular arena — chunky low-poly toy fighters. All 8 copy abilities return, each with two attacks and a shield. You vs a CPU Kirby with a random ability.</p>
         <div class="meta">
           <span>WebGL 3D</span>
           <span>2 attacks + shield per ability</span>
           <span>CPU opponent</span>
         </div>
-        <span class="play-cta">Play now &rarr;</span>
+        <div class="cta-row">
+          <span class="play-cta">Play now &rarr;</span>
+          <a class="shirt-chip" href="merch.html#kirby-rumble">👕 Shirt</a>
+        </div>
       </div>
       <div class="preview" aria-hidden="true">
         <!-- blocky low-poly Kirby on a circular arena (original art) -->
@@ -393,12 +459,12 @@
           <path d="M 158 142 L 162 152 L 172 152 L 164 158 L 167 168 L 158 162 L 149 168 L 152 158 L 144 152 L 154 152 Z" fill="#ffd54d" stroke="#a8861c" stroke-width="1.5"/>
         </svg>
       </div>
-    </a>
+    </article>
 
-    <a class="featured driver" href="street-driver.html" aria-label="Play Street Cruiser">
+    <article class="featured driver">
       <div>
-        <span class="label">New &middot; Real-world driving</span>
-        <h2>Street Cruiser</h2>
+        <span class="label">New · Real-world driving</span>
+        <h2><a href="street-driver.html">Street Cruiser</a></h2>
         <p>Type any US zip code and cruise its real streets — pulled live from OpenStreetMap and rendered as chunky top-down pixel art. Real buildings &amp; collisions, a minimap, day/night with headlights, engine &amp; tire sounds, and four cars to choose from. Touch controls or keyboard.</p>
         <div class="meta">
           <span>Real OSM streets</span>
@@ -406,7 +472,10 @@
           <span>Day / night</span>
           <span>Minimap &amp; SFX</span>
         </div>
-        <span class="play-cta">Play now &rarr;</span>
+        <div class="cta-row">
+          <span class="play-cta">Play now &rarr;</span>
+          <a class="shirt-chip" href="merch.html#street-driver">👕 Shirt</a>
+        </div>
       </div>
       <div class="preview" aria-hidden="true">
         <!-- top-down pixel car cruising a road -->
@@ -438,7 +507,7 @@
           <rect x="111" y="75" width="6" height="4" fill="#fff6d0"/>
         </svg>
       </div>
-    </a>
+    </article>
 
     <h2 class="section-title">More Games</h2>
     <div class="games-grid">
@@ -446,64 +515,80 @@
         <span class="game-tag">3D Action</span>
         <span class="game-name">Robo Revolution</span>
         <span class="game-desc">Build a robo, battle in a neon arena. A Custom Robo tribute.</span>
+        <span class="shirt-link">👕 Shirt design →</span>
       </a>
       <a class="game-card" href="punch-out-roguelike.html">
         <span class="game-tag">Action</span>
         <span class="game-name">Punch-Out Roguelike</span>
         <span class="game-desc">Procedurally generated boxing runs.</span>
+        <span class="shirt-link">👕 Shirt design →</span>
       </a>
       <a class="game-card" href="bottomless-quordle.html">
         <span class="game-tag">Word</span>
         <span class="game-name">Bottomless Quordle</span>
         <span class="game-desc">Quordle that never ends.</span>
+        <span class="shirt-link">👕 Shirt design →</span>
       </a>
       <a class="game-card" href="Custom-UNO-Clone.html">
         <span class="game-tag">Card</span>
         <span class="game-name">Custom UNO Clone</span>
         <span class="game-desc">UNO with house rules.</span>
+        <span class="shirt-link">👕 Shirt design →</span>
       </a>
       <a class="game-card" href="Baker's-Dozen-Game.html">
         <span class="game-tag">Strategy</span>
         <span class="game-name">Baker's Dozen</span>
         <span class="game-desc">Solitaire variant.</span>
+        <span class="shirt-link">👕 Shirt design →</span>
       </a>
       <a class="game-card" href="naruto-tic-tac-toe.html">
         <span class="game-tag">Casual</span>
         <span class="game-name">Naruto Tic Tac Toe</span>
         <span class="game-desc">Tic tac toe with a ninja twist.</span>
+        <span class="shirt-link">👕 Shirt design →</span>
       </a>
       <a class="game-card" href="ACT-Hunt-Connect.html">
         <span class="game-tag">Word</span>
         <span class="game-name">A.C.T. Hunt &amp; Connect</span>
         <span class="game-desc">Vocabulary-finding puzzle.</span>
+        <span class="shirt-link">👕 Shirt design →</span>
       </a>
       <a class="game-card" href="AP-Hunt-Connect.html">
         <span class="game-tag">Word</span>
         <span class="game-name">A.P. Hunt &amp; Connect</span>
         <span class="game-desc">Advanced-Placement vocab edition.</span>
+        <span class="shirt-link">👕 Shirt design →</span>
       </a>
       <a class="game-card" href="STEM-Hunt-Connect.html">
         <span class="game-tag">Word</span>
         <span class="game-name">STEM Hunt &amp; Connect</span>
         <span class="game-desc">Science/math word edition.</span>
+        <span class="shirt-link">👕 Shirt design →</span>
       </a>
       <a class="game-card" href="Falling-Word-Hunt.html">
         <span class="game-tag">Action / Word</span>
         <span class="game-name">Falling Word Hunt</span>
         <span class="game-desc">Catch letters before they hit the floor.</span>
+        <span class="shirt-link">👕 Shirt design →</span>
       </a>
       <a class="game-card" href="shameless-game.html">
         <span class="game-tag">Card</span>
         <span class="game-name">Shameless</span>
         <span class="game-desc">House-rule card battler.</span>
+        <span class="shirt-link">👕 Shirt design →</span>
       </a>
     </div>
   </main>
 
   <footer>
-    <p class="studio-hint">&#9662;&nbsp; a Not Tim Games joint &nbsp;&#9662;</p>
-    <img class="studio-banner" src="assets/not-tim-games.jpg" alt="Not Tim Games" />
-    <p>&copy; 2025 Timothy Howley &middot; <a href="https://github.com/timothy8901/practice-games">Source on GitHub</a></p>
+    <p class="studio-hint">▾&nbsp; a Token Maxxer's Anonymous joint &nbsp;▾</p>
+    <img class="studio-banner" src="assets/token-maxxers-banner.png" alt="Token Maxxer's Anonymous Game Studio" />
+    <div class="foot-links">
+      <a href="https://tims-store-12362.myshopify.com/" target="_blank" rel="noopener">Shop the store ↗</a>
+      <a href="merch.html">Shirt designs</a>
+      <a href="https://github.com/timothy8901/practice-games">Source on GitHub</a>
+    </div>
+    <p>&copy; 2026 Token Maxxer's Anonymous Game Studio &middot; built by Tim Howley</p>
   </footer>
 
 </body>
