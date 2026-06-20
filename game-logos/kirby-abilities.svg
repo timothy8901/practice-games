@@ -1,0 +1,58 @@
+<svg viewBox="0 0 440 300" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="kbStar" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffd6ec"/>
+      <stop offset="0.5" stop-color="#ff5fae"/>
+      <stop offset="1" stop-color="#e02a86"/>
+    </linearGradient>
+    <linearGradient id="kbKirby" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff2f9"/>
+      <stop offset="0.45" stop-color="#ff9ed1"/>
+      <stop offset="1" stop-color="#ff4fa3"/>
+    </linearGradient>
+    <linearGradient id="kbBanner" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#39c6ff"/>
+      <stop offset="1" stop-color="#1773e6"/>
+    </linearGradient>
+    <linearGradient id="kbBrawl" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#d9f3ff"/>
+    </linearGradient>
+  </defs>
+
+  <g stroke="#0f1f4d" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M220 26 L209 70 L172 50 L191 86 L150 92 L191 110 L172 146 L209 124 L220 168 L231 124 L268 146 L249 110 L290 92 L249 86 L268 50 L231 70 Z" fill="#1c6fe0" opacity="0.9"/>
+    <path d="M220 36 L211 76 L178 64 L197 96 L162 104 L197 120 L182 152 L213 132 L220 160" fill="none" stroke="#9adcff" stroke-width="2" opacity="0.7"/>
+  </g>
+
+  <g stroke="#0f1f4d" stroke-width="2.5" stroke-linejoin="round">
+    <path d="M196 16 L201 31 L189 26 Z" fill="#ffd34d"/>
+    <path d="M300 64 L312 60 L307 72 Z" fill="#ffd34d"/>
+    <path d="M132 120 L120 117 L128 109 Z" fill="#ffd34d"/>
+    <circle cx="318" cy="120" r="5" fill="#39c6ff"/>
+    <circle cx="118" cy="58" r="5" fill="#39c6ff"/>
+  </g>
+
+  <path d="M220 56 L243 102 L294 109 L257 145 L266 196 L220 172 L174 196 L183 145 L146 109 L197 102 Z"
+        fill="url(#kbStar)" stroke="#0f1f4d" stroke-width="6" stroke-linejoin="round"/>
+  <path d="M220 72 L235 102 L208 102 Z" fill="#fff2f9" opacity="0.85"/>
+
+  <g font-family="Impact, 'Arial Black', sans-serif" text-anchor="middle">
+    <text x="220" y="156" font-size="76" fill="#0f1f4d" stroke="#0f1f4d" stroke-width="8" stroke-linejoin="round" letter-spacing="1">KIRBY</text>
+    <text x="220" y="156" font-size="76" fill="url(#kbKirby)" letter-spacing="1">KIRBY</text>
+    <text x="222" y="153" font-size="76" fill="#ffffff" opacity="0.25" letter-spacing="1">KIRBY</text>
+  </g>
+
+  <g transform="rotate(-4 220 224)">
+    <path d="M58 200 L386 196 L390 246 L62 250 Z" fill="url(#kbBanner)" stroke="#0f1f4d" stroke-width="5" stroke-linejoin="round"/>
+    <path d="M58 200 L386 196 L387 209 L59 213 Z" fill="#bdeeff" opacity="0.55"/>
+    <text x="224" y="237" text-anchor="middle" font-family="Impact, 'Arial Black', sans-serif" font-size="42" letter-spacing="6" fill="url(#kbBrawl)" stroke="#0f1f4d" stroke-width="1.5">BRAWLER</text>
+  </g>
+
+  <g stroke="#0f1f4d" stroke-width="2" stroke-linejoin="round">
+    <path d="M48 168 L60 172 L50 180 L62 184 L49 192" fill="none" stroke="#ff5fae" stroke-width="4"/>
+    <path d="M392 168 L380 172 L390 180 L378 184 L391 192" fill="none" stroke="#ff5fae" stroke-width="4"/>
+    <circle cx="70" cy="150" r="4" fill="#ffd34d"/>
+    <circle cx="370" cy="150" r="4" fill="#ffd34d"/>
+  </g>
+</svg>

@@ -1,0 +1,60 @@
+<svg viewBox="0 0 440 300" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="chromeBlue" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#e8f6ff"/>
+      <stop offset="0.45" stop-color="#7cc4f5"/>
+      <stop offset="0.52" stop-color="#2a72c4"/>
+      <stop offset="1" stop-color="#bfe6ff"/>
+    </linearGradient>
+    <linearGradient id="goldGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff6cf"/>
+      <stop offset="0.42" stop-color="#ffd24a"/>
+      <stop offset="0.55" stop-color="#d98f15"/>
+      <stop offset="1" stop-color="#ffe79a"/>
+    </linearGradient>
+    <linearGradient id="goldBig" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fffae3"/>
+      <stop offset="0.4" stop-color="#ffd84e"/>
+      <stop offset="0.58" stop-color="#c47e0c"/>
+      <stop offset="1" stop-color="#ffe98f"/>
+    </linearGradient>
+    <linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#9fe0ff"/>
+      <stop offset="0.5" stop-color="#2f7fd0"/>
+      <stop offset="1" stop-color="#8ad4ff"/>
+    </linearGradient>
+    <linearGradient id="plateGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3a4a63"/>
+      <stop offset="1" stop-color="#141c2c"/>
+    </linearGradient>
+    <radialGradient id="ringGlow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0.55" stop-color="#0a1830" stop-opacity="0"/>
+      <stop offset="0.85" stop-color="#1d8fe0" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#1d8fe0" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <ellipse cx="220" cy="132" rx="116" ry="96" fill="url(#ringGlow)"/>
+
+  <ellipse cx="220" cy="150" rx="98" ry="40" fill="none" stroke="#0a1422" stroke-width="13"/>
+  <ellipse cx="220" cy="150" rx="98" ry="40" fill="none" stroke="url(#ringGrad)" stroke-width="7"/>
+  <ellipse cx="220" cy="150" rx="98" ry="40" fill="none" stroke="#dff3ff" stroke-width="1.5" stroke-opacity="0.8"/>
+  <ellipse cx="220" cy="150" rx="84" ry="33" fill="none" stroke="#0e2238" stroke-width="2" stroke-opacity="0.5"/>
+
+  <text x="220" y="116" text-anchor="middle" font-family="Impact, sans-serif" font-size="220" fill="#0a1422" opacity="0.9" transform="translate(2,4)">2</text>
+  <text x="220" y="116" text-anchor="middle" font-family="Impact, sans-serif" font-size="220" fill="url(#goldBig)" stroke="#5a3402" stroke-width="2.5" paint-order="stroke">2</text>
+  <text x="220" y="116" text-anchor="middle" font-family="Impact, sans-serif" font-size="220" fill="none" stroke="#fff7d8" stroke-width="1" stroke-opacity="0.6">2</text>
+
+  <text x="220" y="56" text-anchor="middle" font-family="Impact, sans-serif" font-size="36" letter-spacing="3" fill="#06101e" transform="translate(2,2)">KIRBY BRAWLER</text>
+  <text x="220" y="56" text-anchor="middle" font-family="Impact, sans-serif" font-size="36" letter-spacing="3" fill="url(#chromeBlue)" stroke="#0a2b52" stroke-width="2" paint-order="stroke">KIRBY BRAWLER</text>
+
+  <text x="221" y="223" text-anchor="middle" font-family="Impact, sans-serif" font-size="82" letter-spacing="1" fill="#06101e" transform="translate(3,3)">RUMBLE</text>
+  <text x="220" y="222" text-anchor="middle" font-family="Impact, sans-serif" font-size="82" letter-spacing="1" fill="url(#goldGrad)" stroke="#3d2400" stroke-width="3" paint-order="stroke">RUMBLE</text>
+  <text x="220" y="222" text-anchor="middle" font-family="Impact, sans-serif" font-size="82" letter-spacing="1" fill="none" stroke="#fff7d8" stroke-width="0.8" stroke-opacity="0.55">RUMBLE</text>
+
+  <g>
+    <rect x="148" y="240" width="144" height="34" rx="6" fill="url(#plateGrad)" stroke="#7fd0ff" stroke-width="2"/>
+    <rect x="152" y="244" width="136" height="3" rx="1.5" fill="#bfe6ff" opacity="0.5"/>
+    <text x="220" y="266" text-anchor="middle" font-family="Impact, sans-serif" font-size="29" letter-spacing="9" fill="url(#chromeBlue)" stroke="#0a2b52" stroke-width="1" paint-order="stroke">ARENA</text>
+  </g>
+</svg>

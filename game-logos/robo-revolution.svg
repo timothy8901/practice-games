@@ -1,0 +1,72 @@
+<svg viewBox="0 0 440 300" xmlns="http://www.w3.org/2000/svg" role="img">
+<title>Robo Revolution game logo</title>
+<desc>Neon cyan and magenta wordmark for the build-a-robot arena battler Robo Revolution, with a robot visor head emblem and gear bolt motif.</desc>
+<defs>
+<linearGradient id="rrCyan" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0" stop-color="#9bf6ff"/>
+<stop offset="0.5" stop-color="#22d3ee"/>
+<stop offset="1" stop-color="#0e7fa8"/>
+</linearGradient>
+<linearGradient id="rrMag" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0" stop-color="#ff8be6"/>
+<stop offset="0.5" stop-color="#ff2bd1"/>
+<stop offset="1" stop-color="#a30f8a"/>
+</linearGradient>
+<linearGradient id="rrPlate" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0" stop-color="#1b2540"/>
+<stop offset="1" stop-color="#0a0f1f"/>
+</linearGradient>
+<linearGradient id="rrHead" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0" stop-color="#2b3a5e"/>
+<stop offset="1" stop-color="#121a30"/>
+</linearGradient>
+</defs>
+
+<g transform="translate(220 74)">
+<g>
+<path d="M-46,-30 L-46,30 A12 12 0 0 0 -34,42 L34,42 A12 12 0 0 0 46,30 L46,-30 A16 16 0 0 0 30,-46 L-30,-46 A16 16 0 0 0 -46,-30 Z" fill="url(#rrHead)" stroke="#0a0f1f" stroke-width="6"/>
+<path d="M-46,-30 L-46,30 A12 12 0 0 0 -34,42 L34,42 A12 12 0 0 0 46,30 L46,-30 A16 16 0 0 0 30,-46 L-30,-46 A16 16 0 0 0 -46,-30 Z" fill="none" stroke="#22d3ee" stroke-width="2"/>
+<rect x="-38" y="-22" width="76" height="30" rx="7" fill="#060a16" stroke="#0a0f1f" stroke-width="3"/>
+<rect x="-31" y="-15" width="26" height="16" rx="4" fill="url(#rrCyan)"/>
+<rect x="5" y="-15" width="26" height="16" rx="4" fill="url(#rrMag)"/>
+<rect x="-3" y="-15" width="6" height="16" fill="#060a16"/>
+<rect x="-14" y="16" width="28" height="9" rx="3" fill="#0a1124" stroke="#22d3ee" stroke-width="1.5"/>
+<rect x="-10" y="18" width="4" height="5" fill="#22d3ee"/><rect x="-3" y="18" width="4" height="5" fill="#22d3ee"/><rect x="4" y="18" width="4" height="5" fill="#ff2bd1"/>
+<rect x="-52" y="-12" width="7" height="22" rx="3" fill="#1b2540" stroke="#0a0f1f" stroke-width="3"/>
+<rect x="45" y="-12" width="7" height="22" rx="3" fill="#1b2540" stroke="#0a0f1f" stroke-width="3"/>
+<line x1="0" y1="-46" x2="0" y2="-62" stroke="#0a0f1f" stroke-width="6"/>
+<line x1="0" y1="-46" x2="0" y2="-62" stroke="#22d3ee" stroke-width="2.5"/>
+<circle cx="0" cy="-66" r="6" fill="url(#rrMag)" stroke="#0a0f1f" stroke-width="3"/>
+<circle cx="0" cy="-66" r="2.5" fill="#ffd6f6"/>
+</g>
+</g>
+
+<g transform="translate(220 168)">
+<text x="2" y="6" text-anchor="middle" font-family="Impact, sans-serif" font-size="68" letter-spacing="1" fill="#0a0f1f">ROBO</text>
+<text x="0" y="4" text-anchor="middle" font-family="Impact, sans-serif" font-size="68" letter-spacing="1" fill="url(#rrCyan)" stroke="#0a0f1f" stroke-width="3" paint-order="stroke">ROBO</text>
+</g>
+
+<g transform="translate(220 232)">
+<rect x="-176" y="-26" width="352" height="46" rx="9" fill="url(#rrPlate)" stroke="#ff2bd1" stroke-width="2.5"/>
+<rect x="-176" y="-26" width="352" height="46" rx="9" fill="none" stroke="#0a0f1f" stroke-width="1" opacity="0.6"/>
+<polygon points="-176,-3 -184,-3 -176,-13" fill="#ff2bd1"/>
+<polygon points="176,3 184,3 176,13" fill="#ff2bd1"/>
+<text x="1" y="11" text-anchor="middle" font-family="Impact, sans-serif" font-size="38" letter-spacing="3" fill="#0a0f1f">REVOLUTION</text>
+<text x="0" y="9" text-anchor="middle" font-family="Impact, sans-serif" font-size="38" letter-spacing="3" fill="url(#rrMag)" stroke="#0a0f1f" stroke-width="2" paint-order="stroke">REVOLUTION</text>
+</g>
+
+<g transform="translate(56 168)" opacity="0.95">
+<g stroke="#0a0f1f" stroke-width="3" fill="#22d3ee">
+<path d="M0,-15 L4,-15 L5,-21 L9,-22 L12,-17 L17,-19 L16,-13 L20,-11 L17,-7 L21,-4 L16,-2 L17,4 L11,3 L9,9 L5,8 L2,13 L-2,9 L-7,9 L-7,3 L-13,2 L-12,-4 L-17,-6 L-13,-10 L-16,-15 L-10,-15 L-9,-21 L-4,-19 Z"/>
+</g>
+<circle r="7" fill="#0a0f1f"/>
+<circle r="3.5" fill="#ff2bd1"/>
+</g>
+<g transform="translate(384 168)" opacity="0.95">
+<g stroke="#0a0f1f" stroke-width="3" fill="#ff2bd1">
+<path d="M0,-15 L4,-15 L5,-21 L9,-22 L12,-17 L17,-19 L16,-13 L20,-11 L17,-7 L21,-4 L16,-2 L17,4 L11,3 L9,9 L5,8 L2,13 L-2,9 L-7,9 L-7,3 L-13,2 L-12,-4 L-17,-6 L-13,-10 L-16,-15 L-10,-15 L-9,-21 L-4,-19 Z"/>
+</g>
+<circle r="7" fill="#0a0f1f"/>
+<circle r="3.5" fill="#22d3ee"/>
+</g>
+</svg>

@@ -1,0 +1,80 @@
+<svg viewBox="0 0 440 300" xmlns="http://www.w3.org/2000/svg" role="img">
+<title>Falling Word Hunt game logo</title>
+<desc>Colored letter blocks raining into a basket with motion lines and a bold playful arcade wordmark</desc>
+<defs>
+<linearGradient id="fwhSky" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0" stop-color="#1b2a6b"/>
+<stop offset="1" stop-color="#3a2a7a"/>
+</linearGradient>
+<linearGradient id="fwhWord" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0" stop-color="#ffe14d"/>
+<stop offset="1" stop-color="#ff9d2e"/>
+</linearGradient>
+<linearGradient id="fwhHunt" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0" stop-color="#ff5a6e"/>
+<stop offset="1" stop-color="#cc2222"/>
+</linearGradient>
+</defs>
+
+<g opacity="0.9">
+<rect x="36" y="20" width="368" height="120" rx="18" fill="url(#fwhSky)" stroke="#0c143b" stroke-width="3"/>
+</g>
+
+<g stroke="#7d8bd6" stroke-width="2.4" stroke-linecap="round" opacity="0.55">
+<line x1="78" y1="30" x2="70" y2="58"/>
+<line x1="150" y1="26" x2="142" y2="52"/>
+<line x1="300" y1="28" x2="292" y2="56"/>
+<line x1="360" y1="32" x2="352" y2="58"/>
+</g>
+
+<g font-family="'Arial Black', Impact, sans-serif" font-weight="900" text-anchor="middle">
+<rect x="84" y="36" width="40" height="40" rx="7" fill="#3ec6e0" stroke="#0c143b" stroke-width="3" transform="rotate(-12 104 56)"/>
+<text x="104" y="64" font-size="26" fill="#0c143b" transform="rotate(-12 104 56)">F</text>
+
+<rect x="178" y="30" width="40" height="40" rx="7" fill="#ffd23e" stroke="#0c143b" stroke-width="3" transform="rotate(9 198 50)"/>
+<text x="198" y="58" font-size="26" fill="#0c143b" transform="rotate(9 198 50)">A</text>
+
+<rect x="252" y="40" width="40" height="40" rx="7" fill="#7ce05a" stroke="#0c143b" stroke-width="3" transform="rotate(-7 272 60)"/>
+<text x="272" y="68" font-size="26" fill="#0c143b" transform="rotate(-7 272 60)">B</text>
+
+<rect x="322" y="34" width="40" height="40" rx="7" fill="#ff6b9d" stroke="#0c143b" stroke-width="3" transform="rotate(14 342 54)"/>
+<text x="342" y="62" font-size="26" fill="#0c143b" transform="rotate(14 342 54)">C</text>
+</g>
+
+<g stroke="#aeb9f0" stroke-width="2" stroke-linecap="round" opacity="0.7">
+<line x1="118" y1="86" x2="118" y2="104"/>
+<line x1="210" y1="80" x2="210" y2="100"/>
+<line x1="284" y1="90" x2="284" y2="108"/>
+<line x1="354" y1="84" x2="354" y2="102"/>
+</g>
+
+<g>
+<path d="M150 120 L290 120 L276 156 L164 156 Z" fill="#c97a3a" stroke="#0c143b" stroke-width="3.5"/>
+<path d="M150 120 L290 120 L284 130 L156 130 Z" fill="#e69b54" stroke="#0c143b" stroke-width="3.5"/>
+<g stroke="#0c143b" stroke-width="2" opacity="0.55">
+<line x1="178" y1="130" x2="172" y2="156"/>
+<line x1="206" y1="130" x2="203" y2="156"/>
+<line x1="234" y1="130" x2="237" y2="156"/>
+<line x1="262" y1="130" x2="268" y2="156"/>
+</g>
+<ellipse cx="220" cy="120" rx="72" ry="9" fill="#f1b274" stroke="#0c143b" stroke-width="3.5"/>
+</g>
+
+<g font-family="'Arial Black', Impact, sans-serif" font-weight="900" text-anchor="middle">
+<text x="222" y="205" font-size="55" fill="#0c143b" stroke="#0c143b" stroke-width="8" stroke-linejoin="round" letter-spacing="1">FALLING</text>
+<text x="220" y="203" font-size="55" fill="url(#fwhWord)" letter-spacing="1">FALLING</text>
+</g>
+
+<g font-family="'Arial Black', Impact, sans-serif" font-weight="900" text-anchor="middle">
+<rect x="62" y="226" width="120" height="44" rx="9" fill="#2bd4c0" stroke="#0c143b" stroke-width="4"/>
+<text x="122" y="259" font-size="30" fill="#0c143b" letter-spacing="1">WORD</text>
+
+<text x="300" y="261" font-size="46" fill="#0c143b" stroke="#0c143b" stroke-width="7" stroke-linejoin="round" letter-spacing="1">HUNT</text>
+<text x="298" y="259" font-size="46" fill="url(#fwhHunt)" letter-spacing="1">HUNT</text>
+</g>
+
+<g fill="#ffe14d" stroke="#0c143b" stroke-width="1.5">
+<path d="M388 196 l4 9 9 4 -9 4 -4 9 -4 -9 -9 -4 9 -4 z"/>
+<path d="M44 198 l3 7 7 3 -7 3 -3 7 -3 -7 -7 -3 7 -3 z"/>
+</g>
+</svg>

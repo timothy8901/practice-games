@@ -1,0 +1,64 @@
+<svg viewBox="0 0 440 300" xmlns="http://www.w3.org/2000/svg" role="img">
+<title>Baker's Dozen game logo</title>
+<desc>A warm bakery-themed wordmark reading Baker's Dozen with a baker's hat emblem, a 13 badge, and tidy card columns.</desc>
+<defs>
+<linearGradient id="bdCream" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0" stop-color="#fff6e6"/>
+<stop offset="1" stop-color="#f4d49b"/>
+</linearGradient>
+<linearGradient id="bdRed" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0" stop-color="#e2453a"/>
+<stop offset="1" stop-color="#b71e1e"/>
+</linearGradient>
+<linearGradient id="bdHat" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0" stop-color="#ffffff"/>
+<stop offset="1" stop-color="#efe2cb"/>
+</linearGradient>
+<linearGradient id="bdPlate" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0" stop-color="#5a3318"/>
+<stop offset="1" stop-color="#3d2110"/>
+</linearGradient>
+</defs>
+
+<rect x="32" y="40" width="376" height="218" rx="20" fill="url(#bdPlate)" stroke="#2a1608" stroke-width="3"/>
+<rect x="42" y="50" width="356" height="198" rx="14" fill="none" stroke="#d9a85a" stroke-width="2" stroke-dasharray="3 7"/>
+
+<g>
+<rect x="170" y="58" width="100" height="58" rx="8" fill="url(#bdCream)" stroke="#7a4a1d" stroke-width="3"/>
+<rect x="170" y="58" width="100" height="58" rx="8" fill="none" stroke="#fff" stroke-width="1" opacity="0.5"/>
+</g>
+<g>
+<path d="M180 84 Q172 84 172 76 Q172 67 182 68 Q184 58 196 60 Q202 50 214 56 Q222 49 230 58 Q244 56 244 68 Q254 67 252 78 Q252 85 244 84 Z" fill="url(#bdHat)" stroke="#7a4a1d" stroke-width="3" stroke-linejoin="round"/>
+<rect x="180" y="83" width="64" height="14" rx="3" fill="#ffffff" stroke="#7a4a1d" stroke-width="3"/>
+<line x1="190" y1="86" x2="190" y2="94" stroke="#c9a063" stroke-width="2"/>
+<line x1="202" y1="86" x2="202" y2="94" stroke="#c9a063" stroke-width="2"/>
+<line x1="214" y1="86" x2="214" y2="94" stroke="#c9a063" stroke-width="2"/>
+<line x1="226" y1="86" x2="226" y2="94" stroke="#c9a063" stroke-width="2"/>
+<line x1="238" y1="86" x2="238" y2="94" stroke="#c9a063" stroke-width="2"/>
+</g>
+
+<g>
+<circle cx="270" cy="72" r="20" fill="url(#bdRed)" stroke="#7a1414" stroke-width="3"/>
+<circle cx="270" cy="72" r="20" fill="none" stroke="#ffd9a0" stroke-width="1.5" opacity="0.55"/>
+<text x="270" y="80" text-anchor="middle" font-family="Impact, sans-serif" font-size="24" fill="#fff3df" stroke="#7a1414" stroke-width="0.6">13</text>
+</g>
+
+<g font-family="Georgia, 'Times New Roman', serif" font-weight="bold">
+<text x="221" y="170" text-anchor="middle" font-size="54" fill="#2a1608" stroke="#2a1608" stroke-width="7" stroke-linejoin="round">Baker's</text>
+<text x="221" y="170" text-anchor="middle" font-size="54" fill="url(#bdCream)" stroke="#7a4a1d" stroke-width="1.4">Baker's</text>
+</g>
+
+<g font-family="Georgia, 'Times New Roman', serif" font-weight="bold">
+<text x="221" y="226" text-anchor="middle" font-size="56" fill="#2a1608" stroke="#2a1608" stroke-width="7" stroke-linejoin="round">Dozen</text>
+<text x="221" y="226" text-anchor="middle" font-size="56" fill="url(#bdRed)" stroke="#5a0f0f" stroke-width="1.4">Dozen</text>
+</g>
+
+<g stroke="#2a1608" stroke-width="2">
+<rect x="120" y="234" width="14" height="20" rx="3" fill="#fff6e6"/>
+<rect x="138" y="234" width="14" height="20" rx="3" fill="#f4d49b"/>
+<rect x="156" y="234" width="14" height="20" rx="3" fill="#e2453a"/>
+<rect x="270" y="234" width="14" height="20" rx="3" fill="#e2453a"/>
+<rect x="288" y="234" width="14" height="20" rx="3" fill="#f4d49b"/>
+<rect x="306" y="234" width="14" height="20" rx="3" fill="#fff6e6"/>
+</g>
+</svg>

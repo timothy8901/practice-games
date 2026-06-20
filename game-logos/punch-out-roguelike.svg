@@ -1,0 +1,71 @@
+<svg viewBox="0 0 440 300" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffe79a"/>
+      <stop offset="0.45" stop-color="#ffc02e"/>
+      <stop offset="0.55" stop-color="#f5a307"/>
+      <stop offset="1" stop-color="#c97a06"/>
+    </linearGradient>
+    <linearGradient id="redBanner" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#e8392f"/>
+      <stop offset="1" stop-color="#a8160f"/>
+    </linearGradient>
+    <linearGradient id="glove" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f0463c"/>
+      <stop offset="1" stop-color="#b51811"/>
+    </linearGradient>
+    <radialGradient id="rays" cx="0.5" cy="0.42" r="0.62">
+      <stop offset="0" stop-color="#ffd24a" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#ffd24a" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <g opacity="0.9">
+    <circle cx="220" cy="118" r="100" fill="url(#rays)"/>
+  </g>
+
+  <g stroke="#3a0a07" stroke-width="2" stroke-linejoin="round">
+    <polygon points="120,60 130,82 154,82 162,60" fill="url(#gold)"/>
+    <polygon points="320,60 310,82 286,82 278,60" fill="url(#gold)"/>
+  </g>
+  <g fill="url(#gold)" stroke="#3a0a07" stroke-width="1.5" stroke-linejoin="round">
+    <polygon points="95,52 99,62 110,63 102,70 104,81 95,75 86,81 88,70 80,63 91,62"/>
+    <polygon points="345,52 349,62 360,63 352,70 354,81 345,75 336,81 338,70 330,63 341,62"/>
+  </g>
+
+  <g stroke="#3a0a07" stroke-width="3" stroke-linejoin="round">
+    <path d="M186 44 q34 -22 68 0 l6 26 q-40 16 -80 0 z" fill="url(#glove)"/>
+    <ellipse cx="220" cy="88" rx="46" ry="30" fill="url(#glove)"/>
+    <path d="M193 70 q27 16 54 0" fill="none" stroke="#7a0d08" stroke-width="3"/>
+    <rect x="200" y="100" width="40" height="14" rx="4" fill="#f4ead3"/>
+  </g>
+  <g fill="#ffe79a" stroke="#3a0a07" stroke-width="2" stroke-linejoin="round" opacity="0.95">
+    <path d="M182 56 q-30 -6 -44 14 q24 -4 40 6 z"/>
+    <path d="M258 56 q30 -6 44 14 q-24 -4 -40 6 z"/>
+  </g>
+
+  <g>
+    <path d="M44 132 L396 132 L408 162 L396 192 L44 192 L32 162 Z" fill="url(#redBanner)" stroke="#5e0c07" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M44 132 L396 132 L398 138 L42 138 Z" fill="#ff6258" opacity="0.55"/>
+    <path d="M18 142 L32 162 L18 182 L34 162 Z" fill="#7a0f09" stroke="#5e0c07" stroke-width="2"/>
+    <path d="M422 142 L408 162 L422 182 L406 162 Z" fill="#7a0f09" stroke="#5e0c07" stroke-width="2"/>
+  </g>
+
+  <text x="221" y="180" text-anchor="middle" font-family="Impact, sans-serif" font-size="60" letter-spacing="1" fill="#2a0604" transform="translate(3,3)">PUNCH-OUT</text>
+  <text x="220" y="178" text-anchor="middle" font-family="Impact, sans-serif" font-size="60" letter-spacing="1" fill="url(#gold)" stroke="#2a0604" stroke-width="2" paint-order="stroke">PUNCH-OUT</text>
+
+  <g>
+    <rect x="98" y="206" width="244" height="40" rx="6" fill="#1c1714" stroke="url(#gold)" stroke-width="2.5"/>
+    <rect x="104" y="211" width="232" height="6" rx="3" fill="#ffce4d" opacity="0.5"/>
+    <circle cx="112" cy="226" r="3.5" fill="url(#gold)"/>
+    <circle cx="328" cy="226" r="3.5" fill="url(#gold)"/>
+  </g>
+  <text x="221" y="237" text-anchor="middle" font-family="Impact, sans-serif" font-size="29" letter-spacing="7" fill="#000" transform="translate(2,2)">ROGUELIKE</text>
+  <text x="220" y="235" text-anchor="middle" font-family="Impact, sans-serif" font-size="29" letter-spacing="7" fill="#ffd24a" stroke="#3a2a06" stroke-width="0.8" paint-order="stroke">ROGUELIKE</text>
+
+  <g fill="url(#gold)" stroke="#3a0a07" stroke-width="1.2" stroke-linejoin="round">
+    <polygon points="150,262 153,270 162,270 155,275 158,283 150,278 142,283 145,275 138,270 147,270"/>
+    <polygon points="220,266 223,274 232,274 225,279 228,287 220,282 212,287 215,279 208,274 217,274"/>
+    <polygon points="290,262 293,270 302,270 295,275 298,283 290,278 282,283 285,275 278,270 287,270"/>
+  </g>
+</svg>

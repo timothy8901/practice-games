@@ -1,0 +1,68 @@
+<svg viewBox="0 0 440 300" xmlns="http://www.w3.org/2000/svg" role="img">
+<title>STEM Hunt and Connect game logo</title>
+<desc>A wordmark logo for a science and math vocabulary puzzle game, with an atom and beaker emblem and connected letter nodes in techy teal and green.</desc>
+<defs>
+<linearGradient id="stemFill" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0" stop-color="#7dffd6"/>
+<stop offset="0.5" stop-color="#2ee6a6"/>
+<stop offset="1" stop-color="#13b07a"/>
+</linearGradient>
+<linearGradient id="flaskFill" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0" stop-color="#5fe0ff"/>
+<stop offset="1" stop-color="#1c9fd6"/>
+</linearGradient>
+<linearGradient id="plateFill" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0" stop-color="#0f3a4d"/>
+<stop offset="1" stop-color="#082530"/>
+</linearGradient>
+</defs>
+
+<rect x="38" y="34" width="364" height="232" rx="22" fill="url(#plateFill)" stroke="#2ee6a6" stroke-width="2.5" opacity="0.96"/>
+<rect x="38" y="34" width="364" height="232" rx="22" fill="none" stroke="#0a1b22" stroke-width="1"/>
+
+<g stroke="#1f7d63" stroke-width="2.2" opacity="0.55" stroke-dasharray="2 7" stroke-linecap="round">
+<line x1="120" y1="60" x2="170" y2="92"/>
+<line x1="320" y1="62" x2="270" y2="92"/>
+<line x1="74" y1="150" x2="120" y2="150"/>
+<line x1="366" y1="150" x2="320" y2="150"/>
+</g>
+
+<g>
+<ellipse cx="220" cy="92" rx="62" ry="22" fill="none" stroke="#2ee6a6" stroke-width="3" opacity="0.85"/>
+<ellipse cx="220" cy="92" rx="62" ry="22" fill="none" stroke="#2ee6a6" stroke-width="3" opacity="0.85" transform="rotate(60 220 92)"/>
+<ellipse cx="220" cy="92" rx="62" ry="22" fill="none" stroke="#5fe0ff" stroke-width="3" opacity="0.85" transform="rotate(-60 220 92)"/>
+
+<path d="M204 76 h32 v8 l-9 12 v10 a7 7 0 0 0 1 4 l9 16 a8 8 0 0 1 -7 12 h-20 a8 8 0 0 1 -7 -12 l9 -16 a7 7 0 0 0 1 -4 v-10 l-9 -12 z" fill="url(#flaskFill)" stroke="#06303f" stroke-width="2.5"/>
+<path d="M213 118 h14 l5.5 9.5 a6 6 0 0 1 -5.2 9 h-14.1 a6 6 0 0 1 -5.2 -9 z" fill="#a8f7e0" stroke="#06303f" stroke-width="1.5"/>
+<circle cx="217" cy="128" r="2.2" fill="#ffffff"/>
+<circle cx="224" cy="124" r="1.6" fill="#ffffff"/>
+<circle cx="222" cy="131" r="1.4" fill="#ffffff"/>
+<rect x="202" y="72" width="36" height="6" rx="3" fill="#7dffd6" stroke="#06303f" stroke-width="1.8"/>
+
+<g stroke="#06303f" stroke-width="2">
+<circle cx="158" cy="92" r="9" fill="#ffd64d"/>
+<circle cx="282" cy="92" r="9" fill="#ff7a59"/>
+<circle cx="262" cy="51" r="8" fill="#9b6bff"/>
+<circle cx="178" cy="51" r="8" fill="#5fe0ff"/>
+</g>
+<text x="158" y="96" font-family="Arial Black, sans-serif" font-size="11" fill="#06303f" text-anchor="middle" font-weight="900">N</text>
+<text x="282" y="96" font-family="Arial Black, sans-serif" font-size="11" fill="#06303f" text-anchor="middle" font-weight="900">E</text>
+<text x="262" y="55" font-family="Arial Black, sans-serif" font-size="10" fill="#06303f" text-anchor="middle" font-weight="900">π</text>
+<text x="178" y="55" font-family="Arial Black, sans-serif" font-size="10" fill="#06303f" text-anchor="middle" font-weight="900">∑</text>
+</g>
+
+<text x="221" y="186" font-family="Arial Black, sans-serif" font-size="62" fill="#04181f" text-anchor="middle" letter-spacing="2">STEM</text>
+<text x="220" y="184" font-family="Arial Black, sans-serif" font-size="62" fill="url(#stemFill)" text-anchor="middle" letter-spacing="2" stroke="#04222b" stroke-width="2" paint-order="stroke">STEM</text>
+
+<g stroke="#2ee6a6" stroke-width="2" stroke-linecap="round" opacity="0.9">
+<line x1="108" y1="214" x2="124" y2="214"/>
+<circle cx="104" cy="214" r="3.5" fill="#2ee6a6"/>
+<line x1="316" y1="214" x2="332" y2="214"/>
+<circle cx="336" cy="214" r="3.5" fill="#2ee6a6"/>
+</g>
+
+<text x="221" y="231" font-family="Trebuchet MS, sans-serif" font-size="25" fill="#04181f" text-anchor="middle" font-weight="bold" letter-spacing="1">Hunt &amp; Connect</text>
+<text x="220" y="230" font-family="Trebuchet MS, sans-serif" font-size="25" fill="#bdfff0" text-anchor="middle" font-weight="bold" letter-spacing="1">Hunt <tspan fill="#ffd64d">&amp;</tspan> Connect</text>
+
+<text x="220" y="252" font-family="Courier New, monospace" font-size="11" fill="#6fe8c8" text-anchor="middle" letter-spacing="3">SCIENCE · MATH · VOCAB</text>
+</svg>
