@@ -41,6 +41,7 @@
       --c-kirby:  #d96e8a;
       --c-sequel: #3a8fd0;
       --c-driver: #c9971a;
+      --c-emerald: #18b066;
     }
 
     * { box-sizing: border-box; }
@@ -180,6 +181,8 @@
     .featured.sequel .preview { background: radial-gradient(circle at 50% 35%, #bfe4ff 0%, #ffd1e3 55%, #e8a8c8 100%); }
     .featured.driver { --accent: var(--c-driver); }
     .featured.driver .preview { background: linear-gradient(160deg, #5a6b3f 0%, #46566a 45%, #52555c 100%); }
+    .featured.emerald { --accent: var(--c-emerald); }
+    .featured.emerald .preview { background: radial-gradient(circle at 50% 40%, #bdf5d6 0%, #2fd27a 55%, #0f7a44 100%); }
 
     @media (max-width: 640px) {
       .featured { grid-template-columns: 1fr; text-align: center; }
@@ -253,6 +256,38 @@
     </section>
 
     <h2 class="section-title" id="featured">Featured</h2>
+
+    <article class="featured emerald">
+      <div>
+        <span class="label">New · GBA Romhack</span>
+        <h2><a href="emerald-chaos.html">Pokémon Emerald — Chaos V2</a></h2>
+        <p>My own <b>Pokémon Emerald</b> romhack — a chaos <b>randomizer</b> with a custom <b>achievements</b> system, built straight off the Emerald decompilation. Now playable <b>right in your browser</b> through an embedded mGBA emulator: touch or keyboard controls, and your save lives in your browser. No download, no setup.</p>
+        <div class="meta">
+          <span>Plays in browser · mGBA</span>
+          <span>Built-in randomizer</span>
+          <span>Custom achievements</span>
+          <span>Saves in your browser</span>
+        </div>
+        <div class="cta-row">
+          <span class="play-cta">Play now &rarr;</span>
+          <a class="shirt-chip" href="https://tims-store-12362.myshopify.com/" target="_blank" rel="noopener">👕 Shirt</a>
+        </div>
+      </div>
+      <div class="preview" aria-hidden="true">
+        <!-- emerald gem (original art) -->
+        <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+          <ellipse cx="100" cy="176" rx="44" ry="9" fill="#000000" opacity="0.25"/>
+          <polygon points="58,56 142,56 170,98 100,170 30,98" fill="#2fd27a" stroke="#0f7a44" stroke-width="3"/>
+          <polygon points="58,56 142,56 154,82 46,82" fill="#83f2b6"/>
+          <polygon points="46,82 154,82 170,98 30,98" fill="#37c97e"/>
+          <polygon points="30,98 100,170 72,112" fill="#1ba866"/>
+          <polygon points="170,98 100,170 128,112" fill="#1ba866"/>
+          <polygon points="72,112 128,112 100,170" fill="#13935a"/>
+          <polygon points="72,112 100,98 128,112 100,124" fill="#26b873"/>
+          <polygon points="64,60 90,60 80,76 54,76" fill="#ffffff" opacity="0.5"/>
+        </svg>
+      </div>
+    </article>
 
     <article class="featured grocer">
       <div>
