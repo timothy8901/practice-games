@@ -33,12 +33,29 @@
       position: relative;
       background: #000;
       --availW: calc(100vw - 16px);
-      --availH: calc(100vh - 120px);
+      --availH: calc(100vh - 190px);
       width:  min(var(--availW), calc(var(--availH) * 1.5), 980px);
       height: min(var(--availH), calc(var(--availW) / 1.5), calc(980px / 1.5));
     }
     /* Pin the canvas layer to the box so it can't force #game to grow. */
     #game .ejs_canvas_parent { position: absolute; inset: 0; }
+    /* Keyboard legend under the screen */
+    .controls {
+      flex: 0 0 auto;
+      display: flex; flex-wrap: wrap; gap: 7px 14px;
+      align-items: center; justify-content: center;
+      padding: 9px 12px; border-top: 1px solid #20262e;
+      font-size: .8rem; color: #b6c2cf;
+    }
+    .controls .ctitle { font-weight: 600; color: #8b949e; letter-spacing: .3px; }
+    .controls .ctrl { display: inline-flex; align-items: center; gap: 5px; }
+    .controls .ctrl b { font-weight: 600; color: #8b949e; }
+    .controls kbd {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: .72rem; line-height: 1; color: #e6edf3;
+      background: #1c2128; border: 1px solid #30363d; border-bottom-width: 2px;
+      border-radius: 5px; padding: 4px 6px; min-width: 11px; text-align: center;
+    }
     footer { text-align: center; font-size: .72rem; color: #6e7681; padding: 8px; }
   </style>
 </head>
@@ -51,6 +68,18 @@
   <div id="game-wrap">
     <div id="game"></div>
   </div>
+
+  <section class="controls" aria-label="Keyboard controls">
+    <span class="ctitle">⌨ Keyboard</span>
+    <span class="ctrl"><kbd>←</kbd><kbd>↑</kbd><kbd>↓</kbd><kbd>→</kbd><b>Move</b></span>
+    <span class="ctrl"><kbd>Z</kbd><b>A</b></span>
+    <span class="ctrl"><kbd>X</kbd><b>B</b></span>
+    <span class="ctrl"><kbd>Q</kbd><b>L</b></span>
+    <span class="ctrl"><kbd>E</kbd><b>R</b></span>
+    <span class="ctrl"><kbd>Enter</kbd><b>Start</b></span>
+    <span class="ctrl"><kbd>V</kbd><b>Select</b></span>
+    <span class="ctrl" style="color:#6e7681">· remap &amp; save-states in the in-game menu</span>
+  </section>
 
   <footer>Plays via EmulatorJS (mGBA / WebAssembly). First load fetches the core, then it's cached.</footer>
 
