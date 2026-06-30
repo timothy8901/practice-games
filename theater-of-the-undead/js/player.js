@@ -24,7 +24,7 @@ export class Player {
     this.slot = 0;
     this.grenades = 4; this.tacticals = 0;
     this.speed = 5.2;
-    this.fireCd = 0; this.reloadT = 0; this.reloadFrom = null;
+    this.fireCd = 0; this.reloadT = 0; this.reloadDur = 0; this.reloadFrom = null;
     this.regenT = 0;
     this.meleeCd = 0;
     this.down = false; this.bleed = 0; this.dead = false;
@@ -99,6 +99,7 @@ export class Player {
     if (this.reloadT > 0 || !w.def.mag) return;
     if (w.mag >= w.def.mag || w.reserve <= 0) return;
     this.reloadT = (w.def.reload || 2) * (this.perks.has('speedcola') ? 0.5 : 1);
+    this.reloadDur = this.reloadT;
     this.reloadFrom = w;
     if (G.audio) G.audio.reload();
   }

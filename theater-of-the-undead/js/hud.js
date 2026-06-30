@@ -15,6 +15,7 @@ export class HUD {
       perks: $('perks'), grenades: $('grenades'), tacticals: $('tacticals'),
       prompt: $('prompt'), toast: $('toast'), announce: $('announce'),
       vignette: $('vignette'), reticle: $('reticle'), downbar: $('downbar'), downfill: $('down-fill'),
+      reloadRing: $('reload-ring'), reloadProg: document.querySelector('#reload-ring .rr-prog'),
     };
     this._toastT = 0; this._annT = 0; this._lastPerks = '';
 
@@ -128,6 +129,20 @@ export class HUD {
       this.el.downbar.classList.add('on');
       this.el.downfill.style.width = (p.bleed / 4.5 * 100) + '%';
     } else this.el.downbar.classList.remove('on');
+
+    // reload indicator — radial ring above the player, fills as reload completes
+    if (p.reloadT > 0 && p.reloadDur > 0 && !p.down && G.camera) {
+      const prog = Math.min(1, 1 - p.reloadT / p.reloadDur);
+      _proj.set(p.pos.x, p.pos.y + 2.4, p.pos.z).project(G.camera);
+      const sx = (_proj.x * 0.5 + 0.5) * window.innerWidth;
+      const sy = (-_proj.y * 0.5 + 0.5) * window.innerHeight;
+      if (_proj.z < 1 && Number.isFinite(sx) && Number.isFinite(sy)) {
+        this.el.reloadRing.style.left = sx + 'px';
+        this.el.reloadRing.style.top = sy + 'px';
+        this.el.reloadProg.style.setProperty('--p', prog.toFixed(3));
+        this.el.reloadRing.classList.add('on');
+      } else this.el.reloadRing.classList.remove('on');
+    } else this.el.reloadRing.classList.remove('on');
 
     // reticle
     if (G.input.usingGamepad) this.el.reticle.style.display = 'none';
