@@ -98,6 +98,26 @@ self-contained HTML page.
   survivors. Keyboard + mouse **or** controller. A multi-file game, so it lives in
   its own folder; the homepage links to `theater-of-the-undead/index.html`.
 
+## NEONFABLE — Void Survivor
+
+- **NEONFABLE** (`neonfable.html`) — a single-file synthwave **bullet-heaven
+  roguelite** in the spirit of *Vampire Survivors*. Weapons fire automatically;
+  you only steer, dash and draft. **12 weapons** (Pulse Blaster, Orbital Blades,
+  Homing Swarm, Arc Coil, Rail Lance, Flak Nova, Gun Drones, Void Field, Phase
+  Glaive, Singularity Mines, Prism Ray, Phase Ram), each with a hidden
+  **evolution** unlocked by pairing a maxed weapon with its partner passive, plus
+  9 passives and a 3-card level-up draft with rerolls. Four bosses — Void Warden,
+  Star Archon, Leviathan Prime, and the **ANTIFABLE**, a dark mirror of your own
+  ship that appears at 15:00 — then an endless mode. Meta-progression: runs bank
+  credits into a permanent hangar shop and 4 unlockable hulls, saved to
+  `localStorage`. Also a **daily seeded run** (fixed loadout, identical spawns and
+  drafts for everyone that day). Difficulty scales with your *level*, not just the
+  clock — leveling speeds up spawns and unlocks tougher enemy types early.
+  Controls: WASD/arrows + Space, an on-screen joystick and dash button on touch,
+  or a gamepad with rumble. The soundtrack and every sound effect are **generated
+  live** with the Web Audio API — no audio files. Pure vanilla JS + Canvas 2D, no
+  build step, no dependencies.
+
 ## Dictionary / wordlist notes
 
 The Baker's Dozen game supports validating player words against a wordlist.
