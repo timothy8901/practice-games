@@ -153,6 +153,22 @@ export const HALL = {
   wallH: 2.35,         // full hallway height now that there is a ceiling on it
   wallT: 0.18,
   skirtH: 0.15,
+
+  /* Rounding.
+   *
+   * The MySims pass. Every edge in this building that a hand could reach gets a
+   * radius, because the thing that makes those models read as toys is not the
+   * shading — it is that nothing anywhere comes to a point. Both of these are
+   * decoration: the collidable wall is still the same flat slab it was, so the
+   * physics, the clearance check and every recorded seed are untouched.
+   *
+   * Four facets is the whole budget. Flat geometric normals mean a rounded edge
+   * reads as a run of light bands rather than a gradient, and past four the
+   * bands are too fine to see while the triangle count keeps climbing. */
+  bead: 4,             // facets per quarter turn
+  capR: 0.09,          // bullnose radius over the top of a wall — half wallT
+  skirtR: 0.045,       // radius on the skirting board's top edge
+  skirtOut: 0.03,      // how far the skirting stands proud of the wall face
   stripeY: 1.02,       // the horizontal accent line every office corridor has
   stripeH: 0.075,
 

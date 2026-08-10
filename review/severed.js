@@ -27,6 +27,7 @@ import { Mesher, setPalette } from '../3d-mazeball/src/mesher.js';
 import { Viewer, multiply, lookAt, perspective } from './gl.js';
 
 const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
 const STORE = `severed-floor-review::${KIT_VERSION}`;
 
 // Everything the pieces render goes through this remap from here on.
@@ -51,6 +52,9 @@ function el (tag, attrs = {}, ...kids) {
 /* ── feedback state ───────────────────────────────────────────────────── */
 
 const ASPECTS = [
+  ['bubbly', 'The bubbly pass', 'MySims proportions and rounding on a Severance floor. Does the toy read, or does it fight the tone?'],
+  ['doll-model', 'The Blender doll', 'Rounded, subdivided, smooth-shaded. Toggle Bubbly / Original above the view and say which one you want.'],
+  ['shading', 'Bands, rim and outline', 'Three sliders above the view. Set them where you want them and tell me the numbers — they export with your notes.'],
   ['vibe', 'Does it feel like the floor?', 'Corridors, carpet, strip lights, the quiet. Where does the illusion hold and where does it break?'],
   ['palette', 'Grey, green, light blue', 'The whole kit is re-tinted by hue band rather than repainted piece by piece. Anything reading wrong?'],
   ['doll', 'The man in the suit', 'He tumbles with the ball rather than staying upright. Right call, or should he stay on his feet?'],
@@ -106,9 +110,36 @@ const cam = {
 /** Ceiling geometry, hidden in floor-plan view and by its own toggle. */
 const CEILING_MATERIALS = new Set(['hallCeil', 'hallBar', 'hallLight']);
 
+// Outline colour. Not black: a pure-black line on a light-blue corridor reads as
+// a hole punched in the image. This is the darkest navy already in the palette.
+const INK = [0.055, 0.075, 0.105];
+
 // Offices are flat-lit. Raising the ambient floor is what stops every wall
 // facing away from the key light reading as charcoal instead of off-white.
 const LIGHTING = { ambient: 0.66 };
+
+/**
+ * Graphics style — the MySims pass.
+ *
+ * Three separable knobs, deliberately not one "bubbly" switch, because they
+ * fail in different ways and want judging apart:
+ *
+ *   model    which character mesh. `blender` is the subdivided doll baked by
+ *            3d-mazeball/assets/build_character.py; `boxes` is the original
+ *            hand-meshed one, kept so the two can be compared rather than
+ *            argued about.
+ *   toon     how hard the key light is quantised into bands. Banding is what
+ *            makes a rounded form read as a toy instead of a lit sphere.
+ *   rim      wraparound silhouette light — the cheap stand-in for the soft
+ *            edge that vinyl-toy renders get from subsurface scattering.
+ *   ink      inverted-hull outline width on the character, in metres. Zero
+ *            disables the extra pass entirely.
+ *
+ * The architecture keeps its flat geometric normals (handoff §11.1) and gets
+ * the toon and rim terms only; outlines need closed shells, and a corridor is
+ * an open one.
+ */
+const gfx = { model: 'blender', toon: 0.8, rim: 0.16, ink: 0.011 };
 
 /**
  * Chase-camera state.
@@ -186,7 +217,52 @@ function buildWorld () {
  * Built with the palette remap switched off, so the suit stays navy instead of
  * being re-tinted into the wall it is standing next to.
  */
-function buildCharacter () {
+let dollAsset = null;
+
+/** Fetch the Blender bake once. Failure is survivable — we fall back to boxes. */
+async function loadDoll () {
+  try {
+    const r = await fetch('../3d-mazeball/assets/doll.json', { cache: 'no-store' });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const d = await r.json();
+    // Colour is stored once per part as a run. Expanding it here keeps the file
+    // at a third of the size it would be with a colour on every vertex.
+    const colors = new Float32Array(d.positions.length);
+    for (const part of d.parts) {
+      for (let v = part.start; v < part.start + part.count; v++) {
+        colors[v * 3] = part.color[0];
+        colors[v * 3 + 1] = part.color[1];
+        colors[v * 3 + 2] = part.color[2];
+      }
+    }
+    dollAsset = {
+      positions: new Float32Array(d.positions),
+      normals: new Float32Array(d.normals),
+      colors,
+      triangles: d.triangles,
+      blender: d.blender,
+    };
+  } catch (e) {
+    dollAsset = null;
+    gfx.model = 'boxes';
+    console.warn('doll.json unavailable, falling back to the box doll:', e.message);
+  }
+}
+
+/**
+ * Geometry for the two dolls, keyed by kind.
+ *
+ * Split out from the upload so the turntable can hold both at once and show
+ * them side by side — comparing "the round one" with "the box one" from memory
+ * across a page reload is not a comparison.
+ */
+function dollGeometry (kind) {
+  if (kind === 'blender') {
+    if (!dollAsset) return null;
+    // Smooth per-corner normals straight from the subdivision surface — the one
+    // place in this renderer that is not flat-shaded. The badge is in the bake.
+    return { doll: { ...dollAsset }, badge: null };
+  }
   const wasThemed = true;
   setPalette(null);
   const m = new Mesher();
@@ -222,7 +298,6 @@ function buildCharacter () {
   m.box(0, 0.075, -0.02, 0.11, 0.03, 0.1, 'doll', { color: shirt });
 
   const g = m.build().find(x => x.material === 'doll');
-  viewer.uploadGroup('doll', { positions: g.positions, normals: g.normals, colors: g.colors });
 
   // A badge on a lanyard, so there is something to read the spin against — a
   // solid figure tumbling has no visual reference for how fast it is going.
@@ -230,11 +305,17 @@ function buildCharacter () {
   b.box(0, -0.02, -0.082, 0.05, 0.07, 0.008, 'badge', { color: '#cfe3ee' });
   b.box(0, 0.045, -0.078, 0.006, 0.07, 0.006, 'badge', { color: '#8a93a0' });
   const bg = b.build().find(x => x.material === 'badge');
-  viewer.uploadGroup('badge', {
-    positions: bg.positions, normals: bg.normals, colors: bg.colors, emissive: 0.25,
-  });
-
   if (wasThemed) applyOfficeTheme(true);
+  return {
+    doll: { positions: g.positions, normals: g.normals, colors: g.colors },
+    badge: { positions: bg.positions, normals: bg.normals, colors: bg.colors, emissive: 0.25 },
+  };
+}
+
+function buildCharacter () {
+  const geo = dollGeometry(gfx.model) || dollGeometry('boxes');
+  viewer.uploadGroup('doll', geo.doll);
+  if (geo.badge) viewer.uploadGroup('badge', geo.badge);
 }
 
 /* ── spawn / respawn ──────────────────────────────────────────────────── */
@@ -479,6 +560,7 @@ function frame (now) {
   raf = requestAnimationFrame(frame);
   const dt = Math.min(0.1, (now - last) / 1000 || 0);
   last = now;
+  drawTurntable(dt);
   if (!world) return;
 
   readInput(dt);
@@ -631,8 +713,8 @@ function draw () {
   // The upright pose is a toggle so the two can be compared directly.
   const bp = ballMatrix();
   const M = multiply(T, view.upright ? bp.upright : bp.spun);
-  viewer.drawGroup('doll', mvp, M, { ambient: 0.55 });
-  viewer.drawGroup('badge', mvp, M, { ambient: 0.6 });
+  viewer.drawGroup('doll', mvp, M, { ambient: 0.55, outline: gfx.ink, ink: INK });
+  if (gfx.model !== 'blender') viewer.drawGroup('badge', mvp, M, { ambient: 0.6 });
 }
 
 const spin = { q: [0, 0, 0, 1] };
@@ -810,6 +892,7 @@ function snapshot () {
     artifact: {
       name: 'The Severed Floor — daily shift',
       version: KIT_VERSION,
+      look: { ...gfx },
       path: '3d-mazeball/src/',
       generator: 'generator.js + assemble.js + validate.js',
       notAutoPlaced: NOT_AUTO_PLACED,
@@ -855,6 +938,13 @@ function toMarkdown (s) {
   L.push('| --- | --- |');
   L.push(`| **Artifact** | ${s.artifact.name} |`);
   L.push(`| **Version** | ${s.artifact.version} |`);
+  // The look the reviewer was actually looking at. Without it a note like
+  // "the outline is too heavy" cannot be acted on — heavy at what width?
+  if (s.artifact.look) {
+    const k = s.artifact.look;
+    L.push(`| **Look** | ${k.model === 'blender' ? 'bubbly (Blender doll)' : 'original (box doll)'}`
+      + ` · bands ${k.toon} · rim ${k.rim} · outline ${k.ink} m |`);
+  }
   L.push(`| **Source** | \`${s.artifact.path}\` — ${s.artifact.generator} |`);
   L.push(`| **Reviewer** | ${s.review.reviewer || '_unnamed_'} |`);
   L.push(`| **Exported** | ${s.review.exportedAtLocal} (${s.review.exportedAt}) |`);
@@ -963,6 +1053,105 @@ catch (e) {
 $('#date').value = seedInfo.iso;
 renderAspects();
 updateCounters();
+
+/* ── character turntable ──────────────────────────────────────────────── */
+
+/**
+ * Both dolls, side by side, on a slow turntable.
+ *
+ * A toggle in the toolbar swaps the character in the game, which answers "how
+ * does he look down there" but not "is this one better than that one" — for
+ * that you need them in the same picture at the same moment. Its own GL context
+ * on its own canvas, sharing nothing with the stage but the Viewer class.
+ */
+const tt = { viewer: null, spin: 0, drag: null, ready: false };
+
+function initTurntable () {
+  const canvas = $('#turntable');
+  if (!canvas) return;
+  try { tt.viewer = new Viewer(canvas, { background: [0.113, 0.124, 0.133] }); }
+  catch { return; }
+  tt.viewer.style.toon = gfx.toon;
+  tt.viewer.style.rim = gfx.rim;
+  for (const kind of ['blender', 'boxes']) {
+    const geo = dollGeometry(kind);
+    if (geo) tt.viewer.uploadGroup(`tt:${kind}`, geo.doll);
+  }
+  tt.ready = true;
+
+  let last = null;
+  canvas.addEventListener('pointerdown', e => {
+    last = e.clientX; canvas.setPointerCapture(e.pointerId);
+  });
+  canvas.addEventListener('pointermove', e => {
+    if (last == null) return;
+    tt.drag = (tt.drag ?? 0) + (e.clientX - last) * 0.012;
+    last = e.clientX;
+  });
+  for (const ev of ['pointerup', 'pointercancel']) {
+    canvas.addEventListener(ev, () => { last = null; });
+  }
+}
+
+function drawTurntable (dt) {
+  if (!tt.ready) return;
+  const canvas = $('#turntable');
+  const w = Math.max(1, Math.round(canvas.clientWidth * devicePixelRatio));
+  const h = Math.max(1, Math.round(canvas.clientHeight * devicePixelRatio));
+  if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+
+  tt.spin += dt * 0.55;
+  tt.viewer.style.toon = gfx.toon;
+  tt.viewer.style.rim = gfx.rim;
+  const mvp = tt.viewer.beginFrame({ eye: [0, 0.16, 1.32], at: [0, -0.02, 0], fov: 0.85 });
+
+  const a = tt.spin + (tt.drag ?? 0);
+  const c = Math.cos(a), s = Math.sin(a);
+  const at = x => new Float32Array([c, 0, -s, 0, 0, 1, 0, 0, s, 0, c, 0, x, 0, 0, 1]);
+  if (dollAsset) tt.viewer.drawGroup('tt:blender', mvp, at(-0.26), { ambient: 0.55, outline: gfx.ink, ink: INK });
+  tt.viewer.drawGroup('tt:boxes', mvp, at(0.26), { ambient: 0.55 });
+}
+
+/** Push the style knobs at the renderer and rebuild whatever depends on them. */
+function applyGfx (rebuild = false) {
+  if (viewer) { viewer.style.toon = gfx.toon; viewer.style.rim = gfx.rim; }
+  if (rebuild && viewer && world) { viewer.cache.delete('doll'); buildCharacter(); }
+  for (const b of $$('#gfx-tools [data-model]')) {
+    b.setAttribute('aria-checked', String(gfx.model === b.dataset.model));
+  }
+  const n = $('#doll-stats');
+  if (n) {
+    n.textContent = gfx.model === 'blender' && dollAsset
+      ? `${dollAsset.triangles.toLocaleString()} tris · smooth normals · Blender ${dollAsset.blender}`
+      : 'hand-meshed boxes · flat normals';
+  }
+}
+
+for (const b of $$('#gfx-tools [data-model]')) {
+  b.addEventListener('click', () => {
+    gfx.model = b.dataset.model;
+    applyGfx(true);
+    stage.focus();
+  });
+}
+for (const key of ['toon', 'rim', 'ink']) {
+  const input = $(`#gfx-${key}`);
+  if (!input) continue;
+  input.value = gfx[key];
+  const sync = () => {
+    gfx[key] = Number(input.value);
+    $(`#gfx-${key}-val`).textContent = gfx[key].toFixed(key === 'ink' ? 3 : 2);
+    applyGfx();
+  };
+  input.addEventListener('input', sync);
+  sync();
+}
+
+// The bake is fetched before the first world so the character is never briefly
+// the old one; a failed fetch flips gfx.model to 'boxes' and carries on.
+await loadDoll();
+initTurntable();
+applyGfx();
 buildWorld();
 if (!glError) raf = requestAnimationFrame(frame);
 

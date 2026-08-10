@@ -56,12 +56,17 @@ attribute vec3 aNor;
 attribute vec3 aCol;
 uniform mat4 uMVP;
 uniform mat4 uModel;
+uniform float uOutline;      // inverted-hull push along the world normal
 varying vec3 vNor;
 varying vec3 vCol;
+varying vec3 vPos;
 void main () {
   vec4 wp = uModel * vec4(aPos, 1.0);
-  vNor = mat3(uModel) * aNor;
+  vec3 nw = mat3(uModel) * aNor;
+  wp.xyz += normalize(nw) * uOutline;
+  vNor = nw;
   vCol = aCol;
+  vPos = wp.xyz;
   gl_Position = uMVP * wp;
 }`;
 
@@ -69,18 +74,32 @@ const FRAG = `
 precision mediump float;
 varying vec3 vNor;
 varying vec3 vCol;
+varying vec3 vPos;
 uniform vec3 uKey;
 uniform vec3 uFill;
+uniform vec3 uEye;
 uniform float uAmbient;
 uniform float uEmissive;
 uniform float uOpacity;
+uniform float uToon;         // 0 = smooth falloff, 1 = fully banded
+uniform float uRim;          // strength of the wraparound rim
+uniform vec4 uInk;           // rgb + flag: >0.5 means "draw flat, this is an outline"
 void main () {
+  if (uInk.w > 0.5) { gl_FragColor = vec4(uInk.rgb, uOpacity); return; }
   vec3 n = normalize(vNor);
   if (!gl_FrontFacing) n = -n;              // double-sided, per handoff §11.1
   float key  = max(dot(n, uKey), 0.0);
+  // Quantise the key light into four steps. MySims-era hardware shaded in
+  // bands because it had to; the banding is what makes a rounded form read as
+  // a toy rather than a lit sphere, so it is worth reproducing deliberately.
+  float band = floor(key * 3.0 + 0.5) / 3.0;
+  key = mix(key, band, uToon);
   float fill = max(dot(n, uFill), 0.0) * 0.32;
   float sky  = max(n.y, 0.0) * 0.14;
-  vec3 c = vCol * (uAmbient + key * 0.78 + fill + sky) + vCol * uEmissive;
+  // Rim light along the silhouette: the cheap stand-in for the subsurface glow
+  // that gives vinyl-toy renders their soft edge.
+  float rim = pow(1.0 - abs(dot(n, normalize(uEye - vPos))), 3.0) * uRim;
+  vec3 c = vCol * (uAmbient + key * 0.78 + fill + sky) + vCol * uEmissive + rim;
   gl_FragColor = vec4(c, uOpacity);
 }`;
 
@@ -137,7 +156,17 @@ export class Viewer {
       emissive: gl.getUniformLocation(this.prog, 'uEmissive'),
       opacity: gl.getUniformLocation(this.prog, 'uOpacity'),
       model: gl.getUniformLocation(this.prog, 'uModel'),
+      outline: gl.getUniformLocation(this.prog, 'uOutline'),
+      eye: gl.getUniformLocation(this.prog, 'uEye'),
+      toon: gl.getUniformLocation(this.prog, 'uToon'),
+      rim: gl.getUniformLocation(this.prog, 'uRim'),
+      ink: gl.getUniformLocation(this.prog, 'uInk'),
     };
+    // Shading style, set once and read by every draw. Defaults to the original
+    // smooth look so the 64-piece inspector renders exactly as it always has;
+    // the game turns the toon terms on.
+    this.style = { toon: 0, rim: 0 };
+    this.eye = [0, 0, 0];
     this.identity = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
     this.lineLoc = {
       pos: gl.getAttribLocation(this.lineProg, 'aPos'),
@@ -275,21 +304,13 @@ export class Viewer {
       this._lines(this._ensureGrid().buf, this.grid.count, mvp, [1, 1, 1, 0.075]);
     }
 
-    gl.useProgram(this.prog);
-    gl.uniformMatrix4fv(this.loc.mvp, false, mvp);
-    gl.uniform3fv(this.loc.key, normalize([0.45, 0.82, 0.36]));
-    gl.uniform3fv(this.loc.fill, normalize([-0.55, 0.35, -0.5]));
-    gl.uniform1f(this.loc.ambient, opts.ambient ?? 0.36);
-
+    this.eye = eye;
+    this._lit(mvp, opts);
     gl.uniformMatrix4fv(this.loc.model, false, this.identity);
     const draw = g => {
       gl.uniform1f(this.loc.opacity, g.opacity);
       gl.uniform1f(this.loc.emissive, g.emissive);
-      for (const [buf, loc] of [[g.pos, this.loc.pos], [g.nor, this.loc.nor], [g.col, this.loc.col]]) {
-        gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-        gl.enableVertexAttribArray(loc);
-        gl.vertexAttribPointer(loc, 3, gl.FLOAT, false, 0, 0);
-      }
+      this._bind(g);
       gl.drawArrays(gl.TRIANGLES, 0, g.count);
     };
 
@@ -342,26 +363,60 @@ export class Viewer {
     return entry;
   }
 
-  /** Draw an uploaded group with an explicit model matrix. */
-  drawGroup (key, mvp, model, opts = {}) {
+  /** Bind the uniforms every draw shares. */
+  _lit (mvp, opts) {
     const gl = this.gl;
-    const g = this.cache.get(key);
-    if (!g) return;
     gl.useProgram(this.prog);
     gl.uniformMatrix4fv(this.loc.mvp, false, mvp);
-    gl.uniformMatrix4fv(this.loc.model, false, model || this.identity);
     gl.uniform3fv(this.loc.key, normalize([0.45, 0.82, 0.36]));
     gl.uniform3fv(this.loc.fill, normalize([-0.55, 0.35, -0.5]));
+    gl.uniform3fv(this.loc.eye, this.eye);
     gl.uniform1f(this.loc.ambient, opts.ambient ?? 0.36);
-    gl.uniform1f(this.loc.opacity, opts.opacity ?? g.opacity);
-    gl.uniform1f(this.loc.emissive, opts.emissive ?? g.emissive);
-    const blend = (opts.opacity ?? g.opacity) < 1;
-    if (blend) { gl.enable(gl.BLEND); gl.depthMask(false); }
+    gl.uniform1f(this.loc.toon, opts.toon ?? this.style.toon);
+    gl.uniform1f(this.loc.rim, opts.rim ?? this.style.rim);
+    gl.uniform1f(this.loc.outline, 0);
+    gl.uniform4fv(this.loc.ink, [0, 0, 0, 0]);
+  }
+
+  _bind (g) {
+    const gl = this.gl;
     for (const [buf, loc] of [[g.pos, this.loc.pos], [g.nor, this.loc.nor], [g.col, this.loc.col]]) {
       gl.bindBuffer(gl.ARRAY_BUFFER, buf);
       gl.enableVertexAttribArray(loc);
       gl.vertexAttribPointer(loc, 3, gl.FLOAT, false, 0, 0);
     }
+  }
+
+  /** Draw an uploaded group with an explicit model matrix. */
+  drawGroup (key, mvp, model, opts = {}) {
+    const gl = this.gl;
+    const g = this.cache.get(key);
+    if (!g) return;
+    this._lit(mvp, opts);
+    gl.uniformMatrix4fv(this.loc.model, false, model || this.identity);
+    this._bind(g);
+
+    // Inverted hull: the same mesh grown along its normals, front faces culled
+    // so only the back shell survives, drawn flat and dark before the model
+    // itself covers it. Needs closed geometry and smooth normals — which is
+    // exactly what the Blender character has and the maze shell does not, so
+    // this is opt-in per group rather than a global pass.
+    if (opts.outline) {
+      gl.enable(gl.CULL_FACE);
+      gl.cullFace(gl.FRONT);
+      gl.uniform1f(this.loc.outline, opts.outline);
+      gl.uniform4fv(this.loc.ink, [...(opts.ink || [0.07, 0.09, 0.13]), 1]);
+      gl.uniform1f(this.loc.opacity, 1);
+      gl.drawArrays(gl.TRIANGLES, 0, g.count);
+      gl.uniform1f(this.loc.outline, 0);
+      gl.uniform4fv(this.loc.ink, [0, 0, 0, 0]);
+      gl.disable(gl.CULL_FACE);
+    }
+
+    gl.uniform1f(this.loc.opacity, opts.opacity ?? g.opacity);
+    gl.uniform1f(this.loc.emissive, opts.emissive ?? g.emissive);
+    const blend = (opts.opacity ?? g.opacity) < 1;
+    if (blend) { gl.enable(gl.BLEND); gl.depthMask(false); }
     gl.drawArrays(gl.TRIANGLES, 0, g.count);
     if (blend) { gl.disable(gl.BLEND); gl.depthMask(true); }
   }
@@ -374,6 +429,9 @@ export class Viewer {
     gl.clearColor(bg[0], bg[1], bg[2], 1);
     gl.depthMask(true);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    // Stashed for the rim term, which needs a view vector. Taking it here rather
+    // than as a drawGroup argument keeps every existing call site unchanged.
+    this.eye = cam.eye;
     const proj = perspective(cam.fov ?? 0.95, this.canvas.width / this.canvas.height, 0.12, 500);
     return multiply(proj, lookAt(cam.eye, cam.at, cam.up || [0, 1, 0]));
   }

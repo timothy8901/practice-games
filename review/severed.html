@@ -65,6 +65,7 @@
       <div class="hud" id="hud"></div>
       <div class="tiltgauge"><canvas id="tilt" width="120" height="120"></canvas></div>
       <p class="stage-hint" id="hint">click the view · <b>WASD</b> / arrows tilt the floor · <b>Q</b> <b>E</b> or drag turns the camera · <b>R</b> back to the last checkpoint · <b>Space</b> pause</p>
+      <div class="stage-toolbar">
       <div class="stage-tools">
         <button class="tool" data-toggle="follow" title="Keep the camera behind him, over his shoulder">Follow cam</button>
         <button class="tool" data-toggle="walls" title="Hallway walls. Real collision geometry — this is what keeps him in the corridor.">Hallway walls</button>
@@ -79,10 +80,41 @@
           <select id="jump"></select>
         </label>
       </div>
+      <div class="stage-tools gfx" id="gfx-tools">
+        <span class="gfx-label">Look</span>
+        <button class="tool" data-model="blender" title="Subdivided doll modelled in Blender — rounded forms, smooth normals">Bubbly</button>
+        <button class="tool" data-model="boxes" title="The original hand-meshed doll, for comparison">Original</button>
+        <label class="slider">Bands
+          <input id="gfx-toon" type="range" min="0" max="1" step="0.05">
+          <output id="gfx-toon-val" class="mono"></output>
+        </label>
+        <label class="slider">Rim
+          <input id="gfx-rim" type="range" min="0" max="0.4" step="0.01">
+          <output id="gfx-rim-val" class="mono"></output>
+        </label>
+        <label class="slider">Outline
+          <input id="gfx-ink" type="range" min="0" max="0.03" step="0.001">
+          <output id="gfx-ink-val" class="mono"></output>
+        </label>
+        <span class="spacer"></span>
+        <span id="doll-stats" class="mono dim"></span>
+      </div>
+      </div>
     </div>
   </section>
 
   <aside class="side">
+    <section class="panel tight">
+      <h2>The man in the suit <span class="count">side by side</span></h2>
+      <div class="turntable">
+        <canvas id="turntable"></canvas>
+        <div class="tt-labels"><span>Bubbly</span><span>Original</span></div>
+      </div>
+      <p class="tt-note">Modelled in Blender: subdivision surfaces, everything
+      rounded, smooth vertex normals and an outline pass. The original on the
+      right is hand-meshed boxes with flat normals. Drag to spin.</p>
+    </section>
+
     <section class="panel tight">
       <h2>Shift integrity <span class="count">this file</span></h2>
       <div id="checks" class="checks">running…</div>

@@ -159,6 +159,12 @@ export function assembleMaze (maze, opts = {}) {
     };
     const wallTris = [];
 
+    /**
+     * @param collide  true renders and collides, false renders only,
+     *                 'only' collides without rendering — which is how the wall
+     *                 keeps its flat collidable top while the bullnose bead is
+     *                 the thing you actually see there.
+     */
     const face = (key, colour, quads, collide) => {
       const r = bucket(key);
       const [cr, cg, cb] = parseColor(colour);
@@ -170,12 +176,40 @@ export function assembleMaze (maze, opts = {}) {
           const ml = Math.hypot(mx, my, mz);
           if (ml < 1e-9) continue;
           mx /= ml; my /= ml; mz /= ml;
+          if (collide) wallTris.push(...a, ...b, ...c);
+          if (collide === 'only') continue;
           r.pos.push(...a, ...b, ...c);
           r.nor.push(mx, my, mz, mx, my, mz, mx, my, mz);
           for (let i = 0; i < 3; i++) r.col.push(cr, cg, cb);
-          if (collide) wallTris.push(...a, ...b, ...c);
         }
       }
+    };
+
+    /**
+     * Extrude a 2-D cross-section along a wall segment.
+     *
+     * `pts` are [lateral offset from the segment centre-line, height] pairs, and
+     * consecutive pairs become one quad each. This is how every rounded edge in
+     * the corridor is made: the profile carries the curve, the extrusion carries
+     * it down the hallway. Decoration only, always.
+     */
+    const profile = (key, colour, off, pts) => {
+      const quads = [];
+      for (let i = 0; i < pts.length - 1; i++) {
+        const [o0, y0] = pts[i], [o1, y1] = pts[i + 1];
+        quads.push([off.a(o0, y0), off.b(o0, y0), off.b(o1, y1), off.a(o1, y1)]);
+      }
+      face(key, colour, quads, false);
+    };
+
+    /** A quarter turn as `bead` facets, from angle `t0` to `t1`. */
+    const arc = (cx, cy, r, t0, t1, sign = 1) => {
+      const out = [];
+      for (let i = 0; i <= HALL.bead; i++) {
+        const t = t0 + (t1 - t0) * (i / HALL.bead);
+        out.push([cx + sign * r * Math.cos(t), cy + r * Math.sin(t)]);
+      }
+      return out;
     };
 
     /** One wall segment between two points on the fence line. */
@@ -194,14 +228,32 @@ export function assembleMaze (maze, opts = {}) {
         return runFrom + L;
       }
 
-      face('hallWall', OFFICE.wall, [inner, outer], true);
-      face('hallWall', OFFICE.wallShade, [cap], true);
-      // skirting board, proud of the wall face so it catches the light
-      const sk = HALL.skirtH, sp = t + 0.025;
-      face('hallTrim', OFFICE.skirting, [
-        [off(a, -sp, 0), off(b, -sp, 0), off(b, -sp, sk), off(a, -sp, sk)],
-        [off(a, sp, 0), off(b, sp, 0), off(b, sp, sk), off(a, sp, sk)],
-      ], false);
+      // The wall proper stops short of its own top: the bullnose below covers
+      // the last `capR` of it, so rendering the full slab would only put a hard
+      // corner back inside the bead where it shows as a seam.
+      const wallTop = H - HALL.capR;
+      const shortInner = [off(a, -t, 0), off(b, -t, 0), off(b, -t, wallTop), off(a, -t, wallTop)];
+      const shortOuter = [off(a, t, 0), off(b, t, 0), off(b, t, wallTop), off(a, t, wallTop)];
+      face('hallWall', OFFICE.wall, [shortInner, shortOuter], false);
+      // Collision keeps the original full-height slab and flat top. Nothing the
+      // solver sees changed when the corridor got its radius.
+      face('hallWall', OFFICE.wall, [inner, outer], 'only');
+      face('hallWall', OFFICE.wallShade, [cap], 'only');
+
+      // Bullnose over the top of the wall: a half-round laid along the segment,
+      // from the inner face up over the crown and down to the outer face.
+      profile('hallWall', OFFICE.wallShade,
+        { a: (o, y) => off(a, o, y), b: (o, y) => off(b, o, y) },
+        arc(0, wallTop, HALL.capR, Math.PI, 0));
+
+      // Skirting board: stands proud of the wall face to catch the light, with
+      // its top edge rounded over rather than mitred.
+      const sk = HALL.skirtH, sp = t + HALL.skirtOut, R = HALL.skirtR;
+      for (const s of [-1, 1]) {
+        profile('hallTrim', OFFICE.skirting,
+          { a: (o, y) => off(a, s * o, y), b: (o, y) => off(b, s * o, y) },
+          [[sp, 0], [sp, sk - R], ...arc(sp - R, sk - R, R, 0, Math.PI / 2)]);
+      }
       // the horizontal accent line every corridor in the building has
       const y0 = HALL.stripeY, y1 = y0 + HALL.stripeH;
       face('hallTrim', OFFICE.accent, [
