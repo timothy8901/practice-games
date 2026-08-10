@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Severed Floor — playtest</title>
+<link rel="stylesheet" href="review.css">
+<link rel="stylesheet" href="maze.css">
+<link rel="stylesheet" href="severed.css">
+</head>
+<body class="playtest severed">
+
+<header class="bar">
+  <div class="bar-main">
+    <div class="ident">
+      <h1>THE&nbsp;SEVERED&nbsp;FLOOR <span class="tag">daily shift</span></h1>
+      <p class="sub">
+        <span id="seed-label">—</span>
+        <span class="dot">·</span>
+        <span id="maze-stats">—</span>
+      </p>
+    </div>
+    <div class="bar-actions">
+      <label class="reviewer">
+        <span>Reviewer</span>
+        <input id="reviewer" type="text" placeholder="your name (optional)" autocomplete="off">
+      </label>
+      <button id="export" class="primary">Export feedback</button>
+    </div>
+  </div>
+  <div class="bar-verdict">
+    <div class="verdict" role="radiogroup" aria-label="Overall verdict">
+      <span class="verdict-label">Overall verdict</span>
+      <button class="v" data-verdict="approve" role="radio" aria-checked="false">Approve</button>
+      <button class="v" data-verdict="revise" role="radio" aria-checked="false">Revise</button>
+      <button class="v" data-verdict="discuss" role="radio" aria-checked="false">Needs discussion</button>
+    </div>
+    <div class="counters" id="counters"></div>
+  </div>
+</header>
+
+<main class="play-main">
+  <section class="stage-wrap">
+    <div class="seedbar">
+      <label>Shift <input id="date" type="date"></label>
+      <button id="prev-day" title="Previous shift">‹</button>
+      <button id="next-day" title="Next shift">›</button>
+      <button id="today">Today (UTC)</button>
+      <span class="sep"></span>
+      <label>Floor
+        <select id="size">
+          <option value="5">small</option>
+          <option value="6" selected>standard</option>
+          <option value="7">large</option>
+          <option value="8">sprawling</option>
+        </select>
+      </label>
+      <button id="regen">Regenerate</button>
+      <span class="spacer"></span>
+      <span id="gen-time" class="mono dim"></span>
+    </div>
+
+    <div class="viewport" id="viewport">
+      <canvas id="stage" tabindex="0"></canvas>
+      <div class="hud" id="hud"></div>
+      <div class="tiltgauge"><canvas id="tilt" width="120" height="120"></canvas></div>
+      <p class="stage-hint" id="hint">click the view · <b>WASD</b> / arrows tilt the floor · <b>Q</b> <b>E</b> or drag turns the camera · <b>R</b> back to the last checkpoint · <b>Space</b> pause</p>
+      <div class="stage-tools">
+        <button class="tool" data-toggle="follow" title="Keep the camera behind him, over his shoulder">Follow cam</button>
+        <button class="tool" data-toggle="walls" title="Hallway walls. Real collision geometry — this is what keeps him in the corridor.">Hallway walls</button>
+        <button class="tool" data-toggle="ceiling" title="Suspended tile ceiling on the real 0.6 m grid module. Decoration only — it never collides.">Ceiling</button>
+        <button class="tool" data-toggle="upright" title="Keep him on his feet instead of tumbling with the roll">Upright</button>
+        <button class="tool" data-toggle="worldTilt">Floor tilt</button>
+        <button class="tool" data-toggle="route">Route to elevator</button>
+        <button class="tool" data-toggle="collision">Collision mesh</button>
+        <button class="tool" data-toggle="overhead">Floor plan</button>
+        <span class="spacer"></span>
+        <label class="jump">Jump to
+          <select id="jump"></select>
+        </label>
+      </div>
+    </div>
+  </section>
+
+  <aside class="side">
+    <section class="panel tight">
+      <h2>Shift integrity <span class="count">this file</span></h2>
+      <div id="checks" class="checks">running…</div>
+      <button id="recheck" class="add">Re-run</button>
+    </section>
+
+    <section class="panel tight">
+      <h2>Upcoming shifts <span class="count" id="sweep-count"></span></h2>
+      <p class="lede small">
+        The publish gate over a run of consecutive days, the way a nightly job
+        would. <b>Open</b> means the elevator is reachable and the reference bot
+        got there. <b>Clean</b> means it drove every metre unaided.
+      </p>
+      <div class="sweep-controls">
+        <label>Days <input id="sweep-days" type="number" min="1" max="60" value="14"></label>
+        <button id="sweep" class="add">Run sweep</button>
+      </div>
+      <div id="sweep-out"></div>
+    </section>
+
+    <section class="panel tight">
+      <h2>Feedback</h2>
+      <p class="lede small">
+        Aspects are fixed so notes from different sessions line up. Every note
+        records the shift you were on and which toggles were set.
+      </p>
+      <div id="aspects"></div>
+    </section>
+  </aside>
+</main>
+
+<script type="module" src="severed.js"></script>
+</body>
+</html>

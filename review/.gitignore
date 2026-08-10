@@ -1,0 +1,3 @@
+# Generated replay data for the video recorder. Regenerate with:
+#   node 3d-mazeball/record.mjs > review/_run.json
+_run.json
