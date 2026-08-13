@@ -258,17 +258,84 @@
             to { transform: translateY(110vh) rotate(720deg); opacity: 0.9; }
         }
 
-        /* ----- Series filter ----- */
-        .series-select {
+        /* ----- Series filter: menu button + switch popup ----- */
+        .series-menu-wrap { position: relative; }
+        .series-btn {
+            display: inline-flex; align-items: center; gap: 0.5rem;
             font-family: 'Inter', sans-serif; font-weight: 700; font-size: 0.85rem;
-            color: #1a1006; background-color: var(--scroll-paper);
+            color: #1a1006; background: linear-gradient(180deg, var(--scroll-paper), var(--scroll-paper-dark));
             border: 2px solid var(--leaf-orange-deep); border-radius: 999px;
-            padding: 0.4rem 2rem 0.4rem 0.9rem; cursor: pointer;
-            -webkit-appearance: none; appearance: none;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23c2410c'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
-            background-repeat: no-repeat; background-position: right 0.5rem center; background-size: 1.05rem;
+            padding: 0.4rem 0.95rem; cursor: pointer;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.35);
+            transition: filter 0.15s, transform 0.1s;
         }
-        .series-select:focus { outline: 2px solid var(--leaf-orange); outline-offset: 1px; }
+        .series-btn:hover { filter: brightness(1.05); transform: translateY(-1px); }
+        .series-btn:focus-visible { outline: 2px solid var(--leaf-orange); outline-offset: 2px; }
+        .series-btn .count {
+            font-size: 0.72rem; font-weight: 800; line-height: 1;
+            background: var(--leaf-orange-deep); color: #fff;
+            padding: 0.2rem 0.45rem; border-radius: 999px;
+        }
+        .series-btn .chev { font-size: 0.65rem; opacity: 0.7; }
+
+        .series-pop {
+            display: none; position: absolute; z-index: 40;
+            top: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+            width: min(320px, 88vw);
+            background: linear-gradient(180deg, var(--scroll-paper), var(--scroll-paper-dark));
+            border: 2px solid var(--leaf-orange-deep); border-radius: 14px;
+            box-shadow: 0 16px 40px rgba(0,0,0,0.55), inset 0 0 0 2px rgba(255,255,255,0.35);
+            padding: 0.75rem;
+            text-align: left; color: var(--ink);
+        }
+        .series-pop.show { display: block; animation: scale-in 0.16s ease both; }
+        .series-pop-head {
+            display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
+            padding-bottom: 0.5rem; margin-bottom: 0.4rem;
+            border-bottom: 2px solid rgba(0,0,0,0.12);
+        }
+        .series-pop-head .title { font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; opacity: 0.75; }
+        .series-pop-actions { display: flex; gap: 0.35rem; }
+        .mini-btn {
+            font-size: 0.7rem; font-weight: 800; cursor: pointer;
+            padding: 0.28rem 0.6rem; border-radius: 999px;
+            border: 2px solid var(--leaf-orange-deep);
+            background: var(--leaf-orange); color: #1a1006;
+            transition: filter 0.15s;
+        }
+        .mini-btn:hover { filter: brightness(1.08); }
+        .mini-btn.ghost { background: transparent; color: var(--ink); }
+
+        .series-list { max-height: 46vh; overflow-y: auto; padding-right: 0.15rem; }
+        .series-row {
+            display: flex; align-items: center; justify-content: space-between; gap: 0.6rem;
+            padding: 0.34rem 0.15rem; cursor: pointer;
+            border-radius: 8px;
+        }
+        .series-row:hover { background: rgba(194,65,12,0.09); }
+        .series-row .name { font-size: 0.85rem; font-weight: 600; }
+        .series-row .name .qty { font-size: 0.7rem; opacity: 0.6; font-weight: 700; }
+
+        /* toggle switch */
+        .switch { position: relative; flex: 0 0 auto; width: 40px; height: 22px; }
+        .switch input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+        .switch .track {
+            position: absolute; inset: 0; border-radius: 999px;
+            background: #b9a98c; border: 2px solid rgba(0,0,0,0.25);
+            transition: background 0.18s;
+            pointer-events: none;
+        }
+        .switch .thumb {
+            position: absolute; top: 3px; left: 3px; width: 16px; height: 16px;
+            border-radius: 50%; background: #fffdf7; box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+            transition: transform 0.18s;
+            pointer-events: none;
+        }
+        .switch input:checked ~ .track { background: var(--green-good); }
+        .switch input:checked ~ .thumb { transform: translateX(18px); }
+        .switch input:focus-visible ~ .track { outline: 2px solid var(--leaf-orange); outline-offset: 2px; }
+
+        .series-note { font-size: 0.72rem; font-weight: 700; color: var(--red-bad); margin-top: 0.45rem; min-height: 1rem; }
 
         /* ----- Series chip (trivia modal) ----- */
         .series-chip {
@@ -400,13 +467,27 @@
     <!-- Mode toggle -->
     <div class="flex items-center gap-3 mb-3 flex-wrap justify-center">
         <div class="seg" role="tablist" aria-label="Game mode">
-            <button id="mode-2p" class="active" type="button">2 Player</button>
-            <button id="mode-cpu" type="button">vs CPU</button>
+            <button id="mode-cpu" class="active" type="button">vs CPU</button>
+            <button id="mode-2p" type="button">2 Player</button>
         </div>
-        <label class="flex items-center gap-2 text-sm font-semibold" style="color:var(--scroll-paper);">
-            Anime
-            <select id="series-filter" class="series-select" aria-label="Choose which anime to be quizzed on"></select>
-        </label>
+        <div class="series-menu-wrap">
+            <button id="series-btn" class="series-btn" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="series-pop">
+                <span>Anime</span>
+                <span class="count" id="series-count">16/16</span>
+                <span class="chev" aria-hidden="true">&#9660;</span>
+            </button>
+            <div id="series-pop" class="series-pop" role="dialog" aria-label="Choose which anime are included">
+                <div class="series-pop-head">
+                    <span class="title">Question pool</span>
+                    <div class="series-pop-actions">
+                        <button id="series-all" class="mini-btn" type="button">Include all</button>
+                        <button id="series-none" class="mini-btn ghost" type="button">Clear</button>
+                    </div>
+                </div>
+                <div class="series-list" id="series-list"></div>
+                <p class="series-note" id="series-note" role="status"></p>
+            </div>
+        </div>
         <label class="flex items-center gap-2 text-sm font-semibold" style="color:var(--scroll-paper);">
             <input type="checkbox" id="timer-toggle" checked style="width:18px;height:18px;accent-color:var(--leaf-orange);">
             15s Timer
@@ -755,15 +836,15 @@
             s.hard.forEach(q => HARD.push({ series: s.series, ...q }));
         });
 
-        // Currently-selected anime filter ('all' or a series name) + a recently-asked tracker
-        // so questions don't repeat until the relevant pool is exhausted.
-        let seriesFilter = 'all';
+        // Which anime are switched on in the pool menu (all on by default), plus a
+        // recently-asked tracker so questions don't repeat until the pool is exhausted.
+        const enabledSeries = new Set(SERIES_LIST);
         const usedQuestions = new Set();
 
         function poolFor(isHard) {
             const base = isHard ? HARD : REGULAR;
-            if (seriesFilter === 'all') return base;
-            const filtered = base.filter(q => q.series === seriesFilter);
+            if (enabledSeries.size === 0 || enabledSeries.size === SERIES_LIST.length) return base;
+            const filtered = base.filter(q => enabledSeries.has(q.series));
             return filtered.length ? filtered : base;
         }
         function pickQuestion(isHard) {
@@ -810,7 +891,7 @@
         let gameActive = true;
         let selectedCellIndex = null;
         let isStealAttempt = false;
-        let vsCpu = false;
+        let vsCpu = true;   // default: play the CPU; 2 Player must be switched on
         let useTimer = true;
         let timerId = null;
         let timerDeadline = 0;
@@ -1269,15 +1350,86 @@
 
         resetButton.addEventListener('click', initializeGame);
 
-        // ---- Boot ----
-        const seriesFilterEl = document.getElementById('series-filter');
-        seriesFilterEl.innerHTML = ['<option value="all">All Anime</option>']
-            .concat(SERIES_LIST.map(s => `<option value="${s}">${s}</option>`))
-            .join('');
-        seriesFilterEl.addEventListener('change', () => {
-            seriesFilter = seriesFilterEl.value;
+        // ---- Anime pool menu (switches) ----
+        const seriesBtn = document.getElementById('series-btn');
+        const seriesPop = document.getElementById('series-pop');
+        const seriesList = document.getElementById('series-list');
+        const seriesCount = document.getElementById('series-count');
+        const seriesNote = document.getElementById('series-note');
+
+        // Count questions per series for the row labels.
+        const seriesTotals = {};
+        QUESTION_BANK.forEach(s => { seriesTotals[s.series] = s.regular.length + s.hard.length; });
+
+        seriesList.innerHTML = SERIES_LIST.map((s, i) => `
+            <label class="series-row" for="series-sw-${i}">
+                <span class="name">${s} <span class="qty">(${seriesTotals[s]})</span></span>
+                <span class="switch">
+                    <input type="checkbox" id="series-sw-${i}" data-series="${s}" checked>
+                    <span class="track"></span><span class="thumb"></span>
+                </span>
+            </label>`).join('');
+
+        const seriesInputs = Array.from(seriesList.querySelectorAll('input[type="checkbox"]'));
+
+        function renderSeriesCount() {
+            seriesCount.textContent = `${enabledSeries.size}/${SERIES_LIST.length}`;
+        }
+
+        // Any change to the pool restarts the match (scoreboard is kept).
+        function applySeriesChange() {
             usedQuestions.clear();
+            renderSeriesCount();
+            initializeGame();
+        }
+
+        seriesInputs.forEach(input => {
+            input.addEventListener('change', () => {
+                const name = input.dataset.series;
+                if (input.checked) {
+                    enabledSeries.add(name);
+                    seriesNote.textContent = '';
+                } else {
+                    // Never let the pool empty out — keep at least one series on.
+                    if (enabledSeries.size === 1) {
+                        input.checked = true;
+                        seriesNote.textContent = 'Keep at least one anime switched on.';
+                        return;
+                    }
+                    enabledSeries.delete(name);
+                    seriesNote.textContent = '';
+                }
+                applySeriesChange();
+            });
         });
+
+        document.getElementById('series-all').addEventListener('click', () => {
+            SERIES_LIST.forEach(s => enabledSeries.add(s));
+            seriesInputs.forEach(i => { i.checked = true; });
+            seriesNote.textContent = '';
+            applySeriesChange();
+        });
+
+        // "Clear" leaves the first series on so the pool is never empty.
+        document.getElementById('series-none').addEventListener('click', () => {
+            enabledSeries.clear();
+            enabledSeries.add(SERIES_LIST[0]);
+            seriesInputs.forEach(i => { i.checked = i.dataset.series === SERIES_LIST[0]; });
+            seriesNote.textContent = `Kept ${SERIES_LIST[0]} on — the pool can't be empty.`;
+            applySeriesChange();
+        });
+
+        function toggleSeriesPop(show) {
+            const open = show === undefined ? !seriesPop.classList.contains('show') : show;
+            seriesPop.classList.toggle('show', open);
+            seriesBtn.setAttribute('aria-expanded', String(open));
+            if (!open) seriesNote.textContent = '';
+        }
+        seriesBtn.addEventListener('click', (e) => { e.stopPropagation(); toggleSeriesPop(); });
+        seriesPop.addEventListener('click', (e) => e.stopPropagation());
+        document.addEventListener('click', () => toggleSeriesPop(false));
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') toggleSeriesPop(false); });
+        renderSeriesCount();
         loadScores();
         useTimer = timerToggle.checked;
         initializeGame();
