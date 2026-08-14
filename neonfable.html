@@ -13,6 +13,7 @@
     --void:#060312; --panel:#0e0826; --panel2:#150d38;
     --ink:#eae6ff; --dim:#a89fc7; --faint:#5e5480;
     --cyan:#2ef2ff; --mag:#ff2d95; --vio:#9d5cff; --xp:#5dff9c; --amber:#ffb02e; --red:#ff4d4d;
+    --hell:#c6ff3a;
     --disp:'Avenir Next Condensed','Arial Narrow','Helvetica Neue',Impact,sans-serif;
     --mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;
   }
@@ -69,6 +70,20 @@
   #dashchip{position:absolute;bottom:18px;right:18px;font-size:10px;letter-spacing:.25em;
     padding:6px 12px;border:1px solid rgba(46,242,255,.4);color:var(--cyan);opacity:.85}
   #dashchip.cd{border-color:rgba(94,84,128,.5);color:var(--faint)}
+
+  /* ---------- bullet hell mode ---------- */
+  #bhchip{margin-top:5px;font-size:10px;letter-spacing:.3em;color:var(--hell);
+    text-shadow:0 0 12px rgba(198,255,58,.75);animation:bhPulse 1.6s ease-in-out infinite}
+  @keyframes bhPulse{0%,100%{opacity:.55}50%{opacity:1}}
+  #bhRow{display:flex;flex-direction:column;align-items:center;gap:6px}
+  .btn.bh{color:var(--hell);border-color:rgba(198,255,58,.5);background:rgba(198,255,58,.07);
+    letter-spacing:.2em}
+  .btn.bh:hover{background:rgba(198,255,58,.18);box-shadow:0 0 26px rgba(198,255,58,.35);color:#fff}
+  .btn.bh.armed{background:rgba(198,255,58,.24);color:#0d1400;font-weight:700;
+    border-color:var(--hell);box-shadow:0 0 30px rgba(198,255,58,.55)}
+  #bhNote{color:var(--faint);font-size:9px;letter-spacing:.16em;text-transform:uppercase}
+  #unlockMsg{color:var(--hell);font-size:12px;letter-spacing:.2em;
+    text-shadow:0 0 14px rgba(198,255,58,.7);animation:bhPulse 1.6s ease-in-out infinite}
 
   /* ---------- on-screen touch controls ---------- */
   #touchDash,#touchPause{display:none;position:absolute;pointer-events:auto;z-index:22;
@@ -216,7 +231,7 @@
   }
 </style>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E%F0%9F%91%BE%3C/text%3E%3C/svg%3E">
-<meta name="description" content="NEONFABLE — a synthwave bullet-heaven roguelite. 12 evolving weapons, four bosses, daily seeded runs. Plays in your browser on desktop, mobile and gamepad.">
+<meta name="description" content="NEONFABLE — a synthwave bullet-heaven roguelite. 12 evolving weapons, four bosses, daily seeded runs and an unlockable BULLET HELL mode. Plays in your browser on desktop, mobile and gamepad.">
 <meta property="og:title" content="NEONFABLE — Void Survivor">
 <meta property="og:description" content="A synthwave bullet-heaven roguelite. Survive 15 minutes of the void.">
 <meta property="og:type" content="website">
@@ -233,6 +248,7 @@
     </div>
     <div id="hudTC">
       <div id="timer">00:00</div>
+      <div id="bhchip" class="hidden">☠ BULLET HELL</div>
       <div id="bosswrap" class="hidden">
         <div id="bossname">VOID WARDEN</div>
         <div id="bossbar"><div id="bossfill"></div></div>
@@ -260,6 +276,10 @@
       <button id="dailyBtn" class="btn big">◈ DAILY VOID</button>
     </div>
     <div id="dailyLbl" class="hint"></div>
+    <div id="bhRow" class="hidden">
+      <button id="togBH" class="btn bh">☠ BULLET HELL — OFF</button>
+      <span id="bhNote">Hellions weave danmaku. Standard runs only — dailies stay clean.</span>
+    </div>
     <div class="divider"></div>
     <div id="shopWrap">
       <p class="sub" style="text-align:center">◈ HANGAR UPGRADES — PERMANENT ◈</p>
@@ -306,6 +326,7 @@
     <p class="sub" id="overSub">the void takes another</p>
     <div class="panel statGrid" id="overStats"></div>
     <div id="earned"></div>
+    <div id="unlockMsg" class="hidden"></div>
     <div class="row">
       <button id="againBtn" class="btn big warn">↻ RE-ENGAGE</button>
       <button id="continueBtn" class="btn big hidden">∞ CONTINUE</button>
@@ -350,7 +371,7 @@ function dailyKey(){
 const gR=()=> (game.daily&&game.sR)?game.sR():Math.random();
 
 const C = {cyan:'#2ef2ff',mag:'#ff2d95',vio:'#9d5cff',xp:'#5dff9c',amber:'#ffb02e',red:'#ff4d4d',
-           white:'#ffffff',pink:'#ff7ad9',teal:'#2affc7',orange:'#ff7a2d'};
+           white:'#ffffff',pink:'#ff7ad9',teal:'#2affc7',orange:'#ff7a2d',hell:'#c6ff3a'};
 
 /* ---------------- canvas ---------------- */
 const cv = $('cv');
@@ -373,17 +394,20 @@ const SAVE_KEY = 'neonfable.v1';
 const DEFAULT_SAVE = ()=>({
   credits:0, wins:0,
   best:{score:0,time:0,kills:0,level:0},
-  shop:{}, ships:['wisp'], lastShip:'wisp', dailyBest:null,
-  settings:{music:true,sfx:true,shake:true}
+  shop:{}, ships:['wisp'], lastShip:'wisp', dailyBest:null, bhUnlocked:false,
+  settings:{music:true,sfx:true,shake:true,bulletHell:false}
 });
 let S = DEFAULT_SAVE();
 try{
   const raw = localStorage.getItem(SAVE_KEY);
   if(raw){ const d = JSON.parse(raw); S = Object.assign(DEFAULT_SAVE(), d);
     S.best = Object.assign({score:0,time:0,kills:0,level:0}, d.best||{});
-    S.settings = Object.assign({music:true,sfx:true,shake:true}, d.settings||{});
+    S.settings = Object.assign({music:true,sfx:true,shake:true,bulletHell:false}, d.settings||{});
     S.shop = d.shop||{}; S.ships = d.ships||['wisp']; }
 }catch(e){}
+// grandfather returning players: a recorded best means they already finished a run before
+// BULLET HELL existed, so don't make them replay one to earn the unlock
+if(!S.bhUnlocked && (S.wins>0 || S.best.score>0)) S.bhUnlocked=true;
 function saveGame(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(S)); }catch(e){} }
 
 const SHOP = [
@@ -796,7 +820,8 @@ const game = {
   state:'title', t:0, score:0, kills:0, scrap:0,
   spawnT:0, eliteT:60, bossIdx:0, shake:0, freeze:0, slowmo:0,
   drafts:0, endless:false, bannerT:0, over:false,
-  daily:false, seed:0, sR:null, draftN:0, rerollUses:0, chestN:0, victoryPend:0
+  daily:false, seed:0, sR:null, draftN:0, rerollUses:0, chestN:0, victoryPend:0,
+  bh:false, bhT:0, bhSeen:false, lastThreat:0
 };
 let enemies=[], bullets=[], ebullets=[], gems=[], parts=[], texts=[], beams=[], drops=[], ghosts=[], rings=[];
 let boss=null;
@@ -1236,9 +1261,40 @@ const ETYPES = {
   mite:    {shape:'tri',    col:C.pink,  fill:'rgba(255,122,217,.10)',pcol:'pink',  hp:8,  spd:180,dmg:5,  r:7,  xp:1, score:6,  from:1e9},
   kaze:    {shape:'star',   col:C.red,   fill:'rgba(255,77,77,.15)',  pcol:'red',   hp:24, spd:190,dmg:24, r:12, xp:2, score:24, from:430, kaze:true},
   tank:    {shape:'hex',    col:C.orange,fill:'rgba(255,122,45,.13)', pcol:'orange',hp:260,spd:38, dmg:18, r:26, xp:7, score:48, from:520},
+  // BULLET HELL exclusive — spawned only by the director when the mode is on (from:1e9 keeps it
+  // out of the pickType weight table and out of elite selection)
+  hellion: {shape:'star',   col:C.hell,  fill:'rgba(198,255,58,.10)', pcol:'hell',  hp:78, spd:46, dmg:14, r:22, xp:6, score:44, from:1e9, danmaku:true},
 };
 SPR.enemy={}; SPR.elite={};
 for(const k in ETYPES){ SPR.enemy[k]=enemySprite(k,false); SPR.elite[k]=enemySprite(k,true); }
+/* the hellion gets bespoke art so it never reads as a normal enemy */
+function hellionSprite(){
+  const r=22, pad=r+24, c=mkCanvas(pad*2,pad*2), g=c.getContext('2d');
+  g.translate(pad,pad);
+  g.beginPath(); g.arc(0,0,r*.95,0,TAU);
+  g.shadowColor=C.hell; g.shadowBlur=15;
+  g.lineWidth=2.5; g.strokeStyle=C.hell; g.stroke();
+  const pts=starPts(6,r*.62,r*.26,-Math.PI/2);
+  g.beginPath(); pts.forEach((p,i)=> i?g.lineTo(p[0],p[1]):g.moveTo(p[0],p[1])); g.closePath();
+  g.fillStyle='rgba(26,42,4,.92)'; g.fill();
+  g.lineWidth=2; g.strokeStyle=C.hell; g.stroke();
+  g.shadowBlur=9;
+  for(let i=0;i<6;i++){
+    const a=i/6*TAU;
+    g.beginPath(); g.arc(Math.cos(a)*r*.95, Math.sin(a)*r*.95, 2.7, 0, TAU);
+    g.fillStyle=C.hell; g.fill();
+  }
+  g.shadowBlur=0;
+  return c;
+}
+SPR.enemy.hellion=hellionSprite(); SPR.elite.hellion=SPR.enemy.hellion;
+/* --- bullet hell tuning --- */
+const HELL_CHARGE=.6;   // telegraph time before a volley
+const HELL_WAVES=4;     // rings per volley
+const HELL_WAVE=.16;    // seconds between rings
+const HELL_ARMS=9;      // bullets per ring
+const HELL_TWIST=.34;   // radians the ring rotates each wave (makes the spiral)
+const HELL_CAP=6;       // max hellions alive at once
 SPR.gems=[gemSprite(C.xp,7), gemSprite(C.cyan,9), gemSprite(C.mag,11)];
 
 const hpMul = ()=>1 + game.t/60*.5 + Math.pow(Math.max(0,game.t-300)/60,1.35)*.45;
@@ -1246,7 +1302,9 @@ const dmgMul= ()=>1 + Math.min(1.6, game.t/540);
 
 let eid=0;
 function spawnEnemy(type,x,y,elite){
-  if(enemies.length>330 && !elite) return;
+  // hellions bypass the trash-mob cap — they carry their own HELL_CAP limit, and without this
+  // a saturated late-game field silently starves BULLET HELL of its defining enemy
+  if(enemies.length>330 && !elite && type!=='hellion') return;
   const d=ETYPES[type];
   if(x===undefined){
     const a=gR()*TAU, R=Math.hypot(W,H)*.55+90;
@@ -1259,7 +1317,8 @@ function spawnEnemy(type,x,y,elite){
     xp:d.xp*(elite?14:1), score:d.score*(elite?8:1),
     elite:!!elite, colKey:d.pcol, rot:rand(0,TAU),
     flash:0, stun:0, slowT:0, orbT:0, auraT:0, touchT:0,
-    fireT:rand(1.2,2.6), phase:rand(0,TAU), fuse:-1
+    fireT:rand(1.2,2.6), phase:rand(0,TAU), fuse:-1,
+    spiral:rand(0,TAU), volley:0, volleyT:0, chargeT:0
   });
 }
 const LVL_RAMP=14; // each player level advances the enemy roster by ~14s of progression
@@ -1308,9 +1367,10 @@ function spawnBoss(i,hpScale){
   ringFX(boss.x,boss.y,320,'mag',.8,4);
   Sound.play('bossin'); Sound.intensity=3; shake(12);
 }
-function fireE(x,y,ang,spd,dmg,r,seek){
-  if(ebullets.length>(seek?300:260)) return;
-  ebullets.push({x,y,vx:Math.cos(ang)*spd,vy:Math.sin(ang)*spd,r:r||5.5,dmg,life:7,seek:seek||0});
+function fireE(x,y,ang,spd,dmg,r,seek,col){
+  const cap = game.bh ? 460 : (seek?300:260); // bullet hell needs headroom for danmaku
+  if(ebullets.length>cap) return;
+  ebullets.push({x,y,vx:Math.cos(ang)*spd,vy:Math.sin(ang)*spd,r:r||5.5,dmg,life:7,seek:seek||0,col:col||''});
 }
 function updateBoss(dt){
   const b=boss; if(!b) return;
@@ -1461,6 +1521,20 @@ function director(dt){
     if(threat>game.lastThreat){
       game.lastThreat=threat;
       banner('THREAT LEVEL '+(threat+1),C.red); Sound.play('warn');
+    }
+  }
+  // BULLET HELL: hellions spawn on their own cadence, capped so the screen stays readable
+  if(game.bh){
+    game.bhT-=dt;
+    if(game.bhT<=0){
+      game.bhT=Math.max(4.5, 13 - t*.006 - (lv-1)*.28);
+      let alive=0;
+      for(const e of enemies) if(e.type==='hellion') alive++;
+      const cap=Math.min(HELL_CAP, 1+((t/150)|0)+(((lv-1)/6)|0));
+      if(alive<cap){
+        spawnEnemy('hellion');
+        if(!game.bhSeen){ game.bhSeen=true; banner('HELLION DETECTED',C.hell); Sound.play('warn'); }
+      }
     }
   }
   if(t>=game.eliteT && t>80){
@@ -1710,6 +1784,37 @@ function updateEnemies(dt){
         e.fireT=2.5;
         const aim=Math.atan2(dy,dx);
         for(let k=-1;k<=1;k++) fireE(e.x,e.y,aim+k*.17,195,e.dmg);
+      }
+    }
+    if(dd.danmaku){
+      // hover at danmaku range and strafe, so it stays on screen but out of reach
+      const want=360;
+      if(d<want-60){ vx*=-.85; vy*=-.85; }
+      else if(d<want+80){ const px=-vy,py=vx; vx=px; vy=py; sp*=.8; }
+      const aim=Math.atan2(dy,dx);
+      if(e.volley>0){
+        sp*=.3;
+        e.volleyT-=dt;
+        if(e.volleyT<=0){
+          e.volleyT=HELL_WAVE; e.volley--;
+          const n=HELL_ARMS;
+          for(let k=0;k<n;k++) fireE(e.x,e.y, e.spiral+k/n*TAU, 158, e.dmg*.5, 6, 0, 'hell');
+          fireE(e.x,e.y, aim, 232, e.dmg*.55, 6.5, 0, 'hell'); // aimed shot each wave
+          e.spiral += HELL_TWIST;
+          spawnParts(e.x,e.y,'hell',3,120,.25,3);
+          Sound.play('shoot');
+        }
+      } else if(e.chargeT>0){
+        sp*=.25;
+        e.chargeT-=dt;
+        if(e.chargeT<=0){ e.volley=HELL_WAVES; e.volleyT=0; }
+      } else {
+        e.fireT-=dt;
+        if(e.fireT<=0 && d<760){
+          e.fireT=rand(3.4,4.4);
+          e.chargeT=HELL_CHARGE;
+          Sound.play('arc');
+        }
       }
     }
     if(dd.kaze){
@@ -2111,6 +2216,29 @@ function render(){
       ctx.beginPath(); ctx.arc(e.x,e.y,e.r+6+Math.sin(animT*6)*2,0,TAU);
       ctx.strokeStyle='rgba(255,176,46,.5)'; ctx.lineWidth=1.5; ctx.stroke();
     }
+    if(e.type==='hellion'){
+      // counter-rotating dashed halo — unmistakable silhouette
+      ctx.save();
+      ctx.translate(e.x,e.y); ctx.rotate(-e.rot*1.9);
+      ctx.beginPath(); ctx.arc(0,0,e.r+10,0,TAU);
+      ctx.setLineDash([7,10]); ctx.lineWidth=2;
+      ctx.strokeStyle='rgba(198,255,58,.55)'; ctx.stroke();
+      ctx.restore();
+      if(e.chargeT>0){
+        // telegraph: a ring collapsing inward before the volley
+        const k=1-e.chargeT/HELL_CHARGE;
+        ctx.globalAlpha=.3+.55*k;
+        ctx.beginPath(); ctx.arc(e.x,e.y,e.r+34*(1-k),0,TAU);
+        ctx.strokeStyle=C.hell; ctx.lineWidth=2.5; ctx.stroke();
+        ctx.globalAlpha=1;
+      }
+      if(e.volley>0){
+        ctx.globalCompositeOperation='lighter';
+        ctx.globalAlpha=.55;
+        ctx.drawImage(SPR.dot.hell,e.x-e.r*1.5,e.y-e.r*1.5,e.r*3,e.r*3);
+        ctx.globalAlpha=1; ctx.globalCompositeOperation='source-over';
+      }
+    }
   }
   if(boss) drawBossShape(boss);
   // === glow layer → motion-trail buffer ===
@@ -2210,7 +2338,7 @@ function render(){
   // enemy bullets
   for(const b of ebullets){
     const s=b.r*4.6;
-    ctx.drawImage(b.seek?SPR.dot.red:SPR.dot.mag,b.x-s/2,b.y-s/2,s,s);
+    ctx.drawImage(SPR.dot[b.col]||(b.seek?SPR.dot.red:SPR.dot.mag),b.x-s/2,b.y-s/2,s,s);
     ctx.fillStyle='#fff';
     ctx.fillRect(b.x-1.5,b.y-1.5,3,3);
   }
@@ -2400,12 +2528,28 @@ function buildTitle(){
   const dk=dailyKey();
   const db=(S.dailyBest&&S.dailyBest.key===String(dk))?S.dailyBest.score:0;
   $('dailyLbl').textContent='DAILY '+dk+' — FIXED WISP LOADOUT, SEEDED VOID'+(db?' — BEST '+fmtN(db):'');
+  updateBHRow();
   const b=S.best;
   $('bestLbl').textContent = b.score>0
     ? 'BEST — SCORE '+fmtN(b.score)+' · TIME '+fmtT(b.time)+' · KILLS '+fmtN(b.kills)+' · LV '+b.level+(S.wins>0?' · CLEARS '+S.wins:'')
     : 'NO RUNS ON RECORD. THE VOID AWAITS.';
   updateToggles();
 }
+function updateBHRow(){
+  const row=$('bhRow'), btn=$('togBH');
+  row.classList.toggle('hidden', !S.bhUnlocked);
+  if(!S.bhUnlocked) return;
+  const on=!!S.settings.bulletHell;
+  btn.textContent = on ? '☠ BULLET HELL — ARMED' : '☠ BULLET HELL — OFF';
+  btn.classList.toggle('armed', on);
+  btn.setAttribute('aria-pressed', on?'true':'false');
+}
+$('togBH').onclick=()=>{
+  Sound.unlock();
+  S.settings.bulletHell=!S.settings.bulletHell;
+  saveGame(); updateBHRow();
+  Sound.play(S.settings.bulletHell?'evolve':'click');
+};
 function updateToggles(){
   const map=[['togMusic','music','MUSIC'],['togSfx','sfx','SFX'],['togShake','shake','SHAKE'],
              ['togMusic2','music','MUSIC'],['togSfx2','sfx','SFX'],['togShake2','shake','SHAKE']];
@@ -2542,6 +2686,10 @@ function startRun(daily){
   game.drafts=0; game.endless=false; game.over=false; game.won=false;
   game.bannerT=0; game.creditsPaid=0; game.endlessBosses=0; game.lastBossKill=0;
   game.draftN=0; game.rerollUses=0; game.chestN=0; game.victoryPend=0;
+  // daily runs must stay identical for everyone, so the modifier is forced off there
+  game.bh = !!(S.bhUnlocked && S.settings.bulletHell) && !game.daily;
+  game.bhT = 8; game.bhSeen = false;
+  $('bhchip').classList.toggle('hidden', !game.bh);
   for(const r of RINGS) r.done=false;
   addWeapon(sh.start);
   refreshItems();
@@ -2550,7 +2698,9 @@ function startRun(daily){
   game.state='play';
   Sound.intensity=2;
   $('timer').style.color=game.daily?C.amber:'';
-  banner(game.daily?('DAILY VOID '+game.seed):'SURVIVE 15:00', game.daily?C.amber:C.cyan);
+  banner(game.bh?'☠ BULLET HELL ☠'
+        :(game.daily?('DAILY VOID '+game.seed):'SURVIVE 15:00'),
+         game.bh?C.hell:(game.daily?C.amber:C.cyan));
   if(isTouchDevice){
     const th=$('touchHint'); th.classList.add('show');
     clearTimeout(game.hintTO);
@@ -2562,7 +2712,7 @@ function creditsFor(){
   game.creditsPaid=game.score;
   return earned;
 }
-function endRun(win){
+function endRun(win,abandoned){
   if(game.state==='over') return;
   game.over=!win; game.won=game.won||win;
   game.state='over';
@@ -2575,6 +2725,11 @@ function endRun(win){
   b.kills=Math.max(b.kills,game.kills);
   b.level=Math.max(b.level,P.level);
   if(win) S.wins++;
+  // finishing a run unlocks BULLET HELL. Dying or winning always counts; bailing out via ABANDON
+  // only counts after a real attempt, so ENGAGE→ESC→ABANDON at 0:00 can't shortcut the unlock.
+  const finished = win || !abandoned || game.t>=60;
+  const bhJustUnlocked = !S.bhUnlocked && finished;
+  if(bhJustUnlocked) S.bhUnlocked=true;
   if(game.daily && !game.endless){
     const key=String(game.seed);
     const prev=(S.dailyBest&&S.dailyBest.key===key)?S.dailyBest.score:0;
@@ -2591,6 +2746,12 @@ function endRun(win){
     ['DAMAGE DEALT',fmtN(P.dmg)],['SCORE',fmtN(game.score)],
   ]);
   $('earned').textContent='+'+fmtN(earned)+' ⬢ CREDITS EARNED';
+  const um=$('unlockMsg');
+  um.classList.toggle('hidden', !bhJustUnlocked);
+  if(bhJustUnlocked){
+    um.textContent='☠ BULLET HELL MODE UNLOCKED — arm it in the hangar';
+    Sound.play('evolve');
+  }
   $('continueBtn').classList.toggle('hidden',!win);
   if(!win){
     spawnParts(P.x,P.y,'cyan',50,380,1,7);
@@ -2657,7 +2818,7 @@ $('menuBtn').onclick=()=>{
   game.state='title'; Sound.intensity=1;
 };
 $('resumeBtn').onclick=resumeGame;
-$('abortBtn').onclick=()=>{ endRun(false); };
+$('abortBtn').onclick=()=>{ endRun(false,true); };
 $('rerollBtn').onclick=doReroll;
 
 addEventListener('pointerdown',()=>Sound.unlock());

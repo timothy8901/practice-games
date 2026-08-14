@@ -113,6 +113,11 @@ self-contained HTML page.
   `localStorage`. Also a **daily seeded run** (fixed loadout, identical spawns and
   drafts for everyone that day). Difficulty scales with your *level*, not just the
   clock — leveling speeds up spawns and unlocks tougher enemy types early.
+  Finishing a run unlocks **BULLET HELL**, an optional modifier (off by default,
+  armed from the hangar before launching) that adds the **Hellion** — a lime,
+  ring-haloed emitter that hovers at range, telegraphs, then weaves rotating
+  spirals of danmaku with an aimed shot in every wave. Capped at six alive, and
+  force-disabled in daily runs so those stay identical for everyone.
   Controls: WASD/arrows + Space, an on-screen joystick and dash button on touch,
   or a gamepad with rumble. The soundtrack and every sound effect are **generated
   live** with the Web Audio API — no audio files. Pure vanilla JS + Canvas 2D, no
