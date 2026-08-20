@@ -1,0 +1,3 @@
+# Turnaround stills from `build_character.py -- --preview`. Regenerate them when
+# you want to check proportions; they are not part of the game.
+preview-*.png

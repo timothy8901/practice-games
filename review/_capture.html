@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>recording…</title>
+<style>
+  html, body { margin: 0; background: #0d1114; color: #cfd6da;
+    font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; }
+  #out { display: block; margin: 0 auto; max-width: 100%; }
+  #log { padding: 8px 12px; letter-spacing: 0.05em; }
+</style>
+</head>
+<body>
+<div id="log">idle</div>
+<canvas id="out" width="1280" height="720"></canvas>
+<canvas id="gl" width="1280" height="720" style="display:none"></canvas>
+
+<script type="module">
+/**
+ * _capture.html — replay a recorded bot run through the real renderer and post
+ * each frame to a local sink, so ffmpeg can turn them into a video.
+ *
+ * This is a recording tool, not part of the game. It reuses the game's own world
+ * build, camera and doll so what comes out is the thing the player sees — not a
+ * diagram of it. World tilt is the one thing switched off: a horizon that rocks
+ * 35° every time the bot corrects is fine to play under and unwatchable in a
+ * video.
+ *
+ * The camera settings below are copied from severed.js rather than tuned for
+ * film. They used to differ, because the game's camera sat high enough that a
+ * corridor read as near-top-down; now that the game plays from down at the
+ * marble's shoulder, the playing camera *is* the cinematic one.
+ */
+import { generateMaze } from '../3d-mazeball/src/generator.js';
+import { assembleMaze } from '../3d-mazeball/src/assemble.js';
+import { bodiesFor } from '../3d-mazeball/src/dynamics.js';
+import { applyOfficeTheme, OFFICE } from '../3d-mazeball/src/theme.js';
+import { BALL_R } from '../3d-mazeball/src/kit.js';
+import { Mesher, setPalette } from '../3d-mazeball/src/mesher.js';
+import { Viewer, multiply } from './gl.js';
+
+const SINK = 'http://127.0.0.1:8231';
+const log = m => { document.querySelector('#log').textContent = m; };
+
+applyOfficeTheme(true);
+
+const out = document.querySelector('#out');
+const octx = out.getContext('2d');
+const gl = document.querySelector('#gl');
+const viewer = new Viewer(gl, { background: [0.113, 0.124, 0.133] });
+const LIGHTING = { ambient: 0.66 };
+
+const run = await (await fetch('./_run.json')).json();
+const maze = generateMaze({ seed: run.seed, width: run.size, height: run.size });
+const world = assembleMaze(maze, { theme: 'office', walls: true });
+const bodies = bodiesFor(world);
+
+for (const g of world.groups) {
+  viewer.uploadGroup(`static:${g.material}`, {
+    positions: g.positions, normals: g.normals, colors: g.colors,
+    opacity: g.spec.opacity ?? 1,
+    // Emissives were tuned to glow against a dark outdoor track. Under flat
+    // office light they blow out into white slabs lying on the carpet.
+    emissive: (g.spec.emissive ?? 0) * 0.45,
+  });
+}
+world.dynamicGroups.forEach((g, i) => viewer.uploadGroup(`dyn:${i}`, g));
+
+/* ── the doll, exactly as the game builds him ─────────────────────────── */
+setPalette(null);
+{
+  const m = new Mesher();
+  const suit = '#232c3d', suitDark = '#1a2130', shirt = '#f2f3f0';
+  const tie = '#7fb0cd', skin = '#d9b39b', hair = '#3a3229', shoe = '#15181f';
+  for (const s of [-1, 1]) {
+    m.box(s * 0.055, -0.225, 0, 0.075, 0.17, 0.075, 'doll', { color: suitDark });
+    m.box(s * 0.055, -0.30, -0.012, 0.085, 0.05, 0.12, 'doll', { color: shoe });
+  }
+  m.box(0, -0.04, 0, 0.2, 0.24, 0.13, 'doll', { color: suit });
+  m.box(0, -0.035, -0.068, 0.085, 0.2, 0.012, 'doll', { color: shirt });
+  m.box(0, -0.055, -0.077, 0.032, 0.14, 0.012, 'doll', { color: tie });
+  for (const s of [-1, 1]) {
+    m.boxRot(s * 0.052, 0.03, -0.063, 0.045, 0.1, 0.014, [0, 0, 1], s * 0.28, 'doll', { color: suitDark });
+    m.box(s * 0.125, -0.05, 0, 0.055, 0.21, 0.075, 'doll', { color: suit });
+    m.sphere(s * 0.125, -0.165, 0, 0.032, 'doll', { color: skin, rows: 5, cols: 7 });
+    m.sphere(s * 0.032, 0.155, -0.068, 0.011, 'doll', { color: '#2a2622', rows: 4, cols: 6 });
+  }
+  m.sphere(0, 0.155, 0, 0.083, 'doll', { color: skin, rows: 8, cols: 11 });
+  m.sphere(0, 0.185, 0.012, 0.079, 'doll', { color: hair, rows: 7, cols: 10 });
+  m.box(0, 0.075, -0.02, 0.11, 0.03, 0.1, 'doll', { color: shirt });
+  const g = m.build().find(x => x.material === 'doll');
+  viewer.uploadGroup('doll', { positions: g.positions, normals: g.normals, colors: g.colors });
+
+  const b = new Mesher();
+  b.box(0, -0.02, -0.082, 0.05, 0.07, 0.008, 'badge', { color: '#cfe3ee' });
+  b.box(0, 0.045, -0.078, 0.006, 0.07, 0.006, 'badge', { color: '#8a93a0' });
+  const bg = b.build().find(x => x.material === 'badge');
+  viewer.uploadGroup('badge', { positions: bg.positions, normals: bg.normals, colors: bg.colors, emissive: 0.25 });
+}
+applyOfficeTheme(true);
+
+/* ── camera + spin, mirroring the game ────────────────────────────────── */
+// Identical to severed.js — behind the shoulder, down in the corridor.
+const cam = {
+  yaw: 0, pitch: 0.20, dist: 1.8, height: 0.55, pos: [0, 3, 8],
+  shoulder: 0.35, fov: 1.02, lookY: 0.34,
+};
+const follow = { heading: 0, ratYaw: 0, stable: 0 };
+const TAU = Math.PI * 2;
+const angleDelta = (a, b) => { let d = (a - b) % TAU; if (d > Math.PI) d -= TAU; if (d < -Math.PI) d += TAU; return d; };
+const I = () => new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
+let spinQ = [0, 0, 0, 1];
+
+function updateCam (p, v, dt) {
+  const speed = Math.hypot(v[0], v[2]);
+  if (speed > 0.7) {
+    const h = Math.atan2(v[0], v[2]);
+    follow.ratYaw += angleDelta(h, follow.ratYaw) * Math.min(1, dt * 7);
+  }
+  if (speed >= 2.0) {
+    const heading = Math.atan2(v[0], v[2]);
+    if (Math.abs(angleDelta(heading, follow.heading)) > 0.55) { follow.heading = heading; follow.stable = 0; }
+    else {
+      follow.heading += angleDelta(heading, follow.heading) * Math.min(1, dt * 6);
+      follow.stable += dt;
+      if (follow.stable >= 0.3) {
+        const err = angleDelta(follow.heading, cam.yaw);
+        cam.yaw += err * Math.min(1, dt * (1.6 + Math.abs(err) * 1.4));
+      }
+    }
+  } else follow.stable = 0;
+
+  const dist = cam.dist + Math.min(0.55, speed * 0.035);
+  const want = [
+    p[0] - Math.sin(cam.yaw) * dist * Math.cos(cam.pitch),
+    p[1] + cam.height + Math.sin(cam.pitch) * dist,
+    p[2] - Math.cos(cam.yaw) * dist * Math.cos(cam.pitch),
+  ];
+  const rx = Math.cos(cam.yaw), rz = -Math.sin(cam.yaw), s = cam.shoulder;
+  const eye = [want[0] + rx * s, want[1], want[2] + rz * s];
+  cam.pos = cam.pos.map((val, i) => val + (eye[i] - val) * 0.28);
+  return { eye: cam.pos, at: [p[0] + rx * s * 0.3, p[1] + cam.lookY, p[2] + rz * s * 0.3], fov: cam.fov + Math.min(0.16, speed * 0.014) };
+}
+
+function dollMatrix (p, w, dt) {
+  const mag = Math.hypot(w[0], w[1], w[2]);
+  if (mag > 1e-6) {
+    const a = mag * dt, s = Math.sin(a / 2);
+    const dq = [w[0] / mag * s, w[1] / mag * s, w[2] / mag * s, Math.cos(a / 2)];
+    const q = spinQ;
+    spinQ = [
+      dq[3] * q[0] + dq[0] * q[3] + dq[1] * q[2] - dq[2] * q[1],
+      dq[3] * q[1] - dq[0] * q[2] + dq[1] * q[3] + dq[2] * q[0],
+      dq[3] * q[2] + dq[0] * q[1] - dq[1] * q[0] + dq[2] * q[3],
+      dq[3] * q[3] - dq[0] * q[0] - dq[1] * q[1] - dq[2] * q[2],
+    ];
+    const n = Math.hypot(...spinQ) || 1;
+    spinQ = spinQ.map(v => v / n);
+  }
+  const [x, y, z, wq] = spinQ;
+  return new Float32Array([
+    1 - 2 * (y * y + z * z), 2 * (x * y + z * wq), 2 * (x * z - y * wq), 0,
+    2 * (x * y - z * wq), 1 - 2 * (x * x + z * z), 2 * (y * z + x * wq), 0,
+    2 * (x * z + y * wq), 2 * (y * z - x * wq), 1 - 2 * (x * x + y * y), 0,
+    p[0], p[1], p[2], 1,
+  ]);
+}
+
+/* ── overlay ──────────────────────────────────────────────────────────── */
+function overlay (t, toGoal, frac) {
+  const W = out.width, H = out.height;
+  octx.save();
+  // a soft dark base so the type stays legible over a bright carpet
+  const grad = octx.createLinearGradient(0, H - 110, 0, H);
+  grad.addColorStop(0, 'rgba(8,11,14,0)');
+  grad.addColorStop(1, 'rgba(8,11,14,.72)');
+  octx.fillStyle = grad;
+  octx.fillRect(0, H - 110, W, 110);
+  // a hairline progress bar along the very bottom
+  octx.fillStyle = 'rgba(255,255,255,.16)';
+  octx.fillRect(0, H - 4, W, 4);
+  octx.fillStyle = OFFICE.accent;
+  octx.fillRect(0, H - 4, W * frac, 4);
+
+  octx.font = '600 15px ui-monospace, SFMono-Regular, Menlo, monospace';
+  octx.fillStyle = 'rgba(240,244,246,.92)';
+  octx.textBaseline = 'alphabetic';
+  octx.fillText('THE SEVERED FLOOR', 26, H - 34);
+  octx.font = '12px ui-monospace, SFMono-Regular, Menlo, monospace';
+  octx.fillStyle = 'rgba(200,212,220,.6)';
+  octx.fillText(`shift ${run.iso}`, 26, H - 16);
+
+  octx.textAlign = 'right';
+  octx.font = '600 26px ui-monospace, SFMono-Regular, Menlo, monospace';
+  octx.fillStyle = 'rgba(240,244,246,.95)';
+  octx.fillText(`${t.toFixed(1)}s`, W - 26, H - 36);
+  octx.font = '12px ui-monospace, SFMono-Regular, Menlo, monospace';
+  octx.fillStyle = OFFICE.accent;
+  octx.fillText(`ELEVATOR  ${toGoal.toFixed(0)} m`, W - 26, H - 16);
+  octx.restore();
+}
+
+function card (lines, sub) {
+  const W = out.width, H = out.height;
+  octx.fillStyle = '#0d1114';
+  octx.fillRect(0, 0, W, H);
+  octx.textAlign = 'center';
+  octx.fillStyle = 'rgba(242,246,248,.96)';
+  octx.font = '700 44px ui-monospace, SFMono-Regular, Menlo, monospace';
+  lines.forEach((l, i) => octx.fillText(l, W / 2, H / 2 - 10 + i * 56));
+  if (sub) {
+    octx.font = '15px ui-monospace, SFMono-Regular, Menlo, monospace';
+    octx.fillStyle = OFFICE.accent;
+    octx.fillText(sub, W / 2, H / 2 + 40 + (lines.length - 1) * 56);
+  }
+  octx.textAlign = 'left';
+}
+
+/* ── the capture loop ─────────────────────────────────────────────────── */
+let n = 0;
+const send = async () => {
+  const name = `f${String(n).padStart(5, '0')}.jpg`;
+  n++;
+  await fetch(`${SINK}/${name}`, { method: 'POST', body: out.toDataURL('image/jpeg', 0.78) });
+};
+
+const state = { done: false, frame: 0, total: run.frames.length, error: null };
+window.captureState = () => ({ ...state, sent: n });
+
+window.startCapture = async () => {
+  try {
+    const dt = 1 / run.hz;
+    // title card
+    card(['THE SEVERED FLOOR'], `daily shift ${run.iso} · ${run.routeRooms} rooms · ${run.metres} m`);
+    for (let i = 0; i < 34; i++) await send();
+
+    for (let i = 0; i < run.frames.length; i++) {
+      const f = run.frames[i];
+      const c = updateCam(f.p, f.v, dt);
+      const mvp = viewer.beginFrame(c);
+      const T = I();
+      for (const g of world.groups) viewer.drawGroup(`static:${g.material}`, mvp, T, LIGHTING);
+      world.dynamicGroups.forEach((g, k) => {
+        const body = bodies.find(b => b.cell === g.cell && b.effect === g.effect);
+        viewer.drawGroup(`dyn:${k}`, mvp, body ? body.modelMatrix(f.t) : T, LIGHTING);
+      });
+      const M = dollMatrix(f.p, f.w, dt);
+      viewer.drawGroup('doll', mvp, M, { ambient: 0.55 });
+      viewer.drawGroup('badge', mvp, M, { ambient: 0.6 });
+
+      octx.drawImage(gl, 0, 0, out.width, out.height);
+      const toGoal = Math.hypot(world.goal.x - f.p[0], world.goal.z - f.p[2]);
+      overlay(f.t, toGoal, i / (run.frames.length - 1));
+      await send();
+
+      state.frame = i;
+      if (i % 60 === 0) log(`frame ${i}/${run.frames.length}`);
+    }
+
+    card(['ELEVATOR REACHED'], `${run.seconds}s · ${run.falls} falls · ${run.clean ? 'clean run' : 'assisted'}`);
+    for (let i = 0; i < 56; i++) await send();
+
+    state.done = true;
+    log(`done — ${n} frames`);
+  } catch (e) {
+    state.error = String(e && e.message);
+    log('ERROR ' + state.error);
+  }
+};
+
+log(`ready — ${run.frames.length} frames, shift ${run.iso}`);
+window.ready = true;
+</script>
+</body>
+</html>
