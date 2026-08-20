@@ -44,6 +44,7 @@
       --c-emerald: #18b066;
       --c-neonfable: #7a2ff2;
       --c-faleria: #b5612a;
+      --c-hotstart: #d9541f;
     }
 
     * { box-sizing: border-box; }
@@ -189,6 +190,8 @@
     .featured.neonfable .preview { background: radial-gradient(circle at 50% 42%, #2a1b5e 0%, #150b31 55%, #07030f 100%); }
     .featured.faleria { --accent: var(--c-faleria); margin-top: 20px; }
     .featured.faleria .preview { background: radial-gradient(circle at 50% 38%, #7d5a52 0%, #402c28 55%, #140f0d 100%); }
+    .featured.hotstart { --accent: var(--c-hotstart); }
+    .featured.hotstart .preview { background: radial-gradient(circle at 50% 40%, #6d2a12 0%, #35150a 55%, #150a05 100%); }
 
     /* "new game" flag on the freshest release */
     .featured .new-flag {
@@ -351,6 +354,54 @@
           <rect x="118" y="160" width="10" height="40" fill="#1b150f"/>
           <rect x="118" y="166" width="10" height="2" fill="#8a6539"/>
           <rect x="118" y="178" width="10" height="2" fill="#8a6539"/>
+        </svg>
+      </div>
+    </article>
+
+    <article class="featured hotstart">
+      <div>
+        <span class="label">New · Party / Icebreaker</span>
+        <h2><a href="hot-start-questions.html">Hot Start Questions</a></h2>
+        <p>A deck of <b>conversation starters</b> — tap the stack, watch it shuffle, and flip up a random question. Built from <b>real Hot Ones interview questions</b> across all 30 seasons, rewritten so anyone can answer them. Good for parties, dinners, road trips and awkward silences.</p>
+        <div class="meta">
+          <span>1,670 questions</span>
+          <span>Tap to shuffle &amp; draw</span>
+          <span>Works on mobile</span>
+          <span>No sign-up</span>
+        </div>
+        <div class="cta-row">
+          <span class="play-cta">Draw a card &rarr;</span>
+        </div>
+      </div>
+      <div class="preview" aria-hidden="true">
+        <!-- fanned question-card deck with a chili (original art) -->
+        <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+          <g transform="translate(100 112) scale(1.2) translate(-100 -112)">
+          <ellipse cx="100" cy="174" rx="46" ry="9" fill="#000000" opacity="0.3"/>
+          <!-- back card, fanned left -->
+          <g transform="rotate(-17 100 120)">
+            <rect x="62" y="70" width="66" height="92" rx="9" fill="#f6e7d4" stroke="#8d3a16" stroke-width="3"/>
+            <rect x="68" y="76" width="54" height="80" rx="6" fill="#d9541f" opacity="0.85"/>
+          </g>
+          <!-- back card, fanned right -->
+          <g transform="rotate(15 100 120)">
+            <rect x="72" y="68" width="66" height="92" rx="9" fill="#f6e7d4" stroke="#8d3a16" stroke-width="3"/>
+            <rect x="78" y="74" width="54" height="80" rx="6" fill="#e86a2a" opacity="0.85"/>
+          </g>
+          <!-- front card -->
+          <rect x="67" y="62" width="66" height="94" rx="9" fill="#fffdf7" stroke="#8d3a16" stroke-width="3"/>
+          <!-- question mark -->
+          <text x="100" y="128" font-family="Outfit, sans-serif" font-size="58" font-weight="800"
+                fill="#d9541f" text-anchor="middle">?</text>
+          <!-- chili resting on the front card -->
+          <path d="M112 74 c7 5 7 18 -2 23 c-8 5 -18 1 -19 -7 c-1 -7 5 -10 10 -11 c4 -1 8 -3 11 -5 z"
+                fill="#e0362b"/>
+          <path d="M112 74 c2 -6 8 -9 13 -7" stroke="#3f9e4d" stroke-width="4"
+                fill="none" stroke-linecap="round"/>
+          <!-- little flame spark -->
+          <path d="M84 150 c4 -6 1 -10 -1 -13 c6 2 11 8 11 14 c0 5 -4 9 -9 9 c-5 0 -9 -4 -9 -9 c0 -3 2 -5 4 -7 c0 3 2 5 4 6 z"
+                fill="#f0a326"/>
+          </g>
         </svg>
       </div>
     </article>
