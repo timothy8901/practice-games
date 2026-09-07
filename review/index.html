@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Review — Rat in a Ball, 64 environmental pieces</title>
+<link rel="stylesheet" href="review.css">
+</head>
+<body>
+
+<header class="bar">
+  <div class="bar-main">
+    <div class="ident">
+      <h1 id="artifact-name">Rat in a Ball — 64 Environmental Pieces</h1>
+      <p class="sub">
+        <span id="artifact-version">v—</span>
+        <span class="dot">·</span>
+        <span id="artifact-source">3d-mazeball/src/</span>
+        <span class="dot">·</span>
+        <span id="artifact-stats">—</span>
+      </p>
+    </div>
+    <div class="bar-actions">
+      <label class="reviewer">
+        <span>Reviewer</span>
+        <input id="reviewer" type="text" placeholder="your name (optional)" autocomplete="off">
+      </label>
+      <button id="export" class="primary">Export feedback</button>
+    </div>
+  </div>
+
+  <div class="bar-verdict">
+    <div class="verdict" role="radiogroup" aria-label="Overall verdict">
+      <span class="verdict-label">Overall verdict</span>
+      <button class="v" data-verdict="approve" role="radio" aria-checked="false">Approve</button>
+      <button class="v" data-verdict="revise" role="radio" aria-checked="false">Revise</button>
+      <button class="v" data-verdict="discuss" role="radio" aria-checked="false">Needs discussion</button>
+    </div>
+    <div class="counters" id="counters"></div>
+  </div>
+</header>
+
+<main>
+  <section class="panel" id="overall-panel">
+    <h2>Overall comments</h2>
+    <textarea id="overall" rows="4" placeholder="Anything that applies to the set as a whole — naming, scale, art direction, what is missing."></textarea>
+    <p class="hint">
+      Feedback saves to this browser as you type. Nothing is sent anywhere; the
+      source artifact in <code>3d-mazeball/</code> is never modified.
+    </p>
+  </section>
+
+  <section class="panel" id="decisions-panel">
+    <h2>Decisions taken while building <span class="count" id="decision-count"></span></h2>
+    <p class="lede">
+      Points where the documentation and the physics handoff disagreed, or where
+      the spec could not be built as written. Each one changed the artifact, so
+      each one wants a yes or a no.
+    </p>
+    <div id="decisions" class="decision-list"></div>
+  </section>
+
+  <div id="catalogue"></div>
+
+  <section class="panel" id="tests-panel">
+    <h2>Automated checks <span class="count" id="test-count"></span></h2>
+    <p class="lede">
+      Run in the browser against the same modules the page renders. The
+      provocation block deliberately breaks pieces and asserts the suite goes
+      red — a test that cannot fail is worse than no test.
+    </p>
+    <div id="tests"></div>
+  </section>
+</main>
+
+<div id="inspector" class="inspector" hidden>
+  <div class="inspector-inner">
+    <div class="viewport">
+      <canvas id="stage"></canvas>
+      <div class="stage-head">
+        <span id="stage-title"></span>
+        <button id="close" title="Close (Esc)" aria-label="Close">✕</button>
+      </div>
+      <div class="stage-tools">
+        <button class="tool" data-toggle="collision">Collision mesh</button>
+        <button class="tool" data-toggle="ball">Ball (r&nbsp;=&nbsp;0.35&nbsp;m)</button>
+        <button class="tool" data-toggle="grid">1&nbsp;m grid</button>
+        <button class="tool" data-toggle="spin">Auto-rotate</button>
+        <span class="spacer"></span>
+        <button class="tool" id="prev" title="Previous piece (←)">←</button>
+        <button class="tool" id="next" title="Next piece (→)">→</button>
+      </div>
+      <p class="stage-hint">drag to orbit · scroll to zoom</p>
+    </div>
+    <aside class="inspector-side" id="inspector-side"></aside>
+  </div>
+</div>
+
+<script type="module" src="review.js"></script>
+</body>
+</html>

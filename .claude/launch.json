@@ -2,10 +2,17 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "Static HTML server (python http.server)",
+      "name": "Game studio (all games)",
       "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "http.server", "8000"],
-      "port": 8000
+      "runtimeArgs": ["review/serve.py"],
+      "autoPort": true
+    },
+    {
+      "name": "Theater of the Undead",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["theater-of-the-undead/serve.py", "8124"],
+      "port": 8124,
+      "autoPort": false
     }
   ]
 }

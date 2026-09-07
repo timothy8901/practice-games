@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Playtest — Rat in a Ball, daily maze</title>
+<link rel="stylesheet" href="review.css">
+<link rel="stylesheet" href="maze.css">
+</head>
+<body class="playtest">
+
+<header class="bar">
+  <div class="bar-main">
+    <div class="ident">
+      <h1>Rat in a Ball — daily maze</h1>
+      <p class="sub">
+        <span id="seed-label">—</span>
+        <span class="dot">·</span>
+        <span id="maze-stats">—</span>
+      </p>
+    </div>
+    <div class="bar-actions">
+      <label class="reviewer">
+        <span>Reviewer</span>
+        <input id="reviewer" type="text" placeholder="your name (optional)" autocomplete="off">
+      </label>
+      <button id="export" class="primary">Export feedback</button>
+    </div>
+  </div>
+  <div class="bar-verdict">
+    <div class="verdict" role="radiogroup" aria-label="Overall verdict">
+      <span class="verdict-label">Overall verdict</span>
+      <button class="v" data-verdict="approve" role="radio" aria-checked="false">Approve</button>
+      <button class="v" data-verdict="revise" role="radio" aria-checked="false">Revise</button>
+      <button class="v" data-verdict="discuss" role="radio" aria-checked="false">Needs discussion</button>
+    </div>
+    <div class="counters" id="counters"></div>
+  </div>
+</header>
+
+<main class="play-main">
+  <section class="stage-wrap">
+    <div class="seedbar">
+      <label>Date <input id="date" type="date"></label>
+      <button id="prev-day" title="Previous day">‹</button>
+      <button id="next-day" title="Next day">›</button>
+      <button id="today">Today (UTC)</button>
+      <span class="sep"></span>
+      <label>Size
+        <select id="size">
+          <option value="5">5 × 5</option>
+          <option value="6" selected>6 × 6</option>
+          <option value="7">7 × 7</option>
+          <option value="8">8 × 8</option>
+        </select>
+      </label>
+      <button id="regen">Regenerate</button>
+      <span class="spacer"></span>
+      <span id="gen-time" class="mono dim"></span>
+    </div>
+
+    <div class="viewport" id="viewport">
+      <canvas id="stage" tabindex="0"></canvas>
+      <div class="hud" id="hud"></div>
+      <div class="tiltgauge"><canvas id="tilt" width="120" height="120"></canvas></div>
+      <p class="stage-hint" id="hint">click the view, then <b>WASD</b> / arrows tilt · <b>Q</b> <b>E</b> or drag turns the camera · <b>R</b> respawn · <b>Space</b> pause</p>
+      <div class="stage-tools">
+        <button class="tool" data-toggle="follow" title="Swing the camera round behind the rat and keep it there">Follow cam</button>
+        <button class="tool" data-toggle="trainingWheels" title="Fence every corridor so the ball cannot roll off the sides. Holes in the middle of a piece are left alone.">Training wheels</button>
+        <button class="tool" data-toggle="worldTilt">World tilt</button>
+        <button class="tool" data-toggle="route">Solution route</button>
+        <button class="tool" data-toggle="collision">Collision mesh</button>
+        <button class="tool" data-toggle="overhead">Overhead</button>
+        <span class="spacer"></span>
+        <label class="jump">Jump to
+          <select id="jump"></select>
+        </label>
+      </div>
+    </div>
+  </section>
+
+  <aside class="side">
+    <section class="panel tight">
+      <h2>Checks for this seed</h2>
+      <div id="checks" class="checks">running…</div>
+      <button id="recheck" class="add">Re-run</button>
+    </section>
+
+    <section class="panel tight">
+      <h2>Seed sweep <span class="count" id="sweep-count"></span></h2>
+      <p class="lede small">
+        The publish gate, run over a run of consecutive days the way a nightly
+        job would. <b>Open</b> means the route exists and the reference bot
+        reached the goal. <b>Clean</b> means it drove every metre unaided.
+      </p>
+      <div class="sweep-controls">
+        <label>Days <input id="sweep-days" type="number" min="1" max="60" value="14"></label>
+        <button id="sweep" class="add">Run sweep</button>
+      </div>
+      <div id="sweep-out"></div>
+    </section>
+
+    <section class="panel tight">
+      <h2>Feedback</h2>
+      <p class="lede small">
+        Aspects are fixed so notes from different sessions line up. Every comment
+        records the seed you were on when you wrote it.
+      </p>
+      <div id="aspects"></div>
+    </section>
+  </aside>
+</main>
+
+<script type="module" src="maze.js"></script>
+</body>
+</html>
