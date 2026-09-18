@@ -47,3 +47,13 @@ Build/
 # ---------------------------------------------------------------------------
 *.webm
 kirby-rumble-demo.mp4
+
+# ---------------------------------------------------------------------------
+# Mote Rumble generated art/audio (large). Regenerate with the scripts in
+# unreal/MoteRumble/Tools/ - the manifest there records every Thrixel asset id.
+# ---------------------------------------------------------------------------
+thrixel_assets/
+unreal/MoteRumble/SourceAudio/
+unreal/MoteRumble/Content/Art/
+unreal/MoteRumble/Content/Audio/
+unreal/MoteRumble/Recordings/

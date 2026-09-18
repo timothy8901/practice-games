@@ -1,8 +1,11 @@
 // Copyright Not Tim Games. All Rights Reserved.
+//
+// Arena gameplay: the walkable disc, blast zones, spawn points and respawn
+// halos. The look of the place lives in MoteArenaScenery.cpp.
 
 #include "MoteArena.h"
 
-#include "Components/BoxComponent.h"
+#include "Components/PointLightComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
@@ -10,142 +13,163 @@
 
 namespace
 {
-	// Warm stone platform, cool accent ring, gold pillar caps.
-	static const FLinearColor FloorColor(0.86f, 0.78f, 0.72f);
-	static const FLinearColor InnerColor(0.96f, 0.93f, 0.88f);
-	static const FLinearColor PillarColor(0.58f, 0.76f, 0.70f);
+	const TCHAR* CylinderPath = TEXT("/Engine/BasicShapes/Cylinder.Cylinder");
+	const TCHAR* BasicMaterialPath = TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial");
+	const TCHAR* AdditivePath = TEXT("/Game/FX/M_FX_Additive.M_FX_Additive");
+	constexpr float FloorThickness = 60.f;
 }
 
 AMoteArena::AMoteArena()
 {
-	PrimaryActorTick.bCanEverTick = false;
+	PrimaryActorTick.bCanEverTick = true;
 
-	ArenaRoot = CreateDefaultSubobject<USceneComponent>(TEXT("ArenaRoot"));
-	RootComponent = ArenaRoot;
+	Root = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
+	RootComponent = Root;
 
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> CylMesh(
-		TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
-	static ConstructorHelpers::FObjectFinder<UMaterialInterface> BaseMat(
-		TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> CylinderFinder(CylinderPath);
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> BasicFinder(BasicMaterialPath);
 
-	UStaticMesh* Cylinder = CylMesh.Succeeded() ? CylMesh.Object : nullptr;
-	UMaterialInterface* Mat = BaseMat.Succeeded() ? BaseMat.Object : nullptr;
-
+	// The engine cylinder is 100 across and 100 tall, centred on its origin.
 	Floor = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Floor"));
-	Floor->SetupAttachment(ArenaRoot);
-	if (Cylinder) { Floor->SetStaticMesh(Cylinder); }
-	if (Mat) { Floor->SetMaterial(0, Mat); }
-	Floor->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+	Floor->SetupAttachment(Root);
+	if (CylinderFinder.Succeeded())
+	{
+		Floor->SetStaticMesh(CylinderFinder.Object);
+	}
+	if (BasicFinder.Succeeded())
+	{
+		Floor->SetMaterial(0, BasicFinder.Object);
+	}
 	Floor->SetCollisionProfileName(TEXT("BlockAll"));
+	Floor->SetCastShadow(true);
 
-	InnerDisc = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("InnerDisc"));
-	InnerDisc->SetupAttachment(ArenaRoot);
-	if (Cylinder) { InnerDisc->SetStaticMesh(Cylinder); }
-	if (Mat) { InnerDisc->SetMaterial(0, Mat); }
-	InnerDisc->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-
-	// Pillars and walls are created up front so they exist on the CDO; their
-	// transforms are laid out in BuildArena().
-	Pillars.Reserve(PillarCount);
-	for (int32 i = 0; i < PillarCount; ++i)
-	{
-		const FName Name = *FString::Printf(TEXT("Pillar_%d"), i);
-		UStaticMeshComponent* P = CreateDefaultSubobject<UStaticMeshComponent>(Name);
-		P->SetupAttachment(ArenaRoot);
-		if (Cylinder) { P->SetStaticMesh(Cylinder); }
-		if (Mat) { P->SetMaterial(0, Mat); }
-		P->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-		P->SetCollisionProfileName(TEXT("BlockAll"));
-		Pillars.Add(P);
-	}
-
-	Walls.Reserve(WallSegments);
-	for (int32 i = 0; i < WallSegments; ++i)
-	{
-		const FName Name = *FString::Printf(TEXT("Wall_%d"), i);
-		UBoxComponent* W = CreateDefaultSubobject<UBoxComponent>(Name);
-		W->SetupAttachment(ArenaRoot);
-		W->SetBoxExtent(FVector(40.f, 260.f, 400.f));
-		W->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-		W->SetCollisionProfileName(TEXT("BlockAll"));
-		W->SetHiddenInGame(true);
-		Walls.Add(W);
-	}
+	PlatformMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("PlatformMesh"));
+	PlatformMesh->SetupAttachment(Root);
+	PlatformMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 }
 
 void AMoteArena::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
-	BuildArena();
+	// Top of the disc sits exactly at Z = 0.
+	Floor->SetRelativeScale3D(FVector(PlatformRadius * 2.f / 100.f, PlatformRadius * 2.f / 100.f, FloorThickness / 100.f));
+	Floor->SetRelativeLocation(FVector(0.f, 0.f, -FloorThickness * 0.5f));
 }
 
 void AMoteArena::BeginPlay()
 {
 	Super::BeginPlay();
-	BuildArena();
-
-	// Tint at runtime; the engine's basic material exposes a Color parameter.
-	auto Tint = [](UStaticMeshComponent* Comp, const FLinearColor& C)
-	{
-		if (!Comp) { return; }
-		if (UMaterialInstanceDynamic* MID = Comp->CreateAndSetMaterialInstanceDynamic(0))
-		{
-			MID->SetVectorParameterValue(TEXT("Color"), C);
-		}
-	};
-
-	Tint(Floor, FloorColor);
-	Tint(InnerDisc, InnerColor);
-	for (UStaticMeshComponent* P : Pillars)
-	{
-		Tint(P, PillarColor);
-	}
+	Floor->SetRelativeScale3D(FVector(PlatformRadius * 2.f / 100.f, PlatformRadius * 2.f / 100.f, FloorThickness / 100.f));
+	Floor->SetRelativeLocation(FVector(0.f, 0.f, -FloorThickness * 0.5f));
+	BuildScenery();
 }
 
-void AMoteArena::BuildArena()
+void AMoteArena::Tick(float DeltaSeconds)
 {
-	// Engine cylinder is 100uu across and 100uu tall at scale 1.
-	const float FloorScaleXY = (ArenaRadius * 2.f) / 100.f;
+	Super::Tick(DeltaSeconds);
+	SceneryTime += DeltaSeconds;
 
-	if (Floor)
+	// Respawn halos slowly turn and pulse.
+	for (int32 i = 0; i < RespawnHalos.Num(); ++i)
 	{
-		Floor->SetRelativeLocation(FVector(0.f, 0.f, -20.f));
-		Floor->SetRelativeScale3D(FVector(FloorScaleXY, FloorScaleXY, 0.40f));
+		if (UStaticMeshComponent* Halo = RespawnHalos[i])
+		{
+			if (Halo->IsVisible())
+			{
+				Halo->AddLocalRotation(FRotator(0.f, 60.f * DeltaSeconds, 0.f));
+			}
+		}
 	}
 
-	if (InnerDisc)
+	TickScenery(DeltaSeconds);
+}
+
+bool AMoteArena::IsOutsideBlastZone(const FVector& Location) const
+{
+	const FVector Local = Location - GetActorLocation();
+	return Local.Size2D() > BlastSideRadius || Local.Z > BlastTop || Local.Z < BlastBottom;
+}
+
+bool AMoteArena::IsOverPlatform(const FVector& Location, float Margin) const
+{
+	const FVector Local = Location - GetActorLocation();
+	return Local.Size2D() <= PlatformRadius + Margin;
+}
+
+void AMoteArena::GetSpawnPoint(int32 Index, int32 Count, FVector& OutLocation, float& OutYaw) const
+{
+	// The gameplay camera looks down +X, so fighters line up left/right (Y).
+	const float Spread = PlatformRadius * 0.45f;
+	if (Count <= 2)
 	{
-		const float InnerScale = (ArenaRadius * 1.25f) / 100.f;
-		// A hair above the floor so it doesn't z-fight.
-		InnerDisc->SetRelativeLocation(FVector(0.f, 0.f, 1.5f));
-		InnerDisc->SetRelativeScale3D(FVector(InnerScale, InnerScale, 0.02f));
+		const float Side = (Index == 0) ? -1.f : 1.f;
+		OutLocation = GetActorLocation() + FVector(0.f, Side * Spread, 140.f);
+		OutYaw = (Index == 0) ? 90.f : -90.f;
+		return;
+	}
+	const float Angle = 2.f * PI * Index / Count + PI;
+	OutLocation = GetActorLocation() + FVector(FMath::Cos(Angle) * Spread, FMath::Sin(Angle) * Spread, 140.f);
+	OutYaw = FMath::RadiansToDegrees(Angle) + 180.f;
+}
+
+FVector AMoteArena::GetRespawnPoint(int32 Index, int32 Count) const
+{
+	const float Side = (Count <= 2) ? ((Index == 0) ? -1.f : 1.f) : ((Index % 2 == 0) ? -1.f : 1.f);
+	return GetActorLocation() + FVector(0.f, Side * PlatformRadius * 0.28f, 760.f);
+}
+
+void AMoteArena::ShowRespawnHalo(int32 Slot, const FVector& Location, const FLinearColor& Color, bool bShow)
+{
+	if (Slot < 0 || Slot > 7)
+	{
+		return;
+	}
+	// Created on demand at runtime.
+	while (RespawnHalos.Num() <= Slot)
+	{
+		UStaticMeshComponent* Halo = NewObject<UStaticMeshComponent>(this);
+		Halo->SetupAttachment(Root);
+		Halo->SetStaticMesh(LoadObject<UStaticMesh>(nullptr, CylinderPath));
+		Halo->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		Halo->SetCastShadow(false);
+		Halo->SetRelativeScale3D(FVector(1.9f, 1.9f, 0.06f));
+		Halo->RegisterComponent();
+		Halo->SetVisibility(false);
+
+		UMaterialInterface* Mat = LoadObject<UMaterialInterface>(nullptr, AdditivePath, nullptr, LOAD_Quiet | LOAD_NoWarn);
+		if (!Mat)
+		{
+			Mat = LoadObject<UMaterialInterface>(nullptr, BasicMaterialPath);
+		}
+		Halo->SetMaterial(0, UMaterialInstanceDynamic::Create(Mat, this));
+		RespawnHalos.Add(Halo);
+
+		UPointLightComponent* Light = NewObject<UPointLightComponent>(this);
+		Light->SetupAttachment(Halo);
+		Light->SetCastShadows(false);
+		Light->SetIntensityUnits(ELightUnits::Candelas);
+		Light->SetIntensity(80.f);
+		Light->SetAttenuationRadius(600.f);
+		Light->RegisterComponent();
+		Light->SetVisibility(false);
+		RespawnLights.Add(Light);
 	}
 
-	for (int32 i = 0; i < Pillars.Num(); ++i)
+	UStaticMeshComponent* Halo = RespawnHalos[Slot];
+	UPointLightComponent* Light = RespawnLights[Slot];
+	Halo->SetVisibility(bShow);
+	Light->SetVisibility(bShow);
+	if (!bShow)
 	{
-		UStaticMeshComponent* P = Pillars[i];
-		if (!P) { continue; }
-		const float Angle = (2.f * PI * i) / FMath::Max(1, Pillars.Num());
-		const float R = ArenaRadius + 90.f;
-		P->SetRelativeLocation(FVector(FMath::Cos(Angle) * R, FMath::Sin(Angle) * R, 120.f));
-		P->SetRelativeScale3D(FVector(0.85f, 0.85f, 2.6f));
+		return;
 	}
-
-	for (int32 i = 0; i < Walls.Num(); ++i)
+	Halo->SetWorldLocation(Location);
+	Light->SetLightColor(Color);
+	if (UMaterialInstanceDynamic* MID = Cast<UMaterialInstanceDynamic>(Halo->GetMaterial(0)))
 	{
-		UBoxComponent* W = Walls[i];
-		if (!W) { continue; }
-		const int32 Count = FMath::Max(1, Walls.Num());
-		const float Angle = (2.f * PI * i) / Count;
-		const float R = ArenaRadius + 40.f;
-
-		// Each segment is a chord of the circle, turned to face the centre.
-		const float Circumference = 2.f * PI * R;
-		const float SegmentHalfWidth = (Circumference / Count) * 0.62f;
-		W->SetBoxExtent(FVector(40.f, SegmentHalfWidth, 400.f));
-		W->SetRelativeLocation(FVector(FMath::Cos(Angle) * R, FMath::Sin(Angle) * R, 300.f));
-		W->SetRelativeRotation(FRotator(0.f, FMath::RadiansToDegrees(Angle), 0.f));
+		MID->SetVectorParameterValue(TEXT("Color"), Color);
+		MID->SetScalarParameterValue(TEXT("Intensity"), 6.f);
+		MID->SetScalarParameterValue(TEXT("Opacity"), 0.85f);
+		MID->SetScalarParameterValue(TEXT("RimPower"), 0.f);
 	}
-
-	bBuilt = true;
 }

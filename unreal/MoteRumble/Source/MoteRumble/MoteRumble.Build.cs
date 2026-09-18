@@ -14,9 +14,10 @@ public class MoteRumble : ModuleRules
 			"CoreUObject",
 			"Engine",
 			"InputCore",
-			"EnhancedInput"
+			"EnhancedInput",
+			"ProceduralMeshComponent",
+			"Slate",
+			"SlateCore",
 		});
-
-		PrivateDependencyModuleNames.AddRange(new string[] { });
 	}
 }

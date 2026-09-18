@@ -9,13 +9,14 @@
 
 class USphereComponent;
 class UStaticMeshComponent;
-class UProjectileMovementComponent;
+class UPointLightComponent;
 class AMoteCharacter;
 
 /**
- * Everything a Core throws: bolts, discs, and lobbed cinders.
- * Behaviour (piercing / returning / exploding) is driven by the FMoteAttackDef
- * it was launched with, so one actor covers all eight Cores.
+ * Arrows, chakrams, bombs, energy bolts, fireballs - and the Lightning strike,
+ * which is a stationary telegraph that detonates after a short delay.
+ * Movement is integrated by hand (no ProjectileMovementComponent) so bombs can
+ * arc/bounce and discs can boomerang exactly as designed.
  */
 UCLASS()
 class MOTERUMBLE_API AMoteProjectile : public AActor
@@ -25,48 +26,45 @@ class MOTERUMBLE_API AMoteProjectile : public AActor
 public:
 	AMoteProjectile();
 
-	/** Configure and launch. Call immediately after spawning. */
-	void Launch(AMoteCharacter* InOwnerMote, const FMoteAttackDef& InAttack,
-		const FLinearColor& InColor, const FVector& Direction);
-
-	/** Flip ownership and reverse course (used by Veil's reflecting spin). */
-	void Reflect(AMoteCharacter* NewOwnerMote);
-
-	AMoteCharacter* GetOwnerMote() const { return OwnerMote.Get(); }
-
-protected:
-	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaSeconds) override;
 
-	UFUNCTION()
-	void OnOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
-		UPrimitiveComponent* OtherComp, int32 OtherBodyIndex,
-		bool bFromSweep, const FHitResult& Sweep);
+	/**
+	 * Arm and launch. Direction is the full 3D launch direction; ChargeScale
+	 * multiplies damage/knockback (1 = uncharged).
+	 */
+	void Launch(AMoteCharacter* InOwner, const FMoteMoveDef& InMove, const FVector& Direction,
+		float Speed, float InChargeScale, UStaticMesh* Mesh, float MeshSize, const FLinearColor& InColor);
 
-	/** Radial damage + destroy, for Lob shapes. */
+	/** Turn around and belong to NewOwner. */
+	void Reflect(AMoteCharacter* NewOwner);
+
+	AMoteCharacter* GetOwnerMote() const { return OwnerMote.Get(); }
+	bool IsReflectable() const { return Kind != EMoteProjectileKind::Lightning; }
+	/** A thrown weapon that flies back to its owner (Disc's chakram). */
+	bool IsReturningWeapon() const { return Move.bProjectileReturns; }
+	EMoteProjectileKind GetKind() const { return Kind; }
+	FVector GetVelocity3D() const { return Velocity; }
+
+protected:
+	void HitFighter(AMoteCharacter* Target);
 	void Detonate();
+	void CheckFighterOverlaps();
 
-	UPROPERTY(VisibleAnywhere, Category = "Mote")
-	TObjectPtr<USphereComponent> Collision;
+	UPROPERTY(VisibleAnywhere) TObjectPtr<USphereComponent> Collision;
+	UPROPERTY(VisibleAnywhere) TObjectPtr<UStaticMeshComponent> Mesh;
+	UPROPERTY(VisibleAnywhere) TObjectPtr<UPointLightComponent> Glow;
 
-	UPROPERTY(VisibleAnywhere, Category = "Mote")
-	TObjectPtr<UStaticMeshComponent> Mesh;
-
-	UPROPERTY(VisibleAnywhere, Category = "Mote")
-	TObjectPtr<UProjectileMovementComponent> Movement;
-
-private:
-	UPROPERTY()
 	TWeakObjectPtr<AMoteCharacter> OwnerMote;
-
-	FMoteAttackDef Attack;
+	FMoteMoveDef Move;
+	EMoteProjectileKind Kind = EMoteProjectileKind::EnergyBolt;
 	FLinearColor Color = FLinearColor::White;
-
-	/** Targets already damaged, so piercing shots never double-hit. */
-	UPROPERTY()
-	TSet<TWeakObjectPtr<AActor>> HitActors;
-
+	FVector Velocity = FVector::ZeroVector;
+	float ChargeScale = 1.f;
 	float Age = 0.f;
+	float Life = 1.f;
+	float TrailTimer = 0.f;
 	bool bReturning = false;
-	float SpinRate = 0.f;
+	bool bDetonated = false;
+	int32 Bounces = 0;
+	TArray<TWeakObjectPtr<AMoteCharacter>> AlreadyHit;
 };

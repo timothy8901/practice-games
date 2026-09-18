@@ -2,7 +2,7 @@
 	"FileVersion": 3,
 	"EngineAssociation": "",
 	"Category": "Not Tim Games",
-	"Description": "Mote Rumble - a top-down arena brawler starring the Motes.",
+	"Description": "Mote Rumble - a 3D platform-fighter brawler starring the Motes.",
 	"Modules": [
 		{
 			"Name": "MoteRumble",
@@ -21,6 +21,18 @@
 		},
 		{
 			"Name": "PythonScriptPlugin",
+			"Enabled": true
+		},
+		{
+			"Name": "ProceduralMeshComponent",
+			"Enabled": true
+		},
+		{
+			"Name": "EditorScriptingUtilities",
+			"Enabled": true
+		},
+		{
+			"Name": "Interchange",
 			"Enabled": true
 		}
 	]

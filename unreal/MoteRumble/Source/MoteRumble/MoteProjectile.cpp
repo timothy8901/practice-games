@@ -2,194 +2,343 @@
 
 #include "MoteProjectile.h"
 
+#include "MoteArena.h"
+#include "MoteAudio.h"
 #include "MoteCharacter.h"
-#include "EngineUtils.h"
+#include "MoteEvents.h"
+#include "MoteFX.h"
+#include "MoteGameMode.h"
+
+#include "Components/PointLightComponent.h"
 #include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
-#include "GameFramework/ProjectileMovementComponent.h"
+#include "Engine/StaticMesh.h"
+#include "EngineUtils.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 #include "UObject/ConstructorHelpers.h"
 
+namespace
+{
+	const TCHAR* SphereMeshPath = TEXT("/Engine/BasicShapes/Sphere.Sphere");
+	const TCHAR* BasicMaterialPath = TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial");
+	const TCHAR* AdditivePath = TEXT("/Game/FX/M_FX_Additive.M_FX_Additive");
+	constexpr float HitRadius = 58.f;
+	constexpr float FighterRadius = 46.f;
+	constexpr float LightningDelay = 0.5f;
+	constexpr float BombGravity = 2400.f;
+}
+
 AMoteProjectile::AMoteProjectile()
 {
 	PrimaryActorTick.bCanEverTick = true;
-	InitialLifeSpan = 4.0f;
 
 	Collision = CreateDefaultSubobject<USphereComponent>(TEXT("Collision"));
-	Collision->InitSphereRadius(22.f);
-	Collision->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
-	Collision->SetCollisionResponseToAllChannels(ECR_Overlap);
-	Collision->SetCollisionResponseToChannel(ECC_Camera, ECR_Ignore);
-	Collision->SetGenerateOverlapEvents(true);
+	Collision->InitSphereRadius(HitRadius);
+	Collision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	RootComponent = Collision;
 
 	Mesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Mesh"));
 	Mesh->SetupAttachment(Collision);
 	Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	Mesh->SetRelativeScale3D(FVector(0.35f));
+	Mesh->SetCastShadow(true);
 
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> SphereMesh(
-		TEXT("/Engine/BasicShapes/Sphere.Sphere"));
-	if (SphereMesh.Succeeded())
-	{
-		Mesh->SetStaticMesh(SphereMesh.Object);
-	}
+	Glow = CreateDefaultSubobject<UPointLightComponent>(TEXT("Glow"));
+	Glow->SetupAttachment(Collision);
+	Glow->SetCastShadows(false);
+	Glow->SetIntensityUnits(ELightUnits::Candelas);
+	Glow->SetIntensity(30.f);
+	Glow->SetAttenuationRadius(380.f);
 
-	static ConstructorHelpers::FObjectFinder<UMaterialInterface> BaseMat(
-		TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
-	if (BaseMat.Succeeded())
-	{
-		Mesh->SetMaterial(0, BaseMat.Object);
-	}
-
-	Movement = CreateDefaultSubobject<UProjectileMovementComponent>(TEXT("Movement"));
-	Movement->SetUpdatedComponent(Collision);
-	Movement->InitialSpeed = 1800.f;
-	Movement->MaxSpeed = 3200.f;
-	Movement->bRotationFollowsVelocity = false;
-	Movement->bShouldBounce = false;
-	Movement->ProjectileGravityScale = 0.f;
+	InitialLifeSpan = 6.f;
 }
 
-void AMoteProjectile::BeginPlay()
+void AMoteProjectile::Launch(AMoteCharacter* InOwner, const FMoteMoveDef& InMove, const FVector& Direction,
+	float Speed, float InChargeScale, UStaticMesh* InMesh, float MeshSize, const FLinearColor& InColor)
 {
-	Super::BeginPlay();
-	Collision->OnComponentBeginOverlap.AddDynamic(this, &AMoteProjectile::OnOverlap);
-
-	if (Mesh)
-	{
-		if (UMaterialInstanceDynamic* MID = Mesh->CreateAndSetMaterialInstanceDynamic(0))
-		{
-			MID->SetVectorParameterValue(TEXT("Color"), Color);
-		}
-	}
-}
-
-void AMoteProjectile::Launch(AMoteCharacter* InOwnerMote, const FMoteAttackDef& InAttack,
-	const FLinearColor& InColor, const FVector& Direction)
-{
-	OwnerMote = InOwnerMote;
-	Attack = InAttack;
+	OwnerMote = InOwner;
+	Move = InMove;
+	Kind = InMove.Projectile;
 	Color = InColor;
-	SetInstigator(InOwnerMote);
+	ChargeScale = InChargeScale;
+	Life = FMath::Max(0.2f, InMove.ProjectileLife);
+	Velocity = Direction.GetSafeNormal() * Speed;
+	Glow->SetLightColor(Color);
 
-	const FVector Dir = Direction.GetSafeNormal();
-
-	if (Movement)
+	if (Kind == EMoteProjectileKind::Lightning)
 	{
-		Movement->InitialSpeed = Attack.ProjectileSpeed;
-		Movement->MaxSpeed = Attack.ProjectileSpeed * 1.6f;
-		// Lobbed Cinders arc; everything else flies flat.
-		const bool bLob = (Attack.Shape == EMoteAttackShape::Lob);
-		Movement->ProjectileGravityScale = bLob ? 1.35f : 0.f;
-		Movement->Velocity = Dir * Attack.ProjectileSpeed + (bLob ? FVector(0, 0, 620.f) : FVector::ZeroVector);
+		Mesh->SetVisibility(false);
+		Glow->SetIntensity(0.f);
+		if (UMoteFX* FX = UMoteFX::Get(this))
+		{
+			FX->LightningWarning(GetActorLocation(), Move.ExplosionRadius, LightningDelay, Color);
+		}
+		return;
 	}
 
-	// Discs spin; bolts point where they fly.
-	if (Attack.bReturns)
+	if (InMesh)
 	{
-		SpinRate = 900.f;
-		Mesh->SetRelativeScale3D(FVector(0.55f, 0.55f, 0.12f));
+		Mesh->SetStaticMesh(InMesh);
+		const FBox Box = InMesh->GetBoundingBox();
+		const FVector Size = Box.GetSize();
+		const float Scale = MeshSize / FMath::Max(Size.GetMax(), 1.f);
+
+		// Point the long axis along +X (arrows), then centre it.
+		FRotator Align = FRotator::ZeroRotator;
+		if (Kind == EMoteProjectileKind::Arrow)
+		{
+			if (Size.Z >= Size.X && Size.Z >= Size.Y) { Align = FRotator(-90.f, 0.f, 0.f); }
+			else if (Size.Y >= Size.X) { Align = FRotator(0.f, -90.f, 0.f); }
+		}
+		Mesh->SetRelativeScale3D(FVector(Scale));
+		Mesh->SetRelativeRotation(Align);
+		Mesh->SetRelativeLocation(-Align.RotateVector(Box.GetCenter() * Scale));
 	}
 	else
 	{
-		SetActorRotation(Dir.Rotation());
-		if (Attack.Shape == EMoteAttackShape::Lob)
+		// Glowing orb (energy bolts, fireballs, or any missing art).
+		Mesh->SetStaticMesh(LoadObject<UStaticMesh>(nullptr, SphereMeshPath));
+		const float S = MeshSize / 100.f;
+		Mesh->SetRelativeScale3D(FVector(S));
+		Mesh->SetRelativeLocation(FVector::ZeroVector);
+		Mesh->SetCastShadow(false);
+		UMaterialInterface* Mat = LoadObject<UMaterialInterface>(nullptr, AdditivePath, nullptr, LOAD_Quiet | LOAD_NoWarn);
+		if (!Mat) { Mat = LoadObject<UMaterialInterface>(nullptr, BasicMaterialPath); }
+		if (UMaterialInstanceDynamic* MID = UMaterialInstanceDynamic::Create(Mat, this))
 		{
-			Mesh->SetRelativeScale3D(FVector(0.4f));
+			const FLinearColor C = (Kind == EMoteProjectileKind::Fireball) ? FLinearColor(1.f, 0.45f, 0.1f) : Color;
+			MID->SetVectorParameterValue(TEXT("Color"), C);
+			MID->SetScalarParameterValue(TEXT("Intensity"), 8.f);
+			MID->SetScalarParameterValue(TEXT("Opacity"), 1.f);
+			MID->SetScalarParameterValue(TEXT("RimPower"), 1.5f);
+			Mesh->SetMaterial(0, MID);
 		}
-		else
-		{
-			Mesh->SetRelativeScale3D(FVector(0.45f, 0.2f, 0.2f));
-		}
+		Glow->SetIntensity(60.f);
 	}
 
-	if (Attack.Shape == EMoteAttackShape::Lob)
+	if (!Velocity.IsNearlyZero())
 	{
-		// Cinders live until they land, not on a flight timer.
-		InitialLifeSpan = 6.f;
+		SetActorRotation(Velocity.Rotation());
 	}
 }
 
-void AMoteProjectile::Reflect(AMoteCharacter* NewOwnerMote)
+void AMoteProjectile::Reflect(AMoteCharacter* NewOwner)
 {
-	OwnerMote = NewOwnerMote;
-	SetInstigator(NewOwnerMote);
-	HitActors.Reset();
-	if (Movement)
+	if (!IsReflectable())
 	{
-		Movement->Velocity = -Movement->Velocity * 1.25f;
+		return;
+	}
+	OwnerMote = NewOwner;
+	AlreadyHit.Reset();
+	bReturning = false;
+	Age = FMath::Min(Age, Life * 0.3f);
+
+	// Send it back at whoever threw it, a bit faster.
+	FVector Dir = -Velocity.GetSafeNormal();
+	Velocity = Dir * FMath::Max(Velocity.Size() * 1.25f, 1400.f);
+	if (NewOwner)
+	{
+		Color = NewOwner->GetAccent();
+		Glow->SetLightColor(Color);
 	}
 }
 
 void AMoteProjectile::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
+	if (bDetonated)
+	{
+		return;
+	}
 	Age += DeltaSeconds;
 
-	if (SpinRate != 0.f)
+	// ---- Lightning: telegraph, then strike ----
+	if (Kind == EMoteProjectileKind::Lightning)
 	{
-		AddActorLocalRotation(FRotator(0.f, SpinRate * DeltaSeconds, 0.f));
+		if (Age >= LightningDelay)
+		{
+			Detonate();
+		}
+		return;
 	}
 
-	// Returning discs decelerate, turn around, and home back to the thrower.
-	if (Attack.bReturns && Movement)
+	AMoteCharacter* Owner = OwnerMote.Get();
+
+	// ---- motion ----
+	switch (Kind)
 	{
-		AMoteCharacter* Home = OwnerMote.Get();
-		if (!bReturning)
+	case EMoteProjectileKind::Disc:
+	{
+		Mesh->AddLocalRotation(FRotator(0.f, 1500.f * DeltaSeconds, 0.f));
+		if (Move.bProjectileReturns)
 		{
-			Movement->Velocity -= Movement->Velocity.GetSafeNormal() * 2400.f * DeltaSeconds;
-			if (Movement->Velocity.SizeSquared() < FMath::Square(260.f))
+			if (!bReturning && Age >= Life * 0.45f)
 			{
 				bReturning = true;
-				HitActors.Reset();
+				AlreadyHit.Reset();
+			}
+			if (bReturning && Owner)
+			{
+				const FVector ToOwner = Owner->GetActorLocation() - GetActorLocation();
+				const float Speed = FMath::Max(Velocity.Size(), 1800.f);
+				Velocity = FMath::VInterpTo(Velocity, ToOwner.GetSafeNormal() * Speed, DeltaSeconds, 7.f);
+				if (ToOwner.Size() < 110.f)
+				{
+					if (UMoteAudio* Audio = UMoteAudio::Get(this))
+					{
+						Audio->Play(TEXT("sfx_disc_catch"), 0.8f);
+					}
+					Destroy();
+					return;
+				}
 			}
 		}
-		else if (Home)
+		break;
+	}
+	case EMoteProjectileKind::Bomb:
+	{
+		Velocity.Z -= BombGravity * DeltaSeconds;
+		Mesh->AddLocalRotation(FRotator(-400.f * DeltaSeconds, 0.f, 0.f));
+		break;
+	}
+	default:
+		break;
+	}
+
+	const FVector Prev = GetActorLocation();
+	FVector Next = Prev + Velocity * DeltaSeconds;
+
+	// Bombs bounce once on the platform, then blow on the next touch.
+	if (Kind == EMoteProjectileKind::Bomb)
+	{
+		const AMoteGameMode* GM = GetWorld()->GetAuthGameMode<AMoteGameMode>();
+		const AMoteArena* Arena = GM ? GM->GetArena() : nullptr;
+		const float FloorZ = 30.f;
+		if (Arena && Next.Z <= FloorZ && Prev.Z >= FloorZ - 5.f && Arena->IsOverPlatform(Next))
 		{
-			const FVector ToHome = (Home->GetActorLocation() - GetActorLocation());
-			Movement->Velocity += ToHome.GetSafeNormal() * 5200.f * DeltaSeconds;
-			Movement->Velocity = Movement->Velocity.GetClampedToMaxSize(Attack.ProjectileSpeed * 1.2f);
-			if (ToHome.SizeSquared() < FMath::Square(90.f) && Age > 0.35f)
+			Next.Z = FloorZ;
+			if (Bounces >= 1)
 			{
-				Destroy();
+				SetActorLocation(Next);
+				Detonate();
+				return;
+			}
+			++Bounces;
+			Velocity.Z = -Velocity.Z * 0.45f;
+			Velocity.X *= 0.7f;
+			Velocity.Y *= 0.7f;
+		}
+	}
+	SetActorLocation(Next);
+
+	if (Kind == EMoteProjectileKind::Arrow || Kind == EMoteProjectileKind::EnergyBolt || Kind == EMoteProjectileKind::Fireball)
+	{
+		if (!Velocity.IsNearlyZero())
+		{
+			SetActorRotation(Velocity.Rotation());
+		}
+	}
+
+	// ---- trail ----
+	TrailTimer -= DeltaSeconds;
+	if (TrailTimer <= 0.f)
+	{
+		TrailTimer = 0.03f;
+		if (UMoteFX* FX = UMoteFX::Get(this))
+		{
+			const float Size = (Kind == EMoteProjectileKind::Fireball) ? 1.2f : (Kind == EMoteProjectileKind::Bomb ? 0.5f : 0.8f);
+			FX->ProjectileTrail(GetActorLocation(), Kind == EMoteProjectileKind::Fireball ? FLinearColor(1.f, 0.4f, 0.08f) : Color, Size);
+			if (Kind == EMoteProjectileKind::Fireball)
+			{
+				FX->FireBurst(GetActorLocation(), -Velocity.GetSafeNormal(), 0.35f);
 			}
 		}
 	}
 
-	// A lobbed Cinder detonates the moment it reaches the floor.
-	if (Attack.Shape == EMoteAttackShape::Lob && GetActorLocation().Z <= 30.f)
+	CheckFighterOverlaps();
+	if (bDetonated || IsActorBeingDestroyed())
 	{
-		Detonate();
+		return;
+	}
+
+	// ---- expiry ----
+	const bool bReturningDisc = (Kind == EMoteProjectileKind::Disc && Move.bProjectileReturns);
+	const AMoteGameMode* GM = GetWorld()->GetAuthGameMode<AMoteGameMode>();
+	const bool bOut = GM && GM->GetArena() && GM->GetArena()->IsOutsideBlastZone(GetActorLocation());
+	if (bOut || (!bReturningDisc && Age >= Life) || (bReturningDisc && Age >= Life * 2.5f))
+	{
+		if ((Kind == EMoteProjectileKind::Bomb || Kind == EMoteProjectileKind::Fireball) && !bOut)
+		{
+			Detonate();
+		}
+		else
+		{
+			Destroy();
+		}
 	}
 }
 
-void AMoteProjectile::OnOverlap(UPrimitiveComponent* /*OverlappedComp*/, AActor* OtherActor,
-	UPrimitiveComponent* /*OtherComp*/, int32 /*OtherBodyIndex*/,
-	bool /*bFromSweep*/, const FHitResult& /*Sweep*/)
+void AMoteProjectile::CheckFighterOverlaps()
 {
-	AMoteCharacter* Target = Cast<AMoteCharacter>(OtherActor);
-	if (!Target || Target == OwnerMote.Get())
+	AMoteCharacter* Owner = OwnerMote.Get();
+	for (TActorIterator<AMoteCharacter> It(GetWorld()); It; ++It)
 	{
-		return;
+		AMoteCharacter* Target = *It;
+		if (!Target || Target == Owner || !Target->IsActiveInMatch() || AlreadyHit.Contains(Target))
+		{
+			continue;
+		}
+		if (FVector::Dist(Target->GetActorLocation(), GetActorLocation()) <= HitRadius + FighterRadius)
+		{
+			HitFighter(Target);
+			if (bDetonated || IsActorBeingDestroyed())
+			{
+				return;
+			}
+		}
 	}
-	if (HitActors.Contains(Target))
-	{
-		return;
-	}
-	HitActors.Add(Target);
+}
 
-	if (Attack.Shape == EMoteAttackShape::Lob)
+void AMoteProjectile::HitFighter(AMoteCharacter* Target)
+{
+	if (Move.ExplosionRadius > 0.f)
 	{
 		Detonate();
 		return;
 	}
 
-	const FVector Dir = (Target->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
-	Target->ReceiveHit(Attack.Damage, Dir, Attack.Knockback, OwnerMote.Get());
+	AlreadyHit.Add(Target);
 
-	if (!Attack.bPiercing && !Attack.bReturns)
+	FMoteHitInfo Hit;
+	Hit.Attacker = OwnerMote.Get();
+	Hit.Damage = Move.Damage * ChargeScale;
+	Hit.BaseKnockback = Move.BaseKnockback * FMath::Lerp(1.f, ChargeScale, 0.5f);
+	Hit.KnockbackGrowth = Move.KnockbackGrowth;
+	Hit.LaunchAngle = Move.LaunchAngle;
+	Hit.Direction = Velocity.GetSafeNormal2D();
+	if (Hit.Direction.IsNearlyZero() && OwnerMote.IsValid())
+	{
+		Hit.Direction = (Target->GetActorLocation() - OwnerMote->GetActorLocation()).GetSafeNormal2D();
+	}
+	Hit.Location = GetActorLocation();
+	Hit.Fx = Move.Fx;
+	Hit.HitstopScale = Move.HitstopScale;
+	Hit.ShakeScale = Move.ShakeScale;
+	Hit.bRanged = true;
+
+	const EMoteHitResult Result = Target->TakeHit(Hit);
+	if (Result == EMoteHitResult::Ignored)
+	{
+		return;
+	}
+
+	if (Kind == EMoteProjectileKind::Disc && Move.bProjectileReturns)
+	{
+		// Bounce off and head home.
+		bReturning = true;
+		return;
+	}
+	if (!Move.bProjectilePierces || Result == EMoteHitResult::Blocked)
 	{
 		Destroy();
 	}
@@ -197,21 +346,64 @@ void AMoteProjectile::OnOverlap(UPrimitiveComponent* /*OverlappedComp*/, AActor*
 
 void AMoteProjectile::Detonate()
 {
-	const FVector Origin = GetActorLocation();
-	const float Radius = (Attack.AoERadius > 0.f) ? Attack.AoERadius : 200.f;
+	if (bDetonated)
+	{
+		return;
+	}
+	bDetonated = true;
 
+	const FVector Center = GetActorLocation();
+	const float Radius = FMath::Max(Move.ExplosionRadius, 120.f) * FMath::Lerp(1.f, ChargeScale, 0.5f);
+
+	if (UMoteFX* FX = UMoteFX::Get(this))
+	{
+		if (Kind == EMoteProjectileKind::Lightning)
+		{
+			FX->Lightning(Center, Radius, Color);
+		}
+		else
+		{
+			FX->Explosion(Center, Radius);
+		}
+	}
+	if (UMoteAudio* Audio = UMoteAudio::Get(this))
+	{
+		Audio->Play(Kind == EMoteProjectileKind::Lightning ? TEXT("sfx_lightning") : TEXT("sfx_explosion"), 1.f, 1.f, 0.05f);
+	}
+	if (UMoteEventHub* Hub = UMoteEventHub::Get(this))
+	{
+		Hub->Impact(Center, FMath::Clamp(Radius / 220.f, 0.4f, 1.4f));
+	}
+
+	AMoteCharacter* Owner = OwnerMote.Get();
 	for (TActorIterator<AMoteCharacter> It(GetWorld()); It; ++It)
 	{
-		AMoteCharacter* Mote = *It;
-		if (!Mote || Mote == OwnerMote.Get())
+		AMoteCharacter* Target = *It;
+		if (!Target || Target == Owner || !Target->IsActiveInMatch())
 		{
 			continue;
 		}
-		const FVector Delta = Mote->GetActorLocation() - Origin;
-		if (Delta.SizeSquared2D() <= FMath::Square(Radius))
+		const FVector Delta = Target->GetActorLocation() - Center;
+		const bool bInside = (Kind == EMoteProjectileKind::Lightning)
+			? (Delta.Size2D() <= Radius + FighterRadius && Delta.Z < 900.f && Delta.Z > -150.f)
+			: (Delta.Size() <= Radius + FighterRadius);
+		if (!bInside)
 		{
-			Mote->ReceiveHit(Attack.Damage, Delta.GetSafeNormal2D(), Attack.Knockback, OwnerMote.Get());
+			continue;
 		}
+		FMoteHitInfo Hit;
+		Hit.Attacker = Owner;
+		Hit.Damage = Move.Damage * ChargeScale;
+		Hit.BaseKnockback = Move.BaseKnockback * FMath::Lerp(1.f, ChargeScale, 0.5f);
+		Hit.KnockbackGrowth = Move.KnockbackGrowth;
+		Hit.LaunchAngle = Move.LaunchAngle;
+		Hit.Direction = Delta.GetSafeNormal2D().IsNearlyZero() ? Velocity.GetSafeNormal2D() : Delta.GetSafeNormal2D();
+		Hit.Location = Target->GetActorLocation();
+		Hit.Fx = Move.Fx;
+		Hit.HitstopScale = Move.HitstopScale;
+		Hit.ShakeScale = Move.ShakeScale;
+		Hit.bRanged = true;
+		Target->TakeHit(Hit);
 	}
 
 	Destroy();

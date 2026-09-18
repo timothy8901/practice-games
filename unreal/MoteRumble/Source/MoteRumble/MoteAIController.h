@@ -9,13 +9,25 @@
 class AMoteCharacter;
 
 /**
- * Rival Mote brain.
+ * CPU opponent. Drives its AMoteCharacter purely through the fighter's button
+ * API (SetMoveInput / PressJump / SetJumpHeld / PressLight / PressHeavy /
+ * ReleaseHeavy / SetShieldHeld / PressDodge), exactly like a human would, so it
+ * can never do anything a player can't.
  *
- * Deliberately a plain AController with direct steering rather than an
- * AAIController + behaviour tree: the arena is a flat disc and there is no
- * baked navmesh, so pathfinding would buy nothing and cost a dependency.
- * Keeps a preferred range based on whether its Core is melee or ranged,
- * strafes, and shields reactively.
+ * Behaviour, scaled by Level (1 = sleepy, 9 = sharp):
+ *   - RECOVERY FIRST: when off the platform, steer back toward the centre using
+ *     air jumps, hover (hold jump) and a directional air dodge at the right time.
+ *     Never throw away a stock through carelessness above level 3.
+ *   - Neutral: approach/space to the current fighter's preferred range (melee vs
+ *     projectile fighters), strafe, feint, jump in.
+ *   - Offence: jab strings, finishers, charged heavies when the target is high
+ *     percent or stunned, punish whiffs and shield breaks.
+ *   - Defence: react to an opponent's move startup with shield or dodge
+ *     (probability and reaction time from Level), don't shield forever.
+ *   - Edge-guard: harass an opponent recovering from off-stage with projectiles
+ *     or aerials, without following them too far out.
+ * Reaction delays are real: it decides on a ~0.1-0.35 s think tick (faster at
+ * higher Level) and keeps a small input buffer so it looks human.
  */
 UCLASS()
 class MOTERUMBLE_API AMoteAIController : public AController
@@ -27,23 +39,16 @@ public:
 
 	virtual void Tick(float DeltaSeconds) override;
 
+	void SetLevel(int32 InLevel) { Level = FMath::Clamp(InLevel, 1, 9); }
+	int32 GetLevel() const { return Level; }
+
 protected:
-	/** The Mote this brain is fighting. Resolved lazily. */
-	UPROPERTY()
-	TWeakObjectPtr<AMoteCharacter> Target;
+	virtual void OnPossess(APawn* InPawn) override;
+	virtual void OnUnPossess() override;
 
-	/** Refresh Target if it went missing. */
-	AMoteCharacter* FindTarget();
+	AMoteCharacter* GetFighter() const;
 
-	/** Seconds until the next decision. */
-	float ThinkTimer = 0.f;
+	int32 Level = 5;
 
-	/** Gate so it doesn't chain attacks instantly. */
-	float AttackCooldown = 0.8f;
-
-	/** Seconds left holding the shield. */
-	float ShieldTimer = 0.f;
-
-	/** +1 / -1 orbit direction, flipped occasionally. */
-	float StrafeDir = 1.f;
+	// Implementation state is up to the implementer.
 };

@@ -7,14 +7,20 @@
 #include "MoteArena.generated.h"
 
 class UStaticMeshComponent;
-class UBoxComponent;
+class UInstancedStaticMeshComponent;
+class UPointLightComponent;
 
 /**
- * The duelling ground: a circular platform with a decorative pillar ring and
- * invisible containment walls.
+ * "Skyreach" - the floating battle platform and everything around it.
  *
- * Built procedurally from engine primitives so the game is fully playable in
- * an empty level - no .umap authoring required to get something on screen.
+ * Gameplay (MoteArena.cpp): a flat circular walkable disc of PlatformRadius with
+ * its top at Z = 0 and open edges; blast zones (a vertical cylinder of
+ * BlastSideRadius from Z = BlastBottom to Z = BlastTop). Leave it and you're KO'd.
+ *
+ * Scenery (MoteArenaScenery.cpp): the Thrixel platform mesh fitted over the
+ * collision disc, distant floating islands, pillars, crystal clusters, braziers
+ * with fire and warm lights, ambient drifting embers/dust, and the respawn halo.
+ * Scenery never collides with fighters.
  */
 UCLASS()
 class MOTERUMBLE_API AMoteArena : public AActor
@@ -24,41 +30,55 @@ class MOTERUMBLE_API AMoteArena : public AActor
 public:
 	AMoteArena();
 
-	/** Playable radius; fighters are walled in just past this. */
-	UPROPERTY(EditAnywhere, Category = "Arena")
-	float ArenaRadius = 1750.f;
+	virtual void Tick(float DeltaSeconds) override;
 
-	UPROPERTY(EditAnywhere, Category = "Arena")
-	int32 PillarCount = 14;
+	float GetPlatformRadius() const { return PlatformRadius; }
+	float GetBlastSideRadius() const { return BlastSideRadius; }
+	float GetBlastTop() const { return BlastTop; }
+	float GetBlastBottom() const { return BlastBottom; }
 
-	UPROPERTY(EditAnywhere, Category = "Arena")
-	int32 WallSegments = 24;
+	bool IsOutsideBlastZone(const FVector& Location) const;
+	/** Is this XY above the walkable disc? */
+	bool IsOverPlatform(const FVector& Location, float Margin = 0.f) const;
+	/** Start position for fighter Index of Count, facing the centre. */
+	void GetSpawnPoint(int32 Index, int32 Count, FVector& OutLocation, float& OutYaw) const;
+	/** Where the respawn halo appears for fighter Index. */
+	FVector GetRespawnPoint(int32 Index, int32 Count) const;
 
-	float GetArenaRadius() const { return ArenaRadius; }
+	/** Show/hide the glowing respawn halo platform at a location. */
+	void ShowRespawnHalo(int32 Slot, const FVector& Location, const FLinearColor& Color, bool bShow);
 
 protected:
 	virtual void OnConstruction(const FTransform& Transform) override;
 	virtual void BeginPlay() override;
 
-	/** Lays out floor, pillars, and walls. Safe to call repeatedly. */
-	void BuildArena();
+	/** Implemented in MoteArenaScenery.cpp. Called once from BeginPlay. */
+	void BuildScenery();
+	/** Implemented in MoteArenaScenery.cpp. Animates bobbing islands, flames, embers. */
+	void TickScenery(float DeltaSeconds);
 
-	UPROPERTY(VisibleAnywhere, Category = "Arena")
-	TObjectPtr<USceneComponent> ArenaRoot;
+	// ---- gameplay ----
+	UPROPERTY(EditAnywhere, Category = "Arena") float PlatformRadius = 1500.f;
+	UPROPERTY(EditAnywhere, Category = "Arena") float BlastSideRadius = 4300.f;
+	UPROPERTY(EditAnywhere, Category = "Arena") float BlastTop = 3400.f;
+	UPROPERTY(EditAnywhere, Category = "Arena") float BlastBottom = -2300.f;
 
-	UPROPERTY(VisibleAnywhere, Category = "Arena")
-	TObjectPtr<UStaticMeshComponent> Floor;
+	UPROPERTY(VisibleAnywhere) TObjectPtr<USceneComponent> Root;
+	/** Invisible flat collision disc the fighters stand on. */
+	UPROPERTY(VisibleAnywhere) TObjectPtr<UStaticMeshComponent> Floor;
 
-	/** Inner accent disc, purely visual. */
-	UPROPERTY(VisibleAnywhere, Category = "Arena")
-	TObjectPtr<UStaticMeshComponent> InnerDisc;
+	// ---- scenery (owned by MoteArenaScenery.cpp) ----
+	UPROPERTY(VisibleAnywhere) TObjectPtr<UStaticMeshComponent> PlatformMesh;
+	UPROPERTY() TArray<TObjectPtr<UStaticMeshComponent>> RespawnHalos;
+	UPROPERTY() TArray<TObjectPtr<UPointLightComponent>> RespawnLights;
+	UPROPERTY() TArray<TObjectPtr<UStaticMeshComponent>> SceneryMeshes;
+	UPROPERTY() TArray<TObjectPtr<UPointLightComponent>> SceneryLights;
+	UPROPERTY() TObjectPtr<UInstancedStaticMeshComponent> Embers;
 
-	UPROPERTY()
-	TArray<TObjectPtr<UStaticMeshComponent>> Pillars;
+	float SceneryTime = 0.f;
 
-	UPROPERTY()
-	TArray<TObjectPtr<UBoxComponent>> Walls;
-
-private:
-	bool bBuilt = false;
+	// Scenery implementation state is up to the implementer (add below).
+	TArray<FTransform> SceneryBaseTransforms;
+	TArray<float> SceneryBobPhase;
+	TArray<FVector> EmberVelocities;
 };
