@@ -33,7 +33,7 @@ public:
 	 * multiplies damage/knockback (1 = uncharged).
 	 */
 	void Launch(AMoteCharacter* InOwner, const FMoteMoveDef& InMove, const FVector& Direction,
-		float Speed, float InChargeScale, UStaticMesh* Mesh, float MeshSize, const FLinearColor& InColor);
+		float Speed, float InChargeScale, UStaticMesh* InMesh, float MeshSize, const FLinearColor& InColor);
 
 	/** Turn around and belong to NewOwner. */
 	void Reflect(AMoteCharacter* NewOwner);

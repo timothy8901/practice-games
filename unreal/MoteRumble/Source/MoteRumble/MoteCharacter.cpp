@@ -198,15 +198,15 @@ void AMoteCharacter::SetFighter(EMoteCore NewCore)
 	}
 }
 
-void AMoteCharacter::FitMesh(UStaticMeshComponent* Comp, UStaticMesh* Mesh, float TargetSize, bool bUseHeight)
+void AMoteCharacter::FitMesh(UStaticMeshComponent* Comp, UStaticMesh* MeshAsset, float TargetSize, bool bUseHeight)
 {
-	if (!Comp || !Mesh)
+	if (!Comp || !MeshAsset)
 	{
 		return;
 	}
-	Comp->SetStaticMesh(Mesh);
+	Comp->SetStaticMesh(MeshAsset);
 
-	const FBox Box = Mesh->GetBoundingBox();
+	const FBox Box = MeshAsset->GetBoundingBox();
 	const FVector Size = Box.GetSize();
 	const float Measure = bUseHeight ? Size.Z : Size.GetMax();
 	const float Scale = TargetSize / FMath::Max(Measure, 1.f);
@@ -222,12 +222,12 @@ void AMoteCharacter::FitMesh(UStaticMeshComponent* Comp, UStaticMesh* Mesh, floa
 	Comp->SetRelativeLocation(-Comp->GetRelativeRotation().RotateVector(Centre));
 }
 
-void AMoteCharacter::MountWeapon(UStaticMesh* Mesh)
+void AMoteCharacter::MountWeapon(UStaticMesh* MeshAsset)
 {
 	const FMoteFighterDef& Def = GetFighterDef();
 	const FMoteWeaponMount& Mount = Def.Mount;
 
-	if (!Mesh)
+	if (!MeshAsset)
 	{
 		WeaponMesh->SetStaticMesh(nullptr);
 		WeaponMesh->SetVisibility(false);
@@ -235,10 +235,10 @@ void AMoteCharacter::MountWeapon(UStaticMesh* Mesh)
 		return;
 	}
 
-	WeaponMesh->SetStaticMesh(Mesh);
+	WeaponMesh->SetStaticMesh(MeshAsset);
 	WeaponMesh->SetVisibility(true);
 
-	const FBox Box = Mesh->GetBoundingBox();
+	const FBox Box = MeshAsset->GetBoundingBox();
 	const FVector Size = Box.GetSize();
 
 	// Align the mesh's longest axis with +X.
@@ -916,9 +916,9 @@ void AMoteCharacter::TickMovement(float Dt)
 
 	if (bCanTurn && !Input.IsNearlyZero())
 	{
-		const float TargetYaw = Input.Rotation().Yaw;
+		const float TargetYaw = static_cast<float>(Input.Rotation().Yaw);
 		const float Rate = (bGrounded ? GroundTurnRate : AirTurnRate) * Dt;
-		const float NewYaw = FMath::FixedTurn(GetActorRotation().Yaw, TargetYaw, Rate);
+		const float NewYaw = FMath::FixedTurn(static_cast<float>(GetActorRotation().Yaw), TargetYaw, Rate);
 		SetActorRotation(FRotator(0.f, NewYaw, 0.f));
 	}
 
@@ -1615,20 +1615,20 @@ void AMoteCharacter::EmitProjectiles(float ChargeScale)
 	}
 
 	// Pick the projectile's mesh and size.
-	UStaticMesh* Mesh = nullptr;
+	UStaticMesh* ProjMesh = nullptr;
 	float MeshSize = 60.f;
 	switch (M.Projectile)
 	{
 	case EMoteProjectileKind::Arrow:
-		Mesh = Def.ProjectileMesh.IsEmpty() ? nullptr : LoadObject<UStaticMesh>(nullptr, *Def.ProjectileMesh, nullptr, LOAD_Quiet | LOAD_NoWarn);
+		ProjMesh = Def.ProjectileMesh.IsEmpty() ? nullptr : LoadObject<UStaticMesh>(nullptr, *Def.ProjectileMesh, nullptr, LOAD_Quiet | LOAD_NoWarn);
 		MeshSize = 115.f;
 		break;
 	case EMoteProjectileKind::Disc:
-		Mesh = WeaponMesh ? WeaponMesh->GetStaticMesh() : nullptr;
+		ProjMesh = WeaponMesh ? WeaponMesh->GetStaticMesh() : nullptr;
 		MeshSize = Def.Mount.Length;
 		break;
 	case EMoteProjectileKind::Bomb:
-		Mesh = WeaponMesh ? WeaponMesh->GetStaticMesh() : nullptr;
+		ProjMesh = WeaponMesh ? WeaponMesh->GetStaticMesh() : nullptr;
 		MeshSize = Def.Mount.Length * 1.1f;
 		break;
 	default:
@@ -1652,7 +1652,7 @@ void AMoteCharacter::EmitProjectiles(float ChargeScale)
 
 		if (AMoteProjectile* Shot = World->SpawnActor<AMoteProjectile>(AMoteProjectile::StaticClass(), Muzzle, Aim, Params))
 		{
-			Shot->Launch(this, M, Dir, Speed, ChargeScale, Mesh, MeshSize, GetAccent());
+			Shot->Launch(this, M, Dir, Speed, ChargeScale, ProjMesh, MeshSize, GetAccent());
 		}
 	}
 }

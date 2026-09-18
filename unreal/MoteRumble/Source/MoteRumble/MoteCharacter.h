@@ -220,8 +220,8 @@ protected:
 	bool PredictLethal(const FVector& StartLocation, const FVector& Velocity) const;
 
 	void ApplyFighterVisuals();
-	void FitMesh(UStaticMeshComponent* Comp, UStaticMesh* Mesh, float TargetSize, bool bUseHeight);
-	void MountWeapon(UStaticMesh* Mesh);
+	void FitMesh(UStaticMeshComponent* Comp, UStaticMesh* MeshAsset, float TargetSize, bool bUseHeight);
+	void MountWeapon(UStaticMesh* MeshAsset);
 	void UpdateOverlay(float RealDt);
 	void PlaySfx(FName Sound, float Volume = 1.f, float PitchJitter = 0.06f) const;
 
