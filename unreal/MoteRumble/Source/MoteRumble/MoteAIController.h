@@ -50,5 +50,18 @@ protected:
 
 	int32 Level = 5;
 
-	// Implementation state is up to the implementer.
+	AMoteCharacter* PickTarget(class AMoteGameMode* GM, AMoteCharacter* Me) const;
+	void LogState(const TCHAR* What);
+
+	/** Seconds until the next decision (reaction time). */
+	float ThinkTimer = 0.f;
+	/** Which way it is currently circling. */
+	float StrafeSign = 1.f;
+	/** Committed to blocking/dodging an incoming move. */
+	bool bDefending = false;
+	bool bDefendByDodge = false;
+	float DefendTimer = 0.f;
+	/** Seconds left holding a heavy to charge it. */
+	float ChargeTimer = 0.f;
+	const TCHAR* LastState = nullptr;
 };

@@ -65,6 +65,8 @@ protected:
 
 	void OnHit(const FMoteHitEvent& Event);
 	void OnKO(const FMoteKOEvent& Event);
+	/** World positions the camera must keep in frame this tick. */
+	void GatherTargets(TArray<FVector>& OutPoints, class AMoteGameMode*& OutGM) const;
 
 	UPROPERTY(VisibleAnywhere) TObjectPtr<UCameraComponent> Camera;
 
@@ -76,6 +78,18 @@ protected:
 
 	FDelegateHandle HitHandle;
 	FDelegateHandle KOHandle;
+	FDelegateHandle ImpactHandle;
 
-	// Implementation state (springs, current/target transform, kick) is up to the implementer.
+	// ---- spring state ----
+	FVector CurrentFocus = FVector::ZeroVector;
+	FVector FocusVel = FVector::ZeroVector;
+	float CurrentDistance = 3000.f;
+	float DistanceVel = 0.f;
+	float CurrentPitch = -34.f;
+	float PitchVel = 0.f;
+	float CurrentYaw = 0.f;
+	float YawVel = 0.f;
+	/** Directional impact punch, decays fast. */
+	FVector KickOffset = FVector::ZeroVector;
+	float FovKick = 0.f;
 };

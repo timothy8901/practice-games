@@ -58,10 +58,10 @@ protected:
 	void TickScenery(float DeltaSeconds);
 
 	// ---- gameplay ----
-	UPROPERTY(EditAnywhere, Category = "Arena") float PlatformRadius = 1500.f;
-	UPROPERTY(EditAnywhere, Category = "Arena") float BlastSideRadius = 4300.f;
-	UPROPERTY(EditAnywhere, Category = "Arena") float BlastTop = 3400.f;
-	UPROPERTY(EditAnywhere, Category = "Arena") float BlastBottom = -2300.f;
+	UPROPERTY(EditAnywhere, Category = "Arena") float PlatformRadius = 850.f;
+	UPROPERTY(EditAnywhere, Category = "Arena") float BlastSideRadius = 2900.f;
+	UPROPERTY(EditAnywhere, Category = "Arena") float BlastTop = 2600.f;
+	UPROPERTY(EditAnywhere, Category = "Arena") float BlastBottom = -1700.f;
 
 	UPROPERTY(VisibleAnywhere) TObjectPtr<USceneComponent> Root;
 	/** Invisible flat collision disc the fighters stand on. */
@@ -77,8 +77,13 @@ protected:
 
 	float SceneryTime = 0.f;
 
-	// Scenery implementation state is up to the implementer (add below).
+	// ---- scenery implementation state ----
 	TArray<FTransform> SceneryBaseTransforms;
 	TArray<float> SceneryBobPhase;
 	TArray<FVector> EmberVelocities;
+	UPROPERTY() TArray<TObjectPtr<UStaticMeshComponent>> Flames;
+	TArray<FVector> FlameBase;
+	UPROPERTY() TArray<TObjectPtr<UPointLightComponent>> FlameLights;
+	/** Index into SceneryMeshes of the rock under the platform (it must not bob). */
+	int32 bUnderRockIndex = INDEX_NONE;
 };

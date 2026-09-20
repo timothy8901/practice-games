@@ -10,6 +10,50 @@
 
 class UProceduralMeshComponent;
 class UMaterialInstanceDynamic;
+class UStaticMesh;
+class UStaticMeshComponent;
+class UMaterialInterface;
+
+/** Primitive meshes the effects are built from. */
+enum class EMoteFxShape : uint8 { Sphere, Cube, Plane, Cylinder, Count };
+
+/** The /Game/FX materials. */
+enum class EMoteFxMaterial : uint8 { Additive, Ring, Smoke, Ribbon, Count };
+
+/** One live effect element: a pooled mesh with an animated dynamic material. */
+struct FMoteFxElement
+{
+	TObjectPtr<UStaticMeshComponent> Comp = nullptr;
+	TObjectPtr<UMaterialInstanceDynamic> MID = nullptr;
+	EMoteFxShape Shape = EMoteFxShape::Count;
+	EMoteFxMaterial MatKind = EMoteFxMaterial::Count;
+
+	bool bActive = false;
+	float Age = 0.f;
+	float Life = 0.f;
+
+	FVector Location = FVector::ZeroVector;
+	FVector Velocity = FVector::ZeroVector;
+	FVector Accel = FVector::ZeroVector;
+	/** Fraction of velocity kept per second. */
+	float Drag = 1.f;
+	FRotator Rotation = FRotator::ZeroRotator;
+	FRotator SpinRate = FRotator::ZeroRotator;
+	bool bFaceVelocity = false;
+
+	FVector StartScale = FVector::OneVector;
+	FVector EndScale = FVector::OneVector;
+	FLinearColor Color = FLinearColor::White;
+	float StartIntensity = 4.f;
+	float EndIntensity = 0.f;
+	float StartOpacity = 1.f;
+	float EndOpacity = 0.f;
+	float RimPower = 0.f;
+	/** Ring material only, as a fraction of the plane's half size. */
+	float RingStart = 0.7f;
+	float RingEnd = 0.95f;
+	float RingWidth = 0.14f;
+};
 
 /**
  * All transient visual effects in Mote Rumble, built from meshes + the FX
@@ -83,7 +127,31 @@ public:
 	virtual bool IsTickableWhenPaused() const override { return false; }
 
 protected:
-	// Implementation (pools, live effect list, cached materials) is up to the implementer.
+	// ---- building blocks every effect is composed from ----
+	/** A soft glowing ball that expands and fades. */
+	void Flash(const FVector& Location, float Radius, const FLinearColor& Color, float Life, float Intensity);
+	/** An expanding ring on a plane (Rotation zero = flat on the ground). */
+	void Ring(const FVector& Location, const FRotator& Rotation, float Radius, const FLinearColor& Color,
+		float Life, float Width = 0.14f, float Intensity = 6.f);
+	/** A stretched spark that flies along its velocity. */
+	void Streak(const FVector& Location, const FVector& Velocity, float Length, float Thickness,
+		const FLinearColor& Color, float Life, float Gravity);
+	/** A soft smoke/dust puff. */
+	void Puff(const FVector& Location, const FVector& Velocity, float Radius, const FLinearColor& Color, float Life);
+	/** A glowing cylinder between two points (beams, columns, lightning segments). */
+	void Beam(const FVector& From, const FVector& To, float Thickness, const FLinearColor& Color, float Life);
+
+	/** Claim a pooled element, or steal the oldest one when the pool is full. */
+	FMoteFxElement* Spawn(EMoteFxShape Shape, EMoteFxMaterial MatKind, const FVector& Location, float Life);
+	UStaticMesh* LoadShape(EMoteFxShape Shape);
+	UMaterialInterface* LoadFxMaterial(EMoteFxMaterial Kind);
+	/** The transient actor every effect component hangs off. */
+	AActor* GetHost();
+
+	TArray<FMoteFxElement> Elements;
+	UPROPERTY() TArray<TObjectPtr<UStaticMesh>> Shapes;
+	UPROPERTY() TArray<TObjectPtr<UMaterialInterface>> Materials;
+	TWeakObjectPtr<AActor> Host;
 };
 
 /**
@@ -121,5 +189,12 @@ protected:
 	FLinearColor Color = FLinearColor::White;
 	bool bEmitting = false;
 
-	// Implementation state (sample ring buffer etc.) is up to the implementer.
+	/** One frame of the weapon's cutting edge, in world space. */
+	struct FTrailSample
+	{
+		FVector Base = FVector::ZeroVector;
+		FVector Tip = FVector::ZeroVector;
+		float Age = 0.f;
+	};
+	TArray<FTrailSample> Samples;
 };

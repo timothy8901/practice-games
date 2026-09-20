@@ -638,6 +638,33 @@ void AMoteGameMode::TickFight(float Dt)
 		return;
 	}
 
+	// -MoteDebug: dump where everything actually is, once a second.
+	static float DebugClock = 0.f;
+	if (FParse::Param(FCommandLine::Get(), TEXT("MoteDebug")))
+	{
+		DebugClock += Dt;
+		if (DebugClock >= 1.f)
+		{
+			DebugClock = 0.f;
+			for (AMoteCharacter* F : Fighters)
+			{
+				if (F)
+				{
+					UE_LOG(LogTemp, Warning, TEXT("MOTEDBG fighter %s loc=%s grounded=%d state=%d"),
+						*F->GetFighterDef().DisplayName, *F->GetActorLocation().ToCompactString(),
+						F->IsGrounded() ? 1 : 0, static_cast<int32>(F->GetFighterState()));
+				}
+			}
+			if (CameraDirector)
+			{
+				UE_LOG(LogTemp, Warning, TEXT("MOTEDBG camera loc=%s rot=%s"),
+					*CameraDirector->GetActorLocation().ToCompactString(),
+					*CameraDirector->GetActorRotation().ToCompactString());
+			}
+			UE_LOG(LogTemp, Warning, TEXT("MOTEDBG arena bounds=%s"), *Arena->GetComponentsBoundingBox(true).ToString());
+		}
+	}
+
 	// Blast zones.
 	for (AMoteCharacter* F : Fighters)
 	{

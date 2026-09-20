@@ -131,7 +131,7 @@ AMoteCharacter::AMoteCharacter()
 	CoreLight->SetupAttachment(VisualRoot);
 	CoreLight->SetRelativeLocation(FVector(40.f, 0.f, -10.f));
 	CoreLight->SetIntensityUnits(ELightUnits::Candelas);
-	CoreLight->SetIntensity(14.f);
+	CoreLight->SetIntensity(5.f);
 	CoreLight->SetAttenuationRadius(260.f);
 	CoreLight->SetCastShadows(false);
 
@@ -1993,8 +1993,8 @@ void AMoteCharacter::TickPresentation(float Dt, float RealDt)
 			{
 				const float Pulse = 0.5f + 0.5f * FMath::Sin(WorldTime * 9.f);
 				ShieldMID->SetVectorParameterValue(TEXT("Color"), FMath::Lerp(FLinearColor(1.f, 0.2f, 0.15f), Def.Accent, GetShield01()));
-				ShieldMID->SetScalarParameterValue(TEXT("Opacity"), 0.35f + 0.25f * Pulse * (1.f - GetShield01()));
-				ShieldMID->SetScalarParameterValue(TEXT("Intensity"), 2.5f);
+				ShieldMID->SetScalarParameterValue(TEXT("Opacity"), 0.18f + 0.12f * Pulse * (1.f - GetShield01()));
+				ShieldMID->SetScalarParameterValue(TEXT("Intensity"), 0.9f);
 			}
 		}
 	}
@@ -2002,11 +2002,11 @@ void AMoteCharacter::TickPresentation(float Dt, float RealDt)
 	// Core light breathes, flares while charging.
 	if (CoreLight)
 	{
-		float Glow = 12.f + 4.f * FMath::Sin(WorldTime * 3.f);
+		float Glow = 5.f + 1.6f * FMath::Sin(WorldTime * 3.f);
 		if (IsCharging())
 		{
 			const FMoteMoveDef& M = GetFighterDef().GetMove(MoveSlot);
-			Glow += 60.f * FMath::Clamp(ChargeTime / FMath::Max(M.MaxCharge, 0.01f), 0.f, 1.f);
+			Glow += 26.f * FMath::Clamp(ChargeTime / FMath::Max(M.MaxCharge, 0.01f), 0.f, 1.f);
 		}
 		CoreLight->SetIntensity(Glow);
 	}

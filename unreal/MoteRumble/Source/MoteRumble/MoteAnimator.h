@@ -10,6 +10,26 @@
 struct FMoteAnimState;
 class UStaticMeshComponent;
 
+/** One frame of choreography, in the fighter's VisualRoot space. */
+struct FMotePose
+{
+	FVector BodyOffset = FVector::ZeroVector;
+	FRotator BodyRot = FRotator::ZeroRotator;
+	FVector BodyScale = FVector::OneVector;
+
+	FVector HandR = FVector::ZeroVector;
+	FVector HandL = FVector::ZeroVector;
+	FRotator HandRRot = FRotator::ZeroRotator;
+	FRotator HandLRot = FRotator::ZeroRotator;
+
+	/** Weapon grip transform: the business end points along +X. */
+	FVector WeaponLoc = FVector::ZeroVector;
+	FRotator WeaponRot = FRotator::ZeroRotator;
+	bool bWeaponVisible = true;
+	/** This frame should leave a weapon trail. */
+	bool bTrail = false;
+};
+
 /**
  * Procedural animation for a Mote. There are no skeletons in this game: a Mote
  * is a floating body, two detached gauntlets and a weapon, and this component
@@ -66,6 +86,12 @@ public:
 	FVector GetStrikePoint() const;
 
 protected:
+	/** Distance the hands float out from the body's centre. */
+	float HandRadius() const;
+	void BuildIdlePose(const FMoteAnimState& State, FMotePose& Pose) const;
+	void BuildAttackPose(const FMoteAnimState& State, FMotePose& Pose) const;
+	void BuildPose(const FMoteAnimState& State, FMotePose& Pose) const;
+
 	UPROPERTY() TObjectPtr<USceneComponent> BodyPivot;
 	UPROPERTY() TObjectPtr<UStaticMeshComponent> GauntletL;
 	UPROPERTY() TObjectPtr<UStaticMeshComponent> GauntletR;
@@ -79,6 +105,16 @@ protected:
 	FVector GauntletScaleL = FVector::OneVector;
 	FVector GauntletScaleR = FVector::OneVector;
 	bool bTrailWanted = false;
+
+	// ---- inter-frame smoothing ----
+	bool bInitialised = false;
+	FVector SmoothedBodyOffset = FVector::ZeroVector;
+	FVector SmoothedBodyScale = FVector::OneVector;
+	FRotator SmoothedBodyRot = FRotator::ZeroRotator;
+	FVector SmoothedHandR = FVector::ZeroVector;
+	FVector SmoothedHandL = FVector::ZeroVector;
+	FVector SmoothedWeaponLoc = FVector::ZeroVector;
+	FRotator SmoothedWeaponRot = FRotator::ZeroRotator;
 
 	// Implementation state (smoothing, springs, previous poses) lives here.
 	// The implementer is free to add members below this line.
