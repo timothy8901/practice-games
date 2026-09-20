@@ -31,9 +31,19 @@ namespace
 	}
 
 	/**
-	 * Height of the platform's walkable deck in mesh space. The bounding box top
-	 * is the railing, not the floor, so find the highest vertex that still sits
-	 * out near the full radius of the disc - that is the deck surface.
+	 * Height of the platform's walkable deck in mesh space.
+	 *
+	 * Measure area, not vertices. A flat cap is tessellated as a fan, so every
+	 * one of its vertices sits out past 0.97 of the radius and there are none
+	 * at all over the middle of the disc. Scanning vertices in a radius band
+	 * therefore misses the deck completely and lands on whatever else is in the
+	 * band - on the current sculpt, a redundant inner face 10 units down, which
+	 * buried the fighters to the waist.
+	 *
+	 * So walk the triangles instead: keep the ones that are horizontal and face
+	 * up, total their footprint by height, and take the highest surface broad
+	 * enough to be the floor. That skips railings, rims and lips (too small)
+	 * and inner faces (not the highest) without special-casing any of them.
 	 */
 	float FindDeckTop(UStaticMesh* Mesh)
 	{
@@ -44,22 +54,47 @@ namespace
 		{
 			return Fallback;
 		}
-		const FPositionVertexBuffer& Positions = RenderData->LODResources[0].VertexBuffers.PositionVertexBuffer;
-		const uint32 Count = Positions.GetNumVertices();
-		if (Count == 0)
+		const FStaticMeshLODResources& LOD = RenderData->LODResources[0];
+		const FPositionVertexBuffer& Positions = LOD.VertexBuffers.PositionVertexBuffer;
+		const uint32 VertexCount = Positions.GetNumVertices();
+
+		TArray<uint32> Indices;
+		LOD.IndexBuffer.GetCopy(Indices);
+		if (VertexCount == 0 || Indices.Num() < 3)
 		{
 			return Fallback;
 		}
-		const float MaxRadius = FMath::Max(Box.GetSize().X, Box.GetSize().Y) * 0.5f;
-		float DeckTop = -BIG_NUMBER;
-		for (uint32 i = 0; i < Count; ++i)
+
+		constexpr float BucketHeight = 1.f;
+		TMap<int32, float> FootprintAtHeight;
+		for (int32 i = 0; i + 2 < Indices.Num(); i += 3)
 		{
-			const FVector P(Positions.VertexPosition(i));
-			const float Radius = FVector2D(P.X, P.Y).Size();
-			// Out near the edge of the disc, but not the thin railing posts.
-			if (Radius > MaxRadius * 0.55f && Radius < MaxRadius * 0.97f)
+			if (Indices[i] >= VertexCount || Indices[i + 1] >= VertexCount || Indices[i + 2] >= VertexCount)
 			{
-				DeckTop = FMath::Max(DeckTop, static_cast<float>(P.Z));
+				continue;
+			}
+			const FVector A(Positions.VertexPosition(Indices[i]));
+			const FVector B(Positions.VertexPosition(Indices[i + 1]));
+			const FVector C(Positions.VertexPosition(Indices[i + 2]));
+
+			// Cross product: Z is twice the footprint area, and its sign is the facing.
+			const FVector Normal = FVector::CrossProduct(B - A, C - A);
+			const float Length = Normal.Size();
+			if (Normal.Z <= 0.f || Length < KINDA_SMALL_NUMBER || Normal.Z / Length < 0.98f)
+			{
+				continue;  // facing down, degenerate, or too steep to stand on
+			}
+			const int32 Bucket = FMath::RoundToInt((A.Z + B.Z + C.Z) / 3.f / BucketHeight);
+			FootprintAtHeight.FindOrAdd(Bucket) += Normal.Z * 0.5f;
+		}
+
+		const float DiscArea = PI * FMath::Square(FMath::Max(Box.GetSize().X, Box.GetSize().Y) * 0.5f);
+		float DeckTop = -BIG_NUMBER;
+		for (const TPair<int32, float>& Surface : FootprintAtHeight)
+		{
+			if (Surface.Value > DiscArea * 0.5f)
+			{
+				DeckTop = FMath::Max(DeckTop, Surface.Key * BucketHeight);
 			}
 		}
 		return (DeckTop > -BIG_NUMBER) ? DeckTop : Fallback;
@@ -141,6 +176,13 @@ void AMoteArena::BuildScenery()
 		PlatformMesh->SetRelativeLocation(FVector(-Centre.X, -Centre.Y, -DeckZ));
 		// The collision disc is now purely functional.
 		Floor->SetVisibility(false);
+
+		if (FParse::Param(FCommandLine::Get(), TEXT("MoteDebug")))
+		{
+			// The deck must land on Z = 0: worldBox max Z is the top of the art.
+			UE_LOG(LogTemp, Warning, TEXT("MOTEDBG platform deck=%.2f (box top %.2f) scale=%.3f worldBox=%s"),
+				DeckZ / Scale, Box.Max.Z, Scale, *PlatformMesh->Bounds.GetBox().ToString());
+		}
 	}
 	else if (UMaterialInstanceDynamic* MID = Floor->CreateAndSetMaterialInstanceDynamic(0))
 	{
@@ -157,11 +199,7 @@ void AMoteArena::BuildScenery()
 		const float IslandRadius = FMath::Max(IB.GetSize().X, IB.GetSize().Y) * 0.5f;
 		const float UnderScale = (PlatformRadius * 0.92f) / FMath::Max(IslandRadius, 1.f);
 		AddMesh(IslandArt, FVector(0.f, 0.f, -110.f), FRotator(180.f, 0.f, 0.f), FVector(UnderScale, UnderScale, UnderScale * 1.5f));
-		// Not scenery that bobs: pin it in place.
-		SceneryBaseTransforms.Last() = FTransform(FRotator(180.f, 0.f, 0.f), FVector(0.f, 0.f, -110.f),
-			FVector(UnderScale, UnderScale, UnderScale * 1.5f));
-		SceneryBobPhase.Last() = 0.f;
-		bUnderRockIndex = SceneryMeshes.Num() - 1;
+		StillScenery.Add(SceneryMeshes.Num() - 1);
 	}
 
 	// ---- distant floating islands ----------------------------------------
@@ -206,9 +244,26 @@ void AMoteArena::BuildScenery()
 	// ---- braziers on small rocks just outside the rim ---------------------
 	for (int32 i = 0; i < 4; ++i)
 	{
+		// Above deck height, so the rock reads against the sky instead of
+		// disappearing behind the platform's own silhouette.
 		const float Angle = FMath::DegreesToRadians(35.f + i * 90.f);
-		const FVector Base(FMath::Cos(Angle) * (PlatformRadius + 420.f), FMath::Sin(Angle) * (PlatformRadius + 420.f), -190.f);
+		const FVector Base(FMath::Cos(Angle) * (PlatformRadius + 560.f), FMath::Sin(Angle) * (PlatformRadius + 560.f), 70.f);
+
+		// The rock it stands on. Without one the brazier hangs in open sky.
+		if (IslandArt)
+		{
+			const FBox IB = IslandArt->GetBoundingBox();
+			constexpr float RockWidth = 380.f;
+			const float RockScale = RockWidth / FMath::Max(FMath::Max(IB.GetSize().X, IB.GetSize().Y), 1.f);
+			// Drop it so its peak comes up past the brazier's foot: bedded in, not balanced on.
+			const float PeakZ = IB.Max.Z * RockScale;
+			AddMesh(IslandArt, FVector(Base.X, Base.Y, Base.Z + 45.f - PeakZ),
+				FRotator(0.f, HashRange(i * 91, 0.f, 360.f), 0.f), FVector(RockScale));
+			StillScenery.Add(SceneryMeshes.Num() - 1);
+		}
+
 		AddMesh(Brazier, Base, FRotator(0.f, HashRange(i * 83, 0.f, 360.f), 0.f), FVector(1.5f));
+		StillScenery.Add(SceneryMeshes.Num() - 1);
 
 		// A flame: two additive blobs that flicker in TickScenery.
 		const FVector FlameLoc = Base + FVector(0.f, 0.f, 120.f);
@@ -273,7 +328,7 @@ void AMoteArena::TickScenery(float DeltaSeconds)
 	for (int32 i = 0; i < SceneryMeshes.Num(); ++i)
 	{
 		UStaticMeshComponent* C = SceneryMeshes[i];
-		if (!C || !SceneryBaseTransforms.IsValidIndex(i) || i == bUnderRockIndex)
+		if (!C || !SceneryBaseTransforms.IsValidIndex(i) || StillScenery.Contains(i))
 		{
 			continue;
 		}

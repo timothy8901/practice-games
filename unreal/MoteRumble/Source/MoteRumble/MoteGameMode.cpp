@@ -659,9 +659,11 @@ void AMoteGameMode::TickFight(float Dt)
 			{
 				if (F)
 				{
-					UE_LOG(LogTemp, Warning, TEXT("MOTEDBG fighter %s loc=%s grounded=%d state=%d"),
+					const FBox Vis = F->GetVisualBounds();
+					UE_LOG(LogTemp, Warning, TEXT("MOTEDBG fighter %s loc=%s grounded=%d state=%d visZ=%.1f..%.1f"),
 						*F->GetFighterDef().DisplayName, *F->GetActorLocation().ToCompactString(),
-						F->IsGrounded() ? 1 : 0, static_cast<int32>(F->GetFighterState()));
+						F->IsGrounded() ? 1 : 0, static_cast<int32>(F->GetFighterState()),
+						Vis.Min.Z, Vis.Max.Z);
 				}
 			}
 			if (CameraDirector)

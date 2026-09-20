@@ -547,6 +547,19 @@ bool AMoteCharacter::IsGrounded() const
 	return GetCharacterMovement() && GetCharacterMovement()->IsMovingOnGround();
 }
 
+FBox AMoteCharacter::GetVisualBounds() const
+{
+	FBox Box(ForceInit);
+	for (const UStaticMeshComponent* C : { BodyMesh.Get(), GauntletL.Get(), GauntletR.Get(), WeaponMesh.Get() })
+	{
+		if (C && C->IsVisible() && C->GetStaticMesh())
+		{
+			Box += C->Bounds.GetBox();
+		}
+	}
+	return Box;
+}
+
 int32 AMoteCharacter::GetAirJumpsLeft() const
 {
 	return FMath::Max(0, GetFighterDef().AirJumps - AirJumpsUsed);

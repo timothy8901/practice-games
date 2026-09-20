@@ -149,6 +149,8 @@ public:
 	bool IsActiveInMatch() const { return State != EMoteFighterState::KO && State != EMoteFighterState::Inactive; }
 	bool IsInvulnerable() const { return InvulnTimer > 0.f || State == EMoteFighterState::Respawning; }
 	bool IsGrounded() const;
+	/** World-space bounds of the visible parts. Used by -MoteDebug to check footing. */
+	FBox GetVisualBounds() const;
 	bool IsAttacking() const { return State == EMoteFighterState::Attacking; }
 	bool IsShielding() const { return State == EMoteFighterState::Shielding; }
 	bool IsInHitstun() const { return State == EMoteFighterState::Hitstun; }

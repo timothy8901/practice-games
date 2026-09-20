@@ -84,6 +84,7 @@ protected:
 	UPROPERTY() TArray<TObjectPtr<UStaticMeshComponent>> Flames;
 	TArray<FVector> FlameBase;
 	UPROPERTY() TArray<TObjectPtr<UPointLightComponent>> FlameLights;
-	/** Index into SceneryMeshes of the rock under the platform (it must not bob). */
-	int32 bUnderRockIndex = INDEX_NONE;
+	/** Scenery that must stay put: the rock under the deck, and the braziers,
+	 *  whose flames are separate components that do not bob with them. */
+	TSet<int32> StillScenery;
 };

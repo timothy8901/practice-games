@@ -127,3 +127,9 @@ Trailer: `-MoteRecord=30 -ResX=1920 -ResY=1080` dumps 60 fps frames to
   correctly spelled property silently does nothing.
 * `FCanvasTriangleItem` asserts without a texture resource, and canvas text with
   a Slate font asserts unless the blend mode is translucent.
+* **A flat cap has no vertices over its middle.** It is tessellated as a fan, so
+  every vertex sits out at the rim. Sampling vertices to find the platform's
+  walkable deck found a redundant inner face 10 mesh units down instead, and the
+  art was fitted 88 cm too high - fighters stood buried to the waist. Measure
+  *area*: total the footprint of horizontal, up-facing triangles by height and
+  take the highest surface wide enough to be the floor (`FindDeckTop`).
