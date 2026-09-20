@@ -483,9 +483,13 @@ void UMoteAnimator::BuildPose(const FMoteAnimState& S, FMotePose& P) const
 			P.HandR = HandAt(75.f, R * 1.15f, 0.f);
 			P.WeaponRot = FRotator(-10.f, 80.f, 0.f);
 			break;
-		case 2:  // fists up
+		case 2:  // fists up, weapon stowed at the hip
 			P.HandR = FVector(R * 0.35f, R * 0.5f, BodyHeight * 0.55f);
 			P.HandL = FVector(R * 0.35f, -R * 0.5f, BodyHeight * 0.55f);
+			// Both fists are raised, so the weapon has no hand to sit in. It
+			// used to default to the body's origin - Disc's chakram sat halfway
+			// out of its chest and Cinder's bomb vanished inside it.
+			P.WeaponLoc = HandAt(80.f, R * 1.1f, -BodyHeight * 0.25f);
 			P.WeaponRot = FRotator(-60.f, 30.f, 0.f);
 			break;
 		default:  // weapon planted forward, heroic lean
