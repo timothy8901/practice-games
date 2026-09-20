@@ -188,7 +188,10 @@ void AMoteAIController::Tick(float DeltaSeconds)
 	{
 		if (FMath::FRand() < FMath::Lerp(0.15f, 0.9f, S))
 		{
-			bDefendByDodge = FMath::FRand() < FMath::Lerp(0.2f, 0.5f, S);
+			// Shielding is ground-only, so in the air the shield branch just
+			// zeroes the input and returns - the CPU went limp for the whole
+			// defend window. Air-dodge instead.
+			bDefendByDodge = !Me->IsGrounded() || FMath::FRand() < FMath::Lerp(0.2f, 0.5f, S);
 			DefendTimer = FMath::FRandRange(0.25f, 0.5f);
 		}
 	}

@@ -28,6 +28,9 @@ struct FMotePose
 	bool bWeaponVisible = true;
 	/** This frame should leave a weapon trail. */
 	bool bTrail = false;
+	/** There is something in hand to trail FROM. Distinct from bWeaponVisible,
+	 *  which is about the weapon mesh: Flare's weapon IS its gauntlets. */
+	bool bTrailSource = true;
 
 	/** Raw winding angle for spin moves, applied AFTER smoothing so a
 	 *  multi-turn sweep is not collapsed to the shortest path. */

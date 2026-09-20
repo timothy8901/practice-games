@@ -11,6 +11,7 @@
 #include "MoteFX.h"
 #include "MoteHUD.h"
 #include "MotePlayerController.h"
+#include "MoteProjectile.h"
 
 #include "Engine/Engine.h"
 #include "Engine/GameViewportClient.h"
@@ -195,6 +196,7 @@ AMoteCharacter* AMoteGameMode::SpawnFighter(int32 Index, EMoteCore Core, bool bC
 	Fighter->SetIsCPU(bCPU);
 	Fighter->SetFighter(Core);
 	Fighter->SetStocks(Menu.Stocks);
+	Fighter->ResetStats();
 	Fighter->ResetForMatch(Loc, Yaw);
 
 	if (bCPU)
@@ -246,6 +248,15 @@ void AMoteGameMode::ClearFighters()
 		}
 	}
 	Fighters.Reset();
+	// Anything still in flight now has a dead owner and would keep testing
+	// hits against whoever spawns next.
+	if (UWorld* W = GetWorld())
+	{
+		for (TActorIterator<AMoteProjectile> It(W); It; ++It)
+		{
+			It->Destroy();
+		}
+	}
 	RespawnTimers.Reset();
 	Winner = nullptr;
 	if (Arena)

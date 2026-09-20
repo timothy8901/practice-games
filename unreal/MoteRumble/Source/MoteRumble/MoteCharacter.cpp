@@ -443,11 +443,6 @@ void AMoteCharacter::ResetForMatch(const FVector& Location, float Yaw)
 	SetActorLocation(Location, false, nullptr, ETeleportType::ResetPhysics);
 	SetActorRotation(FRotator(0.f, Yaw, 0.f));
 
-	Percent = 0.f;
-	StatDamageDealt = 0.f;
-	StatKOs = 0;
-	StatFalls = 0;
-	StatMaxCombo = 0.f;
 	ShieldHP = MoteTuning::ShieldMax;
 	InvulnTimer = 0.f;
 	HitstunTimer = 0.f;
@@ -482,6 +477,9 @@ void AMoteCharacter::BeginRespawn(const FVector& HaloLocation, float Yaw)
 	RespawnHalo = HaloLocation;
 	SetActorLocation(HaloLocation, false, nullptr, ETeleportType::ResetPhysics);
 	SetActorRotation(FRotator(0.f, Yaw, 0.f));
+	// A KO claim must not outlive the stock it belongs to, or a later
+	// self-destruct is credited to whoever last landed a hit.
+	LastAttacker.Reset();
 	Percent = 0.f;
 	ShieldHP = MoteTuning::ShieldMax;
 	HitstunTimer = 0.f;
@@ -516,8 +514,20 @@ void AMoteCharacter::BeginRespawn(const FVector& HaloLocation, float Yaw)
 	}
 }
 
+void AMoteCharacter::ResetStats()
+{
+	Percent = 0.f;
+	StatDamageDealt = 0.f;
+	StatKOs = 0;
+	StatFalls = 0;
+	StatMaxCombo = 0.f;
+}
+
 void AMoteCharacter::EnterKO()
 {
+	// The Results transition and the intro beam-in both re-enter KO on a
+	// fighter that is already KO'd; only a real blast counts as a fall.
+	const bool bAlreadyKO = (State == EMoteFighterState::KO);
 	SetState(EMoteFighterState::KO);
 	Phase = EMoteMovePhase::None;
 	HitstopTimer = 0.f;
@@ -526,7 +536,10 @@ void AMoteCharacter::EnterKO()
 	GetCharacterMovement()->SetMovementMode(MOVE_None);
 	VisualRoot->SetVisibility(false, true);
 	if (Trail) { Trail->Clear(); }
-	++StatFalls;
+	if (!bAlreadyKO)
+	{
+		++StatFalls;
+	}
 }
 
 void AMoteCharacter::SetInactive()
@@ -871,6 +884,15 @@ void AMoteCharacter::TickTimers(float Dt)
 		BufferLight = BufferHeavy = BufferJump = BufferDodge = 0.f;
 	}
 
+	// A fighter who has been back on the deck, out of hitstun and untouched for
+	// a moment has escaped: walking off the edge after that is their own doing,
+	// not a KO for whoever last grazed them. Keyed on TimeSinceHurt rather than
+	// TimeSinceLanded, because a flat grounded flinch never re-lands.
+	if (LastAttacker.IsValid() && IsGrounded() && !IsInHitstun() && TimeSinceHurt > 1.5f)
+	{
+		LastAttacker.Reset();
+	}
+
 	// Combo counter: the chain breaks once the victim has been free for a moment.
 	if (ComboVictim.IsValid())
 	{
@@ -1021,9 +1043,11 @@ void AMoteCharacter::Landed(const FHitResult& Hit)
 
 	if (State == EMoteFighterState::Hitstun && bTumble && ImpactVel.Z < -1100.f)
 	{
-		// Ground bounce: pop back up, still tumbling.
-		GetCharacterMovement()->Velocity = FVector(ImpactVel.X * 0.55f, ImpactVel.Y * 0.55f, -ImpactVel.Z * 0.42f);
-		GetCharacterMovement()->SetMovementMode(MOVE_Falling);
+		// Ground bounce: pop back up, still tumbling. This MUST go through the
+		// deferred launch: Landed() is called from ProcessLanded while the
+		// component is still falling, so it calls SetPostLandedPhysics after
+		// we return and projects any Velocity we wrote straight onto the floor.
+		LaunchCharacter(FVector(ImpactVel.X * 0.55f, ImpactVel.Y * 0.55f, -ImpactVel.Z * 0.42f), true, true);
 		if (UMoteFX* FX = UMoteFX::Get(this))
 		{
 			FX->Dust(Foot, 1.4f);
@@ -1802,10 +1826,12 @@ EMoteHitResult AMoteCharacter::TakeHit(const FMoteHitInfo& Hit)
 	FVector Vel = Dir * FMath::Cos(Rad) * Speed + FVector(0.f, 0.f, FMath::Sin(Rad) * Speed);
 
 	const bool bStrong = KB >= MoteTuning::TumbleThreshold;
+	bool bFlatFlinch = false;
 	if (!bStrong && bGrounded && Vel.Z < 450.f)
 	{
 		Vel.Z = 0.f;  // flinches stay on the ground
 		Vel *= 0.8f;
+		bFlatFlinch = true;
 	}
 
 	// Cancel whatever we were doing.
@@ -1821,7 +1847,18 @@ EMoteHitResult AMoteCharacter::TakeHit(const FMoteHitInfo& Hit)
 	HitstunTimer = FMath::Max(bStrong ? 0.3f : 0.14f, KB * MoteTuning::HitstunPerKB);
 	bTumble = bStrong;
 	LaunchVel = Vel;
-	LaunchCharacter(Vel, true, true);
+	if (bFlatFlinch)
+	{
+		// LaunchCharacter always switches to MOVE_Falling, even for a purely
+		// horizontal shove. Through hitstop that left the victim "airborne"
+		// for the whole freeze, so every jab ended in a landing squash and the
+		// next hit treated a standing fighter as airborne.
+		Move->Velocity = FVector(Vel.X, Vel.Y, Move->Velocity.Z);
+	}
+	else
+	{
+		LaunchCharacter(Vel, true, true);
+	}
 
 	// Reel away from the attacker.
 	SetActorRotation(FRotator(0.f, (-Dir).Rotation().Yaw, 0.f));

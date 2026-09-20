@@ -117,6 +117,10 @@ public:
 
 	/** Place on the stage in a fresh state (match start). */
 	void ResetForMatch(const FVector& Location, float Yaw);
+	/** Zero percent and the results-screen stats. Match start only - the
+	 *  Results screen reuses ResetForMatch to pose the winner, and used to
+	 *  wipe the very numbers it was about to display. */
+	void ResetStats();
 	/** Put on the respawn halo; it drops onto the stage when released. */
 	void BeginRespawn(const FVector& HaloLocation, float Yaw);
 	/** Blast-zone crossing: hide, zero velocity, enter KO. The game mode decides what happens next. */

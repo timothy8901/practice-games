@@ -280,6 +280,7 @@ void UMoteAnimator::BuildAttackPose(const FMoteAnimState& S, FMotePose& P) const
 		if (!bStartup && !bCharging && (bActive ? PA > 0.25f : true))
 		{
 			P.bWeaponVisible = false;
+			P.bTrailSource = false;
 		}
 		break;
 	}
@@ -364,6 +365,7 @@ void UMoteAnimator::BuildAttackPose(const FMoteAnimState& S, FMotePose& P) const
 		if (A > 0.55f)
 		{
 			P.bWeaponVisible = true;  // the thrown weapon is back in hand
+			P.bTrailSource = true;
 		}
 	}
 }
@@ -609,7 +611,7 @@ void UMoteAnimator::UpdatePose(const FMoteAnimState& S, float DeltaSeconds)
 		}
 	}
 
-	bTrailWanted = P.bTrail && P.bWeaponVisible;
+	bTrailWanted = P.bTrail && P.bTrailSource;
 }
 
 void UMoteAnimator::GetTrailSegment(FVector& OutBase, FVector& OutTip) const

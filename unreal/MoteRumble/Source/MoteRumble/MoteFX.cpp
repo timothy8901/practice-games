@@ -528,6 +528,11 @@ void UMoteFX::LightningWarning(const FVector& GroundLocation, float Radius, floa
 		E->Color = Color;
 		E->StartIntensity = 3.f;
 		E->EndIntensity = 9.f;
+		// Hold the opacity flat. Spawn's default fades 1 -> 0, which exactly
+		// cancelled the intensity ramp: the warning ring peaked a third of the
+		// way in and was black by the time the bolt actually landed.
+		E->StartOpacity = 1.f;
+		E->EndOpacity = 1.f;
 		E->RingStart = 0.9f;
 		E->RingEnd = 0.55f;
 		E->RingWidth = 0.1f;
