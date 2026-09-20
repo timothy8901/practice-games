@@ -28,8 +28,8 @@ in `Source/MoteRumble/` are the source of truth for signatures.
 ## Space conventions
 
 * UE units: cm, seconds, degrees. +X forward, +Y right, +Z up.
-* The platform's walkable top is the disc of radius 1500 at **Z = 0**, centred
-  on the origin. Blast zones: horizontal radius 4300, top +3400, bottom -2300.
+* The platform's walkable top is the disc of radius 850 at **Z = 0**, centred
+  on the origin. Blast zones: horizontal radius 2900, top +2600, bottom -1700.
 * The gameplay camera looks along **+X** from the -X side, pitched down 30–40°.
   So P1 spawns at -Y (screen left) facing +Y, P2 at +Y facing -Y.
 * A fighter's capsule is radius 46, half-height 64. Its `VisualRoot` sits 30 cm
@@ -53,8 +53,9 @@ in `Source/MoteRumble/` are the source of truth for signatures.
 | `MoteAIController.*` | ai | CPU opponent |
 | `MoteArenaScenery.cpp` | scenery | platform art, sky islands, props, embers, lights |
 | `Tools/import_content.py` | content | imports art/audio, authors FX materials, builds the level |
-| `Tools/gen_audio.py` | audio | synthesizes all SFX/VO/music WAVs |
+| `Tools/gen_audio.py` | audio | synthesizes all 53 SFX/VO/music WAVs (numpy + macOS `say`) |
 | `Tools/make_video.py` | content | frames + cue log → MP4 with a rebuilt soundtrack |
+| `Tools/flip_glb_normals.py` | content | flips a sculpt that came out of the generator inside out |
 
 Modules talk through `UMoteEventHub` (hits, KOs, announcements, flashes,
 impacts). Presentation code never changes gameplay state.
@@ -108,3 +109,21 @@ $UE/Engine/Binaries/Mac/UnrealEditor-Cmd "$PROJ" -run=pythonscript -script="$(pw
 Trailer: `-MoteRecord=30 -ResX=1920 -ResY=1080` dumps 60 fps frames to
 `Recordings/frames` and a cue log to `Recordings/cues.json`; then
 `python3 Tools/make_video.py` builds `Recordings/mote_rumble_demo.mp4`.
+
+
+## Traps that cost a day (all of them silent)
+
+* **Interchange ignores import options** unless they are wrapped in an
+  `InterchangePipelineStackOverride`. Without it `CombineStaticMeshesBehavior`
+  never applies and a Thrixel GLB lands as ~15 separate static meshes.
+* **`LevelEditorSubsystem.new_level()` will not overwrite** an existing map and
+  reports nothing: the actors end up in an untitled level that never gets saved.
+  Switch to a scratch level, delete the map, then create it.
+* **Spawned lights default to Static mobility.** This project disables static
+  lighting, so a static light contributes exactly nothing.
+* **`unreal.Rotator(a, b, c)` is (roll, pitch, yaw)**, not (pitch, yaw, roll).
+  A "pitch -38" sun spent the day firing horizontally.
+* **UE misspells `AerialPespectiveViewDistanceScale`** ("Pespective"), so the
+  correctly spelled property silently does nothing.
+* `FCanvasTriangleItem` asserts without a texture resource, and canvas text with
+  a Slate font asserts unless the blend mode is translucent.

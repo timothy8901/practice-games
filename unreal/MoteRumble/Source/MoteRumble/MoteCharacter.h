@@ -141,6 +141,8 @@ public:
 
 	EMoteFighterState GetFighterState() const { return State; }
 	float GetPercent() const { return Percent; }
+	/** Demo/trailer only: start a fighter already damaged. */
+	void SetPercent(float InPercent) { Percent = FMath::Clamp(InPercent, 0.f, 999.f); }
 	int32 GetStocks() const { return Stocks; }
 	void SetStocks(int32 In) { Stocks = In; }
 	bool IsKO() const { return State == EMoteFighterState::KO; }

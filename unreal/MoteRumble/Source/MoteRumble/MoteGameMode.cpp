@@ -559,6 +559,15 @@ void AMoteGameMode::Tick(float DeltaSeconds)
 			{
 				if (F) { F->SetControlsLocked(false); }
 			}
+			// The attract loop exists to show off KOs, and a fight from 0% will
+			// not reach one inside a short clip - so start it already heated.
+			if (bDemoMode)
+			{
+				for (AMoteCharacter* F : Fighters)
+				{
+					if (F) { F->SetPercent(FMath::FRandRange(58.f, 92.f)); }
+				}
+			}
 			SetPhase(EMoteMatchPhase::Fight);
 		}
 		break;

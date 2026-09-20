@@ -18,7 +18,7 @@ namespace
 {
 	/** The gameplay camera always looks this way down the world X axis. */
 	constexpr float GameplayYaw = 0.f;
-	constexpr float MinDistance = 1650.f;
+	constexpr float MinDistance = 1450.f;
 	constexpr float MaxDistance = 5600.f;
 	constexpr float MinPitch = -38.f;
 	constexpr float MaxPitch = -24.f;
@@ -149,6 +149,11 @@ void AMoteCameraDirector::GatherTargets(TArray<FVector>& OutPoints, AMoteGameMod
 		{
 			continue;
 		}
+		// Someone waiting on the respawn halo is not the action.
+		if (F->GetFighterState() == EMoteFighterState::Respawning)
+		{
+			continue;
+		}
 		const FVector P = F->GetActorLocation();
 		if (Arena && Arena->IsOutsideBlastZone(P))
 		{
@@ -259,8 +264,8 @@ void AMoteCameraDirector::Tick(float DeltaSeconds)
 				Box += P;
 			}
 			// Always keep a decent slice of the platform in frame.
-			Box += FVector(0.f, -PlatformR * 0.42f, 0.f);
-			Box += FVector(0.f, PlatformR * 0.42f, 0.f);
+			Box += FVector(0.f, -PlatformR * 0.3f, 0.f);
+			Box += FVector(0.f, PlatformR * 0.3f, 0.f);
 			Centre = Box.GetCenter();
 			const FVector Extent = Box.GetExtent();
 			SpreadY = FMath::Max(Extent.Y, 400.f);
@@ -270,9 +275,9 @@ void AMoteCameraDirector::Tick(float DeltaSeconds)
 
 		// Fit horizontally (FOV is horizontal in UE) and vertically (16:9-ish).
 		const float HalfH = FMath::DegreesToRadians(FieldOfView * 0.5f);
-		const float NeedH = (SpreadY + 300.f) / FMath::Tan(HalfH);
+		const float NeedH = (SpreadY + 230.f) / FMath::Tan(HalfH);
 		const float HalfV = FMath::Atan(FMath::Tan(HalfH) * 0.5625f);
-		const float NeedV = (SpreadZ + 300.f) / FMath::Tan(HalfV);
+		const float NeedV = (SpreadZ + 240.f) / FMath::Tan(HalfV);
 		TargetDistance = FMath::Clamp(FMath::Max(NeedH, NeedV), MinDistance, MaxDistance);
 
 		// Leave room for the HUD panels and follow fighters knocked below the stage.

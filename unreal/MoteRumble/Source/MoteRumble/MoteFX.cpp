@@ -696,8 +696,8 @@ void UMoteFX::KOBlast(const FVector& Location, const FVector& InwardDirection, c
 
 void UMoteFX::RespawnBeam(const FVector& Location, const FLinearColor& Color)
 {
-	Beam(Location + FVector(0.f, 0.f, -260.f), Location + FVector(0.f, 0.f, 1400.f), 150.f, Color, 0.7f);
-	Flash(Location, 220.f, FLinearColor::White, 0.35f, 9.f);
+	Beam(Location + FVector(0.f, 0.f, -180.f), Location + FVector(0.f, 0.f, 620.f), 62.f, Color, 0.5f);
+	Flash(Location, 150.f, FLinearColor::White, 0.3f, 7.f);
 	Ring(Location + FVector(0.f, 0.f, -70.f), FRotator::ZeroRotator, 320.f, Color, 0.6f, 0.12f, 7.f);
 	for (int32 i = 0; i < 10; ++i)
 	{
