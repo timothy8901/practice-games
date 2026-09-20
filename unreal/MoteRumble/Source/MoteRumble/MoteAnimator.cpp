@@ -54,6 +54,12 @@ void UMoteAnimator::Initialize(USceneComponent* InBodyPivot, UStaticMeshComponen
 	WeaponReach = FMath::Max(InWeaponReach, 30.f);
 	GauntletScaleR = InGauntletR ? InGauntletR->GetRelativeScale3D() : FVector::OneVector;
 	GauntletScaleL = InGauntletL ? InGauntletL->GetRelativeScale3D() : FVector(1.f, -1.f, 1.f);
+	// FitMesh centres each gauntlet's bounds on its own origin by writing a
+	// relative location. The gauntlet GLBs are modelled from their base, so
+	// that offset is 9-22 cm; posing used to overwrite it and the fist ended
+	// up floating above the grip. Keep it and add it back every frame.
+	GauntletOffsetR = InGauntletR ? InGauntletR->GetRelativeLocation() : FVector::ZeroVector;
+	GauntletOffsetL = InGauntletL ? InGauntletL->GetRelativeLocation() : FVector::ZeroVector;
 	bInitialised = false;
 }
 
@@ -196,7 +202,7 @@ void UMoteAnimator::BuildAttackPose(const FMoteAnimState& S, FMotePose& P) const
 		P.HandR = FVector(R * Fwd, R * 0.30f + Tremble, Height);
 		P.HandL = FVector(R * Fwd * 0.9f, -R * 0.30f, Height);
 		P.WeaponLoc = (P.HandR + P.HandL) * 0.5f;
-		P.WeaponRot = FRotator(FMath::Lerp(FMath::Lerp(-30.f, -86.f, Up), 74.f, Down), 0.f, 0.f);
+		P.WeaponRot = FRotator(FMath::Lerp(FMath::Lerp(30.f, 86.f, Up), -74.f, Down), 0.f, 0.f);
 		P.BodyRot.Pitch += FMath::Lerp(-14.f * Up, 26.f * Down, Down);
 		P.BodyScale.Z *= 1.f + Up * 0.06f - Down * 0.10f;
 		break;
@@ -228,7 +234,7 @@ void UMoteAnimator::BuildAttackPose(const FMoteAnimState& S, FMotePose& P) const
 		P.HandR = FVector(R * 0.75f, R * 0.18f, Height + Tremble);
 		P.HandL = HandAt(-52.f, R, -BodyHeight * 0.05f);
 		P.WeaponLoc = P.HandR;
-		P.WeaponRot = FRotator(FMath::Lerp(20.f, -84.f, Rise), 0.f, 0.f);
+		P.WeaponRot = FRotator(FMath::Lerp(-20.f, 84.f, Rise), 0.f, 0.f);
 		P.BodyRot.Pitch -= Rise * 18.f;
 		P.BodyScale.Z *= 1.f + Rise * 0.12f;
 		break;
@@ -238,11 +244,14 @@ void UMoteAnimator::BuildAttackPose(const FMoteAnimState& S, FMotePose& P) const
 	case EMoteMoveAnim::Twirl:
 	case EMoteMoveAnim::ParasolSpin:
 	{
-		// The whole body spins with the weapon held out.
+		// The whole fighter spins with the weapon held out. SpinYaw is applied
+		// after smoothing (see UpdatePose) so the hands and weapon orbit with
+		// the body - writing it into BodyRot only ever turned the egg, because
+		// the gauntlets and weapon are siblings of BodyPivot, not children.
 		const float Turns = (S.MoveAnim == EMoteMoveAnim::SpinSlash) ? 1.f : 2.f;
 		const float Spin = Strike * 360.f * Turns;
 		const float Out = FMath::Lerp(0.85f, 1.25f, Strike);
-		P.BodyRot.Yaw += Spin;
+		P.SpinYaw = Spin;
 		P.HandR = HandAt(70.f, R * Out, -BodyHeight * 0.02f);
 		P.HandL = HandAt(-70.f, R * Out, -BodyHeight * 0.02f);
 		P.WeaponLoc = P.HandR;
@@ -310,10 +319,10 @@ void UMoteAnimator::BuildAttackPose(const FMoteAnimState& S, FMotePose& P) const
 	case EMoteMoveAnim::Plunge:
 	{
 		// Point everything straight down and dive.
-		P.HandR = FVector(R * 0.35f, R * 0.22f, -BodyHeight * 0.45f);
-		P.HandL = FVector(R * 0.35f, -R * 0.22f, -BodyHeight * 0.45f);
+		P.HandR = FVector(R * 0.35f, R * 0.22f, -BodyHeight * 0.2f);
+		P.HandL = FVector(R * 0.35f, -R * 0.22f, -BodyHeight * 0.2f);
 		P.WeaponLoc = (P.HandR + P.HandL) * 0.5f;
-		P.WeaponRot = FRotator(88.f, 0.f, 0.f);
+		P.WeaponRot = FRotator(-88.f, 0.f, 0.f);
 		P.BodyRot.Pitch += 26.f;
 		P.BodyScale.Z *= 1.12f;
 		P.BodyScale.X *= 0.94f;
@@ -330,7 +339,7 @@ void UMoteAnimator::BuildAttackPose(const FMoteAnimState& S, FMotePose& P) const
 			FMath::Lerp(FMath::Lerp(0.f, BodyHeight * 0.9f, Raise), BodyHeight * 0.35f, Point) + Tremble);
 		P.HandL = HandAt(-60.f, R, -BodyHeight * 0.05f);
 		P.WeaponLoc = P.HandR;
-		P.WeaponRot = FRotator(FMath::Lerp(-88.f, -30.f, Point), 0.f, 0.f);
+		P.WeaponRot = FRotator(FMath::Lerp(88.f, 30.f, Point), 0.f, 0.f);
 		P.BodyRot.Pitch -= Raise * 14.f - Point * 20.f;
 		break;
 	}
@@ -465,7 +474,7 @@ void UMoteAnimator::BuildPose(const FMoteAnimState& S, FMotePose& P) const
 		{
 		case 0:  // weapon raised high
 			P.HandR = FVector(R * 0.3f, R * 0.25f, BodyHeight * 0.9f);
-			P.WeaponRot = FRotator(-85.f, 0.f, 0.f);
+			P.WeaponRot = FRotator(85.f, 0.f, 0.f);
 			break;
 		case 1:  // slow spin with the weapon out
 			P.BodyRot.Yaw += T * 90.f;
@@ -479,7 +488,7 @@ void UMoteAnimator::BuildPose(const FMoteAnimState& S, FMotePose& P) const
 			break;
 		default:  // weapon planted forward, heroic lean
 			P.HandR = FVector(R * 0.95f, R * 0.2f, -BodyHeight * 0.25f);
-			P.WeaponRot = FRotator(70.f, 0.f, 0.f);
+			P.WeaponRot = FRotator(-70.f, 0.f, 0.f);
 			P.BodyRot.Pitch += 6.f;
 			break;
 		}
@@ -569,16 +578,27 @@ void UMoteAnimator::UpdatePose(const FMoteAnimState& S, float DeltaSeconds)
 	SmoothedWeaponRot = FMath::Lerp(SmoothedWeaponRot, P.WeaponRot, Blend);
 
 	BodyPivot->SetRelativeLocation(SmoothedBodyOffset);
-	BodyPivot->SetRelativeRotation(SmoothedBodyRot);
 	BodyPivot->SetRelativeScale3D(SmoothedBodyScale);
 
-	GauntletR->SetRelativeLocation(SmoothedHandR);
-	GauntletL->SetRelativeLocation(SmoothedHandL);
-	GauntletR->SetRelativeRotation(P.HandRRot);
-	GauntletL->SetRelativeRotation(P.HandLRot);
+	// Spin is applied here, on top of the smoothed pose, rather than baked into
+	// it: an FRotator lerp always takes the short way round, and a vector lerp
+	// across a half-turn chord would drag the fists through the torso. Both
+	// turned multi-turn sweeps into a static "arms out" pose.
+	const FRotator SpinRot(0.f, P.SpinYaw, 0.f);
+	const bool bSpin = !FMath::IsNearlyZero(P.SpinYaw);
 
-	WeaponPivot->SetRelativeLocation(SmoothedWeaponLoc);
-	WeaponPivot->SetRelativeRotation(SmoothedWeaponRot);
+	BodyPivot->SetRelativeRotation(bSpin ? SmoothedBodyRot + SpinRot : SmoothedBodyRot);
+
+	const FVector HandR = bSpin ? SmoothedHandR.RotateAngleAxis(P.SpinYaw, FVector::UpVector) : SmoothedHandR;
+	const FVector HandL = bSpin ? SmoothedHandL.RotateAngleAxis(P.SpinYaw, FVector::UpVector) : SmoothedHandL;
+	GauntletR->SetRelativeLocation(HandR + GauntletOffsetR);
+	GauntletL->SetRelativeLocation(HandL + GauntletOffsetL);
+	GauntletR->SetRelativeRotation(P.HandRRot + SpinRot);
+	GauntletL->SetRelativeRotation(P.HandLRot + SpinRot);
+
+	WeaponPivot->SetRelativeLocation(bSpin
+		? SmoothedWeaponLoc.RotateAngleAxis(P.SpinYaw, FVector::UpVector) : SmoothedWeaponLoc);
+	WeaponPivot->SetRelativeRotation(SmoothedWeaponRot + SpinRot);
 
 	if (WeaponMesh)
 	{

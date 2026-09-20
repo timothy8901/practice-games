@@ -79,8 +79,12 @@ def build_track(cues, duration):
         if bed is None:
             continue
         start = int(cue["t"] * SR)
-        end = int(music[i + 1]["t"] * SR) if i + 1 < len(music) else total
+        # The last bed has to END where the video ends, not in the tail padding,
+        # or its fade-out is discarded by ffmpeg and the music stops dead on the
+        # final frame.
+        end = int(music[i + 1]["t"] * SR) if i + 1 < len(music) else int(duration * SR)
         end = min(end, total)
+        start = max(start, 0)
         if end <= start:
             continue
         need = end - start
@@ -101,9 +105,15 @@ def build_track(cues, duration):
             continue
         s = pitched(s, float(cue.get("pitch", 1.0))) * float(cue.get("vol", 1.0))
         at = int(cue["t"] * SR)
+        if at < 0:
+            # --start trims into the middle of a sound: keep the tail of it
+            # rather than indexing the track with a negative offset.
+            s = s[-at:]
+            at = 0
+        if len(s) == 0 or at >= total:
+            continue
         end = min(total, at + len(s))
-        if at < total:
-            track[at:end] += s[: end - at]
+        track[at:end] += s[: end - at]
 
     if missing:
         print("  (no wav for: {})".format(", ".join(sorted(missing))))
@@ -112,6 +122,13 @@ def build_track(cues, duration):
     peak = np.max(np.abs(track)) + 1e-9
     if peak > 1.0:
         track = np.tanh(track / peak * 1.4) * 0.92
+
+    # Always land the ending softly, whatever the last cue happened to be.
+    tail = min(int(0.5 * SR), int(duration * SR))
+    if tail > 0:
+        cut = int(duration * SR)
+        track[cut - tail:cut] *= np.linspace(1, 0, tail)[:, None]
+        track[cut:] = 0.0
     return (np.clip(track, -1, 1) * 32767).astype("<i2")
 
 

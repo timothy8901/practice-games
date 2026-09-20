@@ -96,7 +96,7 @@ PROJ=$(pwd)/MoteRumble.uproject   # absolute path to this worktree's project
 $UE/Engine/Build/BatchFiles/Mac/Build.sh MoteRumbleEditor Mac Development -Project="$PROJ" -WaitMutex
 # Play (uncooked) - exits by itself:
 $UE/Engine/Binaries/Mac/UnrealEditor.app/Contents/MacOS/UnrealEditor "$PROJ" -game -windowed \
-  -ResX=1280 -ResY=720 -MoteDemo -MoteShots -MoteQuitAfter=45 -nosplash -unattended
+  -ForceRes -ResX=1280 -ResY=720 -MoteDemo -MoteShots -MoteQuitAfter=45 -nosplash -unattended
 # Screenshots land in Saved/Shots/. Logs: ~/Library/Logs/Unreal Engine/MoteRumbleEditor/
 ```
 
@@ -106,12 +106,24 @@ Headless editor Python (content pipeline):
 $UE/Engine/Binaries/Mac/UnrealEditor-Cmd "$PROJ" -run=pythonscript -script="$(pwd)/Tools/import_content.py" -unattended -nosplash -nop4
 ```
 
-Trailer: `-MoteRecord=30 -ResX=1920 -ResY=1080` dumps 60 fps frames to
+Trailer: `-MoteRecord=30 -ForceRes -ResX=1920 -ResY=1080` dumps 60 fps frames to
 `Recordings/frames` and a cue log to `Recordings/cues.json`; then
 `python3 Tools/make_video.py` builds `Recordings/mote_rumble_demo.mp4`.
 
 
 ## Traps that cost a day (all of them silent)
+
+* **`-ResX/-ResY` alone do not size the window.** Without `-ForceRes` the game
+  opens at whatever the saved user settings say - here 1440x1080 - so every
+  recording came out 4:3 while the command line asked for 16:9, and the camera
+  solved its framing against an aspect it was never rendered at.
+* **A recording run wipes `Recordings/frames` at startup** (`StartPlay`). Never
+  launch a second instance while a capture is in flight; it will delete the
+  frames the first one has already written.
+* **Material usage flags are not inferred.** A material used by an
+  `InstancedStaticMeshComponent` without `bUsedWithInstancedStaticMeshes` is
+  silently swapped for the default grey one at runtime - the arena's 90 embers
+  rendered as grey marbles for the life of the project over this.
 
 * **Interchange ignores import options** unless they are wrapped in an
   `InterchangePipelineStackOverride`. Without it `CombineStaticMeshesBehavior`

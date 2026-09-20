@@ -325,6 +325,18 @@ def finish(mat, unlit=True, blend=unreal.BlendMode.BLEND_ADDITIVE, two_sided=Tru
         mat.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_UNLIT)
     mat.set_editor_property("blend_mode", blend)
     mat.set_editor_property("two_sided", two_sided)
+    # Usage flags are NOT inferred. Without these the engine silently swaps in
+    # the default grey material at runtime and only whispers about it in the
+    # log - which is exactly what happened to the arena's 90 drifting embers,
+    # an InstancedStaticMeshComponent, for the life of the project.
+    for flag in ("used_with_instanced_static_meshes",
+                 "used_with_static_lighting",
+                 "used_with_particle_sprites",
+                 "used_with_mesh_particles"):
+        try:
+            mat.set_editor_property(flag, True)
+        except Exception:
+            pass
     MEL.recompile_material(mat)
     EAL.save_asset(mat.get_path_name())
 

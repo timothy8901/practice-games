@@ -54,7 +54,7 @@ void AMoteGameMode::InitGame(const FString& MapName, const FString& Options, FSt
 	bQuickMode = FParse::Param(Cmd, TEXT("MoteQuick"));
 	bShotsMode = FParse::Param(Cmd, TEXT("MoteShots"));
 	FParse::Value(Cmd, TEXT("MoteRecord="), RecordSeconds);
-	FParse::Value(Cmd, TEXT("MoteLevel="), CmdLevel);
+	const bool bLevelGiven = FParse::Value(Cmd, TEXT("MoteLevel="), CmdLevel);
 	FParse::Value(Cmd, TEXT("MoteQuitAfter="), QuitAfterSeconds);
 	CmdLevel = FMath::Clamp(CmdLevel, 1, 9);
 
@@ -75,6 +75,12 @@ void AMoteGameMode::InitGame(const FString& MapName, const FString& Options, FSt
 		bDemoMode = true;
 		FApp::SetUseFixedTimeStep(true);
 		FApp::SetFixedDeltaTime(1.0 / 60.0);
+	}
+
+	// The attract loop should look like skilled play, not a sparring drill.
+	if (bDemoMode && !bLevelGiven)
+	{
+		CmdLevel = 8;
 	}
 }
 
@@ -565,7 +571,9 @@ void AMoteGameMode::Tick(float DeltaSeconds)
 			{
 				for (AMoteCharacter* F : Fighters)
 				{
-					if (F) { F->SetPercent(FMath::FRandRange(58.f, 92.f)); }
+					// High enough that a clean signature hit actually sends
+					// someone through a blast zone inside a 30-second clip.
+					if (F) { F->SetPercent(FMath::FRandRange(96.f, 138.f)); }
 				}
 			}
 			SetPhase(EMoteMatchPhase::Fight);
@@ -660,10 +668,10 @@ void AMoteGameMode::TickFight(float Dt)
 				if (F)
 				{
 					const FBox Vis = F->GetVisualBounds();
-					UE_LOG(LogTemp, Warning, TEXT("MOTEDBG fighter %s loc=%s grounded=%d state=%d visZ=%.1f..%.1f"),
+					UE_LOG(LogTemp, Warning, TEXT("MOTEDBG fighter %s loc=%s grounded=%d state=%d visZ=%.1f..%.1f pct=%.0f stocks=%d"),
 						*F->GetFighterDef().DisplayName, *F->GetActorLocation().ToCompactString(),
 						F->IsGrounded() ? 1 : 0, static_cast<int32>(F->GetFighterState()),
-						Vis.Min.Z, Vis.Max.Z);
+						Vis.Min.Z, Vis.Max.Z, F->GetPercent(), F->GetStocks());
 				}
 			}
 			if (CameraDirector)

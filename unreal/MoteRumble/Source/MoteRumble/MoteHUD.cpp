@@ -14,6 +14,8 @@
 #include "Engine/Canvas.h"
 #include "Engine/Engine.h"
 #include "Engine/Font.h"
+#include "Fonts/FontMeasure.h"
+#include "Framework/Application/SlateApplication.h"
 #include "Misc/App.h"
 
 namespace
@@ -179,12 +181,27 @@ FVector2D AMoteHUD::Text(const FString& String, float X, float Y, float Size, co
 	Item.SlateFontInfo = Info;
 	Item.BlendMode = SE_BLEND_Translucent;
 
-	float W = 0.f, H = 0.f;
-	Canvas->StrLen(Font, String, W, H);
-	// StrLen measures at the font's own size; rescale to the size we asked for.
-	const float Measured = FMath::Max(H, 1.f);
-	W *= Size / Measured;
-	H = Size;
+	// Measure with the SAME font info we are about to draw with. Canvas->StrLen
+	// uses the UFont's legacy metrics - the wrong typeface and the wrong size -
+	// and rescaling its width by Size/LineHeight then undershoots by a third.
+	// That put the "%" on top of the last digit and pushed every centred string
+	// off centre.
+	float W = 0.f, H = Size;
+	if (FSlateApplication::IsInitialized())
+	{
+		const TSharedRef<FSlateFontMeasure> Measurer =
+			FSlateApplication::Get().GetRenderer()->GetFontMeasureService();
+		const FVector2D Measured(Measurer->Measure(String, Info));
+		W = static_cast<float>(Measured.X);
+		H = FMath::Max(static_cast<float>(Measured.Y), 1.f);
+	}
+	else
+	{
+		Canvas->StrLen(Font, String, W, H);
+		const float Line = FMath::Max(H, 1.f);
+		W *= Size / Line;
+		H = Size;
+	}
 
 	const float DrawX = bCentre ? X - W * 0.5f : X;
 	if (bShadow)
@@ -241,9 +258,12 @@ void AMoteHUD::DrawFighterPanel(AMoteCharacter* Fighter, int32 Index, int32 Coun
 	const FVector2D NumSize = Text(Number, X + OffX + 26.f * S, Y + 40.f * S, 62.f * S * Pop, Col, false, true, TEXT("Black"));
 	Text(TEXT("%"), X + OffX + 26.f * S + NumSize.X + 6.f * S, Y + 66.f * S, 28.f * S, Col, false, true, TEXT("Black"));
 
-	// Stock pips.
+	// Stock pips: one per stock this match was started with, not a fixed five.
+	// Hard-coding 5 made a full 3-stock bar read as "two lives already gone".
+	const AMoteGameMode* GM = GetMoteGameMode();
+	const int32 PipCount = FMath::Clamp(GM ? GM->GetMenu().Stocks : MoteTuning::DefaultStocks, 1, 9);
 	const float PipR = 11.f * S;
-	for (int32 i = 0; i < 5; ++i)
+	for (int32 i = 0; i < PipCount; ++i)
 	{
 		const bool bAlive = i < Fighter->GetStocks();
 		const float PX = X + OffX + PanelW - 40.f * S - i * (PipR * 2.6f);
@@ -252,8 +272,11 @@ void AMoteHUD::DrawFighterPanel(AMoteCharacter* Fighter, int32 Index, int32 Coun
 			bAlive ? Accent : FLinearColor(1.f, 1.f, 1.f, 0.14f));
 	}
 
-	// Respawn countdown reads as a dimmed panel with a timer.
-	if (Fighter->GetFighterState() == EMoteFighterState::KO && Fighter->GetStocks() > 0)
+	// Respawn tag - only once the fight is actually under way. StartMatch parks
+	// both fighters in KO so they can beam in during the intro, and an entrance
+	// is not a respawn: without this gate every demo opened on "RESPAWNING".
+	if (GM && GM->GetPhase() == EMoteMatchPhase::Fight
+		&& Fighter->GetFighterState() == EMoteFighterState::KO && Fighter->GetStocks() > 0)
 	{
 		Text(TEXT("RESPAWNING"), X + OffX + PanelW - 70.f * S, Y + 88.f * S, 18.f * S,
 			FLinearColor(1.f, 1.f, 1.f, 0.6f), true, true, TEXT("Bold"));
@@ -294,9 +317,14 @@ void AMoteHUD::DrawOffscreenMarkers(AMoteGameMode* GM)
 		const FVector2D Centre(Canvas->ClipX * 0.5f, Canvas->ClipY * 0.5f);
 		FVector2D Dir = (P - Centre).GetSafeNormal();
 		const float Margin = 62.f * S;
-		const FVector2D Edge = Centre + Dir * FVector2D(
-			FMath::Min(FMath::Abs(Centre.X - Margin), FMath::Abs(Centre.X - Margin)),
-			FMath::Min(FMath::Abs(Centre.Y - Margin), FMath::Abs(Centre.Y - Margin)));
+		// Push along Dir until it meets the nearer of the two frame edges, so the
+		// bubble actually hugs the border. Scaling each axis independently (as
+		// this once did) leaves diagonal markers floating inside the frame.
+		const float HalfX = FMath::Max(Centre.X - Margin, 1.f);
+		const float HalfY = FMath::Max(Centre.Y - Margin, 1.f);
+		const float TravelX = (FMath::Abs(Dir.X) > KINDA_SMALL_NUMBER) ? HalfX / FMath::Abs(Dir.X) : BIG_NUMBER;
+		const float TravelY = (FMath::Abs(Dir.Y) > KINDA_SMALL_NUMBER) ? HalfY / FMath::Abs(Dir.Y) : BIG_NUMBER;
+		const FVector2D Edge = Centre + Dir * FMath::Min(TravelX, TravelY);
 		const FVector2D At(
 			FMath::Clamp(Edge.X, Margin, Canvas->ClipX - Margin),
 			FMath::Clamp(Edge.Y, Margin, Canvas->ClipY - Margin));

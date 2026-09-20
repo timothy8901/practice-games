@@ -110,6 +110,8 @@ public:
 	void SetShieldHeld(bool bHeld);
 	/** Roll (ground) or air dodge in the current move-input direction. */
 	void PressDodge();
+	/** Dodge aimed at press time, so a buffered roll keeps the direction it was asked for. */
+	void PressDodge(const FVector2D& Dir);
 
 	// ---- Match flow --------------------------------------------------------------
 
@@ -276,6 +278,7 @@ protected:
 	float BufferHeavy = 0.f;
 	float BufferJump = 0.f;
 	float BufferDodge = 0.f;
+	FVector2D BufferDodgeDir = FVector2D::ZeroVector;
 
 	// Move
 	EMoteMoveSlot MoveSlot = EMoteMoveSlot::Jab1;

@@ -28,6 +28,10 @@ struct FMotePose
 	bool bWeaponVisible = true;
 	/** This frame should leave a weapon trail. */
 	bool bTrail = false;
+
+	/** Raw winding angle for spin moves, applied AFTER smoothing so a
+	 *  multi-turn sweep is not collapsed to the shortest path. */
+	float SpinYaw = 0.f;
 };
 
 /**
@@ -104,6 +108,10 @@ protected:
 	float WeaponReach = 150.f;
 	FVector GauntletScaleL = FVector::OneVector;
 	FVector GauntletScaleR = FVector::OneVector;
+	/** FitMesh's bounds-centring offset, which posing must preserve or the
+	 *  fist renders off the grip. */
+	FVector GauntletOffsetL = FVector::ZeroVector;
+	FVector GauntletOffsetR = FVector::ZeroVector;
 	bool bTrailWanted = false;
 
 	// ---- inter-frame smoothing ----

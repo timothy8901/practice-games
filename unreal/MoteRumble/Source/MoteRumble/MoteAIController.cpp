@@ -127,7 +127,26 @@ void AMoteAIController::Tick(float DeltaSeconds)
 
 	if (!Foe)
 	{
-		Me->SetMoveInput(FVector2D::ZeroVector);
+		// The only opponent is KO'd or waiting on the respawn halo. Let go of
+		// everything held - otherwise the shield stays up and drains, or a held
+		// charge auto-fires at nothing - and keep moving, because a statue in
+		// the middle of the stage reads as a hang.
+		Me->SetShieldHeld(false);
+		if (ChargeTimer > 0.f)
+		{
+			ChargeTimer = 0.f;
+			Me->ReleaseHeavy();
+		}
+		const float FromCentre = MyLoc.Size2D();
+		FVector2D Drift(-MyLoc.X, -MyLoc.Y);
+		Drift = Drift.GetSafeNormal() * (FromCentre > Radius * 0.45f ? 0.85f : 0.f);
+		if (Drift.IsNearlyZero())
+		{
+			// Idle pacing so the stage never looks frozen.
+			Drift = FVector2D(0.f, StrafeSign * 0.35f);
+		}
+		Me->SetMoveInput(Drift);
+		LogState(TEXT("wait"));
 		return;
 	}
 
@@ -146,7 +165,11 @@ void AMoteAIController::Tick(float DeltaSeconds)
 	const FMoteMoveDef& Jab = Def.GetMove(EMoteMoveSlot::Jab1);
 	const bool bZoner = (Heavy.Projectile != EMoteProjectileKind::None);
 	const float JabRange = Jab.Reach + 40.f;
-	const float PreferredRange = bZoner ? 820.f : JabRange * 0.8f;
+	// A zoner still wants to outrange a jab, but 820 cm on an 850 cm stage meant
+	// it spent the whole match sprinting away and nobody ever landed anything.
+	const float PreferredRange = bZoner
+		? FMath::Clamp(JabRange * 2.2f, 280.f, Radius * 0.45f)
+		: JabRange * 0.8f;
 
 	// Is the opponent about to hit us?
 	bool bIncoming = false;
@@ -174,9 +197,15 @@ void AMoteAIController::Tick(float DeltaSeconds)
 		DefendTimer -= DeltaSeconds;
 		if (bDefendByDodge)
 		{
-			Me->SetMoveInput(-ToFoeDir);  // roll away from the attacker
-			Me->PressDodge();
+			// Terminal: every branch below calls SetMoveInput again, and the
+			// pawn only reads the direction when it consumes the buffered
+			// dodge - so without the return the roll used whatever the punish
+			// or neutral branch wrote, and went straight into the attacker.
+			Me->SetShieldHeld(false);
+			Me->PressDodge(-ToFoeDir);  // roll away from the attacker
 			DefendTimer = 0.f;
+			LogState(TEXT("dodge"));
+			return;
 		}
 		else
 		{
@@ -248,7 +277,14 @@ void AMoteAIController::Tick(float DeltaSeconds)
 	const float RangeError = Dist - PreferredRange;
 	if (FMath::Abs(RangeError) > 60.f)
 	{
-		Move = ToFoeDir * FMath::Clamp(RangeError / 220.f, -1.f, 1.f);
+		// Asymmetric on purpose. A symmetric ramp decays the closing stick to
+		// nothing exactly as the chaser arrives, so two fighters settle just
+		// outside jab range and circle each other for the whole match. Close
+		// hard; back off gently.
+		const float Drive = (RangeError > 0.f)
+			? FMath::Min(RangeError / 90.f, 1.f)
+			: FMath::Max(RangeError / 220.f, -0.45f);
+		Move = ToFoeDir * Drive;
 	}
 	if (bThink && FMath::FRand() < 0.18f)
 	{
@@ -302,7 +338,10 @@ void AMoteAIController::Tick(float DeltaSeconds)
 		return;
 	}
 
-	if (bZoner && Dist > JabRange * 1.6f && Dist < 2200.f)
+	// JabRange, not JabRange * 1.6: the gap between the two left a dead band
+	// where a zoner would neither shoot nor jab, which is where it spent most
+	// of the match.
+	if (bZoner && Dist > JabRange && Dist < 2200.f)
 	{
 		if (FMath::FRand() < AttackChance)
 		{

@@ -423,6 +423,14 @@ void AMoteCharacter::SetShieldHeld(bool bHeld)
 
 void AMoteCharacter::PressDodge()
 {
+	PressDodge(MoveInput);
+}
+
+void AMoteCharacter::PressDodge(const FVector2D& Dir)
+{
+	// Remember the aim now: MoveInput can be rewritten several times before the
+	// buffer is consumed, which sent every AI roll the wrong way.
+	BufferDodgeDir = Dir.GetClampedToMaxSize(1.f);
 	BufferDodge = InputBuffer;
 }
 
@@ -763,7 +771,7 @@ void AMoteCharacter::Tick(float DeltaSeconds)
 			if (BufferDodge > 0.f && (bGrounded || !bAirDodgeUsed))
 			{
 				BufferDodge = 0.f;
-				StartDodge(FVector(MoveInput.X, MoveInput.Y, 0.f));
+				StartDodge(FVector(BufferDodgeDir.X, BufferDodgeDir.Y, 0.f));
 				bActed = true;
 			}
 			else if (bShieldHeld && bGrounded && ShieldHP > 1.f)
@@ -1134,7 +1142,7 @@ void AMoteCharacter::TickShield(float Dt)
 	if (BufferDodge > 0.f)
 	{
 		BufferDodge = 0.f;
-		StartDodge(FVector(MoveInput.X, MoveInput.Y, 0.f));
+		StartDodge(FVector(BufferDodgeDir.X, BufferDodgeDir.Y, 0.f));
 		return;
 	}
 	if (BufferJump > 0.f)

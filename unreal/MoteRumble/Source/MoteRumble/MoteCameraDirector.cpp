@@ -18,7 +18,7 @@ namespace
 {
 	/** The gameplay camera always looks this way down the world X axis. */
 	constexpr float GameplayYaw = 0.f;
-	constexpr float MinDistance = 1450.f;
+	constexpr float MinDistance = 1150.f;
 	constexpr float MaxDistance = 5600.f;
 	constexpr float MinPitch = -38.f;
 	constexpr float MaxPitch = -24.f;
@@ -251,11 +251,13 @@ void AMoteCameraDirector::Tick(float DeltaSeconds)
 	default:
 	{
 		// Frame every fighter, keep the stage in shot, zoom with their spread.
+		//
+		// Order matters: decide where to LOOK first, then measure how much has
+		// to fit around that look-at, then solve the distance. Biasing the
+		// look-at after solving (as this once did) throws the action back out
+		// of the frame the solve just sized.
 		FVector Centre(0.f, 0.f, 120.f);
-		float SpreadY = PlatformR * 0.9f;
-		float SpreadZ = 260.f;
 		float LowestZ = 0.f;
-
 		if (Points.Num() > 0)
 		{
 			FBox Box(ForceInit);
@@ -263,34 +265,75 @@ void AMoteCameraDirector::Tick(float DeltaSeconds)
 			{
 				Box += P;
 			}
-			// Always keep a decent slice of the platform in frame.
-			Box += FVector(0.f, -PlatformR * 0.3f, 0.f);
-			Box += FVector(0.f, PlatformR * 0.3f, 0.f);
 			Centre = Box.GetCenter();
-			const FVector Extent = Box.GetExtent();
-			SpreadY = FMath::Max(Extent.Y, 400.f);
-			SpreadZ = FMath::Max(Extent.Z, 220.f);
 			LowestZ = Box.Min.Z;
 		}
 
-		// Fit horizontally (FOV is horizontal in UE) and vertically (16:9-ish).
-		const float HalfH = FMath::DegreesToRadians(FieldOfView * 0.5f);
-		const float NeedH = (SpreadY + 230.f) / FMath::Tan(HalfH);
-		const float HalfV = FMath::Atan(FMath::Tan(HalfH) * 0.5625f);
-		const float NeedV = (SpreadZ + 240.f) / FMath::Tan(HalfV);
-		TargetDistance = FMath::Clamp(FMath::Max(NeedH, NeedV), MinDistance, MaxDistance);
-
-		// Leave room for the HUD panels and follow fighters knocked below the stage.
-		TargetFocus = Centre + FVector(0.f, 0.f, 120.f);
+		// Follow fighters knocked below the stage, and keep the stage itself in
+		// shot so a fight at the rim never leaves us staring at empty sky.
+		TargetFocus = Centre;
 		if (LowestZ < -300.f)
 		{
 			TargetFocus.Z = FMath::Min(TargetFocus.Z, LowestZ + 700.f);
 		}
-		// Keep the stage itself in shot: bias the focus back toward the middle
-		// so a fight at the rim never leaves us staring at empty sky.
-		TargetFocus.X = FMath::Clamp(TargetFocus.X * 0.75f, -PlatformR * 0.55f, PlatformR * 0.55f);
-		TargetFocus.Y = FMath::Clamp(TargetFocus.Y * 0.9f, -PlatformR * 1.1f, PlatformR * 1.1f);
-		TargetFocus.Z = FMath::Max(TargetFocus.Z, -900.f);
+		TargetFocus.X = FMath::Clamp(TargetFocus.X, -PlatformR * 0.55f, PlatformR * 0.55f);
+		TargetFocus.Y = FMath::Clamp(TargetFocus.Y, -PlatformR * 1.1f, PlatformR * 1.1f);
+		TargetFocus.Z = FMath::Clamp(TargetFocus.Z, -900.f, 1400.f);
+
+		// Camera basis. Yaw is fixed, so screen-right is world +Y; screen-up is
+		// tilted by the pitch, which is why an X offset shows up as a VERTICAL
+		// shift on screen and has to be measured in camera space, not world Z.
+		// Pitch follows the distance we are about to solve, so use last frame's
+		// - the spring keeps it stable.
+		const FVector Fwd = FRotator(CurrentPitch, GameplayYaw, 0.f).Vector();
+		const FVector Right(0.f, 1.f, 0.f);
+		const FVector Up = FVector::CrossProduct(Fwd, Right).GetSafeNormal();
+
+		// Drop the look-at below the action so the fighters ride above the
+		// damage panels instead of behind them. (Raising it, as the old code
+		// did, pushed them down INTO the panels.)
+		constexpr float PanelRoom = 115.f;
+		TargetFocus -= Up * PanelRoom;
+
+		float SpreadY = 240.f;   // half-extents about the look-at, in camera space
+		float SpreadZ = 210.f;
+		for (const FVector& P : Points)
+		{
+			const FVector D = P - TargetFocus;
+			SpreadY = FMath::Max(SpreadY, FMath::Abs(static_cast<float>(FVector::DotProduct(D, Right))));
+			SpreadZ = FMath::Max(SpreadZ, FMath::Abs(static_cast<float>(FVector::DotProduct(D, Up))));
+		}
+
+		// Solve the fit against the angles the engine actually renders with.
+		// Under the default AspectRatio_MaintainYFOV the authored FieldOfView is
+		// horizontal only at Camera->AspectRatio; the engine pins the VERTICAL
+		// half-angle from it and derives horizontal from the real viewport. So a
+		// 4:3 capture window (which is what the recorder produces) is much
+		// narrower than 52 degrees, and assuming otherwise under-solves the
+		// distance and pushes fighters off the sides.
+		const float HalfAuthored = FMath::DegreesToRadians(FieldOfView * 0.5f);
+		const float CamAspect = (Camera && Camera->AspectRatio > KINDA_SMALL_NUMBER)
+			? Camera->AspectRatio : 1.777778f;
+		float ViewAspect = CamAspect;
+		if (const UWorld* W = GetWorld())
+		{
+			if (const UGameViewportClient* VPC = W->GetGameViewport())
+			{
+				if (const FViewport* VP = VPC->Viewport)
+				{
+					const FIntPoint Size = VP->GetSizeXY();
+					if (Size.X > 0 && Size.Y > 0)
+					{
+						ViewAspect = static_cast<float>(Size.X) / static_cast<float>(Size.Y);
+					}
+				}
+			}
+		}
+		const float TanV = FMath::Tan(HalfAuthored) / CamAspect;
+		const float TanH = TanV * ViewAspect;
+		const float NeedH = (SpreadY + 230.f) / FMath::Max(TanH, KINDA_SMALL_NUMBER);
+		const float NeedV = (SpreadZ + 240.f) / FMath::Max(TanV, KINDA_SMALL_NUMBER);
+		TargetDistance = FMath::Clamp(FMath::Max(NeedH, NeedV), MinDistance, MaxDistance);
 
 		const float ZoomAlpha = FMath::GetMappedRangeValueClamped(
 			FVector2D(MinDistance, MaxDistance), FVector2D(0.f, 1.f), TargetDistance);
