@@ -527,7 +527,7 @@ def build_level():
         return actor
 
     # --- sun: low, warm, raking across the arena from behind/right ---------
-    sun = spawn(unreal.DirectionalLight, (0, 0, 1200), (-38.0, 0.0, 150.0), "Sun")
+    sun = spawn(unreal.DirectionalLight, (0, 0, 1200), (-26.0, 28.0, 0.0), "Sun")
     sun_c = component_of(sun, unreal.DirectionalLightComponent)
     # Lights spawn Static. With static lighting disabled (this project is fully
     # dynamic/Lumen) a static light contributes NOTHING, which leaves the whole
@@ -536,7 +536,7 @@ def build_level():
     set_props(
         sun_c,
         intensity=26.0,
-        light_color=unreal.Color(255, 214, 170),
+        light_color=unreal.Color(255, 206, 155),
         cast_shadows=True,
         dynamic_shadow_distance_movable_light=30000.0,
         atmosphere_sun_light=True,
@@ -544,14 +544,16 @@ def build_level():
         volumetric_scattering_intensity=2.0,
     )
     # --- atmosphere: put the planet surface kilometres below the arena -----
-    atmos = spawn(unreal.SkyAtmosphere, (0, 0, -300000.0), label="SkyAtmosphere")
+    atmos = spawn(unreal.SkyAtmosphere, (0, 0, -120000.0), label="SkyAtmosphere")
     atmos_c = component_of(atmos, unreal.SkyAtmosphereComponent)
     set_props(
         atmos_c,
         transform_mode=unreal.SkyAtmosphereTransformMode.PLANET_TOP_AT_COMPONENT_TRANSFORM,
         rayleigh_scattering_scale=0.035,
-        mie_scattering_scale=0.006,
-        aerial_perspective_view_distance_scale=1.6,
+        mie_scattering_scale=0.0035,
+        aerial_pespective_view_distance_scale=0.05,
+        height_fog_contribution=0.0,
+        aerial_perspective_start_depth=8.0,
     )
 
     # --- a sea of clouds below the floating arena --------------------------
@@ -559,8 +561,8 @@ def build_level():
     clouds_c = component_of(clouds, unreal.VolumetricCloudComponent)
     set_props(
         clouds_c,
-        layer_bottom_altitude=1.2,
-        layer_height=1.4,
+        layer_bottom_altitude=0.35,
+        layer_height=0.7,
         tracing_max_distance=60.0,
         ground_albedo=unreal.Color(120, 110, 100),
     )
@@ -568,20 +570,21 @@ def build_level():
     sky = spawn(unreal.SkyLight, (0, 0, 600), label="SkyLight")
     sky_c = component_of(sky, unreal.SkyLightComponent)
     set_props(sky_c, mobility=unreal.ComponentMobility.MOVABLE)
-    set_props(sky_c, real_time_capture=True, intensity=1.4, volumetric_scattering_intensity=2.0)
+    set_props(sky_c, real_time_capture=True, intensity=1.0, volumetric_scattering_intensity=2.0)
 
-    fog = spawn(unreal.ExponentialHeightFog, (0, 0, -1200), label="HeightFog")
+    fog = spawn(unreal.ExponentialHeightFog, (0, 0, -1500), label="HeightFog")
     fog_c = component_of(fog, unreal.ExponentialHeightFogComponent)
     set_props(
         fog_c,
-        fog_density=0.0012,
-        fog_height_falloff=0.2,
-        fog_inscattering_luminance=unreal.LinearColor(0.9, 0.62, 0.42, 1.0),
+        fog_density=0.00008,
+        fog_height_falloff=0.5,
+        fog_inscattering_luminance=unreal.LinearColor(1.0, 0.72, 0.48, 1.0),
+        fog_max_opacity=0.18,
         volumetric_fog=True,
         volumetric_fog_scattering_distribution=0.3,
         volumetric_fog_albedo=unreal.Color(255, 240, 225),
         volumetric_fog_extinction_scale=0.6,
-        start_distance=4500.0,
+        start_distance=6000.0,
     )
 
     # --- post process ------------------------------------------------------
@@ -614,9 +617,9 @@ def build_level():
     pp("bloom_threshold", 0.3)
     pp("vignette_intensity", 0.4)
     pp("film_grain_intensity", 0.08)
-    pp("color_saturation", unreal.Vector4(1.06, 1.04, 1.02, 1.0))
+    pp("color_saturation", unreal.Vector4(1.12, 1.08, 1.02, 1.0))
     pp("color_contrast", unreal.Vector4(1.06, 1.05, 1.04, 1.0))
-    pp("white_temp", 6900.0)
+    pp("white_temp", 7400.0)
     pp("ambient_occlusion_intensity", 0.6)
     pp("ambient_occlusion_radius", 120.0)
     pp("dynamic_global_illumination_method", unreal.DynamicGlobalIlluminationMethod.LUMEN)
