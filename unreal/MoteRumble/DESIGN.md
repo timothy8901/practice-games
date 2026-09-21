@@ -125,6 +125,15 @@ Trailer: `-MoteRecord=30 -ForceRes -ResX=1920 -ResY=1080` dumps 60 fps frames to
   silently swapped for the default grey one at runtime - the arena's 90 embers
   rendered as grey marbles for the life of the project over this.
 
+* **`RimPower` does nothing on a cube.** All of `M_FX_Additive`'s softness is
+  the fresnel term `pow(saturate(dot(N,V)), RimPower)`, and a cube's face
+  normals are constant across each face - there is nothing to grade against, so
+  the element renders as a hard-edged slab whatever you set. Anything that
+  needs a soft edge has to be the sphere, stretched. A cube scaled to 0.05 on
+  one axis is not a thin streak, it is a white quad.
+* **Additive FX sum.** A dozen elements at intensity 6-10 land on the same
+  pixels during a hit and clip to pure white, taking the fighter's accent
+  colour with them. Budget the whole effect, not each element.
 * **Interchange ignores import options** unless they are wrapped in an
   `InterchangePipelineStackOverride`. Without it `CombineStaticMeshesBehavior`
   never applies and a Thrixel GLB lands as ~15 separate static meshes.
