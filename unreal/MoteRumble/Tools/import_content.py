@@ -19,6 +19,9 @@ ART_ROOT = os.environ.get(
     "MOTE_ART_ROOT", os.path.normpath(os.path.join(PROJECT_DIR, "..", "..", "thrixel_assets", "mote_rumble"))
 )
 AUDIO_ROOT = os.environ.get("MOTE_AUDIO_ROOT", os.path.join(PROJECT_DIR, "SourceAudio"))
+# Imports are idempotent: an asset that already exists is left alone. Name assets
+# here to replace them, e.g. MOTE_REIMPORT=SM_Arena_Platform after re-sculpting.
+REIMPORT = {n.strip() for n in os.environ.get("MOTE_REIMPORT", "").split(",") if n.strip()}
 
 EAL = unreal.EditorAssetLibrary
 MEL = unreal.MaterialEditingLibrary
@@ -51,7 +54,8 @@ def build_mesh_manifest():
         m["SM_{}_Weapon".format(f)] = (os.path.join(ART_ROOT, "weapons", "{}_weapon.glb".format(key)), "/Game/Art/Weapons")
     m["SM_Bow_Arrow"] = (os.path.join(ART_ROOT, "weapons", "bow_arrow.glb"), "/Game/Art/Weapons")
     for name, fn in (
-        ("SM_Arena_Platform", "arena_platform_flipped.glb"),
+        # v2 is the re-sculpt: one closed disc, no railing, nothing above the deck.
+        ("SM_Arena_Platform", "arena_platform_v2.glb"),
         ("SM_Sky_Island", "sky_island.glb"),
         ("SM_Crystal_Cluster", "crystal_cluster.glb"),
         ("SM_Ruined_Pillar", "ruined_pillar.glb"),
@@ -60,7 +64,7 @@ def build_mesh_manifest():
         m[name] = (os.path.join(ART_ROOT, "arena", fn), "/Game/Art/Arena")
     # Fall back to the untextured blockouts if a final file never landed.
     fallbacks = {
-        "SM_Arena_Platform": os.path.join(ART_ROOT, "arena", "arena_platform.glb"),
+        "SM_Arena_Platform": os.path.join(ART_ROOT, "arena", "arena_platform_flipped.glb"),
         "SM_Brazier": os.path.join(ART_ROOT, "arena", "brazier_raw.glb"),
     }
     for name, alt in fallbacks.items():
@@ -118,7 +122,10 @@ def make_interchange_options(recompute_normals=False):
 def import_mesh(name, source, folder, recompute_normals=False):
     dest = "{}/{}".format(folder, name)
     if EAL.does_asset_exist(dest):
-        return "exists"
+        if name not in REIMPORT:
+            return "exists"
+        if not EAL.delete_asset(dest):
+            return "could not delete the old asset for re-import"
     if not os.path.isfile(source):
         return "missing source"
 

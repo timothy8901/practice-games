@@ -37,6 +37,8 @@ namespace
 		float Radius = 1.f;
 		FVector2D Centre = FVector2D::ZeroVector;
 		bool bMeasured = false;
+		/** The deck's triangles face DOWN: the mesh is inside out. */
+		bool bInsideOut = false;
 	};
 
 	/**
@@ -48,10 +50,17 @@ namespace
 	 * entirely, landed on a redundant inner face 10 units down, and buried the
 	 * fighters to the waist.
 	 *
-	 * So walk the triangles: keep the horizontal, up-facing ones, total their
-	 * footprint by height, and take the highest surface that is at least half as
-	 * broad as the broadest one. That skips railings and lips (too small) and
-	 * inner faces (not the highest) without special-casing any of them.
+	 * So walk the triangles: keep the horizontal ones, total their footprint by
+	 * height, and take the highest surface that is at least half as broad as the
+	 * broadest one. That skips railings and lips (too small) and inner faces and
+	 * slab bottoms (not the highest) without special-casing any of them.
+	 *
+	 * Facing is deliberately ignored. Generated sculpts come out inside out
+	 * often enough - both platforms so far have - and an inside-out slab's
+	 * BOTTOM faces up. Trusting the winding measured the bottom as the floor
+	 * and stood the fighters 109 cm inside the stone. The highest broad
+	 * horizontal surface is the top whichever way it faces; bInsideOut reports
+	 * the winding so the import can be fixed, since it will light wrongly.
 	 *
 	 * Everything here comes from the deck, never from the bounding box. A
 	 * sculpt's crystals and roots can hang out past the disc, and a box-based fit
@@ -81,7 +90,7 @@ namespace
 			return Deck;
 		}
 
-		// Calls Visit(A, B, C, Area, Bucket) for every horizontal, up-facing triangle.
+		// Calls Visit(A, B, C, Area, Bucket, bFacesUp) for every horizontal triangle.
 		constexpr float BucketHeight = 1.f;
 		auto ForEachFloorTriangle = [&](auto&& Visit)
 		{
@@ -97,34 +106,45 @@ namespace
 				// Cross product: Z is twice the footprint area, and its sign is the facing.
 				const FVector Normal = FVector::CrossProduct(B - A, C - A);
 				const float Length = Normal.Size();
-				if (Normal.Z <= 0.f || Length < KINDA_SMALL_NUMBER || Normal.Z / Length < 0.98f)
+				if (Length < KINDA_SMALL_NUMBER || FMath::Abs(Normal.Z) / Length < 0.98f)
 				{
-					continue;  // facing down, degenerate, or too steep to stand on
+					continue;  // degenerate, or too steep to stand on
 				}
 				const int32 Bucket = FMath::RoundToInt((A.Z + B.Z + C.Z) / 3.f / BucketHeight);
-				Visit(A, B, C, Normal.Z * 0.5f, Bucket);
+				Visit(A, B, C, FMath::Abs(Normal.Z) * 0.5f, Bucket, Normal.Z > 0.f);
 			}
 		};
 
-		struct FSurface { float Area = 0.f; FVector2D Moment = FVector2D::ZeroVector; };
+		// A surface's area is its larger FACING, never the sum of both: a thin
+		// plate's top and bottom round into the same bucket, and summing them
+		// once made a plate twice the size of the disc, which pushed the real
+		// deck below the "half as broad as the broadest" cut.
+		struct FSurface
+		{
+			float UpArea = 0.f;
+			float DownArea = 0.f;
+			FVector2D UpMoment = FVector2D::ZeroVector;
+			FVector2D DownMoment = FVector2D::ZeroVector;
+			float Area() const { return FMath::Max(UpArea, DownArea); }
+		};
 		TMap<int32, FSurface> Surfaces;
-		ForEachFloorTriangle([&](const FVector& A, const FVector& B, const FVector& C, float Area, int32 Bucket)
+		ForEachFloorTriangle([&](const FVector& A, const FVector& B, const FVector& C, float Area, int32 Bucket, bool bUp)
 		{
 			FSurface& Surface = Surfaces.FindOrAdd(Bucket);
-			Surface.Area += Area;
 			const FVector Mid = (A + B + C) / 3.f;
-			Surface.Moment += FVector2D(Mid.X, Mid.Y) * Area;
+			(bUp ? Surface.UpArea : Surface.DownArea) += Area;
+			(bUp ? Surface.UpMoment : Surface.DownMoment) += FVector2D(Mid.X, Mid.Y) * Area;
 		});
 
 		float Broadest = 0.f;
 		for (const TPair<int32, FSurface>& It : Surfaces)
 		{
-			Broadest = FMath::Max(Broadest, It.Value.Area);
+			Broadest = FMath::Max(Broadest, It.Value.Area());
 		}
 		int32 DeckBucket = INDEX_NONE;
 		for (const TPair<int32, FSurface>& It : Surfaces)
 		{
-			if (It.Value.Area >= Broadest * 0.5f && (DeckBucket == INDEX_NONE || It.Key > DeckBucket))
+			if (It.Value.Area() >= Broadest * 0.5f && (DeckBucket == INDEX_NONE || It.Key > DeckBucket))
 			{
 				DeckBucket = It.Key;
 			}
@@ -135,14 +155,16 @@ namespace
 		}
 
 		const FSurface& Top = Surfaces[DeckBucket];
+		Deck.bInsideOut = Top.DownArea > Top.UpArea;
+		const float TopArea = Top.Area();
 		Deck.Height = DeckBucket * BucketHeight;
-		Deck.Centre = Top.Moment / Top.Area;
+		Deck.Centre = (Deck.bInsideOut ? Top.DownMoment : Top.UpMoment) / TopArea;
 
 		// Radius: the farthest deck vertex from the centre, sanity-bounded by the
 		// radius of a disc of the same area so one stray vertex cannot inflate it.
-		const float EquivRadius = FMath::Sqrt(Top.Area / PI);
+		const float EquivRadius = FMath::Sqrt(TopArea / PI);
 		float Farthest = 0.f;
-		ForEachFloorTriangle([&](const FVector& A, const FVector& B, const FVector& C, float, int32 Bucket)
+		ForEachFloorTriangle([&](const FVector& A, const FVector& B, const FVector& C, float, int32 Bucket, bool)
 		{
 			if (Bucket != DeckBucket)
 			{
@@ -231,14 +253,21 @@ void AMoteArena::BuildScenery()
 		// Sink it so the walkable deck lands on Z = 0, centred on the origin.
 		const float DeckZ = Deck.Height * Scale;
 		PlatformMesh->SetRelativeLocation(FVector(-Deck.Centre.X * Scale, -Deck.Centre.Y * Scale, -DeckZ));
+		if (Deck.bInsideOut)
+		{
+			// Placement is still right (see MeasureDeck), but it will light as if
+			// the sun were underneath. Run Tools/flip_glb_normals.py on the GLB and
+			// re-import with MOTE_REIMPORT=SM_Arena_Platform.
+			UE_LOG(LogTemp, Warning, TEXT("Mote: the arena platform mesh is inside out (its deck faces down) - flip the GLB and re-import it."));
+		}
 		// The collision disc is now purely functional.
 		Floor->SetVisibility(false);
 
 		if (FParse::Param(FCommandLine::Get(), TEXT("MoteDebug")))
 		{
 			// The deck must land on Z = 0: worldBox max Z is the top of the art.
-			UE_LOG(LogTemp, Warning, TEXT("MOTEDBG platform deck=%.2f r=%.2f centre=(%.2f,%.2f) measured=%d (box top %.2f) scale=%.3f worldBox=%s"),
-				Deck.Height, Deck.Radius, Deck.Centre.X, Deck.Centre.Y, Deck.bMeasured ? 1 : 0, Box.Max.Z, Scale,
+			UE_LOG(LogTemp, Warning, TEXT("MOTEDBG platform deck=%.2f r=%.2f centre=(%.2f,%.2f) measured=%d insideout=%d (box top %.2f) scale=%.3f worldBox=%s"),
+				Deck.Height, Deck.Radius, Deck.Centre.X, Deck.Centre.Y, Deck.bMeasured ? 1 : 0, Deck.bInsideOut ? 1 : 0, Box.Max.Z, Scale,
 				*PlatformMesh->Bounds.GetBox().ToString());
 		}
 	}

@@ -68,6 +68,13 @@ impacts). Presentation code never changes gameplay state.
   (Flare has no weapon — its gauntlets are the weapon)
 * Arena: `/Game/Art/Arena/SM_Arena_Platform`, `SM_Sky_Island`,
   `SM_Crystal_Cluster`, `SM_Ruined_Pillar`, `SM_Brazier`
+* The platform is the v2 re-sculpt (Thrixel project "Mote Rumble"): blockout
+  `ecca009c-f5a8-4f61-b87c-9988ab089e37`, textured `74512866-ff52-44b1-9b8a-dfee805a55d8`
+  against the original reference image `e804db1b-6f8a-4645-a96b-03ce3c7e60c6`. It
+  comes out **inside out**, like the first one did: download it as
+  `arena_platform_v2_raw.glb`, run `Tools/flip_glb_normals.py` to write
+  `arena_platform_v2.glb`, then re-import with `MOTE_REIMPORT=SM_Arena_Platform`.
+  The game warns in the log if the deck it measures faces down.
 * Audio: `/Game/Audio/<wav name without extension>` (sfx_*, vo_*, mus_*)
 * Level: `/Game/Maps/Arena` (lighting, sky, clouds, fog, post-process only;
   everything else is spawned at runtime by C++)
@@ -125,6 +132,17 @@ Trailer: `-MoteRecord=30 -ForceRes -ResX=1920 -ResY=1080` dumps 60 fps frames to
   silently swapped for the default grey one at runtime - the arena's 90 embers
   rendered as grey marbles for the life of the project over this.
 
+* **Sculpts come out inside out, and an inside-out slab's BOTTOM faces up.**
+  Both arena platforms so far have. Anything that finds "the floor" by trusting
+  winding measures the underside and stands the fighters inside the stone.
+  `MeasureDeck` takes the highest broad horizontal surface whichever way it
+  faces, counts a surface's larger facing rather than the sum of both (a thin
+  plate's two faces round into one height bucket), and logs a warning when the
+  deck it picked faces down.
+* **A weapon posed at a fixed angle goes through the floor if it is long enough.**
+  The roll's -60 degrees put Blade's odachi tip 80 cm under the stage on every
+  dodge. `BuildPose` now lifts the pitch just enough to rest a grounded fighter's
+  weapon tip on the deck.
 * **`RimPower` does nothing on a cube.** All of `M_FX_Additive`'s softness is
   the fresnel term `pow(saturate(dot(N,V)), RimPower)`, and a cube's face
   normals are constant across each face - there is nothing to grade against, so

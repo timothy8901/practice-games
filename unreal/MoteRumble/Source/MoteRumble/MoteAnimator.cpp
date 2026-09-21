@@ -596,6 +596,26 @@ void UMoteAnimator::BuildPose(const FMoteAnimState& S, FMotePose& P) const
 	// Hands point their knuckles the way they are travelling.
 	P.HandRRot = FRotator(0.f, FMath::RadiansToDegrees(FMath::Atan2(P.HandR.Y, P.HandR.X)) * 0.5f, 0.f);
 	P.HandLRot = FRotator(0.f, FMath::RadiansToDegrees(FMath::Atan2(P.HandL.Y, P.HandL.X)) * 0.5f, 0.f);
+
+	// Never let the weapon's tip go through the deck while standing on it.
+	// Poses are authored as fixed angles, and a fixed down-angle that looks right
+	// on a short weapon drives a long one into the stone - the roll's -60 put the
+	// tip of Blade's odachi ~80 cm under the stage on every dodge, and the
+	// shield pose did the same by less. The weapon hangs off VisualRoot, not the
+	// body, so its tip height is exactly grip.Z + sin(pitch) * reach; lift the
+	// pitch just enough to rest the tip on the floor. Only when grounded - in
+	// the air the floor is too far away to matter.
+	if (S.bGrounded && P.bWeaponVisible && WeaponReach > 1.f)
+	{
+		constexpr float TipClearance = 10.f;
+		const float LowestTipZ = FloorZ + TipClearance;
+		const float TipZ = P.WeaponLoc.Z + FMath::Sin(FMath::DegreesToRadians(P.WeaponRot.Pitch)) * WeaponReach;
+		if (TipZ < LowestTipZ)
+		{
+			const float SinPitch = FMath::Clamp((LowestTipZ - P.WeaponLoc.Z) / WeaponReach, -1.f, 1.f);
+			P.WeaponRot.Pitch = FMath::RadiansToDegrees(FMath::Asin(SinPitch));
+		}
+	}
 }
 
 // ---------------------------------------------------------------------------
