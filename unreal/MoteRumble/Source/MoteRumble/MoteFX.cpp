@@ -499,23 +499,31 @@ void UMoteFX::SlashArc(const FVector& Center, const FRotator& Facing, float Radi
 		const float AngleDeg = Facing.Yaw + Sign * FMath::Lerp(Half, -Half, T);
 		const float A = FMath::DegreesToRadians(AngleDeg);
 		const FVector Pos = Center + FVector(FMath::Cos(A), FMath::Sin(A), 0.f) * Radius * 0.85f;
-		if (FMoteFxElement* E = Spawn(EMoteFxShape::Cube, EMoteFxMaterial::Additive, Pos, 0.2f + T * 0.05f))
+		// Ellipsoids, not paper-thin cubes. A chain of flat boxes read as a
+		// faceted white band with a visible straight edge per segment - the
+		// single most cardboard thing on screen during a swing.
+		if (FMoteFxElement* E = Spawn(EMoteFxShape::Sphere, EMoteFxMaterial::Additive, Pos, 0.2f + T * 0.05f))
 		{
 			E->Rotation = FRotator(0.f, AngleDeg + 90.f, 0.f);
 			const float W = FMath::Sin(T * PI) * 0.55f + 0.25f;  // fat in the middle
-			E->StartScale = FVector(Radius / 130.f * W, 0.06f, 0.5f * W * Strength);
-			E->EndScale = FVector(Radius / 220.f * W, 0.01f, 0.12f * W);
+			E->StartScale = FVector(Radius / 130.f * W, 0.085f, 0.5f * W * Strength);
+			E->EndScale = FVector(Radius / 220.f * W, 0.015f, 0.12f * W);
 			E->Color = FLinearColor::LerpUsingHSV(Color, FLinearColor::White, 0.35f);
-			E->StartIntensity = 8.f * FMath::Clamp(Strength, 0.4f, 1.6f);
+			E->StartIntensity = 3.4f * FMath::Clamp(Strength, 0.4f, 1.6f);
 			E->EndIntensity = 0.f;
+			E->StartOpacity = 0.9f;
+			E->RimPower = 2.0f;
 		}
 	}
 }
 
 void UMoteFX::Shockwave(const FVector& Location, float Radius, const FLinearColor& Color, float Strength)
 {
-	Ring(Location + FVector(0.f, 0.f, 12.f), FRotator::ZeroRotator, Radius, Color, 0.38f, 0.16f, 7.f * Strength);
-	Ring(Location + FVector(0.f, 0.f, 8.f), FRotator::ZeroRotator, Radius * 0.65f, FLinearColor::White, 0.24f, 0.1f, 6.f);
+	// Intensity is clamped: 7 * Strength reached 12.6 on a charged Earthshaker,
+	// which is a solid white annulus rather than a ring of light.
+	Ring(Location + FVector(0.f, 0.f, 12.f), FRotator::ZeroRotator, Radius, Color, 0.38f, 0.16f,
+		FMath::Min(4.5f * Strength, 6.f));
+	Ring(Location + FVector(0.f, 0.f, 8.f), FRotator::ZeroRotator, Radius * 0.65f, FLinearColor::White, 0.24f, 0.1f, 3.5f);
 	// Six, not eight. The centres ride a ring of Radius*0.4 (1.58 m on a
 	// charged Maul) and each puff is 1.41 m across at birth; eight of them
 	// spawn 1.21 m apart and are touching before they move, which is what
@@ -639,7 +647,7 @@ void UMoteFX::ShieldBreak(const FVector& Location, const FLinearColor& Color)
 	Ring(Location, FRotator(90.f, 0.f, 0.f), 260.f, Color, 0.4f, 0.1f, 7.f);
 	for (int32 i = 0; i < 16; ++i)
 	{
-		if (FMoteFxElement* E = Spawn(EMoteFxShape::Cube, EMoteFxMaterial::Additive, Location, RandF(0.4f, 0.8f)))
+		if (FMoteFxElement* E = Spawn(EMoteFxShape::Sphere, EMoteFxMaterial::Additive, Location, RandF(0.4f, 0.8f)))
 		{
 			E->Velocity = FMath::VRand() * RandF(400.f, 1100.f);
 			E->Accel = FVector(0.f, 0.f, -1600.f);
@@ -648,7 +656,11 @@ void UMoteFX::ShieldBreak(const FVector& Location, const FLinearColor& Color)
 			E->StartScale = FVector(RandF(0.1f, 0.22f));
 			E->EndScale = FVector(0.02f);
 			E->Color = Color;
-			E->StartIntensity = 6.f;
+			// Shards of a broken shield, not little white boxes: additive at 6
+			// with flat cube normals clipped every one of them to pure white.
+			E->StartIntensity = 3.2f;
+			E->StartOpacity = 0.9f;
+			E->RimPower = 1.8f;
 		}
 	}
 }
@@ -700,13 +712,15 @@ void UMoteFX::LaunchSmoke(const FVector& Location, const FVector& Velocity, floa
 
 void UMoteFX::DashStreak(const FVector& Location, const FVector& Direction, const FLinearColor& Color)
 {
-	if (FMoteFxElement* E = Spawn(EMoteFxShape::Cube, EMoteFxMaterial::Additive, Location, 0.22f))
+	if (FMoteFxElement* E = Spawn(EMoteFxShape::Sphere, EMoteFxMaterial::Additive, Location, 0.22f))
 	{
 		E->Rotation = Direction.Rotation();
-		E->StartScale = FVector(1.6f, 0.05f, 0.75f);
-		E->EndScale = FVector(2.6f, 0.01f, 0.1f);
+		E->StartScale = FVector(1.6f, 0.075f, 0.75f);
+		E->EndScale = FVector(2.6f, 0.015f, 0.1f);
 		E->Color = Color;
-		E->StartIntensity = 6.f;
+		E->StartIntensity = 3.2f;
+		E->StartOpacity = 0.9f;
+		E->RimPower = 2.0f;
 	}
 }
 

@@ -729,6 +729,17 @@ void AMoteGameMode::TickFight(float Dt)
 			It.RemoveCurrent();
 		}
 	}
+
+	// Put the halo away once its occupant has dropped off it. Nothing else ever
+	// hid it - only ClearFighters did, at the end of the match - so every
+	// respawn left a lit disc hanging over the stage for the rest of the round.
+	for (AMoteCharacter* F : Fighters)
+	{
+		if (F && F->GetFighterState() != EMoteFighterState::Respawning)
+		{
+			Arena->ShowRespawnHalo(F->GetPlayerIndex(), FVector::ZeroVector, F->GetAccent(), false);
+		}
+	}
 }
 
 void AMoteGameMode::HandleKO(AMoteCharacter* Victim)
