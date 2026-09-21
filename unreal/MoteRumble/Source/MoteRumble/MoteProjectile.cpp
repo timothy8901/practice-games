@@ -57,6 +57,7 @@ void AMoteProjectile::Launch(AMoteCharacter* InOwner, const FMoteMoveDef& InMove
 	float Speed, float InChargeScale, UStaticMesh* InMesh, float MeshSize, const FLinearColor& InColor)
 {
 	OwnerMote = InOwner;
+	Thrower = InOwner;
 	Move = InMove;
 	Kind = InMove.Projectile;
 	Color = InColor;

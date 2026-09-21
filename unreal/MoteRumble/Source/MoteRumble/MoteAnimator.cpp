@@ -636,6 +636,7 @@ void UMoteAnimator::UpdatePose(const FMoteAnimState& S, float DeltaSeconds)
 	}
 
 	bTrailWanted = P.bTrail && P.bTrailSource;
+	bWeaponVisibleWanted = P.bWeaponVisible;
 }
 
 void UMoteAnimator::GetTrailSegment(FVector& OutBase, FVector& OutTip) const

@@ -39,6 +39,9 @@ public:
 	void Reflect(AMoteCharacter* NewOwner);
 
 	AMoteCharacter* GetOwnerMote() const { return OwnerMote.Get(); }
+	/** Who threw it. Unlike OwnerMote this survives a reflect, which retargets
+	 *  ownership for hit credit but does not put the chakram back in anyone's hand. */
+	AMoteCharacter* GetThrower() const { return Thrower.Get(); }
 	bool IsReflectable() const { return Kind != EMoteProjectileKind::Lightning; }
 	/** A thrown weapon that flies back to its owner (Disc's chakram). */
 	bool IsReturningWeapon() const { return Move.bProjectileReturns; }
@@ -55,6 +58,7 @@ protected:
 	UPROPERTY(VisibleAnywhere) TObjectPtr<UPointLightComponent> Glow;
 
 	TWeakObjectPtr<AMoteCharacter> OwnerMote;
+	TWeakObjectPtr<AMoteCharacter> Thrower;
 	FMoteMoveDef Move;
 	EMoteProjectileKind Kind = EMoteProjectileKind::EnergyBolt;
 	FLinearColor Color = FLinearColor::White;

@@ -85,6 +85,7 @@ public:
 
 	/** True while a weapon swing should leave a trail. */
 	bool WantsTrail() const { return bTrailWanted; }
+	bool WantsWeaponVisible() const { return bWeaponVisibleWanted; }
 
 	/** World-space ends of the weapon's cutting edge this frame (for trails). */
 	void GetTrailSegment(FVector& OutBase, FVector& OutTip) const;
@@ -114,6 +115,9 @@ protected:
 	/** FitMesh's bounds-centring offset, which posing must preserve or the
 	 *  fist renders off the grip. */
 	FVector GauntletOffsetL = FVector::ZeroVector;
+	/** Last pose's bWeaponVisible, so code that also touches the weapon mesh
+	 *  can respect the animation instead of overriding it. */
+	bool bWeaponVisibleWanted = true;
 	FVector GauntletOffsetR = FVector::ZeroVector;
 	bool bTrailWanted = false;
 

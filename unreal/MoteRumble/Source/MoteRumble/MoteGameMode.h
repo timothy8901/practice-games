@@ -92,6 +92,8 @@ public:
 	bool IsPauseMenuOpen() const { return bPaused; }
 	bool IsDemoMode() const { return bDemoMode; }
 	bool IsRecording() const { return RecordSeconds > 0.f; }
+	/** Index of the frame the recorder writes next - lets debug logs point at an exact PNG. */
+	int32 GetRecordFrame() const { return RecordFrame; }
 	/** Seconds of Fight phase elapsed. */
 	float GetMatchTime() const { return MatchTime; }
 	/** The human player's fighter (nullptr in demo mode). */

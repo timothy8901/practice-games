@@ -30,74 +30,132 @@ namespace
 		return LoadObject<UStaticMesh>(nullptr, Path, nullptr, LOAD_Quiet | LOAD_NoWarn);
 	}
 
+	/** The platform's walkable deck, measured from the mesh itself, in mesh space. */
+	struct FDeck
+	{
+		float Height = 0.f;
+		float Radius = 1.f;
+		FVector2D Centre = FVector2D::ZeroVector;
+		bool bMeasured = false;
+	};
+
 	/**
-	 * Height of the platform's walkable deck in mesh space.
+	 * Find the walkable deck: its height, radius and centre.
 	 *
 	 * Measure area, not vertices. A flat cap is tessellated as a fan, so every
-	 * one of its vertices sits out past 0.97 of the radius and there are none
-	 * at all over the middle of the disc. Scanning vertices in a radius band
-	 * therefore misses the deck completely and lands on whatever else is in the
-	 * band - on the current sculpt, a redundant inner face 10 units down, which
-	 * buried the fighters to the waist.
+	 * one of its vertices sits out at the rim and there are none over the middle
+	 * of the disc - scanning vertices in a radius band once missed the deck
+	 * entirely, landed on a redundant inner face 10 units down, and buried the
+	 * fighters to the waist.
 	 *
-	 * So walk the triangles instead: keep the ones that are horizontal and face
-	 * up, total their footprint by height, and take the highest surface broad
-	 * enough to be the floor. That skips railings, rims and lips (too small)
-	 * and inner faces (not the highest) without special-casing any of them.
+	 * So walk the triangles: keep the horizontal, up-facing ones, total their
+	 * footprint by height, and take the highest surface that is at least half as
+	 * broad as the broadest one. That skips railings and lips (too small) and
+	 * inner faces (not the highest) without special-casing any of them.
+	 *
+	 * Everything here comes from the deck, never from the bounding box. A
+	 * sculpt's crystals and roots can hang out past the disc, and a box-based fit
+	 * would then shrink the deck inside the collision disc - fighters standing on
+	 * air at the edge - and pull it off centre.
 	 */
-	float FindDeckTop(UStaticMesh* Mesh)
+	FDeck MeasureDeck(UStaticMesh* Mesh)
 	{
 		const FBox Box = Mesh->GetBoundingBox();
-		const float Fallback = Box.Max.Z;
+		FDeck Deck;
+		Deck.Height = Box.Max.Z;
+		Deck.Radius = FMath::Max(FMath::Max(Box.GetSize().X, Box.GetSize().Y) * 0.5f, 1.f);
+		Deck.Centre = FVector2D(Box.GetCenter().X, Box.GetCenter().Y);
+
 		const FStaticMeshRenderData* RenderData = Mesh->GetRenderData();
 		if (!RenderData || RenderData->LODResources.Num() == 0)
 		{
-			return Fallback;
+			return Deck;
 		}
 		const FStaticMeshLODResources& LOD = RenderData->LODResources[0];
 		const FPositionVertexBuffer& Positions = LOD.VertexBuffers.PositionVertexBuffer;
 		const uint32 VertexCount = Positions.GetNumVertices();
-
 		TArray<uint32> Indices;
 		LOD.IndexBuffer.GetCopy(Indices);
 		if (VertexCount == 0 || Indices.Num() < 3)
 		{
-			return Fallback;
+			return Deck;
 		}
 
+		// Calls Visit(A, B, C, Area, Bucket) for every horizontal, up-facing triangle.
 		constexpr float BucketHeight = 1.f;
-		TMap<int32, float> FootprintAtHeight;
-		for (int32 i = 0; i + 2 < Indices.Num(); i += 3)
+		auto ForEachFloorTriangle = [&](auto&& Visit)
 		{
-			if (Indices[i] >= VertexCount || Indices[i + 1] >= VertexCount || Indices[i + 2] >= VertexCount)
+			for (int32 i = 0; i + 2 < Indices.Num(); i += 3)
 			{
-				continue;
+				if (Indices[i] >= VertexCount || Indices[i + 1] >= VertexCount || Indices[i + 2] >= VertexCount)
+				{
+					continue;
+				}
+				const FVector A(Positions.VertexPosition(Indices[i]));
+				const FVector B(Positions.VertexPosition(Indices[i + 1]));
+				const FVector C(Positions.VertexPosition(Indices[i + 2]));
+				// Cross product: Z is twice the footprint area, and its sign is the facing.
+				const FVector Normal = FVector::CrossProduct(B - A, C - A);
+				const float Length = Normal.Size();
+				if (Normal.Z <= 0.f || Length < KINDA_SMALL_NUMBER || Normal.Z / Length < 0.98f)
+				{
+					continue;  // facing down, degenerate, or too steep to stand on
+				}
+				const int32 Bucket = FMath::RoundToInt((A.Z + B.Z + C.Z) / 3.f / BucketHeight);
+				Visit(A, B, C, Normal.Z * 0.5f, Bucket);
 			}
-			const FVector A(Positions.VertexPosition(Indices[i]));
-			const FVector B(Positions.VertexPosition(Indices[i + 1]));
-			const FVector C(Positions.VertexPosition(Indices[i + 2]));
+		};
 
-			// Cross product: Z is twice the footprint area, and its sign is the facing.
-			const FVector Normal = FVector::CrossProduct(B - A, C - A);
-			const float Length = Normal.Size();
-			if (Normal.Z <= 0.f || Length < KINDA_SMALL_NUMBER || Normal.Z / Length < 0.98f)
+		struct FSurface { float Area = 0.f; FVector2D Moment = FVector2D::ZeroVector; };
+		TMap<int32, FSurface> Surfaces;
+		ForEachFloorTriangle([&](const FVector& A, const FVector& B, const FVector& C, float Area, int32 Bucket)
+		{
+			FSurface& Surface = Surfaces.FindOrAdd(Bucket);
+			Surface.Area += Area;
+			const FVector Mid = (A + B + C) / 3.f;
+			Surface.Moment += FVector2D(Mid.X, Mid.Y) * Area;
+		});
+
+		float Broadest = 0.f;
+		for (const TPair<int32, FSurface>& It : Surfaces)
+		{
+			Broadest = FMath::Max(Broadest, It.Value.Area);
+		}
+		int32 DeckBucket = INDEX_NONE;
+		for (const TPair<int32, FSurface>& It : Surfaces)
+		{
+			if (It.Value.Area >= Broadest * 0.5f && (DeckBucket == INDEX_NONE || It.Key > DeckBucket))
 			{
-				continue;  // facing down, degenerate, or too steep to stand on
+				DeckBucket = It.Key;
 			}
-			const int32 Bucket = FMath::RoundToInt((A.Z + B.Z + C.Z) / 3.f / BucketHeight);
-			FootprintAtHeight.FindOrAdd(Bucket) += Normal.Z * 0.5f;
+		}
+		if (DeckBucket == INDEX_NONE || Broadest <= KINDA_SMALL_NUMBER)
+		{
+			return Deck;
 		}
 
-		const float DiscArea = PI * FMath::Square(FMath::Max(Box.GetSize().X, Box.GetSize().Y) * 0.5f);
-		float DeckTop = -BIG_NUMBER;
-		for (const TPair<int32, float>& Surface : FootprintAtHeight)
+		const FSurface& Top = Surfaces[DeckBucket];
+		Deck.Height = DeckBucket * BucketHeight;
+		Deck.Centre = Top.Moment / Top.Area;
+
+		// Radius: the farthest deck vertex from the centre, sanity-bounded by the
+		// radius of a disc of the same area so one stray vertex cannot inflate it.
+		const float EquivRadius = FMath::Sqrt(Top.Area / PI);
+		float Farthest = 0.f;
+		ForEachFloorTriangle([&](const FVector& A, const FVector& B, const FVector& C, float, int32 Bucket)
 		{
-			if (Surface.Value > DiscArea * 0.5f)
+			if (Bucket != DeckBucket)
 			{
-				DeckTop = FMath::Max(DeckTop, Surface.Key * BucketHeight);
+				return;
 			}
-		}
-		return (DeckTop > -BIG_NUMBER) ? DeckTop : Fallback;
+			for (const FVector& V : { A, B, C })
+			{
+				Farthest = FMath::Max(Farthest, static_cast<float>(FVector2D::Distance(FVector2D(V.X, V.Y), Deck.Centre)));
+			}
+		});
+		Deck.Radius = FMath::Clamp(Farthest, EquivRadius, EquivRadius * 1.2f);
+		Deck.bMeasured = true;
+		return Deck;
 	}
 
 	/** Deterministic pseudo-random so the stage looks the same every match. */
@@ -165,23 +223,23 @@ void AMoteArena::BuildScenery()
 		PlatformMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
 		const FBox Box = PlatformArt->GetBoundingBox();
-		const FVector Size = Box.GetSize();
-		const float ArtRadius = FMath::Max(Size.X, Size.Y) * 0.5f;
-		// The sculpt's rim overhangs the walkable area a little; allow for it.
-		const float Scale = (PlatformRadius * 1.04f) / FMath::Max(ArtRadius, 1.f);
+		const FDeck Deck = MeasureDeck(PlatformArt);
+		// The visible deck edge sits just outside the walkable one, so a fighter
+		// at the very edge of the collision disc is still standing on stone.
+		const float Scale = (PlatformRadius * 1.02f) / FMath::Max(Deck.Radius, 1.f);
 		PlatformMesh->SetRelativeScale3D(FVector(Scale));
-		// Sink it so the walkable deck - not the railing - lands on Z = 0.
-		const float DeckZ = FindDeckTop(PlatformArt) * Scale;
-		const FVector Centre = Box.GetCenter() * Scale;
-		PlatformMesh->SetRelativeLocation(FVector(-Centre.X, -Centre.Y, -DeckZ));
+		// Sink it so the walkable deck lands on Z = 0, centred on the origin.
+		const float DeckZ = Deck.Height * Scale;
+		PlatformMesh->SetRelativeLocation(FVector(-Deck.Centre.X * Scale, -Deck.Centre.Y * Scale, -DeckZ));
 		// The collision disc is now purely functional.
 		Floor->SetVisibility(false);
 
 		if (FParse::Param(FCommandLine::Get(), TEXT("MoteDebug")))
 		{
 			// The deck must land on Z = 0: worldBox max Z is the top of the art.
-			UE_LOG(LogTemp, Warning, TEXT("MOTEDBG platform deck=%.2f (box top %.2f) scale=%.3f worldBox=%s"),
-				DeckZ / Scale, Box.Max.Z, Scale, *PlatformMesh->Bounds.GetBox().ToString());
+			UE_LOG(LogTemp, Warning, TEXT("MOTEDBG platform deck=%.2f r=%.2f centre=(%.2f,%.2f) measured=%d (box top %.2f) scale=%.3f worldBox=%s"),
+				Deck.Height, Deck.Radius, Deck.Centre.X, Deck.Centre.Y, Deck.bMeasured ? 1 : 0, Box.Max.Z, Scale,
+				*PlatformMesh->Bounds.GetBox().ToString());
 		}
 	}
 	else if (UMaterialInstanceDynamic* MID = Floor->CreateAndSetMaterialInstanceDynamic(0))
@@ -304,7 +362,9 @@ void AMoteArena::BuildScenery()
 		if (UMaterialInstanceDynamic* MID = UMaterialInstanceDynamic::Create(GlowMat, this))
 		{
 			MID->SetVectorParameterValue(TEXT("Color"), FLinearColor(1.f, 0.72f, 0.35f));
-			MID->SetScalarParameterValue(TEXT("Intensity"), 3.f);
+			// At 3 every channel of this warm orange clears 1.0 and the tonemapper
+			// renders the embers white - they read as snow, not brazier sparks.
+			MID->SetScalarParameterValue(TEXT("Intensity"), 1.6f);
 			MID->SetScalarParameterValue(TEXT("Opacity"), 0.85f);
 			MID->SetScalarParameterValue(TEXT("RimPower"), 1.4f);
 			Embers->SetMaterial(0, MID);

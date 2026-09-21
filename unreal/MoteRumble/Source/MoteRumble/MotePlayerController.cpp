@@ -202,7 +202,12 @@ void AMotePlayerController::TickFight(AMoteGameMode* GM)
 	{
 		F->PressHeavy();
 	}
-	if (AnyReleased({ EKeys::J, EKeys::Gamepad_FaceButton_Top }))
+	// Level state, not an edge. Heavy was the only button read as a key-up, and
+	// while the pause menu is open this function never runs - so a release during
+	// pause was lost, the charge latched, and on unpause the fighter fired a fully
+	// charged signature at whatever it was facing. Jump and shield already work
+	// this way and self-correct for the same reason.
+	if (!AnyDown({ EKeys::J, EKeys::Gamepad_FaceButton_Top }))
 	{
 		F->ReleaseHeavy();
 	}

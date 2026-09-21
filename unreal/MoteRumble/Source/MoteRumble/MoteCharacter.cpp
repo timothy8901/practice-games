@@ -1212,6 +1212,16 @@ void AMoteCharacter::StartMove(EMoteMoveSlot Slot)
 
 	MoveSlot = Slot;
 	HitThisSwing.Reset();
+
+	// -MoteDebug: name every move and the exact capture frame it starts on, so a
+	// specific swing can be found in Recordings/frames without scrubbing.
+	if (FParse::Param(FCommandLine::Get(), TEXT("MoteDebug")))
+	{
+		const AMoteGameMode* GM = GetWorld() ? GetWorld()->GetAuthGameMode<AMoteGameMode>() : nullptr;
+		UE_LOG(LogTemp, Warning, TEXT("MOTEDBG move %s %s \"%s\" frame=%d"),
+			*GetFighterDef().DisplayName, *UEnum::GetValueAsString(Slot), *M.Name,
+			GM ? GM->GetRecordFrame() : -1);
+	}
 	HitsDone = 0;
 	ChargeTime = 0.f;
 	bComboQueued = false;
@@ -2075,19 +2085,29 @@ void AMoteCharacter::TickPresentation(float Dt, float RealDt)
 		CoreLight->SetIntensity(Glow);
 	}
 
-	// Disc: hide the held chakram while a returning throw is out.
+	// Disc: hide the held chakram while one it threw is still out. This runs
+	// after the animator, so it has to COMBINE with the pose rather than
+	// overwrite it - it used to force the mesh visible every frame, which undid
+	// the throw animation's own hide and showed a chakram in the hand while
+	// three more flew off. Any live Disc counts, not just a returning one (the
+	// air heavy's Triple Ring never returns), and it is keyed on the thrower so
+	// a reflect does not put the chakram back in the hand.
 	if (WeaponMesh && Core == EMoteCore::Disc)
 	{
 		bool bDiscOut = false;
 		for (TActorIterator<AMoteProjectile> It(GetWorld()); It; ++It)
 		{
-			if (It->GetOwnerMote() == this && It->IsReturningWeapon())
+			if (It->GetThrower() == this && It->GetKind() == EMoteProjectileKind::Disc)
 			{
 				bDiscOut = true;
 				break;
 			}
 		}
-		WeaponMesh->SetHiddenInGame(bDiscOut);
+		const bool bHide = bDiscOut || (Animator && !Animator->WantsWeaponVisible());
+		if (WeaponMesh->bHiddenInGame != bHide)
+		{
+			WeaponMesh->SetHiddenInGame(bHide);
+		}
 	}
 
 	UpdateOverlay(RealDt);

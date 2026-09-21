@@ -385,8 +385,14 @@ void UMoteFX::Beam(const FVector& From, const FVector& To, float Thickness, cons
 		E->StartScale = FVector(Thickness / 100.f, Thickness / 100.f, Len / 100.f);
 		E->EndScale = FVector(Thickness / 320.f, Thickness / 320.f, Len / 100.f);
 		E->Color = Color;
-		E->StartIntensity = 9.f;
+		// RimPower gives the beam a soft round cross-section: unlike a cube, a
+		// cylinder's normals turn away at its silhouette, so the fresnel has
+		// something to fade. At RimPower 0 and intensity 9 every beam - the KO
+		// blast, the respawn column, lightning, the spark filaments - was a flat
+		// hard-edged bar clipped to a single colour.
+		E->StartIntensity = 4.5f;
 		E->EndIntensity = 0.f;
+		E->RimPower = 1.5f;
 	}
 }
 
