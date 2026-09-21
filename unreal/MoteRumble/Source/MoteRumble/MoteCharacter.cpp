@@ -368,7 +368,11 @@ void AMoteCharacter::ApplyFighterVisuals()
 
 	if (Animator)
 	{
-		Animator->Initialize(BodyPivot, GauntletL, GauntletR, WeaponPivot, WeaponMesh, Def, Def.BodyHeight, WeaponReach);
+		// VisualRoot sits HoverHeight above the capsule centre, which sits a half-
+		// height above the deck.
+		const float FloorZ = -(GetCapsuleComponent()->GetScaledCapsuleHalfHeight() + HoverHeight);
+		Animator->Initialize(BodyPivot, GauntletL, GauntletR, WeaponPivot, WeaponMesh, Def, Def.BodyHeight, WeaponReach,
+			FloorZ);
 	}
 }
 

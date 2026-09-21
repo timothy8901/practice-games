@@ -41,7 +41,7 @@ UMoteAnimator::UMoteAnimator()
 
 void UMoteAnimator::Initialize(USceneComponent* InBodyPivot, UStaticMeshComponent* InGauntletL,
 	UStaticMeshComponent* InGauntletR, USceneComponent* InWeaponPivot, UStaticMeshComponent* InWeaponMesh,
-	const FMoteFighterDef& Def, float InBodyHeight, float InWeaponReach)
+	const FMoteFighterDef& Def, float InBodyHeight, float InWeaponReach, float InFloorZ)
 {
 	BodyPivot = InBodyPivot;
 	GauntletL = InGauntletL;
@@ -60,6 +60,9 @@ void UMoteAnimator::Initialize(USceneComponent* InBodyPivot, UStaticMeshComponen
 	// up floating above the grip. Keep it and add it back every frame.
 	GauntletOffsetR = InGauntletR ? InGauntletR->GetRelativeLocation() : FVector::ZeroVector;
 	GauntletOffsetL = InGauntletL ? InGauntletL->GetRelativeLocation() : FVector::ZeroVector;
+	FloorZ = InFloorZ;
+	LastSpinYaw = 0.f;
+	SpinResidual = 0.f;
 	bInitialised = false;
 }
 
@@ -153,8 +156,25 @@ void UMoteAnimator::BuildAttackPose(const FMoteAnimState& S, FMotePose& P) const
 	const float PA = FMath::Clamp(S.PhaseAlpha, 0.f, 1.f);
 
 	// Wind: 0 at rest -> 1 fully wound up. Strike: 0 -> 1 through the hit.
-	const float Wind = bCharging ? 1.f : (bStartup ? EaseOut(PA) : 1.f);
-	const float Strike = bActive ? Snap(PA) : (bStartup ? 0.f : 1.f);
+	//
+	// A held charge shows the COILED wind-up. Strike used to evaluate to 1 while
+	// charging, so every fighter's signature move sat frozen in its impact pose
+	// for the whole charge - on Maul that buried the hammer in the deck for up to
+	// 1.5 s. The Startup a charge releases into stays wound too, or the pose would
+	// snap back to rest between the charge and the swing.
+	const bool bWound = bCharging || (bStartup && S.Charge01 > 0.f);
+	const float Wind = bWound ? 1.f : (bStartup ? EaseOut(PA) : 1.f);
+	const float Strike = bActive ? Snap(PA) : ((bStartup || bCharging) ? 0.f : 1.f);
+
+	// The downward pitch that puts the weapon's tip ON the deck from a grip at
+	// this height, less a little for the head's own thickness. Hard-coded
+	// angles were written for one weapon and drove longer ones through the
+	// floor: -74 put the tip of Maul's 168 cm hammer ~1.4 m under the deck.
+	auto PitchToFloor = [this](float GripZ, float HeadClearance)
+	{
+		const float Drop = GripZ - FloorZ - HeadClearance;
+		return -FMath::RadiansToDegrees(FMath::Asin(FMath::Clamp(Drop / FMath::Max(WeaponReach, 1.f), 0.f, 1.f)));
+	};
 	const float Settle = (!bActive && !bStartup && !bCharging) ? EaseInOut(PA) : 0.f;
 
 	// Charging adds a tremble and a deeper coil.
@@ -196,13 +216,15 @@ void UMoteAnimator::BuildAttackPose(const FMoteAnimState& S, FMotePose& P) const
 		// Raise high overhead, then smash down in front.
 		const float Up = FMath::Lerp(0.f, 1.f, Wind);
 		const float Down = Strike;
-		const float Height = FMath::Lerp(FMath::Lerp(-BodyHeight * 0.1f, BodyHeight * 0.85f, Up),
-			-BodyHeight * 0.55f, Down);
+		// The grip finishes low but not at the fighter's feet, and the head is
+		// aimed at the deck from there: it lands ON the stage, not through it.
+		const float StrikeZ = -BodyHeight * 0.35f;
+		const float Height = FMath::Lerp(FMath::Lerp(-BodyHeight * 0.1f, BodyHeight * 0.85f, Up), StrikeZ, Down);
 		const float Fwd = FMath::Lerp(FMath::Lerp(0.35f, -0.15f, Up), 1.0f, Down);
 		P.HandR = FVector(R * Fwd, R * 0.30f + Tremble, Height);
 		P.HandL = FVector(R * Fwd * 0.9f, -R * 0.30f, Height);
 		P.WeaponLoc = (P.HandR + P.HandL) * 0.5f;
-		P.WeaponRot = FRotator(FMath::Lerp(FMath::Lerp(30.f, 86.f, Up), -74.f, Down), 0.f, 0.f);
+		P.WeaponRot = FRotator(FMath::Lerp(FMath::Lerp(30.f, 86.f, Up), PitchToFloor(StrikeZ, 12.f), Down), 0.f, 0.f);
 		P.BodyRot.Pitch += FMath::Lerp(-14.f * Up, 26.f * Down, Down);
 		P.BodyScale.Z *= 1.f + Up * 0.06f - Down * 0.10f;
 		break;
@@ -248,10 +270,14 @@ void UMoteAnimator::BuildAttackPose(const FMoteAnimState& S, FMotePose& P) const
 		// after smoothing (see UpdatePose) so the hands and weapon orbit with
 		// the body - writing it into BodyRot only ever turned the egg, because
 		// the gauntlets and weapon are siblings of BodyPivot, not children.
+		// The turn itself runs LINEARLY across the active window. Snap puts most
+		// of it in the first frame - 180-290 degrees in one step - which reads as
+		// the weapon jumping backwards and draws a straight trail sheet through
+		// the fighter. Snap still drives the reach-out, where a pop is wanted.
 		const float Turns = (S.MoveAnim == EMoteMoveAnim::SpinSlash) ? 1.f : 2.f;
-		const float Spin = Strike * 360.f * Turns;
+		const float SpinT = bActive ? PA : ((bStartup || bCharging) ? 0.f : 1.f);
 		const float Out = FMath::Lerp(0.85f, 1.25f, Strike);
-		P.SpinYaw = Spin;
+		P.SpinYaw = SpinT * 360.f * Turns;
 		P.HandR = HandAt(70.f, R * Out, -BodyHeight * 0.02f);
 		P.HandL = HandAt(-70.f, R * Out, -BodyHeight * 0.02f);
 		P.WeaponLoc = P.HandR;
@@ -493,10 +519,18 @@ void UMoteAnimator::BuildPose(const FMoteAnimState& S, FMotePose& P) const
 			P.WeaponRot = FRotator(-60.f, 30.f, 0.f);
 			break;
 		default:  // weapon planted forward, heroic lean
-			P.HandR = FVector(R * 0.95f, R * 0.2f, -BodyHeight * 0.25f);
-			P.WeaponRot = FRotator(-70.f, 0.f, 0.f);
+		{
+			// Planted ON the deck: the pitch that reaches the floor from this grip.
+			// A fixed -70 drove Maul's hammer and Veil's parasol through the stage
+			// for the whole results screen.
+			const float GripZ = -BodyHeight * 0.25f;
+			const float Drop = GripZ - FloorZ - 12.f;
+			const float Pitch = -FMath::RadiansToDegrees(FMath::Asin(FMath::Clamp(Drop / FMath::Max(WeaponReach, 1.f), 0.f, 1.f)));
+			P.HandR = FVector(R * 0.95f, R * 0.2f, GripZ);
+			P.WeaponRot = FRotator(Pitch, 0.f, 0.f);
 			P.BodyRot.Pitch += 6.f;
 			break;
+		}
 		}
 		if (Flavour != 2)
 		{
@@ -610,20 +644,32 @@ void UMoteAnimator::UpdatePose(const FMoteAnimState& S, float DeltaSeconds)
 	// it: an FRotator lerp always takes the short way round, and a vector lerp
 	// across a half-turn chord would drag the fists through the torso. Both
 	// turned multi-turn sweeps into a static "arms out" pose.
-	const FRotator SpinRot(0.f, P.SpinYaw, 0.f);
-	const bool bSpin = !FMath::IsNearlyZero(P.SpinYaw);
+	// An interrupted spin - a landing cancel, a hit - drops SpinYaw to zero in a
+	// single frame. Fold whatever was left of the turn into a residual that
+	// unwinds quickly instead of teleporting the fists and weapon. A completed
+	// spin ends on a whole number of turns, so its residual is zero.
+	if (FMath::IsNearlyZero(P.SpinYaw) && !FMath::IsNearlyZero(LastSpinYaw))
+	{
+		SpinResidual = FRotator::NormalizeAxis(FMath::Fmod(LastSpinYaw, 360.f));
+	}
+	SpinResidual = (FMath::Abs(SpinResidual) < 0.5f) ? 0.f : SpinResidual * FMath::Exp(-16.f * Dt);
+	LastSpinYaw = P.SpinYaw;
+	const float SpinYaw = P.SpinYaw + SpinResidual;
+
+	const FRotator SpinRot(0.f, SpinYaw, 0.f);
+	const bool bSpin = !FMath::IsNearlyZero(SpinYaw);
 
 	BodyPivot->SetRelativeRotation(bSpin ? SmoothedBodyRot + SpinRot : SmoothedBodyRot);
 
-	const FVector HandR = bSpin ? SmoothedHandR.RotateAngleAxis(P.SpinYaw, FVector::UpVector) : SmoothedHandR;
-	const FVector HandL = bSpin ? SmoothedHandL.RotateAngleAxis(P.SpinYaw, FVector::UpVector) : SmoothedHandL;
+	const FVector HandR = bSpin ? SmoothedHandR.RotateAngleAxis(SpinYaw, FVector::UpVector) : SmoothedHandR;
+	const FVector HandL = bSpin ? SmoothedHandL.RotateAngleAxis(SpinYaw, FVector::UpVector) : SmoothedHandL;
 	GauntletR->SetRelativeLocation(HandR + GauntletOffsetR);
 	GauntletL->SetRelativeLocation(HandL + GauntletOffsetL);
 	GauntletR->SetRelativeRotation(P.HandRRot + SpinRot);
 	GauntletL->SetRelativeRotation(P.HandLRot + SpinRot);
 
 	WeaponPivot->SetRelativeLocation(bSpin
-		? SmoothedWeaponLoc.RotateAngleAxis(P.SpinYaw, FVector::UpVector) : SmoothedWeaponLoc);
+		? SmoothedWeaponLoc.RotateAngleAxis(SpinYaw, FVector::UpVector) : SmoothedWeaponLoc);
 	WeaponPivot->SetRelativeRotation(SmoothedWeaponRot + SpinRot);
 
 	if (WeaponMesh)

@@ -75,7 +75,8 @@ public:
 	 */
 	void Initialize(USceneComponent* InBodyPivot, UStaticMeshComponent* InGauntletL,
 		UStaticMeshComponent* InGauntletR, USceneComponent* InWeaponPivot,
-		UStaticMeshComponent* InWeaponMesh, const FMoteFighterDef& Def, float InBodyHeight, float InWeaponReach);
+		UStaticMeshComponent* InWeaponMesh, const FMoteFighterDef& Def, float InBodyHeight, float InWeaponReach,
+		float InFloorZ = -96.f);
 
 	/**
 	 * Pose everything for this frame. Called by the fighter at the end of its
@@ -123,6 +124,12 @@ protected:
 
 	// ---- inter-frame smoothing ----
 	bool bInitialised = false;
+	/** The deck's height in VisualRoot space while grounded, so poses that swing
+	 *  a weapon down can aim it AT the floor instead of through it. */
+	float FloorZ = -96.f;
+	/** Spin bookkeeping: what was left of an interrupted turn, unwinding. */
+	float LastSpinYaw = 0.f;
+	float SpinResidual = 0.f;
 	FVector SmoothedBodyOffset = FVector::ZeroVector;
 	FVector SmoothedBodyScale = FVector::OneVector;
 	FRotator SmoothedBodyRot = FRotator::ZeroRotator;

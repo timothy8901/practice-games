@@ -60,6 +60,8 @@ protected:
 	/** Committed to blocking/dodging an incoming move. */
 	bool bDefending = false;
 	bool bDefendByDodge = false;
+	/** Pacing while the opponent is off the stage: heading back in, or strolling out. */
+	bool bWaitReturning = false;
 	float DefendTimer = 0.f;
 	/** Seconds left holding a heavy to charge it. */
 	float ChargeTimer = 0.f;

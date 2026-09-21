@@ -530,13 +530,17 @@ void UMoteFX::Shockwave(const FVector& Location, float Radius, const FLinearColo
 	Ring(Location + FVector(0.f, 0.f, 12.f), FRotator::ZeroRotator, Radius, Color, 0.38f, 0.16f,
 		FMath::Min(4.5f * Strength, 6.f));
 	Ring(Location + FVector(0.f, 0.f, 8.f), FRotator::ZeroRotator, Radius * 0.65f, FLinearColor::White, 0.24f, 0.1f, 3.5f);
-	// Six, not eight. The centres ride a ring of Radius*0.4 (1.58 m on a
-	// charged Maul) and each puff is 1.41 m across at birth; eight of them
-	// spawn 1.21 m apart and are touching before they move, which is what
-	// turned the ring into a ball. Six spawn 1.58 m apart and stay distinct.
+	// Six, not eight, and SPACED rather than scattered. The centres ride a ring
+	// of Radius*0.4 (1.58 m on a charged Maul) and each puff is 1.41 m across at
+	// birth. At independent random angles several routinely land within a
+	// puff-width of each other and fuse on the first frame - that is what turned
+	// the ring into a ball, and six random puffs do it too. Even 60-degree steps
+	// put them 1.58 m apart, wider than a new puff; the random phase keeps the
+	// ring from looking stamped.
+	const float Phase = RandF(0.f, 2.f * PI);
 	for (int32 i = 0; i < 6; ++i)
 	{
-		const float A = RandF(0.f, 2.f * PI);
+		const float A = Phase + static_cast<float>(i) * (2.f * PI / 6.f);
 		const FVector Out(FMath::Cos(A), FMath::Sin(A), 0.f);
 		Puff(Location + Out * Radius * 0.4f, Out * RandF(200.f, 480.f) + FVector(0.f, 0.f, RandF(60.f, 220.f)),
 			90.f * Strength, FLinearColor(0.72f, 0.66f, 0.58f), RandF(0.45f, 0.8f));

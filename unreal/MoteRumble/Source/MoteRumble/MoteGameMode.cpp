@@ -87,6 +87,15 @@ void AMoteGameMode::InitGame(const FString& MapName, const FString& Options, FSt
 
 void AMoteGameMode::StartPlay()
 {
+	// Engine notices - "Preparing SoundWaves (1)" when a sound is first played,
+	// asset-compile counts and the like - are drawn as on-screen debug text in the
+	// editor build. One landed on the GO! frame of every recorded demo. Nothing
+	// the game shows uses them (the HUD is all Canvas), so turn them off.
+	if (GEngine)
+	{
+		GEngine->Exec(GetWorld(), TEXT("DisableAllScreenMessages"));
+	}
+
 	// The floor must exist before anything spawns onto it.
 	SpawnArena();
 	Super::StartPlay();

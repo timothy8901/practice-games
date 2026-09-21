@@ -27,6 +27,7 @@ void AMoteAIController::OnPossess(APawn* InPawn)
 	Super::OnPossess(InPawn);
 	ThinkTimer = FMath::FRandRange(0.f, 0.15f);
 	StrafeSign = FMath::RandBool() ? 1.f : -1.f;
+	bWaitReturning = false;
 }
 
 void AMoteAIController::OnUnPossess()
@@ -137,14 +138,24 @@ void AMoteAIController::Tick(float DeltaSeconds)
 			ChargeTimer = 0.f;
 			Me->ReleaseHeavy();
 		}
+		// Pace with hysteresis: stroll out along screen left/right to half the
+		// radius, head back in to a fifth of it, turn round, repeat. A single
+		// threshold with opposing inputs on each side had the CPU dithering
+		// across it every few frames, facing flicking back and forth - which
+		// read as just as much of a glitch as the statue it replaced.
 		const float FromCentre = MyLoc.Size2D();
-		FVector2D Drift(-MyLoc.X, -MyLoc.Y);
-		Drift = Drift.GetSafeNormal() * (FromCentre > Radius * 0.45f ? 0.85f : 0.f);
-		if (Drift.IsNearlyZero())
+		if (FromCentre > Radius * 0.5f)
 		{
-			// Idle pacing so the stage never looks frozen.
-			Drift = FVector2D(0.f, StrafeSign * 0.35f);
+			bWaitReturning = true;
 		}
+		else if (bWaitReturning && FromCentre < Radius * 0.2f)
+		{
+			bWaitReturning = false;
+			StrafeSign *= -1.f;
+		}
+		const FVector2D Drift = bWaitReturning
+			? FVector2D(-MyLoc.X, -MyLoc.Y).GetSafeNormal() * 0.85f
+			: FVector2D(0.f, StrafeSign * 0.35f);  // world Y = screen left/right under the fixed-yaw camera
 		Me->SetMoveInput(Drift);
 		LogState(TEXT("wait"));
 		return;
@@ -198,25 +209,67 @@ void AMoteAIController::Tick(float DeltaSeconds)
 	if (DefendTimer > 0.f)
 	{
 		DefendTimer -= DeltaSeconds;
+		const bool bAir = !Me->IsGrounded();
+		const FVector2D My2D(MyLoc.X, MyLoc.Y);
+		const FVector2D Inward = (-My2D).GetSafeNormal();
 		if (bDefendByDodge)
 		{
-			// Terminal: every branch below calls SetMoveInput again, and the
-			// pawn only reads the direction when it consumes the buffered
-			// dodge - so without the return the roll used whatever the punish
-			// or neutral branch wrote, and went straight into the attacker.
-			Me->SetShieldHeld(false);
-			Me->PressDodge(-ToFoeDir);  // roll away from the attacker
-			DefendTimer = 0.f;
-			LogState(TEXT("dodge"));
-			return;
+			// Aim the dodge where it will END, not merely away from the attacker.
+			// With the foe on the inward side, straight back rolls or air-dodges
+			// the CPU off the stage - and in the air burns the dodge its recovery
+			// relies on. Try straight away, then the two sideways escapes (the one
+			// leaning toward centre first), and take the first that stays on.
+			const float Travel = bAir ? 450.f : 360.f;
+			const float SafeR = Radius * 0.85f;
+			FVector2D SideA(-ToFoeDir.Y, ToFoeDir.X);
+			FVector2D SideB = -SideA;
+			const float DotA = FVector2D::DotProduct(SideA, Inward);
+			const float DotB = FVector2D::DotProduct(SideB, Inward);
+			if (DotB > DotA || (FMath::IsNearlyEqual(DotA, DotB, 0.05f) && StrafeSign < 0.f))
+			{
+				Swap(SideA, SideB);
+			}
+			const FVector2D Candidates[] = { -ToFoeDir, SideA, SideB };
+			FVector2D Aim = FVector2D::ZeroVector;
+			if (!bAir || Me->HasAirDodge())
+			{
+				for (const FVector2D& Dir : Candidates)
+				{
+					if ((My2D + Dir * Travel).Size() <= SafeR)
+					{
+						Aim = Dir;
+						break;
+					}
+				}
+			}
+			if (!Aim.IsNearlyZero())
+			{
+				// Terminal: every branch below calls SetMoveInput again. The dodge
+				// carries its own aim (PressDodge(Dir)), so nothing can re-aim it.
+				Me->SetShieldHeld(false);
+				Me->PressDodge(Aim);
+				DefendTimer = 0.f;
+				LogState(TEXT("dodge"));
+				return;
+			}
+			// Nowhere safe to dodge to: block instead (grounded; see below).
+			bDefendByDodge = false;
 		}
-		else
+		if (bAir)
 		{
-			Me->SetShieldHeld(true);
-			Me->SetMoveInput(FVector2D::ZeroVector);
-			LogState(TEXT("defend"));
+			// Shields are ground-only, so a shield press in the air does nothing
+			// and the zeroed input just leaves the CPU limp. Drift home instead,
+			// keeping the air dodge in reserve for recovery.
+			Me->SetShieldHeld(false);
+			Me->SetMoveInput(Inward);
+			DefendTimer = 0.f;
+			LogState(TEXT("defend-drift"));
 			return;
 		}
+		Me->SetShieldHeld(true);
+		Me->SetMoveInput(FVector2D::ZeroVector);
+		LogState(TEXT("defend"));
+		return;
 	}
 	Me->SetShieldHeld(false);
 

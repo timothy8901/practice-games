@@ -163,6 +163,8 @@ public:
 	bool IsCharging() const { return State == EMoteFighterState::Attacking && Phase == EMoteMovePhase::Charging; }
 	float GetShield01() const { return ShieldHP / MoteTuning::ShieldMax; }
 	int32 GetAirJumpsLeft() const;
+	/** Is the one air dodge per airtime still available? The AI's recovery depends on it. */
+	bool HasAirDodge() const { return !bAirDodgeUsed; }
 	float GetHoverLeft() const { return HoverLeft; }
 	/** The move in progress (valid only while attacking). */
 	const FMoteMoveDef* GetCurrentMove() const;
