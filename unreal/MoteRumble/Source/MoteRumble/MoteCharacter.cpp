@@ -1283,7 +1283,13 @@ void AMoteCharacter::OnMoveActive()
 	{
 		if (UMoteFX* FX = UMoteFX::Get(this))
 		{
-			const bool bRightToLeft = (M.Anim != EMoteMoveAnim::SlashLeft);
+			// Bow's two melee jabs are mirrored by the animator so the hand that
+			// holds the bow swings it (see the BowLeft case in BuildPose), which
+			// reverses the direction the swoosh has to sweep.
+			const bool bMirrored = (GetFighterDef().Hold == EMoteWeaponHold::BowLeft)
+				&& (M.Anim == EMoteMoveAnim::BowBash || M.Anim == EMoteMoveAnim::SlashLeft);
+			const bool bRightToLeft = bMirrored ? (M.Anim == EMoteMoveAnim::SlashLeft)
+				: (M.Anim != EMoteMoveAnim::SlashLeft);
 			const float Arc = (M.Shape == EMoteHitShape::Radial) ? 360.f : M.ArcDegrees;
 			const float R = (M.Shape == EMoteHitShape::Radial) ? M.Radius : M.Reach;
 			FX->SlashArc(GetActorLocation() + FVector(0.f, 0.f, M.HeightOffset + 10.f), MoveFacing.Rotation(),

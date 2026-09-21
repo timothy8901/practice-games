@@ -547,7 +547,15 @@ def build_level():
     set_props(sun_c, mobility=unreal.ComponentMobility.MOVABLE)
     set_props(
         sun_c,
-        intensity=26.0,
+        # The deck is a 17 m pale-albedo disc and the only large surface whose
+        # normal faces the sun's hemisphere, so it collects ~85% of its light
+        # from this one source (measured: its cast shadow sits at 0.15 of the
+        # lit deck in scene-linear). At 26 - 2.6x the engine default - it
+        # rendered two stops over mid grey, up on the tonemapper's shoulder
+        # where the stone's texture contrast gets squashed flat. The ambient
+        # lost here comes back on the SkyLight below, which barely touches an
+        # up-facing surface this sun-dominated.
+        intensity=20.0,
         light_color=unreal.Color(255, 206, 155),
         cast_shadows=True,
         dynamic_shadow_distance_movable_light=30000.0,
@@ -582,7 +590,12 @@ def build_level():
     sky = spawn(unreal.SkyLight, (0, 0, 600), label="SkyLight")
     sky_c = component_of(sky, unreal.SkyLightComponent)
     set_props(sky_c, mobility=unreal.ComponentMobility.MOVABLE)
-    set_props(sky_c, real_time_capture=True, intensity=1.0, volumetric_scattering_intensity=2.0)
+    # Pays back the sun trim on everything that is NOT the deck: the fighters'
+    # shaded volumes, the platform rim, the island undersides (measured at
+    # 0.066 sRGB - crushed on the toe). Up-facing stone is only ~15% ambient,
+    # so this lifts those without re-lifting the deck. It does not touch the
+    # sky on screen - SkyAtmosphere draws that; the SkyLight is only IBL.
+    set_props(sky_c, real_time_capture=True, intensity=1.3, volumetric_scattering_intensity=2.0)
 
     fog = spawn(unreal.ExponentialHeightFog, (0, 0, -1500), label="HeightFog")
     fog_c = component_of(fog, unreal.ExponentialHeightFogComponent)
@@ -625,6 +638,40 @@ def build_level():
     pp("auto_exposure_speed_up", 4.0)
     pp("auto_exposure_speed_down", 2.0)
     pp("auto_exposure_bias", 0.6)
+    # Exposure is NOT hunting. Measured across frames 400-1800 (every 50th) a
+    # fixed deck patch holds a median of 0.606..0.803 sRGB (1 sigma 0.049)
+    # straight through the KO flashes at 499/925, with no dip-and-recover after
+    # either - so the histogram rails and the bias above are not the defect, and
+    # lowering the bias would only drag the sky and the fighters down with the
+    # deck.
+    #
+    # The defect is dynamic range. On frame_01050 the sky reads 0.332 sRGB while
+    # the deck reads 0.68..0.72, roughly two stops higher, up where the film
+    # curve's slope collapses - so the stone's albedo variation renders at
+    # reduced contrast. The deck is not clipped (max 0.779, no deck pixel above
+    # 0.99); it is compressed.
+    #
+    # Local exposure reduces contrast of the BASE layer above mid grey only, and
+    # hands the detail layer back at full strength. Because the sky sits at the
+    # pivot and the fighters at or below it, that lands on the deck and little
+    # else. Leave shadow contrast at its 1.0 default: the toe is fine, and
+    # lifting it would flatten the cast shadows. A highlight value below 1.0 is
+    # on its own enough to enable the feature (PostProcessing.cpp:799-805).
+    #
+    # Do NOT reach for color_contrast instead. UE's grading contrast pivots at
+    # ACEScc mid grey, so raising it pushes the deck - which is ABOVE mid grey -
+    # brighter still and makes the wash worse. Do NOT trim the sun either: it is
+    # spawned with atmosphere_sun_light=True, and SkyAtmosphere's in-scattering
+    # is linear in its illuminance (DirectionalLightComponent.cpp:582), so
+    # dimming the sun dims the sky, the sun disc and the cloud sea with it.
+    #
+    # These four constants are fitted from the captured PNGs, not from a render.
+    # Expect one tuning pass, and check a capture for bilateral ringing along
+    # the deck's edge against the sky and around the fighters.
+    pp("local_exposure_highlight_contrast_scale", 0.60)
+    pp("local_exposure_detail_strength", 1.40)
+    pp("local_exposure_blurred_luminance_blend", 0.50)
+    pp("local_exposure_blurred_luminance_kernel_size_percent", 40.0)
     pp("bloom_intensity", 0.45)
     pp("bloom_threshold", 0.3)
     pp("vignette_intensity", 0.4)
@@ -632,8 +679,12 @@ def build_level():
     pp("color_saturation", unreal.Vector4(1.12, 1.08, 1.02, 1.0))
     pp("color_contrast", unreal.Vector4(1.06, 1.05, 1.04, 1.0))
     pp("white_temp", 7400.0)
-    pp("ambient_occlusion_intensity", 0.6)
-    pp("ambient_occlusion_radius", 120.0)
+    # The engraved rings are shallow surface relief; a 120 cm radius is far
+    # wider than the grooves, so AO was contributing almost nothing to their
+    # read. Tighter and a little stronger puts the contact darkening back into
+    # the rings and under the fighters.
+    pp("ambient_occlusion_intensity", 0.75)
+    pp("ambient_occlusion_radius", 70.0)
     pp("dynamic_global_illumination_method", unreal.DynamicGlobalIlluminationMethod.LUMEN)
     pp("reflection_method", unreal.ReflectionMethod.LUMEN)
     pp("lumen_final_gather_quality", 2.0)

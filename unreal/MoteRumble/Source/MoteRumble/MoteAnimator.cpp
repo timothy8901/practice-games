@@ -525,13 +525,33 @@ void UMoteAnimator::BuildPose(const FMoteAnimState& S, FMotePose& P) const
 		break;
 	}
 	case EMoteWeaponHold::BowLeft:
-		if (S.MoveAnim != EMoteMoveAnim::DrawBow || S.State != EMoteFighterState::Attacking)
+	{
+		// Bow's two melee jabs - Jab1 Bow Swipe (BowBash) and Jab2 Limb Strike
+		// (SlashLeft) - are authored as RIGHT-handed sweeps, because SweepWeapon is
+		// shared with the five fighters that swing from the right hand. The bow is
+		// held in the LEFT hand, so re-parking it here left the right fist sweeping
+		// empty air while the bow stood upright. Mirror the whole sweep across the
+		// fighter's forward axis instead: the bow hand swings, the other one guards.
+		const bool bBowMelee = (S.State == EMoteFighterState::Attacking)
+			&& (S.MoveAnim == EMoteMoveAnim::BowBash || S.MoveAnim == EMoteMoveAnim::SlashLeft);
+		if (bBowMelee)
+		{
+			// Reflecting in the fighter's XZ plane negates Y, yaw and roll; pitch survives.
+			const FVector Swing(P.HandR.X, -P.HandR.Y, P.HandR.Z);
+			P.HandR = FVector(P.HandL.X, -P.HandL.Y, P.HandL.Z);
+			P.HandL = Swing;
+			P.WeaponLoc = P.HandL;
+			P.WeaponRot = FRotator(P.WeaponRot.Pitch, -P.WeaponRot.Yaw, -P.WeaponRot.Roll);
+			P.BodyRot.Yaw = -P.BodyRot.Yaw;
+		}
+		else if (S.MoveAnim != EMoteMoveAnim::DrawBow || S.State != EMoteFighterState::Attacking)
 		{
 			// Bow carried upright in the left hand.
 			P.WeaponLoc = P.HandL;
 			P.WeaponRot = FRotator(90.f, 0.f, 0.f);
 		}
 		break;
+	}
 	case EMoteWeaponHold::Gauntlets:
 		P.bWeaponVisible = false;
 		break;

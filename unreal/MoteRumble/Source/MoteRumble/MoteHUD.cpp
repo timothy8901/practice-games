@@ -27,6 +27,15 @@ namespace
 	const FLinearColor Ink(0.03f, 0.035f, 0.05f, 1.f);
 	const FLinearColor Paper(0.96f, 0.96f, 0.98f, 1.f);
 
+	/**
+	 * The damage-panel band, in reference units: the plate height and the gap
+	 * between its bottom edge and the bottom of the frame. DrawFighterPanel lays
+	 * the plates out from these and DrawOffscreenMarkers keeps its bubbles clear
+	 * of them, so the two have to read the same pair of numbers.
+	 */
+	constexpr float PanelBandH = 124.f;
+	constexpr float PanelBandInset = 40.f;
+
 	/** Damage colour ramp: clean white to furious red. */
 	FLinearColor PercentColour(float Percent)
 	{
@@ -227,11 +236,11 @@ void AMoteHUD::DrawFighterPanel(AMoteCharacter* Fighter, int32 Index, int32 Coun
 	const FMoteFighterDef& Def = Fighter->GetFighterDef();
 
 	const float PanelW = 400.f * S;
-	const float PanelH = 124.f * S;
+	const float PanelH = PanelBandH * S;
 	const float Gap = 60.f * S;
 	const float TotalW = Count * PanelW + (Count - 1) * Gap;
 	const float X = (Canvas->ClipX - TotalW) * 0.5f + Index * (PanelW + Gap);
-	float Y = Canvas->ClipY - PanelH - 40.f * S;
+	float Y = Canvas->ClipY - PanelH - PanelBandInset * S;
 
 	// Shake the whole panel when its fighter gets hit.
 	const float ShakeAmount = PanelShake.FindRef(Fighter);
@@ -316,20 +325,32 @@ void AMoteHUD::DrawOffscreenMarkers(AMoteGameMode* GM)
 		}
 		const FVector2D Centre(Canvas->ClipX * 0.5f, Canvas->ClipY * 0.5f);
 		FVector2D Dir = (P - Centre).GetSafeNormal();
+		const float R = 30.f * S;
 		const float Margin = 62.f * S;
+		// The damage panels own the bottom-centre band and the markers are drawn
+		// over them, so a bubble parked on the bottom edge landed square on a name
+		// and a percent. The bottom edge gets its own margin - the panel band plus
+		// the bubble radius plus a little air - so a marker for a fighter below the
+		// stage rides along the top of the panels instead of through them.
+		const float BottomMargin = (PanelBandH + PanelBandInset + 12.f) * S + R;
+		const float MinX = Margin;
+		const float MaxX = FMath::Max(Canvas->ClipX - Margin, MinX + 1.f);
+		const float MinY = Margin;
+		const float MaxY = FMath::Max(Canvas->ClipY - BottomMargin, MinY + 1.f);
 		// Push along Dir until it meets the nearer of the two frame edges, so the
 		// bubble actually hugs the border. Scaling each axis independently (as
-		// this once did) leaves diagonal markers floating inside the frame.
-		const float HalfX = FMath::Max(Centre.X - Margin, 1.f);
-		const float HalfY = FMath::Max(Centre.Y - Margin, 1.f);
-		const float TravelX = (FMath::Abs(Dir.X) > KINDA_SMALL_NUMBER) ? HalfX / FMath::Abs(Dir.X) : BIG_NUMBER;
-		const float TravelY = (FMath::Abs(Dir.Y) > KINDA_SMALL_NUMBER) ? HalfY / FMath::Abs(Dir.Y) : BIG_NUMBER;
+		// this once did) leaves diagonal markers floating inside the frame. The
+		// box is no longer centred on Centre, so each axis measures its own reach
+		// in the direction we are travelling rather than one shared half-size.
+		const float ReachX = FMath::Max((Dir.X >= 0.f) ? MaxX - Centre.X : Centre.X - MinX, 1.f);
+		const float ReachY = FMath::Max((Dir.Y >= 0.f) ? MaxY - Centre.Y : Centre.Y - MinY, 1.f);
+		const float TravelX = (FMath::Abs(Dir.X) > KINDA_SMALL_NUMBER) ? ReachX / FMath::Abs(Dir.X) : BIG_NUMBER;
+		const float TravelY = (FMath::Abs(Dir.Y) > KINDA_SMALL_NUMBER) ? ReachY / FMath::Abs(Dir.Y) : BIG_NUMBER;
 		const FVector2D Edge = Centre + Dir * FMath::Min(TravelX, TravelY);
 		const FVector2D At(
-			FMath::Clamp(Edge.X, Margin, Canvas->ClipX - Margin),
-			FMath::Clamp(Edge.Y, Margin, Canvas->ClipY - Margin));
+			FMath::Clamp(Edge.X, MinX, MaxX),
+			FMath::Clamp(Edge.Y, MinY, MaxY));
 
-		const float R = 30.f * S;
 		Box(At.X - R, At.Y - R, R * 2.f, R * 2.f, FLinearColor(F->GetAccent().R, F->GetAccent().G, F->GetAccent().B, 0.85f));
 		Text(FString::Printf(TEXT("%d"), FMath::FloorToInt(F->GetPercent())), At.X, At.Y - R * 0.55f, 26.f * S,
 			Ink, true, false, TEXT("Black"));

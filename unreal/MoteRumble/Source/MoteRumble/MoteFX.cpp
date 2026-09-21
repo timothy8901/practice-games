@@ -321,17 +321,25 @@ void UMoteFX::Ring(const FVector& Location, const FRotator& Rotation, float Radi
 void UMoteFX::Streak(const FVector& Location, const FVector& Velocity, float Length, float Thickness,
 	const FLinearColor& Color, float Life, float Gravity)
 {
-	if (FMoteFxElement* E = Spawn(EMoteFxShape::Cube, EMoteFxMaterial::Additive, Location, Life))
+	// A stretched sphere, not a cube. All of M_FX_Additive's softness comes from
+	// its fresnel term, and a cube's face normals are constant across each face,
+	// so RimPower has nothing to grade against: every spark came out a hard-edged
+	// slab clipped to white. An ellipsoid fades to nothing at its own silhouette.
+	if (FMoteFxElement* E = Spawn(EMoteFxShape::Sphere, EMoteFxMaterial::Additive, Location, Life))
 	{
 		E->Velocity = Velocity;
 		E->Accel = FVector(0.f, 0.f, -Gravity);
 		E->Drag = 0.12f;
 		E->bFaceVelocity = true;
-		E->StartScale = FVector(Length / 100.f, Thickness / 100.f, Thickness / 100.f);
-		E->EndScale = FVector(Length / 260.f, Thickness / 400.f, Thickness / 400.f);
+		// Fatter across than the old box: the rim falloff eats the outer edge, so
+		// the same Thickness reads thinner than it did as a solid slab.
+		E->StartScale = FVector(Length / 100.f, Thickness / 70.f, Thickness / 70.f);
+		E->EndScale = FVector(Length / 260.f, Thickness / 300.f, Thickness / 300.f);
 		E->Color = Color;
-		E->StartIntensity = 7.f;
+		E->StartIntensity = 3.2f;
 		E->EndIntensity = 0.f;
+		E->StartOpacity = 0.9f;
+		E->RimPower = 2.2f;
 	}
 }
 
@@ -342,10 +350,21 @@ void UMoteFX::Puff(const FVector& Location, const FVector& Velocity, float Radiu
 		E->Velocity = Velocity;
 		E->Drag = 0.25f;
 		E->SpinRate = FRotator(RandF(-40.f, 40.f), RandF(-40.f, 40.f), 0.f);
-		E->StartScale = FVector(Radius / 140.f);
-		E->EndScale = FVector(Radius / 45.f);
+		// Dust and smoke, not fog. The engine sphere is 100 across, so these
+		// read as 0.87*Radius blooming to 1.39*Radius - a 1.6x growth. The old
+		// 140 -> 45 pair grew 3.1x, to 2.2*Radius: a charged Maul Earthshaker
+		// (Radius 162) finished 3.6 m across, taller than two fighters, and its
+		// puffs sat on a 3.2 m ring, so they merged into one grey dome 6.8 m
+		// wide - a third of the frame, with the deck lost behind it.
+		E->StartScale = FVector(Radius / 115.f);
+		E->EndScale = FVector(Radius / 72.f);
 		E->Color = Color;
-		E->StartOpacity = 0.55f;
+		// M_FX_Smoke is Opacity * (1 - Fresnel(RimPower)), which is much flatter
+		// than a soft ball - the disc averages ~0.82 of Opacity - so at 0.55 two
+		// overlapping puffs already composited to 0.70 and three to 0.83.
+		// (DESIGN.md documents pow(dot(N,V), RimPower) here; the authored
+		// material is not that. Re-tune if the material is ever corrected.)
+		E->StartOpacity = 0.30f;
 		E->EndOpacity = 0.f;
 		E->RimPower = 2.2f;
 	}
@@ -381,9 +400,11 @@ void UMoteFX::HitSpark(const FVector& Location, const FVector& Direction, EMoteF
 	const float S = FMath::Clamp(Strength, 0.2f, 2.f);
 	const FVector Dir = Direction.GetSafeNormal(UE_SMALL_NUMBER, FVector::UpVector);
 
-	// White-hot core that collapses fast.
-	Flash(Location, 46.f * (0.7f + S * 0.6f), FLinearColor(1.f, 0.96f, 0.85f), 0.12f, 11.f);
-	Flash(Location, 80.f * (0.6f + S * 0.8f), Color, 0.2f, 6.f);
+	// White-hot core that collapses fast. Well under the old 11/6: a dozen-plus
+	// additive sparks land on top of these two, and the sum was clipping the whole
+	// impact to a flat white disc with no accent colour left in it.
+	Flash(Location, 46.f * (0.7f + S * 0.6f), FLinearColor(1.f, 0.96f, 0.85f), 0.12f, 6.5f);
+	Flash(Location, 80.f * (0.6f + S * 0.8f), Color, 0.2f, 4.f);
 
 	// Sparks thrown along the launch direction.
 	const int32 Count = FMath::RoundToInt(FMath::Lerp(5.f, 18.f, FMath::Min(S / 2.f, 1.f)));
@@ -400,13 +421,17 @@ void UMoteFX::HitSpark(const FVector& Location, const FVector& Direction, EMoteF
 		// Two crossing blade flashes.
 		for (int32 i = 0; i < 2; ++i)
 		{
-			if (FMoteFxElement* E = Spawn(EMoteFxShape::Cube, EMoteFxMaterial::Additive, Location, 0.16f))
+			if (FMoteFxElement* E = Spawn(EMoteFxShape::Sphere, EMoteFxMaterial::Additive, Location, 0.16f))
 			{
 				E->Rotation = FRotator(RandF(-40.f, 40.f), RandF(0.f, 360.f), i == 0 ? 35.f : -35.f);
-				E->StartScale = FVector(2.4f * S, 0.05f, 0.5f * S);
-				E->EndScale = FVector(3.4f * S, 0.01f, 0.1f * S);
+				// A flattened ellipsoid, not a paper-thin cube: scaled this far down on
+				// one axis the cube was a literal white quad with four straight edges.
+				E->StartScale = FVector(2.4f * S, 0.07f, 0.5f * S);
+				E->EndScale = FVector(3.4f * S, 0.015f, 0.1f * S);
 				E->Color = FLinearColor::LerpUsingHSV(Color, FLinearColor::White, 0.45f);
-				E->StartIntensity = 10.f;
+				E->StartIntensity = 4.5f;
+				E->StartOpacity = 0.9f;
+				E->RimPower = 1.8f;
 			}
 		}
 		break;
@@ -491,7 +516,11 @@ void UMoteFX::Shockwave(const FVector& Location, float Radius, const FLinearColo
 {
 	Ring(Location + FVector(0.f, 0.f, 12.f), FRotator::ZeroRotator, Radius, Color, 0.38f, 0.16f, 7.f * Strength);
 	Ring(Location + FVector(0.f, 0.f, 8.f), FRotator::ZeroRotator, Radius * 0.65f, FLinearColor::White, 0.24f, 0.1f, 6.f);
-	for (int32 i = 0; i < 8; ++i)
+	// Six, not eight. The centres ride a ring of Radius*0.4 (1.58 m on a
+	// charged Maul) and each puff is 1.41 m across at birth; eight of them
+	// spawn 1.21 m apart and are touching before they move, which is what
+	// turned the ring into a ball. Six spawn 1.58 m apart and stay distinct.
+	for (int32 i = 0; i < 6; ++i)
 	{
 		const float A = RandF(0.f, 2.f * PI);
 		const FVector Out(FMath::Cos(A), FMath::Sin(A), 0.f);
@@ -505,7 +534,10 @@ void UMoteFX::Explosion(const FVector& Location, float Radius)
 	Flash(Location, Radius * 0.9f, FLinearColor(1.f, 0.85f, 0.45f), 0.16f, 14.f);
 	Flash(Location, Radius * 1.35f, FLinearColor(1.f, 0.42f, 0.09f), 0.34f, 8.f);
 	Ring(Location, FRotator::ZeroRotator, Radius * 2.f, FLinearColor(1.f, 0.6f, 0.2f), 0.4f, 0.14f, 8.f);
-	for (int32 i = 0; i < 10; ++i)
+	// Seven is enough: these all sit inside a Radius*0.35 sphere, so every
+	// one overlaps every other and ten layers pinned the core solid (0.94
+	// coverage whatever the opacity is).
+	for (int32 i = 0; i < 7; ++i)
 	{
 		Puff(Location + FMath::VRand() * Radius * 0.35f,
 			FMath::VRand() * RandF(150.f, 420.f) + FVector(0.f, 0.f, 180.f),
