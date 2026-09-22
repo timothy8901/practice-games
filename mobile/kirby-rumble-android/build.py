@@ -71,9 +71,14 @@ def patch(html, what, old, new):
 def mobile_html(game, origin, version):
     """kirby-rumble.html plus the mobile layer, with three.js inlined so it runs offline."""
     css = read(os.path.join(HERE, 'web', 'mobile.css'))
-    js = read(os.path.join(HERE, 'web', 'mobile.js'))
     three = read(THREE)
-    for name, text, bad in (('three.js', three, '</script'), ('mobile.js', js, '</script'), ('mobile.css', css, '</style')):
+    # Order matters: the loader defines KBModels, the art layer wraps buildKirby and
+    # startFight, and the touch layer wraps renderOverlay and starts its own frame loop.
+    layers = [(name, read(os.path.join(HERE, 'web', name)))
+              for name in ('models.js', 'thrixel-art.js', 'mobile.js')]
+    js = '\n'.join('<script id="kb-%s">\n%s</script>' % (name.replace('.js', ''), text) for name, text in layers)
+    for name, text, bad in ([('three.js', three, '</script'), ('mobile.css', css, '</style')]
+                            + [(n, t, '</script') for n, t in layers]):
         if bad in text.lower():
             die('%s contains "%s", which would end its inline tag early' % (name, bad))
 
@@ -96,7 +101,7 @@ def mobile_html(game, origin, version):
     html = patch(html, 'resolution cap', 'renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));',
                  'renderer.setPixelRatio(Math.min(window.KB_MAX_DPR || 2, window.devicePixelRatio || 1));')
     html = patch(html, 'mobile stylesheet', '</head>', '<style id="kb-mobile-css">\n' + css + '</style>\n</head>')
-    html = patch(html, 'mobile layer', '</body>', '<script id="kb-mobile-js">\n' + js + '</script>\n</body>')
+    html = patch(html, 'mobile layers', '</body>', js + '\n</body>')
     # Last, so none of the patches above can match inside the library.
     html = patch(html, 'bundled three.js', '<script src="https://unpkg.com/three@0.152.2/build/three.min.js"></script>',
                  '<script>/* three.js r152, MIT license, bundled for offline play */\n' + three + '\n</script>')
@@ -154,6 +159,23 @@ def ensure_keystore(t, env):
     os.chmod(KEYSTORE, 0o600)
 
 
+def model_files():
+    models = sorted(glob.glob(os.path.join(HERE, 'models', '*.glb')))
+    if not models:
+        die('no packed models in models/ - run: python3 tools/pack_models.py\n'
+            '(it needs the Thrixel art in thrixel_assets/mote_rumble, which is not in git)')
+    return models
+
+
+def copy_models(dest):
+    os.makedirs(dest, exist_ok=True)
+    total = 0
+    for path in model_files():
+        shutil.copy2(path, dest)
+        total += os.path.getsize(path)
+    print('  %d Thrixel models, %.1f MB' % (len(model_files()), total / 1e6))
+
+
 # ------------------------------------------------------------------- the APK
 def build_apk(html, version_name, version_code, debuggable):
     t = find_tools()
@@ -165,6 +187,7 @@ def build_apk(html, version_name, version_code, debuggable):
     os.makedirs(www)
     with open(os.path.join(www, 'index.html'), 'w', encoding='utf-8') as f:
         f.write(html)
+    copy_models(os.path.join(www, 'models'))
 
     android = os.path.join(HERE, 'android')
     res = os.path.join(BUILD, 'res.zip')
@@ -221,6 +244,8 @@ def package_zip(apk, html, version_name):
         z.write(apk, ZIP_FOLDER + '/KirbyBrawler2.apk', compress_type=zipfile.ZIP_STORED)  # already compressed
         z.writestr(ZIP_FOLDER + '/How to install.txt', notes)
         z.writestr(ZIP_FOLDER + '/web/index.html', html)
+        for path in model_files():                                   # the web copy needs them too
+            z.write(path, ZIP_FOLDER + '/web/models/' + os.path.basename(path))
     return out
 
 

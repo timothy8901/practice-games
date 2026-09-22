@@ -1,7 +1,8 @@
 # Kirby Brawler 2 for Android
 
 Packages the browser game `kirby-rumble.html` (Kirby Brawler 2: Rumble Arena) as
-an installable Android app with touch controls, plus a zip to hand around.
+an installable Android app - touch controls, and the Thrixel art from Mote Rumble
+in place of the code-drawn fighters and stage - plus a zip to hand around.
 
 ```bash
 python3 build.py
@@ -24,13 +25,26 @@ notes (`INSTALL.txt`) and `web/index.html`, the same page as a single web file.
   Special, Shield (hold) and Jump on the right, with cooldown rings; pause and
   sound at the top. They drive `game.input`, the same object the keyboard sets.
   The layer also pauses the fight when the app or tab goes to the background,
-  drops the render resolution (then shadow detail) on phones that can't hold
-  45 fps, and exposes `KB.back()` / `KB.appPause()` for the Android side. They switch on
+  starts phones at 1.5x resolution and drops it (then shadow detail) when the
+  frame rate can't hold, and exposes `KB.back()` / `KB.appPause()` for Android. They switch on
   for touchscreens; `?touch=1` / `?touch=0` force them on or off.
-- **The app** (`android/`): one Activity with a full-screen WebView loading
-  `file:///android_asset/www/index.html?app=android`. Landscape, immersive, screen
-  kept on, Back routed to the game, renderer crashes recovered by reloading.
-  minSdk 24 (Android 7.0), targetSdk 34.
+- **The art** (`web/thrixel-art.js`, `web/models.js`, `models/`): each ability maps
+  to the Core built from it for Mote Rumble - sword/Blade, beam/Arc, cutter/Disc,
+  hammer/Maul, archer/Bow, fire/Flare, bomb/Cinder, parasol/Veil - so a fighter is
+  a Mote body, its two floating gauntlets and its weapon, on the stone arena with
+  the floating islands behind it. The rig is untouched: the layer swaps what
+  `parts.body`, the arm pivots and `parts.weapon` look like, nothing about how they
+  move. It also switches the scene to Mote Rumble's dusk light and filmic tone
+  mapping, without which the stone clips to white.
+  `tools/pack_models.py` turns the 10 MB Thrixel GLBs into ~300 KB ones (the
+  geometry is already small; the 2048px PBR textures are what weighed) and
+  measures the arena's deck so the game seats it exactly. Run it after changing
+  the art; `models/` is committed, `thrixel_assets/` is not.
+- **The app** (`android/`): one Activity with a full-screen WebView. The page is
+  served from a virtual https host backed by the APK's assets rather than from
+  file://, so `fetch()` can read the models and nothing on the phone's filesystem
+  is reachable. Landscape, immersive, screen kept on, Back routed to the game,
+  renderer crashes recovered by reloading. minSdk 24 (Android 7.0), targetSdk 34.
 - **No Gradle.** The SDK's build-tools (`aapt2`, `d8`, `zipalign`, `apksigner`),
   `platforms/android-34` and a JDK 17 are all it needs.
 

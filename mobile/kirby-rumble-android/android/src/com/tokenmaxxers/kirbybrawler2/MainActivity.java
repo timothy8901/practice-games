@@ -15,13 +15,20 @@ import android.view.WindowInsets;
 import android.view.WindowInsetsController;
 import android.view.WindowManager;
 import android.webkit.ConsoleMessage;
+import android.webkit.MimeTypeMap;
 import android.webkit.RenderProcessGoneDetail;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.HashMap;
 
 /**
  * Kirby Brawler 2 on Android: one full-screen WebView running the bundled game
@@ -32,8 +39,12 @@ import android.webkit.WebViewClient;
  */
 public class MainActivity extends Activity {
     private static final String TAG = "KirbyBrawler2";
+    // The page is served from a virtual https host backed by the APK's assets rather
+    // than from file://, so it is one ordinary origin: fetch() can read the Thrixel
+    // models, and nothing on the phone's filesystem is reachable from the page.
+    private static final String ASSET_HOST = "appassets.androidplatform.net";
     // ?app=android tells the page it is inside the app: touch controls on, no browser fullscreen request.
-    private static final String GAME_URL = "file:///android_asset/www/index.html?app=android";
+    private static final String GAME_URL = "https://" + ASSET_HOST + "/assets/www/index.html?app=android";
 
     private WebView web;
 
@@ -83,9 +94,27 @@ public class MainActivity extends Activity {
 
         web.setWebViewClient(new WebViewClient() {
             @Override
+            public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
+                Uri url = request.getUrl();
+                if (!ASSET_HOST.equals(url.getHost())) return null;   // nothing else is served
+                String path = url.getPath() == null ? "" : url.getPath();
+                if (!path.startsWith("/assets/") || path.contains("..")) return notFound();
+                String asset = path.substring("/assets/".length());
+                try {
+                    InputStream stream = getAssets().open(asset);
+                    WebResourceResponse response = new WebResourceResponse(mimeOf(asset), null, stream);
+                    response.setResponseHeaders(new HashMap<String, String>());
+                    return response;
+                } catch (IOException missing) {
+                    Log.w(TAG, "no such asset: " + asset);
+                    return notFound();
+                }
+            }
+
+            @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 Uri url = request.getUrl();
-                if ("file".equals(url.getScheme())) return false;
+                if (ASSET_HOST.equals(url.getHost())) return false;
                 // A web link opens in the browser rather than replacing the game.
                 try {
                     startActivity(new Intent(Intent.ACTION_VIEW, url));
@@ -115,6 +144,22 @@ public class MainActivity extends Activity {
         });
         setContentView(web);
         web.loadUrl(GAME_URL);
+    }
+
+    private static WebResourceResponse notFound() {
+        WebResourceResponse response = new WebResourceResponse(
+                "text/plain", "utf-8", 404, "Not Found", new HashMap<String, String>(),
+                new ByteArrayInputStream(new byte[0]));
+        return response;
+    }
+
+    private static String mimeOf(String asset) {
+        if (asset.endsWith(".html")) return "text/html";
+        if (asset.endsWith(".js")) return "application/javascript";
+        if (asset.endsWith(".glb")) return "model/gltf-binary";
+        String extension = MimeTypeMap.getFileExtensionFromUrl(asset);
+        String guess = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension);
+        return guess != null ? guess : "application/octet-stream";
     }
 
     @Override

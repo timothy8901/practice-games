@@ -303,9 +303,12 @@
   // Dynamic resolution: phones that can't hold 45 fps in a fight step the render
   // resolution down (2x -> 1x, a quarter at a time), then shadow detail. Never back
   // up, so it can't flicker between settings.
-  const perf = { cap: Math.min(2, window.devicePixelRatio || 1), frames: 0, since: 0, last: 0, shadowsCut: false };
+  // Phones start at 1.5x rather than 2x: the art is detailed enough that the extra
+  // pixels cost more than they show, and a weak phone starts in a playable place.
+  const perf = { cap: Math.min(TOUCH ? 1.5 : 2, window.devicePixelRatio || 1),
+                 frames: 0, since: 0, last: 0, shadowsCut: false };
   function adaptResolution(t) {
-    if (!fighting || document.hidden) { perf.last = 0; perf.frames = 0; return; }
+    if (document.hidden) { perf.last = 0; perf.frames = 0; return; }
     if (!perf.last) { perf.last = t; perf.since = t + 1000; perf.frames = 0; return; }   // skip the first second
     perf.last = t;
     if (t < perf.since) return;
@@ -313,7 +316,7 @@
     if (perf.frames < 2 || t - perf.since < 2000) return;
     const fps = (perf.frames - 1) * 1000 / (t - perf.since);
     perf.frames = 0; perf.since = t;
-    if (fps >= 45) return;
+    if (fps >= (fighting ? 45 : 30)) return;   // menus render the same scene, just idle
     if (perf.cap > 1) {
       perf.cap = Math.max(1, perf.cap - 0.25);
       window.KB_MAX_DPR = perf.cap;
@@ -382,6 +385,14 @@
     },
     appPause,
   };
+
+  if (TOUCH) {
+    // Phone screens are small and the thumbs cover the corners: sit a little closer.
+    // (Checked against the arena's far edge, which stays in frame.)
+    camBasePos.set(0, 13.2, 11.2);
+  }
+
+  if (perf.cap < (window.devicePixelRatio || 1)) { window.KB_MAX_DPR = perf.cap; resize(); }
 
   window.addEventListener('resize', layout);
   layout();

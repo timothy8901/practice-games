@@ -27,7 +27,9 @@ HOW TO PLAY
   Pause      button at the top of the screen, or your phone's Back button
   Sound      button at the top of the screen, or on the menu
 
-  Pick one of 8 abilities, then knock the CPU Kirby's hearts out before it gets yours.
+  Pick one of 8 abilities, then knock the CPU's hearts out before it gets yours.
+  The fighters and the arena are the Thrixel models from Mote Rumble: each ability
+  is its matching Core (Sword is Blade, Hammer is Maul, Parasol is Veil, and so on).
 
 UPDATING
   A newer APK installs over this one (same signing key), no uninstall needed.
