@@ -12,14 +12,14 @@
       "port": 8000
     },
     {
-      "name": "Kirby Brawler 2 mobile build",
+      "name": "Blob Knight Rumpler build",
       "runtimeExecutable": "python3",
       "runtimeArgs": [
         "-m",
         "http.server",
         "8766",
         "--directory",
-        "mobile/kirby-rumble-android/build/assets/www"
+        "mobile/blob-knight-rumpler/build/assets/www"
       ],
       "port": 8766
     }
