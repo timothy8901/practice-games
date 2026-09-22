@@ -1,0 +1,152 @@
+/* Kirby Brawler 2 - mobile edition. build.py injects this into kirby-rumble.html. */
+
+/* ---------- the game fills the screen ---------- */
+:root { --s: 1; }   /* control scale; mobile.js sets it from the screen size */
+html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
+body {
+  position: fixed; inset: 0;
+  background: #1a1a2e;
+  -webkit-user-select: none; user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+header, .controls-panel, footer { display: none !important; }
+main { max-width: none; margin: 0; padding: 0; height: 100%; }
+#game-wrap { position: absolute; inset: 0; border-radius: 0; border-left: 0; box-shadow: none; }
+#game-canvas-holder { position: absolute; inset: 0; }
+#game-canvas-holder canvas { width: 100% !important; height: 100% !important; }
+button { touch-action: manipulation; }
+
+.hud {
+  top: max(8px, env(safe-area-inset-top));
+  left: max(10px, env(safe-area-inset-left));
+  right: max(10px, env(safe-area-inset-right));
+}
+
+/* ---------- menus: centered, scrollable if a short screen needs it ---------- */
+.overlay { align-items: flex-start; overflow-y: auto; padding: 10px; }
+.overlay-card { margin: auto; }
+.kb-brand {
+  font-size: 0.74rem; font-weight: 900; letter-spacing: 0.24em; text-transform: uppercase;
+  background: linear-gradient(90deg, #ffc0d3, #8fd4ff, #ffd54d);
+  -webkit-background-clip: text; background-clip: text;
+  color: transparent; -webkit-text-fill-color: transparent;
+  margin-bottom: -8px;
+}
+.kb-pill {
+  display: inline-block; padding: 1px 7px; border-radius: 9px;
+  background: var(--c); color: #fff; font-size: 0.68rem; font-weight: 900;
+  letter-spacing: 0.05em; text-transform: uppercase; text-shadow: 0 1px 1px rgba(0,0,0,0.35);
+}
+
+/* Landscape phones are short: tighten the cards and the HUD. */
+@media (max-height: 520px) {
+  .overlay-card { padding: 14px 20px; gap: 10px; }
+  .overlay-title { font-size: 1.3rem; }
+  .overlay-title.victory { font-size: 1.6rem; }
+  .overlay-title.defeat { font-size: 1.45rem; }
+  .overlay-sub { font-size: 0.8rem; }
+  .overlay-btn { padding: 9px 16px; font-size: 0.86rem; }
+  .pick-grid { gap: 6px; }
+  .pick-btn { padding: 8px 5px; font-size: 0.76rem; }
+  .hud-panel { min-width: 140px; padding: 6px 10px; border-radius: 10px; }
+  .hud-name { font-size: 0.64rem; }
+  .hud-hearts { margin-top: 3px; }
+  .hud-hearts svg { width: 14px; height: 12.5px; }
+  .hud-bars { margin-top: 4px; gap: 3px; }
+  .hud-bar { height: 5px; }
+  .hud-bar-label { font-size: 0.5rem; }
+}
+
+/* ---------- touch controls (only while a fight is on) ---------- */
+#kb-touch, #kb-top { display: none; }
+html.kb-touch body.kb-fighting #kb-touch { display: block; }
+html.kb-touch body.kb-fighting #kb-top { display: flex; }
+
+#kb-touch { position: absolute; inset: 0; z-index: 5; touch-action: none; }
+
+.kb-stick {
+  position: absolute; left: 0; top: 0;
+  width: calc(var(--s) * 124px); height: calc(var(--s) * 124px);
+  border-radius: 50%; pointer-events: none;
+  background: radial-gradient(circle, rgba(255,255,255,0.13) 0 56%, rgba(255,255,255,0.05) 57% 100%);
+  border: 2px solid rgba(255,255,255,0.38);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.22), inset 0 0 18px rgba(143,212,255,0.28);
+  opacity: 0.5; transition: opacity 0.15s;
+  will-change: transform;
+}
+.kb-stick.active { opacity: 0.95; }
+.kb-knob {
+  position: absolute; left: 50%; top: 50%;
+  width: calc(var(--s) * 58px); height: calc(var(--s) * 58px);
+  margin: calc(var(--s) * -29px) 0 0 calc(var(--s) * -29px);
+  border-radius: 50%;
+  background: radial-gradient(circle at 36% 30%, #fff 0, #ffd1e3 32%, #ff8fb8 100%);
+  box-shadow: 0 4px 10px rgba(0,0,0,0.35), inset 0 -4px 8px rgba(200,60,110,0.3);
+  will-change: transform;
+}
+
+.kb-btn {
+  position: absolute; border-radius: 50%; pointer-events: none;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  color: #fff;
+  background: radial-gradient(circle at 34% 26%, rgba(255,255,255,0.45), rgba(255,255,255,0) 46%), var(--c);
+  border: 2px solid rgba(255,255,255,0.6);
+  box-shadow: 0 5px 0 rgba(0,0,0,0.28), 0 8px 18px rgba(0,0,0,0.3);
+  opacity: 0.9;
+  transition: transform 0.06s, filter 0.06s, box-shadow 0.06s;
+}
+.kb-btn svg { width: 40%; height: 40%; flex: none; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.4)); }
+.kb-btn.kb-a1 svg { width: 36%; height: 36%; }
+.kb-btn b {
+  font-size: calc(var(--s) * 8.5px); line-height: 1.05; margin-top: 1px;
+  font-weight: 900; letter-spacing: 0.03em; text-transform: uppercase; text-align: center;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+  max-width: 80%;   /* long move names ("Parasol Twirl") wrap to two lines */
+}
+.kb-btn.kb-a1 b { font-size: calc(var(--s) * 9.5px); }
+.kb-btn.down {
+  transform: scale(0.9); filter: brightness(1.22);
+  box-shadow: 0 1px 0 rgba(0,0,0,0.28), 0 3px 10px rgba(0,0,0,0.3);
+}
+/* Cooldown ring: fills as the move comes back (Attack, Special) or as the shield refills. */
+.kb-btn .ring {
+  position: absolute; inset: calc(var(--s) * -7px); border-radius: 50%;
+  background: conic-gradient(var(--rc, rgba(255,255,255,0.85)) calc(var(--p, 1) * 1turn), rgba(255,255,255,0.14) 0);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3.5px));
+          mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3.5px));
+}
+.kb-btn.kb-a2 .ring { --rc: #c8a4ff; }
+.kb-btn.kb-a2.ready .ring { --rc: #ffd54d; }
+.kb-btn.kb-a2.ready { box-shadow: 0 5px 0 rgba(0,0,0,0.28), 0 0 18px 3px rgba(255,213,77,0.55); }
+.kb-btn.kb-shield .ring { --rc: #8fd4ff; }
+.kb-btn.kb-shield.low .ring { --rc: #ff6e96; }
+
+#kb-top {
+  position: absolute; z-index: 5; gap: 10px;
+  top: max(8px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%);
+}
+#kb-top button {
+  width: 40px; height: 40px; padding: 0; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; background: rgba(20,20,38,0.55);
+  border: 2px solid rgba(255,255,255,0.45);
+  box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+}
+#kb-top button:active { filter: brightness(1.3); }
+#kb-top svg { width: 20px; height: 20px; }
+#kb-sound .off, #kb-sound.off .on { display: none; }
+#kb-sound.off .off { display: inline; }
+
+/* ---------- phone held upright (browser only; the app is locked to landscape) ---------- */
+#kb-rotate {
+  display: none; position: fixed; inset: 0; z-index: 50;
+  flex-direction: column; align-items: center; justify-content: center; gap: 16px;
+  background: #1a1a2e; color: #f0f0f5; text-align: center;
+  font-weight: 800; letter-spacing: 0.04em;
+}
+#kb-rotate svg { width: 64px; height: 64px; color: #ffd54d; animation: kbTurn 1.8s ease-in-out infinite; }
+@keyframes kbTurn { 0%, 25% { transform: rotate(0); } 55%, 100% { transform: rotate(-90deg); } }
+@media (orientation: portrait) {
+  html.kb-touch:not(.kb-app) #kb-rotate { display: flex; }
+}

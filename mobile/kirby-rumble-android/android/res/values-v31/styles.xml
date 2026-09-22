@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Android 12+ launch splash: the icon on the icon's own navy. -->
+    <style name="GameTheme" parent="@android:style/Theme.DeviceDefault.NoActionBar.Fullscreen">
+        <item name="android:windowBackground">@color/game_bg</item>
+        <item name="android:colorBackground">@color/game_bg</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:windowSplashScreenBackground">@color/splash_bg</item>
+    </style>
+    <color name="splash_bg">#FF14203A</color>
+</resources>

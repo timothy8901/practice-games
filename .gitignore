@@ -57,3 +57,7 @@ unreal/MoteRumble/SourceAudio/
 unreal/MoteRumble/Content/Art/
 unreal/MoteRumble/Content/Audio/
 unreal/MoteRumble/Recordings/
+
+# Kirby Brawler 2 Android packaging: build output (the signing key lives in ~/.android)
+mobile/kirby-rumble-android/build/
+mobile/kirby-rumble-android/dist/

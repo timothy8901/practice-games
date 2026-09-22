@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108">
+  <!-- Adaptive-icon foreground: 108x108 canvas, art kept inside the 66-unit safe circle. -->
+  <defs>
+    <linearGradient id="goldBig" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fffae3"/>
+      <stop offset="0.4" stop-color="#ffd84e"/>
+      <stop offset="0.58" stop-color="#c47e0c"/>
+      <stop offset="1" stop-color="#ffe98f"/>
+    </linearGradient>
+    <linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#9fe0ff"/>
+      <stop offset="0.5" stop-color="#2f7fd0"/>
+      <stop offset="1" stop-color="#8ad4ff"/>
+    </linearGradient>
+    <radialGradient id="ringGlow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0.5" stop-color="#1d8fe0" stop-opacity="0"/>
+      <stop offset="0.82" stop-color="#1d8fe0" stop-opacity="0.5"/>
+      <stop offset="1" stop-color="#1d8fe0" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="floor" cx="0.5" cy="0.45" r="0.6">
+      <stop offset="0" stop-color="#8fd4ff" stop-opacity="0.42"/>
+      <stop offset="1" stop-color="#1d8fe0" stop-opacity="0.08"/>
+    </radialGradient>
+  </defs>
+  <ellipse cx="54" cy="67" rx="36" ry="17" fill="url(#ringGlow)"/>
+  <ellipse cx="54" cy="67" rx="28" ry="10.5" fill="url(#floor)"/>
+  <!-- back half of the ring, behind the 2 -->
+  <path d="M26 67 A28 10.5 0 0 1 82 67" fill="none" stroke="#0a1422" stroke-width="4"/>
+  <path d="M26 67 A28 10.5 0 0 1 82 67" fill="none" stroke="url(#ringGrad)" stroke-width="2.2"/>
+  <!-- the 2 -->
+  <text x="54.8" y="73.2" text-anchor="middle" font-family="Impact, sans-serif" font-size="56" fill="#0a1422" opacity="0.85">2</text>
+  <text x="54" y="72" text-anchor="middle" font-family="Impact, sans-serif" font-size="56" fill="url(#goldBig)" stroke="#5a3402" stroke-width="1.1" paint-order="stroke">2</text>
+  <text x="54" y="72" text-anchor="middle" font-family="Impact, sans-serif" font-size="56" fill="none" stroke="#fff7d8" stroke-width="0.35" stroke-opacity="0.7">2</text>
+  <!-- front half of the ring, over the 2's base -->
+  <path d="M26 67 A28 10.5 0 0 0 82 67" fill="none" stroke="#0a1422" stroke-width="4"/>
+  <path d="M26 67 A28 10.5 0 0 0 82 67" fill="none" stroke="url(#ringGrad)" stroke-width="2.2"/>
+  <path d="M26 67 A28 10.5 0 0 0 82 67" fill="none" stroke="#dff3ff" stroke-width="0.5" stroke-opacity="0.85"/>
+</svg>

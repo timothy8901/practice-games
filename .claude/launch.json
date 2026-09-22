@@ -4,8 +4,24 @@
     {
       "name": "Static HTML server (python http.server)",
       "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "http.server", "8000"],
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8000"
+      ],
       "port": 8000
+    },
+    {
+      "name": "Kirby Brawler 2 mobile build",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8766",
+        "--directory",
+        "mobile/kirby-rumble-android/build/assets/www"
+      ],
+      "port": 8766
     }
   ]
 }
