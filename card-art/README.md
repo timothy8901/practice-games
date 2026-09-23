@@ -6,6 +6,8 @@ on 2026-09-23 as 512px PNGs, then resized to 256px and encoded as WebP — the
 whole deck is about 60 KB, small enough to live inside the page as data URIs so
 it works offline in the Android app with nothing to fetch.
 
+![the twelve cards](deck.webp)
+
 `python3 card-art/inline.py` rewrites the `BUFF_ART` block in
 `blob-knight-rumpler.html` from these files. Re-run it after replacing any card.
 
