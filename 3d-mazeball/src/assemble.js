@@ -121,6 +121,7 @@ export function assembleMaze (maze, opts = {}) {
     // Centre-lines, moved into world space alongside the geometry they describe.
     const routes = (built.routes || []).map(r => ({
       width: r.width,
+      room: r.room,
       pts: r.pts.map(p => {
         const [x, z] = rotXZ(p.x, p.z, cell.rot);
         return { x: x + ox, y: p.y, z: z + oz };
@@ -386,6 +387,9 @@ export function assembleMaze (maze, opts = {}) {
     for (const cell of placed) {
       for (let ri = 0; ri < cell.routes.length; ri++) {
         const route = cell.routes[ri];
+        // A room builds its own perimeter. Fencing its centre-line would put a
+        // corridor down the middle of it.
+        if (route.room) continue;
         const others = cell.routes.filter((_, i) => i !== ri).map(r => r.pts);
         const half = route.width / 2 + T;
         const pts = route.pts;

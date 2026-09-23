@@ -16,7 +16,7 @@
 
 import { generateMaze, dailySeed, seedForDate, isoToday, NOT_AUTO_PLACED } from '../3d-mazeball/src/generator.js';
 import { lumonFloor, floorFingerprint, FLOOR } from '../3d-mazeball/src/lumon.js';
-import { applyOfficeTheme, OFFICE, FLAVOUR } from '../3d-mazeball/src/theme.js';
+import { applyOfficeTheme, OFFICE, FLAVOUR, mdrDesks } from '../3d-mazeball/src/theme.js';
 import { assembleMaze, behavioursAt, cellCentre } from '../3d-mazeball/src/assemble.js';
 import { validateSeed, validateRun, validateMaze } from '../3d-mazeball/src/validate.js';
 import { Ball, stepBall, tiltUp, gatherFrom, supportUnder, FIXED, MAX_TILT, GRAVITY } from '../3d-mazeball/src/physics.js';
@@ -303,6 +303,17 @@ function placeDesks () {
     const away = open[0];                                    // the way out
     const [dx, dz] = DELTA[away];
     const cc = cellCentre(c.cx, c.cz, maze.width, maze.height);
+
+    // MDR is a room, not a corridor, and gets the four-desk windmill. The poses
+    // come from theme.js so the models drawn here land on the collision boxes
+    // the piece built — the same call, in world space instead of piece space.
+    if (c.landmark.ch === 'S') {
+      for (const d of mdrDesks(dx, dz, cc.x, cc.z)) {
+        deskPlacements.push({ x: d.x, z: d.z, yaw: d.yaw, name: 'MDR' });
+      }
+      continue;
+    }
+
     // 3.1 m back from the tile centre put the desk INSIDE the dead-end wall,
     // which stands about 3 m back — measured, not guessed. 1.15 m lands it in
     // the pocket in front of that wall, and 0.72 m of lateral offset tucks it

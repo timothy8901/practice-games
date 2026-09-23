@@ -303,45 +303,118 @@ export function buildElevator (m, dir, half, deckT) {
  * and the one piece of signage on the floor. Deliberately unremarkable — it is
  * the thing you leave.
  */
+/**
+ * Macrodata Refinement.
+ *
+ * The one room on the floor that is a room. Everything else is a 2.4 m corridor
+ * whose walls are built by following the racing line; this piece walls itself,
+ * marks its route `room: true` so the corridor fence leaves it alone, and gets
+ * an interior wide enough for the thing everybody recognises — four desks in a
+ * windmill around a shared hub.
+ *
+ * Local frame: `along` runs outward toward the only open edge, `across` is to
+ * its left. The whole prop is then rotated into place by the cell's quarter
+ * turn, so nothing here has to know which way the room faces on the floor.
+ */
+export const MDR = {
+  back: -4.2,          // rear wall, measured along the outward axis
+  across: 4.2,         // half-width of the interior
+  gap: 2.8,            // the doorway in the front wall
+  deskR: 1.9,          // how far each desk sits from the hub centre
+  deskW: 1.6,          // matches the baked Thrixel desk: 1.60 x 1.21 x 0.82 m
+  deskD: 0.82,
+  deskH: 0.72,         // collision only to desk-top height
+};
+
+/**
+ * Where the four desks stand, in whatever frame you hand it.
+ *
+ * Called twice with the same rule and never with two: once by buildArrival in
+ * the piece's local frame to place collision, and once by the review page in
+ * world space to draw the baked Thrixel model. Two copies of this arithmetic is
+ * how the desks you can see stop lining up with the desks you can hit.
+ *
+ * `f` is the outward unit vector toward the open edge. The four are a windmill
+ * — each rotated a quarter turn from its neighbour — set at the corners of the
+ * hub rather than on its axes, so the route in from the doorway runs between
+ * them instead of through one.
+ */
+export function mdrDesks (fx, fz, cx = 0, cz = 0) {
+  const rx = -fz, rz = fx;                       // across
+  const C = MDR.back + (5.0 - MDR.back) / 2;     // hub centre, along the outward axis
+  const D = MDR.deskR;
+  const out = [];
+  for (const [sa, sc, turned] of [[1, 1, false], [1, -1, true], [-1, -1, false], [-1, 1, true]]) {
+    const along = C + sa * D, across = sc * D;
+    out.push({
+      x: cx + fx * along + rx * across,
+      z: cz + fz * along + rz * across,
+      turned,                                    // long axis across the room, not along it
+      yaw: Math.atan2(fx, fz) + (turned ? Math.PI / 2 : 0),
+    });
+  }
+  return out;
+}
+
 export function buildArrival (m, dir, half, deckT) {
   const fx = dir.x, fz = dir.z;
   const rx = -fz, rz = fx;
   const P = (along, across) => [fx * along + rx * across, 0, fz * along + rz * across];
   const yaw = Math.atan2(fx, fz);
-  const back = -half + 1.2;
+  const back = MDR.back, W = MDR.across, H = HALL.wallH, T = HALL.wallT;
 
+  // The route the corridor outside stitches onto. Marked as a room so the fence
+  // does not erect a pair of corridor walls down the middle of the floor.
   m.addRoute([
     { x: fx * half, y: 0, z: fz * half },
-    { x: fx * (back + 1.0), y: 0, z: fz * (back + 1.0) },
-  ], 3.6);
+    { x: fx * (back + 1.4), y: 0, z: fz * (back + 1.4) },
+  ], 2.4, { room: true });
 
+  // Carpet, wall to wall.
   m.polyPrism([
-    [P(half, -2.6)[0], P(half, -2.6)[2]],
-    [P(half, 2.6)[0], P(half, 2.6)[2]],
-    [P(back, 2.6)[0], P(back, 2.6)[2]],
-    [P(back, -2.6)[0], P(back, -2.6)[2]],
+    [P(half, -W)[0], P(half, -W)[2]],
+    [P(half, W)[0], P(half, W)[2]],
+    [P(back, W)[0], P(back, W)[2]],
+    [P(back, -W)[0], P(back, -W)[2]],
   ], 0, deckT, 'track', { color: OFFICE.carpet, sideColor: OFFICE.skirting });
 
-  const w = P(back, 0);
-  m.boxRot(w[0], HALL.wallH / 2, w[2], 5.2, HALL.wallH, HALL.wallT, [0, 1, 0], yaw,
-    'wall', { color: OFFICE.wall });
-  m.boxRot(w[0], HALL.skirtH / 2, w[2], 5.2, HALL.skirtH, HALL.wallT + 0.03, [0, 1, 0], yaw,
-    'marker', { color: OFFICE.skirting, collide: false });
+  const wallOpts = { color: OFFICE.wall };
+  const mid = (back + half) / 2, depth = half - back;
 
-  // desk with a terminal, off to one side so the corridor stays clear
-  const d = P(back + 1.05, 1.75);
-  m.boxRot(d[0], 0.36, d[2], 1.9, 0.1, 0.85, [0, 1, 0], yaw, 'steel', { color: OFFICE.wallShade });
-  for (const s of [-1, 1]) {
-    const leg = P(back + 1.05, 1.75 + s * 0.8);
-    m.boxRot(leg[0], 0.18, leg[2], 0.08, 0.36, 0.7, [0, 1, 0], yaw, 'steel',
-      { color: OFFICE.steelDark, collide: false });
+  // Rear wall, then the two long side walls.
+  const wb = P(back, 0);
+  m.boxRot(wb[0], H / 2, wb[2], W * 2 + T, H, T, [0, 1, 0], yaw, 'wall', wallOpts);
+  for (const sc of [-1, 1]) {
+    const ws = P(mid, sc * W);
+    m.boxRot(ws[0], H / 2, ws[2], T, H, depth, [0, 1, 0], yaw, 'wall', wallOpts);
   }
-  const scr = P(back + 0.85, 1.75);
-  m.boxRot(scr[0], 0.66, scr[2], 0.7, 0.5, 0.06, [0, 1, 0], yaw, 'glow',
-    { color: OFFICE.accent, collide: false });
+  // Front wall, in two returns either side of the doorway.
+  const jamb = (W - MDR.gap / 2) / 2 + MDR.gap / 4;
+  for (const sc of [-1, 1]) {
+    const seg = (W - MDR.gap / 2);
+    const wf = P(half, sc * (MDR.gap / 2 + seg / 2));
+    m.boxRot(wf[0], H / 2, wf[2], seg, H, T, [0, 1, 0], yaw, 'wall', wallOpts);
+  }
+
+  // Suspended ceiling over the room. Decoration — the ball cannot reach 2.35 m,
+  // and a collidable ceiling makes the camera boom think it is buried every frame.
+  const cc = P(mid, 0);
+  m.boxRot(cc[0], H - HALL.ceilDrop, cc[2], W * 2, 0.02, depth, [0, 1, 0], yaw,
+    'hallCeil', { color: OFFICE.wallShade, collide: false });
+
+  // The desks. Geometry is the baked Thrixel model, drawn by the review page;
+  // what the piece contributes is the collision, a desk-shaped box up to
+  // desk-top height. The ball is 0.7 m across and the top is at 0.72 m, so
+  // there was never a gap to roll under.
+  for (const d of mdrDesks(fx, fz)) {
+    const sx = d.turned ? MDR.deskD : MDR.deskW;
+    const sz = d.turned ? MDR.deskW : MDR.deskD;
+    m.boxRot(d.x, MDR.deskH / 2, d.z, sx, MDR.deskH, sz, [0, 1, 0], yaw, 'steel',
+      { render: false });
+  }
 
   // floor decal marking the start
-  const s0 = P(0, 0);
+  const s0 = P(mid, 0);
   m.boxRot(s0[0], 0.012, s0[2], 2.2, 0.02, 0.12, [0, 1, 0], yaw, 'marker',
     { color: OFFICE.accentDeep, collide: false });
 }

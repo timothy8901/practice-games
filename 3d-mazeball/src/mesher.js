@@ -116,8 +116,16 @@ export class Mesher {
    * DoubleSide, so triangle winding never has to be reasoned about — see
    * handoff §11.1, a whole class of bug that simply stops existing.
    */
+  /**
+   * @param opts.collide  false = decoration, drawn but never hit (handoff §4.4)
+   * @param opts.render   false = the mirror image: hit but never drawn. For a
+   *        collision proxy standing in for geometry that is drawn some other
+   *        way — the MDR desks are baked Thrixel models the review page draws
+   *        itself, and a solid box under each one reads as a plinth.
+   */
   tri (A, B, C, mat, opts = {}) {
     const collide = opts.collide !== false;
+    const render = opts.render !== false;
     const ux = B[0] - A[0], uy = B[1] - A[1], uz = B[2] - A[2];
     const vx = C[0] - A[0], vy = C[1] - A[1], vz = C[2] - A[2];
     let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
@@ -137,12 +145,14 @@ export class Mesher {
       return;
     }
 
-    const g = this._g(mat);
-    g.pos.push(A[0], A[1], A[2], B[0], B[1], B[2], C[0], C[1], C[2]);
-    g.nor.push(nx, ny, nz, nx, ny, nz, nx, ny, nz);
-    const col = parseColor(opts.color || '#ffffff');
-    for (let i = 0; i < 3; i++) g.col.push(col[0], col[1], col[2]);
-    this.triCount++;
+    if (render) {
+      const g = this._g(mat);
+      g.pos.push(A[0], A[1], A[2], B[0], B[1], B[2], C[0], C[1], C[2]);
+      g.nor.push(nx, ny, nz, nx, ny, nz, nx, ny, nz);
+      const col = parseColor(opts.color || '#ffffff');
+      for (let i = 0; i < 3; i++) g.col.push(col[0], col[1], col[2]);
+      this.triCount++;
+    }
 
     if (collide) {
       this._c(mat).push(A[0], A[1], A[2], B[0], B[1], B[2], C[0], C[1], C[2]);
@@ -425,9 +435,17 @@ export class Mesher {
    * deck helpers, not by hand. The width is what lets the generator fence a
    * corridor without measuring geometry it cannot see.
    */
-  addRoute (path, width = 2.4) {
+  /**
+   * @param opts.room  this centre-line runs through a ROOM the piece walls for
+   *        itself, so the corridor fence must not build along it. Without this
+   *        a room gets a pair of corridor walls erected down its middle.
+   */
+  addRoute (path, width = 2.4, opts = {}) {
     if (!path || path.length < 2) return;
-    this.routes.push({ width, pts: path.map(p => ({ x: p.x, y: p.y, z: p.z })) });
+    this.routes.push({
+      width, room: !!opts.room,
+      pts: path.map(p => ({ x: p.x, y: p.y, z: p.z })),
+    });
   }
 
   /** Moving-part geometry, one entry per declared effect. */
