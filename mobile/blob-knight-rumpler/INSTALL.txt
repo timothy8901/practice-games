@@ -42,9 +42,13 @@ HOW TO PLAY
   earn it. Each one also unlocks a small permanent buff - a knight's own eight
   only help while you are carrying that knight, the twelve overall always count.
 
-  BOOSTS - the toggle on the title screen. Turn it off and you get no card
-  before a match and none of the achievement buffs: just the knight and the
-  arena. Achievements still tick over either way.
+  SETTINGS - on the title screen. Two boost switches, off independently: CARDS
+  (the three dealt before a match) and BUFFS (what your achievements have
+  unlocked). Turn both off for just the knight and the arena; achievements still
+  tick over either way. Settings also holds your SAVE - everything lives in this
+  phone's browser storage, so copy the string somewhere safe if you care about
+  it, and paste it back to restore. (Key rebinding is there on a computer; a
+  phone has no keyboard to rebind.)
 
   TWO MODES
     1v1        pick your knight and the challenger's (or leave it random), then

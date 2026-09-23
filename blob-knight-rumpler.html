@@ -166,6 +166,7 @@
     text-align: center;
     max-width: 470px;
     width: calc(100% - 32px);
+    max-height: calc(100% - 20px);   /* a landscape phone is 360px tall: scroll inside, never off the edge */
     display: flex; flex-direction: column; gap: 14px; align-items: center;
     animation: cardIn 0.28s cubic-bezier(0.2, 1.2, 0.4, 1);
   }
@@ -190,7 +191,7 @@
   .overlay-btn.primary:hover { transform: translateY(-1px); background: #fff5a0; }
   .overlay-btn.ghost { background: transparent; color: var(--text); }
   .overlay-btn.ghost:hover { background: #2b2b40; border-color: var(--accent); }
-  .pick-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; width: 100%; }
+  .pick-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; width: 100%; overflow-y: auto; }
   @media (max-width: 480px) { .pick-grid { grid-template-columns: repeat(2, 1fr); } }
   .pick-btn {
     background: #1a1a2e; border: 2px solid #3a3a52;
@@ -285,6 +286,40 @@
   }
   .achv-row.done em { color: var(--accent); }
   .tally { color: #2b2b40; background: var(--accent); border-radius: 5px; padding: 1px 6px; font-size: 0.7rem; margin-left: 6px; }
+  .pick-tag { display: block; font-size: 0.55rem; color: #8fd4ff; font-weight: 700; margin-top: 3px; letter-spacing: 0.02em; }
+  .overlay-sub.warn { color: #ff9ab0; font-size: 0.78rem; }
+  .hud-banner.danger { color: #ff8095; text-shadow: 0 3px 18px rgba(0,0,0,0.7), 0 0 26px rgba(255,90,122,0.5); }
+
+  /* ---------- settings ---------- */
+  .set-list {
+    width: 100%; flex: 1 1 auto; min-height: 90px; overflow-y: auto;
+    display: flex; flex-direction: column; gap: 7px; padding-right: 5px; text-align: left;
+  }
+  .set-note { font-size: 0.64rem; color: var(--muted); line-height: 1.45; }
+  .set-note strong { color: var(--accent); }
+  .set-buttons { display: flex; gap: 8px; flex-wrap: wrap; }
+  #set-controls { display: flex; flex-direction: column; gap: 7px; }
+  .set-buttons .overlay-btn { padding: 7px 12px; font-size: 0.74rem; }
+  .key-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
+  @media (max-width: 460px) { .key-grid { grid-template-columns: 1fr; } }
+  .key-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    background: #1a1a2e; border: 1px solid #33334a; border-left: 4px solid #33334a;
+    border-radius: 8px; padding: 7px 10px; cursor: pointer; font-family: inherit; color: var(--text);
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .key-row:hover { background: #23233c; border-color: var(--accent); }
+  .key-row.listening { border-color: var(--accent); border-left-color: var(--accent); background: #2b2b40; }
+  .key-act { font-size: 0.72rem; font-weight: 800; letter-spacing: 0.04em; }
+  .key-caps { display: flex; gap: 4px; align-items: center; font-size: 0.62rem; color: var(--muted); }
+  .key-caps kbd { font-size: 0.62rem; padding: 1px 5px; }
+  .key-caps em { font-style: normal; color: #70708e; }
+  .key-row.listening .key-caps { color: var(--accent); font-weight: 800; }
+  .save-box {
+    width: 100%; min-height: 54px; resize: vertical;
+    background: #11111e; color: var(--text); border: 1px solid #3a3a52; border-radius: 8px;
+    padding: 7px 9px; font-family: ui-monospace, Menlo, monospace; font-size: 0.6rem; line-height: 1.4;
+  }
   .overlay-btn.ghost .tally { color: #2b2b40; }
   /* the unlock, while you are still fighting */
   .achv-toast {
@@ -870,6 +905,14 @@ function buildHatAndWeapon(g, parts, key) {
 
 // -------------------------------------------------------------- FIGHTER ----
 const MAX_HP = 6;
+// A hop used to cost nothing on the way down, so hopping forever was a free way
+// to reset neutral. Landing now holds you for a few frames: half speed, and no
+// shield until it clears. Attacks still come out, so the buffer below can pay
+// off the moment you touch down.
+const LAND_LAG = 0.09;    // ~5 frames at 60fps
+// An attack pressed a few frames early - out of a shield drop, a landing, the
+// tail of a swing - is remembered rather than dropped.
+const INPUT_BUFFER = 0.08;
 function makeFighter(isPlayer, abilityKey) {
   const palette = isPlayer ? PALETTES.player : PALETTES.cpu;
   const { group, parts } = buildFighter(palette, abilityKey);
@@ -901,6 +944,8 @@ function makeFighter(isPlayer, abilityKey) {
     cd: { a1: 0, a2: 0 },
     shield: { active: false, stamina: 1, broken: 0 },
     hitT: 0, invuln: 0, flashT: 0, redT: 0, squashT: 0,
+    landT: 0,                          // landing recovery left
+    buf: null,                         // { slot, t } an attack pressed early
     reflect: 0,                        // parasol twirl reflect window
     dash: null,                        // { dx, dz, t, dur, hitSet }
     anim: { run: 0 },
@@ -979,6 +1024,19 @@ const BUFFS = {
 };
 const BUFF_KEYS = Object.keys(BUFFS);
 
+// What a core plays like, for the picker - the move names alone do not tell you
+// whether Blaze Rush is a dash or a projectile.
+const CORE_TAG = {
+  sword:   'Balanced melee \u00b7 wide arc',
+  beam:    'Long melee \u00b7 lightning bolt',
+  cutter:  'Zoner \u00b7 returning disc, triple spread',
+  hammer:  'Heavy bruiser \u00b7 huge knockback',
+  archer:  'Long-range zoner \u00b7 piercing shot',
+  fire:    'Close burner \u00b7 forward dash',
+  bomb:    'Trapper \u00b7 arcing blasts',
+  parasol: 'Quick jabs \u00b7 reflects projectiles',
+};
+
 // --- card art: generated by card-art/inline.py, do not edit by hand ---
 const BUFF_ART = {
   armor: 'data:image/webp;base64,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',
@@ -1046,6 +1104,8 @@ const game = {
   sel: { player: 'sword', foe: 'random' },
   buffKey: null,          // the card the player took for this match, or null
   offer: [],              // the three on the table
+  keyNote: null,          // what the settings screen has to say about a rebind
+  achvFrom: 'menu',       // where the achievements screen was opened from
   score: { p: 0, c: 0 },  // KOs landed; in survival p is how many knights you have toppled
   clock: 0,               // seconds left on the match/round clock, 0 = untimed
   sudden: false,          // sudden death, after a tied clock
@@ -1349,6 +1409,8 @@ function updateFighter(f, dt, input) {
   if (f.redT > 0) f.redT -= dt;
   if (f.reflect > 0) f.reflect -= dt;
   if (f.shield.broken > 0) f.shield.broken -= dt;
+  if (f.landT > 0) f.landT -= dt;
+  if (f.buf) { f.buf.t -= dt; if (f.buf.t <= 0) f.buf = null; }
 
   // shield stamina
   const bul = wears(f, 'bulwark');
@@ -1373,7 +1435,8 @@ function updateFighter(f, dt, input) {
   }
 
   // shield input (can't shield mid-attack / broken)
-  const wantShield = input.shield && f.state === 'idle' && f.shield.broken <= 0 && f.shield.stamina > 0.08;
+  const wantShield = input.shield && f.state === 'idle' && f.landT <= 0
+    && f.shield.broken <= 0 && f.shield.stamina > 0.08;
   f.shield.active = wantShield;
   f.parts.bubble.visible = f.shield.active;
   if (f.parts.bubbleRing) f.parts.bubbleRing.visible = f.shield.active;
@@ -1405,14 +1468,21 @@ function updateFighter(f, dt, input) {
     f.airY += f.airVy * dt;
     if (f.airY <= 0) {
       f.airY = 0; f.airVy = 0;
-      if (wasFalling) spawnDust(g.position.x, g.position.z, 7);  // landing puff
+      if (wasFalling) {
+        spawnDust(g.position.x, g.position.z, 7);   // landing puff
+        f.landT = LAND_LAG;
+      }
     }
   }
 
   // attacks
-  if (f.state === 'idle' && !f.shield.active) {
-    if (input.a1Pressed) tryAttack(f, 'a1');
-    else if (input.a2Pressed) tryAttack(f, 'a2');
+  // take the press now, spend it as soon as the state allows - pressing early
+  // out of a shield drop or a landing used to lose the input entirely
+  if (input.a1Pressed) f.buf = { slot: 'a1', t: INPUT_BUFFER };
+  else if (input.a2Pressed) f.buf = { slot: 'a2', t: INPUT_BUFFER };
+  if (f.buf && f.state === 'idle' && !f.shield.active) {
+    if (tryAttack(f, f.buf.slot)) f.buf = null;
+    else if (f.cd[f.buf.slot] > 0) f.buf = null;   // on cooldown: let it go rather than fire late
   }
 
   // attack progression
@@ -1485,12 +1555,13 @@ function updateFighter(f, dt, input) {
   // movement
   let mx = 0, mz = 0;
   const canMove = (f.state === 'idle') && !f.shield.active;
+  const footing = f.landT > 0 ? 0.5 : 1;   // heavy for a few frames after a hop
   if (canMove) {
     mx = input.mx; mz = input.mz;
     const len = Math.hypot(mx, mz);
     if (len > 0.01) {
       mx /= len; mz /= len;
-      const SPEED = 5.6 * (f.speedMul || 1) * moveMul(f);
+      const SPEED = 5.6 * (f.speedMul || 1) * moveMul(f) * footing;
       f.vx = mx * SPEED; f.vz = mz * SPEED;
       g.rotation.y = Math.atan2(mx, mz);
       f.anim.run += dt * 11;
@@ -1859,15 +1930,86 @@ function updateParticlesAndFx(dt) {
 }
 
 // ----------------------------------------------------------------- INPUT ----
-const KEYMAP = {
-  KeyW:'up', ArrowUp:'up', KeyS:'down', ArrowDown:'down',
-  KeyA:'left', ArrowLeft:'left', KeyD:'right', ArrowRight:'right',
-  Space:'jump',
-  KeyH:'a1', KeyX:'a1',
-  KeyJ:'a2', KeyZ:'a2',
-  KeyK:'shield', ShiftLeft:'shield', ShiftRight:'shield', KeyC:'shield',
+const DEFAULT_KEYS = {
+  up:     ['KeyW', 'ArrowUp'],
+  down:   ['KeyS', 'ArrowDown'],
+  left:   ['KeyA', 'ArrowLeft'],
+  right:  ['KeyD', 'ArrowRight'],
+  jump:   ['Space'],
+  a1:     ['KeyH', 'KeyX'],
+  a2:     ['KeyJ', 'KeyZ'],
+  shield: ['KeyK', 'ShiftLeft', 'ShiftRight', 'KeyC'],
 };
+const ACTION_ORDER = ['up', 'down', 'left', 'right', 'jump', 'a1', 'a2', 'shield'];
+const ACTION_NAME = { up:'Up', down:'Down', left:'Left', right:'Right',
+                      jump:'Jump', a1:'Attack', a2:'Special', shield:'Shield' };
+// The game keeps these two for itself; binding them would strand the player.
+const RESERVED_KEYS = { KeyP: 'Pause', KeyM: 'Mute' };
+
+function loadKeys() {
+  const out = {};
+  for (const a of ACTION_ORDER) out[a] = DEFAULT_KEYS[a].slice();
+  try {
+    const saved = JSON.parse(localStorage.getItem('bkr-keys') || 'null');
+    if (saved) for (const a of ACTION_ORDER) {
+      if (Array.isArray(saved[a])) out[a] = saved[a].filter(c => typeof c === 'string');
+    }
+  } catch (_) {}
+  return out;
+}
+function saveKeys() { try { localStorage.setItem('bkr-keys', JSON.stringify(keyBind)); } catch (_) {} }
+let keyBind = loadKeys();
+let KEYMAP = {};
+function rebuildKeymap() {
+  KEYMAP = {};
+  for (const a of ACTION_ORDER) for (const code of keyBind[a]) KEYMAP[code] = a;
+}
+rebuildKeymap();
+// One key, one action: taking it from somewhere else is the point of rebinding.
+function bindKey(action, code) {
+  if (RESERVED_KEYS[code]) return keyLabel(code) + ' is ' + RESERVED_KEYS[code].toLowerCase() + '.';
+  for (const a of ACTION_ORDER) keyBind[a] = keyBind[a].filter(c => c !== code);
+  keyBind[action] = [code];
+  saveKeys();
+  rebuildKeymap();
+  // The key you just pressed is held down, and its keyup will now map somewhere
+  // else or nowhere at all - so let go of everything rather than walk into the
+  // next fight holding a direction nobody can release.
+  for (const a of ACTION_ORDER) game.input[a] = false;
+  game.prev.a1 = game.prev.a2 = game.prev.jump = false;
+  return null;
+}
+function resetKeys() { keyBind = {}; for (const a of ACTION_ORDER) keyBind[a] = DEFAULT_KEYS[a].slice(); saveKeys(); rebuildKeymap(); }
+function keyLabel(code) {
+  if (!code) return '\u2014';
+  if (code.indexOf('Key') === 0) return code.slice(3);
+  if (code.indexOf('Digit') === 0) return code.slice(5);
+  if (code.indexOf('Numpad') === 0) return 'Num ' + code.slice(6);
+  if (code.indexOf('Shift') === 0) return 'Shift';
+  if (code.indexOf('Control') === 0) return 'Ctrl';
+  if (code.indexOf('Alt') === 0) return 'Alt';
+  if (code.indexOf('Meta') === 0) return 'Cmd';
+  const named = { Space:'Space', ArrowUp:'\u2191', ArrowDown:'\u2193', ArrowLeft:'\u2190', ArrowRight:'\u2192',
+                  Enter:'Enter', Tab:'Tab', Backquote:'`', Minus:'-', Equal:'=', Comma:',', Period:'.', Slash:'/',
+                  Semicolon:';', Quote:"'", BracketLeft:'[', BracketRight:']', Backslash:'\\' };
+  return named[code] || code;
+}
+let capturingAction = null;    // the settings screen is waiting for a key
+
 window.addEventListener('keydown', (e) => {
+  // Typing in the save box is typing: no rebinding, no mute, and no movement key
+  // left held down because the browser ate the keyup (Cmd+C used to stick Shield on).
+  const el = e.target;
+  if (el && (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT' || el.isContentEditable)) return;
+  if (capturingAction) {       // rebinding: this press is the binding, not a move
+    e.preventDefault();
+    const action = capturingAction;
+    capturingAction = null;
+    if (e.code !== 'Escape') game.keyNote = bindKey(action, e.code);
+    else game.keyNote = null;
+    renderOverlay();
+    return;
+  }
   if (e.code === 'KeyM') { sfx.toggle(); return; }
   if (e.code === 'KeyP' && (game.phase === 'fight' || game.phase === 'paused')) {
     game.phase = game.phase === 'fight' ? 'paused' : 'fight';
@@ -1881,6 +2023,36 @@ window.addEventListener('keyup', (e) => {
   const a = KEYMAP[e.code];
   if (a) game.input[a] = false;
 });
+
+// ------------------------------------------------------------ SAVE FILE ----
+// Everything the game remembers, as one string to paste somewhere safe. Browser
+// storage is the only home it has, and clearing site data empties it.
+const SAVE_KEYS = ['bkr-stats', 'bkr-best', 'bkr-opts', 'bkr-cards', 'bkr-perks', 'bkr-keys', 'ntg-sfx'];
+function exportSave() {
+  const bag = { v: 1 };
+  for (const k of SAVE_KEYS) {
+    try { const v = localStorage.getItem(k); if (v !== null) bag[k] = v; } catch (_) {}
+  }
+  try { return btoa(unescape(encodeURIComponent(JSON.stringify(bag)))); }
+  catch (_) { return ''; }
+}
+function importSave(text) {
+  let bag;
+  try { bag = JSON.parse(decodeURIComponent(escape(atob(String(text || '').trim())))); }
+  catch (_) { return 'That does not look like a save string.'; }
+  // The version marker is the signature. Requiring bkr-stats rejected the save of
+  // anyone who had not finished a match yet - the string this very screen gave them.
+  if (!bag || bag.v !== 1) return 'That is not a Blob Knight Rumpler save.';
+  for (const k of SAVE_KEYS) {
+    try {
+      // A key the save does not carry was unset in the profile it came from, so
+      // clear it rather than leaving this browser's value standing in for it.
+      if (typeof bag[k] === 'string') localStorage.setItem(k, bag[k]);
+      else localStorage.removeItem(k);
+    } catch (_) {}
+  }
+  return null;
+}
 
 // ------------------------------------------------------------------- HUD ----
 const HEART = (filled) => `<svg viewBox="0 0 20 18"><path d="M10 17 C10 17 1 11 1 5.5 C1 2.4 3.5 1 5.7 1 C7.5 1 9.2 2 10 3.6 C10.8 2 12.5 1 14.3 1 C16.5 1 19 2.4 19 5.5 C19 11 10 17 10 17 Z"
@@ -1912,9 +2084,10 @@ function clockText(s) {
   return Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0');
 }
 // FIGHT! / ROUND 4 / SUDDEN DEATH — shown over the arena, gone in a second and a half
-function banner(text) {
+function banner(text, kind) {
   if (!bannerEl) return;
   bannerEl.textContent = text;
+  bannerEl.classList.toggle('danger', kind === 'danger');
   bannerEl.classList.remove('show');
   void bannerEl.offsetWidth;        // restart the animation
   bannerEl.classList.add('show');
@@ -1991,7 +2164,8 @@ const overlayEl = document.getElementById('overlay');
 function coreButton(key, attr) {
   return `<button class="pick-btn" data-${attr}="${key}" style="--ab-accent:${ABIL[key].accent}">
       <span class="pick-dot" style="background:${ABIL[key].accent}"></span>${ABIL[key].name}
-      <span class="pick-moves">${ABIL[key].a1.label} &middot; ${ABIL[key].a2.label}</span></button>`;
+      <span class="pick-moves">${ABIL[key].a1.label} &middot; ${ABIL[key].a2.label}</span>
+      <span class="pick-tag">${CORE_TAG[key] || ''}</span></button>`;
 }
 function optRow(label, key, choices) {
   return `<div class="opt-row"><span class="opt-label">${label}</span><div class="opt-choices">` +
@@ -2000,6 +2174,10 @@ function optRow(label, key, choices) {
 }
 
 function renderOverlay() {
+  // Arming a rebind and then leaving - Back, the phone's Back button, starting a
+  // match - used to leave the listener armed, and the next key pressed anywhere
+  // was silently swallowed and rebound. Only this screen listens for a binding.
+  if (game.phase !== 'settings') capturingAction = null;
   updateHud();
   if (game.phase === 'fight') { overlayEl.classList.add('hidden'); return; }
   overlayEl.classList.remove('hidden');
@@ -2023,10 +2201,12 @@ function renderOverlay() {
         </div>
         <div class="overlay-buttons">
           <button class="overlay-btn ghost" data-act="achv">Achievements<span class="tally">${ACHV.filter(earned).length} / ${ACHV.length}</span></button>
-          <button class="overlay-btn ghost" data-act="boosts">Boosts<span class="tally">${boostsOn() ? 'On' : 'Off'}</span></button>
+          <button class="overlay-btn ghost" data-act="settings">Settings</button>
         </div>
-        <div class="overlay-sub menu-note" id="menu-boosts">${boostsOn()
-          ? 'Boosts on: a card before every match, plus whatever your achievements have earned.'
+        <div class="overlay-sub menu-note" id="menu-boosts">${
+          cardsOn() && perksOn() ? 'Boosts on: a card before every match, plus whatever your achievements have earned.'
+          : cardsOn() ? 'Cards on, achievement buffs off.'
+          : perksOn() ? 'Achievement buffs on, no card before a match.'
           : 'Boosts off: no cards, no achievement buffs \u2014 just the knight and the arena.'}</div>
         <div class="overlay-sub" id="menu-hint" style="font-size:0.72rem">Sound: press <kbd>M</kbd> &middot; Pause: <kbd>P</kbd></div>
       </div>`;
@@ -2094,12 +2274,57 @@ function renderOverlay() {
     overlayEl.innerHTML = `
       <div class="overlay-card wide">
         <div class="overlay-title">Achievements</div>
-        <div class="overlay-sub"><strong>${ACHV.filter(earned).length}</strong> of ${ACHV.length} earned${boostsOn()
+        <div class="overlay-sub"><strong>${ACHV.filter(earned).length}</strong> of ${ACHV.length} earned${perksOn()
           ? ' &middot; every one of them a permanent buff'
-          : ' &middot; <strong>boosts are off</strong>, so none of them apply'}</div>
-        <div class="achv-list${boostsOn() ? '' : ' off'}">
+          : ' &middot; <strong>achievement buffs are off</strong>, so none of them apply'}</div>
+        <div class="achv-list${perksOn() ? '' : ' off'}">
           ${section('Overall', ACHV.filter(a => !a.core))}
           ${ABIL_KEYS.map(k => section(ABIL[k].name, ACHV.filter(a => a.core === k))).join('')}
+        </div>
+        <button class="overlay-btn ghost" data-act="achv-back">Back</button>
+      </div>`;
+
+  } else if (game.phase === 'settings') {
+    const toggle = (label, key, on, note) => `
+      <div class="opt-row">
+        <span class="opt-label">${label}</span>
+        <div class="opt-choices">
+          <button class="opt-btn${on ? ' on' : ''}" data-flag="${key}" data-val="1">On</button>
+          <button class="opt-btn${on ? '' : ' on'}" data-flag="${key}" data-val="0">Off</button>
+        </div>
+      </div>${note ? `<div class="set-note">${note}</div>` : ''}`;
+    const keyRow = (a) => `
+      <button class="key-row${capturingAction === a ? ' listening' : ''}" data-bind="${a}">
+        <span class="key-act">${ACTION_NAME[a]}</span>
+        <span class="key-caps">${capturingAction === a ? 'press a key\u2026'
+          : (keyBind[a].length ? keyBind[a].map(c => `<kbd>${keyLabel(c)}</kbd>`).join('') : '<em>unbound</em>')}</span>
+      </button>`;
+    overlayEl.innerHTML = `
+      <div class="overlay-card wide">
+        <div class="overlay-title">Settings</div>
+        <div class="set-list">
+          <div class="achv-head">Boosts</div>
+          ${toggle('Cards', 'bkr-cards', cardsOn(), 'Three buff cards dealt before every match.')}
+          ${toggle('Buffs', 'bkr-perks', perksOn(), 'The permanent buffs your achievements have unlocked.')}
+
+          <div id="set-controls">
+            <div class="achv-head">Controls</div>
+            <div class="key-grid">${ACTION_ORDER.map(keyRow).join('')}</div>
+            <div class="set-note">Click an action, then press the key you want \u2014 it moves there from
+              wherever it was. <kbd>Esc</kbd> backs out. <kbd>P</kbd> stays pause and <kbd>M</kbd> stays mute.
+              ${game.keyNote ? `<strong>${game.keyNote}</strong>` : ''}</div>
+            <div class="set-buttons"><button class="overlay-btn ghost" data-act="keys-reset">Restore default keys</button></div>
+          </div>
+
+          <div class="achv-head">Save</div>
+          <div class="set-note">Everything here lives in this browser, and clearing site data empties it.
+            Copy the string somewhere safe, or paste one back in.</div>
+          <div class="set-buttons">
+            <button class="overlay-btn ghost" data-act="save-export">Copy my save</button>
+            <button class="overlay-btn ghost" data-act="save-import">Load a save</button>
+          </div>
+          <textarea class="save-box" id="save-box" spellcheck="false" placeholder="Your save string appears here \u2014 or paste one in and press Load a save."></textarea>
+          <div class="set-note" id="save-note"></div>
         </div>
         <button class="overlay-btn ghost" data-act="menu">Back</button>
       </div>`;
@@ -2130,6 +2355,7 @@ function renderOverlay() {
         <div class="overlay-sub">${modeName} &middot; ${surv ? 'round ' + survivalRound() : game.score.p + ' \u2013 ' + game.score.c} &middot; ${game.tier}</div>
         <div class="overlay-buttons">
           <button class="overlay-btn primary" data-act="resume">Resume</button>
+          <button class="overlay-btn ghost" data-act="achv">Achievements<span class="tally">${ACHV.filter(earned).length} / ${ACHV.length}</span></button>
           <button class="overlay-btn ghost" data-act="menu">Quit to Menu</button>
         </div>
       </div>`;
@@ -2143,6 +2369,7 @@ function renderOverlay() {
           <strong>${ABIL[game.cpu.ability].name}</strong> challenger.<br>
           <strong>${game.player.hp}</strong> of ${game.player.maxHp} hearts left \u2014 they carry straight into the next round.</div>
         <div class="overlay-sub">Next up: <strong>${ABIL[game.nextFoe].name}</strong> &middot; ${tierLabel(step)}${step.bonusHp ? ' &middot; +' + step.bonusHp + ' hearts' : ''}</div>
+        ${game.player.hp <= 2 ? `<div class="overlay-sub warn">Down to ${game.player.hp === 1 ? 'your last heart' : 'two hearts'} \u2014 nothing heals them, so the run ends on the next slip.</div>` : ''}
         <div class="overlay-buttons">
           <button class="overlay-btn primary" data-act="next">Fight Round ${survivalRound()}</button>
           <button class="overlay-btn ghost" data-act="menu">End Run</button>
@@ -2193,6 +2420,21 @@ overlayEl.addEventListener('click', (e) => {
   }
   const foe = e.target.closest('[data-foe]');
   if (foe) { sfx.select(); game.sel.foe = foe.dataset.foe; game.phase = 'rules'; renderOverlay(); return; }
+  const flag = e.target.closest('[data-flag]');
+  if (flag) {
+    sfx.select();
+    setFlag(flag.dataset.flag, flag.dataset.val === '1');
+    renderOverlay();
+    return;
+  }
+  const bind = e.target.closest('[data-bind]');
+  if (bind) {
+    sfx.select();
+    capturingAction = bind.dataset.bind;
+    game.keyNote = null;
+    renderOverlay();
+    return;
+  }
   const opt = e.target.closest('[data-opt]');
   if (opt) {
     sfx.select();
@@ -2216,8 +2458,41 @@ overlayEl.addEventListener('click', (e) => {
   switch (act.dataset.act) {
     case 'menu':   quitToMenu(); break;
     case 'pick':   game.phase = 'pick'; renderOverlay(); break;
-    case 'achv':   game.phase = 'achv'; renderOverlay(); break;
-    case 'boosts': setBoosts(!boostsOn()); renderOverlay(); break;
+    // opened from the pause card, Back used to quit the match outright
+    case 'achv':   game.achvFrom = (game.phase === 'paused') ? 'paused' : 'menu';
+                   game.phase = 'achv'; renderOverlay(); break;
+    case 'achv-back': game.phase = game.achvFrom === 'paused' ? 'paused' : 'menu';
+                   renderOverlay(); break;
+    case 'settings': game.phase = 'settings'; game.keyNote = null; capturingAction = null; renderOverlay(); break;
+    case 'keys-reset': resetKeys(); game.keyNote = 'Default keys restored.'; renderOverlay(); break;
+    case 'save-export': {
+      // no re-render here: it would wipe the box the save was just written into
+      const box = document.getElementById('save-box');
+      const note = document.getElementById('save-note');
+      box.value = exportSave();
+      box.focus(); box.select();
+      note.innerHTML = '<strong>Copied \u2014 keep it somewhere safe.</strong>';
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(box.value).catch(() => {
+            note.innerHTML = '<strong>Select the text above and copy it.</strong>';
+          });
+        } else {
+          note.innerHTML = '<strong>Select the text above and copy it.</strong>';
+        }
+      } catch (_) { note.innerHTML = '<strong>Select the text above and copy it.</strong>'; }
+      break;
+    }
+    case 'save-import': {
+      const box = document.getElementById('save-box');
+      const note = document.getElementById('save-note');
+      if (!box.value.trim()) { note.innerHTML = '<strong>Paste a save string into the box first.</strong>'; break; }
+      const err = importSave(box.value);
+      if (err) { note.innerHTML = '<strong>' + err + '</strong>'; break; }
+      note.innerHTML = '<strong>Save loaded \u2014 reloading\u2026</strong>';
+      setTimeout(() => location.reload(), 350);   // simplest way to re-read every setting
+      break;
+    }
     case 'rules':  game.phase = 'rules'; renderOverlay(); break;
     case 'back':   game.phase = game.mode === 'survival' ? 'pick' : 'foe'; renderOverlay(); break;
     case 'resume': game.phase = 'fight'; renderOverlay(); break;
@@ -2225,7 +2500,7 @@ overlayEl.addEventListener('click', (e) => {
     // every match is drafted, rematches included - unless boosts are off, and
     // then there is nothing to draft and nothing to carry
     case 'fight': case 'again': case 'rematch':
-      if (!boostsOn()) { game.buffKey = null; beginMatch(); }
+      if (!cardsOn()) { game.buffKey = null; beginMatch(); }
       else { game.phase = 'draft'; rollOffer(); renderOverlay(); }
       break;
   }
@@ -2410,8 +2685,22 @@ const PERK_LABEL = {
   heart:  (n) => '+' + n + ' heart',
 };
 function perkText(p) { const f = p && PERK_LABEL[p.stat]; return f ? f(p.amt) : ''; }
-function boostsOn() { try { return localStorage.getItem('bkr-boosts') !== '0'; } catch (_) { return true; } }
-function setBoosts(on) { try { localStorage.setItem('bkr-boosts', on ? '1' : '0'); } catch (_) {} }
+// Boosts were one switch; they are two, so a run can drop the draft and keep the
+// buffs it earned, or the other way round. An old single-switch save splits into
+// whatever it was set to.
+function flagOn(key) { try { return localStorage.getItem(key) !== '0'; } catch (_) { return true; } }
+function setFlag(key, on) { try { localStorage.setItem(key, on ? '1' : '0'); } catch (_) {} }
+(function splitOldBoostSwitch() {
+  try {
+    const old = localStorage.getItem('bkr-boosts');
+    if (old === null) return;
+    if (localStorage.getItem('bkr-cards') === null) localStorage.setItem('bkr-cards', old);
+    if (localStorage.getItem('bkr-perks') === null) localStorage.setItem('bkr-perks', old);
+    localStorage.removeItem('bkr-boosts');
+  } catch (_) {}
+})();
+function cardsOn() { return flagOn('bkr-cards'); }
+function perksOn() { return flagOn('bkr-perks'); }
 
 const NO_PERKS = { move: 1, cd: 1, kbOut: 1, kbIn: 1, shield: 1, jump: 1, heart: 0 };
 function perkSum(list) {
@@ -2421,7 +2710,7 @@ function perkSum(list) {
 }
 // What this core is actually carrying into the fight.
 function perksFor(core) {
-  if (!boostsOn()) return Object.assign({}, NO_PERKS);
+  if (!perksOn()) return Object.assign({}, NO_PERKS);
   const s = perkSum(ACHV.filter(a => earned(a) && (!a.core || a.core === core)));
   return {
     move: 1 + s.move,
@@ -2519,6 +2808,7 @@ function deploy(playerHp, cpuHp) {
     f.group.position.set(x, 0, 0);
     f.group.rotation.set(0, face, 0);
     f.state = 'idle'; f.attack = null; f.dash = null; f.koT = 0;
+    f.landT = 0; f.buf = null;
     f.kvx = f.kvz = f.vx = f.vz = 0;
     f.airY = 0; f.airVy = 0;
     f.cd.a1 = 0; f.cd.a2 = 0;
@@ -2579,7 +2869,7 @@ function suddenDeath() {
   game.sudden = true;
   game.clock = 0;
   deploy(2, 2);
-  banner('Sudden Death');
+  banner('Sudden Death', 'danger');
 }
 
 function timeUp() {
