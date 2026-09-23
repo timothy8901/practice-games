@@ -250,9 +250,10 @@
   .buff-card:hover { border-color: var(--accent); transform: translateY(-3px); box-shadow: 0 10px 22px rgba(0,0,0,0.45); }
   .buff-card:active { transform: translateY(-1px); }
   /* ---------- achievements ---------- */
-  .overlay-card.wide { max-width: 640px; }
+  /* the list takes whatever height the screen has left, on a phone or a desktop */
+  .overlay-card.wide { max-width: 640px; max-height: calc(100% - 24px); }
   .achv-list {
-    width: 100%; max-height: 300px; overflow-y: auto; text-align: left;
+    width: 100%; flex: 1 1 auto; min-height: 90px; overflow-y: auto; text-align: left;
     display: flex; flex-direction: column; gap: 5px; padding-right: 5px;
   }
   .achv-head {
