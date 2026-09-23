@@ -406,6 +406,7 @@
         case 'pick': game.phase = 'menu'; break;
         case 'foe': game.phase = 'pick'; break;
         case 'rules': game.phase = game.mode === 'survival' ? 'pick' : 'foe'; break;
+        case 'draft': game.phase = 'rules'; break;
         // a run abandoned from these screens still counts what it cleared
         case 'result': case 'roundover': quitToMenu(); sfx.select(); return true;
         default: return false;   // title menu: let Android close the app

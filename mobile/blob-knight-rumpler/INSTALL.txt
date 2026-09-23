@@ -31,6 +31,11 @@ HOW TO PLAY
   Each knight is a core: Blade, Arc, Disc, Maul, Bow, Flare, Cinder or Veil,
   with its own attack and special.
 
+  BEFORE EVERY MATCH you are dealt three buff cards out of twelve - Heavy Armor,
+  Keen Edge, Swift Boots and so on. Take one for the whole match (or the whole
+  survival run), or tap Ignore and fight without. The card you took shows under
+  your name while you fight.
+
   TWO MODES
     1v1        pick your knight and the challenger's (or leave it random), then
                set the rules: 1, 2, 3 or 5 KOs to win, a clock (or none) and how
