@@ -1,0 +1,63 @@
+# ---------------------------------------------------------------------------
+# Unreal Engine (unreal/MoteRumble)
+# Only source, config, and content are tracked. Everything below is generated
+# by the engine or the build and can be huge (GBs).
+# ---------------------------------------------------------------------------
+Binaries/
+DerivedDataCache/
+Intermediate/
+Saved/
+Build/
+.vs/
+.vscode/
+*.xcworkspace/
+*.xcodeproj/
+*.sln
+*.suo
+*.opensdf
+*.sdf
+*.VC.db
+*.VC.opendb
+
+# Compiled binaries / shader caches
+*.dll
+*.dylib
+*.exe
+*.app/
+*.ipa
+*.o
+*.obj
+*.pdb
+*.lib
+*.a
+
+# UE can regenerate these
+*.generated.h
+
+# ---------------------------------------------------------------------------
+# macOS
+# ---------------------------------------------------------------------------
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# ---------------------------------------------------------------------------
+# Media captured from the browser games (regenerate as needed, keeps repo slim)
+# ---------------------------------------------------------------------------
+*.webm
+kirby-rumble-demo.mp4
+
+# ---------------------------------------------------------------------------
+# Mote Rumble generated art/audio (large). Regenerate with the scripts in
+# unreal/MoteRumble/Tools/ - the manifest there records every Thrixel asset id.
+# ---------------------------------------------------------------------------
+thrixel_assets/
+unreal/MoteRumble/SourceAudio/
+unreal/MoteRumble/Content/Art/
+unreal/MoteRumble/Content/Audio/
+unreal/MoteRumble/Recordings/
+
+# Blob Knight Rumpler Android packaging: build output (the signing key lives in ~/.android)
+mobile/blob-knight-rumpler/build/
+mobile/blob-knight-rumpler/dist/

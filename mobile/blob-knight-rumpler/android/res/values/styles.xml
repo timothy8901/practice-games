@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Full screen, no title bar, and the game's navy behind the WebView so there is no white flash. -->
+    <style name="GameTheme" parent="@android:style/Theme.DeviceDefault.NoActionBar.Fullscreen">
+        <item name="android:windowBackground">@color/game_bg</item>
+        <item name="android:colorBackground">@color/game_bg</item>
+        <item name="android:windowContentOverlay">@null</item>
+    </style>
+    <color name="game_bg">#FF1A1A2E</color>
+</resources>

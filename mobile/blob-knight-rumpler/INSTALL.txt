@@ -1,0 +1,66 @@
+BLOB KNIGHT RUMPLER  (Android, version {version})
+=================================================
+
+WHAT'S IN HERE
+  BlobKnightRumpler.apk   the game as an Android app. Plays offline.
+  web/                    the same game as a web page (index.html + models/),
+                          for putting on a website; see the bottom of this file
+
+INSTALL ON YOUR PHONE  (Android 7.0 or newer)
+  1. Get BlobKnightRumpler.apk onto the phone: download this zip on the phone and
+     open it in the Files app, or copy the APK over by USB, Drive or email.
+  2. Tap BlobKnightRumpler.apk.
+  3. The first time, Android asks to allow installs from that app (Files, Chrome,
+     Drive...). Tap Settings, turn on "Allow from this source", then go back.
+  4. Tap Install, then Open.
+
+  If Play Protect warns that it doesn't recognise the developer, tap "More details"
+  then "Install anyway". The app isn't from the Play Store; it asks for no
+  permissions apart from vibration.
+
+HOW TO PLAY
+  Move       drag your left thumb anywhere on the left half of the screen
+  ATTACK     big pink button (bottom right)
+  SPECIAL    purple button; its ring fills while it recharges and glows gold when ready
+  SHIELD     blue button, hold it; the ring shows how much shield is left
+  JUMP       green button; hop over swings and projectiles
+  Pause      button at the top of the screen, or your phone's Back button
+  Sound      button at the top of the screen, or on the menu
+
+  Pick one of 8 knights, then knock the CPU's hearts out before it gets yours.
+  Each knight is a core: Blade, Arc, Disc, Maul, Bow, Flare, Cinder or Veil,
+  with its own attack and special.
+
+  BEFORE EVERY MATCH you are dealt three buff cards out of twelve - Heavy Armor,
+  Keen Edge, Swift Boots and so on. Take one for the whole match (or the whole
+  survival run), or tap Ignore and fight without. The card you took shows under
+  your name while you fight.
+
+  ACHIEVEMENTS - 76 of them, twelve overall and eight for each of the eight
+  knights. They tick over as you play; the list and your progress are on the
+  title screen under Achievements, and one pops up in the corner the moment you
+  earn it. Each one also unlocks a small permanent buff - a knight's own eight
+  only help while you are carrying that knight, the twelve overall always count.
+
+  BOOSTS - the toggle on the title screen. Turn it off and you get no card
+  before a match and none of the achievement buffs: just the knight and the
+  arena. Achievements still tick over either way.
+
+  TWO MODES
+    1v1        pick your knight and the challenger's (or leave it random), then
+               set the rules: 1, 2, 3 or 5 KOs to win, a clock (or none) and how
+               good the CPU is - Easy, Medium, Hard or Expert. A tied clock goes
+               to sudden death.
+    SURVIVAL   challenger after challenger, a tier harder every two rounds. Your
+               hearts carry from round to round and nothing heals them, so the run
+               ends when you go down. The menu remembers your best.
+
+UPDATING
+  A newer APK installs over this one (same signing key), no uninstall needed.
+
+PLAY IT IN A BROWSER INSTEAD
+  web/ holds the whole game: index.html plus its models. Put the folder on any
+  website (your games page, itch.io as an HTML game) and open that link on a
+  phone. It goes full screen on the first tap; hold the phone sideways. On a
+  computer it plays with the keyboard: WASD or arrows to move, Space jump,
+  H attack, J special, K shield.

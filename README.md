@@ -61,14 +61,30 @@ A GitHub Pages deploy workflow lives at `.github/workflows/pages.yml`. After
 merging into `main` and enabling Pages → Source: GitHub Actions, the site
 goes live at https://timothy8901.github.io/practice-games/.
 
-## Kirby Brawler 2: Rumble Arena
+## Blob Knight Rumpler
 
-A top-down 3D sequel — `kirby-rumble.html`. One circular arena, chunky
-low-poly toy fighters built in Three.js, and the same 8 copy abilities —
-each with **two attacks** (`H` / `J`, or `X` / `Z`) and a **shield** (`K`,
-or `Shift` / `C`) — against a CPU Kirby with a random ability. Move with
-WASD / arrows, **`Space` jump-dodges** over swings and projectiles, `P`
-pauses, `M` mutes. It pulls Three.js from a CDN but is still a single
+A top-down 3D arena fighter — `blob-knight-rumpler.html`. One circular
+arena, chunky low-poly blob knights built in Three.js, and eight cores —
+Blade, Arc, Disc, Maul, Bow, Flare, Cinder and Veil — each with **two
+attacks** (`H` / `J`, or `X` / `Z`) and a **shield** (`K`, or `Shift` /
+`C`). Two single-player modes: a **1v1 duel** where you choose both
+knights and the rules (1/2/3/5 KOs to win, an optional clock with sudden
+death on a tie, and an Easy / Medium / Hard / Expert CPU), and
+**survival**, an endless ladder of challengers that climbs a tier every
+two rounds — your hearts carry from round to round and nothing heals
+them, so the run ends when you are knocked out. Before either one you draw
+**a buff card**: three of twelve are dealt (art generated with Thrixel, see
+`card-art/`), and you take one or go in bare. **76 achievements** track as you
+play — twelve overall and eight for each core — and **each one unlocks a
+permanent buff**. A core's own eight only apply while you carry that core, so a
+full save is a strong Blade rather than one unstoppable knight; the twelve
+overall always apply. The whole list, with what each unlocks, is in
+[`achievements/`](achievements/README.md) and in the game under Achievements on
+the title screen. **Boosts** on the title screen turns the lot off — no cards
+before a match and no achievement buffs — for a run on the game as it ships;
+achievements still track. Move with WASD / arrows,
+**`Space` jump-dodges** over swings and projectiles, `P` pauses, `M`
+mutes. It pulls Three.js from a CDN but is still a single
 self-contained HTML page.
 
 ## Grocery Tycoon
@@ -97,6 +113,31 @@ self-contained HTML page.
   Box, Pack-a-Punch, wall-buys, traps, hellhound rounds, power-ups, and 4
   survivors. Keyboard + mouse **or** controller. A multi-file game, so it lives in
   its own folder; the homepage links to `theater-of-the-undead/index.html`.
+
+## NEONFABLE — Void Survivor
+
+- **NEONFABLE** (`neonfable.html`) — a single-file synthwave **bullet-heaven
+  roguelite** in the spirit of *Vampire Survivors*. Weapons fire automatically;
+  you only steer, dash and draft. **12 weapons** (Pulse Blaster, Orbital Blades,
+  Homing Swarm, Arc Coil, Rail Lance, Flak Nova, Gun Drones, Void Field, Phase
+  Glaive, Singularity Mines, Prism Ray, Phase Ram), each with a hidden
+  **evolution** unlocked by pairing a maxed weapon with its partner passive, plus
+  9 passives and a 3-card level-up draft with rerolls. Four bosses — Void Warden,
+  Star Archon, Leviathan Prime, and the **ANTIFABLE**, a dark mirror of your own
+  ship that appears at 15:00 — then an endless mode. Meta-progression: runs bank
+  credits into a permanent hangar shop and 4 unlockable hulls, saved to
+  `localStorage`. Also a **daily seeded run** (fixed loadout, identical spawns and
+  drafts for everyone that day). Difficulty scales with your *level*, not just the
+  clock — leveling speeds up spawns and unlocks tougher enemy types early.
+  Finishing a run unlocks **BULLET HELL**, an optional modifier (off by default,
+  armed from the hangar before launching) that adds the **Hellion** — a lime,
+  ring-haloed emitter that hovers at range, telegraphs, then weaves rotating
+  spirals of danmaku with an aimed shot in every wave. Capped at six alive, and
+  force-disabled in daily runs so those stay identical for everyone.
+  Controls: WASD/arrows + Space, an on-screen joystick and dash button on touch,
+  or a gamepad with rumble. The soundtrack and every sound effect are **generated
+  live** with the Web Audio API — no audio files. Pure vanilla JS + Canvas 2D, no
+  build step, no dependencies.
 
 ## Dictionary / wordlist notes
 

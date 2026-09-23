@@ -4,13 +4,40 @@
     {
       "name": "Game studio (all games)",
       "runtimeExecutable": "python3",
-      "runtimeArgs": ["review/serve.py"],
+      "runtimeArgs": [
+        "review/serve.py"
+      ],
       "autoPort": true
+    },
+    {
+      "name": "Games site (port 8767)",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8767"
+      ],
+      "port": 8767
+    },
+    {
+      "name": "Blob Knight Rumpler build",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8766",
+        "--directory",
+        "mobile/blob-knight-rumpler/build/assets/www"
+      ],
+      "port": 8766
     },
     {
       "name": "Theater of the Undead",
       "runtimeExecutable": "python3",
-      "runtimeArgs": ["theater-of-the-undead/serve.py", "8124"],
+      "runtimeArgs": [
+        "theater-of-the-undead/serve.py",
+        "8124"
+      ],
       "port": 8124,
       "autoPort": false
     }

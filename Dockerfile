@@ -6,9 +6,9 @@ FROM nginx:alpine
 # Custom server config (gzip, no-cache for dev iteration, SPA fallback)
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Serve the games — original at the root path, sequel at /kirby-rumble.html
+# Serve the games — Kirby Brawler at the root path, Blob Knight Rumpler at its own
 COPY kirby-abilities.html /usr/share/nginx/html/index.html
-COPY kirby-rumble.html /usr/share/nginx/html/kirby-rumble.html
+COPY blob-knight-rumpler.html /usr/share/nginx/html/blob-knight-rumpler.html
 
 # Healthcheck so `docker ps` shows the container is actually serving
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \

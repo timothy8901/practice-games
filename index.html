@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Token Maxxer's Anonymous Game Studio — a collection of browser games you can play instantly, plus official pixel-art game tees. Featured: Grocery Tycoon, Theater of the Undead, FableQuest RPG.">
+  <meta name="description" content="Token Maxxer's Anonymous Game Studio — a collection of browser games you can play instantly, plus official pixel-art game tees. New: FALERIA, a post-apocalyptic survival and settlement-building sandbox.">
   <title>Token Maxxer's Anonymous Game Studio</title>
 
   <!-- ===== Social share / OpenGraph ===== -->
@@ -42,6 +42,9 @@
       --c-sequel: #3a8fd0;
       --c-driver: #c9971a;
       --c-emerald: #18b066;
+      --c-neonfable: #7a2ff2;
+      --c-faleria: #b5612a;
+      --c-punch: #3f3428;
     }
 
     * { box-sizing: border-box; }
@@ -178,11 +181,29 @@
     .featured.kirby { --accent: var(--c-kirby); }
     .featured.kirby .preview { background: radial-gradient(circle at 50% 50%, #ffe3ec 0%, #ffc0d3 60%, #e89ab4 100%); }
     .featured.sequel { --accent: var(--c-sequel); }
-    .featured.sequel .preview { background: radial-gradient(circle at 50% 35%, #bfe4ff 0%, #ffd1e3 55%, #e8a8c8 100%); }
+    .featured.sequel .preview { background: radial-gradient(circle at 50% 35%, #cfe2ff 0%, #a9b6d4 55%, #7d86a8 100%); }
     .featured.driver { --accent: var(--c-driver); }
     .featured.driver .preview { background: linear-gradient(160deg, #5a6b3f 0%, #46566a 45%, #52555c 100%); }
     .featured.emerald { --accent: var(--c-emerald); }
     .featured.emerald .preview { background: radial-gradient(circle at 50% 40%, #bdf5d6 0%, #2fd27a 55%, #0f7a44 100%); }
+    .featured.neonfable { --accent: var(--c-neonfable); }
+    .featured.neonfable .preview { background: radial-gradient(circle at 50% 42%, #2a1b5e 0%, #150b31 55%, #07030f 100%); }
+    .featured.faleria { --accent: var(--c-faleria); margin-top: 20px; }
+    .featured.faleria .preview { background: radial-gradient(circle at 50% 38%, #7d5a52 0%, #402c28 55%, #140f0d 100%); }
+
+    /* "new game" flag on the freshest release */
+    .featured .new-flag {
+      position: absolute; top: -13px; right: 20px; z-index: 3;
+      font-family: "Press Start 2P", monospace; font-size: 0.56rem; letter-spacing: 0.06em;
+      color: #fff; background: var(--red); padding: 9px 14px; border-radius: 9px;
+      box-shadow: 0 4px 0 var(--red-dk), 0 8px 20px rgba(60,44,18,0.22);
+      animation: newflag 2.6s ease-in-out infinite;
+    }
+    @keyframes newflag { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+    @media (prefers-reduced-motion: reduce) { .featured .new-flag { animation: none; } }
+    @media (max-width: 640px) { .featured .new-flag { right: 50%; transform: translateX(50%); animation: none; } }
+    .featured.punch { --accent: var(--c-punch); }
+    .featured.punch .preview { background: radial-gradient(circle at 50% 38%, #f6eeda 0%, #dcc9a2 55%, #8d7a56 100%); }
 
     @media (max-width: 640px) {
       .featured { grid-template-columns: 1fr; text-align: center; }
@@ -257,6 +278,139 @@
 
     <h2 class="section-title" id="featured">Featured</h2>
 
+    <article class="featured faleria">
+      <div class="new-flag" aria-label="New game">NEW GAME!</div>
+      <div>
+        <span class="label">Just released · Survival Sandbox</span>
+        <h2><a href="faleria/index.html">FALERIA — Wasteland Sandbox</a></h2>
+        <p>A <b>2D side-scrolling survival and settlement builder</b> set after the bombs. Dig a <b>seeded open world</b> of ruined cities, caves, bunkers and mineshafts; break junk down into <b>steel, screws, gears and circuitry</b>; then build a base, wire up <b>generators and power conduits</b>, and raise a radio beacon to pull in survivors. Assign them as farmers, guards, scavengers and traders — then hold the walls when the <b>raiders come</b>, because they will tear through anything you leave standing. Level up a full <b>S.P.E.C.I.A.L. perk chart</b>, fight ghouls, mutants and deathclaws, and go find what is sealed under the bedrock.</p>
+        <div class="meta">
+          <span>Keyboard &amp; mouse</span>
+          <span>Seeded worlds — share a seed</span>
+          <span>185 items · 94 recipes</span>
+          <span>Settlers, power grids &amp; raids</span>
+          <span>34-perk S.P.E.C.I.A.L.</span>
+          <span>Day/night, weather &amp; lighting</span>
+          <span>Saves in your browser</span>
+        </div>
+        <div class="cta-row">
+          <span class="play-cta">Play now &rarr;</span>
+          <a class="shirt-chip" href="https://tims-store-12362.myshopify.com/" target="_blank" rel="noopener">👕 Shirt</a>
+        </div>
+      </div>
+      <div class="preview" aria-hidden="true">
+        <!-- wasteland settlement at dusk (original art) -->
+        <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <radialGradient id="flSun" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#ffb56a" stop-opacity="0.75"/>
+              <stop offset="100%" stop-color="#ffb56a" stop-opacity="0"/>
+            </radialGradient>
+          </defs>
+          <!-- low sun -->
+          <circle cx="132" cy="72" r="44" fill="url(#flSun)"/>
+          <circle cx="132" cy="72" r="15" fill="#e8a352" opacity="0.85"/>
+          <!-- ruined skyline -->
+          <rect x="14" y="86" width="18" height="62" fill="#2b2320"/>
+          <rect x="34" y="70" width="13" height="78" fill="#221b19"/>
+          <rect x="49" y="98" width="21" height="50" fill="#2b2320"/>
+          <rect x="150" y="80" width="16" height="68" fill="#221b19"/>
+          <rect x="168" y="104" width="18" height="44" fill="#2b2320"/>
+          <!-- broken windows -->
+          <rect x="18" y="94" width="3" height="4" fill="#e8a352" opacity="0.7"/>
+          <rect x="25" y="106" width="3" height="4" fill="#e8a352" opacity="0.45"/>
+          <rect x="38" y="82" width="3" height="4" fill="#e8a352" opacity="0.6"/>
+          <rect x="154" y="92" width="3" height="4" fill="#e8a352" opacity="0.5"/>
+          <!-- radio beacon mast -->
+          <rect x="97" y="60" width="4" height="76" fill="#8a8276"/>
+          <rect x="88" y="70" width="22" height="3" fill="#8a8276"/>
+          <rect x="92" y="82" width="14" height="3" fill="#8a8276"/>
+          <circle cx="99" cy="56" r="5" fill="#e2503a"/>
+          <circle cx="99" cy="56" r="11" fill="#e2503a" opacity="0.22"/>
+          <!-- settlement wall + shack -->
+          <rect x="112" y="112" width="34" height="26" fill="#4a3a2c"/>
+          <rect x="112" y="112" width="34" height="4" fill="#63503d"/>
+          <rect x="124" y="122" width="9" height="16" fill="#2a2119"/>
+          <rect x="60" y="120" width="30" height="18" fill="#4a3a2c"/>
+          <rect x="60" y="120" width="30" height="3" fill="#63503d"/>
+          <!-- lamp glow -->
+          <circle cx="108" cy="118" r="4" fill="#ffd98a"/>
+          <circle cx="108" cy="118" r="12" fill="#ffd98a" opacity="0.2"/>
+          <!-- survivor in a vault suit -->
+          <rect x="46" y="120" width="7" height="9" fill="#d8a878"/>
+          <rect x="45" y="129" width="9" height="12" fill="#2f5f9e"/>
+          <rect x="45" y="141" width="4" height="7" fill="#204577"/>
+          <rect x="50" y="141" width="4" height="7" fill="#204577"/>
+          <rect x="53" y="131" width="10" height="3" fill="#8d949a"/>
+          <!-- ground strata -->
+          <rect x="0" y="148" width="200" height="12" fill="#5a4632"/>
+          <rect x="0" y="148" width="200" height="3" fill="#6b6455"/>
+          <rect x="0" y="160" width="200" height="40" fill="#3a2e22"/>
+          <!-- exposed ore in the dirt -->
+          <rect x="28" y="168" width="6" height="5" fill="#c07a3e"/>
+          <rect x="150" y="176" width="7" height="5" fill="#7fd44f" opacity="0.8"/>
+          <rect x="88" y="182" width="6" height="5" fill="#9a8d84"/>
+          <!-- dug shaft -->
+          <rect x="118" y="160" width="10" height="40" fill="#1b150f"/>
+          <rect x="118" y="166" width="10" height="2" fill="#8a6539"/>
+          <rect x="118" y="178" width="10" height="2" fill="#8a6539"/>
+        </svg>
+      </div>
+    </article>
+
+
+    <article class="featured neonfable">
+      <div>
+        <span class="label">New · Roguelite / Bullet Heaven</span>
+        <h2><a href="neonfable.html">NEONFABLE — Void Survivor</a></h2>
+        <p>A <b>synthwave bullet-heaven roguelite</b>. Your weapons fire themselves — you only fly, dodge and choose. Survive 15 minutes of the void across <b>12 weapons</b> that each hide a secret <b>evolution</b>, chase upgrade drafts every level, and outlast four bosses ending in the <b>ANTIFABLE</b>, a dark mirror of your own ship. Bank credits into a permanent <b>hangar</b>, unlock four hulls, and take on a <b>daily seeded run</b> everyone plays identically. Finish a run to unlock <b>BULLET HELL</b> — an optional modifier that seeds the void with Hellions weaving spiral danmaku. Procedural synthwave soundtrack, generated live in your browser.</p>
+        <div class="meta">
+          <span>Touch, keyboard &amp; gamepad</span>
+          <span>12 weapons · 8 evolutions</span>
+          <span>4 bosses · endless mode</span>
+          <span>Daily seeded runs</span>
+          <span>Unlockable bullet hell</span>
+          <span>Saves your progress</span>
+        </div>
+        <div class="cta-row">
+          <span class="play-cta">Play now &rarr;</span>
+          <a class="shirt-chip" href="https://tims-store-12362.myshopify.com/" target="_blank" rel="noopener">👕 Shirt</a>
+        </div>
+      </div>
+      <div class="preview" aria-hidden="true">
+        <!-- neon void survivor (original art) -->
+        <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <radialGradient id="nfGlow" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#2ef2ff" stop-opacity="0.5"/>
+              <stop offset="100%" stop-color="#2ef2ff" stop-opacity="0"/>
+            </radialGradient>
+          </defs>
+          <!-- starfield -->
+          <circle cx="30" cy="36" r="1.6" fill="#ffffff" opacity="0.75"/>
+          <circle cx="168" cy="52" r="1.3" fill="#ffffff" opacity="0.55"/>
+          <circle cx="44" cy="150" r="1.4" fill="#ffffff" opacity="0.6"/>
+          <circle cx="158" cy="160" r="1.7" fill="#ffffff" opacity="0.5"/>
+          <circle cx="104" cy="24" r="1.2" fill="#ffffff" opacity="0.45"/>
+          <!-- closing enemies -->
+          <polygon points="42,66 56,76 42,86 28,76" fill="#ff2d95" opacity="0.9"/>
+          <polygon points="160,104 172,113 160,122 148,113" fill="#ff2d95" opacity="0.75"/>
+          <polygon points="62,158 74,166 62,174 50,166" fill="#9d5cff" opacity="0.8"/>
+          <polygon points="146,44 157,52 146,60 135,52" fill="#9d5cff" opacity="0.65"/>
+          <!-- player glow + orbit ring -->
+          <circle cx="100" cy="104" r="48" fill="url(#nfGlow)"/>
+          <circle cx="100" cy="104" r="35" fill="none" stroke="#2ef2ff" stroke-width="2"
+                  stroke-dasharray="8 8" opacity="0.7"/>
+          <!-- engine flare -->
+          <polygon points="93,120 107,120 100,140" fill="#ffb02e" opacity="0.85"/>
+          <!-- ship -->
+          <polygon points="100,74 116,119 100,110 84,119" fill="#0a1830"
+                   stroke="#2ef2ff" stroke-width="3.5" stroke-linejoin="round"/>
+          <circle cx="100" cy="99" r="3.4" fill="#ffffff"/>
+        </svg>
+      </div>
+    </article>
+
     <article class="featured emerald">
       <div>
         <span class="label">New · GBA Romhack</span>
@@ -285,6 +439,53 @@
           <polygon points="72,112 128,112 100,170" fill="#13935a"/>
           <polygon points="72,112 100,98 128,112 100,124" fill="#26b873"/>
           <polygon points="64,60 90,60 80,76 54,76" fill="#ffffff" opacity="0.5"/>
+        </svg>
+      </div>
+    </article>
+
+    <article class="featured punch">
+      <div>
+        <span class="label">New &middot; Beat 'em up</span>
+        <h2><a href="rock-paper-punch.html">Rock, Paper, Punch!</a></h2>
+        <p>An endless side-scrolling <b>arcade brawler</b> drawn as a 1933 <b>rubber-hose cartoon</b> &mdash; grain, flicker and all. Pick <b>Rock</b> (tank), <b>Paper</b> (all-rounder) or <b>Scissors</b> (glass cannon), then punch your way through <b>procedurally generated</b> streets while the enemies scale to your level. Quick and heavy melee, jump, and a one-second dodge. <b>5 lives</b>, health packs, and a rank ladder that climbs as you do.</p>
+        <div class="meta">
+          <span>Touch-first &middot; d-pad + 2 buttons</span>
+          <span>Endless survival</span>
+          <span>Procedural streets</span>
+          <span>Enemies scale to you</span>
+        </div>
+        <div class="cta-row">
+          <span class="play-cta">Play now &rarr;</span>
+          <a class="shirt-chip" href="https://tims-store-12362.myshopify.com/" target="_blank" rel="noopener">&#128085; Shirt</a>
+        </div>
+      </div>
+      <div class="preview" aria-hidden="true">
+        <!-- rubber-hose glove throwing a punch (original art) -->
+        <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+          <!-- impact starburst -->
+          <polygon points="129,17 138,49 169,36 160,69 193,75 168,97 192,120 159,125 167,157 137,144 126,175 108,147 82,168 81,135 48,138 66,110 36,95 66,80 49,52 83,56 84,23 109,44"
+                   fill="#fdf8ec" stroke="#2b2620" stroke-width="4" stroke-linejoin="round" opacity="0.95"/>
+          <!-- rubber-hose arm coming in from the left -->
+          <path d="M0 154 Q22 138 46 124" fill="none" stroke="#2b2620" stroke-width="22" stroke-linecap="round"/>
+          <path d="M0 154 Q22 138 46 124" fill="none" stroke="#f7f1e2" stroke-width="12" stroke-linecap="round"/>
+          <!-- cuff band -->
+          <path d="M72 84 C62 96 60 122 70 136 L50 145 C36 124 38 90 54 74 Z"
+                fill="#f7f1e2" stroke="#2b2620" stroke-width="4.5" stroke-linejoin="round"/>
+          <!-- glove fist: wobbly right edge reads as knuckles -->
+          <path d="M84 80 C98 60 128 56 142 72 Q158 84 150 97 Q163 108 149 119 Q159 132 139 140 C120 152 94 150 84 135 C73 118 73 96 84 80 Z"
+                fill="#f7f1e2" stroke="#2b2620" stroke-width="5" stroke-linejoin="round"/>
+          <!-- back-of-hand / finger split -->
+          <path d="M120 66 C113 92 113 120 120 144" fill="none" stroke="#2b2620" stroke-width="3.6" stroke-linecap="round"/>
+          <!-- knuckle creases -->
+          <path d="M149 97 C140 100 131 98 125 94" fill="none" stroke="#2b2620" stroke-width="3.2" stroke-linecap="round"/>
+          <path d="M148 119 C139 122 130 120 124 116" fill="none" stroke="#2b2620" stroke-width="3.2" stroke-linecap="round"/>
+          <!-- thumb folded across the fingers -->
+          <path d="M96 138 C110 128 130 128 142 137" fill="none" stroke="#2b2620" stroke-width="4" stroke-linecap="round"/>
+          <circle cx="97" cy="139" r="7" fill="#f7f1e2" stroke="#2b2620" stroke-width="4"/>
+          <!-- highlight -->
+          <path d="M96 84 C105 74 119 72 127 78" fill="none" stroke="#ffffff" stroke-width="6" stroke-linecap="round" opacity="0.9"/>
+          <!-- speed lines -->
+          <path d="M4 100 h30 M0 78 h22 M12 122 h20" fill="none" stroke="#2b2620" stroke-width="4.5" stroke-linecap="round" opacity="0.5"/>
         </svg>
       </div>
     </article>
@@ -456,13 +657,15 @@
 
     <article class="featured sequel">
       <div>
-        <span class="label">New · 3D Sequel</span>
-        <h2><a href="kirby-rumble.html">Kirby Brawler 2: Rumble Arena</a></h2>
-        <p>Top-down 3D duel on one circular arena — chunky low-poly toy fighters. All 8 copy abilities return, each with two attacks and a shield. You vs a CPU Kirby with a random ability.</p>
+        <span class="label">New · 3D Arena Fighter</span>
+        <h2><a href="blob-knight-rumpler.html">Blob Knight Rumpler</a></h2>
+        <p>Top-down 3D duel on one circular arena — chunky low-poly blob knights. Eight cores to pick from — Blade, Arc, Disc, Maul, Bow, Flare, Cinder, Veil — each with an attack, a special and a shield. Duel a CPU knight under your own rules, or climb a survival ladder that ends when you do.</p>
         <div class="meta">
           <span>WebGL 3D</span>
-          <span>2 attacks + shield per ability</span>
-          <span>CPU opponent</span>
+          <span>1v1 + survival</span>
+          <span>12 buff cards</span>
+          <span>76 achievements</span>
+          <span>4 CPU difficulties</span>
         </div>
         <div class="cta-row">
           <span class="play-cta">Play now &rarr;</span>
@@ -470,28 +673,36 @@
         </div>
       </div>
       <div class="preview" aria-hidden="true">
-        <!-- blocky low-poly Kirby on a circular arena (original art) -->
+        <!-- blob knight standing in the arena ring (original art) -->
         <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
-          <ellipse cx="100" cy="150" rx="78" ry="26" fill="#ffd1e3" stroke="#e8a8c8" stroke-width="3"/>
-          <ellipse cx="100" cy="146" rx="58" ry="18" fill="#fff3e0"/>
-          <!-- faceted body -->
-          <polygon points="100,38 134,56 142,96 118,124 82,124 58,96 66,56" fill="#ffa8c8" stroke="#e87aa8" stroke-width="2.5"/>
-          <polygon points="100,38 134,56 118,72 92,64" fill="#ffc0d8" opacity="0.8"/>
-          <polygon points="58,96 82,124 74,128 52,106" fill="#e87aa8" opacity="0.5"/>
-          <!-- feet -->
-          <polygon points="62,124 88,122 84,140 58,138" fill="#e8506e" stroke="#a82a4a" stroke-width="2"/>
-          <polygon points="112,122 138,124 142,138 116,140" fill="#e8506e" stroke="#a82a4a" stroke-width="2"/>
-          <!-- eyes -->
-          <rect x="84" y="68" width="9" height="24" rx="4" fill="#20305e"/>
-          <rect x="107" y="68" width="9" height="24" rx="4" fill="#20305e"/>
-          <rect x="86" y="70" width="5" height="8" rx="2.5" fill="#ffffff"/>
-          <rect x="109" y="70" width="5" height="8" rx="2.5" fill="#ffffff"/>
-          <!-- blush + mouth -->
-          <polygon points="68,96 82,94 80,102 68,103" fill="#ff6e96" opacity="0.8"/>
-          <polygon points="118,94 132,96 132,103 120,102" fill="#ff6e96" opacity="0.8"/>
-          <rect x="95" y="100" width="10" height="6" rx="3" fill="#7a1f30"/>
-          <!-- gold star on arena -->
-          <path d="M 158 142 L 162 152 L 172 152 L 164 158 L 167 168 L 158 162 L 149 168 L 152 158 L 144 152 L 154 152 Z" fill="#ffd54d" stroke="#a8861c" stroke-width="1.5"/>
+          <defs>
+            <linearGradient id="bkrShell" x1="0.3" y1="0" x2="0.7" y2="1">
+              <stop offset="0" stop-color="#63ad7c"/><stop offset="0.45" stop-color="#357d55"/><stop offset="1" stop-color="#1b4030"/>
+            </linearGradient>
+            <linearGradient id="bkrGold" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#fff6cf"/><stop offset="0.45" stop-color="#ffd24a"/><stop offset="1" stop-color="#c07d10"/>
+            </linearGradient>
+            <linearGradient id="bkrRing" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#9fe0ff"/><stop offset="0.5" stop-color="#2f7fd0"/><stop offset="1" stop-color="#8ad4ff"/>
+            </linearGradient>
+          </defs>
+          <ellipse cx="100" cy="150" rx="78" ry="26" fill="#cfd8ea" stroke="#9aa8c4" stroke-width="3"/>
+          <ellipse cx="100" cy="147" rx="58" ry="18" fill="#e4eaf4"/>
+          <path d="M22 150 A78 26 0 0 1 178 150" fill="none" stroke="#0a1422" stroke-width="7"/>
+          <path d="M22 150 A78 26 0 0 1 178 150" fill="none" stroke="url(#bkrRing)" stroke-width="4"/>
+          <!-- floating gauntlets -->
+          <path d="M40 116 q-9 6 -7 14 q2 9 13 9 q11 0 13-9 q2-8 -7-14 z" fill="url(#bkrShell)" stroke="#0d2117" stroke-width="3" stroke-linejoin="round"/>
+          <path d="M160 116 q9 6 7 14 q-2 9 -13 9 q-11 0 -13-9 q-2-8 7-14 z" fill="url(#bkrShell)" stroke="#0d2117" stroke-width="3" stroke-linejoin="round"/>
+          <!-- horns -->
+          <path d="M74 52 q-7-16 4-26 q2 15 11 20 z" fill="url(#bkrGold)" stroke="#5a3402" stroke-width="2" stroke-linejoin="round"/>
+          <path d="M126 52 q7-16 -4-26 q-2 15 -11 20 z" fill="url(#bkrGold)" stroke="#5a3402" stroke-width="2" stroke-linejoin="round"/>
+          <!-- body, brow and visor -->
+          <path d="M100 40 c24 0 40 20 40 44 c0 24 -17 40 -40 40 c-23 0 -40 -16 -40 -40 c0 -24 16 -44 40 -44 z" fill="url(#bkrShell)" stroke="#0d2117" stroke-width="4" stroke-linejoin="round"/>
+          <path d="M74 57 q26 -15 52 0 q-26 -6 -52 0 z" fill="#ffffff" opacity="0.18"/>
+          <path d="M63 70 q37 -13 74 0" fill="none" stroke="url(#bkrGold)" stroke-width="6" stroke-linecap="round"/>
+          <path d="M70 85 q30 -11 60 0 q-30 17 -60 0 z" fill="#3fd8ff" stroke="#0d2117" stroke-width="2.5" stroke-linejoin="round"/>
+          <path d="M22 150 A78 26 0 0 0 178 150" fill="none" stroke="#0a1422" stroke-width="7"/>
+          <path d="M22 150 A78 26 0 0 0 178 150" fill="none" stroke="url(#bkrRing)" stroke-width="4"/>
         </svg>
       </div>
     </article>
@@ -551,11 +762,6 @@
         <span class="game-name">Pokémon Sword &amp; Shield: Absolute Chaos</span>
         <span class="game-desc">A fully randomized Sword &amp; Shield Ultimate Plus demake — playable in your browser.</span>
       </a>
-      <a class="game-card" href="RPS%20RTS/inkwell_tactics.html">
-        <span class="game-tag">RTS</span>
-        <span class="game-name">Ink Splatt</span>
-        <span class="game-desc">A rubber-hose RTS of Rock, Paper, Scissors — mine Ink &amp; Graphite, tech up your roster, and crack two rival Hands under fog in a 1933 ink-cartoon war.</span>
-      </a>
       <a class="game-card" href="https://timothy8901.github.io/robo-revolution/" target="_blank" rel="noopener">
         <span class="game-tag">3D Action</span>
         <span class="game-name">Robo Revolution</span>
@@ -589,7 +795,7 @@
       <a class="game-card" href="tic-tac-toe-jutsu.html">
         <span class="game-tag">Trivia / Casual</span>
         <span class="game-name">Tic Tac Toe Jutsu</span>
-        <span class="game-desc">Anime trivia tic-tac-toe — 10 series, steal tiles to win.</span>
+        <span class="game-desc">Anime trivia tic-tac-toe — 16 series incl. sports, steal tiles to win.</span>
         <span class="shirt-link">👕 Shirt design →</span>
       </a>
       <a class="game-card" href="ACT-Hunt-Connect.html">
@@ -621,6 +827,11 @@
         <span class="game-name">Shameless</span>
         <span class="game-desc">House-rule card battler.</span>
         <span class="shirt-link">👕 Shirt design →</span>
+      </a>
+      <a class="game-card" href="hot-start-questions.html">
+        <span class="game-tag">Party / Icebreaker</span>
+        <span class="game-name">Hot Start Questions</span>
+        <span class="game-desc">Tap the deck, shuffle, and flip a random conversation starter. 1,670 questions.</span>
       </a>
     </div>
   </main>
