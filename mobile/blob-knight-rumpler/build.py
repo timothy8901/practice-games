@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build Blob Knight Rumpler for Android: a signed APK, and a zip to hand around.
 
-    python3 build.py                  # the game as it is on origin/main
+    python3 build.py                  # the current release from origin/main
     python3 build.py --source FILE    # or any copy of the engine page
     python3 build.py --debuggable     # test build that Chrome DevTools can attach to
 
@@ -35,6 +35,11 @@ THREE = os.path.join(HERE, 'vendor', 'three-0.152.2.min.js')
 # Kirby-era strings are still in it (none, once the renamed page reaches main).
 ENGINE_PAGES = ('blob-knight-rumpler.html', 'kirby-rumble.html')
 ZIP_FOLDER = 'Blob Knight Rumpler - Android'
+# The release these defaults build. Android refuses an install whose version code
+# is not higher than the one on the phone, so raise both together for every build
+# handed out, and keep them here rather than in whoever-typed-the-command's memory.
+VERSION_NAME = '3.3'
+VERSION_CODE = 6
 
 
 def die(msg):
@@ -340,8 +345,9 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
     ap.add_argument('--ref', default='origin/main', help='git ref to take the engine page from (default: origin/main)')
     ap.add_argument('--source', help='build this copy of the engine page instead of the one at --ref')
-    ap.add_argument('--version-name', default='1.0')
-    ap.add_argument('--version-code', type=int, default=1, help='raise it for every build you hand out')
+    ap.add_argument('--version-name', default=VERSION_NAME)
+    ap.add_argument('--version-code', type=int, default=VERSION_CODE,
+                    help='raise it for every build you hand out (default: %d)' % VERSION_CODE)
     ap.add_argument('--debuggable', action='store_true',
                     help='test build: Chrome DevTools can attach to the WebView (not zipped)')
     args = ap.parse_args()

@@ -74,7 +74,9 @@ notes (`INSTALL.txt`) and `web/index.html`, the same page as a single web file.
 The first build creates `~/.android/blob-knight-rumpler.jks` with a random password
 in `~/.android/blob-knight-rumpler.jks.password`. Both stay out of git. Back them up:
 Android only installs an update over an existing install when both builds were
-signed with the same key. Raise `--version-code` for each build you hand out.
+signed with the same key. The release the defaults build is `VERSION_NAME` /
+`VERSION_CODE` at the top of build.py - raise both for each build you hand out,
+since Android refuses an install whose code is not higher than the phone's.
 
 ## Icons
 
