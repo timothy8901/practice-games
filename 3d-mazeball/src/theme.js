@@ -317,13 +317,19 @@ export function buildElevator (m, dir, half, deckT) {
  * turn, so nothing here has to know which way the room faces on the floor.
  */
 export const MDR = {
-  back: -4.2,          // rear wall, measured along the outward axis
-  across: 4.2,         // half-width of the interior
+  // The room spans four tiles' worth of floor. The lattice places pieces; it
+  // does not clamp their geometry, so MDR stays ONE cell and simply builds
+  // bigger than its square — the squares it covers are marked `~` in lumon.js's
+  // plan so nothing else is routed into them.
+  back: -14.0,         // rear wall, measured along the outward axis
+  front: 5.0,          // the doorway wall, on the cell boundary
+  across: 10.0,        // half-width of the interior — 20 m wall to wall
   gap: 2.8,            // the doorway in the front wall
-  deskR: 1.9,          // how far each desk sits from the hub centre
+  deskR: 3.4,          // how far each desk sits from the hub centre
   deskW: 1.6,          // matches the baked Thrixel desk: 1.60 x 1.21 x 0.82 m
   deskD: 0.82,
   deskH: 0.72,         // collision only to desk-top height
+  lightEvery: 3.6,     // ceiling fittings, on the same rhythm as the corridors
 };
 
 /**
@@ -341,7 +347,7 @@ export const MDR = {
  */
 export function mdrDesks (fx, fz, cx = 0, cz = 0) {
   const rx = -fz, rz = fx;                       // across
-  const C = MDR.back + (5.0 - MDR.back) / 2;     // hub centre, along the outward axis
+  const C = (MDR.back + MDR.front) / 2;          // hub centre, along the outward axis
   const D = MDR.deskR;
   const out = [];
   for (const [sa, sc, turned] of [[1, 1, false], [1, -1, true], [-1, -1, false], [-1, 1, true]]) {
@@ -360,52 +366,94 @@ export function buildArrival (m, dir, half, deckT) {
   const fx = dir.x, fz = dir.z;
   const rx = -fz, rz = fx;
   const P = (along, across) => [fx * along + rx * across, 0, fz * along + rz * across];
+  const Q = (along, across, y) => [fx * along + rx * across, y, fz * along + rz * across];
   const yaw = Math.atan2(fx, fz);
-  const back = MDR.back, W = MDR.across, H = HALL.wallH, T = HALL.wallT;
+  const back = MDR.back, front = MDR.front, W = MDR.across;
+  const H = HALL.wallH, T = HALL.wallT;
+  const mid = (back + front) / 2, depth = front - back;
 
   // The route the corridor outside stitches onto. Marked as a room so the fence
   // does not erect a pair of corridor walls down the middle of the floor.
   m.addRoute([
     { x: fx * half, y: 0, z: fz * half },
-    { x: fx * (back + 1.4), y: 0, z: fz * (back + 1.4) },
+    { x: fx * (back + 2.5), y: 0, z: fz * (back + 2.5) },
   ], 2.4, { room: true });
 
   // Carpet, wall to wall.
   m.polyPrism([
-    [P(half, -W)[0], P(half, -W)[2]],
-    [P(half, W)[0], P(half, W)[2]],
+    [P(front, -W)[0], P(front, -W)[2]],
+    [P(front, W)[0], P(front, W)[2]],
     [P(back, W)[0], P(back, W)[2]],
     [P(back, -W)[0], P(back, -W)[2]],
   ], 0, deckT, 'track', { color: OFFICE.carpet, sideColor: OFFICE.skirting });
 
   const wallOpts = { color: OFFICE.wall };
-  const mid = (back + half) / 2, depth = half - back;
 
-  // Rear wall, then the two long side walls.
+  // Rear wall, the two long side walls, and a front wall in two returns either
+  // side of the doorway.
   const wb = P(back, 0);
   m.boxRot(wb[0], H / 2, wb[2], W * 2 + T, H, T, [0, 1, 0], yaw, 'wall', wallOpts);
   for (const sc of [-1, 1]) {
     const ws = P(mid, sc * W);
     m.boxRot(ws[0], H / 2, ws[2], T, H, depth, [0, 1, 0], yaw, 'wall', wallOpts);
   }
-  // Front wall, in two returns either side of the doorway.
-  const jamb = (W - MDR.gap / 2) / 2 + MDR.gap / 4;
+  const seg = W - MDR.gap / 2;
   for (const sc of [-1, 1]) {
-    const seg = (W - MDR.gap / 2);
-    const wf = P(half, sc * (MDR.gap / 2 + seg / 2));
+    const wf = P(front, sc * (MDR.gap / 2 + seg / 2));
     m.boxRot(wf[0], H / 2, wf[2], seg, H, T, [0, 1, 0], yaw, 'wall', wallOpts);
   }
 
-  // Suspended ceiling over the room. Decoration — the ball cannot reach 2.35 m,
-  // and a collidable ceiling makes the camera boom think it is buried every frame.
-  const cc = P(mid, 0);
-  m.boxRot(cc[0], H - HALL.ceilDrop, cc[2], W * 2, 0.02, depth, [0, 1, 0], yaw,
+  // Skirting and the accent line, carried round all four walls so the room is
+  // trimmed like the corridors that lead to it.
+  const sp = T / 2 + HALL.skirtOut;
+  const runs = [
+    [back + sp, front - sp, -(W - sp), 'across'], [back + sp, front - sp, W - sp, 'across'],
+    [-(W - sp), W - sp, back + sp, 'along'],
+  ];
+  for (const [a0, a1, at, axis] of runs) {
+    const band = (y0, y1, colour) => {
+      const c = (u, y) => (axis === 'across' ? Q(u, at, y) : Q(at, u, y));
+      m.quad(c(a0, y0), c(a1, y0), c(a1, y1), c(a0, y1), 'hallTrim',
+        { color: colour, collide: false });
+    };
+    band(0, HALL.skirtH, OFFICE.skirting);
+    band(HALL.stripeY, HALL.stripeY + HALL.stripeH, OFFICE.accent);
+  }
+
+  /* Suspended ceiling, on the same 0.6 m module as every corridor.
+   *
+   * At 20 x 19 m a plain pale slab overhead reads as fog rather than as a
+   * ceiling — the grid is the only thing giving the room a sense of its own
+   * size. Decoration throughout: the ball cannot reach 2.35 m, and a collidable
+   * ceiling makes the camera's boom think it is buried every frame. */
+  const cy = H - HALL.ceilDrop;
+  m.quad(Q(back, -W, cy), Q(front, -W, cy), Q(front, W, cy), Q(back, W, cy),
     'hallCeil', { color: OFFICE.wallShade, collide: false });
 
+  const bar = (a0, a1, at, axis) => {
+    const h = HALL.barT / 2, y = cy - HALL.barDrop;
+    const c = (u, v) => (axis === 'across' ? Q(u, v, y) : Q(v, u, y));
+    m.quad(c(a0, at - h), c(a1, at - h), c(a1, at + h), c(a0, at + h),
+      'hallBar', { color: OFFICE.wallDark, collide: false });
+  };
+  for (let v = -W; v <= W + 1e-6; v += HALL.tile) bar(back, front, v, 'across');
+  for (let u = back; u <= front + 1e-6; u += HALL.tile) bar(-W, W, u, 'along');
+
+  // Recessed light panels on a grid, so the room is lit like an office rather
+  // than by one notional sun.
+  const hl = HALL.lightL / 2, ly = cy - 0.004;
+  for (let u = back + MDR.lightEvery; u < front; u += MDR.lightEvery) {
+    for (let v = -W + MDR.lightEvery; v < W; v += MDR.lightEvery) {
+      m.quad(Q(u - hl, v - hl, ly), Q(u + hl, v - hl, ly),
+        Q(u + hl, v + hl, ly), Q(u - hl, v + hl, ly),
+        'hallLight', { color: OFFICE.light, collide: false });
+    }
+  }
+
   // The desks. Geometry is the baked Thrixel model, drawn by the review page;
-  // what the piece contributes is the collision, a desk-shaped box up to
-  // desk-top height. The ball is 0.7 m across and the top is at 0.72 m, so
-  // there was never a gap to roll under.
+  // what the piece contributes is collision — a desk-shaped box up to desk-top
+  // height, never drawn, because a solid box under an open-legged desk reads as
+  // a plinth it is standing on.
   for (const d of mdrDesks(fx, fz)) {
     const sx = d.turned ? MDR.deskD : MDR.deskW;
     const sz = d.turned ? MDR.deskW : MDR.deskD;

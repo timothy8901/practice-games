@@ -42,13 +42,24 @@ import { TILE, DIRS, DELTA } from './kit.js';
  *   E  the elevator. The way out, and the goal.
  *   P  Perpetuity Wing   — dead end off the main hall
  *   B  Break Room        — dead end off the south corridor
+ *   ~  reserved: MDR's floor plate covers this square, so nothing may be
+ *      placed here. No tile and no connection — identical to `.` for routing.
  *
  * Read it as a plan seen from above, north at the top.
+ *
+ * WHY `~` EXISTS
+ * --------------
+ * The lattice places pieces; it does not clamp their geometry. MDR is ONE cell
+ * whose room is 19 x 20 m — four tiles' worth of floor — so the squares that
+ * room covers have to be kept clear or a corridor gets built inside the office.
+ * Marking them rather than leaving them blank means the plan shows the room's
+ * real footprint, and a corridor routed into it is a visible mistake in the
+ * drawing instead of an invisible one in the geometry.
  */
 export const FLOOR = `
-.........
-.S######.
-...#...#.
+~~.......
+~S######.
+~~.#...#.
 .#######.
 .#...#...
 .#...P...
@@ -133,7 +144,7 @@ export function lumonFloor () {
   for (let z = 0; z < height; z++) {
     for (let x = 0; x < width; x++) {
       const ch = grid[idx(x, z, width)];
-      if (!ch) continue;
+      if (!ch || ch === '~') continue;          // reserved by MDR's floor plate
 
       const dirs = {};
       for (const d of DIRS) {
@@ -145,7 +156,8 @@ export function lumonFloor () {
         // LEVELS[true] === undefined and every edge waypoint loses its height —
         // which shows up far away as "the route is unsupported".
         // This floor is flat, so every opening is level 0.
-        if (grid[idx(nx, nz, width)]) dirs[d] = 0;
+        const n = grid[idx(nx, nz, width)];
+        if (n && n !== '~') dirs[d] = 0;
       }
       const sig = DIRS.map(d => (dirs[d] === undefined ? '-' : String(dirs[d]))).join('');
       const chosen = pieceFor(ch, sig);
