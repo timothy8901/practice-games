@@ -1,0 +1,53 @@
+<svg viewBox="0 0 440 300" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="hero" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#7ed957"/>
+      <stop offset="1" stop-color="#3fa34d"/>
+    </linearGradient>
+    <linearGradient id="loopg" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#3fa34d"/>
+      <stop offset="0.5" stop-color="#e9c628"/>
+      <stop offset="1" stop-color="#3fa34d"/>
+    </linearGradient>
+  </defs>
+
+  <g stroke="#1c2b22" stroke-width="9" fill="none" stroke-linecap="round" opacity="0.9">
+    <path d="M150 88 C 96 88, 96 150, 150 150 C 204 150, 236 88, 290 88 C 344 88, 344 150, 290 150 C 236 150, 204 88, 150 88 Z"/>
+  </g>
+  <g stroke="url(#loopg)" stroke-width="5" fill="none" stroke-linecap="round">
+    <path d="M150 88 C 96 88, 96 150, 150 150 C 204 150, 236 88, 290 88 C 344 88, 344 150, 290 150 C 236 150, 204 88, 150 88 Z"/>
+  </g>
+
+  <g stroke="#1c2b22" stroke-width="3">
+    <rect x="118" y="40" width="24" height="24" rx="4" fill="#7ed957" transform="rotate(-14 130 52)"/>
+    <rect x="206" y="34" width="24" height="24" rx="4" fill="#e9c628" transform="rotate(10 218 46)"/>
+    <rect x="296" y="44" width="24" height="24" rx="4" fill="#7ed957" transform="rotate(-8 308 56)"/>
+    <rect x="160" y="120" width="22" height="22" rx="4" fill="#e9c628" transform="rotate(6 171 131)"/>
+    <rect x="258" y="118" width="22" height="22" rx="4" fill="#7ed957" transform="rotate(-10 269 129)"/>
+  </g>
+  <g fill="#1c2b22" font-family="Arial Black, sans-serif" font-size="15" font-weight="bold" text-anchor="middle">
+    <text x="130" y="57" transform="rotate(-14 130 52)">Q</text>
+    <text x="218" y="51" transform="rotate(10 218 46)">U</text>
+    <text x="308" y="61" transform="rotate(-8 308 56)">O</text>
+    <text x="171" y="136" transform="rotate(6 171 131)">R</text>
+    <text x="269" y="134" transform="rotate(-10 269 129)">D</text>
+  </g>
+
+  <g>
+    <rect x="120" y="92" width="200" height="34" rx="5" fill="#2f4034" stroke="#7ed957" stroke-width="2"/>
+    <text x="220" y="116" font-family="Trebuchet MS, sans-serif" font-size="20" font-weight="bold" letter-spacing="6" text-anchor="middle" fill="#e9c628">BOTTOMLESS</text>
+  </g>
+
+  <text x="222" y="232" font-family="Arial Black, sans-serif" font-size="74" font-weight="bold" letter-spacing="1" text-anchor="middle" fill="#1c2b22" stroke="#1c2b22" stroke-width="9" stroke-linejoin="round">QUORDLE</text>
+  <text x="220" y="230" font-family="Arial Black, sans-serif" font-size="74" font-weight="bold" letter-spacing="1" text-anchor="middle" fill="url(#hero)">QUORDLE</text>
+
+  <g stroke="#1c2b22" stroke-width="3">
+    <rect x="64" y="208" width="20" height="20" rx="4" fill="#e9c628" transform="rotate(-12 74 218)"/>
+    <rect x="360" y="206" width="20" height="20" rx="4" fill="#7ed957" transform="rotate(12 370 216)"/>
+  </g>
+
+  <g stroke="#3fa34d" stroke-width="3" stroke-linecap="round" opacity="0.85">
+    <line x1="120" y1="255" x2="320" y2="255"/>
+  </g>
+  <text x="222" y="278" font-family="Trebuchet MS, sans-serif" font-size="13" font-weight="bold" letter-spacing="4" text-anchor="middle" fill="#9fdf7f">ENDLESS WORD GUESSING</text>
+</svg>

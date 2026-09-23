@@ -5,98 +5,196 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>A.C.T. Word Quest</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
     <style>
+        /* ===== Themed palette: ACT = BLUE ===== */
+        :root {
+            --accent: #2563eb;        /* blue-600 */
+            --accent-soft: #60a5fa;   /* blue-400 */
+            --accent-dark: #1d4ed8;   /* blue-700 */
+            --accent-tint: #dbeafe;   /* blue-100 */
+            --accent-tint2: #eff6ff;  /* blue-50 */
+            --ink: #0f172a;
+            --muted: #64748b;
+        }
+        * { box-sizing: border-box; }
+        html, body { margin: 0; }
         body {
             font-family: 'Inter', sans-serif;
-            /* Prevents scrolling and other default touch actions on the game board */
-            touch-action: none;
+            touch-action: none; /* Prevents scrolling on the game board */
+            color: var(--ink);
+            background:
+                radial-gradient(1200px 600px at 10% -10%, var(--accent-tint2), transparent 60%),
+                radial-gradient(900px 500px at 110% 10%, #f1f5f9, transparent 55%),
+                #f8fafc;
+            min-height: 100vh;
         }
-        .grid-container {
-            position: relative;
+        .app-shell {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 24px;
+            box-shadow: 0 20px 45px -25px rgba(15, 23, 42, 0.45);
         }
+        .panel {
+            background: #ffffff;
+            border: 1px solid #eef2f7;
+            border-radius: 18px;
+            box-shadow: 0 6px 18px -12px rgba(15, 23, 42, 0.25);
+        }
+        .brand-title {
+            background: linear-gradient(90deg, var(--accent-dark), var(--accent-soft));
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            letter-spacing: -0.02em;
+        }
+        .pill {
+            display: inline-flex; align-items: center; gap: .4rem;
+            padding: .35rem .75rem; border-radius: 9999px;
+            font-weight: 700; font-size: .8rem; line-height: 1;
+            background: var(--accent-tint); color: var(--accent-dark);
+        }
+        /* ===== Stats bar ===== */
+        .stat-chip {
+            display: flex; flex-direction: column; align-items: center;
+            min-width: 72px; padding: .45rem .7rem; border-radius: 14px;
+            background: #f8fafc; border: 1px solid #eef2f7;
+        }
+        .stat-chip .label { font-size: .62rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 700; }
+        .stat-chip .value { font-size: 1.05rem; font-weight: 800; color: var(--ink); font-variant-numeric: tabular-nums; }
+        /* ===== Progress bar ===== */
+        .progress-track { height: 10px; border-radius: 9999px; background: #e2e8f0; overflow: hidden; }
+        .progress-fill { height: 100%; border-radius: 9999px; width: 0%;
+            background: linear-gradient(90deg, var(--accent-soft), var(--accent));
+            transition: width .45s cubic-bezier(.22,.61,.36,1); }
+        /* ===== Grid ===== */
+        .grid-container { position: relative; }
         #word-hunt-svg-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none; /* Allows touch events to pass through to the grid */
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 2;
         }
         .grid-cell {
-            position: relative;
-            user-select: none;
-            display: flex;
-            justify-content: center;
-            align-items: center;
+            position: relative; user-select: none;
+            display: flex; justify-content: center; align-items: center;
             aspect-ratio: 1 / 1;
         }
         .grid-cell-content {
-            position: absolute;
-            width: 80%;
-            height: 80%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 600;
-            border-radius: 9999px;
-            transition: background-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
+            position: absolute; width: 84%; height: 84%;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 700; border-radius: 9999px;
+            background: #ffffff; color: #1e293b;
+            box-shadow: inset 0 0 0 1px #e2e8f0;
+            transition: background-color .15s ease, color .15s ease, transform .15s ease, box-shadow .15s ease;
+            z-index: 1;
         }
         .grid-cell-content.selecting {
-            background-color: #60a5fa; /* blue-400 */
-            color: white;
-            transform: scale(1.1);
+            background: var(--accent-soft);
+            color: #fff;
+            transform: scale(1.12);
+            box-shadow: 0 6px 14px -6px rgba(37,99,235,.6);
+            z-index: 3;
         }
+        .grid-cell-content.found-locked {
+            background: var(--accent-tint);
+            color: var(--accent-dark);
+            box-shadow: inset 0 0 0 1px var(--accent-soft);
+        }
+        .grid-cell-content.pop { animation: cellPop .4s ease; }
+        @keyframes cellPop {
+            0% { transform: scale(1); }
+            45% { transform: scale(1.3); }
+            100% { transform: scale(1); }
+        }
+        /* ===== Connections cells ===== */
+        .connections-placeholder {
+            border: 1px dashed #d7dee8; background: #f8fafc;
+        }
+        .connections-word {
+            border: 1px solid #e2e8f0;
+            background: #f8fafc; color: #1e293b;
+            transition: transform .12s ease, background-color .15s ease, color .15s ease, box-shadow .15s ease;
+        }
+        .connections-word:hover { transform: translateY(-1px); box-shadow: 0 6px 14px -10px rgba(15,23,42,.5); }
         .connections-word.selected {
-            background-color: #60a5fa; /* blue-400 */
-            color: white;
-            border-color: #3b82f6; /* blue-600 */
+            background: var(--accent);
+            color: #fff;
+            border-color: var(--accent-dark);
+            box-shadow: 0 8px 18px -10px rgba(37,99,235,.8);
+            transform: translateY(-1px);
         }
-        .category-solved {
-            transition: all 0.5s ease-in-out;
-            transform-origin: top;
+        .connections-word.correct-flash { animation: correctFlash .6s ease; }
+        @keyframes correctFlash {
+            0%,100% { background: #22c55e; color:#fff; }
+            50% { background: #16a34a; color:#fff; transform: scale(1.06); }
         }
-        .fade-in { animation: fadeIn 0.5s ease-in-out; }
+        .connections-word.wrong-shake { animation: wrongShake .5s ease; }
+        @keyframes wrongShake {
+            0%,100% { transform: translateX(0); background:#fee2e2; }
+            20% { transform: translateX(-7px); background:#fecaca; }
+            40% { transform: translateX(7px); background:#fecaca; }
+            60% { transform: translateX(-5px); background:#fecaca; }
+            80% { transform: translateX(5px); background:#fecaca; }
+        }
+        .category-solved { transition: all .5s ease-in-out; transform-origin: top; }
+        .found-chip { animation: fadeIn .45s ease; }
+        .fade-in { animation: fadeIn .5s ease-in-out; }
         @keyframes fadeIn {
-            from { opacity: 0; transform: scale(0.95) translateY(5px); }
-            to { opacity: 1; transform: scale(1) translateY(0); }
+            from { opacity: 0; transform: scale(.95) translateY(6px); }
+            to   { opacity: 1; transform: scale(1) translateY(0); }
         }
-        #custom-puzzle-modal input {
-            @apply w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-400 focus:border-transparent transition;
-        }
-        .connections-word.flashing, .grid-cell-content.flashing {
-            animation: flash 0.4s ease-in-out 3;
-        }
+        .connections-word.flashing, .grid-cell-content.flashing { animation: flash .4s ease-in-out 3; }
         @keyframes flash {
-          50% { 
-            background-color: #fbbf24; /* amber-400 */
-            color: white; 
-            transform: scale(1.1);
-          }
+          50% { background-color: #fbbf24; color: #fff; transform: scale(1.12); }
         }
+        .btn-accent { background: var(--accent); color:#fff; }
+        .btn-accent:hover { background: var(--accent-dark); }
+        /* ===== Confetti ===== */
+        #confetti-canvas {
+            position: fixed; inset: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 60;
+        }
+        .modal-pop { animation: modalPop .4s cubic-bezier(.18,.89,.32,1.28); }
+        @keyframes modalPop { from { opacity:0; transform: scale(.8); } to { opacity:1; transform: scale(1); } }
     </style>
 </head>
-<body class="bg-gray-100 text-gray-800 flex items-center justify-center min-h-screen p-2 sm:p-4">
+<body class="flex items-center justify-center min-h-screen p-2 sm:p-4">
 
-    <div class="w-full max-w-6xl mx-auto bg-white rounded-2xl shadow-lg p-4 sm:p-6 md:p-8">
-        <header class="text-center mb-6 relative">
-            <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">A.C.T. Word Quest</h1>
-            <p id="header-subtitle" class="text-gray-600 mt-2">Sharpen your vocabulary and critical thinking for test day.</p>
+    <canvas id="confetti-canvas"></canvas>
+
+    <div class="app-shell w-full max-w-6xl mx-auto p-4 sm:p-6 md:p-8">
+        <header class="text-center mb-5 relative">
+            <span class="pill mb-3">ACT Prep</span>
+            <h1 class="text-3xl sm:text-4xl font-extrabold brand-title">A.C.T. Word Quest</h1>
+            <p id="header-subtitle" class="text-slate-500 mt-2">Sharpen your vocabulary and critical thinking for test day.</p>
         </header>
 
-        <div class="flex flex-col md:flex-row gap-8">
+        <!-- Stats + progress -->
+        <div class="flex flex-wrap items-center justify-center gap-3 mb-3">
+            <div class="stat-chip"><span class="label">Time</span><span class="value" id="stat-time">00:00</span></div>
+            <div class="stat-chip"><span class="label">Score</span><span class="value" id="stat-score">0</span></div>
+            <div class="stat-chip"><span class="label">Hints</span><span class="value" id="stat-hints">3</span></div>
+            <div class="stat-chip"><span class="label">Best</span><span class="value" id="stat-best">--</span></div>
+        </div>
+        <div class="max-w-3xl mx-auto mb-7">
+            <div class="flex justify-between text-xs font-semibold text-slate-500 mb-1">
+                <span>Progress</span><span id="progress-label">0%</span>
+            </div>
+            <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+        </div>
+
+        <div class="flex flex-col md:flex-row gap-6">
             <!-- Word Hunt Section -->
             <div class="w-full md:w-1/2 flex flex-col">
-                <h2 class="text-2xl font-semibold mb-4 text-center">1. Word Hunt</h2>
-                <div class="grid-container bg-gray-200 rounded-lg p-2">
+                <h2 class="text-xl font-bold mb-3 flex items-center gap-2"><span class="pill">1</span> Word Hunt</h2>
+                <div class="grid-container panel p-2 sm:p-3">
                     <div id="word-hunt-grid" class="grid gap-1"></div>
                     <svg id="word-hunt-svg-overlay"></svg>
                 </div>
                 <div class="mt-4">
                     <div class="flex items-center justify-between mb-2">
-                        <h3 class="font-semibold text-lg">Found Words (<span id="found-words-count">0</span>/<span id="total-words-count">16</span>):</h3>
-                        <button id="word-hunt-hint-btn" class="p-2 rounded-full hover:bg-yellow-200 transition disabled:opacity-50 disabled:cursor-not-allowed" title="Get a hint">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-yellow-500"><path d="M15.09 16.05A6.94 6.94 0 0 1 12 19a7 7 0 0 1-7-7c0-2.35 1.13-4.43 2.91-5.78"></path><path d="M12 2a7 7 0 0 0-7 7c0 2.35 1.13-4.43 2.91-5.78"></path><path d="M12 2v10"></path><path d="M22 12h-2"></path><path d="M4 12H2"></path><path d="m19.78 4.22-1.42 1.42"></path><path d="m5.64 18.36-1.42-1.42"></path><path d="M12 22v-2"></path></svg>
+                        <h3 class="font-bold text-base">Found Words (<span id="found-words-count">0</span>/<span id="total-words-count">16</span>)</h3>
+                        <button id="word-hunt-hint-btn" class="p-2 rounded-full hover:bg-yellow-100 transition disabled:opacity-40 disabled:cursor-not-allowed" title="Reveal part of a hidden word">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-amber-500"><path d="M9 18h6"></path><path d="M10 22h4"></path><path d="M15.09 14a5 5 0 1 0-6.18 0 4 4 0 0 1 .92 2h4.34a4 4 0 0 1 .92-2Z"></path></svg>
                         </button>
                     </div>
                     <div id="found-words-list" class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm"></div>
@@ -105,40 +203,45 @@
 
             <!-- Connections Section -->
             <div class="w-full md:w-1/2 flex flex-col">
-                <h2 class="text-2xl font-semibold mb-4 text-center">2. Connections</h2>
+                <h2 class="text-xl font-bold mb-3 flex items-center gap-2"><span class="pill">2</span> Connections</h2>
                  <div id="solved-categories" class="space-y-2 mb-4"></div>
                 <div id="connections-grid" class="grid grid-cols-4 gap-2"></div>
                 <div class="mt-4 flex flex-col items-center">
-                    <p id="connections-message" class="h-6 text-center font-medium text-red-500"></p>
-                    <div class="flex gap-4 mt-2 items-center">
-                        <button id="shuffle-button" class="px-6 py-3 bg-gray-200 text-gray-800 font-semibold rounded-full hover:bg-gray-300 transition disabled:bg-gray-400">Shuffle</button>
-                        <button id="submit-button" class="px-6 py-3 bg-blue-500 text-white font-semibold rounded-full hover:bg-blue-600 transition disabled:bg-gray-400">Submit</button>
-                        <button id="connections-hint-btn" class="p-2 rounded-full hover:bg-yellow-200 transition disabled:opacity-50 disabled:cursor-not-allowed" title="Get a hint">
-                           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-yellow-500"><path d="M15.09 16.05A6.94 6.94 0 0 1 12 19a7 7 0 0 1-7-7c0-2.35 1.13-4.43 2.91-5.78"></path><path d="M12 2a7 7 0 0 0-7 7c0 2.35 1.13-4.43 2.91-5.78"></path><path d="M12 2v10"></path><path d="M22 12h-2"></path><path d="M4 12H2"></path><path d="m19.78 4.22-1.42 1.42"></path><path d="m5.64 18.36-1.42-1.42"></path><path d="M12 22v-2"></path></svg>
+                    <p id="connections-message" class="h-6 text-center font-semibold text-red-500"></p>
+                    <div class="flex gap-3 mt-2 items-center">
+                        <button id="shuffle-button" class="px-5 py-2.5 bg-slate-100 text-slate-700 font-bold rounded-full hover:bg-slate-200 transition disabled:opacity-50">Shuffle</button>
+                        <button id="submit-button" class="px-6 py-2.5 btn-accent font-bold rounded-full transition disabled:opacity-40 disabled:cursor-not-allowed">Submit</button>
+                        <button id="connections-hint-btn" class="p-2 rounded-full hover:bg-yellow-100 transition disabled:opacity-40 disabled:cursor-not-allowed" title="Flash a matching pair">
+                           <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-amber-500"><path d="M9 18h6"></path><path d="M10 22h4"></path><path d="M15.09 14a5 5 0 1 0-6.18 0 4 4 0 0 1 .92 2h4.34a4 4 0 0 1 .92-2Z"></path></svg>
                         </button>
                     </div>
-                     <p class="mt-4 text-sm text-gray-500">Mistakes remaining: <span id="mistakes-count">4</span></p>
+                     <p class="mt-4 text-sm text-slate-500">Mistakes remaining: <span id="mistakes-count" class="font-bold text-slate-700">4</span></p>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- Modals -->
-    <div id="score-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden p-4">
-        <div class="bg-white rounded-2xl shadow-lg p-8 text-center max-w-md w-full mx-auto">
-            <h2 class="text-3xl font-bold text-green-500 mb-2">Puzzle Complete!</h2>
-            <p id="score-date" class="text-gray-500 font-medium mb-6"></p>
-            <div class="grid grid-cols-2 gap-4 text-lg mb-8">
-                <div class="flex flex-col items-center p-4 bg-gray-100 rounded-lg">
-                    <span class="text-sm font-semibold text-gray-600">Time</span>
-                    <span id="score-time" class="font-bold text-2xl text-gray-900">--:--</span>
+    <div id="score-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center hidden p-4 z-50">
+        <div class="modal-pop bg-white rounded-2xl shadow-2xl p-8 text-center max-w-md w-full mx-auto">
+            <h2 class="text-3xl font-extrabold text-green-500 mb-2">Puzzle Complete!</h2>
+            <p id="score-date" class="text-slate-500 font-medium mb-6"></p>
+            <div class="grid grid-cols-3 gap-3 text-lg mb-8">
+                <div class="flex flex-col items-center p-4 bg-slate-50 rounded-xl">
+                    <span class="text-xs font-semibold text-slate-500">Time</span>
+                    <span id="score-time" class="font-extrabold text-2xl text-slate-900">--:--</span>
                 </div>
-                <div class="flex flex-col items-center p-4 bg-gray-100 rounded-lg">
-                    <span class="text-sm font-semibold text-gray-600">Guesses</span>
-                    <span id="score-guesses" class="font-bold text-2xl text-gray-900">0</span>
+                <div class="flex flex-col items-center p-4 bg-slate-50 rounded-xl">
+                    <span class="text-xs font-semibold text-slate-500">Score</span>
+                    <span id="score-points" class="font-extrabold text-2xl text-slate-900">0</span>
+                </div>
+                <div class="flex flex-col items-center p-4 bg-slate-50 rounded-xl">
+                    <span class="text-xs font-semibold text-slate-500">Guesses</span>
+                    <span id="score-guesses" class="font-extrabold text-2xl text-slate-900">0</span>
                 </div>
             </div>
-            <button id="close-score-btn" class="w-full px-6 py-3 bg-blue-500 text-white font-semibold rounded-full hover:bg-blue-600 transition">View Solved Board</button>
+            <p id="score-best" class="text-sm font-semibold text-blue-600 mb-4"></p>
+            <button id="close-score-btn" class="w-full px-6 py-3 btn-accent font-bold rounded-full transition">View Solved Board</button>
         </div>
     </div>
 
@@ -164,6 +267,51 @@
     const totalWordsCountEl = document.getElementById('total-words-count');
     const wordHuntHintBtn = document.getElementById('word-hunt-hint-btn');
     const connectionsHintBtn = document.getElementById('connections-hint-btn');
+    const scorePointsEl = document.getElementById('score-points');
+    const scoreBestEl = document.getElementById('score-best');
+    const statTimeEl = document.getElementById('stat-time');
+    const statScoreEl = document.getElementById('stat-score');
+    const statHintsEl = document.getElementById('stat-hints');
+    const statBestEl = document.getElementById('stat-best');
+    const progressFillEl = document.getElementById('progress-fill');
+    const progressLabelEl = document.getElementById('progress-label');
+
+    // --- THEME / STORAGE ---
+    const ACCENT = '#2563eb';
+    const STORAGE_KEY = 'actWordQuest_best_v2';
+    const MAX_HINTS = 3;
+
+    // --- SOUND (WebAudio, all wrapped in try/catch) ---
+    let audioCtx = null;
+    function getAudioCtx() {
+        try {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            return audioCtx;
+        } catch (e) { return null; }
+    }
+    function tone(freq, dur, type = 'sine', vol = 0.12, when = 0) {
+        try {
+            const ctx = getAudioCtx();
+            if (!ctx) return;
+            const o = ctx.createOscillator();
+            const g = ctx.createGain();
+            o.type = type; o.frequency.value = freq;
+            o.connect(g); g.connect(ctx.destination);
+            const t = ctx.currentTime + when;
+            g.gain.setValueAtTime(0.0001, t);
+            g.gain.exponentialRampToValueAtTime(vol, t + 0.01);
+            g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+            o.start(t); o.stop(t + dur + 0.02);
+        } catch (e) {}
+    }
+    const sfx = {
+        tick:  () => tone(420, 0.05, 'square', 0.05),
+        found: () => { tone(523, 0.1, 'triangle', 0.12); tone(784, 0.16, 'triangle', 0.1, 0.08); },
+        wrong: () => { tone(180, 0.18, 'sawtooth', 0.1); tone(120, 0.22, 'sawtooth', 0.1, 0.05); },
+        correct: () => { tone(523,0.1,'triangle',0.12); tone(659,0.1,'triangle',0.12,0.08); tone(880,0.18,'triangle',0.12,0.16); },
+        win:   () => { [523,659,784,1047].forEach((f,i)=>tone(f,0.25,'triangle',0.13,i*0.13)); }
+    };
 
     // --- A.C.T. FOCUSED GAME DATA ---
     const puzzles = [
@@ -217,6 +365,54 @@
     let startTime;
     let totalGuesses = 0;
     let wordLocations = new Map();
+    let score = 0;
+    let hintsLeft = MAX_HINTS;
+    let timerInterval = null;
+    let gameActive = false;
+
+    // --- SCORE / TIMER / PROGRESS HELPERS ---
+    function addScore(n) { score = Math.max(0, score + n); statScoreEl.textContent = score; }
+    function formatTime(sec) {
+        const m = Math.floor(sec / 60).toString().padStart(2, '0');
+        const s = (sec % 60).toString().padStart(2, '0');
+        return `${m}:${s}`;
+    }
+    function startTimer() {
+        stopTimer();
+        startTime = Date.now();
+        statTimeEl.textContent = '00:00';
+        timerInterval = setInterval(() => {
+            statTimeEl.textContent = formatTime(Math.floor((Date.now() - startTime) / 1000));
+        }, 1000);
+    }
+    function stopTimer() { if (timerInterval) { clearInterval(timerInterval); timerInterval = null; } }
+    function updateProgress() {
+        const totalGroups = gameData.length || 1;
+        const huntPart = allWords.length ? (foundWords.size / allWords.length) * 50 : 0;
+        const connPart = (solvedGroups / totalGroups) * 50;
+        const pct = Math.round(huntPart + connPart);
+        progressFillEl.style.width = pct + '%';
+        progressLabelEl.textContent = pct + '%';
+    }
+    function loadBest() {
+        try {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            if (!raw) { statBestEl.textContent = '--'; return null; }
+            const b = JSON.parse(raw);
+            statBestEl.textContent = b.score != null ? b.score : '--';
+            return b;
+        } catch (e) { statBestEl.textContent = '--'; return null; }
+    }
+    function saveBest(finalScore, durationSec) {
+        try {
+            const prev = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
+            let best = prev;
+            const isBetter = !prev || finalScore > prev.score || (finalScore === prev.score && durationSec < prev.time);
+            if (isBetter) { best = { score: finalScore, time: durationSec }; localStorage.setItem(STORAGE_KEY, JSON.stringify(best)); }
+            statBestEl.textContent = best.score;
+            return isBetter;
+        } catch (e) { return false; }
+    }
 
     // --- PUZZLE MANAGEMENT ---
     function getDailyPuzzleIndex() { const epoch = new Date('2024-01-01T00:00:00Z'); const now = new Date(); const diff = now.getTime() - epoch.getTime(); const dayIndex = Math.floor(diff / (1000 * 60 * 60 * 24)); return dayIndex % puzzles.length; }
@@ -238,8 +434,8 @@
         return true; 
     }
     function renderWordHuntGrid() { wordHuntGrid.innerHTML = ''; wordHuntGrid.style.gridTemplateColumns = `repeat(${GRID_SIZE}, 1fr)`; for (let r = 0; r < GRID_SIZE; r++) { for (let c = 0; c < GRID_SIZE; c++) { const cell = document.createElement('div'); cell.className = 'grid-cell'; cell.dataset.r = r; cell.dataset.c = c; const content = document.createElement('div'); content.className = 'grid-cell-content text-base md:text-lg'; content.textContent = grid[r][c]; cell.appendChild(content); wordHuntGrid.appendChild(cell); } } }
-    function handleSelectionStart(e) { e.preventDefault(); const target = getCellFromEvent(e); if (!target) return; isSelecting = true; selectionPath = [target]; updateSelectionUI(); }
-    function handleSelectionMove(e) { e.preventDefault(); if (!isSelecting) return; const target = getCellFromEvent(e); if (!target || target === selectionPath[selectionPath.length - 1]) return; const lastCell = selectionPath[selectionPath.length - 1]; if (selectionPath.length > 1 && target === selectionPath[selectionPath.length - 2]) { selectionPath.pop(); if (selectionPath.length === 1) selectionDirection = { dr: null, dc: null }; updateSelectionUI(); return; } const lastR = parseInt(lastCell.dataset.r), lastC = parseInt(lastCell.dataset.c); const newR = parseInt(target.dataset.r), newC = parseInt(target.dataset.c); if (selectionPath.length === 1) { const dr = Math.sign(newR - lastR), dc = Math.sign(newC - lastC); if (dr !== 0 || dc !== 0) { selectionDirection = { dr, dc }; selectionPath.push(target); } } else { if (newR === lastR + selectionDirection.dr && newC === lastC + selectionDirection.dc) selectionPath.push(target); } updateSelectionUI(); }
+    function handleSelectionStart(e) { e.preventDefault(); const target = getCellFromEvent(e); if (!target) return; getAudioCtx(); isSelecting = true; selectionPath = [target]; updateSelectionUI(); }
+    function handleSelectionMove(e) { e.preventDefault(); if (!isSelecting) return; const target = getCellFromEvent(e); if (!target || target === selectionPath[selectionPath.length - 1]) return; const lastCell = selectionPath[selectionPath.length - 1]; if (selectionPath.length > 1 && target === selectionPath[selectionPath.length - 2]) { selectionPath.pop(); if (selectionPath.length === 1) selectionDirection = { dr: null, dc: null }; updateSelectionUI(); return; } const lastR = parseInt(lastCell.dataset.r), lastC = parseInt(lastCell.dataset.c); const newR = parseInt(target.dataset.r), newC = parseInt(target.dataset.c); const before = selectionPath.length; if (selectionPath.length === 1) { const dr = Math.sign(newR - lastR), dc = Math.sign(newC - lastC); if (dr !== 0 || dc !== 0) { selectionDirection = { dr, dc }; selectionPath.push(target); } } else { if (newR === lastR + selectionDirection.dr && newC === lastC + selectionDirection.dc) selectionPath.push(target); } if (selectionPath.length !== before) sfx.tick(); updateSelectionUI(); }
     function handleSelectionEnd(e) { e.preventDefault(); if (!isSelecting) return; isSelecting = false; const selectedWord = selectionPath.map(cell => cell.querySelector('.grid-cell-content').textContent).join(''); const reversedWord = selectedWord.split('').reverse().join(''); if (allWords.includes(selectedWord) && !foundWords.has(selectedWord)) { foundWords.add(selectedWord); markWordAsFound(selectionPath); updateFoundWordsUI(selectedWord); } else if (allWords.includes(reversedWord) && !foundWords.has(reversedWord)) { foundWords.add(reversedWord); markWordAsFound(selectionPath); updateFoundWordsUI(reversedWord); } else { clearSelectionUI(); } selectionPath = []; if (foundWords.size === allWords.length) activateConnectionsGame(); }
     function getCellFromEvent(e) { const touch = e.touches?.[0] || e.changedTouches?.[0]; const target = touch ? document.elementFromPoint(touch.clientX, touch.clientY) : e.target; return target ? target.closest('.grid-cell') : null; }
     function updateSelectionUI() { clearSelectionUI(); selectionPath.forEach(cell => cell.querySelector('.grid-cell-content').classList.add('selecting')); }
@@ -247,53 +443,154 @@
     
     function markWordAsFound(path) {
         clearSelectionUI();
+        sfx.found();
         const gridRect = wordHuntGrid.getBoundingClientRect();
         const startCell = path[0];
         const endCell = path[path.length - 1];
         const startRect = startCell.getBoundingClientRect();
         const endRect = endCell.getBoundingClientRect();
-        const strokeWidth = startRect.width * 0.8; 
+        const strokeWidth = startRect.width * 0.8;
         const x1 = startRect.left + startRect.width / 2 - gridRect.left;
         const y1 = startRect.top + startRect.height / 2 - gridRect.top;
         const x2 = endRect.left + endRect.width / 2 - gridRect.left;
         const y2 = endRect.top + endRect.height / 2 - gridRect.top;
         const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
         line.setAttribute('x1', x1); line.setAttribute('y1', y1); line.setAttribute('x2', x2); line.setAttribute('y2', y2);
-        line.setAttribute('stroke', '#4ade80'); line.setAttribute('stroke-width', strokeWidth);
-        line.setAttribute('stroke-linecap', 'round'); line.setAttribute('opacity', '0.6');
+        line.setAttribute('stroke', ACCENT); line.setAttribute('stroke-width', strokeWidth);
+        line.setAttribute('stroke-linecap', 'round'); line.setAttribute('opacity', '0.45');
         line.classList.add('fade-in');
         wordHuntSvgOverlay.appendChild(line);
+        // pop + lock each cell with theme color
+        path.forEach((cell, i) => {
+            const content = cell.querySelector('.grid-cell-content');
+            if (!content) return;
+            setTimeout(() => {
+                content.classList.add('found-locked', 'pop');
+                content.addEventListener('animationend', () => content.classList.remove('pop'), { once: true });
+            }, i * 45);
+        });
     }
     
     function updateFoundWordsUI(newHuntWord) {
         const wordData = gameData.flatMap(cat => cat.words).find(w => w.hunt === newHuntWord || w.hunt === newHuntWord.split('').reverse().join(''));
         const displayWord = wordData ? wordData.display : newHuntWord;
         const wordEl = document.createElement('div');
-        wordEl.className = 'p-2 bg-green-100 text-green-800 rounded-md text-center font-medium fade-in';
+        wordEl.className = 'found-chip p-2 bg-blue-100 text-blue-800 rounded-lg text-center font-semibold';
         wordEl.textContent = displayWord;
         foundWordsListEl.appendChild(wordEl);
         foundWordsCountEl.textContent = foundWords.size;
+        addScore(50);
+        updateProgress();
         addWordToConnectionsGrid(displayWord, wordData.hunt);
     }
 
     // --- CONNECTIONS LOGIC ---
-    function handleSubmit() { if (selectedConnectionWords.length !== 4) return; totalGuesses++; const sortedSelection = [...selectedConnectionWords].sort(); let correctGroup = gameData.find(group => JSON.stringify(group.words.map(w => w.hunt).sort()) === JSON.stringify(sortedSelection)); if (correctGroup) { handleCorrectSubmission(correctGroup); } else { handleIncorrectSubmission(); } selectedConnectionWords = []; document.querySelectorAll('.connections-word.selected').forEach(el => el.classList.remove('selected')); submitButton.disabled = true; }
-    function handleCorrectSubmission(group) { solvedGroups++; const solvedGroupEl = document.createElement('div'); solvedGroupEl.className = `category-solved p-4 rounded-lg ${group.color} text-white fade-in`; solvedGroupEl.innerHTML = `<p class="font-bold text-lg">${group.category}</p><p class="font-medium">${group.words.map(w => w.display).join(', ')}</p>`; solvedCategoriesEl.prepend(solvedGroupEl); selectedConnectionWords.forEach(word => { connectionsGrid.querySelector(`[data-word='${word}']`)?.remove(); }); if (solvedGroups === gameData.length) { displayScore(); } }
-    function initializeConnectionsGrid() { connectionsGrid.innerHTML = ''; for (let i = 0; i < 16; i++) { const placeholder = document.createElement('div'); placeholder.className = 'connections-placeholder p-2 h-16 md:h-20 bg-gray-200 rounded-lg'; connectionsGrid.appendChild(placeholder); } }
-    function addWordToConnectionsGrid(displayWord, huntWord) { const placeholder = connectionsGrid.querySelector('.connections-placeholder'); if (!placeholder) return; const wordButton = document.createElement('button'); wordButton.className = 'connections-word p-2 h-16 md:h-20 text-sm sm:text-base bg-gray-200 rounded-lg font-semibold flex items-center justify-center text-center hover:bg-gray-300 transition focus:outline-none focus:ring-2 focus:ring-blue-400 fade-in'; wordButton.textContent = displayWord; wordButton.dataset.word = huntWord; wordButton.addEventListener('click', handleConnectionWordClick); placeholder.replaceWith(wordButton); }
+    function handleSubmit() { if (selectedConnectionWords.length !== 4) return; totalGuesses++; const sortedSelection = [...selectedConnectionWords].sort(); let correctGroup = gameData.find(group => JSON.stringify(group.words.map(w => w.hunt).sort()) === JSON.stringify(sortedSelection)); if (correctGroup) { handleCorrectSubmission(correctGroup); } else { handleIncorrectSubmission(); } }
+    function handleCorrectSubmission(group) {
+        sfx.correct();
+        const selectedEls = selectedConnectionWords.map(word => connectionsGrid.querySelector(`[data-word='${word}']`)).filter(Boolean);
+        selectedEls.forEach(el => el.classList.add('correct-flash'));
+        const wordsToClear = [...selectedConnectionWords];
+        selectedConnectionWords = [];
+        submitButton.disabled = true;
+        addScore(100);
+        setTimeout(() => {
+            solvedGroups++;
+            const solvedGroupEl = document.createElement('div');
+            solvedGroupEl.className = `category-solved p-4 rounded-xl ${group.color} text-white fade-in shadow`;
+            solvedGroupEl.innerHTML = `<p class="font-extrabold text-lg">${group.category}</p><p class="font-medium">${group.words.map(w => w.display).join(', ')}</p>`;
+            solvedCategoriesEl.prepend(solvedGroupEl);
+            wordsToClear.forEach(word => { connectionsGrid.querySelector(`[data-word='${word}']`)?.remove(); });
+            updateProgress();
+            if (solvedGroups === gameData.length) { displayScore(); }
+        }, 550);
+    }
+    function initializeConnectionsGrid() { connectionsGrid.innerHTML = ''; for (let i = 0; i < 16; i++) { const placeholder = document.createElement('div'); placeholder.className = 'connections-placeholder p-2 h-16 md:h-20 rounded-lg'; connectionsGrid.appendChild(placeholder); } }
+    function addWordToConnectionsGrid(displayWord, huntWord) { const placeholder = connectionsGrid.querySelector('.connections-placeholder'); if (!placeholder) return; const wordButton = document.createElement('button'); wordButton.className = 'connections-word p-2 h-16 md:h-20 text-sm sm:text-base rounded-lg font-bold flex items-center justify-center text-center focus:outline-none fade-in'; wordButton.textContent = displayWord; wordButton.dataset.word = huntWord; wordButton.addEventListener('click', handleConnectionWordClick); placeholder.replaceWith(wordButton); }
     function activateConnectionsGame() { shuffleButton.disabled = false; connectionsHintBtn.disabled = false; wordHuntHintBtn.disabled = true; }
     function shuffleArray(array) { for (let i = array.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1));[array[i], array[j]] = [array[j], array[i]]; } return array; }
     function renderConnectionsGrid() { const wordsToDisplay = Array.from(connectionsGrid.querySelectorAll('.connections-word')); const shuffledWords = shuffleArray(wordsToDisplay); connectionsGrid.innerHTML = ''; shuffledWords.forEach(wordEl => connectionsGrid.appendChild(wordEl)); }
-    function handleConnectionWordClick(e) { const word = e.target.dataset.word; if (selectedConnectionWords.includes(word)) { selectedConnectionWords = selectedConnectionWords.filter(w => w !== word); e.target.classList.remove('selected'); } else if (selectedConnectionWords.length < 4) { selectedConnectionWords.push(word); e.target.classList.add('selected'); } submitButton.disabled = selectedConnectionWords.length !== 4; }
-    function handleIncorrectSubmission() { mistakes--; mistakesCountEl.textContent = mistakes; connectionsMessageEl.textContent = "Incorrect. Try again."; setTimeout(() => connectionsMessageEl.textContent = "", 1500); if (mistakes === 0) { displayScore(true); } }
+    function handleConnectionWordClick(e) { const btn = e.currentTarget; const word = btn.dataset.word; if (selectedConnectionWords.includes(word)) { selectedConnectionWords = selectedConnectionWords.filter(w => w !== word); btn.classList.remove('selected'); } else if (selectedConnectionWords.length < 4) { selectedConnectionWords.push(word); btn.classList.add('selected'); sfx.tick(); } submitButton.disabled = selectedConnectionWords.length !== 4; }
+    function handleIncorrectSubmission() {
+        sfx.wrong();
+        mistakes--; mistakesCountEl.textContent = mistakes;
+        addScore(-25);
+        connectionsMessageEl.textContent = "Not a group. Try again.";
+        const selectedEls = document.querySelectorAll('.connections-word.selected');
+        selectedEls.forEach(el => { el.classList.add('wrong-shake'); el.addEventListener('animationend', () => el.classList.remove('wrong-shake'), { once: true }); });
+        setTimeout(() => {
+            connectionsMessageEl.textContent = "";
+            document.querySelectorAll('.connections-word.selected').forEach(el => el.classList.remove('selected'));
+            selectedConnectionWords = [];
+            submitButton.disabled = true;
+            if (mistakes === 0) { displayScore(true); }
+        }, 700);
+    }
 
     // --- SCORING & DISPLAY ---
-    function displayScore(isGameOver = false) { const endTime = Date.now(); const duration = Math.round((endTime - startTime) / 1000); const minutes = Math.floor(duration / 60).toString().padStart(2, '0'); const seconds = (duration % 60).toString().padStart(2, '0'); scoreTimeEl.textContent = `${minutes}:${seconds}`; scoreGuessesEl.textContent = totalGuesses; scoreDateEl.textContent = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }); if (isGameOver) { scoreModal.querySelector('h2').textContent = "Game Over!"; scoreModal.querySelector('h2').classList.replace('text-green-500', 'text-red-500'); } else { scoreModal.querySelector('h2').textContent = "Puzzle Complete!"; scoreModal.querySelector('h2').classList.replace('text-red-500', 'text-green-500'); } setTimeout(() => scoreModal.classList.remove('hidden'), 500); }
-    
+    function displayScore(isGameOver = false) {
+        if (!gameActive) return;
+        gameActive = false;
+        stopTimer();
+        const duration = Math.round((Date.now() - startTime) / 1000);
+        scoreTimeEl.textContent = formatTime(duration);
+        scoreGuessesEl.textContent = totalGuesses;
+        if (!isGameOver) { const timeBonus = Math.max(0, 600 - duration); addScore(timeBonus); }
+        scorePointsEl.textContent = score;
+        scoreDateEl.textContent = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+        const h2 = scoreModal.querySelector('h2');
+        if (isGameOver) {
+            h2.textContent = "Game Over!";
+            h2.classList.remove('text-green-500'); h2.classList.add('text-red-500');
+            scoreBestEl.textContent = '';
+            sfx.wrong();
+        } else {
+            h2.textContent = "Puzzle Complete!";
+            h2.classList.remove('text-red-500'); h2.classList.add('text-green-500');
+            const isNewBest = saveBest(score, duration);
+            scoreBestEl.textContent = isNewBest ? 'New best score!' : '';
+            sfx.win();
+            launchConfetti();
+        }
+        setTimeout(() => scoreModal.classList.remove('hidden'), 500);
+    }
+
+    // --- CONFETTI ---
+    function launchConfetti() {
+        try {
+            const canvas = document.getElementById('confetti-canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+            const colors = ['#2563eb', '#60a5fa', '#fbbf24', '#22c55e', '#f472b6', '#a855f7'];
+            const pieces = [];
+            for (let i = 0; i < 160; i++) {
+                pieces.push({ x: Math.random()*canvas.width, y: -20 - Math.random()*canvas.height*0.5,
+                    size: 6 + Math.random()*7, color: colors[Math.floor(Math.random()*colors.length)],
+                    vx: (Math.random()-0.5)*3, vy: 2 + Math.random()*4, rot: Math.random()*Math.PI, vr: (Math.random()-0.5)*0.3 });
+            }
+            let frames = 0;
+            (function anim() {
+                ctx.clearRect(0,0,canvas.width,canvas.height);
+                pieces.forEach(p => {
+                    p.x += p.vx; p.y += p.vy; p.rot += p.vr; p.vy += 0.03;
+                    ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+                    ctx.fillStyle = p.color; ctx.fillRect(-p.size/2, -p.size/2, p.size, p.size*0.6); ctx.restore();
+                });
+                frames++;
+                if (frames < 220) requestAnimationFrame(anim);
+                else ctx.clearRect(0,0,canvas.width,canvas.height);
+            })();
+        } catch (e) {}
+    }
+
     // --- HINT LOGIC ---
-    function flashElements(elements, buttonToDisable) { if (!elements || elements.some(el => !el)) return; buttonToDisable.disabled = true; elements.forEach(el => { el.classList.add('flashing'); el.addEventListener('animationend', () => { el.classList.remove('flashing'); }, { once: true }); }); setTimeout(() => { buttonToDisable.disabled = false; }, 1200); }
-    function handleWordHuntHint() { const unfoundWords = allWords.filter(w => !foundWords.has(w)); if (unfoundWords.length === 0) { wordHuntHintBtn.disabled = true; return; } const hintWord = unfoundWords[Math.floor(Math.random() * unfoundWords.length)]; const path = wordLocations.get(hintWord); if (!path || path.length === 0) { console.error("Could not find path for hint word:", hintWord); return; } let hintCoords; if (path.length <= 3) { hintCoords = path; } else { const start = Math.floor(Math.random() * (path.length - 2)); hintCoords = path.slice(start, start + 3); } const hintElements = hintCoords.map(({r, c}) => wordHuntGrid.querySelector(`.grid-cell[data-r='${r}'][data-c='${c}'] .grid-cell-content`)); flashElements(hintElements, wordHuntHintBtn); }
-    function handleConnectionsHint() { const solvedCategoryNames = Array.from(solvedCategoriesEl.querySelectorAll('.font-bold')).map(el => el.textContent); const unsolvedGroups = gameData.filter(group => !solvedCategoryNames.includes(group.category)); if (unsolvedGroups.length === 0) { connectionsHintBtn.disabled = true; return; } const wordsOnBoard = Array.from(connectionsGrid.querySelectorAll('.connections-word')).map(el => el.dataset.word); const hintGroup = unsolvedGroups.find(group => { const wordsInGroupOnBoard = group.words.map(w => w.hunt).filter(word => wordsOnBoard.includes(word)); return wordsInGroupOnBoard.length >= 2; }); if (!hintGroup) { return; } const hintableWords = hintGroup.words.map(w => w.hunt).filter(word => wordsOnBoard.includes(word)); const wordsToFlash = hintableWords.sort(() => 0.5 - Math.random()).slice(0, 2); const hintElements = wordsToFlash.map(word => connectionsGrid.querySelector(`.connections-word[data-word='${word}']`)); flashElements(hintElements, connectionsHintBtn); }
+    function updateHintUI() {
+        statHintsEl.textContent = hintsLeft;
+        if (hintsLeft <= 0) { wordHuntHintBtn.disabled = true; }
+    }
+    function flashElements(elements, buttonToDisable) { if (!elements || elements.some(el => !el)) return; buttonToDisable.disabled = true; elements.forEach(el => { el.classList.add('flashing'); el.addEventListener('animationend', () => { el.classList.remove('flashing'); }, { once: true }); }); setTimeout(() => { if (hintsLeft > 0) buttonToDisable.disabled = false; }, 1200); }
+    function handleWordHuntHint() { if (hintsLeft <= 0) return; const unfoundWords = allWords.filter(w => !foundWords.has(w)); if (unfoundWords.length === 0) { wordHuntHintBtn.disabled = true; return; } const hintWord = unfoundWords[Math.floor(Math.random() * unfoundWords.length)]; const path = wordLocations.get(hintWord); if (!path || path.length === 0) { return; } let hintCoords; if (path.length <= 3) { hintCoords = path; } else { const start = Math.floor(Math.random() * (path.length - 2)); hintCoords = path.slice(start, start + 3); } const hintElements = hintCoords.map(({r, c}) => wordHuntGrid.querySelector(`.grid-cell[data-r='${r}'][data-c='${c}'] .grid-cell-content`)); hintsLeft--; addScore(-15); updateHintUI(); flashElements(hintElements, wordHuntHintBtn); }
+    function handleConnectionsHint() { if (hintsLeft <= 0) return; const solvedCategoryNames = Array.from(solvedCategoriesEl.querySelectorAll('.font-extrabold')).map(el => el.textContent); const unsolvedGroups = gameData.filter(group => !solvedCategoryNames.includes(group.category)); if (unsolvedGroups.length === 0) { connectionsHintBtn.disabled = true; return; } const wordsOnBoard = Array.from(connectionsGrid.querySelectorAll('.connections-word')).map(el => el.dataset.word); const hintGroup = unsolvedGroups.find(group => { const wordsInGroupOnBoard = group.words.map(w => w.hunt).filter(word => wordsOnBoard.includes(word)); return wordsInGroupOnBoard.length >= 2; }); if (!hintGroup) { return; } const hintableWords = hintGroup.words.map(w => w.hunt).filter(word => wordsOnBoard.includes(word)); const wordsToFlash = hintableWords.sort(() => 0.5 - Math.random()).slice(0, 2); const hintElements = wordsToFlash.map(word => connectionsGrid.querySelector(`.connections-word[data-word='${word}']`)); hintsLeft--; addScore(-15); updateHintUI(); flashElements(hintElements, connectionsHintBtn); }
 
 
 
@@ -301,20 +598,25 @@
     function resetGame() {
         grid = []; foundWords.clear(); isSelecting = false; selectionPath = []; selectedConnectionWords = [];
         mistakes = 4; solvedGroups = 0; totalGuesses = 0;
+        score = 0; hintsLeft = MAX_HINTS; gameActive = true;
         wordLocations.clear();
         wordHuntSvgOverlay.innerHTML = '';
         headerSubtitle.textContent = 'Sharpen your vocabulary and critical thinking for test day.';
         foundWordsCountEl.textContent = '0'; foundWordsListEl.innerHTML = '';
         solvedCategoriesEl.innerHTML = ''; mistakesCountEl.textContent = '4';
-        connectionsMessageEl.textContent = ''; 
-        submitButton.disabled = true; 
+        connectionsMessageEl.textContent = '';
+        statScoreEl.textContent = '0';
+        statHintsEl.textContent = MAX_HINTS;
+        submitButton.disabled = true;
         shuffleButton.disabled = true;
         wordHuntHintBtn.disabled = false;
         connectionsHintBtn.disabled = true;
         scoreModal.classList.add('hidden');
+        loadBest();
         initializeWordHunt();
         initializeConnectionsGrid();
-        startTime = Date.now();
+        updateProgress();
+        startTimer();
     }
 
     // --- EVENT LISTENERS ---

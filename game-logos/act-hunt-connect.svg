@@ -1,0 +1,91 @@
+<svg viewBox="0 0 440 300" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="navyGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2a5db0"/>
+      <stop offset="1" stop-color="#163a78"/>
+    </linearGradient>
+    <linearGradient id="amberGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffd24d"/>
+      <stop offset="1" stop-color="#f2a517"/>
+    </linearGradient>
+    <linearGradient id="blueText" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#6fb6ff"/>
+      <stop offset="1" stop-color="#2f74d0"/>
+    </linearGradient>
+    <radialGradient id="nodeGlow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff2c4"/>
+      <stop offset="1" stop-color="#f2a517"/>
+    </radialGradient>
+  </defs>
+
+  <g stroke="#0c264f" stroke-width="2.5" stroke-linecap="round">
+    <line x1="92" y1="58" x2="138" y2="40"/>
+    <line x1="138" y1="40" x2="170" y2="70"/>
+    <line x1="170" y1="70" x2="214" y2="46"/>
+    <line x1="214" y1="46" x2="252" y2="74"/>
+    <line x1="252" y1="74" x2="300" y2="44"/>
+    <line x1="300" y1="44" x2="338" y2="66"/>
+    <line x1="138" y1="40" x2="170" y2="70"/>
+    <line x1="92" y1="58" x2="120" y2="86"/>
+  </g>
+  <g stroke="#7fd0ff" stroke-width="1.4" stroke-linecap="round" opacity="0.95">
+    <line x1="92" y1="58" x2="138" y2="40"/>
+    <line x1="138" y1="40" x2="170" y2="70"/>
+    <line x1="170" y1="70" x2="214" y2="46"/>
+    <line x1="214" y1="46" x2="252" y2="74"/>
+    <line x1="252" y1="74" x2="300" y2="44"/>
+    <line x1="300" y1="44" x2="338" y2="66"/>
+    <line x1="92" y1="58" x2="120" y2="86"/>
+  </g>
+
+  <g stroke="#0c264f" stroke-width="2">
+    <circle cx="92" cy="58" r="11" fill="url(#nodeGlow)"/>
+    <circle cx="138" cy="40" r="9" fill="url(#nodeGlow)"/>
+    <circle cx="170" cy="70" r="11" fill="url(#nodeGlow)"/>
+    <circle cx="214" cy="46" r="9" fill="url(#nodeGlow)"/>
+    <circle cx="252" cy="74" r="11" fill="url(#nodeGlow)"/>
+    <circle cx="300" cy="44" r="9" fill="url(#nodeGlow)"/>
+    <circle cx="338" cy="66" r="11" fill="url(#nodeGlow)"/>
+    <circle cx="120" cy="86" r="7" fill="#7fd0ff"/>
+  </g>
+  <g font-family="Arial Black, sans-serif" font-size="12" fill="#0c264f" text-anchor="middle">
+    <text x="92" y="62">A</text>
+    <text x="170" y="74">C</text>
+    <text x="252" y="78">T</text>
+  </g>
+
+  <g>
+    <circle cx="338" cy="66" r="22" fill="none" stroke="#0c264f" stroke-width="6"/>
+    <circle cx="338" cy="66" r="22" fill="none" stroke="#7fd0ff" stroke-width="3"/>
+    <line x1="354" y1="82" x2="372" y2="100" stroke="#0c264f" stroke-width="8" stroke-linecap="round"/>
+    <line x1="354" y1="82" x2="372" y2="100" stroke="#7fd0ff" stroke-width="4" stroke-linecap="round"/>
+    <circle cx="338" cy="66" r="22" fill="#ffffff" opacity="0.12"/>
+  </g>
+
+  <g transform="translate(220 168)">
+    <rect x="-118" y="-30" width="236" height="60" rx="12" fill="url(#navyGrad)" stroke="#0c264f" stroke-width="3.5"/>
+    <rect x="-112" y="-25" width="224" height="11" rx="5" fill="#ffffff" opacity="0.18"/>
+    <text x="2" y="20" font-family="Arial Black, sans-serif" font-size="52" fill="#0c264f" text-anchor="middle" letter-spacing="3">A.C.T.</text>
+    <text x="0" y="18" font-family="Arial Black, sans-serif" font-size="52" fill="#eaf3ff" text-anchor="middle" letter-spacing="3">A.C.T.</text>
+  </g>
+
+  <g font-family="Impact, sans-serif" text-anchor="middle">
+    <text x="124" y="248" font-size="56" fill="#0c264f" letter-spacing="1">HUNT</text>
+    <text x="122" y="246" font-size="56" fill="url(#amberGrad)" stroke="#8a4e06" stroke-width="1" letter-spacing="1">HUNT</text>
+
+    <text x="227" y="240" font-size="36" fill="#0c264f">&amp;</text>
+    <text x="226" y="238" font-size="36" fill="#ffd24d">&amp;</text>
+
+    <text x="328" y="248" font-size="50" fill="#0c264f" letter-spacing="1">CONNECT</text>
+    <text x="326" y="246" font-size="50" fill="url(#blueText)" stroke="#0c264f" stroke-width="0.8" letter-spacing="1">CONNECT</text>
+  </g>
+
+  <g stroke="#f2a517" stroke-width="2" stroke-linecap="round">
+    <line x1="60" y1="266" x2="380" y2="266"/>
+  </g>
+  <g fill="#7fd0ff" stroke="#0c264f" stroke-width="1.2">
+    <circle cx="60" cy="266" r="4"/>
+    <circle cx="380" cy="266" r="4"/>
+    <circle cx="220" cy="266" r="4"/>
+  </g>
+</svg>

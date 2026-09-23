@@ -1,0 +1,59 @@
+<svg viewBox="0 0 440 300" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="ooze" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#9be84a"/>
+      <stop offset="1" stop-color="#3f8c12"/>
+    </linearGradient>
+    <linearGradient id="blood" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#e23b3b"/>
+      <stop offset="1" stop-color="#9c1212"/>
+    </linearGradient>
+    <linearGradient id="skullg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#dfe9cf"/>
+      <stop offset="1" stop-color="#8aa06a"/>
+    </linearGradient>
+  </defs>
+
+  <g stroke="#0a1505" stroke-width="2" stroke-linejoin="round">
+    <path d="M210 30 q-10 4 -8 14 l4 22 8 -2 -2 -22 q-1 -8 -2 -12z" fill="#5a0d0d" opacity="0.85"/>
+    <path d="M232 30 q10 4 8 14 l-4 22 -8 -2 2 -22 q1 -8 2 -12z" fill="#5a0d0d" opacity="0.85"/>
+  </g>
+
+  <g stroke="#0a1505" stroke-width="3.5" stroke-linejoin="round">
+    <rect x="173" y="44" width="94" height="74" rx="14" fill="url(#skullg)"/>
+    <path d="M196 116 q9 12 24 12 q15 0 24 -12 l0 16 q-6 6 -12 6 l0 -8 -6 0 0 8 -12 0 0 -8 -6 0 0 8 q-6 0 -12 -6z" fill="url(#skullg)"/>
+    <ellipse cx="195" cy="78" rx="13" ry="15" fill="#1d3a0c"/>
+    <ellipse cx="245" cy="78" rx="13" ry="15" fill="#1d3a0c"/>
+    <circle cx="197" cy="81" r="4.5" fill="#aef258" stroke="none"/>
+    <circle cx="243" cy="81" r="4.5" fill="#aef258" stroke="none"/>
+    <path d="M220 90 l-8 16 16 0 z" fill="#1d3a0c"/>
+  </g>
+
+  <g fill="#1d3a0c" stroke="#0a1505" stroke-width="1">
+    <rect x="201" y="124" width="6" height="11"/>
+    <rect x="209" y="124" width="6" height="13"/>
+    <rect x="217" y="124" width="6" height="11"/>
+    <rect x="225" y="124" width="6" height="13"/>
+    <rect x="233" y="124" width="6" height="11"/>
+  </g>
+
+  <g transform="rotate(-3 220 155)">
+    <path d="M70 138 L370 138 L360 174 L80 174 Z" fill="url(#blood)" stroke="#3a0606" stroke-width="3"/>
+    <path d="M70 138 L62 152 L70 138 Z M370 138 L378 152 L370 138 Z" fill="#3a0606"/>
+    <text x="220" y="166" text-anchor="middle" font-family="Impact, sans-serif" font-size="34" letter-spacing="3" fill="#ffe1d6" stroke="#3a0606" stroke-width="0.8">THEATER</text>
+  </g>
+
+  <text x="220" y="196" text-anchor="middle" font-family="Georgia, serif" font-style="italic" font-size="17" letter-spacing="4" fill="#d6f29a" stroke="#0a1505" stroke-width="0.6">of the</text>
+
+  <g>
+    <path d="M70 256 q4 14 9 0 M132 256 q4 18 9 0 M205 256 q5 16 10 0 M286 256 q4 20 9 0 M358 256 q4 13 9 0" fill="none" stroke="#3f8c12" stroke-width="6" stroke-linecap="round"/>
+    <text x="222" y="252" text-anchor="middle" font-family="Impact, sans-serif" font-size="76" letter-spacing="2" fill="#0a1505">UNDEAD</text>
+    <text x="220" y="250" text-anchor="middle" font-family="Impact, sans-serif" font-size="76" letter-spacing="2" fill="url(#ooze)" stroke="#0a1505" stroke-width="2.5" paint-order="stroke">UNDEAD</text>
+    <g fill="url(#ooze)" stroke="#0a1505" stroke-width="1.5">
+      <path d="M97 252 q-5 16 0 24 q5 -8 0 -24z"/>
+      <path d="M168 254 q-5 22 0 30 q5 -10 0 -30z"/>
+      <path d="M250 254 q-5 14 0 20 q5 -8 0 -20z"/>
+      <path d="M323 252 q-5 20 0 28 q5 -10 0 -28z"/>
+    </g>
+  </g>
+</svg>

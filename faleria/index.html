@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FALERIA — Wasteland Sandbox</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%23120f0c'/><rect x='4' y='3' width='8' height='3' fill='%23d8a03c'/><rect x='6' y='6' width='4' height='7' fill='%237d9c5a'/></svg>" />
+    <script type="module" crossorigin src="./assets/index-d-TGqWcg.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-DAqpgBCx.css">
+  </head>
+  <body>
+    <div id="app">
+      <header id="topbar">
+        <h1>FALERIA</h1>
+        <span class="tag">2D Post-Apocalyptic Survival &amp; Settlement Sandbox</span>
+        <span class="spacer"></span>
+        <a class="backlink" href="../index.html">← all games</a>
+        <span id="buildinfo">v1.0</span>
+      </header>
+
+      <div id="stage">
+        <canvas id="game" width="640" height="360"></canvas>
+        <div id="loading"><div class="lbox"><div class="ltitle">FALERIA</div><div class="lbar"><i></i></div><div class="lmsg">Booting…</div></div></div>
+      </div>
+
+      <section id="controls-panel">
+        <div class="cp-head">
+          <strong>CONTROLS</strong>
+          <span class="hint">Click the game window first so it takes keyboard focus.</span>
+        </div>
+        <div class="cp-grid">
+          <div class="cp-col">
+            <h4>Movement</h4>
+            <ul>
+              <li><kbd>←</kbd><kbd>→</kbd><span>Walk / run</span></li>
+              <li><kbd>↑</kbd><span>Jump (hold to jump higher)</span></li>
+              <li><kbd>↓</kbd><span>Crouch · climb down · drop through platforms</span></li>
+              <li><kbd>↑</kbd><kbd>↓</kbd><span>Climb ladders</span></li>
+              <li><kbd>Shift</kbd><span>Sprint (uses AP)</span></li>
+            </ul>
+          </div>
+          <div class="cp-col">
+            <h4>Action</h4>
+            <ul>
+              <li><kbd>1</kbd>–<kbd>9</kbd><span>Select hotbar slot</span></li>
+              <li><kbd>Space</kbd><span>Use selected item (attack / mine / place / eat)</span></li>
+              <li><kbd>Mouse</kbd><span>Aim · left-click = use at cursor</span></li>
+              <li><kbd>Wheel</kbd><span>Cycle hotbar</span></li>
+              <li><kbd>E</kbd><span>Interact (doors, benches, chests, settlers)</span></li>
+              <li><kbd>R</kbd><span>Reload weapon</span></li>
+              <li><kbd>V</kbd><span>V.A.T.S. targeting (slow-mo, costs AP)</span></li>
+              <li><kbd>G</kbd><span>Throw grenade</span></li>
+              <li><kbd>H</kbd><span>Quick-use Stimpak</span></li>
+              <li><kbd>X</kbd><span>Toggle background-wall placement mode</span></li>
+            </ul>
+          </div>
+          <div class="cp-col">
+            <h4>Menus</h4>
+            <ul>
+              <li><kbd>P</kbd><span>Pause menu</span></li>
+              <li><kbd>I</kbd><span>Inventory &amp; gear (scrap junk here)</span></li>
+              <li><kbd>C</kbd><span>Crafting</span></li>
+              <li><kbd>B</kbd><span>Build menu (structures)</span></li>
+              <li><kbd>M</kbd><span>Settlement management</span></li>
+              <li><kbd>K</kbd><span>Character: S.P.E.C.I.A.L. &amp; perks</span></li>
+              <li><kbd>J</kbd><span>Quest journal</span></li>
+              <li><kbd>Tab</kbd><span>World map</span></li>
+              <li><kbd>Esc</kbd><span>Close menu / back</span></li>
+            </ul>
+          </div>
+          <div class="cp-col">
+            <h4>System</h4>
+            <ul>
+              <li><kbd>F5</kbd><span>Save game</span></li>
+              <li><kbd>F9</kbd><span>Load last save</span></li>
+              <li><kbd>F</kbd><span>Toggle Pip-Boy lamp</span></li>
+              <li><kbd>N</kbd><span>Toggle sound</span></li>
+              <li><kbd>-</kbd><kbd>=</kbd><span>Zoom out / in</span></li>
+              <li><kbd>F3</kbd><span>Debug overlay</span></li>
+            </ul>
+            <h4>Survival</h4>
+            <ul class="tips">
+              <li>Hunger, thirst &amp; rads all tick — eat, drink purified water, use RadAway.</li>
+              <li>Sleep in a bed at night to pass time and heal.</li>
+              <li>Raiders come for your settlement. Build turrets.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+    </div>
+  </body>
+</html>

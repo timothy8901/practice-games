@@ -1,0 +1,87 @@
+<svg viewBox="0 0 440 300" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="esGold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff3c4"/>
+      <stop offset="0.45" stop-color="#f6cd55"/>
+      <stop offset="0.75" stop-color="#e0a526"/>
+      <stop offset="1" stop-color="#b07a17"/>
+    </linearGradient>
+    <linearGradient id="esGoldStory" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff7da"/>
+      <stop offset="0.5" stop-color="#f4c948"/>
+      <stop offset="1" stop-color="#c98a1c"/>
+    </linearGradient>
+    <linearGradient id="esBanner" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2f5fb0"/>
+      <stop offset="1" stop-color="#16336b"/>
+    </linearGradient>
+    <linearGradient id="esSteel" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#eef3f8"/>
+      <stop offset="0.5" stop-color="#b8c4d2"/>
+      <stop offset="1" stop-color="#7a8aa0"/>
+    </linearGradient>
+    <linearGradient id="esShield" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3a6cc0"/>
+      <stop offset="1" stop-color="#11285a"/>
+    </linearGradient>
+  </defs>
+
+  <g stroke="#0a1430" stroke-width="6" stroke-linejoin="round">
+    <path d="M138 64 L302 64 L283 92 L157 92 Z" fill="url(#esBanner)"/>
+  </g>
+  <path d="M138 64 L302 64 L283 92 L157 92 Z" fill="none" stroke="#f6cd55" stroke-width="1.6" stroke-linejoin="round" opacity="0.85" transform="translate(0,2)"/>
+  <path d="M138 64 L120 56 L120 84 L157 92 Z" fill="#16336b" stroke="#0a1430" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M302 64 L320 56 L320 84 L283 92 Z" fill="#16336b" stroke="#0a1430" stroke-width="5" stroke-linejoin="round"/>
+
+  <g stroke="#0a1430" stroke-width="2">
+    <path d="M118 40 C150 30 180 33 220 49 C260 33 290 30 322 40 C300 47 270 47 248 41 C238 50 232 54 220 56 C208 54 202 50 192 41 C170 47 140 47 118 40 Z" fill="#7c1f1f"/>
+  </g>
+  <ellipse cx="220" cy="44" rx="10" ry="9" fill="url(#esGold)" stroke="#0a1430" stroke-width="2"/>
+  <circle cx="220" cy="44" r="3.2" fill="#7c1f1f"/>
+
+  <text x="220" y="86" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="22" font-weight="bold" fill="#fff3c4" letter-spacing="3">ELDER</text>
+
+  <g>
+    <text x="220" y="172" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="78" font-weight="bold" fill="#0a1430" stroke="#0a1430" stroke-width="9" stroke-linejoin="round">Story</text>
+    <text x="220" y="172" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="78" font-weight="bold" fill="url(#esGoldStory)">Story</text>
+  </g>
+
+  <g transform="translate(146,112)">
+    <ellipse cx="0" cy="60" rx="40" ry="9" fill="#0a1430" opacity="0.35"/>
+    <path d="M0 8 L24 16 L24 42 C24 58 12 66 0 72 C-12 66 -24 58 -24 42 L-24 16 Z" fill="url(#esShield)" stroke="#0a1430" stroke-width="4.5" stroke-linejoin="round"/>
+    <path d="M0 14 L18 20 L18 41 C18 53 9 60 0 65 C-9 60 -18 53 -18 41 L-18 20 Z" fill="none" stroke="#f6cd55" stroke-width="2" stroke-linejoin="round" opacity="0.9"/>
+    <path d="M0 8 L0 72 M-24 38 L24 38" stroke="#f6cd55" stroke-width="2" opacity="0.55"/>
+    <circle cx="0" cy="38" r="6.5" fill="url(#esGold)" stroke="#0a1430" stroke-width="2"/>
+  </g>
+
+  <g transform="translate(294,112)">
+    <ellipse cx="0" cy="60" rx="40" ry="9" fill="#0a1430" opacity="0.35"/>
+    <path d="M0 8 L24 16 L24 42 C24 58 12 66 0 72 C-12 66 -24 58 -24 42 L-24 16 Z" fill="url(#esShield)" stroke="#0a1430" stroke-width="4.5" stroke-linejoin="round"/>
+    <path d="M0 5 L0 -18 M-3 4 L-3 -14 M3 4 L3 -14" stroke="#0a1430" stroke-width="6" stroke-linecap="round"/>
+    <path d="M0 5 L0 -18" stroke="url(#esSteel)" stroke-width="3.2" stroke-linecap="round"/>
+    <path d="M0 -18 L-3 -24 L0 -30 L3 -24 Z" fill="url(#esSteel)" stroke="#0a1430" stroke-width="2" stroke-linejoin="round"/>
+    <path d="M-10 6 L10 6" stroke="#0a1430" stroke-width="6" stroke-linecap="round"/>
+    <path d="M-10 6 L10 6" stroke="url(#esGold)" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="0" cy="38" r="6" fill="url(#esGold)" stroke="#0a1430" stroke-width="2"/>
+  </g>
+
+  <g stroke="#0a1430" stroke-width="2.5" stroke-linejoin="round">
+    <rect x="160" y="208" width="120" height="40" rx="6" fill="url(#esBanner)"/>
+  </g>
+  <rect x="165" y="213" width="110" height="30" rx="4" fill="none" stroke="#f6cd55" stroke-width="1.4" opacity="0.85"/>
+  <text x="220" y="237" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="26" font-weight="bold" fill="#f6cd55" letter-spacing="6">RPG</text>
+
+  <g fill="#1a1f2e" transform="translate(0,0)">
+    <path d="M120 246 L160 228 L160 248 Z" fill="#8a5a0e" stroke="#0a1430" stroke-width="2" stroke-linejoin="round"/>
+    <path d="M320 246 L280 228 L280 248 Z" fill="#8a5a0e" stroke="#0a1430" stroke-width="2" stroke-linejoin="round"/>
+  </g>
+
+  <g opacity="0.92">
+    <path d="M82 196 C70 190 64 178 70 166 C66 178 78 182 84 188 C86 178 100 176 104 184 C100 178 92 174 88 168 C100 170 110 180 108 192 C118 186 130 192 128 204 C126 196 116 196 110 200 C116 204 116 214 108 216 C112 208 104 204 98 206 C100 198 92 192 86 196 C90 200 88 208 82 208 C86 202 80 198 76 200 C80 194 84 196 82 196 Z" fill="#7c1f1f" stroke="#0a1430" stroke-width="1.6" stroke-linejoin="round"/>
+    <circle cx="78" cy="180" r="1.8" fill="#f6cd55"/>
+  </g>
+  <g opacity="0.92" transform="translate(440,0) scale(-1,1)">
+    <path d="M82 196 C70 190 64 178 70 166 C66 178 78 182 84 188 C86 178 100 176 104 184 C100 178 92 174 88 168 C100 170 110 180 108 192 C118 186 130 192 128 204 C126 196 116 196 110 200 C116 204 116 214 108 216 C112 208 104 204 98 206 C100 198 92 192 86 196 C90 200 88 208 82 208 C86 202 80 198 76 200 C80 194 84 196 82 196 Z" fill="#7c1f1f" stroke="#0a1430" stroke-width="1.6" stroke-linejoin="round"/>
+    <circle cx="78" cy="180" r="1.8" fill="#f6cd55"/>
+  </g>
+</svg>

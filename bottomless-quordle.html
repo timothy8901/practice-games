@@ -1,144 +1,421 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Endless Word Twist</title>
-    <!-- Load Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>Bottomless Quordle</title>
     <style>
-        /* Custom styles for game tiles and keyboard */
-        body {
-            font-family: 'Inter', sans-serif;
+        /* ===================== THEME TOKENS ===================== */
+        :root {
+            --bg: #f7f8fb;
+            --bg-grad-1: #eef1f7;
+            --bg-grad-2: #f7f8fb;
+            --panel: #ffffff;
+            --panel-2: #f0f2f7;
+            --border: #d3d6de;
+            --tile-border: #c4c8d2;
+            --tile-border-filled: #8d93a3;
+            --text: #1a1c22;
+            --text-dim: #6b7280;
+            --text-on-color: #ffffff;
+            --correct: #2fa35a;
+            --present: #d9a31f;
+            --absent: #8a8f9c;
+            --key-bg: #e3e6ee;
+            --key-text: #1a1c22;
+            --accent: #5b6cff;
+            --accent-soft: rgba(91,108,255,0.14);
+            --shadow: 0 10px 30px rgba(20,25,45,0.10);
+            --shadow-sm: 0 2px 6px rgba(20,25,45,0.08);
         }
-        .tile {
-            /* Use aspect-ratio for responsive square tiles */
-            aspect-ratio: 1 / 1;
-            width: 100%;
-            display: inline-flex;
-            justify-content: center;
+        html.dark {
+            --bg: #0f1115;
+            --bg-grad-1: #161a22;
+            --bg-grad-2: #0d0f14;
+            --panel: #181b22;
+            --panel-2: #1f232c;
+            --border: #2c313c;
+            --tile-border: #3a4150;
+            --tile-border-filled: #5b6473;
+            --text: #f3f4f6;
+            --text-dim: #9aa1b1;
+            --text-on-color: #ffffff;
+            --correct: #2fae5e;
+            --present: #d6a623;
+            --absent: #4a5060;
+            --key-bg: #343b48;
+            --key-text: #f3f4f6;
+            --accent: #7d8bff;
+            --accent-soft: rgba(125,139,255,0.18);
+            --shadow: 0 14px 40px rgba(0,0,0,0.45);
+            --shadow-sm: 0 2px 8px rgba(0,0,0,0.35);
+        }
+
+        * { box-sizing: border-box; }
+        html, body { height: 100%; }
+        body {
+            margin: 0;
+            font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: radial-gradient(1200px 700px at 50% -10%, var(--bg-grad-1), var(--bg-grad-2)) fixed;
+            color: var(--text);
+            display: flex;
+            flex-direction: column;
             align-items: center;
-            font-size: 2rem;
+            min-height: 100vh;
+            padding: 10px 10px 24px;
+            transition: background-color .3s ease, color .3s ease;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .wrap { width: 100%; max-width: 560px; }
+
+        /* ===================== HEADER ===================== */
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 6px 4px 12px;
+        }
+        .title {
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            font-size: clamp(1.25rem, 5vw, 1.8rem);
+            line-height: 1;
+        }
+        .title .dot { color: var(--accent); }
+        .title .sub {
+            font-size: .62rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: .15em;
+            color: var(--text-dim);
+        }
+        .header-actions { display: flex; align-items: center; gap: 8px; }
+        .icon-btn {
+            border: 1px solid var(--border);
+            background: var(--panel);
+            color: var(--text);
+            width: 40px; height: 40px;
+            border-radius: 12px;
+            font-size: 1.1rem;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: var(--shadow-sm);
+            transition: transform .12s ease, background-color .2s ease, border-color .2s ease;
+        }
+        .icon-btn:hover { border-color: var(--accent); }
+        .icon-btn:active { transform: scale(0.9); }
+
+        /* ===================== STATS BAR ===================== */
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            margin-bottom: 14px;
+        }
+        .stat {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 8px 6px;
+            text-align: center;
+            box-shadow: var(--shadow-sm);
+        }
+        .stat .num {
+            font-size: clamp(1.05rem, 4.5vw, 1.35rem);
+            font-weight: 800;
+            line-height: 1.1;
+            letter-spacing: -0.01em;
+        }
+        .stat .lbl {
+            font-size: .58rem;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            color: var(--text-dim);
+            margin-top: 2px;
+            font-weight: 600;
+        }
+        .stat.pulse .num { animation: numPulse .5s ease; }
+        @keyframes numPulse {
+            0% { transform: scale(1); }
+            40% { transform: scale(1.3); color: var(--correct); }
+            100% { transform: scale(1); }
+        }
+
+        /* ===================== BOARDS ===================== */
+        #boards {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+        .quad {
+            position: relative;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 10px;
+            box-shadow: var(--shadow-sm);
+            transition: box-shadow .3s ease, border-color .3s ease, transform .2s ease;
+            overflow: hidden;
+        }
+        .quad-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            min-height: 16px;
+        }
+        .quad-num {
+            font-size: .6rem;
             font-weight: 700;
             text-transform: uppercase;
+            letter-spacing: .1em;
+            color: var(--text-dim);
+        }
+        .quad-word {
+            font-size: .62rem;
+            font-weight: 800;
+            letter-spacing: .12em;
+            color: var(--correct);
+            opacity: 0;
+            transform: translateY(-3px);
+            transition: opacity .3s ease, transform .3s ease;
+        }
+        .quad.solved .quad-word { opacity: 1; transform: translateY(0); }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            grid-auto-rows: 1fr;
+            gap: 5px;
+        }
+        .quad.solved {
+            border-color: var(--correct);
+            box-shadow: 0 0 0 2px var(--correct), var(--shadow-sm);
+        }
+        .quad.dim { opacity: .55; }
+
+        /* ===================== TILES ===================== */
+        .tile {
+            position: relative;
+            aspect-ratio: 1 / 1;
+            width: 100%;
+            border-radius: 7px;
+            perspective: 600px;
+            background: transparent;
+        }
+        .tile-inner {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: clamp(0.95rem, 4.6vw, 1.7rem);
+            font-weight: 800;
+            text-transform: uppercase;
             user-select: none;
-            border: 2px solid #3f3f46; /* border-gray-700 */
-            color: #f3f4f6; /* text-gray-100 */
-            transition: all 0.3s ease;
+            border: 2px solid var(--tile-border);
+            border-radius: 7px;
+            color: var(--text);
+            background: transparent;
+            transform-style: preserve-3d;
+            transition: transform .2s ease, border-color .15s ease, background-color .15s ease;
         }
-        .tile-filled {
-            border-color: #52525b; /* border-gray-600 */
-            transform: scale(1.02);
+        .tile.filled .tile-inner {
+            border-color: var(--tile-border-filled);
+            animation: pop .12s ease;
         }
-        .tile-correct {
-            background-color: #16a34a; /* bg-green-600 */
-            border-color: #16a34a;
-            color: white;
-            transform: rotateX(360deg);
-            transition: all 0.5s ease;
+        @keyframes pop {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.08); }
+            100% { transform: scale(1); }
         }
-        .tile-present {
-            background-color: #eab308; /* bg-yellow-500 */
-            border-color: #eab308;
-            color: white;
-            transform: rotateX(360deg);
-            transition: all 0.5s ease;
+        /* Flip reveal */
+        .tile.flip .tile-inner { animation: flipReveal .55s ease forwards; }
+        @keyframes flipReveal {
+            0%   { transform: rotateX(0deg); }
+            49%  { transform: rotateX(90deg); }
+            50%  { transform: rotateX(90deg); }
+            100% { transform: rotateX(0deg); }
         }
-        .tile-absent {
-            background-color: #3f3f46; /* bg-gray-700 */
-            border-color: #3f3f46;
-            color: #d1d5db; /* text-gray-300 */
-            opacity: 0.8;
-            transition: all 0.5s ease;
+        .tile-inner.correct { background: var(--correct); border-color: var(--correct); color: var(--text-on-color); }
+        .tile-inner.present { background: var(--present); border-color: var(--present); color: var(--text-on-color); }
+        .tile-inner.absent  { background: var(--absent);  border-color: var(--absent);  color: var(--text-on-color); }
+
+        /* Solve dance */
+        .tile.dance .tile-inner { animation: dance .55s ease; }
+        @keyframes dance {
+            0%   { transform: translateY(0) scale(1); }
+            30%  { transform: translateY(-10px) scale(1.06); }
+            60%  { transform: translateY(2px) scale(0.98); }
+            100% { transform: translateY(0) scale(1); }
+        }
+
+        /* Shake (invalid word) */
+        .shake { animation: shake .45s cubic-bezier(.36,.07,.19,.97); }
+        @keyframes shake {
+            10%, 90% { transform: translateX(-1px); }
+            20%, 80% { transform: translateX(2px); }
+            30%, 50%, 70% { transform: translateX(-4px); }
+            40%, 60% { transform: translateX(4px); }
+        }
+
+        /* ===================== KEYBOARD ===================== */
+        #keyboard { margin-top: 4px; touch-action: manipulation; }
+        .krow {
+            display: flex;
+            justify-content: center;
+            gap: 6px;
+            margin-bottom: 7px;
         }
         .key {
-            transition: background-color 0.2s ease, transform 0.1s ease;
+            flex: 1 1 0;
+            min-width: 0;
+            height: 52px;
+            border: none;
+            border-radius: 9px;
+            background: var(--key-bg);
+            color: var(--key-text);
+            font-weight: 700;
+            font-size: clamp(.78rem, 3.6vw, 1rem);
+            text-transform: uppercase;
+            cursor: pointer;
+            box-shadow: var(--shadow-sm);
+            transition: transform .08s ease, background-color .25s ease, color .25s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 2px;
         }
-        .key:active {
-            transform: scale(0.95);
-        }
-        .key-correct { background-color: #16a34a !important; }
-        .key-present { background-color: #eab308 !important; }
-        .key-absent { background-color: #3f3f46 !important; }
+        .key.wide { flex: 1.6 1 0; font-size: clamp(.6rem,2.8vw,.8rem); }
+        .key:active, .key.pressed { transform: scale(0.92) translateY(1px); }
+        .key.correct { background: var(--correct); color: var(--text-on-color); }
+        .key.present { background: var(--present); color: var(--text-on-color); }
+        .key.absent  { background: var(--absent);  color: var(--text-on-color); }
 
-        /* Animation for solved quadrant */
-        @keyframes flashGreen {
-            0% { box-shadow: 0 0 0 0px rgba(22, 163, 74, 0.7); }
-            50% { box-shadow: 0 0 0 8px rgba(22, 163, 74, 0.3); }
-            100% { box-shadow: 0 0 0 0px rgba(22, 163, 74, 0.0); }
-        }
-        .quad-solved {
-            animation: flashGreen 1.5s ease;
-        }
-
-        /* Message popup */
-        #message-popup {
-            transition: opacity 0.3s ease, transform 0.3s ease;
-            transform: translateY(-100px);
+        /* ===================== TOAST ===================== */
+        #toast {
+            position: fixed;
+            top: 18px;
+            left: 50%;
+            transform: translate(-50%, -120%);
+            background: #d23b46;
+            color: #fff;
+            padding: 11px 18px;
+            border-radius: 12px;
+            font-weight: 700;
+            font-size: .9rem;
+            box-shadow: var(--shadow);
             opacity: 0;
+            pointer-events: none;
+            transition: transform .3s cubic-bezier(.2,.9,.3,1.2), opacity .3s ease;
+            z-index: 50;
+            text-align: center;
+            max-width: 90vw;
         }
-        #message-popup.show {
-            transform: translateY(0);
-            opacity: 1;
+        #toast.show { transform: translate(-50%, 0); opacity: 1; }
+        #toast.good { background: var(--correct); }
+
+        /* ===================== CONFETTI ===================== */
+        #confetti {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 60;
+            overflow: hidden;
+        }
+        .confetti-piece {
+            position: absolute;
+            width: 9px;
+            height: 14px;
+            border-radius: 2px;
+            will-change: transform, opacity;
+            animation: fall linear forwards;
+        }
+        @keyframes fall {
+            0%   { transform: translateY(-10vh) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(110vh) rotate(720deg); opacity: 0.9; }
         }
 
-        /* Game Over screen */
-        #game-over-screen {
-            transition: opacity 0.5s ease;
+        .footer-note {
+            text-align: center;
+            color: var(--text-dim);
+            font-size: .68rem;
+            margin-top: 14px;
+            letter-spacing: .02em;
+        }
+
+        @media (max-width: 380px) {
+            .stat .lbl { font-size: .5rem; }
+            .key { height: 46px; }
         }
     </style>
 </head>
-<body class="bg-gray-900 text-gray-100 flex flex-col items-center justify-center min-h-screen p-2">
+<body>
+    <div class="wrap">
+        <!-- Header -->
+        <header>
+            <div class="title">
+                <span>Bottomless<span class="dot">.</span></span>
+                <span class="sub">Quordle</span>
+            </div>
+            <div class="header-actions">
+                <button id="theme-btn" class="icon-btn" title="Toggle theme" aria-label="Toggle theme">🌙</button>
+                <button id="reset-btn" class="icon-btn" title="Reset stats" aria-label="Reset stats">↺</button>
+            </div>
+        </header>
 
-    <!-- Header -->
-    <header class="w-full max-w-xl mx-auto flex justify-between items-center p-2 mb-2">
-        <h1 class="text-2xl md:text-3xl font-bold text-white">Endless Word Twist</h1>
-        <div class="text-right">
-            <div class="text-lg font-semibold">Score: <span id="score">0</span></div>
-            <div class="text-sm text-gray-400">Guess: <span id="guess-count">1</span> / 8</div>
+        <!-- Stats -->
+        <div class="stats">
+            <div class="stat" id="stat-streak"><div class="num">0</div><div class="lbl">Streak</div></div>
+            <div class="stat" id="stat-best"><div class="num">0</div><div class="lbl">Best</div></div>
+            <div class="stat" id="stat-solved"><div class="num">0</div><div class="lbl">Solved</div></div>
+            <div class="stat" id="stat-avg"><div class="num">—</div><div class="lbl">Avg Guess</div></div>
         </div>
-    </header>
 
-    <!-- Game Board -->
-    <main id="game-board" class="w-full max-w-xl grid grid-cols-2 gap-2 bg-gray-700 rounded-md overflow-hidden">
-        <!-- Quadrant 0 -->
-        <div id="quad-0" class="grid grid-cols-5 gap-1 bg-gray-900 p-2"></div>
-        <!-- Quadrant 1 -->
-        <div id="quad-1" class="grid grid-cols-5 gap-1 bg-gray-900 p-2"></div>
-        <!-- Quadrant 2 -->
-        <div id="quad-2" class="grid grid-cols-5 gap-1 bg-gray-900 p-2"></div>
-        <!-- Quadrant 3 -->
-        <div id="quad-3" class="grid grid-cols-5 gap-1 bg-gray-900 p-2"></div>
-    </main>
+        <!-- Boards -->
+        <main id="boards">
+            <div class="quad" id="quad-0">
+                <div class="quad-head"><span class="quad-num">Board 1</span><span class="quad-word"></span></div>
+                <div class="grid" data-grid="0"></div>
+            </div>
+            <div class="quad" id="quad-1">
+                <div class="quad-head"><span class="quad-num">Board 2</span><span class="quad-word"></span></div>
+                <div class="grid" data-grid="1"></div>
+            </div>
+            <div class="quad" id="quad-2">
+                <div class="quad-head"><span class="quad-num">Board 3</span><span class="quad-word"></span></div>
+                <div class="grid" data-grid="2"></div>
+            </div>
+            <div class="quad" id="quad-3">
+                <div class="quad-head"><span class="quad-num">Board 4</span><span class="quad-word"></span></div>
+                <div class="grid" data-grid="3"></div>
+            </div>
+        </main>
 
-    <!-- Keyboard -->
-    <div id="keyboard" class="w-full max-w-xl mx-auto mt-4">
-        <!-- Keys will be dynamically generated -->
+        <!-- Keyboard -->
+        <div id="keyboard"></div>
+
+        <div class="footer-note">Solve all 4 to start a fresh round. It never ends.</div>
     </div>
 
-    <!-- Message Popup -->
-    <div id="message-popup" class="fixed top-10 p-3 rounded-md shadow-lg bg-red-600 text-white font-semibold">
-        Not in word list!
-    </div>
-
-    <!-- Game Over Screen -->
-    <div id="game-over-screen" class="fixed inset-0 bg-gray-900 bg-opacity-90 flex flex-col items-center justify-center hidden opacity-0">
-        <h2 class="text-4xl font-bold text-white mb-4">Game Over!</h2>
-        <p class="text-2xl text-gray-300 mb-6">Final Score: <span id="final-score">0</span></p>
-        <button id="play-again-btn" class="px-6 py-3 bg-green-600 text-white text-lg font-bold rounded-md shadow-lg hover:bg-green-700 transition-colors">
-            Play Again
-        </button>
-    </div>
+    <div id="toast"></div>
+    <div id="confetti"></div>
 
     <script>
-        // --- WORD LISTS ---
-        // A smaller list for solutions to make the game playable
+        // ===================== WORD LISTS =====================
         const SOLUTION_WORDS = [
             "APPLE", "BEACH", "BRAIN", "BREAD", "BRUSH", "CHAIR", "CHEST", "CHORD", "CLICK", "CLOCK",
             "CLOUD", "DANCE", "DIARY", "DREAM", "DRINK", "EARTH", "FLUTE", "GHOST", "GRAPE", "GREEN",
             "HAPPY", "HEART", "HOUSE", "JUICE", "LIGHT", "LUCKY", "MAGIC", "MONEY", "MUSIC", "NIGHT",
-            "OCEAN", "PAPER", "PARTY", "PHONE", "PIZZA", "PLANT", "QUIET", "RAINB", "RIVER", "ROBOT",
-            "ROCKY", "SHARK", "SHEEP", "SKATE", "SLEEP", "SMILE", "SOUND", "SPACE", "SPORT", "SQUARE",
+            "OCEAN", "PAPER", "PARTY", "PHONE", "PIZZA", "PLANT", "QUIET", "RAINY", "RIVER", "ROBOT",
+            "ROCKY", "SHARK", "SHEEP", "SKATE", "SLEEP", "SMILE", "SOUND", "SPACE", "SPORT", "SCORE",
             "STARS", "STORM", "SUNNY", "SWEET", "TABLE", "TIGER", "TRAIN", "WATER", "WHALE", "WHITE",
             "WOMAN", "WORLD", "YACHT", "ZEBRA", "ALIVE", "BLEND", "CARRY", "DATES", "EAGLE", "FABLE",
             "GIANT", "HOTEL", "IMAGE", "JOKER", "KOALA", "LEMON", "MANGO", "NINJA", "OLIVE", "PILOT",
@@ -146,7 +423,7 @@
         ];
 
         // VALID_WORDS will be populated from embedded solutions and optionally an external/local wordlist.
-        let VALID_WORDS = Array.from(new Set(SOLUTION_WORDS.map(w => w.toUpperCase())));
+        let VALID_WORDS = new Set(SOLUTION_WORDS.map(w => w.toUpperCase()));
 
         // Try to load an external wordlist (remote first, then local files) and merge 5-letter words.
         async function loadWordlist() {
@@ -164,375 +441,563 @@
                         .split(/\r?\n/)
                         .map(w => w.trim().toUpperCase())
                         .filter(Boolean)
-                        .filter(w => w.length === 5); // keep 5-letter words for this game
+                        .filter(w => w.length === 5 && /^[A-Z]+$/.test(w));
                     if (words.length > 0) {
-                        const merged = new Set([...VALID_WORDS, ...words]);
-                        VALID_WORDS = Array.from(merged);
-                        console.log('Loaded wordlist from', url, 'words:', VALID_WORDS.length);
+                        for (const w of words) VALID_WORDS.add(w);
+                        console.log('Loaded wordlist from', url, 'words:', VALID_WORDS.size);
                         return;
                     }
                 } catch (err) {
                     console.warn('Could not load wordlist from', url, err);
-                    // try next candidate
                 }
             }
             console.warn('No external wordlist loaded; using embedded SOLUTION_WORDS only.');
         }
 
+        // ===================== CONSTANTS =====================
+        const NUM_BOARDS = 4;
+        const NUM_ROWS = 8;
+        const WORD_LEN = 5;
+        const STATS_KEY = 'bottomlessQuordleStats';
+        const THEME_KEY = 'bottomlessQuordleTheme';
 
-        // --- GAME STATE ---
-        let targetWords = ["", "", "", ""];
-        let currentGuessNumber = 1; // Tracks 1 to 10
-        let totalScore = 0;
+        // ===================== GAME STATE =====================
+        let targetWords = [];
+        let boardSolved = [false, false, false, false];
+        let boardLetterStates = [{}, {}, {}, {}]; // per-board letter status
+        let currentRow = 0;          // active row index (0..NUM_ROWS-1)
         let currentGuess = "";
-        let isGameOver = false;
-        let isProcessing = false; // Prevent spamming Enter
-        let letterStates = {}; // {'A': 'correct', 'B': 'present', 'C': 'absent'}
+        let isProcessing = false;
+        let roundOver = false;       // true when all rows used without solving everything
 
-        // --- DOM Elements ---
-        const quadrants = [
-            document.getElementById('quad-0'),
-            document.getElementById('quad-1'),
-            document.getElementById('quad-2'),
-            document.getElementById('quad-3'),
-        ];
+        let stats = {
+            streak: 0,
+            bestStreak: 0,
+            totalSolved: 0,
+            totalGuessesOnSolved: 0  // sum of guesses-to-solve, for average
+        };
+
+        // ===================== DOM =====================
+        const boardEls = [0,1,2,3].map(i => document.getElementById('quad-' + i));
+        const gridEls = Array.from(document.querySelectorAll('.grid'));
         const keyboardDiv = document.getElementById('keyboard');
-        const scoreEl = document.getElementById('score');
-        const guessCountEl = document.getElementById('guess-count');
-        const messagePopup = document.getElementById('message-popup');
-        const gameOverScreen = document.getElementById('game-over-screen');
-        const finalScoreEl = document.getElementById('final-score');
-        const playAgainBtn = document.getElementById('play-again-btn');
+        const toastEl = document.getElementById('toast');
+        const confettiEl = document.getElementById('confetti');
+        const themeBtn = document.getElementById('theme-btn');
+        const resetBtn = document.getElementById('reset-btn');
 
-        // --- KEYBOARD ---
+        const statEls = {
+            streak: document.querySelector('#stat-streak .num'),
+            best: document.querySelector('#stat-best .num'),
+            solved: document.querySelector('#stat-solved .num'),
+            avg: document.querySelector('#stat-avg .num')
+        };
+
+        // ===================== AUDIO (WebAudio, fail-safe) =====================
+        let audioCtx = null;
+        function ensureAudio() {
+            try {
+                if (!audioCtx) {
+                    const AC = window.AudioContext || window.webkitAudioContext;
+                    if (AC) audioCtx = new AC();
+                }
+                if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+            } catch (e) { /* ignore */ }
+        }
+        function beep(freq, dur, type, vol) {
+            try {
+                if (!audioCtx) return;
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = type || 'sine';
+                osc.frequency.value = freq;
+                gain.gain.value = 0.0001;
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                const t = audioCtx.currentTime;
+                const v = vol == null ? 0.08 : vol;
+                gain.gain.setValueAtTime(0.0001, t);
+                gain.gain.exponentialRampToValueAtTime(v, t + 0.01);
+                gain.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+                osc.start(t);
+                osc.stop(t + dur + 0.02);
+            } catch (e) { /* ignore */ }
+        }
+        const Sound = {
+            tap()    { beep(330, 0.05, 'square', 0.04); },
+            reveal() { beep(440, 0.06, 'sine', 0.05); },
+            solve()  {
+                try {
+                    [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => beep(f, 0.16, 'triangle', 0.07), i * 90));
+                } catch (e) { /* ignore */ }
+            },
+            error()  { beep(160, 0.18, 'sawtooth', 0.05); }
+        };
+
+        // ===================== KEYBOARD LAYOUT =====================
         const keyboardLayout = [
             "Q W E R T Y U I O P",
             "A S D F G H J K L",
             "ENTER Z X C V B N M BACK"
         ];
 
-        // --- INITIALIZATION ---
+        // ===================== INIT =====================
         async function init() {
-            // Load dictionary (if available) before starting
-            try {
-                await loadWordlist();
-            } catch (e) {
-                console.warn('loadWordlist failed:', e);
-            }
-            createKeyboard();
-            createGrids();
-            startGame();
-            addEventListeners();
+            loadTheme();
+            loadStats();
+            renderStats();
+            buildKeyboard();
+            buildGrids();
+            attachEvents();
+            startRound();
+            // Load dictionary in background; gameplay works with embedded words immediately.
+            try { await loadWordlist(); } catch (e) { console.warn('loadWordlist failed:', e); }
         }
 
-        function createGrids() {
-            quadrants.forEach((quad) => {
-                quad.innerHTML = '';
-                for (let i = 0; i < 8 * 5; i++) { // 8 rows, 5 cols
+        function buildGrids() {
+            gridEls.forEach(grid => {
+                grid.innerHTML = '';
+                for (let i = 0; i < NUM_ROWS * WORD_LEN; i++) {
                     const tile = document.createElement('div');
                     tile.className = 'tile';
-                    quad.appendChild(tile);
+                    const inner = document.createElement('div');
+                    inner.className = 'tile-inner';
+                    tile.appendChild(inner);
+                    grid.appendChild(tile);
                 }
             });
         }
 
-        function createKeyboard() {
+        function buildKeyboard() {
+            keyboardDiv.innerHTML = '';
             keyboardLayout.forEach(row => {
                 const rowDiv = document.createElement('div');
-                rowDiv.className = 'flex justify-center gap-1 mb-1';
+                rowDiv.className = 'krow';
                 row.split(' ').forEach(key => {
-                    const keyBtn = document.createElement('button');
-                    keyBtn.className = 'key h-12 rounded-md font-bold uppercase p-2 bg-gray-600 text-white flex-1';
-                    keyBtn.textContent = key;
-                    keyBtn.dataset.key = key;
-                    if (key === 'ENTER') keyBtn.classList.add('flex-grow-[1.5]');
-                    if (key === 'BACK') keyBtn.classList.add('flex-grow-[1.5]');
-                    rowDiv.appendChild(keyBtn);
+                    const btn = document.createElement('button');
+                    btn.className = 'key';
+                    btn.type = 'button';
+                    btn.dataset.key = key;
+                    if (key === 'ENTER') { btn.classList.add('wide'); btn.textContent = 'Enter'; }
+                    else if (key === 'BACK') { btn.classList.add('wide'); btn.textContent = '⌫'; }
+                    else { btn.textContent = key; }
+                    rowDiv.appendChild(btn);
                 });
                 keyboardDiv.appendChild(rowDiv);
             });
         }
 
-        function addEventListeners() {
-            // On-screen keyboard
+        function attachEvents() {
             keyboardDiv.addEventListener('click', (e) => {
-                if (isProcessing || isGameOver) return;
-                const key = e.target.closest('button')?.dataset.key;
-                if (!key) return;
-
-                if (key === 'ENTER') {
-                    submitGuess();
-                } else if (key === 'BACK') {
-                    deleteLetter();
-                } else {
-                    addLetter(key);
-                }
+                const btn = e.target.closest('button');
+                if (!btn) return;
+                ensureAudio();
+                handleKey(btn.dataset.key);
             });
 
-            // Physical keyboard
             document.addEventListener('keydown', (e) => {
-                if (isProcessing || isGameOver) return;
-                if (e.key === 'Enter') {
-                    submitGuess();
-                } else if (e.key === 'Backspace') {
-                    deleteLetter();
-                } else if (e.key.match(/^[a-zA-Z]$/)) {
-                    addLetter(e.key.toUpperCase());
-                }
+                if (e.metaKey || e.ctrlKey || e.altKey) return;
+                ensureAudio();
+                if (e.key === 'Enter') { e.preventDefault(); handleKey('ENTER'); }
+                else if (e.key === 'Backspace') { e.preventDefault(); handleKey('BACK'); }
+                else if (/^[a-zA-Z]$/.test(e.key)) { handleKey(e.key.toUpperCase()); }
             });
 
-            // Play Again
-            playAgainBtn.addEventListener('click', startGame);
+            themeBtn.addEventListener('click', toggleTheme);
+            resetBtn.addEventListener('click', () => {
+                if (confirm('Reset all stats?')) {
+                    stats = { streak: 0, bestStreak: 0, totalSolved: 0, totalGuessesOnSolved: 0 };
+                    saveStats();
+                    renderStats();
+                    startRound();
+                }
+            });
         }
 
-        // --- GAME LOGIC ---
-        function startGame() {
-            // Reset game state
-            targetWords = [getNewWord(), getNewWord(), getNewWord(), getNewWord()];
-            currentGuessNumber = 1;
-            totalScore = 0;
-            currentGuess = "";
-            isGameOver = false;
-            isProcessing = false;
-            letterStates = {};
+        function handleKey(key) {
+            if (isProcessing) return;
+            if (roundOver) { startRound(); return; }
+            if (key === 'ENTER') submitGuess();
+            else if (key === 'BACK') deleteLetter();
+            else if (/^[A-Z]$/.test(key)) addLetter(key);
+            flashKey(key);
+        }
 
-            // Reset UI
-            createGrids(); // Clears all tiles
-            updateScoreUI();
-            updateGuessCountUI();
+        function flashKey(key) {
+            const btn = keyboardDiv.querySelector('button[data-key="' + key + '"]');
+            if (!btn) return;
+            btn.classList.add('pressed');
+            setTimeout(() => btn.classList.remove('pressed'), 110);
+        }
+
+        // ===================== ROUND CONTROL =====================
+        function startRound() {
+            targetWords = [getNewWord(), getNewWord(), getNewWord(), getNewWord()];
+            boardSolved = [false, false, false, false];
+            boardLetterStates = [{}, {}, {}, {}];
+            currentRow = 0;
+            currentGuess = "";
+            isProcessing = false;
+            roundOver = false;
+
+            buildGrids();
+            boardEls.forEach(el => {
+                el.classList.remove('solved', 'dim');
+                el.querySelector('.quad-word').textContent = '';
+            });
             resetKeyboardUI();
-            
-            // Hide Game Over screen
-            gameOverScreen.classList.add('hidden', 'opacity-0');
         }
 
         function getNewWord() {
             return SOLUTION_WORDS[Math.floor(Math.random() * SOLUTION_WORDS.length)];
         }
 
+        // ===================== INPUT =====================
         function addLetter(letter) {
-            if (currentGuess.length < 5) {
+            if (currentGuess.length < WORD_LEN) {
                 currentGuess += letter;
-                updateCurrentRowUI();
+                renderActiveRow(true);
+                Sound.tap();
             }
         }
 
         function deleteLetter() {
-            currentGuess = currentGuess.slice(0, -1);
-            updateCurrentRowUI();
+            if (currentGuess.length > 0) {
+                currentGuess = currentGuess.slice(0, -1);
+                renderActiveRow(false);
+                Sound.tap();
+            }
         }
 
-        function updateCurrentRowUI() {
-            // Update the "active" row in all 4 grids
-            const guessRowIndex = currentGuessNumber - 1;
-            for (let i = 0; i < 4; i++) {
-                const quad = quadrants[i];
-                for (let j = 0; j < 5; j++) {
-                    const tile = quad.children[guessRowIndex * 5 + j];
+        function renderActiveRow(justAdded) {
+            for (let b = 0; b < NUM_BOARDS; b++) {
+                if (boardSolved[b]) continue;
+                const grid = gridEls[b];
+                for (let c = 0; c < WORD_LEN; c++) {
+                    const tile = grid.children[currentRow * WORD_LEN + c];
+                    if (!tile) continue;
+                    const inner = tile.firstChild;
+                    const ch = currentGuess[c] || '';
+                    inner.textContent = ch;
+                    if (ch) tile.classList.add('filled');
+                    else tile.classList.remove('filled');
+                }
+            }
+            // Pop animation only on the newly added tile (board 0 reference is fine; class is on all)
+            if (justAdded) {
+                const idx = currentGuess.length - 1;
+                for (let b = 0; b < NUM_BOARDS; b++) {
+                    if (boardSolved[b]) continue;
+                    const tile = gridEls[b].children[currentRow * WORD_LEN + idx];
                     if (tile) {
-                        tile.textContent = currentGuess[j] || '';
-                        if (currentGuess[j]) {
-                            tile.classList.add('tile-filled');
-                        } else {
-                            tile.classList.remove('tile-filled');
-                        }
+                        tile.classList.remove('filled');
+                        void tile.offsetWidth;
+                        tile.classList.add('filled');
                     }
                 }
             }
         }
 
+        // ===================== SUBMIT =====================
         async function submitGuess() {
-            if (currentGuess.length !== 5) {
-                showMessage("Word must be 5 letters!");
+            if (isProcessing) return;
+            if (currentGuess.length !== WORD_LEN) {
+                shakeActiveRow();
+                showToast('Not enough letters');
+                Sound.error();
+                return;
+            }
+            if (!VALID_WORDS.has(currentGuess)) {
+                shakeActiveRow();
+                showToast('Not in word list');
+                Sound.error();
                 return;
             }
 
-            if (!VALID_WORDS.includes(currentGuess)) {
-                showMessage("Not in word list!");
-                return;
-            }
-
-            if (isProcessing || isGameOver) return;
             isProcessing = true;
-
             const guess = currentGuess;
-            const guessRow = currentGuessNumber - 1;
-            const pointsThisTurn = 11 - currentGuessNumber;
-            let solvedQuadrants = [];
-            
-            const currentLetterStates = {};
+            const rowIndex = currentRow;
+            const newlySolved = [];
 
-            // Process each quadrant
-            for (let i = 0; i < 4; i++) {
-                const target = targetWords[i];
-                const feedback = getGuessFeedback(guess, target);
-                
-                // Update grid UI
-                await updateGridRow(i, guessRow, guess, feedback);
-                
-                // Check for solve
-                if (guess === target) {
-                    solvedQuadrants.push(i);
-                    totalScore += pointsThisTurn;
-                }
-
-                // Update keyboard letter states (global)
-                feedback.forEach((status, index) => {
-                    const letter = guess[index];
-                    updateLetterState(letter, status);
-                });
+            // Compute feedback and animate each board (boards animate together; cols staggered)
+            const tasks = [];
+            for (let b = 0; b < NUM_BOARDS; b++) {
+                if (boardSolved[b]) continue;
+                const feedback = getGuessFeedback(guess, targetWords[b]);
+                // Update per-board keyboard letter states
+                feedback.forEach((status, i) => updateLetterState(b, guess[i], status));
+                tasks.push(revealRow(b, rowIndex, guess, feedback));
+                if (guess === targetWords[b]) newlySolved.push(b);
             }
+            await Promise.all(tasks);
 
-            // Update UI after processing
             updateKeyboardUI();
-            updateScoreUI();
-            
-            // Handle solved quadrants
-            if (solvedQuadrants.length > 0) {
-                await handleSolvedQuadrants(solvedQuadrants);
+
+            // Handle newly solved boards
+            for (const b of newlySolved) {
+                boardSolved[b] = true;
+                markBoardSolved(b, targetWords[b]);
+                // stats: record a solve (guesses used = rowIndex + 1)
+                stats.totalSolved += 1;
+                stats.totalGuessesOnSolved += (rowIndex + 1);
             }
 
-            // Move to next guess
-            currentGuessNumber++;
-            currentGuess = "";
-            updateGuessCountUI();
+            if (newlySolved.length > 0) {
+                Sound.solve();
+                renderStats(true);
+                saveStats();
+            }
 
-            // Check for game over
-            if (currentGuessNumber > 8) {
-                endGame();
+            currentRow += 1;
+            currentGuess = "";
+
+            const allSolved = boardSolved.every(Boolean);
+            if (allSolved) {
+                // Completed the whole round: streak up, celebrate, fresh boards.
+                stats.streak += 1;
+                if (stats.streak > stats.bestStreak) stats.bestStreak = stats.streak;
+                saveStats();
+                renderStats(true);
+                celebrate();
+                showToast('Round complete! +1 streak', true);
+                isProcessing = false;
+                setTimeout(() => startRound(), 1500);
+                return;
+            }
+
+            if (currentRow >= NUM_ROWS) {
+                // Ran out of rows with boards unsolved: streak breaks, but game continues.
+                roundOver = true;
+                stats.streak = 0;
+                saveStats();
+                renderStats();
+                revealUnsolved();
+                showToast('Out of guesses — tap any key for a new round');
+                Sound.error();
             }
 
             isProcessing = false;
         }
 
         function getGuessFeedback(guess, target) {
-            let feedback = Array(5).fill('absent');
-            let targetLetters = target.split('');
-            let guessLetters = guess.split('');
-
-            // First pass: Find 'correct' (green)
-            for (let i = 0; i < 5; i++) {
+            const feedback = Array(WORD_LEN).fill('absent');
+            const targetLetters = target.split('');
+            const guessLetters = guess.split('');
+            for (let i = 0; i < WORD_LEN; i++) {
                 if (guessLetters[i] === targetLetters[i]) {
                     feedback[i] = 'correct';
-                    targetLetters[i] = null; // Mark as used
-                    guessLetters[i] = null; // Mark as used
+                    targetLetters[i] = null;
+                    guessLetters[i] = null;
                 }
             }
-
-            // Second pass: Find 'present' (yellow)
-            for (let i = 0; i < 5; i++) {
+            for (let i = 0; i < WORD_LEN; i++) {
                 if (guessLetters[i] !== null) {
-                    const indexInTarget = targetLetters.indexOf(guessLetters[i]);
-                    if (indexInTarget !== -1) {
+                    const idx = targetLetters.indexOf(guessLetters[i]);
+                    if (idx !== -1) {
                         feedback[i] = 'present';
-                        targetLetters[indexInTarget] = null; // Mark as used
+                        targetLetters[idx] = null;
                     }
                 }
             }
             return feedback;
         }
 
-        async function updateGridRow(quadIndex, rowIndex, guess, feedback) {
-            const quad = quadrants[quadIndex];
-            const tiles = Array.from(quad.children).slice(rowIndex * 5, rowIndex * 5 + 5);
-            
-            // Apply flip animation
-            for (let i = 0; i < 5; i++) {
-                await new Promise(resolve => setTimeout(resolve, 100)); // Stagger flip
-                const tile = tiles[i];
-                tile.textContent = guess[i];
-                tile.classList.remove('tile-filled');
-                if (feedback[i] === 'correct') {
-                    tile.classList.add('tile-correct');
-                } else if (feedback[i] === 'present') {
-                    tile.classList.add('tile-present');
-                } else {
-                    tile.classList.add('tile-absent');
+        // Animate a single board's row with staggered 3D flips.
+        function revealRow(boardIndex, rowIndex, guess, feedback) {
+            return new Promise(resolve => {
+                const grid = gridEls[boardIndex];
+                let done = 0;
+                for (let c = 0; c < WORD_LEN; c++) {
+                    const tile = grid.children[rowIndex * WORD_LEN + c];
+                    const inner = tile.firstChild;
+                    setTimeout(() => {
+                        tile.classList.remove('filled');
+                        tile.classList.add('flip');
+                        if (boardIndex === 0) Sound.reveal();
+                        // Apply color at the midpoint of the flip (when edge-on)
+                        setTimeout(() => {
+                            inner.textContent = guess[c];
+                            inner.classList.remove('correct', 'present', 'absent');
+                            inner.classList.add(feedback[c]);
+                        }, 275);
+                        setTimeout(() => {
+                            tile.classList.remove('flip');
+                            done++;
+                            if (done === WORD_LEN) resolve();
+                        }, 560);
+                    }, c * 130);
+                }
+            });
+        }
+
+        function markBoardSolved(boardIndex, word) {
+            const el = boardEls[boardIndex];
+            el.classList.add('solved');
+            el.querySelector('.quad-word').textContent = word;
+            // Tile dance across the solved word row(s) — animate the last filled row.
+            const grid = gridEls[boardIndex];
+            const startRow = Math.max(0, currentRow);
+            for (let c = 0; c < WORD_LEN; c++) {
+                const tile = grid.children[startRow * WORD_LEN + c];
+                if (tile) {
+                    setTimeout(() => {
+                        tile.classList.add('dance');
+                        setTimeout(() => tile.classList.remove('dance'), 600);
+                    }, c * 90);
                 }
             }
         }
 
-        async function handleSolvedQuadrants(quadIndexes) {
-            // Flash green border
-            for (const i of quadIndexes) {
-                quadrants[i].classList.add('quad-solved');
-            }
-
-            // Wait for animation
-            await new Promise(resolve => setTimeout(resolve, 1500));
-
-            // Reset solved quadrants
-            for (const i of quadIndexes) {
-                quadrants[i].classList.remove('quad-solved');
-                targetWords[i] = getNewWord(); // Get new word
-                clearGridUI(i); // Clear the UI for this grid
+        function revealUnsolved() {
+            // Show answers on boards that weren't solved.
+            for (let b = 0; b < NUM_BOARDS; b++) {
+                if (!boardSolved[b]) {
+                    boardEls[b].classList.add('dim');
+                    const w = boardEls[b].querySelector('.quad-word');
+                    w.textContent = targetWords[b];
+                    w.style.color = 'var(--present)';
+                    boardEls[b].classList.add('solved'); // reuse to reveal the word label
+                }
             }
         }
 
-        function clearGridUI(quadIndex) {
-            const quad = quadrants[quadIndex];
-            const tiles = quad.children;
-            for (let i = 0; i < tiles.length; i++) {
-                tiles[i].textContent = '';
-                tiles[i].className = 'tile'; // Reset to default state
+        // ===================== KEYBOARD STATE =====================
+        // Best status across the 4 boards: correct > present > absent.
+        const STATUS_RANK = { absent: 1, present: 2, correct: 3 };
+        function updateLetterState(boardIndex, letter, status) {
+            const cur = boardLetterStates[boardIndex][letter];
+            if (!cur || STATUS_RANK[status] > STATUS_RANK[cur]) {
+                boardLetterStates[boardIndex][letter] = status;
             }
         }
 
-        function endGame() {
-            isGameOver = true;
-            finalScoreEl.textContent = totalScore;
-            gameOverScreen.classList.remove('hidden');
-            // Use timeout to allow a DOM repaint, then trigger transition
-            setTimeout(() => {
-                gameOverScreen.classList.remove('opacity-0');
-            }, 10);
-        }
-
-        // --- UI UPDATES ---
-        function updateScoreUI() {
-            scoreEl.textContent = totalScore;
-        }
-
-        function updateGuessCountUI() {
-            guessCountEl.textContent = Math.min(currentGuessNumber, 8);
-        }
-
-        function updateLetterState(letter, status) {
-            const current = letterStates[letter];
-            // Priority: correct > present > absent
-            if (current === 'correct') return;
-            if (current === 'present' && status === 'absent') return;
-            letterStates[letter] = status;
-        }
-
-        function resetKeyboardUI() {
-            keyboardDiv.querySelectorAll('button').forEach(btn => {
-                btn.classList.remove('key-correct', 'key-present', 'key-absent');
-            });
+        function bestLetterStatus(letter) {
+            let best = null;
+            for (let b = 0; b < NUM_BOARDS; b++) {
+                if (boardSolved[b]) continue; // ignore solved boards
+                const s = boardLetterStates[b][letter];
+                if (s && (!best || STATUS_RANK[s] > STATUS_RANK[best])) best = s;
+            }
+            return best;
         }
 
         function updateKeyboardUI() {
             keyboardDiv.querySelectorAll('button').forEach(btn => {
                 const key = btn.dataset.key;
-                if (letterStates[key]) {
-                    btn.classList.remove('key-correct', 'key-present', 'key-absent');
-                    btn.classList.add(`key-${letterStates[key]}`);
-                }
+                if (key === 'ENTER' || key === 'BACK') return;
+                btn.classList.remove('correct', 'present', 'absent');
+                const s = bestLetterStatus(key);
+                if (s) btn.classList.add(s);
             });
         }
 
-        function showMessage(msg) {
-            messagePopup.textContent = msg;
-            messagePopup.classList.add('show');
-            setTimeout(() => {
-                messagePopup.classList.remove('show');
-            }, 2000);
+        function resetKeyboardUI() {
+            keyboardDiv.querySelectorAll('button').forEach(btn => {
+                btn.classList.remove('correct', 'present', 'absent');
+            });
         }
 
-        // --- Start the game ---
+        // ===================== ANIMATIONS / FEEDBACK =====================
+        function shakeActiveRow() {
+            for (let b = 0; b < NUM_BOARDS; b++) {
+                if (boardSolved[b]) continue;
+                const grid = gridEls[b];
+                for (let c = 0; c < WORD_LEN; c++) {
+                    const tile = grid.children[currentRow * WORD_LEN + c];
+                    if (!tile) continue;
+                    tile.classList.remove('shake');
+                    void tile.offsetWidth;
+                    tile.classList.add('shake');
+                    setTimeout(() => tile.classList.remove('shake'), 460);
+                }
+            }
+        }
+
+        let toastTimer = null;
+        function showToast(msg, good) {
+            toastEl.textContent = msg;
+            toastEl.classList.toggle('good', !!good);
+            toastEl.classList.add('show');
+            clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2000);
+        }
+
+        function celebrate() {
+            const colors = ['#2fae5e', '#d6a623', '#5b6cff', '#e85d75', '#46c7c7', '#ffffff'];
+            const count = 90;
+            for (let i = 0; i < count; i++) {
+                const piece = document.createElement('div');
+                piece.className = 'confetti-piece';
+                piece.style.left = Math.random() * 100 + 'vw';
+                piece.style.background = colors[Math.floor(Math.random() * colors.length)];
+                piece.style.animationDuration = (1.6 + Math.random() * 1.4) + 's';
+                piece.style.animationDelay = (Math.random() * 0.3) + 's';
+                piece.style.transform = 'translateY(-10vh)';
+                confettiEl.appendChild(piece);
+                setTimeout(() => piece.remove(), 3500);
+            }
+        }
+
+        // ===================== STATS =====================
+        function loadStats() {
+            try {
+                const raw = localStorage.getItem(STATS_KEY);
+                if (raw) {
+                    const s = JSON.parse(raw);
+                    stats.streak = s.streak || 0;
+                    stats.bestStreak = s.bestStreak || 0;
+                    stats.totalSolved = s.totalSolved || 0;
+                    stats.totalGuessesOnSolved = s.totalGuessesOnSolved || 0;
+                }
+            } catch (e) { console.warn('loadStats failed', e); }
+        }
+
+        function saveStats() {
+            try { localStorage.setItem(STATS_KEY, JSON.stringify(stats)); }
+            catch (e) { /* ignore */ }
+        }
+
+        function renderStats(pulse) {
+            statEls.streak.textContent = stats.streak;
+            statEls.best.textContent = stats.bestStreak;
+            statEls.solved.textContent = stats.totalSolved;
+            const avg = stats.totalSolved > 0
+                ? (stats.totalGuessesOnSolved / stats.totalSolved).toFixed(1)
+                : '—';
+            statEls.avg.textContent = avg;
+            if (pulse) {
+                ['stat-streak', 'stat-solved'].forEach(id => {
+                    const el = document.getElementById(id);
+                    el.classList.remove('pulse');
+                    void el.offsetWidth;
+                    el.classList.add('pulse');
+                });
+            }
+        }
+
+        // ===================== THEME =====================
+        function loadTheme() {
+            let theme;
+            try { theme = localStorage.getItem(THEME_KEY); } catch (e) { theme = null; }
+            if (theme === null) {
+                theme = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+            }
+            applyTheme(theme);
+        }
+        function applyTheme(theme) {
+            if (theme === 'dark') document.documentElement.classList.add('dark');
+            else document.documentElement.classList.remove('dark');
+            themeBtn.textContent = theme === 'dark' ? '☀️' : '🌙';
+        }
+        function toggleTheme() {
+            const isDark = document.documentElement.classList.contains('dark');
+            const next = isDark ? 'light' : 'dark';
+            applyTheme(next);
+            try { localStorage.setItem(THEME_KEY, next); } catch (e) { /* ignore */ }
+        }
+
+        // ===================== GO =====================
         init();
     </script>
 </body>
 </html>
-
-

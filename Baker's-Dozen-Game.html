@@ -1,663 +1,1269 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Baker's Dozen</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-    <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            touch-action: manipulation; /* Prevents double-tap zoom on mobile */
-        }
-        .hexagon {
-            position: relative;
-            width: 100px;
-            height: 115.47px;
-            background-color: #f0f0f0;
-            margin: 57.74px 0;
-            clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-size: 2.5rem;
-            font-weight: 700;
-            color: #333;
-            cursor: pointer;
-            transition: background-color 0.2s ease, transform 0.1s ease;
-            -webkit-user-select: none; /* Safari */
-            -ms-user-select: none; /* IE 10+ */
-            user-select: none; /* Standard syntax */
-        }
-        .hexagon:active {
-            transform: scale(0.95);
-        }
-        .hexagon-center {
-            background-color: #fde047; /* yellow-300 */
-        }
-        .hexagon-outer {
-             background-color: #e5e7eb; /* gray-200 */
-        }
-        .hexagon-outer:hover {
-            background-color: #d1d5db; /* gray-300 */
-        }
-        .shake {
-            animation: shake 0.5s;
-        }
-        @keyframes shake {
-            0%, 100% { transform: translateX(0); }
-            10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
-            20%, 40%, 60%, 80% { transform: translateX(5px); }
-        }
-         /* Smaller hexagons for smaller screens */
-        @media (max-width: 640px) {
-            .hexagon {
-                width: 80px;
-                height: 92.38px;
-                margin: 46.19px 0;
-                 font-size: 2rem;
-            }
-        }
-         /* Modal styles */
-        .modal-backdrop {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.6);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 50;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Baker's Dozen Solitaire</title>
+<style>
+    :root {
+        --felt-1: #1d6b3f;
+        --felt-2: #0f4d2a;
+        --felt-3: #0a3a20;
+        --card-w: 78px;
+        --card-h: 110px;
+        --card-radius: 8px;
+        --red: #c8102e;
+        --black: #1a1a1a;
+        --slot-line: rgba(255,255,255,0.28);
+        --gold: #f5d061;
+    }
+
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+    html, body {
+        margin: 0;
+        padding: 0;
+        min-height: 100%;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        color: #f3f7f4;
+        background:
+            radial-gradient(ellipse at 50% 18%, var(--felt-1) 0%, var(--felt-2) 55%, var(--felt-3) 100%);
+        background-attachment: fixed;
+        -webkit-user-select: none;
+        user-select: none;
+        touch-action: manipulation;
+    }
+
+    body::before {
+        /* subtle felt weave texture */
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        opacity: 0.06;
+        background-image:
+            repeating-linear-gradient(45deg, #000 0 1px, transparent 1px 3px),
+            repeating-linear-gradient(-45deg, #000 0 1px, transparent 1px 3px);
+        background-size: 4px 4px;
+        z-index: 0;
+    }
+
+    .wrap {
+        position: relative;
+        z-index: 1;
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 14px 14px 40px;
+    }
+
+    /* ---------- Header / toolbar ---------- */
+    header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 12px;
+    }
+    .title {
+        display: flex;
+        align-items: baseline;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+    .title h1 {
+        margin: 0;
+        font-size: 1.55rem;
+        font-weight: 800;
+        letter-spacing: 0.5px;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.45);
+        color: #fff;
+    }
+    .title .sub {
+        font-size: 0.8rem;
+        color: rgba(255,255,255,0.7);
+    }
+
+    .stats {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+    .stat {
+        background: rgba(0,0,0,0.28);
+        border: 1px solid rgba(255,255,255,0.12);
+        border-radius: 8px;
+        padding: 5px 11px;
+        text-align: center;
+        min-width: 64px;
+        backdrop-filter: blur(2px);
+    }
+    .stat .lbl {
+        font-size: 0.6rem;
+        text-transform: uppercase;
+        letter-spacing: 0.7px;
+        color: rgba(255,255,255,0.6);
+    }
+    .stat .val {
+        font-size: 1.05rem;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+        color: #fff;
+    }
+
+    .toolbar {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-bottom: 14px;
+    }
+    button.btn {
+        font-family: inherit;
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: #143a25;
+        background: linear-gradient(#ffffff, #e6efe8);
+        border: 1px solid rgba(0,0,0,0.18);
+        border-radius: 8px;
+        padding: 8px 13px;
+        cursor: pointer;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.25);
+        transition: transform 0.08s ease, box-shadow 0.12s ease, filter 0.12s ease;
+    }
+    button.btn:hover { filter: brightness(1.04); }
+    button.btn:active { transform: translateY(1px) scale(0.98); box-shadow: 0 1px 2px rgba(0,0,0,0.25); }
+    button.btn:disabled { opacity: 0.45; cursor: default; transform: none; filter: none; }
+    button.btn.primary {
+        color: #fff;
+        background: linear-gradient(#f5d061, #d9a72e);
+        color: #3a2a05;
+        border-color: rgba(0,0,0,0.25);
+    }
+    button.btn.accent {
+        color: #fff;
+        background: linear-gradient(#2f9e58, #1c7a40);
+        border-color: rgba(0,0,0,0.25);
+    }
+
+    /* ---------- Foundations ---------- */
+    .foundations {
+        display: flex;
+        gap: 12px;
+        justify-content: center;
+        margin-bottom: 18px;
+        flex-wrap: wrap;
+    }
+    .slot {
+        width: var(--card-w);
+        height: var(--card-h);
+        border-radius: var(--card-radius);
+        border: 2px dashed var(--slot-line);
+        background: rgba(255,255,255,0.04);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+    }
+    .slot .slot-suit {
+        font-size: 2.2rem;
+        opacity: 0.25;
+        line-height: 1;
+    }
+    .slot.red .slot-suit { color: #ff8a9c; }
+    .slot.black .slot-suit { color: rgba(255,255,255,0.45); }
+    .slot.drop-ok {
+        border-color: var(--gold);
+        background: rgba(245,208,97,0.16);
+        box-shadow: 0 0 14px rgba(245,208,97,0.5), inset 0 0 10px rgba(245,208,97,0.2);
+    }
+
+    /* ---------- Tableau ---------- */
+    .tableau-scroll {
+        overflow-x: auto;
+        overflow-y: visible;
+        padding-bottom: 24px;
+        -webkit-overflow-scrolling: touch;
+    }
+    .tableau {
+        display: flex;
+        gap: 10px;
+        justify-content: center;
+        min-width: min-content;
+        padding: 6px 4px 0;
+    }
+    .column {
+        position: relative;
+        width: var(--card-w);
+        flex: 0 0 auto;
+        border-radius: var(--card-radius);
+        padding-bottom: 2px;
+        transition: box-shadow 0.15s ease;
+    }
+    .column.col-drop-ok {
+        box-shadow: 0 0 0 3px var(--gold), 0 0 16px rgba(245,208,97,0.5);
+        border-radius: 12px;
+    }
+    .column .col-base {
+        /* empty placeholder so empty columns keep a footprint */
+        width: var(--card-w);
+        height: var(--card-h);
+        border-radius: var(--card-radius);
+        border: 2px dashed var(--slot-line);
+        background: rgba(255,255,255,0.03);
+    }
+
+    /* ---------- Cards ---------- */
+    .card {
+        position: absolute;
+        left: 0;
+        width: var(--card-w);
+        height: var(--card-h);
+        border-radius: var(--card-radius);
+        background:
+            linear-gradient(155deg, #ffffff 0%, #f4f6f8 60%, #e9edf0 100%);
+        border: 1px solid rgba(0,0,0,0.18);
+        box-shadow: 0 2px 4px rgba(0,0,0,0.35);
+        cursor: pointer;
+        transition: top 0.26s cubic-bezier(.22,.7,.3,1),
+                    left 0.26s cubic-bezier(.22,.7,.3,1),
+                    transform 0.12s ease,
+                    box-shadow 0.12s ease;
+        overflow: hidden;
+        will-change: top, left, transform;
+    }
+    .card::after {
+        /* glossy face highlight */
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        background: linear-gradient(150deg, rgba(255,255,255,0.55), rgba(255,255,255,0) 42%);
+        pointer-events: none;
+    }
+    .card .corner {
+        position: absolute;
+        font-weight: 800;
+        line-height: 0.92;
+        text-align: center;
+        font-size: 0.86rem;
+    }
+    .card .corner .rank { display: block; }
+    .card .corner .pip { display: block; font-size: 0.78rem; }
+    .card .corner.tl { top: 5px; left: 6px; }
+    .card .corner.br { bottom: 5px; right: 6px; transform: rotate(180deg); }
+    .card .center-pip {
+        position: absolute;
+        top: 50%; left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 2.5rem;
+        line-height: 1;
+        opacity: 0.92;
+    }
+    .card.red .corner, .card.red .center-pip { color: var(--red); }
+    .card.black .corner, .card.black .center-pip { color: var(--black); }
+
+    .card.selected {
+        box-shadow: 0 0 0 3px var(--gold), 0 6px 14px rgba(0,0,0,0.5);
+        transform: translateY(-6px);
+        z-index: 500 !important;
+    }
+    .card.dragging {
+        transition: none;
+        z-index: 1000 !important;
+        box-shadow: 0 0 0 2px var(--gold), 0 12px 24px rgba(0,0,0,0.55);
+        cursor: grabbing;
+    }
+    .card.movable:not(.dragging):hover {
+        box-shadow: 0 4px 10px rgba(0,0,0,0.45);
+    }
+    .card.hint {
+        animation: hintPulse 0.8s ease 2;
+    }
+    @keyframes hintPulse {
+        0%,100% { box-shadow: 0 2px 4px rgba(0,0,0,0.35); }
+        50% { box-shadow: 0 0 0 3px #6ad1ff, 0 6px 16px rgba(0,0,0,0.5); }
+    }
+    .card.shake { animation: cardShake 0.4s ease; }
+    @keyframes cardShake {
+        0%,100% { transform: translateX(0); }
+        20% { transform: translateX(-6px); }
+        40% { transform: translateX(6px); }
+        60% { transform: translateX(-4px); }
+        80% { transform: translateX(4px); }
+    }
+    .pop { animation: popIn 0.32s cubic-bezier(.2,1.4,.5,1); }
+    @keyframes popIn {
+        0% { transform: scale(0.5); opacity: 0.2; }
+        60% { transform: scale(1.18); }
+        100% { transform: scale(1); opacity: 1; }
+    }
+
+    /* ---------- Modal ---------- */
+    .backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.6);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 2000;
+        padding: 18px;
+    }
+    .backdrop.hidden { display: none; }
+    .modal {
+        background: linear-gradient(#fffef8, #f1ece0);
+        color: #1d2a22;
+        border-radius: 16px;
+        padding: 28px 26px;
+        max-width: 380px;
+        width: 100%;
+        text-align: center;
+        box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+        border: 1px solid rgba(0,0,0,0.1);
+    }
+    .modal h2 {
+        margin: 0 0 6px;
+        font-size: 1.9rem;
+        color: #b8860b;
+    }
+    .modal p { margin: 6px 0; font-size: 0.98rem; }
+    .modal .modal-stats {
+        display: flex;
+        justify-content: space-around;
+        margin: 16px 0 20px;
+        gap: 10px;
+    }
+    .modal .modal-stats .ms .v { font-size: 1.4rem; font-weight: 800; color: #1c7a40; }
+    .modal .modal-stats .ms .l { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.5px; color: #6a7a70; }
+
+    /* ---------- Confetti / fireworks canvas ---------- */
+    #fx {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 1900;
+    }
+
+    .help {
+        font-size: 0.78rem;
+        color: rgba(255,255,255,0.62);
+        text-align: center;
+        margin-top: 6px;
+        line-height: 1.4;
+    }
+    .help b { color: var(--gold); }
+
+    /* ---------- Responsive: shrink cards to try fit 13 columns ---------- */
+    @media (max-width: 1120px) { :root { --card-w: 70px; --card-h: 99px; } }
+    @media (max-width: 1000px) { :root { --card-w: 62px; --card-h: 88px; } .card .center-pip { font-size: 2rem; } }
+    @media (max-width: 880px)  { :root { --card-w: 54px; --card-h: 77px; } .card .corner { font-size: 0.72rem; } .card .corner .pip { font-size: 0.64rem; } .card .center-pip { font-size: 1.6rem; } }
+    @media (max-width: 760px)  {
+        .tableau { justify-content: flex-start; }
+        :root { --card-w: 50px; --card-h: 72px; }
+    }
+    @media (max-width: 600px)  {
+        .title h1 { font-size: 1.2rem; }
+        :root { --card-w: 46px; --card-h: 66px; }
+        .card .corner { font-size: 0.62rem; }
+        .card .corner .pip { font-size: 0.56rem; }
+        .card .center-pip { font-size: 1.35rem; }
+    }
+</style>
 </head>
-<body class="bg-gray-100 flex flex-col items-center justify-center min-h-screen p-4 text-gray-800">
-
-    <div id="game-container" class="w-full max-w-md mx-auto text-center">
-        <h1 class="text-4xl font-bold mb-1">Baker's Dozen</h1>
-        <p class="text-gray-600 mb-4">Find 13 words to win!</p>
-
-        <!-- Game Info: Score & Word Count -->
-        <div class="flex justify-around mb-4 text-lg">
-            <div>
-                <span class="font-semibold">Score:</span>
-                <span id="score">0</span>
-            </div>
-            <div>
-                <span class="font-semibold">Words:</span>
-                <span id="word-count">0 / 13</span>
-            </div>
+<body>
+<div class="wrap">
+    <header>
+        <div class="title">
+            <h1>Baker&rsquo;s Dozen</h1>
+            <span class="sub">Solitaire &middot; build each suit A&rarr;K</span>
         </div>
-
-        <!-- Word Display -->
-        <div id="word-display-container" class="h-12 w-full bg-white rounded-lg shadow-inner flex items-center justify-center mb-4 text-2xl font-semibold tracking-widest">
-            <span id="current-word"></span>
-            <span class="animate-ping">|</span>
+        <div class="stats">
+            <div class="stat"><div class="lbl">Time</div><div class="val" id="time">0:00</div></div>
+            <div class="stat"><div class="lbl">Moves</div><div class="val" id="moves">0</div></div>
+            <div class="stat"><div class="lbl">Best</div><div class="val" id="best">--</div></div>
+            <div class="stat"><div class="lbl">Wins</div><div class="val" id="wins">0</div></div>
         </div>
+    </header>
 
-        <!-- Notification Area -->
-        <div id="notification" class="h-6 mb-2 text-red-500 font-semibold transition-opacity duration-300 opacity-0"></div>
-
-        <!-- Hexagon Grid -->
-        <div class="relative w-[300px] h-[346px] sm:w-[300px] sm:h-[346.41px] mx-auto mb-4 flex items-center justify-center">
-             <div id="center-hex" class="absolute hexagon hexagon-center"></div>
-             <div id="outer-hex-0" class="absolute hexagon hexagon-outer" style="transform: translate(0, -100px) scale(0.9);"></div>
-             <div id="outer-hex-1" class="absolute hexagon hexagon-outer" style="transform: translate(87px, -50px) scale(0.9);"></div>
-             <div id="outer-hex-2" class="absolute hexagon hexagon-outer" style="transform: translate(87px, 50px) scale(0.9);"></div>
-             <div id="outer-hex-3" class="absolute hexagon hexagon-outer" style="transform: translate(0, 100px) scale(0.9);"></div>
-             <div id="outer-hex-4" class="absolute hexagon hexagon-outer" style="transform: translate(-87px, 50px) scale(0.9);"></div>
-             <div id="outer-hex-5" class="absolute hexagon hexagon-outer" style="transform: translate(-87px, -50px) scale(0.9);"></div>
-        </div>
-
-
-        <!-- Action Buttons -->
-        <div class="grid grid-cols-3 gap-3 mb-4">
-            <button id="shuffle-btn" class="py-3 bg-white rounded-lg shadow-md font-semibold text-gray-700 active:scale-95 transition-transform">Shuffle</button>
-            <button id="enter-btn" class="py-3 bg-blue-500 text-white rounded-lg shadow-md font-semibold active:scale-95 transition-transform">Enter</button>
-            <button id="clear-btn" class="py-3 bg-white rounded-lg shadow-md font-semibold text-gray-700 active:scale-95 transition-transform">Clear</button>
-        </div>
-
-        <!-- Found Words List -->
-        <div class="w-full bg-white rounded-lg shadow-inner p-2 h-32 overflow-y-auto">
-            <h3 class="font-semibold text-left mb-2">Found Words:</h3>
-            <div id="found-words" class="flex flex-wrap gap-2 text-sm">
-                <!-- Words will be added here -->
-            </div>
-        </div>
+    <div class="toolbar">
+        <button class="btn primary" id="new-btn">New Game</button>
+        <button class="btn accent" id="auto-btn">Auto-Play</button>
+        <button class="btn" id="undo-btn">Undo</button>
+        <button class="btn" id="hint-btn">Hint</button>
+        <button class="btn" id="sound-btn">Sound: On</button>
     </div>
 
-    <!-- Game Over Modal -->
-    <div id="game-over-modal" class="modal-backdrop hidden">
-        <div class="bg-white rounded-lg shadow-2xl p-8 m-4 max-w-sm w-full text-center">
-            <h2 class="text-3xl font-bold mb-4">Congratulations!</h2>
-            <p class="text-lg mb-2">You baked a dozen (and one)!</p>
-            <p class="text-lg mb-6">Final Score: <span id="final-score" class="font-bold"></span></p>
-            <button id="play-again-btn" class="w-full py-3 bg-blue-500 text-white rounded-lg shadow-md font-semibold active:scale-95 transition-transform">Play Again</button>
-        </div>
+    <div class="foundations" id="foundations"></div>
+
+    <div class="tableau-scroll">
+        <div class="tableau" id="tableau"></div>
     </div>
 
+    <p class="help">
+        Move the <b>bottom card</b> of a column onto another column's bottom card if it is one rank lower
+        (suit ignored). Send cards to the <b>foundations</b> by suit, Ace first. Empty columns can&rsquo;t be refilled.
+        <br>Tip: <b>click a card then click a target</b>, or <b>drag &amp; drop</b>. <b>Double-click</b> sends a card to its foundation.
+    </p>
+</div>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            // DOM Elements
-            const scoreEl = document.getElementById('score');
-            const wordCountEl = document.getElementById('word-count');
-            const currentWordEl = document.getElementById('current-word');
-            const notificationEl = document.getElementById('notification');
-            const centerHexEl = document.getElementById('center-hex');
-            const outerHexEls = Array.from({ length: 6 }, (_, i) => document.getElementById(`outer-hex-${i}`));
-            const shuffleBtn = document.getElementById('shuffle-btn');
-            const enterBtn = document.getElementById('enter-btn');
-            const clearBtn = document.getElementById('clear-btn');
-            const foundWordsEl = document.getElementById('found-words');
-            const gameOverModal = document.getElementById('game-over-modal');
-            const finalScoreEl = document.getElementById('final-score');
-            const playAgainBtn = document.getElementById('play-again-btn');
-            const wordDisplayContainer = document.getElementById('word-display-container');
+<!-- Win / status modal -->
+<div class="backdrop hidden" id="modal">
+    <div class="modal">
+        <h2 id="modal-title">You Win!</h2>
+        <p id="modal-msg">All 52 cards home.</p>
+        <div class="modal-stats">
+            <div class="ms"><div class="v" id="m-time">0:00</div><div class="l">Time</div></div>
+            <div class="ms"><div class="v" id="m-moves">0</div><div class="l">Moves</div></div>
+        </div>
+        <button class="btn primary" id="modal-btn" style="width:100%;padding:11px;">Play Again</button>
+    </div>
+</div>
 
-            // Game State
-            let score = 0;
-            let foundWords = [];
-            let currentWord = '';
-            let centerLetter = '';
-            let outerLetters = [];
-            const VOWELS = 'AEIOU';
-            const CONSONANTS = 'BCDFGHJKLMNPQRSTVWXYZ';
-            const GAME_END_COUNT = 13;
+<canvas id="fx"></canvas>
 
-            // Simplified Word List (fallback)
-            // In a real application, this should be replaced by a large, licensed word list
-            // or a public wordlist placed in `wordlist.txt` (one word per line).
-            // The game will try to load `wordlist.txt` at startup and fall back to this array
-            // if loading fails.
-            const DICTIONARY = [
-                "BAKE", "BAKES", "BAKING", "CAKE", "CAKES", "LAKE", "LAKES", "MAKE", "MAKES", "MAKING", "RAKE", "RAKES", "RAKING", "TAKE", "TAKES", "TAKING", "BEAR", "BEARS", "DEAR", "FEAR", "FEARING", "FEARS", "GEAR", "GEARS", "HEAR", "HEARING", "HEARS", "NEAR", "REAR", "TEAR", "TEARING", "TEARS",
-                "YEAR", "YEARS", "BALK", "TALK", "TALKING", "TALKS", "WALK", "WALKING", "WALKS", "BAND", "BANDS", "HAND", "HANDS", "LAND", "LANDING", "LANDS", "SAND", "BANK", "BANKING", "BANKS", "RANK", "RANKS", "SANK", "TANK", "TANKS", "BELT", "BELTS", "FELT",
-                "MELT", "MELTS", "BENT", "DENT", "DENTS", "RENT", "RENTING", "RENTS", "SENT", "TENT", "TENTS", "WENT", "BEST", "BESTS", "NEST", "NESTS", "REST", "RESTING", "RESTS", "TEST", "TESTING", "TESTS", "VEST", "VESTS", "WEST", "BIND", "BINDING", "BINDS",
-                "FIND", "FINDING", "FINDS", "HIND", "KIND", "MIND", "MINDING", "MINDS", "WIND", "WINDING", "WINDS", "BITE", "BITES", "BITING", "KITE", "KITES", "RITE", "RITES", "SITE", "SITES", "BOAT", "BOATS", "COAT", "COATS", "GOAT", "GOATS", "BOLD", "COLD",
-                "FOLD", "FOLDING", "FOLDS", "GOLD", "HOLD", "HOLDING", "HOLDS", "SOLD", "TOLD", "BOMB", "BOMBS", "COMB", "COMBS", "TOMB", "TOMBS", "BOND", "BONDS", "FOND", "POND", "PONDS", "BONE", "BONES", "CONE", "CONES", "GONE",
-                "HONE", "LONE", "TONE", "ZONE", "ZONES", "BOOK", "BOOKING", "BOOKS", "COOK", "COOKING", "COOKS", "HOOK", "HOOKING", "HOOKS", "LOOK", "LOOKING", "LOOKS", "TOOK", "BOOM", "BOOMING", "BOOMS", "DOOM", "DOOMS", "ROOM", "ROOMS", "ZOOM", "ZOOMING", "ZOOMS", "BORN",
-                "CORN", "CORNS", "HORN", "HORNS", "MORN", "TORN", "WORN", "BOTH", "MOTH", "MOTHS", "BULK", "HULK", "SULK", "BURN", "BURNING", "BURNS", "TURN", "TURNING", "TURNS", "BURY", "FURY",
-                "BUSH", "BUSHES", "PUSH", "PUSHES", "PUSHING", "BUST", "BUSTS", "DUST", "DUSTING", "DUSTS", "GUST", "LUST", "MUST", "RUST", "RUSTING", "RUSTS", "CALL", "CALLING", "CALLS", "FALL", "FALLING", "FALLS", "HALL", "HALLS", "MALL", "MALLS", "TALL", "WALL", "WALLS",
-                "CALM", "PALM", "PALMS", "CAMP", "CAMPING", "CAMPS", "DAMP", "LAMP", "LAMPS", "RAMP", "VAMP", "CARD", "CARDS", "HARD", "YARD", "YARDS", "CARE", "CARES", "CARING", "DARE", "DARES", "DARING", "FARE", "FARES", "HARE", "HARES",
-                "MARE", "MARES", "RARE", "CART", "CARTS", "DART", "DARTS", "HART", "PART", "PARTS", "TART", "TARTS", "CASH", "DASH", "DASHES", "DASHING", "HASH", "LASH", "LASHES", "LASHING", "MASH", "RASH", "CAST", "CASTING", "CASTS",
-                "FAST", "LAST", "LASTING", "LASTS", "PAST", "VAST", "CELL", "CELLS", "FELL", "HELL", "SELL", "SELLING", "SELLS", "TELL", "TELLING", "TELLS", "WELL", "YELL", "YELLING", "YELLS", "CHAT", "CHATS", "THAT", "CHIP", "CHIPS",
-                "FLIP", "FLIPS", "GRIP", "GRIPS", "SHIP", "SHIPS", "SKIP", "SKIPS", "SLIP", "SLIPS", "TRIP", "TRIPS", "WHIP", "WHIPS", "CLAM", "CLAMS", "CRAM", "DRAM", "SCAM", "SCAMS", "SLAM", "SLAMS", "SWAM", "COIN", "COINS",
-                "JOIN", "JOINING", "JOINS", "COME", "COMES", "COMING", "SOME", "COOL", "COOLS", "POOL", "POOLS", "COST", "COSTS", "LOST", "CROP", "CROPS", "DROP", "DROPS", "PLOP", "SHOP", "SHOPS", "STOP", "STOPS", "CULT", "CULTS", "GULT",
-                "DECK", "DECKS", "NECK", "NECKS", "PECK", "PECKS", "DEEP", "JEEP", "JEEPS", "KEEP", "KEEPING", "KEEPS", "PEEP", "PEEPS", "WEEP", "WEEPS", "DEER", "PEER", "PEERS", "DICE", "MICE", "NICE", "RICE",
-                "VICE", "DIME", "DIMES", "LIME", "LIMES", "MIME", "MIMES", "TIME", "TIMES", "TIMING", "DINE", "DINES", "DINING", "FINE", "FINES", "LINE", "LINES", "MINE", "MINES", "NINE", "NINES", "PINE", "PINES", "VINE", "VINES", "WINE", "WINES", "DIRT",
-                "FLIRT", "FLIRTS", "SHIRT", "SHIRTS", "DOLL", "DOLLS", "DULL", "GULL", "GULLS", "HULL", "HULLS", "LULL", "MULL", "DOWN", "DOWNS", "TOWN", "TOWNS", "DRAW", "DRAWS", "PAW", "PAWS", "SAW", "DREAM", "DREAMING", "DREAMS",
-                "CREAM", "CREAMS", "STEAM", "STEAMS", "DRILL", "DRILLS", "GRILL", "GRILLS", "SKILL", "SKILLS", "SPILL", "SPILLS", "STILL", "THRILL", "THRILLS", "DRUM", "DRUMS", "GLUM", "PLUM", "PLUMS", "SLUM", "SLUMS", "SWUM",
-                "EACH", "ECHO", "EDGE", "ELSE", "EPIC", "EVEN", "EVER", "EVIL", "EXAM", "EXIT", "FACE", "LACE", "MACE", "PACE",
-                "RACE", "FAIL", "HAIL", "JAIL", "MAIL", "NAIL", "PAIL", "RAIL", "SAIL", "TAIL", "WAIL", "FAIR", "HAIR", "LAIR",
-                "PAIR", "FAKE", "FAME", "GAME", "LAME", "NAME", "SAME", "TAME", "FARM", "HARM", "WARM", "FEEL", "HEEL", "REEL",
-                "FEET", "MEET", "FILE", "MILE", "PILE", "TILE", "WHILE", "FILL", "HILL", "KILL", "MILL", "PILL", "TILL", "WILL",
-                "FILM", "FIRE", "HIRE", "TIRE", "WIRE", "FIRM", "FISH", "WISH", "FIST", "LIST", "MIST", "FIVE", "HIVE", "LIVE",
-                "FLAG", "SNAG", "STAG", "FLAT", "SPAT", "FLEW", "GREW", "STEW", "FLOW", "GLOW", "SLOW", "SNOW", "FOAM", "ROAM",
-                "FOIL", "SOIL", "FOOD", "MOOD", "FOOL", "TOOL", "FORK", "PORK", "WORK", "FORM", "NORM", "STORM", "WORM", "FOUR",
-                "HOUR", "POUR", "SOUR", "TOUR", "FROM", "FUEL", "FULL", "PULL", "FUSE", "MUSE", "GAIN", "MAIN", "PAIN", "RAIN",
-                "VAIN", "GATE", "HATE", "LATE", "MATE", "RATE", "GAVE", "SAVE", "WAVE", "GILD", "WILD", "GIVE", "LIVE", "GLAD",
-                "GOAL", "SOUL", "GONE", "GOOD", "HOOD", "WOOD", "GOOF", "POOF", "ROOF", "GRAB", "CRAB", "SCAB", "STAB", "GREY",
-                "PREY", "THEY", "GROW", "SHOW", "GULF", "HACK", "JACK", "LACK", "PACK", "RACK", "SACK", "TACK", "HAVE", "HEAD",
-                "LEAD", "READ", "HEAL", "MEAL", "SEAL", "ZEAL", "HEAT", "MEAT", "NEAT", "SEAT", "HELP", "YELP", "HERE", "HIGH",
-                "SIGH", "THIGH", "HIKE", "LIKE", "PIKE", "HINT", "LINT", "MINT", "TINT", "HOLE", "MOLE", "POLE", "ROLE", "SOLE",
-                "HOME", "ROPE", "HOPE", "HUGE", "HUNT", "RUNT", "HURT", "IDEA", "IDLE", "INCH", "INTO", "IRON", "ITEM", "JUMP",
-                "BUMP", "DUMP", "LUMP", "PUMP", "JUNK", "SUNK", "JUST", "KICK", "LICK", "PICK", "QUICK", "SICK", "TICK", "WICK",
-                "KISS", "MISS", "KNEE", "KNEW", "KNOT", "PLOT", "SHOT", "SPOT", "TROT", "KNOW", "BLOW", "CROW", "FLOW", "GLOW",
-                "GROW", "SHOW", "SLOW", "SNOW", "THROW", "LEAK", "PEAK", "WEAK", "LEAN", "MEAN", "LEAP", "CHEAP", "HEAP", "REAP",
-                "LEFT", "LEND", "BEND", "MEND", "SEND", "TEND", "LESS", "MESS", "LIFT", "GIFT", "RIFT", "SIFT", "LIKE", "LOAN",
-                "GROAN", "MOAN", "LOCK", "COCK", "DOCK", "MOCK", "ROCK", "SOCK", "LONG", "SONG", "LOOP", "POOP", "SOUP", "LOSE",
-                "HOSE", "NOSE", "POSE", "ROSE", "LOUD", "CLOUD", "PROUD", "LOVE", "DOVE", "GLOVE", "SHOVE", "LUCK", "BUCK", "DUCK",
-                "TUCK", "LUNG", "SUNG", "MADE", "FADE", "JADE", "SHADE", "SPADE", "TRADE", "MARK", "BARK", "DARK", "HARK", "LARK",
-                "PARK", "SHARK", "SPARK", "STARK", "MASK", "TASK", "MAZE", "GAZE", "HAZE", "MILD", "MOON", "NOON", "SOON", "MORE",
-                "CORE", "PORE", "SORE", "TORE", "WORE", "MOVE", "PROVE", "MUCH", "SUCH", "MUST", "NAIL", "PAIL", "RAIL", "SAIL",
-                "TAIL", "WAIL", "NICE", "RICE", "VICE", "NIGHT", "FIGHT", "LIGHT", "MIGHT", "RIGHT", "SIGHT", "TIGHT", "ONLY",
-                "OPEN", "OVAL", "OVER", "OWED", "OWN", "PACE", "RACE", "PACK", "RACK", "SACK", "TACK", "PAID", "LAID", "MAID",
-                "RAID", "PAGE", "CAGE", "RAGE", "SAGE", "WAGE", "PALE", "SALE", "TALE", "WHALE", "PART", "TART", "PASS", "MASS",
-                "PATH", "BATH", "MATH", "PAVE", "CAVE", "GAVE", "SAVE", "WAVE", "PEEL", "FEEL", "HEEL", "REEL", "PINT", "PIPE",
-                "RIPE", "WIPE", "PLAY", "CLAY", "PRAY", "STAY", "SWAY", "TRAY", "PLUS", "POEM", "POKE", "JOKE", "WOKE", "YOKE",
-                "POOL", "POOR", "DOOR", "FLOOR", "POST", "HOST", "MOST", "POUR", "SOUR", "TOUR", "PULL", "PUSH", "PURE", "CURE",
-                "LURE", "SURE", "QUIT", "QUIET", "QUITE", "QUOTE", "RACE", "RAIN", "VAIN", "RARE", "RATE", "REACH", "BEACH",
-                "EACH", "PEACH", "TEACH", "READ", "LEAD", "RIDE", "HIDE", "SIDE", "TIDE", "WIDE", "RING", "BRING", "KING", "SING",
-                "SLING", "SPRING", "STING", "SWING", "THING", "WING", "RISE", "WISE", "ROAD", "LOAD", "TOAD", "ROLL", "POLL",
-                "TOLL", "ROOF", "ROOM", "ROOT", "BOOT", "HOOT", "LOOT", "ROOT", "SHOOT", "ROSE", "HOSE", "NOSE", "POSE", "ROUGH",
-                "TOUGH", "ROUND", "BOUND", "FOUND", "GROUND", "HOUND", "MOUND", "POUND", "SOUND", "WOUND", "RULE", "RUDE", "RUN",
-                "BUN", "FUN", "GUN", "NUN", "PUN", "RUN", "SUN", "RUSH", "BUSH", "CRUSH", "FLUSH", "GUSH", "HUSH", "LUSH", "PLUSH",
-                "RUSH", "SAFE", "SAME", "SAID", "SALT", "MALT", "SAND", "BAND", "HAND", "LAND", "SANG", "BANG", "GANG", "HANG",
-                "RANG", "SAVE", "WAVE", "SEAT", "BEAT", "FEAT", "HEAT", "MEAT", "NEAT", "WHEAT", "SEED", "FEED", "NEED", "REED",
-                "WEED", "SEEK", "GEEK", "LEEK", "MEEK", "WEEK", "SEEM", "SEEN", "GREEN", "QUEEN", "SCREEN", "TEEN", "SEND", "BEND",
-                "LEND", "MEND", "TEND", "SENSE", "DENSE", "TENSE", "SERVE", "CURVE", "NERVE", "SHED", "SHINE", "WHINE", "SHOE",
-                "SHOP", "STOP", "SHOT", "KNOT", "PLOT", "SPOT", "TROT", "SHOW", "SICK", "KICK", "LICK", "PICK", "QUICK", "TICK",
-                "WICK", "SIGN", "SINK", "INK", "LINK", "PINK", "RINK", "WINK", "SITE", "BITE", "KITE", "RITE", "SIZE", "SKIN",
-                "CHIN", "GRIN", "SPIN", "THIN", "TWIN", "SLAP", "CLAP", "TRAP", "WRAP", "SLID", "GRID", "RID", "SOAK", "CROAK",
-                "SOAP", "SOLD", "TOLD", "SOME", "COME", "SOON", "MOON", "NOON", "SORT", "FORT", "PORT", "SHORT", "SPOT", "STAY",
-                "SUIT", "SURE", "TAKE", "CAKE", "LAKE", "MAKE", "RAKE", "TALK", "WALK", "TALL", "BALL", "CALL", "FALL", "HALL",
-                "MALL", "WALL", "TEAM", "BEAM", "CREAM", "DREAM", "GLEAM", "SEAM", "STEAM", "STREAM", "TELL", "WELL", "YELL",
-                "THAN", "THAT", "THEM", "THEN", "WHEN", "THIN", "CHIN", "GRIN", "SKIN", "SPIN", "TWIN", "THIS", "TICK", "KICK",
-                "LICK", "PICK", "QUICK", "SICK", "WICK", "TIDE", "HIDE", "RIDE", "SIDE", "WIDE", "TIE", "DIE", "LIE", "PIE",
-                "TINY", "TONE", "BONE", "CONE", "GONE", "HONE", "LONE", "ZONE", "TOOK", "BOOK", "COOK", "HOOK", "LOOK", "TOOL",
-                "FOOL", "COOL", "POOL", "TRAP", "CLAP", "SLAP", "WRAP", "TREE", "FREE", "THREE", "TRIP", "CHIP", "FLIP", "GRIP",
-                "SHIP", "SKIP", "SLIP", "WHIP", "TRUE", "BLUE", "CLUE", "GLUE", "TUNE", "DUNE", "JUNE", "TURN", "BURN", "TYPE",
-                "HYPE", "RIPE", "WIPE", "UNIT", "UPON", "USED", "USER", "VAST", "PAST", "VERY", "VIEW", "VOTE", "WAIT", "BAIT",
-                "GAIT", "WAKE", "CAKE", "FAKE", "LAKE", "MAKE", "RAKE", "SAKE", "TAKE", "WANT", "HUNT", "PUNT", "RUNT", "WAR",
-                "JAR", "TAR", "WASH", "CASH", "DASH", "HASH", "LASH", "MASH", "RASH", "WAVE", "CAVE", "GAVE", "PAVE", "SAVE",
-                "WEAR", "BEAR", "DEAR", "FEAR", "GEAR", "HEAR", "NEAR", "REAR", "TEAR", "YEAR", "WEEK", "GEEK", "LEEK", "MEEK",
-                "SEEK", "WENT", "BENT", "DENT", "RENT", "SENT", "TENT", "WERE", "WEST", "BEST", "NEST", "REST", "TEST", "VEST",
-                "WHAT", "WHEN", "WHIP", "CHIP", "FLIP", "GRIP", "SHIP", "SKIP", "SLIP", "TRIP", "WHOM", "WIDE", "HIDE", "RIDE",
-                "SIDE", "TIDE", "WIFE", "KNIFE", "LIFE", "WILD", "MILD", "WILL", "BILL", "FILL", "HILL", "KILL", "MILL", "PILL",
-                "SILL", "TILL", "WIND", "BIND", "FIND", "HIND", "KIND", "MIND", "WINE", "DINE", "FINE", "LINE", "MINE", "NINE",
-                "PINE", "VINE", "WING", "BRING", "KING", "RING", "SING", "SLING", "SPRING", "STING", "SWING", "THING", "WIPE",
-                "PIPE", "RIPE", "TYPE", "WIRE", "FIRE", "HIRE", "TIRE", "WISE", "RISE", "WITH", "MYTH", "WORD", "WORK", "FORK",
-                "PORK", "WORN", "BORN", "CORN", "HORN", "MORN", "TORN", "YARD", "CARD", "HARD", "YAWN", "DAWN", "FAWN", "PAWN",
-                "YEAR", "DEAR", "FEAR", "GEAR", "HEAR", "NEAR", "REAR", "TEAR", "YELL", "BELL", "CELL", "FELL", "HELL", "SELL",
-                "TELL", "WELL", "YOUR", "FOUR", "HOUR", "POUR", "SOUR", "TOUR", "ZERO", "ZONE", "BONE", "CONE", "GONE", "HONE",
-                "LONE", "TONE", "BAKER", "MAKER", "TAKER", "BRAIN", "CHAIN", "GRAIN", "PLAIN", "RAINY", "SPAIN", "STAIN", "TRAIN",
-                "BEACH", "PEACH", "TEACH", "REACH", "BREAD", "DREAD", "STEAD", "THREAD", "TREAD", "CLEAN", "GLEAN", "LEANT", "MEANT",
-                "EARTH", "HEART", "HEAVY", "LEAVY", "READY", "STEADY", "LEMON", "MELON", "BEING", "BRING", "FLING", "SLING", "STING",
-                "SWING", "THING", "WRING", "BLAZE", "CRAZE", "GRAZE", "HAZEL", "MAIZE", "CHECK", "FLECK", "SPECK", "WRECK", "CHEEK",
-                "GREEK", "SLEEK", "CREEP", "SLEEP", "STEEP", "SWEEP", "CHESS", "GUESS", "PRESS", "STRESS", "CHILD", "MILDLY", "WILDLY",
-                "CHILL", "DRILL", "GRILL", "SKILL", "SPILL", "STILL", "THRILL", "CLIMB", "CRUMB", "DUMMY", "PLUMB", "THUMB", "CLOTH",
-                "BROTH", "FROTH", "SLOTH", "COACH", "POACH", "ROACH", "COAST", "BOAST", "ROAST", "TOAST", "COUNT", "MOUNT", "CROWN",
-                "BROWN", "CLOWN", "DROWN", "FROWN", "GROWN", "TOWNY", "DAILY", "GAILY", "DANCE", "FENCE", "HENCE", "PENCE", "SENSE",
-                "TENSE", "WHENCE", "DRIVE", "STRIVE", "THRIVE", "EMPTY", "ENTRY", "EQUAL", "EXTRA", "FABLE", "CABLE", "GABLE", "TABLE",
-                "FAINT", "PAINT", "SAINT", "TAINT", "FIELD", "SHIELD", "WIELD", "YIELD", "FIFTH", "SIXTH", "FIGHT", "LIGHT", "MIGHT",
-                "NIGHT", "RIGHT", "SIGHT", "TIGHT", "FINAL", "FLAME", "BLAME", "FRAME", "SHAME", "FLOOD", "BLOOD", "FOCUS", "FORGE",
-                "GORGE", "FOUND", "GROUND", "HOUND", "MOUND", "POUND", "ROUND", "SOUND", "WOUND", "FRESH", "FRONT", "FRUIT", "SUIT",
-                "FUNNY", "BUNNY", "HONEY", "MONEY", "RUNNY", "SUNNY", "GLASS", "GRASS", "GHOST", "HOSTS", "POSTS", "ROASTS", "TOASTS",
-                "GLOBE", "PROBE", "ROBES", "GLORY", "STORY", "GRACE", "PLACE", "SPACE", "TRACE", "GRADE", "SHADE", "SPADE", "TRADE",
-                "GREAT", "WHEAT", "GREEN", "QUEEN", "SCREEN", "SEEN", "TEEN", "GROUP", "DROOP", "SCOOP", "SNOOP", "STOOP", "SWOOP",
-                "TROOP", "GUARD", "GUIDE", "PRIDE", "SLIDE", "STRIDE", "GUILT", "BUILT", "QUILT", "HAPPY", "SAPPY", "HEARD", "BEARD",
-                "HOUSE", "BLOUSE", "MOUSE", "SPOUSE", "HUMAN", "IMAGE", "INDEX", "INPUT", "ISSUE", "JELLY", "BELLY", "FELLY", "TELLY",
-                "JOINT", "POINT", "JUDGE", "FUDGE", "GRUDGE", "NUDGE", "SLUDGE", "TRUDGE", "JUICE", "SLUICE", "LARGE", "BARGE", "CHARGE",
-                "LEARN", "EARNS", "YEARN", "LEAST", "BEAST", "FEAST", "YEAST", "LEAVE", "CLEAVE", "HEAVE", "WEAVE", "LEVEL", "REVEL",
-                "LIGHT", "MIGHT", "NIGHT", "RIGHT", "SIGHT", "TIGHT", "LOCAL", "VOCAL", "LOOSE", "GOOSE", "NOOSE", "MAGIC", "TRAGIC",
-                "MAJOR", "MAYOR", "MAPLE", "STAPLE", "MARCH", "PARCH", "STARCH", "MATCH", "BATCH", "CATCH", "HATCH", "LATCH", "PATCH",
-                "SNATCH", "THATCH", "WATCH", "METAL", "PETAL", "SETAL", "METER", "PETER", "MODEL", "NODAL", "TODAL", "YODEL", "MONTH",
-                "MORAL", "CORAL", "LORAL", "MUSIC", "NEVER", "CLEVER", "FEVER", "LEVER", "SEVER", "NOBLE", "NOISE", "POISE", "NORTH",
-                "WORTH", "NURSE", "CURSE", "PULSE", "WORSE", "OCEAN", "OFTEN", "ORDER", "BORDER", "OTHER", "BROTHER", "MOTHER", "SMOTHER",
-                "OUGHT", "BOUGHT", "BROUGHT", "FOUGHT", "NOUGHT", "SOUGHT", "THOUGHT", "WROUGHT", "OWNER", "PAPER", "TAPER", "VAPOR",
-                "PARTY", "HEARTY", "TARDY", "PEACE", "CEASE", "CREASE", "GREASE", "LEASE", "PHONE", "SHONE", "STONE", "TONER", "ZONER",
-                "PIANO", "PIECE", "NIECE", "PILOT", "PITCH", "BITCH", "DITCH", "HITCH", "WITCH", "PLACE", "GRACE", "SPACE", "TRACE",
-                "PLANT", "CHANT", "GRANT", "PANTS", "RANTS", "SLANT", "PLATE", "SLATE", "STATE", "POUND", "ROUND", "SOUND", "WOUND",
-                "POWER", "TOWER", "PRICE", "DICE", "MICE", "NICE", "RICE", "SLICE", "SPICE", "THRICE", "TWICE", "VICE", "PRIDE", "BRIDE",
-                "GUIDE", "SLIDE", "STRIDE", "PRIME", "CRIME", "GRIME", "SLIME", "PRINT", "FLINT", "GLINT", "HINT", "LINT", "MINT", "SPLINT",
-                "SQUINT", "TINT", "PRIZE", "PROUD", "CLOUD", "LOUD", "SHROUD", "PROVE", "GROOVE", "MOVE", "QUEEN", "GREEN", "SEEN", "TEEN",
-                "QUICK", "BRICK", "CHICK", "CLICK", "FLICK", "SLICK", "STICK", "THICK", "TRICK", "QUIET", "QUITE", "QUOTE", "RANGE", "CHANGE",
-                "GRANGE", "STRANGE", "REPLY", "IMPLY", "RIGHT", "FIGHT", "LIGHT", "MIGHT", "NIGHT", "SIGHT", "TIGHT", "RIVER", "DIVER", "GIVER",
-                "LIVER", "SHIVER", "ROBOT", "ROUND", "BOUND", "FOUND", "GROUND", "HOUND", "MOUND", "POUND", "SOUND", "WOUND", "ROYAL", "LOYAL",
-                "RULER", "RUMOR", "HUMOR", "TUMOR", "SAUCE", "SCALE", "STALE", "WHALE", "SCARE", "SHARE", "STARE", "SCENE", "SCORE", "SNORE",
-                "STORE", "SENSE", "DENSE", "TENSE", "SERVE", "CURVE", "NERVE", "SHAKE", "BRAKE", "CAKED", "FLAKE", "MAKER", "RAKED", "SNAKE",
-                "STAKE", "TAKER", "SHALL", "SHAPE", "DRAPE", "GRAPE", "SCRAPE", "SHARE", "SCARE", "STARE", "SHARK", "BARK", "DARK", "HARK",
-                "LARK", "MARK", "PARK", "SPARK", "STARK", "SHEET", "BLEET", "FLEET", "GREET", "MEET", "STREET", "SWEET", "TWEET", "SHELF",
-                "SHIRT", "DIRT", "FLIRT", "SKIRT", "SQUIRT", "SHORT", "FORT", "PORT", "SORT", "SIGHT", "FIGHT", "LIGHT", "MIGHT", "NIGHT",
-                "RIGHT", "TIGHT", "SILK", "MILK", "SINCE", "MINCE", "PRINCE", "WINCE", "SIXTY", "SKILL", "CHILL", "DRILL", "GRILL", "SPILL",
-                "STILL", "THRILL", "SLEEP", "CREEP", "JEEP", "KEEP", "PEEP", "STEEP", "SWEEP", "WEEP", "SLICE", "DICE", "MICE", "NICE", "PRICE",
-                "RICE", "SPICE", "THRICE", "TWICE", "VICE", "SMALL", "STALL", "SMILE", "WHILE", "SMOKE", "BROKE", "CHOKE", "POKE", "SPOKE",
-                "STROKE", "WOKE", "YOKE", "SOLID", "SOLVE", "SOUND", "FOUND", "GROUND", "HOUND", "MOUND", "POUND", "ROUND", "WOUND", "SOUTH",
-                "MOUTH", "SPACE", "GRACE", "PLACE", "TRACE", "SPEAK", "CREAK", "FREAK", "SNEAK", "SQUEAK", "STREAK", "WEAK", "SPEND", "BLEND",
-                "LEND", "MEND", "SEND", "TEND", "TREND", "SPOKE", "BROKE", "CHOKE", "SMOKE", "STROKE", "WOKE", "YOKE", "SPORT", "SHORT", "STAFF",
-                "STAGE", "CAGE", "PAGE", "RAGE", "SAGE", "WAGE", "STAND", "BRAND", "GLAND", "GRAND", "STRAND", "START", "CHART", "DART", "HART",
-                "MART", "PART", "SMART", "TART", "STATE", "SLATE", "PLATE", "STEAL", "MEAL", "REAL", "SEAL", "TEAL", "VEAL", "ZEAL", "STEAM",
-                "BEAM", "CREAM", "DREAM", "GLEAM", "SEAM", "STREAM", "TEAM", "STEEL", "FEEL", "HEEL", "PEEL", "REEL", "WHEEL", "STICK", "BRICK",
-                "CHICK", "CLICK", "FLICK", "QUICK", "SLICK", "THICK", "TRICK", "STILL", "CHILL", "DRILL", "GRILL", "SKILL", "SPILL", "THRILL",
-                "STONE", "PHONE", "SHONE", "TONER", "ZONER", "STOOD", "WOOD", "STORE", "CORE", "MORE", "PORE", "SCORE", "SHORE", "SNORE", "SORE",
-                "TORE", "WORE", "STORM", "FORM", "NORM", "WARM", "WORM", "STORY", "GLORY", "STUDY", "STYLE", "SMILE", "WHILE", "SUGAR", "SWEAT",
-                "THREAT", "TABLE", "CABLE", "FABLE", "GABLE", "TASTE", "HASTE", "PASTE", "WASTE", "THANK", "BANK", "BLANK", "CRANK", "DRANK",
-                "FRANK", "PLANK", "PRANK", "RANK", "SHANK", "SHRANK", "SPANK", "STANK", "TANK", "YANK", "THEIR", "THEME", "THERE", "WHERE",
-                "THESE", "THICK", "BRICK", "CHICK", "CLICK", "FLICK", "QUICK", "SLICK", "STICK", "TRICK", "THING", "BRING", "FLING", "KING",
-                "RING", "SING", "SLING", "SPRING", "STING", "SWING", "WING", "WRING", "THINK", "BLINK", "BRINK", "CLINK", "DRINK", "INK",
-                "LINK", "PINK", "RINK", "SHRINK", "SINK", "SLINK", "STINK", "WINK", "THIRD", "BIRD", "GIRD", "HERD", "NERD", "WORD", "THOSE",
-                "THREE", "FREE", "TREE", "THROW", "CROW", "GLOW", "GROW", "SHOW", "SLOW", "SNOW", "TODAY", "TONGUE", "TOUCH", "COUCH", "POUCH",
-                "SLOUCH", "VOUCH", "TOUGH", "ROUGH", "TOWEL", "VOWEL", "TOWER", "POWER", "TRADE", "GRADE", "SHADE", "SPADE", "TRAIN", "BRAIN",
-                "CHAIN", "DRAIN", "GRAIN", "PLAIN", "RAIN", "SPAIN", "STAIN", "TREAT", "BLEAT", "CHEAT", "WHEAT", "TREND", "BLEND", "LEND",
-                "MEND", "SEND", "SPEND", "TEND", "TRIAL", "TRIBE", "SCRIBE", "TRICK", "BRICK", "CHICK", "CLICK", "FLICK", "QUICK", "SLICK",
-                "STICK", "THICK", "TRULY", "DULY", "NEWLY", "TRUST", "BUST", "CRUST", "DUST", "GUST", "LUST", "MUST", "RUST", "TRUTH", "YOUTH",
-                "TWICE", "DICE", "MICE", "NICE", "PRICE", "RICE", "SLICE", "SPICE", "THRICE", "VICE", "UNCLE", "UNDER", "UNION", "UNITE", "UNTIL",
-                "UPSET", "USUAL", "VALUE", "VIDEO", "VOICE", "CHOICE", "REJOICE", "WASTE", "HASTE", "PASTE", "TASTE", "WATCH", "BATCH", "CATCH",
-                "HATCH", "LATCH", "MATCH", "PATCH", "SNATCH", "THATCH", "WATER", "WEIGH", "SLEIGH", "WHALE", "SCALE", "STALE", "WHEAT", "GREAT",
-                "TREAT", "WHEEL", "FEEL", "HEEL", "PEEL", "REEL", "STEEL", "WHERE", "THERE", "WHICH", "WHILE", "SMILE", "STYLE", "WHITE", "QUITE",
-                "WRITE", "WHOLE", "WHOSE", "WOMAN", "LEMON", "WORLD", "WORRY", "HURRY", "SORRY", "WOULD", "COULD", "SHOULD", "WRITE", "QUITE",
-                "WHITE", "WRONG", "ALONG", "STRONG", "YOUNG", "AMONG", "TONGUE", "BEAUTY", "BOTTLE", "BRAVELY", "BREAKFAST", "BUILDING",
-                "BUSINESS", "BUTTER", "BUTTON", "CABBAGE", "CAMERA", "CANDLE", "CARPET", "CASTLE", "CAREFUL", "CELERY", "CENTER", "CENTRE",
-                "CHAIR", "CHANCE", "CHANGE", "CHEESE", "CHICKEN", "CHIMNEY", "CHOICE", "CIRCLE", "CLIMATE", "CLOTHES", "COFFEE", "COLLECT",
-                "COLOUR", "COMFORT", "COMPANY", "COMPLETE", "COMPUTER", "CONTAIN", "CONTINUE", "CONVERSATION", "CORNER", "CORRECT", "COUNTRY",
-                "COURSE", "COVER", "CREATE", "CREATURE", "CULTURE", "CURTAIN", "DANGER", "DECIDE", "DECLARE", "DECREASE", "DELIGHT", "DELIVER",
-                "DEPEND", "DESCRIBE", "DESIGN", "DESTROY", "DEVELOP", "DIAMOND", "DIFFERENT", "DIFFICULT", "DIRECTION", "DISAPPEAR", "DISCOVER",
-                "DISCUSS", "DISTANCE", "DISTURB", "DIVIDE", "DOCTOR", "DOUBLE", "DOUBT", "DOZEN", "DURING", "EARLY", "EARTH", "EAST", "EASY",
-                "EIGHT", "EITHER", "ELECTRIC", "ELEPHANT", "EMPTY", "ENCOURAGE", "ENGINE", "ENJOY", "ENOUGH", "ENTER", "ENTRANCE", "ESCAPE",
-                "EVENING", "EVENT", "EVERY", "EXACT", "EXAMINE", "EXAMPLE", "EXCELLENT", "EXCEPT", "EXCITE", "EXCUSE", "EXERCISE", "EXIST",
-                "EXPECT", "EXPENSIVE", "EXPLAIN", "EXPLODE", "EXPLORE", "EXTRA", "FAMOUS", "FATHER", "FAVOURITE", "FEBRUARY", "FEMALE", "FINALLY",
-                "FINISH", "FLOWER", "FOREIGN", "FOREST", "FORGET", "FORGIVE", "FORWARD", "FRIEND", "FRIGHTEN", "FUTURE", "GARAGE", "GARDEN",
-                "GENERAL", "GIRAFFE", "GOVERNMENT", "GRAMMAR", "GROUP", "GROW", "GUARD", "GUIDE", "HAPPEN", "HAPPY", "HEAVY", "HEIGHT", "HISTORY",
-                "HOLIDAY", "HOSPITAL", "HOUR", "HOWEVER", "HUNGRY", "HUSBAND", "IMPORTANT", "IMPROVE", "INCLUDE", "INCREASE", "INDEED", "INSIDE",
-                "INSTEAD", "INSTRUCT", "INTEREST", "ISLAND", "JANUARY", "JOURNEY", "JULY", "JUNE", "KETTLE", "KITCHEN", "KNIFE", "KNOWLEDGE",
-                "LANGUAGE", "LAUGH", "LEARN", "LEAVE", "LENGTH", "LESSON", "LETTER", "LIBRARY", "LISTEN", "LITTLE", "MACHINE", "MAGAZINE",
-                "MARRIAGE", "MATERIAL", "MEASURE", "MEDICINE", "MEETING", "MENTION", "MIDDLE", "MILLION", "MINUTE", "MISTAKE", "MODERN",
-                "MOMENT", "MONEY", "MONTH", "MORNING", "MOTHER", "MOUNTAIN", "MUSIC", "NARROW", "NATION", "NATURE", "NEARLY", "NECESSARY",
-                "NEIGHBOUR", "NEITHER", "NERVE", "NEVER", "NOBODY", "NOISE", "NORMAL", "NORTH", "NOTHING", "NOTICE", "NOVEMBER", "NUMBER",
-                "OBEY", "OBJECT", "OCEAN", "OCTOBER", "OFFER", "OFFICE", "OFTEN", "OLD-FASHIONED", "ONCE", "ONLY", "OPEN", "OPPOSITE",
- "ORDINARY", "OTHER", "OURSELVES", "OUTSIDE", "PACKAGE", "PAGE", "PARENT", "PARTICULAR", "PASSAGE", "PAST", "PATIENCE", "PEACE",
-                "PENCIL", "PEOPLE", "PERHAPS", "PERSON", "PETROL", "PHOTOGRAPH", "PIECE", "PLACE", "PLANET", "PLANT", "PLENTY", "POCKET",
-                "POINT", "POLICE", "POLITE", "POOR", "POPULAR", "POSITION", "POSSESS", "POSSIBLE", "POST", "POTATO", "POUR", "POWER", "PREPARE",
-                "PRESENT", "PRESIDENT", "PRESS", "PRETTY", "PREVENT", "PRICE", "PRISON", "PRIVATE", "PRIZE", "PROBABLY", "PRODUCE", "PROMISE",
-                "PROMPT", "PRONOUNCE", "PROTECT", "PROVIDE", "PUBLIC", "PULL", "PUNISH", "PUPIL", "PUSH", "QUARTER", "QUEEN", "QUESTION", "QUICK",
-                "QUIET", "QUITE", "RADIO", "RAIN", "RANGE", "REACH", "READ", "READY", "RECEIVE", "RECENT", "RECORD", "RED", "REMEMBER", "REMIND",
-                "RENT", "REPAIR", "REPEAT", "REPLY", "REPORT", "REST", "RESTAURANT", "RESULT", "RETURN", "RICE", "RICH", "RIDE", "RIGHT",
-                "RISE", "RIVER", "ROAD", "ROB", "ROCK", "ROOM", "ROUND", "RUBBER", "RUDE", "RULE", "RUN", "RUSH", "SAFE", "SAIL", "SALT",
-                "SAME", "SANDWICH", "SATURDAY", "SAVE", "SAY", "SCHOOL", "SCIENCE", "SCISSORS", "SEARCH", "SEAT", "SECOND", "SECRETARY", "SEE",
-                "SEEM", "SELL", "SEND", "SENTENCE", "SEPARATE", "SEPTEMBER", "SERIOUS", "SERVE", "SEVEN", "SEVERAL", "SHADOW", "SHAKE", "SHAPE",
-                "SHARE", "SHARP", "SHE", "SHEEP", "SHEET", "SHELF", "SHINE", "SHIP", "SHIRT", "SHOE", "SHOOT", "SHOP", "SHORT", "SHOUT",
-                "SHOW", "SHUT", "SIDE", "SIGN", "SIGNAL", "SILENCE", "SILLY", "SILVER", "SIMILAR", "SIMPLE", "SINCE", "SING", "SINGLE", "SISTER",
-                "SIT", "SIX", "SIZE", "SKILL", "SKIN", "SKIRT", "SKY", "SLEEP", "SLOW", "SMALL", "SMART", "SMELL", "SMILE", "SMOKE", "SNOW",
-                "SOAP", "SOCK", "SOFT", "SOME", "SOMEBODY", "SOMEONE", "SOMETHING", "SOMETIMES", "SON", "SOON", "SORRY", "SOUND", "SOUP",
-                "SOUTH", "SPACE", "SPEAK", "SPECIAL", "SPEED", "SPELL", "SPEND", "SPOON", "SPORT", "SPREAD", "SPRING", "SQUARE", "STAMP",
-                "STAND", "STAR", "START", "STATION", "STAY", "STEAL", "STEAM", "STEP", "STILL", "STOMACH", "STONE", "STOP", "STORE", "STORM",
-                "STORY", "STRANGE", "STREET", "STRONG", "STRUCTURE", "STUDENT", "STUDY", "STUPID", "SUBJECT", "SUBSTANCE", "SUCCESSFUL", "SUCH",
-                "SUDDEN", "SUGAR", "SUGGEST", "SUIT", "SUMMER", "SUN", "SUNDAY", "SUPPOSE", "SURE", "SURPRISE", "SWEET", "SWIM", "SWORD", "TABLE",
-                "TAKE", "TALK", "TALL", "TASTE", "TAXI", "TEA", "TEACH", "TEAM", "TEAR", "TELEPHONE", "TELEVISION", "TELL", "TEMPERATURE", "TEN",
-                "TERM", "TERRIBLE", "TEST", "THAN", "THANK", "THEATRE", "THEIR", "THEM", "THEMSELVES", "THEN", "THERE", "THESE", "THEY", "THICK",
-                "THIEF", "THIN", "THING", "THINK", "THIRD", "THIRSTY", "THIRTEEN", "THIRTY", "THIS", "THOSE", "THOUGH", "THOUGHT", "THOUSAND",
-                "THROAT", "THROUGH", "THROW", "THURSDAY", "TICKET", "TIDY", "TIE", "TIME", "TIN", "TIRED", "TITLE", "TOBACCO", "TODAY", "TOE",
-                "TOGETHER", "TOMATO", "TOMORROW", "TONGUE", "TONIGHT", "TOO", "TOOTH", "TOP", "TOTAL", "TOUCH", "TOUR", "TOWARDS", "TOWN", "TRAFFIC",
-                "TRAIN", "TRANSLATE", "TRAVEL", "TREAT", "TREE", "TROUBLE", "TROUSERS", "TRUE", "TRUST", "TRY", "TUESDAY", "TURN", "TWELVE",
-                "TWENTY", "TWICE", "TYPE", "UGLY", "UMBRELLA", "UNCLE", "UNDER", "UNDERSTAND", "UNTIL", "UPSTAIRS", "USUAL", "USUALLY", "VEGETABLE",
-                "VERY", "VILLAGE", "VOICE", "VISIT", "WAIT", "WAKE", "WALK", "WANT", "WARM", "WASH", "WASTE", "WATCH", "WATER", "WAY", "WEAK", "WEAR",
-                "WEATHER", "WEDNESDAY", "WEEK", "WEIGH", "WELCOME", "WELL", "WEST", "WHAT", "WHEAT", "WHEEL", "WHEN", "WHERE", "WHICH", "WHILE",
-                "WHITE", "WHO", "WHOLE", "WHOSE", "WHY", "WIDE", "WIFE", "WILD", "WILL", "WIN", "WIND", "WINDOW", "WINE", "WINTER", "WIRE", "WISE",
-                "WISH", "WITH", "WITHOUT", "WOMAN", "WONDER", "WONDERFUL", "WOOD", "WOOL", "WORD", "WORK", "WORLD", "WORRY", "WORSE", "WORST",
-                "WORTH", "WOULD", "WOUND", "WRITE", "WRONG", "YARD", "YEAR", "YELLOW", "YES", "YESTERDAY", "YET", "YOU", "YOUNG", "YOUR", "ZERO",
-                "PANGRAM"
-            ];
+<script>
+(function () {
+    "use strict";
 
-            // WORD_SET will be populated from `wordlist.txt` if present. It provides O(1)
-            // lookup for word validation. If loading fails we fall back to DICTIONARY.
-            let WORD_SET = null;
+    /* =========================================================
+       Baker's Dozen Solitaire
+       - 52 cards dealt into 13 columns of 4 (face up).
+       - Classic rule: any KING dealt into a column is moved to
+         the BOTTOM of that column at deal time, so it never
+         buries a lower card it can't be placed on.
+       - Only the bottom (last) card of a column is in play.
+       - Build down by rank (suit irrelevant) within tableau.
+       - Foundations build up by suit from Ace to King.
+       - Empty columns may NOT be refilled.
+       - Win when all 52 cards reach foundations.
+       ========================================================= */
 
-            async function loadWordlist() {
-                // Try sources in order:
-                // 1) Remote dwyl/english-words raw file (fast, openly licensed)
-                // 2) local wordlist_dwyl.txt (if you prefer to store it locally)
-                // 3) local wordlist.txt (legacy / manual replacement)
-                // 4) fallback to embedded DICTIONARY
-                const candidates = [
-                    'https://raw.githubusercontent.com/dwyl/english-words/master/words_alpha.txt',
-                    'wordlist_dwyl.txt',
-                    'wordlist.txt'
-                ];
+    var SUITS = ["spades", "hearts", "diamonds", "clubs"];
+    var SUIT_SYMBOL = { spades: "♠", hearts: "♥", diamonds: "♦", clubs: "♣" };
+    var SUIT_COLOR = { spades: "black", clubs: "black", hearts: "red", diamonds: "red" };
+    var RANK_NAMES = [null, "A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"]; // 1..13
+    var NUM_COLS = 13;
 
-                for (const url of candidates) {
-                    try {
-                        const resp = await fetch(url);
-                        if (!resp.ok) throw new Error('HTTP ' + resp.status);
-                        const txt = await resp.text();
-                        const words = txt
-                            .split(/\r?\n/)
-                            .map(w => w.trim().toUpperCase())
-                            .filter(w => w && !w.startsWith('#'));
-                        if (words.length > 0) {
-                            WORD_SET = new Set(words);
-                            console.log('Loaded wordlist from', url, 'with', WORD_SET.size, 'words');
-                            return;
-                        }
-                    } catch (err) {
-                        console.warn('Could not load wordlist from', url, err);
-                        // try next candidate
-                    }
-                }
+    // --- DOM refs ---
+    var tableauEl = document.getElementById("tableau");
+    var foundationsEl = document.getElementById("foundations");
+    var timeEl = document.getElementById("time");
+    var movesEl = document.getElementById("moves");
+    var bestEl = document.getElementById("best");
+    var winsEl = document.getElementById("wins");
+    var modalEl = document.getElementById("modal");
+    var modalTitle = document.getElementById("modal-title");
+    var modalMsg = document.getElementById("modal-msg");
+    var mTime = document.getElementById("m-time");
+    var mMoves = document.getElementById("m-moves");
 
-                // Final fallback
-                console.warn('Falling back to embedded DICTIONARY');
-                WORD_SET = new Set(DICTIONARY);
+    // --- Game state ---
+    var columns = [];      // array of 13 arrays of card objects (top->bottom; last = playable)
+    var foundations = {};  // suit -> top rank int (0 = empty)
+    var cards = {};        // id -> card object
+    var history = [];      // undo stack
+    var moves = 0;
+    var startTime = 0;
+    var elapsedBeforePause = 0;
+    var timerId = null;
+    var gameWon = false;
+    var soundOn = true;
+    var selected = null;   // currently selected card id (click-mode)
+    var autoRunning = false;
+    var layoutPending = false;
+
+    // --- Persisted stats ---
+    var LS_KEY = "bakersDozenSolitaire";
+    var stats = loadStats();
+
+    function loadStats() {
+        try {
+            var raw = localStorage.getItem(LS_KEY);
+            if (raw) {
+                var s = JSON.parse(raw);
+                return { bestTime: s.bestTime || null, wins: s.wins || 0 };
             }
+        } catch (e) {}
+        return { bestTime: null, wins: 0 };
+    }
+    function saveStats() {
+        try { localStorage.setItem(LS_KEY, JSON.stringify(stats)); } catch (e) {}
+    }
 
-            function hasValidWord(center, outers) {
-                const allLetters = new Set([center, ...outers]);
-                // Choose source: prefer WORD_SET (loaded file), otherwise fallback to DICTIONARY array
-                const source = WORD_SET ? Array.from(WORD_SET) : DICTIONARY;
-                for (const word of source) {
-                    if (word.length < 4 || !word.includes(center)) {
-                        continue;
-                    }
-
-                    let possible = true;
-                    // Check if all letters in the word are available on the board
-                    const wordLetters = [...word];
-                    for (const letter of wordLetters) {
-                        if (!allLetters.has(letter)) {
-                            possible = false;
-                            break;
-                        }
-                    }
-
-                    if (possible) {
-                        return true; // Found at least one valid word
-                    }
-                }
-                return false; // No valid words found
+    /* ---------------- Audio (WebAudio, try/catch wrapped) ---------------- */
+    var audioCtx = null;
+    function ensureAudio() {
+        if (!soundOn) return null;
+        try {
+            if (!audioCtx) {
+                var AC = window.AudioContext || window.webkitAudioContext;
+                if (!AC) return null;
+                audioCtx = new AC();
             }
+            if (audioCtx.state === "suspended") { audioCtx.resume(); }
+            return audioCtx;
+        } catch (e) { return null; }
+    }
+    function tone(freq, dur, type, vol, when) {
+        try {
+            var ctx = ensureAudio();
+            if (!ctx) return;
+            var t0 = ctx.currentTime + (when || 0);
+            var osc = ctx.createOscillator();
+            var gain = ctx.createGain();
+            osc.type = type || "sine";
+            osc.frequency.setValueAtTime(freq, t0);
+            gain.gain.setValueAtTime(0.0001, t0);
+            gain.gain.exponentialRampToValueAtTime(vol || 0.12, t0 + 0.01);
+            gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(t0);
+            osc.stop(t0 + dur + 0.02);
+        } catch (e) {}
+    }
+    var SFX = {
+        move: function () { tone(320, 0.08, "triangle", 0.10); },
+        foundation: function () { tone(540, 0.10, "sine", 0.12); tone(760, 0.12, "sine", 0.10, 0.05); },
+        invalid: function () { tone(150, 0.16, "sawtooth", 0.09); },
+        select: function () { tone(440, 0.05, "sine", 0.07); },
+        win: function () {
+            var notes = [523, 587, 659, 698, 784, 880, 988, 1047];
+            for (var i = 0; i < notes.length; i++) { tone(notes[i], 0.22, "sine", 0.11, i * 0.10); }
+        }
+    };
 
-            function init() {
-                score = 0;
-                foundWords = [];
-                currentWord = '';
-                generateLetters();
-                updateDisplay();
-                gameOverModal.classList.add('hidden');
+    /* ---------------- Deck / deal ---------------- */
+    function buildDeck() {
+        var deck = [];
+        var idc = 0;
+        for (var s = 0; s < SUITS.length; s++) {
+            for (var r = 1; r <= 13; r++) {
+                deck.push({ id: "c" + (idc++), suit: SUITS[s], rank: r, el: null });
             }
+        }
+        return deck;
+    }
+    function shuffle(arr) {
+        for (var i = arr.length - 1; i > 0; i--) {
+            var j = Math.floor(Math.random() * (i + 1));
+            var t = arr[i]; arr[i] = arr[j]; arr[j] = t;
+        }
+        return arr;
+    }
 
-            function generateLetters() {
-                let newCenter, newOuters;
-                let attempts = 0; // Failsafe to prevent infinite loops
-                do {
-                    // Pick a center letter (vowel)
-                    newCenter = VOWELS[Math.floor(Math.random() * VOWELS.length)];
-
-                    // Pick outer letters
-                    newOuters = [];
-                    const allLetters = VOWELS + CONSONANTS;
-                    while (newOuters.length < 6) {
-                        const newLetter = allLetters[Math.floor(Math.random() * allLetters.length)];
-                        if (newLetter !== newCenter && !newOuters.includes(newLetter)) {
-                            newOuters.push(newLetter);
-                        }
-                    }
-                    attempts++;
-                } while (!hasValidWord(newCenter, newOuters) && attempts < 200); 
-
-                centerLetter = newCenter;
-                outerLetters = newOuters;
+    function deal() {
+        var deck = shuffle(buildDeck());
+        columns = [];
+        cards = {};
+        for (var c = 0; c < NUM_COLS; c++) columns.push([]);
+        // deal 4 cards to each of 13 columns
+        var di = 0;
+        for (var row = 0; row < 4; row++) {
+            for (var col = 0; col < NUM_COLS; col++) {
+                var card = deck[di++];
+                cards[card.id] = card;
+                columns[col].push(card);
             }
-            
-            function updateDisplay() {
-                // Update score and word count
-                scoreEl.textContent = score;
-                wordCountEl.textContent = `${foundWords.length} / ${GAME_END_COUNT}`;
-
-                // Update current word
-                currentWordEl.textContent = currentWord;
-
-                // Update letter hexagons
-                centerHexEl.textContent = centerLetter;
-                outerHexEls.forEach((hex, i) => {
-                    hex.textContent = outerLetters[i];
-                });
-
-                // Update found words list
-                foundWordsEl.innerHTML = '';
-                const sortedWords = [...foundWords].sort();
-                sortedWords.forEach(word => {
-                    const wordDiv = document.createElement('div');
-                    wordDiv.textContent = word;
-                    wordDiv.className = 'px-2 py-1 bg-gray-200 rounded';
-                    foundWordsEl.appendChild(wordDiv);
-                });
+        }
+        // Classic Baker's Dozen: move every King to the bottom of its column.
+        for (var k = 0; k < NUM_COLS; k++) {
+            var colArr = columns[k];
+            var kings = [];
+            var rest = [];
+            for (var x = 0; x < colArr.length; x++) {
+                if (colArr[x].rank === 13) kings.push(colArr[x]);
+                else rest.push(colArr[x]);
             }
+            // kings first (top), non-kings after, so kings sit deepest (top of the visible stack,
+            // i.e. NOT the playable bottom card) — this prevents a King from blocking the column.
+            columns[k] = kings.concat(rest);
+        }
+        foundations = { spades: 0, hearts: 0, diamonds: 0, clubs: 0 };
+    }
 
-            function handleLetterClick(letter) {
-                currentWord += letter;
-                updateDisplay();
+    /* ---------------- Card element building ---------------- */
+    function buildCardEl(card) {
+        var el = document.createElement("div");
+        el.className = "card " + SUIT_COLOR[card.suit];
+        el.dataset.id = card.id;
+        var sym = SUIT_SYMBOL[card.suit];
+        var rk = RANK_NAMES[card.rank];
+        el.innerHTML =
+            '<div class="corner tl"><span class="rank">' + rk + '</span><span class="pip">' + sym + '</span></div>' +
+            '<div class="center-pip">' + sym + '</div>' +
+            '<div class="corner br"><span class="rank">' + rk + '</span><span class="pip">' + sym + '</span></div>';
+        card.el = el;
+        attachCardHandlers(card, el);
+        return el;
+    }
+
+    /* ---------------- Render ---------------- */
+    function render() {
+        // foundations
+        foundationsEl.innerHTML = "";
+        for (var s = 0; s < SUITS.length; s++) {
+            var suit = SUITS[s];
+            var slot = document.createElement("div");
+            slot.className = "slot " + SUIT_COLOR[suit];
+            slot.dataset.suit = suit;
+            if (foundations[suit] > 0) {
+                var topCard = { suit: suit, rank: foundations[suit] };
+                var faux = document.createElement("div");
+                faux.className = "card " + SUIT_COLOR[suit];
+                faux.style.position = "relative";
+                var sym = SUIT_SYMBOL[suit], rk = RANK_NAMES[foundations[suit]];
+                faux.innerHTML =
+                    '<div class="corner tl"><span class="rank">' + rk + '</span><span class="pip">' + sym + '</span></div>' +
+                    '<div class="center-pip">' + sym + '</div>' +
+                    '<div class="corner br"><span class="rank">' + rk + '</span><span class="pip">' + sym + '</span></div>';
+                slot.appendChild(faux);
+            } else {
+                var label = document.createElement("div");
+                label.className = "slot-suit";
+                label.textContent = SUIT_SYMBOL[suit];
+                slot.appendChild(label);
             }
+            foundationsEl.appendChild(slot);
+        }
 
-            function handleClear() {
-                currentWord = currentWord.slice(0, -1);
-                updateDisplay();
+        // tableau
+        tableauEl.innerHTML = "";
+        for (var c = 0; c < NUM_COLS; c++) {
+            var colEl = document.createElement("div");
+            colEl.className = "column";
+            colEl.dataset.col = c;
+            var colArr = columns[c];
+            if (colArr.length === 0) {
+                var base = document.createElement("div");
+                base.className = "col-base";
+                colEl.appendChild(base);
             }
-
-            function handleShuffle() {
-                // Fisher-Yates shuffle
-                for (let i = outerLetters.length - 1; i > 0; i--) {
-                    const j = Math.floor(Math.random() * (i + 1));
-                    [outerLetters[i], outerLetters[j]] = [outerLetters[j], outerLetters[i]];
-                }
-                updateDisplay();
+            for (var i = 0; i < colArr.length; i++) {
+                var card = colArr[i];
+                var el = card.el || buildCardEl(card);
+                el.classList.remove("selected", "dragging", "hint");
+                colEl.appendChild(el);
             }
+            tableauEl.appendChild(colEl);
+        }
+        layout();
+        updateMovableClasses();
+        updateHud();
+    }
 
-            function handleEnter() {
-                const word = currentWord.toUpperCase();
-
-                // 1. Check length
-                if (word.length < 4) {
-                    showNotification("Word must be at least 4 letters long");
-                    wordDisplayContainer.classList.add('shake');
-                    setTimeout(() => wordDisplayContainer.classList.remove('shake'), 500);
-                    return;
-                }
-
-                // 2. Check if center letter is used
-                if (!word.includes(centerLetter)) {
-                    showNotification("Must use the center letter");
-                    wordDisplayContainer.classList.add('shake');
-                    setTimeout(() => wordDisplayContainer.classList.remove('shake'), 500);
-                    return;
-                }
-
-                // 3. Check if already found
-                if (foundWords.includes(word)) {
-                    showNotification("Already found");
-                    currentWord = '';
-                    updateDisplay();
-                    return;
-                }
-
-                // 4. Check if it's a real word (prefer loaded wordlist)
-                if (!(WORD_SET ? WORD_SET.has(word) : DICTIONARY.includes(word))) {
-                    showNotification("Not in word list");
-                    wordDisplayContainer.classList.add('shake');
-                    setTimeout(() => wordDisplayContainer.classList.remove('shake'), 500);
-                    currentWord = '';
-                    updateDisplay();
-                    return;
-                }
-                
-                // Word is valid!
-                foundWords.push(word);
-                
-                // Calculate score
-                let wordScore = word.length;
-                const uniqueLetters = new Set(word);
-                
-                // Pangram check (uses all 7 letters)
-                if (uniqueLetters.size === 7) {
-                    wordScore = Math.round(wordScore * 1.5);
-                    showNotification("Pangram! + " + wordScore + " pts");
-                } else {
-                     showNotification("Nice! + " + wordScore + " pts");
-                }
-
-                score += wordScore;
-
-                // The core mechanic: replace used outer letters
-                replaceUsedLetters(word);
-
-                currentWord = '';
-                updateDisplay();
-
-                // Check for game over
-                if (foundWords.length >= GAME_END_COUNT) {
-                    endGame();
-                }
+    // Position cards absolutely with a fanned overlap based on card height.
+    function layout() {
+        var cs = getComputedStyle(document.documentElement);
+        var cardH = parseFloat(cs.getPropertyValue("--card-h")) || 110;
+        // overlap so up to 13-deep columns still fit; show ~26% of each buried card
+        var overlap = Math.max(18, Math.round(cardH * 0.26));
+        for (var c = 0; c < NUM_COLS; c++) {
+            var colArr = columns[c];
+            var colEl = tableauEl.children[c];
+            if (!colEl) continue;
+            var maxOffset = 0;
+            for (var i = 0; i < colArr.length; i++) {
+                var el = colArr[i].el;
+                if (!el) continue;
+                var top = i * overlap;
+                el.style.top = top + "px";
+                el.style.zIndex = String(10 + i);
+                maxOffset = top + cardH;
             }
-            
-            function replaceUsedLetters(word) {
-                const usedIndices = outerLetters
-                    .map((letter, index) => word.includes(letter) ? index : -1)
-                    .filter(index => index !== -1);
-            
-                if (usedIndices.length === 0) return;
-            
-                let candidateOuterLetters;
-                let attempts = 0; // Failsafe to prevent infinite loops
-            
-                do {
-                    candidateOuterLetters = [...outerLetters];
-                    const allPossibleLetters = (VOWELS + CONSONANTS).split('');
-            
-                    // For each index that needs a new letter, find a valid replacement
-                    for (const index of usedIndices) {
-                        let newLetter;
-                        let pickAttempts = 0;
-                        do {
-                            newLetter = allPossibleLetters[Math.floor(Math.random() * allPossibleLetters.length)];
-                            pickAttempts++;
-                        } while (
-                            (candidateOuterLetters.includes(newLetter) || newLetter === centerLetter) && pickAttempts < 100
-                        );
-                        candidateOuterLetters[index] = newLetter;
-                    }
-                    attempts++;
-                } while (!hasValidWord(centerLetter, candidateOuterLetters) && attempts < 100); 
-            
-                outerLetters = candidateOuterLetters;
+            colEl.style.height = (colArr.length ? maxOffset : cardH) + "px";
+        }
+    }
+
+    function updateMovableClasses() {
+        for (var c = 0; c < NUM_COLS; c++) {
+            var colArr = columns[c];
+            for (var i = 0; i < colArr.length; i++) {
+                var el = colArr[i].el;
+                if (!el) continue;
+                var isBottom = (i === colArr.length - 1);
+                el.classList.toggle("movable", isBottom);
+                el.style.cursor = isBottom ? "pointer" : "default";
             }
+        }
+    }
 
-            function showNotification(message) {
-                notificationEl.textContent = message;
-                notificationEl.classList.remove('opacity-0');
-                setTimeout(() => {
-                    notificationEl.classList.add('opacity-0');
-                }, 2000);
+    /* ---------------- HUD ---------------- */
+    function fmtTime(ms) {
+        var s = Math.floor(ms / 1000);
+        var m = Math.floor(s / 60);
+        s = s % 60;
+        return m + ":" + (s < 10 ? "0" : "") + s;
+    }
+    function updateHud() {
+        movesEl.textContent = String(moves);
+        bestEl.textContent = stats.bestTime ? fmtTime(stats.bestTime) : "--";
+        winsEl.textContent = String(stats.wins);
+    }
+    function startTimer() {
+        stopTimer();
+        startTime = Date.now();
+        elapsedBeforePause = 0;
+        timerId = setInterval(function () {
+            timeEl.textContent = fmtTime(currentElapsed());
+        }, 250);
+    }
+    function stopTimer() {
+        if (timerId) { clearInterval(timerId); timerId = null; }
+    }
+    function currentElapsed() {
+        return elapsedBeforePause + (startTime ? (Date.now() - startTime) : 0);
+    }
+
+    /* ---------------- Rules helpers ---------------- */
+    function bottomCard(col) {
+        var a = columns[col];
+        return a.length ? a[a.length - 1] : null;
+    }
+    function findCardCol(id) {
+        for (var c = 0; c < NUM_COLS; c++) {
+            var a = columns[c];
+            if (a.length && a[a.length - 1].id === id) return c; // only meaningful if it's the bottom card
+        }
+        // fallback: locate anywhere
+        for (var c2 = 0; c2 < NUM_COLS; c2++) {
+            var a2 = columns[c2];
+            for (var i = 0; i < a2.length; i++) if (a2[i].id === id) return c2;
+        }
+        return -1;
+    }
+    function isPlayable(id) {
+        var col = findCardCol(id);
+        if (col < 0) return false;
+        var b = bottomCard(col);
+        return b && b.id === id;
+    }
+    // tableau move legal? source bottom card onto dest bottom card, one rank lower
+    function canMoveToColumn(srcCol, destCol) {
+        if (srcCol === destCol) return false;
+        var src = bottomCard(srcCol);
+        if (!src) return false;
+        var dest = bottomCard(destCol);
+        if (!dest) return false; // empty columns can't be refilled
+        return src.rank === dest.rank - 1;
+    }
+    function canMoveToFoundation(card) {
+        if (!card) return false;
+        return foundations[card.suit] === card.rank - 1;
+    }
+
+    /* ---------------- Move execution ---------------- */
+    function snapshot() {
+        var snap = {
+            columns: columns.map(function (a) { return a.map(function (c) { return c.id; }); }),
+            foundations: { spades: foundations.spades, hearts: foundations.hearts, diamonds: foundations.diamonds, clubs: foundations.clubs },
+            moves: moves
+        };
+        history.push(snap);
+        if (history.length > 600) history.shift();
+        document.getElementById("undo-btn").disabled = false;
+    }
+
+    function restore(snap) {
+        columns = snap.columns.map(function (ids) { return ids.map(function (id) { return cards[id]; }); });
+        foundations = {
+            spades: snap.foundations.spades, hearts: snap.foundations.hearts,
+            diamonds: snap.foundations.diamonds, clubs: snap.foundations.clubs
+        };
+        moves = snap.moves;
+    }
+
+    // animate a card flying from its current screen pos to a target rect, then re-render
+    function moveCardToFoundation(srcCol, opts) {
+        var card = bottomCard(srcCol);
+        if (!canMoveToFoundation(card)) return false;
+        snapshot();
+        columns[srcCol].pop();
+        foundations[card.suit] = card.rank;
+        moves++;
+        if (!(opts && opts.silent)) SFX.foundation();
+        animateAndRender(card, true);
+        afterMove();
+        return true;
+    }
+
+    function moveCardToColumn(srcCol, destCol, opts) {
+        if (!canMoveToColumn(srcCol, destCol)) return false;
+        snapshot();
+        var card = columns[srcCol].pop();
+        columns[destCol].push(card);
+        moves++;
+        if (!(opts && opts.silent)) SFX.move();
+        animateAndRender(card, false);
+        afterMove();
+        return true;
+    }
+
+    // Re-render then add a small pop to the moved card / foundation slot.
+    function animateAndRender(card, toFoundation) {
+        render();
+        if (toFoundation) {
+            var slot = foundationsEl.querySelector('.slot[data-suit="' + card.suit + '"] .card');
+            if (slot) { slot.classList.add("pop"); setTimeout(function () { slot.classList.remove("pop"); }, 340); }
+        }
+    }
+
+    function afterMove() {
+        clearSelection();
+        updateHud();
+        checkWin();
+    }
+
+    /* ---------------- Win ---------------- */
+    function isWon() {
+        return foundations.spades === 13 && foundations.hearts === 13 &&
+               foundations.diamonds === 13 && foundations.clubs === 13;
+    }
+    function checkWin() {
+        if (gameWon || !isWon()) return;
+        gameWon = true;
+        autoRunning = false;
+        stopTimer();
+        elapsedBeforePause = currentElapsed();
+        var finalMs = elapsedBeforePause;
+        stats.wins++;
+        if (!stats.bestTime || finalMs < stats.bestTime) stats.bestTime = finalMs;
+        saveStats();
+        updateHud();
+        SFX.win();
+        startFireworks();
+        mTime.textContent = fmtTime(finalMs);
+        mMoves.textContent = String(moves);
+        modalTitle.textContent = "You Win!";
+        modalMsg.textContent = "All 52 cards are home. Well played!";
+        setTimeout(function () { modalEl.classList.remove("hidden"); }, 700);
+    }
+
+    /* ---------------- Selection (click-to-move) ---------------- */
+    function clearSelection() {
+        if (selected && cards[selected] && cards[selected].el) {
+            cards[selected].el.classList.remove("selected");
+        }
+        selected = null;
+        clearDropTargets();
+    }
+    function selectCard(id) {
+        clearSelection();
+        selected = id;
+        if (cards[id] && cards[id].el) cards[id].el.classList.add("selected");
+        SFX.select();
+        highlightDropTargets(id);
+    }
+    function highlightDropTargets(id) {
+        var srcCol = findCardCol(id);
+        var card = bottomCard(srcCol);
+        // foundation targets
+        for (var s = 0; s < SUITS.length; s++) {
+            if (card && card.suit === SUITS[s] && canMoveToFoundation(card)) {
+                var slot = foundationsEl.querySelector('.slot[data-suit="' + SUITS[s] + '"]');
+                if (slot) slot.classList.add("drop-ok");
             }
-
-            function endGame() {
-                finalScoreEl.textContent = score;
-                gameOverModal.classList.remove('hidden');
+        }
+        // column targets
+        for (var c = 0; c < NUM_COLS; c++) {
+            if (canMoveToColumn(srcCol, c)) {
+                var colEl = tableauEl.children[c];
+                if (colEl) colEl.classList.add("col-drop-ok");
             }
+        }
+    }
+    function clearDropTargets() {
+        var slots = foundationsEl.querySelectorAll(".slot.drop-ok");
+        for (var i = 0; i < slots.length; i++) slots[i].classList.remove("drop-ok");
+        var cols = tableauEl.querySelectorAll(".column.col-drop-ok");
+        for (var j = 0; j < cols.length; j++) cols[j].classList.remove("col-drop-ok");
+    }
 
-            // Event Listeners
-            centerHexEl.addEventListener('click', () => handleLetterClick(centerLetter));
-            outerHexEls.forEach((hex, i) => {
-                hex.addEventListener('click', () => handleLetterClick(outerLetters[i]));
-            });
-            clearBtn.addEventListener('click', handleClear);
-            shuffleBtn.addEventListener('click', handleShuffle);
-            enterBtn.addEventListener('click', handleEnter);
-            playAgainBtn.addEventListener('click', init);
-            
-            // Keyboard support
-            document.addEventListener('keydown', (e) => {
-                const key = e.key.toUpperCase();
-                const allLettersOnBoard = [centerLetter, ...outerLetters];
+    function shakeCard(id) {
+        var el = cards[id] && cards[id].el;
+        if (!el) return;
+        el.classList.remove("shake");
+        void el.offsetWidth; // reflow to restart anim
+        el.classList.add("shake");
+        setTimeout(function () { el.classList.remove("shake"); }, 420);
+    }
 
-                if (key === 'ENTER') {
-                    handleEnter();
-                } else if (key === 'BACKSPACE') {
-                    handleClear();
-                } else if (allLettersOnBoard.includes(key)) {
-                    handleLetterClick(key);
-                } else if (key === ' ') { // Use spacebar to shuffle
-                    e.preventDefault();
-                    handleShuffle();
-                }
-            });
+    // Attempt to act on a click target given an already-selected source card.
+    function tryPlaySelectedTo(destColMaybe) {
+        var srcCol = findCardCol(selected);
+        if (srcCol < 0) { clearSelection(); return; }
+        var card = bottomCard(srcCol);
 
+        if (destColMaybe === "foundation") {
+            if (moveCardToFoundation(srcCol)) return;
+            SFX.invalid(); shakeCard(selected); return;
+        }
+        if (typeof destColMaybe === "number") {
+            if (moveCardToColumn(srcCol, destColMaybe)) return;
+            SFX.invalid(); shakeCard(selected); clearSelection();
+            return;
+        }
+    }
 
-            // Start the game: load external wordlist first (if present), then initialize.
-            loadWordlist().then(() => init());
+    /* ---------------- Card event handlers (click + drag) ---------------- */
+    var drag = null; // {id, startX, startY, offX, offY, moved, srcCol}
+
+    function attachCardHandlers(card, el) {
+        // double click -> send to foundation
+        el.addEventListener("dblclick", function (e) {
+            e.preventDefault();
+            if (!isPlayable(card.id)) return;
+            var srcCol = findCardCol(card.id);
+            if (!moveCardToFoundation(srcCol)) { SFX.invalid(); shakeCard(card.id); }
         });
-    </script>
+
+        // pointer down begins potential drag / click
+        el.addEventListener("pointerdown", function (e) {
+            if (gameWon || autoRunning) return;
+            if (!isPlayable(card.id)) return; // only bottom cards are interactive
+            if (e.button !== undefined && e.button !== 0) return;
+            startDrag(card, el, e);
+        });
+    }
+
+    function startDrag(card, el, e) {
+        var rect = el.getBoundingClientRect();
+        drag = {
+            id: card.id,
+            srcCol: findCardCol(card.id),
+            startX: e.clientX,
+            startY: e.clientY,
+            offX: e.clientX - rect.left,
+            offY: e.clientY - rect.top,
+            origLeft: rect.left,
+            origTop: rect.top,
+            moved: false,
+            el: el
+        };
+        try { el.setPointerCapture(e.pointerId); } catch (err) {}
+        el.addEventListener("pointermove", onDragMove);
+        el.addEventListener("pointerup", onDragEnd);
+        el.addEventListener("pointercancel", onDragEnd);
+    }
+
+    function onDragMove(e) {
+        if (!drag) return;
+        var dx = e.clientX - drag.startX;
+        var dy = e.clientY - drag.startY;
+        if (!drag.moved && (Math.abs(dx) > 5 || Math.abs(dy) > 5)) {
+            drag.moved = true;
+            drag.el.classList.add("dragging");
+            // freeze element to viewport via fixed positioning
+            drag.el.style.position = "fixed";
+            drag.el.style.left = drag.origLeft + "px";
+            drag.el.style.top = drag.origTop + "px";
+            drag.el.style.margin = "0";
+            highlightDropTargets(drag.id);
+        }
+        if (drag.moved) {
+            drag.el.style.left = (e.clientX - drag.offX) + "px";
+            drag.el.style.top = (e.clientY - drag.offY) + "px";
+        }
+    }
+
+    function onDragEnd(e) {
+        if (!drag) return;
+        var el = drag.el;
+        el.removeEventListener("pointermove", onDragMove);
+        el.removeEventListener("pointerup", onDragEnd);
+        el.removeEventListener("pointercancel", onDragEnd);
+        try { el.releasePointerCapture(e.pointerId); } catch (err) {}
+
+        var d = drag;
+        drag = null;
+
+        if (!d.moved) {
+            // treat as a click
+            clearDropTargets();
+            el.classList.remove("dragging");
+            handleCardClick(d.id);
+            return;
+        }
+
+        // determine drop target under pointer
+        el.classList.remove("dragging");
+        el.style.visibility = "hidden";
+        var target = document.elementFromPoint(e.clientX, e.clientY);
+        el.style.visibility = "";
+        clearDropTargets();
+
+        var dropped = false;
+        if (target) {
+            var slot = target.closest ? target.closest(".slot") : null;
+            var colEl = target.closest ? target.closest(".column") : null;
+            if (slot && slot.dataset.suit) {
+                var card = cards[d.id];
+                if (card.suit === slot.dataset.suit && moveCardToFoundation(d.srcCol)) dropped = true;
+            } else if (colEl && colEl.dataset.col !== undefined) {
+                var destCol = parseInt(colEl.dataset.col, 10);
+                if (moveCardToColumn(d.srcCol, destCol)) dropped = true;
+            }
+        }
+
+        if (!dropped) {
+            SFX.invalid();
+            // reset inline positioning then re-render to snap back
+            el.style.position = "";
+            el.style.left = "";
+            el.style.top = "";
+            el.style.margin = "";
+            shakeCard(d.id);
+            render();
+        }
+    }
+
+    // Click logic: select, or move selected onto this card's column, or auto-foundation.
+    function handleCardClick(id) {
+        if (gameWon || autoRunning) return;
+        if (selected === null) {
+            if (isPlayable(id)) selectCard(id);
+            return;
+        }
+        if (selected === id) {
+            // second click on same card -> try auto-foundation, else deselect
+            var srcCol = findCardCol(id);
+            if (canMoveToFoundation(bottomCard(srcCol))) {
+                moveCardToFoundation(srcCol);
+            } else {
+                clearSelection();
+            }
+            return;
+        }
+        // clicked a different card -> attempt move onto its column
+        var destCol = findCardCol(id);
+        tryPlaySelectedTo(destCol);
+    }
+
+    // Clicking a foundation slot or empty column area
+    foundationsEl.addEventListener("click", function (e) {
+        if (gameWon || autoRunning || selected === null) return;
+        var slot = e.target.closest(".slot");
+        if (!slot) return;
+        var card = cards[selected];
+        if (card && card.suit === slot.dataset.suit) {
+            tryPlaySelectedTo("foundation");
+        } else {
+            SFX.invalid(); shakeCard(selected); clearSelection();
+        }
+    });
+    tableauEl.addEventListener("click", function (e) {
+        if (gameWon || autoRunning || selected === null) return;
+        if (e.target.closest(".card")) return; // handled per-card
+        var colEl = e.target.closest(".column");
+        if (!colEl) return;
+        var destCol = parseInt(colEl.dataset.col, 10);
+        tryPlaySelectedTo(destCol);
+    });
+
+    /* ---------------- Auto-play (send all possible to foundations) ---------------- */
+    function autoPlayStep() {
+        if (gameWon) { autoRunning = false; return; }
+        for (var c = 0; c < NUM_COLS; c++) {
+            var card = bottomCard(c);
+            if (card && canMoveToFoundation(card)) {
+                autoRunning = true;
+                clearSelection();
+                moveCardToFoundation(c, { silent: false });
+                setTimeout(autoPlayStep, 200);
+                return;
+            }
+        }
+        autoRunning = false;
+    }
+    function autoPlay() {
+        if (gameWon) return;
+        clearSelection();
+        autoPlayStep();
+    }
+
+    /* ---------------- Hint ---------------- */
+    function findHint() {
+        // 1) any card that can go to foundation
+        for (var c = 0; c < NUM_COLS; c++) {
+            var card = bottomCard(c);
+            if (card && canMoveToFoundation(card)) return { id: card.id, dest: "foundation" };
+        }
+        // 2) any legal tableau move that's "useful": prefer moves that don't just shuffle a king onto nothing
+        for (var s = 0; s < NUM_COLS; s++) {
+            for (var d = 0; d < NUM_COLS; d++) {
+                if (canMoveToColumn(s, d)) {
+                    var src = bottomCard(s);
+                    return { id: src.id, dest: d };
+                }
+            }
+        }
+        return null;
+    }
+    function showHint() {
+        if (gameWon || autoRunning) return;
+        var h = findHint();
+        if (!h) { SFX.invalid(); flashMessage("No moves available", "Try a New Game or Undo."); return; }
+        var el = cards[h.id] && cards[h.id].el;
+        if (el) {
+            el.classList.remove("hint");
+            void el.offsetWidth;
+            el.classList.add("hint");
+            setTimeout(function () { el.classList.remove("hint"); }, 1700);
+        }
+        SFX.select();
+    }
+    function flashMessage(title, msg) {
+        modalTitle.textContent = title;
+        modalMsg.textContent = msg;
+        mTime.parentElement.parentElement.style.display = "none";
+        document.getElementById("modal-btn").textContent = "OK";
+        modalEl.classList.remove("hidden");
+        modalIsInfo = true;
+    }
+    var modalIsInfo = false;
+
+    /* ---------------- Undo ---------------- */
+    function undo() {
+        if (autoRunning || history.length === 0) return;
+        var snap = history.pop();
+        restore(snap);
+        gameWon = false;
+        clearSelection();
+        render();
+        SFX.move();
+        document.getElementById("undo-btn").disabled = history.length === 0;
+    }
+
+    /* ---------------- New game ---------------- */
+    function newGame() {
+        stopFireworks();
+        modalEl.classList.add("hidden");
+        modalIsInfo = false;
+        mTime.parentElement.parentElement.style.display = "";
+        document.getElementById("modal-btn").textContent = "Play Again";
+        gameWon = false;
+        autoRunning = false;
+        moves = 0;
+        history = [];
+        selected = null;
+        document.getElementById("undo-btn").disabled = true;
+        deal();
+        render();
+        timeEl.textContent = "0:00";
+        startTimer();
+    }
+
+    /* ---------------- Fireworks / confetti win FX ---------------- */
+    var fxCanvas = document.getElementById("fx");
+    var fxCtx = fxCanvas.getContext("2d");
+    var fxParticles = [];
+    var fxRAF = null;
+
+    function sizeFx() {
+        fxCanvas.width = window.innerWidth;
+        fxCanvas.height = window.innerHeight;
+    }
+    window.addEventListener("resize", function () {
+        sizeFx();
+        if (!gameWon) {
+            clearTimeout(layoutTimer);
+            layoutTimer = setTimeout(layout, 80);
+        }
+    });
+    var layoutTimer = null;
+
+    function startFireworks() {
+        sizeFx();
+        fxParticles = [];
+        var bursts = 0;
+        function spawnBurst() {
+            if (!gameWon) return;
+            var cx = Math.random() * fxCanvas.width;
+            var cy = Math.random() * fxCanvas.height * 0.6 + 20;
+            var hue = Math.floor(Math.random() * 360);
+            var count = 38;
+            for (var i = 0; i < count; i++) {
+                var ang = (Math.PI * 2 * i) / count;
+                var spd = 2 + Math.random() * 3.5;
+                fxParticles.push({
+                    x: cx, y: cy,
+                    vx: Math.cos(ang) * spd,
+                    vy: Math.sin(ang) * spd,
+                    life: 1,
+                    color: "hsl(" + (hue + Math.random() * 40) + ",90%,60%)"
+                });
+            }
+            bursts++;
+            if (bursts < 14 && gameWon) setTimeout(spawnBurst, 320 + Math.random() * 280);
+        }
+        spawnBurst();
+        if (!fxRAF) fxLoop();
+    }
+
+    function fxLoop() {
+        fxCtx.clearRect(0, 0, fxCanvas.width, fxCanvas.height);
+        for (var i = fxParticles.length - 1; i >= 0; i--) {
+            var p = fxParticles[i];
+            p.vy += 0.045; // gravity
+            p.vx *= 0.99;
+            p.x += p.vx;
+            p.y += p.vy;
+            p.life -= 0.012;
+            if (p.life <= 0) { fxParticles.splice(i, 1); continue; }
+            fxCtx.globalAlpha = Math.max(0, p.life);
+            fxCtx.fillStyle = p.color;
+            fxCtx.beginPath();
+            fxCtx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+            fxCtx.fill();
+        }
+        fxCtx.globalAlpha = 1;
+        if (fxParticles.length > 0 || gameWon) {
+            fxRAF = requestAnimationFrame(fxLoop);
+        } else {
+            fxRAF = null;
+            fxCtx.clearRect(0, 0, fxCanvas.width, fxCanvas.height);
+        }
+    }
+    function stopFireworks() {
+        if (fxRAF) { cancelAnimationFrame(fxRAF); fxRAF = null; }
+        fxParticles = [];
+        try { fxCtx.clearRect(0, 0, fxCanvas.width, fxCanvas.height); } catch (e) {}
+    }
+
+    /* ---------------- Buttons / keyboard ---------------- */
+    document.getElementById("new-btn").addEventListener("click", function () { ensureAudio(); newGame(); });
+    document.getElementById("auto-btn").addEventListener("click", function () { ensureAudio(); autoPlay(); });
+    document.getElementById("undo-btn").addEventListener("click", function () { ensureAudio(); undo(); });
+    document.getElementById("hint-btn").addEventListener("click", function () { ensureAudio(); showHint(); });
+    document.getElementById("sound-btn").addEventListener("click", function () {
+        soundOn = !soundOn;
+        this.textContent = "Sound: " + (soundOn ? "On" : "Off");
+        if (soundOn) ensureAudio();
+    });
+    document.getElementById("modal-btn").addEventListener("click", function () {
+        if (modalIsInfo) {
+            modalEl.classList.add("hidden");
+            modalIsInfo = false;
+            mTime.parentElement.parentElement.style.display = "";
+            document.getElementById("modal-btn").textContent = "Play Again";
+        } else {
+            newGame();
+        }
+    });
+
+    document.addEventListener("keydown", function (e) {
+        if (e.key === "n" || e.key === "N") { ensureAudio(); newGame(); }
+        else if (e.key === "a" || e.key === "A") { ensureAudio(); autoPlay(); }
+        else if (e.key === "h" || e.key === "H") { ensureAudio(); showHint(); }
+        else if (e.key === "z" || e.key === "Z" || ((e.ctrlKey || e.metaKey) && e.key === "z")) { ensureAudio(); undo(); }
+        else if (e.key === "Escape") { clearSelection(); }
+    });
+
+    // Initialize
+    sizeFx();
+    newGame();
+})();
+</script>
 </body>
 </html>
-

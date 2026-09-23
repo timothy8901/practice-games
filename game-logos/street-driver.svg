@@ -1,0 +1,82 @@
+<svg viewBox="0 0 440 300" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="chrome" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff7fb"/>
+      <stop offset="0.42" stop-color="#ff9be0"/>
+      <stop offset="0.5" stop-color="#ffd24a"/>
+      <stop offset="0.58" stop-color="#ff7ad0"/>
+      <stop offset="1" stop-color="#b81fa6"/>
+    </linearGradient>
+    <linearGradient id="cruiseChrome" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#eafcff"/>
+      <stop offset="0.45" stop-color="#6fe9ff"/>
+      <stop offset="0.55" stop-color="#bff7ff"/>
+      <stop offset="1" stop-color="#1f8fc9"/>
+    </linearGradient>
+    <linearGradient id="road" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#241a3a"/>
+      <stop offset="1" stop-color="#0a0716"/>
+    </linearGradient>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3a1a5e"/>
+      <stop offset="0.6" stop-color="#ff2e88"/>
+      <stop offset="1" stop-color="#ffb24a"/>
+    </linearGradient>
+    <linearGradient id="beam" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#fff7c8" stop-opacity="0.85"/>
+      <stop offset="1" stop-color="#fff7c8" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <ellipse cx="220" cy="78" rx="150" ry="34" fill="#ff2e88" opacity="0.18"/>
+
+  <circle cx="220" cy="86" r="40" fill="url(#sky)"/>
+  <rect x="180" y="74" width="80" height="3.5" fill="#0a0716"/>
+  <rect x="178" y="80" width="84" height="3.5" fill="#0a0716"/>
+  <rect x="180" y="86" width="80" height="4" fill="#0a0716"/>
+  <rect x="184" y="93" width="72" height="4.5" fill="#0a0716"/>
+
+  <path d="M150 230 L196 96 L244 96 L290 230 Z" fill="url(#road)" stroke="#ff5bd0" stroke-width="2"/>
+  <path d="M150 230 L196 96 L244 96 L290 230 Z" fill="none" stroke="#6fe9ff" stroke-width="0.8" opacity="0.5"/>
+
+  <g fill="#ffd24a">
+    <polygon points="217,104 223,104 224,114 216,114"/>
+    <polygon points="215,122 225,122 226.5,137 213.5,137"/>
+    <polygon points="212,148 228,148 230,168 210,168"/>
+    <polygon points="208,182 232,182 235,208 205,208"/>
+  </g>
+
+  <polygon points="206,232 214,210 226,210 234,232" fill="url(#beam)"/>
+
+  <g>
+    <rect x="208" y="226" width="24" height="34" rx="6" fill="#16d6ff" stroke="#0a2a3a" stroke-width="2"/>
+    <rect x="212" y="232" width="16" height="12" rx="3" fill="#0a2a3a"/>
+    <rect x="210" y="227" width="5" height="5" rx="1.5" fill="#fff7c8"/>
+    <rect x="225" y="227" width="5" height="5" rx="1.5" fill="#fff7c8"/>
+    <rect x="211" y="254" width="6" height="3" rx="1" fill="#ff4242"/>
+    <rect x="223" y="254" width="6" height="3" rx="1" fill="#ff4242"/>
+  </g>
+
+  <text x="220" y="200" text-anchor="middle" font-family="Impact, sans-serif" font-size="62" letter-spacing="1.5" fill="#10040f" transform="skewX(-8)">STREET</text>
+  <text x="220" y="197" text-anchor="middle" font-family="Impact, sans-serif" font-size="62" letter-spacing="1.5" fill="url(#chrome)" stroke="#5a0f4d" stroke-width="1.2" transform="skewX(-8)">STREET</text>
+
+  <text x="220" y="252" text-anchor="middle" font-family="Impact, sans-serif" font-size="50" letter-spacing="3" fill="#031820" transform="skewX(-8)">CRUISER</text>
+  <text x="220" y="249" text-anchor="middle" font-family="Impact, sans-serif" font-size="50" letter-spacing="3" fill="url(#cruiseChrome)" stroke="#0a4763" stroke-width="1.1" transform="skewX(-8)">CRUISER</text>
+
+  <g stroke-linecap="round">
+    <line x1="74" y1="234" x2="178" y2="234" stroke="#ff2e88" stroke-width="3"/>
+    <line x1="74" y1="234" x2="178" y2="234" stroke="#16d6ff" stroke-width="1" opacity="0.7"/>
+    <line x1="262" y1="234" x2="366" y2="234" stroke="#ff2e88" stroke-width="3"/>
+    <line x1="262" y1="234" x2="366" y2="234" stroke="#16d6ff" stroke-width="1" opacity="0.7"/>
+  </g>
+  <g fill="#ffd24a">
+    <rect x="86" y="231.5" width="14" height="5"/>
+    <rect x="110" y="231.5" width="14" height="5"/>
+    <rect x="134" y="231.5" width="14" height="5"/>
+    <rect x="290" y="231.5" width="14" height="5"/>
+    <rect x="314" y="231.5" width="14" height="5"/>
+    <rect x="338" y="231.5" width="14" height="5"/>
+  </g>
+
+  <text x="220" y="278" text-anchor="middle" font-family="Arial Black, sans-serif" font-size="13" letter-spacing="7" fill="#16d6ff" stroke="#06222e" stroke-width="0.5">ARCADE</text>
+</svg>
