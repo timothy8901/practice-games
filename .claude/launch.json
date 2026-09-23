@@ -22,6 +22,16 @@
         "mobile/blob-knight-rumpler/build/assets/www"
       ],
       "port": 8766
+    },
+    {
+      "name": "Games site (port 8767)",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8767"
+      ],
+      "port": 8767
     }
   ]
 }

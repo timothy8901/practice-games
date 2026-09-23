@@ -30,9 +30,10 @@ KEY_ALIAS = 'blobknightrumpler'
 KEYSTORE = os.path.expanduser('~/.android/blob-knight-rumpler.jks')
 KEYPASS = KEYSTORE + '.password'
 THREE = os.path.join(HERE, 'vendor', 'three-0.152.2.min.js')
-# The engine page this is built from. It is the published browser game and is never
-# modified here; every Kirby-era name in it is renamed on the way into this build.
-ENGINE_PAGE = 'kirby-rumble.html'
+# The engine page this is built from: the published browser game, never modified
+# here. It is being renamed on the site, so accept either name, and rename whatever
+# Kirby-era strings are still in it (none, once the renamed page reaches main).
+ENGINE_PAGES = ('blob-knight-rumpler.html', 'kirby-rumble.html')
 ZIP_FOLDER = 'Blob Knight Rumpler - Android'
 
 
@@ -56,18 +57,23 @@ def read_game(args):
     if args.source:
         return read(args.source), os.path.abspath(args.source)
     git = ['git', '-C', REPO]
-    text = subprocess.run(git + ['show', args.ref + ':' + ENGINE_PAGE], check=True,
-                          capture_output=True, encoding='utf-8').stdout
-    last = subprocess.run(git + ['log', '-1', '--format=%h %cs', args.ref, '--', ENGINE_PAGE],
-                          check=True, capture_output=True, encoding='utf-8').stdout.strip()
-    return text, '%s:%s (last changed %s)' % (args.ref, ENGINE_PAGE, last)
+    for page in ENGINE_PAGES:
+        found = subprocess.run(git + ['cat-file', '-e', args.ref + ':' + page], capture_output=True)
+        if found.returncode != 0:
+            continue
+        text = subprocess.run(git + ['show', args.ref + ':' + page], check=True,
+                              capture_output=True, encoding='utf-8').stdout
+        last = subprocess.run(git + ['log', '-1', '--format=%h %cs', args.ref, '--', page],
+                              check=True, capture_output=True, encoding='utf-8').stdout.strip()
+        return text, '%s:%s (last changed %s)' % (args.ref, page, last)
+    die('none of %s exist at %s - pass --source FILE' % (' / '.join(ENGINE_PAGES), args.ref))
 
 
 def patch(html, what, old, new):
     n = html.count(old)
     if n != 1:
         die('cannot apply the "%s" patch: expected this exactly once in the game, found it %d times:\n    %s\n'
-            '%s has changed; update mobile_html() in build.py to match.' % (what, n, old[:140], ENGINE_PAGE))
+            'the engine page has changed; update mobile_html() in build.py to match.' % (what, n, old[:140]))
     return html.replace(old, new)
 
 
@@ -78,6 +84,23 @@ def patch_all(html, what, old, new, expected):
     return html.replace(old, new)
 
 
+def rename_patch(html, what, old, new, expected=1):
+    """A rename that may already have happened upstream: applying it is optional,
+    finding it more than once is not."""
+    n = html.count(old)
+    if n == 0:
+        rename_patch.skipped.append(what)
+        return html
+    if n != expected:
+        die('the "%s" rename expected %d occurrences, found %d: %s' % (what, expected, n, old[:100]))
+    rename_patch.applied.append(what)
+    return html.replace(old, new)
+
+
+rename_patch.applied = []
+rename_patch.skipped = []
+
+
 def rename_patches(html):
     """Every Kirby-era name the page carries, renamed for this build.
 
@@ -85,32 +108,49 @@ def rename_patches(html):
     Rumpler, whose fighters are the armoured blob knights of the Thrixel art, so
     nothing a player (or a view-source) can read may still say Kirby.
     """
-    html = patch(html, 'page title', '<title>Kirby Brawler 2 \u2014 Rumble Arena (3D)</title>',
+    html = rename_patch(html, 'page title', '<title>Kirby Brawler 2 \u2014 Rumble Arena (3D)</title>',
                  '<title>Blob Knight Rumpler</title>')
-    html = patch(html, 'header title', '<h1>Kirby Brawler 2 \u2014 Rumble Arena</h1>',
+    html = rename_patch(html, 'header title', '<h1>Kirby Brawler 2 \u2014 Rumble Arena</h1>',
                  '<h1>Blob Knight Rumpler</h1>')
-    html = patch(html, 'header blurb',
+    html = rename_patch(html, 'header blurb',
                  'Top-down 3D arena duel. Blocky toy fighters, 8 copy abilities, 2 attacks each + shield.',
                  'Top-down 3D arena duel. Armoured blob knights, 8 cores, 2 attacks each + shield.')
-    html = patch(html, 'back link',
+    html = rename_patch(html, 'back link',
                  '<a class="back-link" href="kirby-abilities.html">&larr; Play the original Kirby Brawler</a>', '')
-    html = patch(html, 'footer credit',
+    # The site's page links across to the other game; the app is standalone and
+    # carries no link to it (either wording, depending on how renamed the page is).
+    html = rename_patch(html, 'sibling link',
+                        '<a class="back-link" href="kirby-abilities.html">&larr; Play Kirby Brawler</a>', '')
+    html = rename_patch(html, 'footer credit',
                  ' &middot; sequel to <a href="kirby-abilities.html">Kirby Brawler</a>', '')
-    html = patch(html, 'source banner', 'KIRBY BRAWLER 2 \u2014 RUMBLE ARENA', 'BLOB KNIGHT RUMPLER \u2014 RUMBLE ARENA')
-    html = patch(html, 'builder banner', 'KIRBY BUILDER ----', 'KNIGHT BUILDER ---')
-    html = patch(html, 'visible comment', '// Kirby always stays visible', '// The knight always stays visible')
-    html = patch(html, 'menu blurb', 'You vs a CPU Kirby with a random ability.',
+    html = rename_patch(html, 'source banner', 'KIRBY BRAWLER 2 \u2014 RUMBLE ARENA', 'BLOB KNIGHT RUMPLER \u2014 RUMBLE ARENA')
+    html = rename_patch(html, 'builder banner', 'KIRBY BUILDER ----', 'KNIGHT BUILDER ---')
+    html = rename_patch(html, 'visible comment', '// Kirby always stays visible', '// The knight always stays visible')
+    html = rename_patch(html, 'menu blurb', 'You vs a CPU Kirby with a random ability.',
                  'You vs a CPU knight carrying a random core.')
-    html = patch(html, 'pick button', 'data-act="pick">Choose Your Kirby</button>',
+    html = rename_patch(html, 'pick button', 'data-act="pick">Choose Your Kirby</button>',
                  'data-act="pick">Choose Your Knight</button>')
-    html = patch(html, 'pick title', '<div class="overlay-title">Choose Your Kirby</div>',
+    html = rename_patch(html, 'pick title', '<div class="overlay-title">Choose Your Kirby</div>',
                  '<div class="overlay-title">Choose Your Knight</div>')
-    html = patch(html, 'victory line', '</strong> Kirby toppled the CPU', '</strong> knight toppled the CPU')
-    html = patch(html, 'defeat line', '</strong> Kirby got the better of you.',
+    html = rename_patch(html, 'victory line', '</strong> Kirby toppled the CPU', '</strong> knight toppled the CPU')
+    html = rename_patch(html, 'defeat line', '</strong> Kirby got the better of you.',
                  '</strong> knight got the better of you.')
-    html = patch(html, 'result button', '>Change Ability</button>', '>Change Knight</button>')
-    html = patch_all(html, 'builder function', 'buildKirby', 'buildFighter', 3)
+    html = rename_patch(html, 'result button', '>Change Ability</button>', '>Change Knight</button>')
+    html = rename_patch(html, 'builder function', 'buildKirby', 'buildFighter', 3)
+    if rename_patch.applied:
+        print('  renamed in the page: %s' % ', '.join(rename_patch.applied))
+    if rename_patch.skipped:
+        print('  already renamed upstream: %d of %d' % (len(rename_patch.skipped),
+                                                        len(rename_patch.applied) + len(rename_patch.skipped)))
     return html
+
+
+def stamp_source(origin):
+    """Provenance for the build stamp: the commit, not the engine page's filename."""
+    tail = origin.split(':')[-1]
+    for page in ENGINE_PAGES:
+        tail = tail.replace(page, '')
+    return tail.strip(' ()') or origin
 
 
 def mobile_html(game, origin, version):
@@ -130,7 +170,7 @@ def mobile_html(game, origin, version):
 
     html = patch(game, 'build stamp', '<!DOCTYPE html>\n',
                  '<!DOCTYPE html>\n<!-- %s %s, built by build.py from the Rumble Arena engine (%s) -->\n'
-                 % (APP_NAME, version, origin.split(':')[-1].replace(ENGINE_PAGE, '').strip() or origin))
+                 % (APP_NAME, version, stamp_source(origin)))
     # No pinch-zoom or double-tap zoom mid-fight; let the page reach under notches (the CSS keeps clear of them).
     html = patch(html, 'viewport', '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
                  '<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, '
