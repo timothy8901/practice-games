@@ -83,7 +83,29 @@ uniform float uEmissive;
 uniform float uOpacity;
 uniform float uToon;         // 0 = smooth falloff, 1 = fully banded
 uniform float uRim;          // strength of the wraparound rim
+uniform float uKeyGain;      // how hard the key light hits; see LIGHTING in severed.js
 uniform vec4 uInk;           // rgb + flag: >0.5 means "draw flat, this is an outline"
+
+/**
+ * Soft shoulder, so the top of the light ramp stops clipping to flat white.
+ *
+ * An off-white office wall is the pathological case for this renderer. #e9ebe6
+ * is 0.914, and the light terms reach ambient 0.66 + key 0.78 + fill 0.32 +
+ * sky 0.14 = 1.90, so a lit wall computes 1.74 and saturates. With four toon
+ * bands the wall values are {0.60, 0.84, 1.08, 1.32}: the top TWO both land
+ * past 1.0 and clamp to the SAME white, which is why a banded corridor showed
+ * two bands instead of four.
+ *
+ * Below the knee nothing changes, so every colour that was not already blowing
+ * out is untouched; above it the curve is asymptotic to 1 and the bands stay
+ * apart — 1.08 and 1.32 come back as 0.933 and 0.974.
+ */
+vec3 shoulder (vec3 c) {
+  const float K = 0.75;
+  vec3 hi = 1.0 - (1.0 - K) * exp(-(c - K) / (1.0 - K));
+  return mix(c, hi, step(vec3(K), c));
+}
+
 void main () {
   if (uInk.w > 0.5) { gl_FragColor = vec4(uInk.rgb, uOpacity); return; }
   vec3 n = normalize(vNor);
@@ -99,8 +121,8 @@ void main () {
   // Rim light along the silhouette: the cheap stand-in for the subsurface glow
   // that gives vinyl-toy renders their soft edge.
   float rim = pow(1.0 - abs(dot(n, normalize(uEye - vPos))), 3.0) * uRim;
-  vec3 c = vCol * (uAmbient + key * 0.78 + fill + sky) + vCol * uEmissive + rim;
-  gl_FragColor = vec4(c, uOpacity);
+  vec3 c = vCol * (uAmbient + key * uKeyGain + fill + sky) + vCol * uEmissive + rim;
+  gl_FragColor = vec4(shoulder(c), uOpacity);
 }`;
 
 const LINE_VERT = `
@@ -160,12 +182,13 @@ export class Viewer {
       eye: gl.getUniformLocation(this.prog, 'uEye'),
       toon: gl.getUniformLocation(this.prog, 'uToon'),
       rim: gl.getUniformLocation(this.prog, 'uRim'),
+      keyGain: gl.getUniformLocation(this.prog, 'uKeyGain'),
       ink: gl.getUniformLocation(this.prog, 'uInk'),
     };
     // Shading style, set once and read by every draw. Defaults to the original
     // smooth look so the 64-piece inspector renders exactly as it always has;
     // the game turns the toon terms on.
-    this.style = { toon: 0, rim: 0 };
+    this.style = { toon: 0, rim: 0, keyGain: 0.78 };
     this.eye = [0, 0, 0];
     this.identity = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
     this.lineLoc = {
@@ -374,6 +397,7 @@ export class Viewer {
     gl.uniform1f(this.loc.ambient, opts.ambient ?? 0.36);
     gl.uniform1f(this.loc.toon, opts.toon ?? this.style.toon);
     gl.uniform1f(this.loc.rim, opts.rim ?? this.style.rim);
+    gl.uniform1f(this.loc.keyGain, opts.keyGain ?? this.style.keyGain);
     gl.uniform1f(this.loc.outline, 0);
     gl.uniform4fv(this.loc.ink, [0, 0, 0, 0]);
   }

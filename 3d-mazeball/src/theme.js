@@ -27,6 +27,9 @@ import { setPalette } from './mesher.js';
  * carpet, the blue is doors and signage, the grey is everything structural.
  */
 export const OFFICE = {
+  // Door leaves: a shade darker and greener than the wall, so a closed door
+  // reads as a plane in the wall rather than a hole in it.
+  door: '#c9d2cb',
   carpet: '#93a58f',        // corridor carpet, pale grey-green
   carpetAlt: '#849a86',     // ramps and landings, a shade cooler
   carpetDark: '#6d7d6c',
@@ -149,6 +152,20 @@ export const themeActive = () => active;
 
 /* ── hallway dimensions ───────────────────────────────────────────────── */
 
+/**
+ * Render groups the office dress drops.
+ *
+ * `marker` is the kit's lane striping — plank lines, edge dashes, the timber
+ * grain of a wooden race track. On a Monkey Ball course it tells you where the
+ * track is. On an office floor it reads as floorboards painted across the
+ * carpet, which is the single most out-of-place thing in a Lumon corridor.
+ *
+ * Every marker in the kit is declared `deco: true` and emits no collidable
+ * triangles, so dropping the group is render-only by construction — assert it
+ * rather than trusting it, which assembleMaze does.
+ */
+export const OFFICE_HIDE = new Set(['marker']);
+
 export const HALL = {
   wallH: 2.35,         // full hallway height now that there is a ceiling on it
   wallT: 0.18,
@@ -169,6 +186,17 @@ export const HALL = {
   capR: 0.09,          // bullnose radius over the top of a wall — half wallT
   skirtR: 0.045,       // radius on the skirting board's top edge
   skirtOut: 0.03,      // how far the skirting stands proud of the wall face
+  coveR: 0.10,         // concave radius where the wall meets the ceiling
+
+  /* Doors.
+   *
+   * On the same metric rhythm as the ceiling fittings, because a real building
+   * sets both out from the same grid. 7.2 m is two ceiling modules short of
+   * every other light panel, so a door never lands directly under a fitting. */
+  doorEvery: 7.2,
+  doorW: 0.95,
+  doorH: 2.05,
+  doorFrame: 0.06,
   stripeY: 1.02,       // the horizontal accent line every office corridor has
   stripeH: 0.075,
 

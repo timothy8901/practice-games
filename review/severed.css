@@ -242,3 +242,24 @@ body.severed .sweep-day { border-radius: 1px; }
   line-height: 1.45;
   color: var(--ink-3);
 }
+
+/* ── which floor is loaded ─────────────────────────────────────────────── */
+
+/* The authored floor and the daily generator are different products sharing one
+   harness, so the switch between them sits at the far left of the bar, ahead of
+   the shift controls it disables. */
+.floor-switch { display: inline-flex; gap: 5px; }
+.floor-switch .tool {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--line);
+  color: var(--ink-2);
+  border-radius: 5px; padding: 4px 10px; font-size: 11.5px;
+}
+.floor-switch .tool[aria-checked="true"] {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--ink);
+  font-weight: 600;
+}
+#shift-controls { display: inline-flex; align-items: center; gap: 6px; }
+#shift-controls:has(:disabled) { opacity: 0.4; }

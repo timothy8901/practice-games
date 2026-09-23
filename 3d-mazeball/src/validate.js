@@ -340,7 +340,14 @@ export function runBot (world, opts = {}) {
         const cell = world.maze.cellAt.get(wp.cell);
         skipped.push({
           waypoint: target, cell: wp.cell, piece: cell?.pieceId,
-          at: { x: +wp.x.toFixed(1), y: +wp.y.toFixed(2), z: +wp.z.toFixed(1) },
+          // Defensive: this is the *reporting* path for a bot that is already
+          // stuck, and a waypoint that arrived without a height would otherwise
+          // turn a useful diagnostic into a TypeError that hides it.
+          at: {
+            x: +(wp.x ?? 0).toFixed(1),
+            y: Number.isFinite(wp.y) ? +wp.y.toFixed(2) : null,
+            z: +(wp.z ?? 0).toFixed(1),
+          },
         });
         target = Math.min(wps.length - 1, target + 1);
         const nxt = wps[target];
@@ -391,29 +398,46 @@ export function runBot (world, opts = {}) {
 
 /* ── the sweep ────────────────────────────────────────────────────────── */
 
-/** Everything §5.5 asks for, for one seed. */
-export function validateSeed (seed, opts = {}) {
-  const maze = generateMaze({ seed, ...opts });
-  const world = assembleMaze(maze);
+/**
+ * The gate itself, run against a maze that already exists.
+ *
+ * Split out from validateSeed so an AUTHORED floor gets exactly the same checks
+ * as a generated one. The alternative — a second, parallel set of checks for
+ * hand-made maps — is how a hand-made map quietly stops being held to the
+ * standard the generated ones are.
+ *
+ * `reproducible` is the one check that cannot be asked of a maze in isolation,
+ * so the caller supplies the verdict: a seeded maze proves it by regenerating,
+ * an authored one is reproducible by construction.
+ */
+export function validateMaze (maze, opts = {}, reproducible = true) {
+  const world = opts.world || assembleMaze(maze, opts.assemble);
   const graph = graphCheck(maze);
   const clearance = clearanceCheck(world);
   const physics = opts.skipBot ? { pass: true, skipped: true } : runBot(world, opts);
-
-  // Reproducibility: the same seed must rebuild the same maze, and building it
-  // a second time must not consume a different amount of the RNG stream.
-  const again = generateMaze({ seed, ...opts });
-  const reproducible = mazeFingerprint(maze) === mazeFingerprint(again);
+  const ok = graph.pass && clearance.pass && reproducible && maze.failures.length === 0;
 
   return {
-    seed,
+    seed: maze.seed,
     fingerprint: mazeFingerprint(maze),
-    pass: graph.pass && clearance.pass && physics.pass && reproducible && maze.failures.length === 0,
-    clean: graph.pass && clearance.pass && !!physics.clean && reproducible && maze.failures.length === 0,
+    pass: ok && physics.pass,
+    clean: ok && !!physics.clean,
     graph, clearance, physics, reproducible,
     unplaceable: maze.failures,
     stats: { ...maze.stats, ...world.stats },
     maze, world,
   };
+}
+
+/** Everything §5.5 asks for, for one seed. */
+export function validateSeed (seed, opts = {}) {
+  const maze = generateMaze({ seed, ...opts });
+  // Reproducibility: the same seed must rebuild the same maze, and building it
+  // a second time must not consume a different amount of the RNG stream.
+  const again = generateMaze({ seed, ...opts });
+  const r = validateMaze(maze, opts, mazeFingerprint(maze) === mazeFingerprint(again));
+  r.seed = seed;
+  return r;
 }
 
 /** Sweep a run of consecutive days, the way a nightly job would. */

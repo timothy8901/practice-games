@@ -15,9 +15,10 @@
  */
 
 import { generateMaze, dailySeed, seedForDate, isoToday, NOT_AUTO_PLACED } from '../3d-mazeball/src/generator.js';
+import { lumonFloor, floorFingerprint, FLOOR } from '../3d-mazeball/src/lumon.js';
 import { applyOfficeTheme, OFFICE, FLAVOUR } from '../3d-mazeball/src/theme.js';
-import { assembleMaze, behavioursAt } from '../3d-mazeball/src/assemble.js';
-import { validateSeed, validateRun } from '../3d-mazeball/src/validate.js';
+import { assembleMaze, behavioursAt, cellCentre } from '../3d-mazeball/src/assemble.js';
+import { validateSeed, validateRun, validateMaze } from '../3d-mazeball/src/validate.js';
 import { Ball, stepBall, tiltUp, gatherFrom, supportUnder, FIXED, MAX_TILT, GRAVITY } from '../3d-mazeball/src/physics.js';
 import { bodiesFor } from '../3d-mazeball/src/dynamics.js';
 import { resolveEnv } from '../3d-mazeball/src/behaviors.js';
@@ -52,6 +53,10 @@ function el (tag, attrs = {}, ...kids) {
 /* ── feedback state ───────────────────────────────────────────────────── */
 
 const ASPECTS = [
+  ['floor', 'One authored floor', 'MDR to the elevator, the same every time, with two wings you can look down and skip. Does it read as a building rather than a maze?'],
+  ['corridor', 'Does the corridor read as Lumon?', 'Off-white walls, mint carpet, the blue line at 1.02 m, doors on a 7.2 m rhythm, a tile ceiling. What is missing, and what is too much?'],
+  ['furniture', 'The MDR workstation', 'Modelled in Thrixel, baked to vertex colours, standing in the wings. Right object? Right places? Worth adding more?'],
+  ['lighting', 'Exposure and banding', 'The corridor used to clip to white — two of the four toon bands were the same colour. Is it now readable, or has it gone flat?'],
   ['bubbly', 'The bubbly pass', 'MySims proportions and rounding on a Severance floor. Does the toy read, or does it fight the tone?'],
   ['doll-model', 'The Blender doll', 'Rounded, subdivided, smooth-shaded. Toggle Bubbly / Original above the view and say which one you want.'],
   ['shading', 'Bands, rim and outline', 'Three sliders above the view. Set them where you want them and tell me the numbers — they export with your notes.'],
@@ -87,6 +92,16 @@ let maze = null, world = null, bodies = [], viewer = null, glError = null;
 let seedInfo = { iso: isoToday(), seed: dailySeed(), size: 6 };
 let checkResult = null;
 
+/**
+ * Which floor is loaded.
+ *
+ * 'lumon'  — the authored severed floor. One map, the same every time, so it
+ *            can be designed rather than tuned. This is the MVP.
+ * 'daily'  — the seeded generator, kept because it still works and the publish
+ *            gate still covers it.
+ */
+const mode = { floor: 'lumon' };
+
 const view = { follow: true, walls: true, ceiling: true, upright: false, worldTilt: true, route: false, collision: false, overhead: false };
 const input = { f: 0, r: 0, camYaw: 0, paused: false };
 /**
@@ -114,9 +129,18 @@ const CEILING_MATERIALS = new Set(['hallCeil', 'hallBar', 'hallLight']);
 // a hole punched in the image. This is the darkest navy already in the palette.
 const INK = [0.055, 0.075, 0.105];
 
-// Offices are flat-lit. Raising the ambient floor is what stops every wall
-// facing away from the key light reading as charcoal instead of off-white.
-const LIGHTING = { ambient: 0.66 };
+/**
+ * Corridor exposure.
+ *
+ * Offices are flat-lit, so the ambient floor is high — that is what stops a
+ * wall facing away from the key reading as charcoal instead of off-white. But
+ * ambient 0.66 with the renderer's default key of 0.78 puts almost every
+ * surface past 1.0: the up-facing carpet computed 1.5x and the walls 1.9x, so
+ * the whole corridor sat jammed against white and the mint carpet washed out to
+ * near-grey. Pulling both down lands a lit wall near 0.79 and the carpet near
+ * 0.58 — still bright and still flat, but with the colours actually visible.
+ */
+const LIGHTING = { ambient: 0.52, keyGain: 0.55 };
 
 /**
  * Graphics style — the MySims pass.
@@ -171,16 +195,23 @@ let ball = new Ball(BALL_R);
 
 function buildWorld () {
   const t0 = performance.now();
-  maze = generateMaze({ seed: seedInfo.seed, width: seedInfo.size, height: seedInfo.size });
+  // The MVP is one authored floor. The daily generator is still here and still
+  // validated — `mode` picks between them, and everything downstream takes the
+  // same shape either way.
+  maze = mode.floor === 'lumon'
+    ? lumonFloor()
+    : generateMaze({ seed: seedInfo.seed, width: seedInfo.size, height: seedInfo.size });
   world = assembleMaze(maze, { theme: 'office', walls: view.walls });
   bodies = bodiesFor(world);
   const ms = performance.now() - t0;
 
-  $('#seed-label').textContent = `${seedInfo.iso}  ·  file 0x${seedInfo.seed.toString(16).toUpperCase()}`;
+  $('#seed-label').textContent = mode.floor === 'lumon'
+    ? `the severed floor  ·  plan ${floorFingerprint(maze)}`
+    : `${seedInfo.iso}  ·  file 0x${seedInfo.seed.toString(16).toUpperCase()}`;
   $('#maze-stats').textContent =
     `${maze.stats.occupied} rooms · ${maze.stats.pathLength}-room route (${maze.stats.metres} m to the elevator) · `
-    + `${maze.stats.distinctPieces} distinct layouts · ${world.stats.renderTriangles.toLocaleString()} tris · `
-    + `${world.stats.drawCalls} draw calls`;
+    + (maze.stats.landmarks ? `${maze.stats.landmarks} landmarks · ` : `${maze.stats.distinctPieces} distinct layouts · `)
+    + `${world.stats.renderTriangles.toLocaleString()} tris · ${world.stats.drawCalls} draw calls`;
   $('#gen-time').textContent = `generated in ${ms.toFixed(0)} ms`;
 
   if (viewer) {
@@ -195,12 +226,20 @@ function buildWorld () {
       });
     }
     world.dynamicGroups.forEach((g, i) => viewer.uploadGroup(`dyn:${i}`, g));
+    if (deskAsset) viewer.uploadGroup('desk', deskAsset);
     buildCharacter();
   }
 
+  placeDesks();
   buildJumpList();
   respawn(true);
   runChecks();
+  for (const el of $$('#shift-controls input, #shift-controls button, #shift-controls select')) {
+    el.disabled = mode.floor === 'lumon';       // there is no "yesterday" on an authored floor
+  }
+  for (const b of $$('#floor-tools [data-floor]')) {
+    b.setAttribute('aria-checked', String(mode.floor === b.dataset.floor));
+  }
   if (!state.seedsPlayed.includes(seedInfo.iso)) { state.seedsPlayed.push(seedInfo.iso); save(); }
 }
 
@@ -217,6 +256,67 @@ function buildWorld () {
  * Built with the palette remap switched off, so the suit stays navy instead of
  * being re-tinted into the wall it is standing next to.
  */
+/**
+ * The MDR workstation, modelled in Thrixel and baked to vertex colours.
+ *
+ * Thrixel ships GLB with PBR textures and this renderer has no texture support
+ * at all, so the texture is sampled down to per-vertex colour at build time by
+ * 3d-mazeball/assets/bake_glb.py. Nothing at runtime knows Thrixel exists — it
+ * is the same {positions, normals, colors} every other group is.
+ */
+let deskAsset = null;
+let deskPlacements = [];
+
+async function loadDesk () {
+  try {
+    const r = await fetch('../3d-mazeball/assets/desk.json', { cache: 'no-store' });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const d = await r.json();
+    deskAsset = {
+      positions: new Float32Array(d.positions),
+      normals: new Float32Array(d.normals),
+      colors: new Float32Array(d.colors),
+      triangles: d.triangles,
+    };
+  } catch (e) {
+    deskAsset = null;
+    console.warn('desk.json unavailable, the floor goes unfurnished:', e.message);
+  }
+}
+
+/**
+ * Where the desks stand.
+ *
+ * Only in rooms with a closed end — MDR and the two dead-end wings — and pushed
+ * back against that closed wall. The corridor is 2.4 m wide between walls that
+ * are real collision geometry, so a desk anywhere along a through-route would
+ * either block the racing line or have to be phased through; against the blind
+ * wall of a dead end it is visible from down the hall and never in the way.
+ */
+function placeDesks () {
+  deskPlacements = [];
+  if (!deskAsset || !maze) return;
+  for (const c of maze.cells) {
+    if (!c.landmark || c.landmark.ch === 'E') continue;      // never in the lift
+    const open = Object.keys(c.dirs);
+    if (open.length !== 1) continue;                         // needs a closed end
+    const away = open[0];                                    // the way out
+    const [dx, dz] = DELTA[away];
+    const cc = cellCentre(c.cx, c.cz, maze.width, maze.height);
+    // 3.1 m back from the tile centre put the desk INSIDE the dead-end wall,
+    // which stands about 3 m back — measured, not guessed. 1.15 m lands it in
+    // the pocket in front of that wall, and 0.72 m of lateral offset tucks it
+    // against a side wall so the 2.4 m corridor still has a clear lane past it.
+    const [lx, lz] = [-dz, dx];                              // lateral, across the corridor
+    deskPlacements.push({
+      x: cc.x - dx * 1.15 + lx * 0.72,
+      z: cc.z - dz * 1.15 + lz * 0.72,
+      yaw: Math.atan2(-lx, -lz),                             // face back across the corridor
+      name: c.landmark.short,
+    });
+  }
+}
+
 let dollAsset = null;
 
 /** Fetch the Blender bake once. Failure is survivable — we fall back to boxes. */
@@ -397,7 +497,14 @@ function runChecks () {
   $('#checks').textContent = 'running…';
   setTimeout(() => {
     let r;
-    try { r = validateSeed(seedInfo.seed, { width: seedInfo.size, height: seedInfo.size }); }
+    try {
+      // The authored floor is checked against the world you are actually
+      // playing, toggles and all, rather than a freshly generated one — on a
+      // hand-made map that is the only version whose verdict means anything.
+      r = mode.floor === 'lumon'
+        ? validateMaze(maze, { world })
+        : validateSeed(seedInfo.seed, { width: seedInfo.size, height: seedInfo.size });
+    }
     catch (e) { $('#checks').replaceChildren(checkRow('fail', 'checks threw', e.message)); return; }
     checkResult = r;
     const p = r.physics;
@@ -414,7 +521,9 @@ function runChecks () {
         `${p.seconds}s · ${p.falls} falls · ${p.resets} resets`),
       checkRow(p.clean ? 'pass' : 'warn', 'Physics — driven clean, no assisted segments',
         p.clean ? 'all segments' : `${(p.skipped || []).length} needed help`),
-      checkRow(r.reproducible ? 'pass' : 'fail', 'Reproducible — same seed, same maze', r.fingerprint),
+      mode.floor === 'lumon'
+        ? checkRow('pass', 'Authored — the same floor every load', `plan ${r.fingerprint}`)
+        : checkRow(r.reproducible ? 'pass' : 'fail', 'Reproducible — same seed, same maze', r.fingerprint),
       checkRow(r.unplaceable.length ? 'fail' : 'pass', 'Every socket signature had a piece',
         r.unplaceable.length ? `${r.unplaceable.length} unplaceable` : 'no gaps'),
     ].filter(Boolean);
@@ -703,6 +812,17 @@ function draw () {
     const M = body ? body.modelMatrix(run.t) : I();
     viewer.drawGroup(`dyn:${i}`, mvp, multiply(T, M), LIGHTING);
   });
+
+  // Furniture rides the tilted world group with the floor it stands on.
+  for (const d of deskPlacements) {
+    const c = Math.cos(d.yaw), sn = Math.sin(d.yaw);
+    viewer.drawGroup('desk', mvp, multiply(T, new Float32Array([
+      c, 0, -sn, 0,
+      0, 1, 0, 0,
+      sn, 0, c, 0,
+      d.x, 0, d.z, 1,
+    ])), LIGHTING);
+  }
 
   if (view.route) viewer.drawPath(world.waypoints, mvp, [1, 0.82, 0.28, 0.75], 0.35);
 
@@ -1114,9 +1234,22 @@ function drawTurntable (dt) {
 
 /** Push the style knobs at the renderer and rebuild whatever depends on them. */
 function applyGfx (rebuild = false) {
-  if (viewer) { viewer.style.toon = gfx.toon; viewer.style.rim = gfx.rim; }
+  if (viewer) {
+    viewer.style.toon = gfx.toon;
+    viewer.style.rim = gfx.rim;
+    viewer.style.keyGain = LIGHTING.keyGain;
+  }
   if (rebuild && viewer && world) { viewer.cache.delete('doll'); buildCharacter(); }
-  for (const b of $$('#gfx-tools [data-model]')) {
+  for (const b of $$('#floor-tools [data-floor]')) {
+  b.addEventListener('click', () => {
+    if (mode.floor === b.dataset.floor) return;
+    mode.floor = b.dataset.floor;
+    buildWorld();
+    stage.focus();
+  });
+}
+
+for (const b of $$('#gfx-tools [data-model]')) {
     b.setAttribute('aria-checked', String(gfx.model === b.dataset.model));
   }
   const n = $('#doll-stats');
@@ -1125,6 +1258,15 @@ function applyGfx (rebuild = false) {
       ? `${dollAsset.triangles.toLocaleString()} tris · smooth normals · Blender ${dollAsset.blender}`
       : 'hand-meshed boxes · flat normals';
   }
+}
+
+for (const b of $$('#floor-tools [data-floor]')) {
+  b.addEventListener('click', () => {
+    if (mode.floor === b.dataset.floor) return;
+    mode.floor = b.dataset.floor;
+    buildWorld();
+    stage.focus();
+  });
 }
 
 for (const b of $$('#gfx-tools [data-model]')) {
@@ -1149,7 +1291,7 @@ for (const key of ['toon', 'rim', 'ink']) {
 
 // The bake is fetched before the first world so the character is never briefly
 // the old one; a failed fetch flips gfx.model to 'boxes' and carries on.
-await loadDoll();
+await Promise.all([loadDoll(), loadDesk()]);
 initTurntable();
 applyGfx();
 buildWorld();
@@ -1163,6 +1305,7 @@ if (!glError) raf = requestAnimationFrame(frame);
  */
 Object.assign(window, {
   world: () => world, maze: () => maze, ball: () => ball, snapshot, toMarkdown, setDate,
+  desks: () => ({ loaded: !!deskAsset, uploaded: !!viewer?.cache.has('desk'), placements: deskPlacements }),
   step (seconds = 1 / 60, frames = 1) {
     for (let i = 0; i < frames; i++) frame((last || 0) + seconds * 1000);
     return { t: run.t, pos: { ...ball.p }, buffer: [stage.width, stage.height] };

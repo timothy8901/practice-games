@@ -42,6 +42,12 @@
 <main class="play-main">
   <section class="stage-wrap">
     <div class="seedbar">
+      <span class="floor-switch" id="floor-tools">
+        <button class="tool" data-floor="lumon" title="One authored Lumon floor — the same every time, so it can be designed">The severed floor</button>
+        <button class="tool" data-floor="daily" title="The seeded daily generator — a different maze every day">Daily shift</button>
+      </span>
+      <span class="sep"></span>
+      <span id="shift-controls">
       <label>Shift <input id="date" type="date"></label>
       <button id="prev-day" title="Previous shift">‹</button>
       <button id="next-day" title="Next shift">›</button>
@@ -56,6 +62,7 @@
         </select>
       </label>
       <button id="regen">Regenerate</button>
+      </span>
       <span class="spacer"></span>
       <span id="gen-time" class="mono dim"></span>
     </div>

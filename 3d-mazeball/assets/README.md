@@ -47,3 +47,35 @@ do not "fix" the exporter to emit face normals.
 basis that the model faces local −Z. Blender models face −Y, and the axis map in
 `export()` accounts for the difference. Exported the naive way he runs down the
 corridor backwards.
+
+## `desk.json` — the MDR workstation
+
+Generated in Thrixel, reduced, then baked to vertex colours by `bake_glb.py`.
+The intermediate GLB lives under `thrixel_assets/`, which this repo gitignores,
+so only the bake is committed. To regenerate it:
+
+| step | what |
+| --- | --- |
+| prompt | "A plain white office desk with a boxy beige 1980s CRT computer terminal and a chunky keyboard on it." |
+| tool | `thrixel_create_model` (hard-surface, multi-part) |
+| submission | `8c1fcbc0-abb0-429a-a10f-3056978878da` — 24,536 tris |
+| reduce | `thrixel_reduce_triangles` to 3,000 → `eb1eb429-033d-42f2-ba1f-af85713c6031` (free, keeps the texture) |
+| bake | `bake_glb.py ... --scale 0.8` → 2,996 tris, 1.60 × 1.21 × 0.82 m |
+
+### Why the bake exists at all
+
+Thrixel ships GLB with PBR textures. `review/gl.js` has **no texture support** —
+no UVs, no samplers, nothing. Rather than grow a texture path through a
+deliberately dependency-free renderer, `bake_glb.py` samples each vertex's
+base-colour texel at build time and writes the same `{positions, normals,
+colors}` every other render group already is. Nothing at runtime knows Thrixel
+exists.
+
+### Check the winding
+
+Thrixel models on this account have a history of arriving inside out, with
+winding and stored normals agreeing with each other while both point inward —
+so comparing the two catches nothing. `bake_glb.py` runs a world-space test
+instead and prints the verdict; pass `--flip` when it says INWARD. This desk
+came back `OUTWARD (signed volume +0.12246 m3 [closed])`, so no flip was needed.
+Do not skip reading that line: the failure is silent and looks like bad lighting.

@@ -16,7 +16,7 @@ import { buildPiece, PIECE_BY_ID } from './pieces.js';
 import { TILE, HALF, BALL_R, DECK_T, LEVELS, DELTA, DIRS, EDGE_VEC, MATERIALS, resolveMaterial, isDeco } from './kit.js';
 import { GridCollider, binsFor, supportUnder, nearestSurface } from './physics.js';
 import { Mesher, parseColor } from './mesher.js';
-import { PROPS, HALL, OFFICE } from './theme.js';
+import { PROPS, HALL, OFFICE, OFFICE_HIDE } from './theme.js';
 
 /**
  * Build a themed prop in place of a piece. Same shape as buildPiece(), so the
@@ -92,6 +92,9 @@ export function assembleMaze (maze, opts = {}) {
     const { x: ox, z: oz } = cellCentre(cell.cx, cell.cz, w, h);
 
     for (const g of built.groups) {
+      // The office floor is carpet, not a timber race track. Render-only: these
+      // groups carry no collidable triangles (see OFFICE_HIDE).
+      if (office && OFFICE_HIDE.has(g.material)) continue;
       let r = render.get(g.material);
       if (!r) { r = { pos: [], nor: [], col: [], spec: g.spec }; render.set(g.material, r); }
       const base = r.pos.length;
@@ -150,8 +153,15 @@ export function assembleMaze (maze, opts = {}) {
     const bucket = key => {
       let r = render.get(key);
       if (!r) {
+        // A downward-facing ceiling quad gets n = (0,-1,0), so key, fill and
+        // sky are all zero and it receives the ambient term alone — which made
+        // the ceiling the darkest surface in a corridor that is lit from the
+        // ceiling. A little emissive puts the light back where the fittings say
+        // it comes from. Decoration either way; none of this collides.
         r = { pos: [], nor: [], col: [], spec: key === 'hallLight'
           ? { color: OFFICE.light, deco: true, emissive: 0.9 }
+          : key === 'hallCeil' ? { color: OFFICE.wallShade, deco: true, emissive: 0.30 }
+          : key === 'hallBar' ? { color: OFFICE.wallDark, deco: true, emissive: 0.10 }
           : MATERIALS.rubber };
         render.set(key, r);
       }
@@ -254,11 +264,72 @@ export function assembleMaze (maze, opts = {}) {
           { a: (o, y) => off(a, s * o, y), b: (o, y) => off(b, s * o, y) },
           [[sp, 0], [sp, sk - R], ...arc(sp - R, sk - R, R, 0, Math.PI / 2)]);
       }
-      // the horizontal accent line every corridor in the building has
+      // Coving where the wall meets the ceiling.
+      //
+      // The wall top has a bullnose and the skirting has a radius, but the
+      // corridor's most visible interior edge — dead ahead at eye height in the
+      // chase camera — was still a hard right angle. A concave quarter-round
+      // closes it: the other half of the "nothing comes to a point" pass.
+      const cov = HALL.coveR;
+      for (const sd of [-1, 1]) {
+        profile('hallTrim', OFFICE.wallShade,
+          { a: (o, y) => off(a, sd * o, y), b: (o, y) => off(b, sd * o, y) },
+          arc(t + cov, H - HALL.ceilDrop - cov, cov, Math.PI, Math.PI / 2, -1));
+      }
+
+      // Doors.
+      //
+      // The one prop that makes a white corridor unmistakably Lumon. Placed on
+      // the same metric rhythm the ceiling fittings use, so they sit on the
+      // building's grid rather than on however finely the route was sampled.
+      // Inner face only, decoration only — you roll straight past them.
+      // Walk the multiples of doorEvery that fall inside this segment, the way
+      // the ceiling cross-bars do. Requiring the whole leaf to fit inside one
+      // segment — `doorAt + doorW <= L` — put exactly ONE door on the entire
+      // floor, because the route is sampled into segments far shorter than a
+      // door is wide. A door centred on the crossing point is correct instead:
+      // consecutive segments of a straight run are collinear, so a leaf that
+      // overhangs into the next one lands exactly where it should.
+      const doorStep = HALL.doorEvery;
+      for (let k = Math.ceil(runFrom / doorStep) * doorStep; k < runFrom + L; k += doorStep) {
+        const u = k - runFrom;
+        const ux = dx / L, uz = dz / L;
+        const D = (uu, yy, lat) => [
+          a.x + ux * uu + nx * lat, a.y + yy, a.z + uz * uu + nz * lat,
+        ];
+        // Corridor-facing face, not "the -t face". The wall centre-line sits at
+        // lateral `half * side` from the route, so the side facing the corridor
+        // is the one toward lateral zero — `-side * t`. Hard-coding -t is the
+        // same mistake the accent stripe was making: right on one wall of every
+        // corridor, and on the outside of the other.
+        const lat = -side * t - 0.004;
+        const hwd = HALL.doorW / 2, dh = HALL.doorH, fr = HALL.doorFrame;
+        const c0 = u - hwd, c1 = u + hwd;
+        face('hallTrim', OFFICE.accent,
+          [[D(c0, 0, lat), D(c1, 0, lat), D(c1, dh, lat), D(c0, dh, lat)]], false);
+        face('hallTrim', OFFICE.door, [[
+          D(c0 + fr, 0, lat - 0.004), D(c1 - fr, 0, lat - 0.004),
+          D(c1 - fr, dh - fr, lat - 0.004), D(c0 + fr, dh - fr, lat - 0.004),
+        ]], false);
+        face('hallTrim', OFFICE.wallDark, [[
+          D(c1 - fr - 0.22, 1.02, lat - 0.008), D(c1 - fr - 0.06, 1.02, lat - 0.008),
+          D(c1 - fr - 0.06, 1.10, lat - 0.008), D(c1 - fr - 0.22, 1.10, lat - 0.008),
+        ]], false);
+      }
+
+      // The horizontal accent line every corridor in the building has.
+      //
+      // On BOTH faces, like the skirting above it. Emitted on `-sp` alone it
+      // landed on the corridor-facing side for one value of `side` and on the
+      // void-facing back of the wall for the other — so exactly one wall of
+      // every corridor was missing the most recognisable cue in the building,
+      // and the other was painting it where nobody could stand to see it.
       const y0 = HALL.stripeY, y1 = y0 + HALL.stripeH;
-      face('hallTrim', OFFICE.accent, [
-        [off(a, -sp, y0), off(b, -sp, y0), off(b, -sp, y1), off(a, -sp, y1)],
-      ], false);
+      for (const s of [-1, 1]) {
+        face('hallTrim', OFFICE.accent, [
+          [off(a, s * sp, y0), off(b, s * sp, y0), off(b, s * sp, y1), off(a, s * sp, y1)],
+        ], false);
+      }
 
       /* Ceiling.
        *
