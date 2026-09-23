@@ -109,6 +109,44 @@
   .hud-bar-label { font-size: 0.56rem; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; display: flex; justify-content: space-between; }
   .hud-bar-label .rdy { color: var(--accent); font-weight: 800; opacity: 0; transition: opacity 0.15s; }
   .hud-bar.special.ready ~ .hud-bar-label .rdy, .special-row.ready .rdy { opacity: 1; }
+  /* centre of the HUD: the match clock, the KO count (or survival round) and
+     which CPU tier is standing across from you. */
+  .hud-center {
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    background: linear-gradient(180deg, rgba(40,40,66,0.9), rgba(20,20,38,0.86));
+    border: 1px solid #44445c; border-radius: 12px;
+    padding: 7px 15px 8px; min-width: 108px;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05);
+    backdrop-filter: blur(3px);
+  }
+  .hud-center.hidden, .hud-clock.hidden { display: none; }
+  .hud.idle .hud-panel, .hud.idle .hud-center { display: none; }
+  .hud-clock {
+    font-size: 1.2rem; font-weight: 900; letter-spacing: 0.04em; line-height: 1;
+    font-variant-numeric: tabular-nums; color: var(--text);
+  }
+  .hud-clock.low { color: #ff5a7a; animation: clockPulse 0.55s ease-in-out infinite; }
+  @keyframes clockPulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+  .hud-score { display: flex; align-items: baseline; gap: 6px; color: var(--text); font-weight: 900; font-size: 0.72rem; letter-spacing: 0.06em; }
+  .hud-score b { font-size: 1.02rem; font-variant-numeric: tabular-nums; }
+  .hud-score em { font-style: normal; font-size: 0.54rem; letter-spacing: 0.14em; color: var(--muted); }
+  .hud-tag { font-size: 0.54rem; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+  /* big centre callout: FIGHT!, ROUND 3, SUDDEN DEATH */
+  .hud-banner {
+    position: absolute; top: 33%; left: 0; right: 0; z-index: 5;
+    text-align: center; pointer-events: none; opacity: 0;
+    font-size: clamp(1.4rem, 5vw, 2.2rem); font-weight: 900;
+    letter-spacing: 0.14em; text-transform: uppercase; color: #fff5a0;
+    text-shadow: 0 3px 18px rgba(0,0,0,0.7), 0 0 26px rgba(255,213,77,0.45);
+  }
+  .hud-banner.show { animation: bannerPop 1.5s ease-out forwards; }
+  @keyframes bannerPop {
+    0%   { opacity: 0; transform: scale(0.72); }
+    14%  { opacity: 1; transform: scale(1.09); }
+    26%  { transform: scale(1); }
+    70%  { opacity: 1; }
+    100% { opacity: 0; transform: scale(1.05); }
+  }
 
   /* ---------- overlay ---------- */
   .overlay {
@@ -165,6 +203,34 @@
   .pick-btn:active { transform: translateY(0); }
   .pick-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; vertical-align: middle; box-shadow: 0 0 6px currentColor; }
   .pick-moves { display: block; font-size: 0.58rem; color: var(--muted); font-weight: 600; margin-top: 3px; }
+  .pick-btn.wide { grid-column: 1 / -1; }
+
+  /* ---------- mode picker + battle rules ---------- */
+  .mode-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; }
+  @media (max-width: 430px) { .mode-grid { grid-template-columns: 1fr; } }
+  .mode-btn {
+    background: #1a1a2e; border: 2px solid #3a3a52; border-top: 5px solid var(--m-accent, #ffd54d);
+    color: var(--text); padding: 13px 12px 14px; border-radius: 10px; cursor: pointer;
+    font-family: inherit; text-align: center;
+    transition: transform 0.1s, background 0.15s, border-color 0.15s;
+  }
+  .mode-btn b { display: block; font-size: 1rem; font-weight: 900; letter-spacing: 0.05em; }
+  .mode-btn span { display: block; font-size: 0.66rem; color: var(--muted); font-weight: 600; line-height: 1.4; margin-top: 5px; }
+  .mode-btn .mode-best { color: var(--m-accent, #ffd54d); font-weight: 800; letter-spacing: 0.06em; margin-top: 6px; }
+  .mode-btn:hover { background: #2b2b40; border-color: var(--m-accent, var(--accent)); transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0,0,0,0.4); }
+  .mode-btn:active { transform: translateY(0); }
+  .opt-list { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+  .opt-row { display: flex; align-items: center; gap: 10px; }
+  .opt-label { min-width: 88px; text-align: left; font-size: 0.58rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+  .opt-choices { display: flex; gap: 6px; flex: 1; }
+  .opt-btn {
+    flex: 1; background: #1a1a2e; border: 2px solid #3a3a52; color: var(--text);
+    padding: 9px 4px; border-radius: 8px; cursor: pointer; font-family: inherit;
+    font-weight: 800; font-size: 0.78rem; letter-spacing: 0.03em;
+    transition: background 0.14s, border-color 0.14s, color 0.14s;
+  }
+  .opt-btn:hover { background: #2b2b40; border-color: var(--accent); }
+  .opt-btn.on { background: var(--accent); border-color: var(--accent); color: #2b2b40; }
 
   kbd {
     background: #11111e; border: 1px solid #44445c; border-radius: 4px;
@@ -252,7 +318,7 @@
       </a>
     </div>
     <h1>Blob Knight Rumpler</h1>
-    <p class="subtitle">Top-down 3D arena duel. Eight blob knights, each with an attack, a special and a shield.</p>
+    <p class="subtitle">Top-down 3D arena fighter. Duel a CPU knight under your own rules, or climb an endless survival ladder.</p>
     <a class="back-link" href="kirby-abilities.html">&larr; Play Kirby Brawler</a>
   </header>
 
@@ -271,12 +337,18 @@
             <div class="hud-bar special" id="hud-p-special-bar"><i id="hud-p-special" style="width:100%"></i></div>
           </div>
         </div>
+        <div class="hud-center hidden" id="hud-center">
+          <div class="hud-clock" id="hud-clock">2:00</div>
+          <div class="hud-score" id="hud-score"><b>0</b><em>KO</em><b>0</b></div>
+          <div class="hud-tag" id="hud-tag">Medium</div>
+        </div>
         <div class="hud-panel right" id="hud-cpu">
           <div class="hud-name"><span class="abil" id="hud-c-ability">—</span><span class="who">CPU</span></div>
           <div class="hud-hearts" id="hud-c-hearts"></div>
         </div>
       </div>
 
+      <div class="hud-banner" id="hud-banner"></div>
       <div class="overlay" id="overlay"></div>
     </div>
 
@@ -741,6 +813,8 @@ function makeFighter(isPlayer, abilityKey) {
     isPlayer, parts, group, blob, teamRing: ring,
     ability: abilityKey,
     hp: MAX_HP,
+    maxHp: MAX_HP,                     // survival challengers can carry spares
+    speedMul: 1,                       // CPU tiers walk at different paces
     facing: isPlayer ? 0 : Math.PI,    // player faces +Z(away cam start ok), cpu faces player
     vx: 0, vz: 0, kvx: 0, kvz: 0,
     airY: 0, airVy: 0,                 // jump height + vertical velocity
@@ -752,7 +826,8 @@ function makeFighter(isPlayer, abilityKey) {
     reflect: 0,                        // parasol twirl reflect window
     dash: null,                        // { dx, dz, t, dur, hitSet }
     anim: { run: 0 },
-    ai: { think: 0, cool: 0.8, moveX: 0, moveZ: 0, shieldT: 0, strafe: 1, windup: 0, pendingA2: false },
+    ai: { think: 0, cool: 0.8, moveX: 0, moveZ: 0, shieldT: 0, strafe: 1, windup: 0, pendingA2: false,
+          tune: null, hesitate: 0 },
   };
 }
 
@@ -777,8 +852,67 @@ const shockwaves = [];    // { mesh, t, dur, maxR }
 const flashes = [];       // impact glow rings / spark stars (userData.flash)
 const trails = [];        // weapon swing trails { mesh, t, dur }
 
+// ------------------------------------------------------------ DIFFICULTY ----
+// Four CPU tiers. What actually separates them is reaction time, the length of
+// the wind-up "tell" before a swing (a long one is readable, a short one is not)
+// and how long it waits between attacks. None of them hit harder than you do:
+// the CPU plays better, it does not cheat.
+const DIFFS = {
+  easy:   { name:'Easy',   think:0.30, windup:[0.42,0.22], coolA1:[1.10,0.80], coolA2:[1.60,0.90], shieldP:0.05, dodgeP:0.05, a2P:0.18, speed:0.84, hesitate:0.22 },
+  medium: { name:'Medium', think:0.18, windup:[0.26,0.12], coolA1:[0.62,0.55], coolA2:[1.05,0.70], shieldP:0.16, dodgeP:0.16, a2P:0.30, speed:0.94, hesitate:0.08 },
+  hard:   { name:'Hard',   think:0.11, windup:[0.16,0.07], coolA1:[0.40,0.35], coolA2:[0.80,0.45], shieldP:0.30, dodgeP:0.28, a2P:0.44, speed:1.00, hesitate:0    },
+  expert: { name:'Expert', think:0.07, windup:[0.10,0.05], coolA1:[0.26,0.22], coolA2:[0.60,0.35], shieldP:0.45, dodgeP:0.40, a2P:0.58, speed:1.00, hesitate:0    },
+};
+const DIFF_KEYS = Object.keys(DIFFS);
+
+// A survival run keeps climbing after Expert: the tell keeps shrinking and the
+// challengers start bringing spare hearts.
+function tuneFor(key, extra) {
+  const base = DIFFS[key] || DIFFS.medium;
+  if (!extra) return base;
+  const k = Math.pow(0.86, extra);
+  return Object.assign({}, base, {
+    windup: [Math.max(0.06, base.windup[0] * k), base.windup[1] * k],
+    coolA1: [Math.max(0.18, base.coolA1[0] * k), base.coolA1[1] * k],
+    coolA2: [Math.max(0.45, base.coolA2[0] * k), base.coolA2[1] * k],
+    shieldP: Math.min(0.62, base.shieldP + extra * 0.04),
+    dodgeP: Math.min(0.55, base.dodgeP + extra * 0.04),
+    speed: Math.min(1.12, base.speed + extra * 0.03),
+  });
+}
+
+// ------------------------------------------------------------ MATCH RULES ----
+const OPT_DEFAULT = { ko: 2, time: 120, diff: 'medium' };
+const KO_CHOICES = [[1, '1'], [2, '2'], [3, '3'], [5, '5']];
+const TIME_CHOICES = [[0, 'Off'], [60, '1:00'], [120, '2:00'], [180, '3:00']];
+const DIFF_CHOICES = DIFF_KEYS.map(k => [k, DIFFS[k].name]);
+function loadOpts() {
+  try {
+    const raw = JSON.parse(localStorage.getItem('bkr-opts') || '{}');
+    return {
+      ko:   KO_CHOICES.some(c => c[0] === raw.ko) ? raw.ko : OPT_DEFAULT.ko,
+      time: TIME_CHOICES.some(c => c[0] === raw.time) ? raw.time : OPT_DEFAULT.time,
+      diff: DIFFS[raw.diff] ? raw.diff : OPT_DEFAULT.diff,
+    };
+  } catch (_) { return Object.assign({}, OPT_DEFAULT); }
+}
+function saveOpts() { try { localStorage.setItem('bkr-opts', JSON.stringify(game.opts)); } catch (_) {} }
+function bestRun() { try { return parseInt(localStorage.getItem('bkr-best') || '0', 10) || 0; } catch (_) { return 0; } }
+function saveBest(n) { try { if (n > bestRun()) localStorage.setItem('bkr-best', String(n)); } catch (_) {} }
+
 const game = {
-  phase: 'menu',          // menu | pick | fight | result | paused
+  phase: 'menu',          // menu | pick | foe | rules | fight | roundover | result | paused
+  mode: '1v1',            // '1v1' | 'survival'
+  opts: loadOpts(),       // { ko, time, diff } — remembered between visits
+  sel: { player: 'sword', foe: 'random' },
+  score: { p: 0, c: 0 },  // KOs landed; in survival p is how many knights you have toppled
+  clock: 0,               // seconds left on the match/round clock, 0 = untimed
+  sudden: false,          // sudden death, after a tied clock
+  tier: '',               // label for the CPU tier currently in the ring
+  nextFoe: null,          // the survival challenger waiting in the wings
+  newBest: false,
+  endedBy: 'ko',          // 'ko' | 'time'
+  pendingKO: null,        // { t, playerDown } — the beat between a KO and what follows
   player: null,
   cpu: null,
   time: 0,
@@ -1008,6 +1142,7 @@ function applyHit(target, dmg, dirx, dirz, kb, accent) {
 }
 
 function ko(target) {
+  if (target.state === 'ko') return;   // one KO per life, whoever asks
   target.state = 'ko';
   target.koT = 0;
   sfx.ko();
@@ -1029,12 +1164,11 @@ function ko(target) {
       life: 1.1, maxLife: 1.1, spin: (Math.random()-0.5)*14 });
     scene.add(st);
   }
-  setTimeout(() => {
-    game.phase = 'result';
-    game.result = target.isPlayer ? 'lose' : 'win';
-    if (game.result === 'win') sfx.win(); else sfx.lose();
-    renderOverlay();
-  }, 900);
+  // a KO scores a point; what happens next (another life, another challenger,
+  // or the end of it) waits for the body to finish sinking — see the loop.
+  if (target.isPlayer) game.score.c++; else game.score.p++;
+  updateHud();
+  game.pendingKO = { t: 0.9, playerDown: target.isPlayer };
 }
 
 // ------------------------------------------------------------ FIGHT TICK ----
@@ -1187,7 +1321,7 @@ function updateFighter(f, dt, input) {
     const len = Math.hypot(mx, mz);
     if (len > 0.01) {
       mx /= len; mz /= len;
-      const SPEED = 5.6;
+      const SPEED = 5.6 * (f.speedMul || 1);
       f.vx = mx * SPEED; f.vz = mz * SPEED;
       g.rotation.y = Math.atan2(mx, mz);
       f.anim.run += dt * 11;
@@ -1331,8 +1465,10 @@ function aiControl(cpu, dt) {
   if (!pl || pl.state === 'ko' || cpu.state === 'ko') return out;
 
   const ai = cpu.ai;
+  const T = ai.tune || DIFFS[game.opts.diff] || DIFFS.medium;
   ai.think -= dt;
   ai.cool -= dt;
+  if (ai.hesitate > 0) ai.hesitate -= dt;
   if (ai.shieldT > 0) { ai.shieldT -= dt; out.shield = true; return out; }
 
   const dx = pl.group.position.x - cpu.group.position.x;
@@ -1343,11 +1479,11 @@ function aiControl(cpu, dt) {
   const ideal = ranged ? 5.6 : (def.a1.range ? def.a1.range - 0.4 : 1.8);
 
   if (ai.think <= 0) {
-    ai.think = 0.14;
+    ai.think = T.think;
     // reactive shield when the player attacks at close range
     // (only commits once the player's swing is actually in its damage window,
     //  so it can't read fakes — fairer & lets you bait shields)
-    if (pl.state === 'attack' && d < 3.4 && cpu.shield.stamina > 0.4 && Math.random() < 0.2) {
+    if (pl.state === 'attack' && d < 3.4 && cpu.shield.stamina > 0.4 && Math.random() < T.shieldP) {
       ai.shieldT = 0.4;
       out.shield = true;
       return out;
@@ -1355,13 +1491,16 @@ function aiControl(cpu, dt) {
     // choose strafe direction occasionally
     if (Math.random() < 0.1) ai.strafe = -ai.strafe;
     // hop to dodge incoming ranged attacks
-    if (pl.state === 'attack' && d > 2.5 && cpu.airY <= 0 && Math.random() < 0.2) {
+    if (pl.state === 'attack' && d > 2.5 && cpu.airY <= 0 && Math.random() < T.dodgeP) {
       out.jumpPressed = true;
     }
-    // attack decisions — start a short readable wind-up before committing
-    if (ai.cool <= 0 && ai.windup <= 0 && d < (ranged ? 8.5 : ideal + 1.2)) {
-      ai.windup = 0.16 + Math.random() * 0.08;   // brief tell so the player can react
-      ai.pendingA2 = cpu.cd.a2 <= 0 && Math.random() < 0.34;
+    // an easy knight loses the thread now and then and just stands there
+    if (T.hesitate && ai.hesitate <= 0 && Math.random() < T.hesitate) ai.hesitate = 0.35 + Math.random() * 0.45;
+    // attack decisions — start a readable wind-up before committing. The length
+    // of that tell is the difficulty: Easy telegraphs, Expert barely does.
+    if (ai.cool <= 0 && ai.windup <= 0 && ai.hesitate <= 0 && d < (ranged ? 8.5 : ideal + 1.2)) {
+      ai.windup = T.windup[0] + Math.random() * T.windup[1];
+      ai.pendingA2 = cpu.cd.a2 <= 0 && Math.random() < T.a2P;
     }
   }
 
@@ -1372,11 +1511,13 @@ function aiControl(cpu, dt) {
     cpu.group.rotation.y += angNorm(targetAng - cpu.group.rotation.y) * Math.min(1, dt * 14);
     if (ai.windup <= 0 && cpu.state === 'idle' && !cpu.shield.active) {
       cpu.group.rotation.y = targetAng;
-      if (ai.pendingA2 && cpu.cd.a2 <= 0) { out.a2Pressed = true; ai.cool = 0.95 + Math.random() * 0.7; }
-      else if (cpu.cd.a1 <= 0) { out.a1Pressed = true; ai.cool = 0.5 + Math.random() * 0.5; }
+      if (ai.pendingA2 && cpu.cd.a2 <= 0) { out.a2Pressed = true; ai.cool = T.coolA2[0] + Math.random() * T.coolA2[1]; }
+      else if (cpu.cd.a1 <= 0) { out.a1Pressed = true; ai.cool = T.coolA1[0] + Math.random() * T.coolA1[1]; }
       else ai.cool = 0.3;
     }
   }
+
+  if (ai.hesitate > 0) return out;   // caught flat-footed: no footwork this beat
 
   // positioning: approach / retreat to ideal range, strafe a little
   const err = d - ideal;
@@ -1571,9 +1712,9 @@ const HEART = (filled) => `<svg viewBox="0 0 20 18"><path d="M10 17 C10 17 1 11 
   fill="${filled ? '#ff5a7a' : '#33334a'}" stroke="${filled ? '#a82a4a' : '#444460'}" stroke-width="1.4"/></svg>`;
 
 let _prevHp = { p: MAX_HP, c: MAX_HP };
-function renderHearts(elId, hp, key) {
+function renderHearts(elId, hp, key, max) {
   const el = document.getElementById(elId);
-  el.innerHTML = Array.from({length: MAX_HP}, (_, i) => HEART(i < hp)).join('');
+  el.innerHTML = Array.from({length: max}, (_, i) => HEART(i < hp)).join('');
   // pop the heart that just emptied (the highest now-empty index)
   if (hp < _prevHp[key]) {
     const idx = hp;            // first empty heart
@@ -1582,19 +1723,59 @@ function renderHearts(elId, hp, key) {
   }
   _prevHp[key] = hp;
 }
+
+const hudEl = document.querySelector('.hud');
+const centerEl = document.getElementById('hud-center');
+const clockEl = document.getElementById('hud-clock');
+const scoreEl = document.getElementById('hud-score');
+const tagEl = document.getElementById('hud-tag');
+const bannerEl = document.getElementById('hud-banner');
+
+function clockText(s) {
+  const t = Math.max(0, Math.ceil(s));
+  return Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0');
+}
+// FIGHT! / ROUND 4 / SUDDEN DEATH — shown over the arena, gone in a second and a half
+function banner(text) {
+  if (!bannerEl) return;
+  bannerEl.textContent = text;
+  bannerEl.classList.remove('show');
+  void bannerEl.offsetWidth;        // restart the animation
+  bannerEl.classList.add('show');
+}
+function matchLive() {
+  return game.phase === 'fight' || game.phase === 'paused'
+      || game.phase === 'result' || game.phase === 'roundover';
+}
 function updateHud() {
+  const live = matchLive();
+  hudEl.classList.toggle('idle', !live);
+  centerEl.classList.toggle('hidden', !live);
+  if (live) {
+    const timed = game.opts.time > 0 && !game.sudden;
+    clockEl.classList.toggle('hidden', !timed);
+    if (timed) clockEl.textContent = clockText(game.clock);
+    scoreEl.innerHTML = game.mode === 'survival'
+      ? 'Round <b>' + survivalRound() + '</b>'
+      : '<b>' + game.score.p + '</b><em>KO</em><b>' + game.score.c + '</b>';
+    tagEl.textContent = game.sudden ? 'Sudden death' : (game.tier || DIFFS[game.opts.diff].name);
+  }
   if (!game.player) return;
   const p = game.player, c = game.cpu;
   document.getElementById('hud-p-ability').textContent = ABIL[p.ability].name;
-  document.getElementById('hud-c-ability').textContent = c ? ABIL[c.ability].name : '—';
+  document.getElementById('hud-c-ability').textContent = c ? ABIL[c.ability].name : '\u2014';
   document.getElementById('hud-player').style.setProperty('--p-accent', ABIL[p.ability].accent);
   if (c) document.getElementById('hud-cpu').style.setProperty('--cpu-accent', ABIL[c.ability].accent);
-  renderHearts('hud-p-hearts', p.hp, 'p');
-  if (c) renderHearts('hud-c-hearts', c.hp, 'c');
+  renderHearts('hud-p-hearts', p.hp, 'p', p.maxHp);
+  if (c) renderHearts('hud-c-hearts', c.hp, 'c', c.maxHp);
   else document.getElementById('hud-c-hearts').innerHTML = '';
 }
 function updateHudBars() {
   if (!game.player) return;
+  if (game.phase === 'fight' && game.opts.time > 0 && !game.sudden) {
+    clockEl.textContent = clockText(game.clock);
+    clockEl.classList.toggle('low', game.clock <= 10);
+  }
   const sh = game.player.shield;
   document.getElementById('hud-p-shield').style.width = (sh.stamina * 100).toFixed(0) + '%';
   document.getElementById('hud-p-shield-bar').classList.toggle('low', sh.stamina < 0.3 || sh.broken > 0);
@@ -1609,82 +1790,192 @@ function updateHudBars() {
 
 // --------------------------------------------------------------- OVERLAY ----
 const overlayEl = document.getElementById('overlay');
+
+function coreButton(key, attr) {
+  return `<button class="pick-btn" data-${attr}="${key}" style="--ab-accent:${ABIL[key].accent}">
+      <span class="pick-dot" style="background:${ABIL[key].accent}"></span>${ABIL[key].name}
+      <span class="pick-moves">${ABIL[key].a1.label} &middot; ${ABIL[key].a2.label}</span></button>`;
+}
+function optRow(label, key, choices) {
+  return `<div class="opt-row"><span class="opt-label">${label}</span><div class="opt-choices">` +
+    choices.map(([v, t]) => `<button class="opt-btn${game.opts[key] === v ? ' on' : ''}" data-opt="${key}" data-val="${v}">${t}</button>`).join('') +
+    `</div></div>`;
+}
+
 function renderOverlay() {
+  updateHud();
   if (game.phase === 'fight') { overlayEl.classList.add('hidden'); return; }
   overlayEl.classList.remove('hidden');
+  const surv = game.mode === 'survival';
+  const modeName = surv ? 'Survival' : '1v1 Duel';
+
   if (game.phase === 'menu') {
+    const best = bestRun();
     overlayEl.innerHTML = `
       <div class="overlay-card">
         <div class="overlay-title">Rumble Arena</div>
-        <div class="overlay-sub">One circular arena. You vs a CPU knight carrying a random core.<br>
-          Every ability has <strong>two attacks</strong> (<kbd>H</kbd> + <kbd>J</kbd>) and a <strong>shield</strong> (<kbd>K</kbd>).<br>
+        <div class="overlay-sub" id="menu-controls">One circular arena, one CPU knight.<br>
+          Every core has <strong>two attacks</strong> (<kbd>H</kbd> + <kbd>J</kbd>) and a <strong>shield</strong> (<kbd>K</kbd>).<br>
           <kbd>Space</kbd> hops over swings and projectiles.</div>
-        <div class="overlay-buttons">
-          <button class="overlay-btn primary" data-act="pick">Choose Your Knight</button>
+        <div class="mode-grid">
+          <button class="mode-btn" data-mode="1v1" style="--m-accent:#6dd64d"><b>1v1 Duel</b>
+            <span>Pick both knights, set the rules, fight. First to the KO limit takes it.</span></button>
+          <button class="mode-btn" data-mode="survival" style="--m-accent:#ff5a7a"><b>Survival</b>
+            <span>Challenger after challenger, each one sharper. Your hearts carry over and nothing heals them.</span>
+            ${best ? `<span class="mode-best">Best run: ${best} knight${best === 1 ? '' : 's'}</span>` : ''}</button>
         </div>
-        <div class="overlay-sub" style="font-size:0.72rem">Sound: press <kbd>M</kbd> to toggle &middot; Pause: <kbd>P</kbd></div>
+        <div class="overlay-sub" id="menu-hint" style="font-size:0.72rem">Sound: press <kbd>M</kbd> &middot; Pause: <kbd>P</kbd></div>
       </div>`;
+
   } else if (game.phase === 'pick') {
     overlayEl.innerHTML = `
       <div class="overlay-card">
         <div class="overlay-title">Choose Your Knight</div>
-        <div class="pick-grid">
-          ${ABIL_KEYS.map(k => `
-            <button class="pick-btn" data-pick="${k}" style="--ab-accent:${ABIL[k].accent}">
-              <span class="pick-dot" style="background:${ABIL[k].accent}"></span>${ABIL[k].name}
-              <span class="pick-moves">${ABIL[k].a1.label} &middot; ${ABIL[k].a2.label}</span>
-            </button>`).join('')}
-        </div>
+        <div class="overlay-sub">${modeName} &middot; eight cores, each with an attack, a special and a shield.</div>
+        <div class="pick-grid">${ABIL_KEYS.map(k => coreButton(k, 'pick')).join('')}</div>
         <button class="overlay-btn ghost" data-act="menu">Back</button>
       </div>`;
+
+  } else if (game.phase === 'foe') {
+    overlayEl.innerHTML = `
+      <div class="overlay-card">
+        <div class="overlay-title">Choose the Challenger</div>
+        <div class="overlay-sub">You are carrying <strong>${ABIL[game.sel.player].name}</strong>. Who walks in against you?</div>
+        <div class="pick-grid">
+          ${ABIL_KEYS.map(k => coreButton(k, 'foe')).join('')}
+          <button class="pick-btn wide" data-foe="random" style="--ab-accent:#8fd4ff">
+            <span class="pick-dot" style="background:linear-gradient(90deg,#6dd64d,#ffd54d,#ec4899)"></span>Random Core
+            <span class="pick-moves">Rolled fresh every rematch</span></button>
+        </div>
+        <button class="overlay-btn ghost" data-act="pick">Back</button>
+      </div>`;
+
+  } else if (game.phase === 'rules') {
+    const foeName = surv ? 'a new challenger every round'
+      : (game.sel.foe === 'random' ? 'a random core' : ABIL[game.sel.foe].name);
+    const explain = surv
+      ? `Hearts carry from round to round and nothing heals them. The CPU climbs a tier every two rounds${game.opts.time ? ', and a challenger you cannot finish before the clock ends the run.' : '.'}`
+      : `First to ${game.opts.ko} KO${game.opts.ko === 1 ? '' : 's'} wins${game.opts.time ? '. If the clock runs out the KO lead takes it \u2014 level, and it goes to sudden death.' : '. No clock: play it out.'}`;
+    overlayEl.innerHTML = `
+      <div class="overlay-card">
+        <div class="overlay-title">Battle Rules</div>
+        <div class="overlay-sub"><strong>${ABIL[game.sel.player].name}</strong> vs ${foeName}</div>
+        <div class="opt-list">
+          ${surv ? '' : optRow('KOs to win', 'ko', KO_CHOICES)}
+          ${optRow(surv ? 'Round time' : 'Time limit', 'time', TIME_CHOICES)}
+          ${optRow(surv ? 'Opening CPU' : 'CPU', 'diff', DIFF_CHOICES)}
+        </div>
+        <div class="overlay-sub" style="font-size:0.72rem">${explain}</div>
+        <div class="overlay-buttons">
+          <button class="overlay-btn primary" data-act="fight">${surv ? 'Start Run' : 'Fight'}</button>
+          <button class="overlay-btn ghost" data-act="back">Back</button>
+        </div>
+      </div>`;
+
   } else if (game.phase === 'paused') {
     overlayEl.innerHTML = `
       <div class="overlay-card">
         <div class="overlay-title">Paused</div>
+        <div class="overlay-sub">${modeName} &middot; ${surv ? 'round ' + survivalRound() : game.score.p + ' \u2013 ' + game.score.c} &middot; ${game.tier}</div>
         <div class="overlay-buttons">
           <button class="overlay-btn primary" data-act="resume">Resume</button>
           <button class="overlay-btn ghost" data-act="menu">Quit to Menu</button>
         </div>
       </div>`;
+
+  } else if (game.phase === 'roundover') {
+    const step = currentStep();
+    overlayEl.innerHTML = `
+      <div class="overlay-card">
+        <div class="overlay-title victory">Round ${survivalRound() - 1} cleared</div>
+        <div class="overlay-sub">Your <strong>${ABIL[game.player.ability].name}</strong> knight toppled the
+          <strong>${ABIL[game.cpu.ability].name}</strong> challenger.<br>
+          <strong>${game.player.hp}</strong> of ${game.player.maxHp} hearts left \u2014 they carry straight into the next round.</div>
+        <div class="overlay-sub">Next up: <strong>${ABIL[game.nextFoe].name}</strong> &middot; ${tierLabel(step)}${step.bonusHp ? ' &middot; +' + step.bonusHp + ' hearts' : ''}</div>
+        <div class="overlay-buttons">
+          <button class="overlay-btn primary" data-act="next">Fight Round ${survivalRound()}</button>
+          <button class="overlay-btn ghost" data-act="menu">End Run</button>
+        </div>
+      </div>`;
+
+  } else if (game.phase === 'result' && surv) {
+    const n = game.score.p;
+    overlayEl.innerHTML = `
+      <div class="overlay-card">
+        <div class="overlay-title ${n ? 'victory' : 'defeat'}">Run Over</div>
+        <div class="overlay-sub">You toppled <strong>${n}</strong> challenger${n === 1 ? '' : 's'}${game.endedBy === 'time' ? `, then ran out of clock on round ${n + 1}` : ''}.<br>
+          ${game.newBest && n ? 'A new best run.' : `Best run: <strong>${bestRun()}</strong>.`}</div>
+        <div class="overlay-buttons">
+          <button class="overlay-btn primary" data-act="again">New Run</button>
+          <button class="overlay-btn ghost" data-act="rules">Change Rules</button>
+          <button class="overlay-btn ghost" data-act="menu">Menu</button>
+        </div>
+      </div>`;
+
   } else if (game.phase === 'result') {
     const won = game.result === 'win';
+    const how = game.endedBy === 'time' ? ' on the clock' : '';
     overlayEl.innerHTML = `
       <div class="overlay-card">
         <div class="overlay-title ${won ? 'victory' : 'defeat'}">${won ? 'VICTORY!' : 'DEFEAT'}</div>
-        <div class="overlay-sub">${won
-          ? `Your <strong>${ABIL[game.player.ability].name}</strong> knight toppled the CPU's <strong>${ABIL[game.cpu.ability].name}</strong>.`
-          : `The CPU's <strong>${ABIL[game.cpu.ability].name}</strong> knight got the better of you.`}</div>
+        <div class="overlay-sub"><strong>${game.score.p} \u2013 ${game.score.c}</strong> &middot; ${won
+          ? `your <strong>${ABIL[game.player.ability].name}</strong> knight took the match${how}.`
+          : `the CPU's <strong>${ABIL[game.cpu.ability].name}</strong> knight took the match${how}.`}</div>
         <div class="overlay-buttons">
-          <button class="overlay-btn primary" data-act="rematch">Rematch (new CPU)</button>
-          <button class="overlay-btn ghost" data-act="pick">Change Knight</button>
+          <button class="overlay-btn primary" data-act="rematch">Rematch</button>
+          <button class="overlay-btn ghost" data-act="rules">Change Rules</button>
           <button class="overlay-btn ghost" data-act="menu">Menu</button>
         </div>
       </div>`;
   }
 }
+
 overlayEl.addEventListener('click', (e) => {
-  const act = e.target.closest('[data-act]');
-  if (act) {
-    const a = act.dataset.act;
-    sfx.select();
-    if (a === 'pick') { game.phase = 'pick'; renderOverlay(); }
-    else if (a === 'menu') { game.phase = 'menu'; renderOverlay(); }
-    else if (a === 'resume') { game.phase = 'fight'; renderOverlay(); }
-    else if (a === 'rematch') startFight(game.player.ability);
-    return;
-  }
+  const mode = e.target.closest('[data-mode]');
+  if (mode) { sfx.select(); game.mode = mode.dataset.mode; game.phase = 'pick'; renderOverlay(); return; }
   const pick = e.target.closest('[data-pick]');
-  if (pick) { sfx.select(); startFight(pick.dataset.pick); }
+  if (pick) {
+    sfx.select();
+    game.sel.player = pick.dataset.pick;
+    game.phase = game.mode === 'survival' ? 'rules' : 'foe';
+    renderOverlay(); return;
+  }
+  const foe = e.target.closest('[data-foe]');
+  if (foe) { sfx.select(); game.sel.foe = foe.dataset.foe; game.phase = 'rules'; renderOverlay(); return; }
+  const opt = e.target.closest('[data-opt]');
+  if (opt) {
+    sfx.select();
+    const key = opt.dataset.opt;
+    game.opts[key] = key === 'diff' ? opt.dataset.val : Number(opt.dataset.val);
+    saveOpts();
+    renderOverlay(); return;
+  }
+  const act = e.target.closest('[data-act]');
+  if (!act) return;
+  sfx.select();
+  switch (act.dataset.act) {
+    case 'menu':   quitToMenu(); break;
+    case 'pick':   game.phase = 'pick'; renderOverlay(); break;
+    case 'rules':  game.phase = 'rules'; renderOverlay(); break;
+    case 'back':   game.phase = game.mode === 'survival' ? 'pick' : 'foe'; renderOverlay(); break;
+    case 'resume': game.phase = 'fight'; renderOverlay(); break;
+    case 'next':   nextRound(); break;
+    case 'fight': case 'again': case 'rematch': beginMatch(); break;
+  }
 });
 
 // ------------------------------------------------------------- GAME FLOW ----
-function randomCpuAbility(excludeKey) {
-  const pool = ABIL_KEYS.filter(k => k !== excludeKey);
+// A fight starts in one of three ways: a fresh match (beginMatch), the next life
+// inside a duel (nextLife) or the next challenger of a survival run (nextRound).
+// All three hand over to deploy(), the only place that puts fighters on their marks.
+
+function randomCore(exclude, alsoExclude) {
+  let pool = ABIL_KEYS.filter(k => k !== exclude && k !== alsoExclude);
+  if (!pool.length) pool = ABIL_KEYS.filter(k => k !== exclude);
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
-function startFight(playerAbility) {
-  // clear world entities
+function clearWorld() {
   for (const pr of projectiles) scene.remove(pr.mesh);
   projectiles.length = 0;
   for (const p of particles) scene.remove(p.mesh);
@@ -1695,18 +1986,59 @@ function startFight(playerAbility) {
   flashes.length = 0;
   for (const tr of trails) scene.remove(tr.mesh);
   trails.length = 0;
+}
 
-  if (!game.player) game.player = makeFighter(true, playerAbility);
-  else setFighterAbility(game.player, playerAbility);
-  if (!game.cpu) game.cpu = makeFighter(false, randomCpuAbility(playerAbility));
-  else setFighterAbility(game.cpu, randomCpuAbility(playerAbility));
+function setPlayerCore(key) {
+  if (!game.player) game.player = makeFighter(true, key);
+  else setFighterAbility(game.player, key);
+}
+function setFoeCore(key) {
+  if (!game.cpu) game.cpu = makeFighter(false, key);
+  else setFighterAbility(game.cpu, key);
+}
 
-  // reset both fighters
-  for (const [f, x, face] of [[game.player, -4, 0], [game.cpu, 4, Math.PI]]) {
-    f.hp = MAX_HP;
+// Survival numbers each round by how many challengers you have already toppled.
+function survivalRound() { return game.score.p + 1; }
+
+// Which tier is in the ring right now: whatever you picked in a duel, and in
+// survival a tier harder every two rounds — then, past Expert, sharper still
+// and carrying spare hearts.
+function currentStep() {
+  if (game.mode !== 'survival') return { key: game.opts.diff, extra: 0, bonusHp: 0 };
+  const start = Math.max(0, DIFF_KEYS.indexOf(game.opts.diff));
+  const step = start + Math.floor((survivalRound() - 1) / 2);
+  const extra = Math.max(0, step - (DIFF_KEYS.length - 1));
+  return {
+    key: DIFF_KEYS[Math.min(DIFF_KEYS.length - 1, step)],
+    extra,
+    bonusHp: Math.min(3, Math.floor(extra / 2)),
+  };
+}
+function tierLabel(step) { return DIFFS[step.key].name + (step.extra ? ' +' + step.extra : ''); }
+
+// Both knights on their marks, facing each other, clocks and cooldowns clean.
+// playerHp is what the player brings in — survival hands over whatever hearts
+// they finished the last round with.
+function deploy(playerHp, cpuHp) {
+  clearWorld();
+  const step = currentStep();
+  const tune = tuneFor(step.key, step.extra);
+  game.tier = tierLabel(step);
+  game.player.maxHp = MAX_HP;
+  game.cpu.maxHp = MAX_HP + step.bonusHp;
+  game.player.speedMul = 1;
+  game.cpu.speedMul = tune.speed;
+  game.cpu.ai.tune = tune;
+
+  const marks = [
+    [game.player, -4, playerHp, Math.PI / 2],
+    [game.cpu, 4, cpuHp == null ? game.cpu.maxHp : cpuHp, -Math.PI / 2],
+  ];
+  for (const [f, x, hp, face] of marks) {
+    f.hp = Math.max(1, Math.min(f.maxHp, Math.round(hp)));
     f.group.position.set(x, 0, 0);
-    f.group.rotation.set(0, face + (x < 0 ? Math.PI/2 : -Math.PI/2), 0);
-    f.state = 'idle'; f.attack = null; f.dash = null;
+    f.group.rotation.set(0, face, 0);
+    f.state = 'idle'; f.attack = null; f.dash = null; f.koT = 0;
     f.kvx = f.kvz = f.vx = f.vz = 0;
     f.airY = 0; f.airVy = 0;
     f.cd.a1 = 0; f.cd.a2 = 0;
@@ -1716,22 +2048,108 @@ function startFight(playerAbility) {
     f.group.position.y = 0;
     f.group.scale.setScalar(1);
     if (f.parts.body) f.parts.body.scale.setScalar(1);
-    if (f.ai) { f.ai.windup = 0; f.ai.cool = 0.8; f.ai.shieldT = 0; f.ai.think = 0; }
+    if (f.ai) { f.ai.windup = 0; f.ai.cool = 0.8; f.ai.shieldT = 0; f.ai.think = 0; f.ai.hesitate = 0; }
     resetPose(f);
   }
-  // reset camera framing for a fresh match
+  // reset camera framing for a fresh fight
   camKick = { x: 0, y: 0, z: 0 }; camShake = 0; game.hitStop = 0;
   camTarget.set(0, 0, 0);
-  // face each other
-  game.player.group.rotation.y = Math.PI/2;  // toward +x (cpu)
-  game.cpu.group.rotation.y = -Math.PI/2;
 
-  _prevHp = { p: MAX_HP, c: MAX_HP };
+  game.pendingKO = null;
+  _prevHp = { p: game.player.hp, c: game.cpu.hp };
   game.phase = 'fight';
   game.result = null;
   updateHud();
   renderOverlay();
 }
+
+function beginMatch() {
+  game.score = { p: 0, c: 0 };
+  game.sudden = false;
+  game.newBest = false;
+  game.endedBy = 'ko';
+  game.clock = game.opts.time;
+  game.nextFoe = null;
+  setPlayerCore(game.sel.player);
+  setFoeCore(game.mode === 'survival' || game.sel.foe === 'random'
+    ? randomCore(game.sel.player) : game.sel.foe);
+  deploy(MAX_HP);
+  banner(game.mode === 'survival' ? 'Round 1' : 'Fight!');
+}
+
+// Duel: someone lost a life but the match runs on. Both reset, the clock does not.
+function nextLife() {
+  deploy(MAX_HP);
+  banner('Fight!');
+}
+
+// Survival: the next challenger walks on and the player keeps their hearts.
+function nextRound() {
+  setFoeCore(game.nextFoe || randomCore(game.sel.player, game.cpu.ability));
+  game.nextFoe = null;
+  game.clock = game.opts.time;          // each round gets its own clock
+  deploy(game.player.hp);               // hearts carry over; nothing heals them
+  banner('Round ' + survivalRound());
+}
+
+// Tied when the clock ran out: two hearts each, next KO takes it.
+function suddenDeath() {
+  game.sudden = true;
+  game.clock = 0;
+  deploy(2, 2);
+  banner('Sudden Death');
+}
+
+function timeUp() {
+  if (game.mode === 'survival') { game.endedBy = 'time'; return endRun(); }
+  if (game.score.p !== game.score.c) return endMatch(game.score.p > game.score.c ? 'win' : 'lose', 'time');
+  suddenDeath();
+}
+
+function endMatch(result, by) {
+  game.pendingKO = null;
+  game.result = result;
+  game.endedBy = by || 'ko';
+  game.phase = 'result';
+  if (result === 'win') sfx.win(); else sfx.lose();
+  renderOverlay();
+}
+
+function endRun() {
+  game.pendingKO = null;
+  game.newBest = game.score.p > bestRun();
+  saveBest(game.score.p);
+  game.result = 'lose';
+  game.phase = 'result';
+  sfx.lose();
+  renderOverlay();
+}
+
+// The beat after a KO has elapsed: next life, next challenger, or the end of it.
+function afterKO(playerDown) {
+  if (game.mode === 'survival') {
+    if (playerDown) { game.endedBy = 'ko'; return endRun(); }
+    game.nextFoe = randomCore(game.sel.player, game.cpu.ability);
+    game.phase = 'roundover';
+    sfx.win();
+    renderOverlay();
+    return;
+  }
+  if (game.sudden || game.score.p >= game.opts.ko || game.score.c >= game.opts.ko) {
+    return endMatch(game.score.p > game.score.c ? 'win' : 'lose', 'ko');
+  }
+  nextLife();
+}
+
+// Leaving mid-run still counts the challengers you beat.
+function quitToMenu() {
+  if (game.mode === 'survival' && matchLive()) saveBest(game.score.p);
+  game.pendingKO = null;
+  game.sudden = false;
+  game.phase = 'menu';
+  renderOverlay();
+}
+window.quitToMenu = quitToMenu;
 
 // --------------------------------------------------------------- RESIZE ----
 function resize() {
@@ -1751,9 +2169,16 @@ function loop() {
   requestAnimationFrame(loop);
   let dt = Math.min(0.05, clock.getDelta());
   const realDt = dt;
-  if (game.phase === 'paused' || game.phase === 'menu' || game.phase === 'pick') dt = 0;
+  // every screen that isn't the fight itself freezes the simulation
+  if (game.phase !== 'fight' && game.phase !== 'result') dt = 0;
   if (game.hitStop > 0) { game.hitStop -= realDt; dt = 0; }
   game.time += dt;
+
+  // match clock: only while the fight is actually live
+  if (game.phase === 'fight' && !game.pendingKO && game.clock > 0) {
+    game.clock = Math.max(0, game.clock - dt);
+    if (game.clock <= 0) timeUp();
+  }
 
   if (game.phase === 'fight' || game.phase === 'result') {
     if (game.player && game.cpu) {
@@ -1779,6 +2204,16 @@ function loop() {
   // FX keep animating during hit-stop so impacts read; freeze only on menus/pause
   const fxDt = (game.phase === 'fight' || game.phase === 'result') ? (dt || realDt) : 0;
   updateParticlesAndFx(fxDt);
+  // the beat after a KO — the body sinks, then the match decides what follows.
+  // Ticked here rather than on a timer so pausing holds it too.
+  if (game.pendingKO) {
+    game.pendingKO.t -= fxDt;
+    if (game.pendingKO.t <= 0) {
+      const playerDown = game.pendingKO.playerDown;
+      game.pendingKO = null;
+      afterKO(playerDown);
+    }
+  }
   updateHudBars();
 
   // camera: ease toward fighters' midpoint, plus shake

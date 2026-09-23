@@ -67,9 +67,14 @@ A top-down 3D arena fighter — `blob-knight-rumpler.html`. One circular
 arena, chunky low-poly blob knights built in Three.js, and eight cores —
 Blade, Arc, Disc, Maul, Bow, Flare, Cinder and Veil — each with **two
 attacks** (`H` / `J`, or `X` / `Z`) and a **shield** (`K`, or `Shift` /
-`C`) — against a CPU knight carrying a random core. Move with
-WASD / arrows, **`Space` jump-dodges** over swings and projectiles, `P`
-pauses, `M` mutes. It pulls Three.js from a CDN but is still a single
+`C`). Two single-player modes: a **1v1 duel** where you choose both
+knights and the rules (1/2/3/5 KOs to win, an optional clock with sudden
+death on a tie, and an Easy / Medium / Hard / Expert CPU), and
+**survival**, an endless ladder of challengers that climbs a tier every
+two rounds — your hearts carry from round to round and nothing heals
+them, so the run ends when you are knocked out. Move with WASD / arrows,
+**`Space` jump-dodges** over swings and projectiles, `P` pauses, `M`
+mutes. It pulls Three.js from a CDN but is still a single
 self-contained HTML page.
 
 ## Grocery Tycoon

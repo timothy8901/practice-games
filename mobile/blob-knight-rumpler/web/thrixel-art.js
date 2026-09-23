@@ -227,29 +227,29 @@
 
   // --------------------------------------------------------------- gating
   // Don't start a fight in half the art: hold the pick until the models land.
-  const startOriginal = window.startFight;
-  let pendingAbility = null;
-  window.startFight = function (ability) {
+  const startOriginal = window.beginMatch;
+  let pending = false;
+  window.beginMatch = function () {
     if (!art.ready && !art.failed) {
-      pendingAbility = ability;
+      pending = true;
       const card = overlayEl.querySelector('.overlay-card');
       if (card && !card.querySelector('.bkr-loading')) {
         card.insertAdjacentHTML('beforeend', '<div class="overlay-sub bkr-loading">Loading fighters…</div>');
       }
       return;
     }
-    startOriginal(ability);
+    startOriginal();
   };
 
   loadArt().then(() => {
     dressArena();
     console.log('[BKR] Thrixel art ready');
-    if (pendingAbility) { const ability = pendingAbility; pendingAbility = null; startFight(ability); }
-    else if (game.phase === 'menu' || game.phase === 'pick') renderOverlay();
+    if (pending) { pending = false; beginMatch(); }
+    else if (game.phase !== 'fight') renderOverlay();
   }).catch((err) => {
     console.error('[BKR] Thrixel art failed, keeping the built-in look: ' + err.message);
     art.failed = true;
-    if (pendingAbility) { const ability = pendingAbility; pendingAbility = null; startOriginal(ability); }
-    else if (game.phase === 'menu' || game.phase === 'pick') renderOverlay();
+    if (pending) { pending = false; startOriginal(); }
+    else if (game.phase !== 'fight') renderOverlay();
   });
 })();

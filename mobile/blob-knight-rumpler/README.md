@@ -5,10 +5,15 @@ same fighting, wearing the Thrixel art from Mote Rumble, with touch controls and
 every fighter renamed to the core it wears. Produces an installable Android app
 and a zip to hand around.
 
-The engine page is `kirby-rumble.html` on `origin/main` - the published browser
-game, which this build reads and never modifies. Every name it carries from that
-era is renamed on the way in (`rename_patches()` in build.py, and web/rename.js
-for the fighters), so nothing in the app or its page carries the old name.
+The engine page is `blob-knight-rumpler.html` - the published browser game,
+which this build reads and never modifies. It still accepts the page under its
+old name (`kirby-rumble.html`) on a ref where the rename has not landed yet, and
+renames every name from that era on the way in (`rename_patches()` in build.py,
+and web/rename.js for the fighters), so nothing in the app or its page carries
+the old name.
+
+The page brings its own single-player modes - a 1v1 duel with the rules you set,
+and the survival ladder - so this build only has to make them work under a thumb.
 
 ```bash
 python3 build.py
@@ -32,7 +37,9 @@ notes (`INSTALL.txt`) and `web/index.html`, the same page as a single web file.
   sound at the top. They drive `game.input`, the same object the keyboard sets.
   The layer also pauses the fight when the app or tab goes to the background,
   starts phones at 1.5x resolution and drops it (then shadow detail) when the
-  frame rate can't hold, and exposes `KB.back()` / `KB.appPause()` for Android. They switch on
+  frame rate can't hold, and exposes `BKR.back()` / `BKR.appPause()` for Android (Back steps
+  down the menus - rules to challenger to knight to title - and ends a survival
+  run from the round or result card). They switch on
   for touchscreens; `?touch=1` / `?touch=0` force them on or off.
 - **The art** (`web/thrixel-art.js`, `web/models.js`, `models/`): each ability maps
   to the core built from it for Mote Rumble - sword/Blade, beam/Arc, cutter/Disc,

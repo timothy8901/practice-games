@@ -257,9 +257,9 @@
     if (!card) return;
     if (game.phase === 'menu') {
       card.insertAdjacentHTML('afterbegin', '<div class="bkr-brand">Blob Knight Rumpler</div>');
-      const subs = card.querySelectorAll('.overlay-sub');
+      const subs = [card.querySelector('#menu-controls'), card.querySelector('#menu-hint')];
       if (TOUCH && subs[0]) {
-        subs[0].innerHTML = 'One circular arena. You vs a CPU knight carrying a random core.<br>' +
+        subs[0].innerHTML = 'One circular arena, one CPU knight.<br>' +
           `Drag the left side of the screen to move. Every core has two attacks, ${PILL('Attack', COLORS.a1)} ` +
           `and ${PILL('Special', COLORS.a2)}, and a ${PILL('Shield', COLORS.shield)} you hold.<br>` +
           `${PILL('Jump', COLORS.jump)} hops over swings and projectiles.`;
@@ -396,7 +396,11 @@
       switch (game.phase) {
         case 'fight': game.phase = 'paused'; break;
         case 'paused': game.phase = 'fight'; break;
-        case 'pick': case 'result': game.phase = 'menu'; break;
+        case 'pick': game.phase = 'menu'; break;
+        case 'foe': game.phase = 'pick'; break;
+        case 'rules': game.phase = game.mode === 'survival' ? 'pick' : 'foe'; break;
+        // a run abandoned from these screens still counts what it cleared
+        case 'result': case 'roundover': quitToMenu(); sfx.select(); return true;
         default: return false;   // title menu: let Android close the app
       }
       sfx.select();
