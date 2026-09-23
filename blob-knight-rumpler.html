@@ -217,6 +217,7 @@
   .mode-btn b { display: block; font-size: 1rem; font-weight: 900; letter-spacing: 0.05em; }
   .mode-btn span { display: block; font-size: 0.66rem; color: var(--muted); font-weight: 600; line-height: 1.4; margin-top: 5px; }
   .mode-btn .mode-best { color: var(--m-accent, #ffd54d); font-weight: 800; letter-spacing: 0.06em; margin-top: 6px; }
+  .menu-note { font-size: 0.68rem; }
   .mode-btn:hover { background: #2b2b40; border-color: var(--m-accent, var(--accent)); transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0,0,0,0.4); }
   .mode-btn:active { transform: translateY(0); }
   .opt-list { display: flex; flex-direction: column; gap: 8px; width: 100%; }
@@ -2024,7 +2025,7 @@ function renderOverlay() {
           <button class="overlay-btn ghost" data-act="achv">Achievements<span class="tally">${ACHV.filter(earned).length} / ${ACHV.length}</span></button>
           <button class="overlay-btn ghost" data-act="boosts">Boosts<span class="tally">${boostsOn() ? 'On' : 'Off'}</span></button>
         </div>
-        <div class="overlay-sub" id="menu-boosts" style="font-size:0.68rem">${boostsOn()
+        <div class="overlay-sub menu-note" id="menu-boosts">${boostsOn()
           ? 'Boosts on: a card before every match, plus whatever your achievements have earned.'
           : 'Boosts off: no cards, no achievement buffs \u2014 just the knight and the arena.'}</div>
         <div class="overlay-sub" id="menu-hint" style="font-size:0.72rem">Sound: press <kbd>M</kbd> &middot; Pause: <kbd>P</kbd></div>
