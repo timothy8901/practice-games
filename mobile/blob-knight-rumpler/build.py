@@ -31,9 +31,12 @@ KEYSTORE = os.path.expanduser('~/.android/blob-knight-rumpler.jks')
 KEYPASS = KEYSTORE + '.password'
 THREE = os.path.join(HERE, 'vendor', 'three-0.152.2.min.js')
 # The engine page this is built from: the published browser game, never modified
-# here. It is being renamed on the site, so accept either name, and rename whatever
-# Kirby-era strings are still in it (none, once the renamed page reaches main).
+# here. It was renamed on the site, so older refs still carry the Kirby-era name;
+# accept either, and rename whatever Kirby-era strings are still in it (none, on
+# any ref since the rename landed). ENGINE_MARK is what tells the game apart from
+# the redirect stub that now sits at the old name.
 ENGINE_PAGES = ('blob-knight-rumpler.html', 'kirby-rumble.html')
+ENGINE_MARK = 'const ABIL = {'
 ZIP_FOLDER = 'Blob Knight Rumpler - Android'
 # The release these defaults build. Android refuses an install whose version code
 # is not higher than the one on the phone, so raise both together for every build
@@ -68,10 +71,13 @@ def read_game(args):
             continue
         text = subprocess.run(git + ['show', args.ref + ':' + page], check=True,
                               capture_output=True, encoding='utf-8').stdout
+        if ENGINE_MARK not in text:
+            continue        # the redirect left at the old name, not the game
         last = subprocess.run(git + ['log', '-1', '--format=%h %cs', args.ref, '--', page],
                               check=True, capture_output=True, encoding='utf-8').stdout.strip()
         return text, '%s:%s (last changed %s)' % (args.ref, page, last)
-    die('none of %s exist at %s - pass --source FILE' % (' / '.join(ENGINE_PAGES), args.ref))
+    die('no game page at %s - looked for %s carrying "%s". Pass --source FILE.'
+        % (args.ref, ' / '.join(ENGINE_PAGES), ENGINE_MARK))
 
 
 def patch(html, what, old, new):

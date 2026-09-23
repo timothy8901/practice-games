@@ -9,6 +9,8 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 # Serve the games — Kirby Brawler at the root path, Blob Knight Rumpler at its own
 COPY kirby-abilities.html /usr/share/nginx/html/index.html
 COPY blob-knight-rumpler.html /usr/share/nginx/html/blob-knight-rumpler.html
+# The name it shipped under until 2026-09-23, kept as a redirect for old links
+COPY kirby-rumble.html /usr/share/nginx/html/kirby-rumble.html
 
 # Healthcheck so `docker ps` shows the container is actually serving
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \

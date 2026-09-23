@@ -7,7 +7,9 @@ and a zip to hand around.
 
 The engine page is `blob-knight-rumpler.html` - the published browser game,
 which this build reads and never modifies. It still accepts the page under its
-old name (`kirby-rumble.html`) on a ref where the rename has not landed yet, and
+old name (`kirby-rumble.html`) on a ref from before the rename - it checks the
+page actually carries the engine, so the redirect now sitting at that name on
+main can never be built by mistake - and it
 renames every name from that era on the way in (`rename_patches()` in build.py,
 and web/rename.js for the fighters), so nothing in the app or its page carries
 the old name.
