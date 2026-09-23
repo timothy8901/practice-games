@@ -39,7 +39,12 @@ HOW TO PLAY
   ACHIEVEMENTS - 76 of them, twelve overall and eight for each of the eight
   knights. They tick over as you play; the list and your progress are on the
   title screen under Achievements, and one pops up in the corner the moment you
-  earn it.
+  earn it. Each one also unlocks a small permanent buff - a knight's own eight
+  only help while you are carrying that knight, the twelve overall always count.
+
+  BOOSTS - the toggle on the title screen. Turn it off and you get no card
+  before a match and none of the achievement buffs: just the knight and the
+  arena. Achievements still tick over either way.
 
   TWO MODES
     1v1        pick your knight and the challenger's (or leave it random), then

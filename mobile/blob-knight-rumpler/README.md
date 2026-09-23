@@ -17,9 +17,10 @@ and the survival ladder - so this build only has to make them work under a thumb
 The twelve buff cards ride along the same way: their art is inlined in the page
 as WebP data URIs (about 60 KB for the set, see `card-art/` in the repo), so
 there is nothing extra for this build to package or for the app to fetch. Same
-for the 76 achievements (`achievements/` in the repo): the page carries the list
-and keeps the counters in the WebView's own localStorage, so a phone's progress
-is its own.
+for the 76 achievements (`achievements/` in the repo): the page carries the list,
+the permanent buff each one unlocks and the Boosts toggle that switches every
+boost off, and it keeps the counters in the WebView's own localStorage, so a
+phone's progress is its own.
 
 ```bash
 python3 build.py

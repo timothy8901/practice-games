@@ -1,99 +1,891 @@
 {
-  "_note": "The source of truth for Blob Knight Rumpler's achievements. Run achievements/inline.py after editing: it writes the ACHV block into blob-knight-rumpler.html and regenerates achievements/README.md. 'stat' names a counter the game keeps; 'need' is the target. Core stats: w wins, ko knockouts, a1 basic attacks landed, a2 specials landed, sig the core's signature feat, fl flawless wins, hard wins against Hard or Expert.",
+  "_note": "The source of truth for Blob Knight Rumpler's achievements. Run achievements/inline.py after editing: it writes the ACHV block into blob-knight-rumpler.html and regenerates achievements/README.md. 'stat' names a counter the game keeps; 'need' is the target. Core stats: w wins, ko knockouts, a1 basic attacks landed, a2 specials landed, sig the core's signature feat, fl flawless wins, hard wins against Hard or Expert. Each achievement also carries a 'perk': the permanent boost unlocking it grants. A core's own eight apply only when you are carrying that core; the twelve overall apply always. Both are switched off together by the Boosts toggle on the title screen.",
   "overall": [
-    { "id": "field",     "name": "Take the Field", "line": "Play ten matches.",                                  "stat": "matches",  "need": 10 },
-    { "id": "champion",  "name": "Champion",       "line": "Win twenty-five matches.",                           "stat": "wins",     "need": 25 },
-    { "id": "armoury",   "name": "Full Armoury",   "line": "Win a match with all eight cores.",                  "stat": "coresWon", "need": 8 },
-    { "id": "hundred",   "name": "Hundred Falls",  "line": "Knock down a hundred knights.",                      "stat": "kos",      "need": 100 },
-    { "id": "survivor",  "name": "Survivor",       "line": "Clear five rounds in one survival run.",             "stat": "survBest", "need": 5 },
-    { "id": "gauntlet",  "name": "The Gauntlet",   "line": "Clear ten rounds in one survival run.",              "stat": "survBest", "need": 10 },
-    { "id": "untouched", "name": "Untouchable",    "line": "Win five matches without losing a heart.",           "stat": "flawless", "need": 5 },
-    { "id": "photo",     "name": "Photo Finish",   "line": "Win a match in sudden death.",                       "stat": "sudden",   "need": 1 },
-    { "id": "laststand", "name": "Last Stand",     "line": "Win a match after being down to your last heart.",   "stat": "comeback", "need": 1 },
-    { "id": "collector", "name": "Collector",      "line": "Take all twelve buff cards at least once.",          "stat": "cards",    "need": 12 },
-    { "id": "expert",    "name": "Expert Class",   "line": "Beat an Expert knight.",                             "stat": "expert",   "need": 1 },
-    { "id": "barehand",  "name": "Bare-Handed",    "line": "Beat a Hard or Expert knight with no card taken.",   "stat": "bare",     "need": 1 }
+    {
+      "id": "field",
+      "name": "Take the Field",
+      "line": "Play ten matches.",
+      "stat": "matches",
+      "need": 10,
+      "perk": {
+        "stat": "move",
+        "amount": 0.03
+      }
+    },
+    {
+      "id": "champion",
+      "name": "Champion",
+      "line": "Win twenty-five matches.",
+      "stat": "wins",
+      "need": 25,
+      "perk": {
+        "stat": "cd",
+        "amount": 0.05
+      }
+    },
+    {
+      "id": "armoury",
+      "name": "Full Armoury",
+      "line": "Win a match with all eight cores.",
+      "stat": "coresWon",
+      "need": 8,
+      "perk": {
+        "stat": "heart",
+        "amount": 1
+      }
+    },
+    {
+      "id": "hundred",
+      "name": "Hundred Falls",
+      "line": "Knock down a hundred knights.",
+      "stat": "kos",
+      "need": 100,
+      "perk": {
+        "stat": "kbOut",
+        "amount": 0.1
+      }
+    },
+    {
+      "id": "survivor",
+      "name": "Survivor",
+      "line": "Clear five rounds in one survival run.",
+      "stat": "survBest",
+      "need": 5,
+      "perk": {
+        "stat": "shield",
+        "amount": 0.06
+      }
+    },
+    {
+      "id": "gauntlet",
+      "name": "The Gauntlet",
+      "line": "Clear ten rounds in one survival run.",
+      "stat": "survBest",
+      "need": 10,
+      "perk": {
+        "stat": "kbOut",
+        "amount": 0.08
+      }
+    },
+    {
+      "id": "untouched",
+      "name": "Untouchable",
+      "line": "Win five matches without losing a heart.",
+      "stat": "flawless",
+      "need": 5,
+      "perk": {
+        "stat": "kbIn",
+        "amount": 0.08
+      }
+    },
+    {
+      "id": "photo",
+      "name": "Photo Finish",
+      "line": "Win a match in sudden death.",
+      "stat": "sudden",
+      "need": 1,
+      "perk": {
+        "stat": "jump",
+        "amount": 0.06
+      }
+    },
+    {
+      "id": "laststand",
+      "name": "Last Stand",
+      "line": "Win a match after being down to your last heart.",
+      "stat": "comeback",
+      "need": 1,
+      "perk": {
+        "stat": "kbIn",
+        "amount": 0.06
+      }
+    },
+    {
+      "id": "collector",
+      "name": "Collector",
+      "line": "Take all twelve buff cards at least once.",
+      "stat": "cards",
+      "need": 12,
+      "perk": {
+        "stat": "cd",
+        "amount": 0.05
+      }
+    },
+    {
+      "id": "expert",
+      "name": "Expert Class",
+      "line": "Beat an Expert knight.",
+      "stat": "expert",
+      "need": 1,
+      "perk": {
+        "stat": "kbOut",
+        "amount": 0.08
+      }
+    },
+    {
+      "id": "barehand",
+      "name": "Bare-Handed",
+      "line": "Beat a Hard or Expert knight with no card taken.",
+      "stat": "bare",
+      "need": 1,
+      "perk": {
+        "stat": "shield",
+        "amount": 0.06
+      }
+    }
   ],
   "cores": [
-    { "key": "sword", "name": "Blade", "achievements": [
-      { "id": "blooded",   "name": "Blooded",       "line": "Win a match as Blade.",                       "stat": "w",    "need": 1 },
-      { "id": "swordhand", "name": "Swordhand",     "line": "Win five matches as Blade.",                  "stat": "w",    "need": 5 },
-      { "id": "thresher",  "name": "Thresher",      "line": "Knock down twenty knights as Blade.",         "stat": "ko",   "need": 20 },
-      { "id": "cuts",      "name": "Hundred Cuts",  "line": "Land seventy-five Edge Slashes.",             "stat": "a1",   "need": 75 },
-      { "id": "waxing",    "name": "Waxing Moon",   "line": "Land twenty Crescent Cleaves.",               "stat": "a2",   "need": 20 },
-      { "id": "moonfall",  "name": "Moonfall",      "line": "Finish three knights with Crescent Cleave.",  "stat": "sig",  "need": 3 },
-      { "id": "scratch",   "name": "Not a Scratch", "line": "Win as Blade without losing a heart.",        "stat": "fl",   "need": 1 },
-      { "id": "tempered",  "name": "Tempered",      "line": "Beat a Hard or Expert knight as Blade.",      "stat": "hard", "need": 1 }
-    ] },
-    { "key": "beam", "name": "Arc", "achievements": [
-      { "id": "firstlight", "name": "First Light",  "line": "Win a match as Arc.",                         "stat": "w",    "need": 1 },
-      { "id": "stormbring", "name": "Stormbringer", "line": "Win five matches as Arc.",                    "stat": "w",    "need": 5 },
-      { "id": "conductor",  "name": "Conductor",    "line": "Knock down twenty knights as Arc.",           "stat": "ko",   "need": 20 },
-      { "id": "sweeping",   "name": "Sweeping Guard","line": "Land seventy-five Glaive Sweeps.",           "stat": "a1",   "need": 75 },
-      { "id": "charged",    "name": "Charged",      "line": "Land twenty Thunderstrikes.",                 "stat": "a2",   "need": 20 },
-      { "id": "stormcall",  "name": "Stormcall",    "line": "Finish three knights with Thunderstrike.",    "stat": "sig",  "need": 3 },
-      { "id": "earthed",    "name": "Earthed",      "line": "Win as Arc without losing a heart.",          "stat": "fl",   "need": 1 },
-      { "id": "weathered",  "name": "Weathered",    "line": "Beat a Hard or Expert knight as Arc.",        "stat": "hard", "need": 1 }
-    ] },
-    { "key": "cutter", "name": "Disc", "achievements": [
-      { "id": "opening",   "name": "Opening Throw", "line": "Win a match as Disc.",                        "stat": "w",    "need": 1 },
-      { "id": "ringlead",  "name": "Ringleader",    "line": "Win five matches as Disc.",                   "stat": "w",    "need": 5 },
-      { "id": "sawtooth",  "name": "Sawtooth",      "line": "Knock down twenty knights as Disc.",          "stat": "ko",   "need": 20 },
-      { "id": "goodarm",   "name": "Good Arm",      "line": "Land seventy-five Chakram Throws.",           "stat": "a1",   "need": 75 },
-      { "id": "threering", "name": "Three Rings",   "line": "Land twenty Triple Rings.",                   "stat": "a2",   "need": 20 },
-      { "id": "roundtrip", "name": "Round Trip",    "line": "Hit fifteen times with a chakram on its way back.", "stat": "sig", "need": 15 },
-      { "id": "cleancirc", "name": "Clean Circle",  "line": "Win as Disc without losing a heart.",         "stat": "fl",   "need": 1 },
-      { "id": "wellthrown","name": "Well Thrown",   "line": "Beat a Hard or Expert knight as Disc.",       "stat": "hard", "need": 1 }
-    ] },
-    { "key": "hammer", "name": "Maul", "achievements": [
-      { "id": "groundwork","name": "Groundwork",    "line": "Win a match as Maul.",                        "stat": "w",    "need": 1 },
-      { "id": "demolisher","name": "Demolisher",    "line": "Win five matches as Maul.",                   "stat": "w",    "need": 5 },
-      { "id": "flattener", "name": "Flattener",     "line": "Knock down twenty knights as Maul.",          "stat": "ko",   "need": 20 },
-      { "id": "heavyhands","name": "Heavy Hands",   "line": "Land seventy-five Crushers.",                 "stat": "a1",   "need": 75 },
-      { "id": "tremor",    "name": "Tremor",        "line": "Land twenty Earthshakers.",                   "stat": "a2",   "need": 20 },
-      { "id": "aftershock","name": "Aftershock",    "line": "Finish three knights with Earthshaker.",      "stat": "sig",  "need": 3 },
-      { "id": "unmoved",   "name": "Unmoved",       "line": "Win as Maul without losing a heart.",         "stat": "fl",   "need": 1 },
-      { "id": "immovable", "name": "Immovable",     "line": "Beat a Hard or Expert knight as Maul.",       "stat": "hard", "need": 1 }
-    ] },
-    { "key": "archer", "name": "Bow", "achievements": [
-      { "id": "firstdraw", "name": "First Draw",    "line": "Win a match as Bow.",                         "stat": "w",    "need": 1 },
-      { "id": "marksman",  "name": "Marksman",      "line": "Win five matches as Bow.",                    "stat": "w",    "need": 5 },
-      { "id": "quiver",    "name": "Quiver Empty",  "line": "Knock down twenty knights as Bow.",           "stat": "ko",   "need": 20 },
-      { "id": "rapidfire", "name": "Rapid Fire",    "line": "Land seventy-five Point Blanks.",             "stat": "a1",   "need": 75 },
-      { "id": "trueaim",   "name": "True Aim",      "line": "Land twenty Heartseekers.",                   "stat": "a2",   "need": 20 },
-      { "id": "longshot",  "name": "Longshot",      "line": "Land ten Heartseekers from across the arena.","stat": "sig",  "need": 10 },
-      { "id": "untouched", "name": "Untouched",     "line": "Win as Bow without losing a heart.",          "stat": "fl",   "need": 1 },
-      { "id": "steady",    "name": "Steady Hand",   "line": "Beat a Hard or Expert knight as Bow.",        "stat": "hard", "need": 1 }
-    ] },
-    { "key": "fire", "name": "Flare", "achievements": [
-      { "id": "spark",     "name": "Spark",         "line": "Win a match as Flare.",                       "stat": "w",    "need": 1 },
-      { "id": "wildfire",  "name": "Wildfire",      "line": "Win five matches as Flare.",                  "stat": "w",    "need": 5 },
-      { "id": "scorched",  "name": "Scorched Earth","line": "Knock down twenty knights as Flare.",         "stat": "ko",   "need": 20 },
-      { "id": "slowburn",  "name": "Slow Burn",     "line": "Land seventy-five Flame Bursts.",             "stat": "a1",   "need": 75 },
-      { "id": "throttle",  "name": "Full Throttle", "line": "Land twenty Blaze Rushes.",                   "stat": "a2",   "need": 20 },
-      { "id": "burnout",   "name": "Burnout",       "line": "Finish three knights with Blaze Rush.",       "stat": "sig",  "need": 3 },
-      { "id": "fireproof", "name": "Fireproof",     "line": "Win as Flare without losing a heart.",        "stat": "fl",   "need": 1 },
-      { "id": "forged",    "name": "Forged",        "line": "Beat a Hard or Expert knight as Flare.",      "stat": "hard", "need": 1 }
-    ] },
-    { "key": "bomb", "name": "Cinder", "achievements": [
-      { "id": "fuselit",   "name": "Fuse Lit",      "line": "Win a match as Cinder.",                      "stat": "w",    "need": 1 },
-      { "id": "bombardier","name": "Bombardier",    "line": "Win five matches as Cinder.",                 "stat": "w",    "need": 5 },
-      { "id": "blastrad",  "name": "Blast Radius",  "line": "Knock down twenty knights as Cinder.",        "stat": "ko",   "need": 20 },
-      { "id": "steadydrop","name": "Steady Drops",  "line": "Land seventy-five Drop Bombs.",               "stat": "a1",   "need": 75 },
-      { "id": "bignoise",  "name": "Big Noise",     "line": "Land twenty Big Bombs.",                      "stat": "a2",   "need": 20 },
-      { "id": "demolition","name": "Demolition",    "line": "Finish three knights with a blast.",          "stat": "sig",  "need": 3 },
-      { "id": "noblowback","name": "No Blowback",   "line": "Win as Cinder without losing a heart.",       "stat": "fl",   "need": 1 },
-      { "id": "controlled","name": "Controlled Burn","line": "Beat a Hard or Expert knight as Cinder.",    "stat": "hard", "need": 1 }
-    ] },
-    { "key": "parasol", "name": "Veil", "achievements": [
-      { "id": "curtainup", "name": "Curtain Up",    "line": "Win a match as Veil.",                        "stat": "w",    "need": 1 },
-      { "id": "prima",     "name": "Prima",         "line": "Win five matches as Veil.",                   "stat": "w",    "need": 5 },
-      { "id": "thorned",   "name": "Thorned",       "line": "Knock down twenty knights as Veil.",          "stat": "ko",   "need": 20 },
-      { "id": "needlework","name": "Needlework",    "line": "Land seventy-five Point Jabs.",               "stat": "a1",   "need": 75 },
-      { "id": "inbloom",   "name": "In Bloom",      "line": "Land twenty Blooms.",                         "stat": "a2",   "need": 20 },
-      { "id": "turnabout", "name": "Turnabout",     "line": "Send ten projectiles back as Veil.",          "stat": "sig",  "need": 10 },
-      { "id": "unruffled", "name": "Unruffled",     "line": "Win as Veil without losing a heart.",         "stat": "fl",   "need": 1 },
-      { "id": "poised",    "name": "Poised",        "line": "Beat a Hard or Expert knight as Veil.",       "stat": "hard", "need": 1 }
-    ] }
+    {
+      "key": "sword",
+      "name": "Blade",
+      "achievements": [
+        {
+          "id": "blooded",
+          "name": "Blooded",
+          "line": "Win a match as Blade.",
+          "stat": "w",
+          "need": 1,
+          "perk": {
+            "stat": "move",
+            "amount": 0.04
+          }
+        },
+        {
+          "id": "swordhand",
+          "name": "Swordhand",
+          "line": "Win five matches as Blade.",
+          "stat": "w",
+          "need": 5,
+          "perk": {
+            "stat": "cd",
+            "amount": 0.05
+          }
+        },
+        {
+          "id": "thresher",
+          "name": "Thresher",
+          "line": "Knock down twenty knights as Blade.",
+          "stat": "ko",
+          "need": 20,
+          "perk": {
+            "stat": "kbOut",
+            "amount": 0.08
+          }
+        },
+        {
+          "id": "cuts",
+          "name": "Hundred Cuts",
+          "line": "Land seventy-five Edge Slashes.",
+          "stat": "a1",
+          "need": 75,
+          "perk": {
+            "stat": "cd",
+            "amount": 0.05
+          }
+        },
+        {
+          "id": "waxing",
+          "name": "Waxing Moon",
+          "line": "Land twenty Crescent Cleaves.",
+          "stat": "a2",
+          "need": 20,
+          "perk": {
+            "stat": "kbOut",
+            "amount": 0.08
+          }
+        },
+        {
+          "id": "moonfall",
+          "name": "Moonfall",
+          "line": "Finish three knights with Crescent Cleave.",
+          "stat": "sig",
+          "need": 3,
+          "perk": {
+            "stat": "shield",
+            "amount": 0.06
+          }
+        },
+        {
+          "id": "scratch",
+          "name": "Not a Scratch",
+          "line": "Win as Blade without losing a heart.",
+          "stat": "fl",
+          "need": 1,
+          "perk": {
+            "stat": "kbIn",
+            "amount": 0.07
+          }
+        },
+        {
+          "id": "tempered",
+          "name": "Tempered",
+          "line": "Beat a Hard or Expert knight as Blade.",
+          "stat": "hard",
+          "need": 1,
+          "perk": {
+            "stat": "kbIn",
+            "amount": 0.07
+          }
+        }
+      ]
+    },
+    {
+      "key": "beam",
+      "name": "Arc",
+      "achievements": [
+        {
+          "id": "firstlight",
+          "name": "First Light",
+          "line": "Win a match as Arc.",
+          "stat": "w",
+          "need": 1,
+          "perk": {
+            "stat": "move",
+            "amount": 0.04
+          }
+        },
+        {
+          "id": "stormbring",
+          "name": "Stormbringer",
+          "line": "Win five matches as Arc.",
+          "stat": "w",
+          "need": 5,
+          "perk": {
+            "stat": "cd",
+            "amount": 0.05
+          }
+        },
+        {
+          "id": "conductor",
+          "name": "Conductor",
+          "line": "Knock down twenty knights as Arc.",
+          "stat": "ko",
+          "need": 20,
+          "perk": {
+            "stat": "kbOut",
+            "amount": 0.08
+          }
+        },
+        {
+          "id": "sweeping",
+          "name": "Sweeping Guard",
+          "line": "Land seventy-five Glaive Sweeps.",
+          "stat": "a1",
+          "need": 75,
+          "perk": {
+            "stat": "cd",
+            "amount": 0.05
+          }
+        },
+        {
+          "id": "charged",
+          "name": "Charged",
+          "line": "Land twenty Thunderstrikes.",
+          "stat": "a2",
+          "need": 20,
+          "perk": {
+            "stat": "kbOut",
+            "amount": 0.08
+          }
+        },
+        {
+          "id": "stormcall",
+          "name": "Stormcall",
+          "line": "Finish three knights with Thunderstrike.",
+          "stat": "sig",
+          "need": 3,
+          "perk": {
+            "stat": "shield",
+            "amount": 0.06
+          }
+        },
+        {
+          "id": "earthed",
+          "name": "Earthed",
+          "line": "Win as Arc without losing a heart.",
+          "stat": "fl",
+          "need": 1,
+          "perk": {
+            "stat": "kbIn",
+            "amount": 0.07
+          }
+        },
+        {
+          "id": "weathered",
+          "name": "Weathered",
+          "line": "Beat a Hard or Expert knight as Arc.",
+          "stat": "hard",
+          "need": 1,
+          "perk": {
+            "stat": "kbIn",
+            "amount": 0.07
+          }
+        }
+      ]
+    },
+    {
+      "key": "cutter",
+      "name": "Disc",
+      "achievements": [
+        {
+          "id": "opening",
+          "name": "Opening Throw",
+          "line": "Win a match as Disc.",
+          "stat": "w",
+          "need": 1,
+          "perk": {
+            "stat": "move",
+            "amount": 0.04
+          }
+        },
+        {
+          "id": "ringlead",
+          "name": "Ringleader",
+          "line": "Win five matches as Disc.",
+          "stat": "w",
+          "need": 5,
+          "perk": {
+            "stat": "cd",
+            "amount": 0.05
+          }
+        },
+        {
+          "id": "sawtooth",
+          "name": "Sawtooth",
+          "line": "Knock down twenty knights as Disc.",
+          "stat": "ko",
+          "need": 20,
+          "perk": {
+            "stat": "kbOut",
+            "amount": 0.08
+          }
+        },
+        {
+          "id": "goodarm",
+          "name": "Good Arm",
+          "line": "Land seventy-five Chakram Throws.",
+          "stat": "a1",
+          "need": 75,
+          "perk": {
+            "stat": "cd",
+            "amount": 0.05
+          }
+        },
+        {
+          "id": "threering",
+          "name": "Three Rings",
+          "line": "Land twenty Triple Rings.",
+          "stat": "a2",
+          "need": 20,
+          "perk": {
+            "stat": "kbOut",
+            "amount": 0.08
+          }
+        },
+        {
+          "id": "roundtrip",
+          "name": "Round Trip",
+          "line": "Hit fifteen times with a chakram on its way back.",
+          "stat": "sig",
+          "need": 15,
+          "perk": {
+            "stat": "shield",
+            "amount": 0.06
+          }
+        },
+        {
+          "id": "cleancirc",
+          "name": "Clean Circle",
+          "line": "Win as Disc without losing a heart.",
+          "stat": "fl",
+          "need": 1,
+          "perk": {
+            "stat": "kbIn",
+            "amount": 0.07
+          }
+        },
+        {
+          "id": "wellthrown",
+          "name": "Well Thrown",
+          "line": "Beat a Hard or Expert knight as Disc.",
+          "stat": "hard",
+          "need": 1,
+          "perk": {
+            "stat": "kbIn",
+            "amount": 0.07
+          }
+        }
+      ]
+    },
+    {
+      "key": "hammer",
+      "name": "Maul",
+      "achievements": [
+        {
+          "id": "groundwork",
+          "name": "Groundwork",
+          "line": "Win a match as Maul.",
+          "stat": "w",
+          "need": 1,
+          "perk": {
+            "stat": "move",
+            "amount": 0.04
+          }
+        },
+        {
+          "id": "demolisher",
+          "name": "Demolisher",
+          "line": "Win five matches as Maul.",
+          "stat": "w",
+          "need": 5,
+          "perk": {
+            "stat": "cd",
+            "amount": 0.05
+          }
+        },
+        {
+          "id": "flattener",
+          "name": "Flattener",
+          "line": "Knock down twenty knights as Maul.",
+          "stat": "ko",
+          "need": 20,
+          "perk": {
+            "stat": "kbOut",
+            "amount": 0.08
+          }
+        },
+        {
+          "id": "heavyhands",
+          "name": "Heavy Hands",
+          "line": "Land seventy-five Crushers.",
+          "stat": "a1",
+          "need": 75,
+          "perk": {
+            "stat": "cd",
+            "amount": 0.05
+          }
+        },
+        {
+          "id": "tremor",
+          "name": "Tremor",
+          "line": "Land twenty Earthshakers.",
+          "stat": "a2",
+          "need": 20,
+          "perk": {
+            "stat": "kbOut",
+            "amount": 0.08
+          }
+        },
+        {
+          "id": "aftershock",
+          "name": "Aftershock",
+          "line": "Finish three knights with Earthshaker.",
+          "stat": "sig",
+          "need": 3,
+          "perk": {
+            "stat": "shield",
+            "amount": 0.06
+          }
+        },
+        {
+          "id": "unmoved",
+          "name": "Unmoved",
+          "line": "Win as Maul without losing a heart.",
+          "stat": "fl",
+          "need": 1,
+          "perk": {
+            "stat": "kbIn",
+            "amount": 0.07
+          }
+        },
+        {
+          "id": "immovable",
+          "name": "Immovable",
+          "line": "Beat a Hard or Expert knight as Maul.",
+          "stat": "hard",
+          "need": 1,
+          "perk": {
+            "stat": "kbIn",
+            "amount": 0.07
+          }
+        }
+      ]
+    },
+    {
+      "key": "archer",
+      "name": "Bow",
+      "achievements": [
+        {
+          "id": "firstdraw",
+          "name": "First Draw",
+          "line": "Win a match as Bow.",
+          "stat": "w",
+          "need": 1,
+          "perk": {
+            "stat": "move",
+            "amount": 0.04
+          }
+        },
+        {
+          "id": "marksman",
+          "name": "Marksman",
+          "line": "Win five matches as Bow.",
+          "stat": "w",
+          "need": 5,
+          "perk": {
+            "stat": "cd",
+            "amount": 0.05
+          }
+        },
+        {
+          "id": "quiver",
+          "name": "Quiver Empty",
+          "line": "Knock down twenty knights as Bow.",
+          "stat": "ko",
+          "need": 20,
+          "perk": {
+            "stat": "kbOut",
+            "amount": 0.08
+          }
+        },
+        {
+          "id": "rapidfire",
+          "name": "Rapid Fire",
+          "line": "Land seventy-five Point Blanks.",
+          "stat": "a1",
+          "need": 75,
+          "perk": {
+            "stat": "cd",
+            "amount": 0.05
+          }
+        },
+        {
+          "id": "trueaim",
+          "name": "True Aim",
+          "line": "Land twenty Heartseekers.",
+          "stat": "a2",
+          "need": 20,
+          "perk": {
+            "stat": "kbOut",
+            "amount": 0.08
+          }
+        },
+        {
+          "id": "longshot",
+          "name": "Longshot",
+          "line": "Land ten Heartseekers from across the arena.",
+          "stat": "sig",
+          "need": 10,
+          "perk": {
+            "stat": "shield",
+            "amount": 0.06
+          }
+        },
+        {
+          "id": "untouched",
+          "name": "Untouched",
+          "line": "Win as Bow without losing a heart.",
+          "stat": "fl",
+          "need": 1,
+          "perk": {
+            "stat": "kbIn",
+            "amount": 0.07
+          }
+        },
+        {
+          "id": "steady",
+          "name": "Steady Hand",
+          "line": "Beat a Hard or Expert knight as Bow.",
+          "stat": "hard",
+          "need": 1,
+          "perk": {
+            "stat": "kbIn",
+            "amount": 0.07
+          }
+        }
+      ]
+    },
+    {
+      "key": "fire",
+      "name": "Flare",
+      "achievements": [
+        {
+          "id": "spark",
+          "name": "Spark",
+          "line": "Win a match as Flare.",
+          "stat": "w",
+          "need": 1,
+          "perk": {
+            "stat": "move",
+            "amount": 0.04
+          }
+        },
+        {
+          "id": "wildfire",
+          "name": "Wildfire",
+          "line": "Win five matches as Flare.",
+          "stat": "w",
+          "need": 5,
+          "perk": {
+            "stat": "cd",
+            "amount": 0.05
+          }
+        },
+        {
+          "id": "scorched",
+          "name": "Scorched Earth",
+          "line": "Knock down twenty knights as Flare.",
+          "stat": "ko",
+          "need": 20,
+          "perk": {
+            "stat": "kbOut",
+            "amount": 0.08
+          }
+        },
+        {
+          "id": "slowburn",
+          "name": "Slow Burn",
+          "line": "Land seventy-five Flame Bursts.",
+          "stat": "a1",
+          "need": 75,
+          "perk": {
+            "stat": "cd",
+            "amount": 0.05
+          }
+        },
+        {
+          "id": "throttle",
+          "name": "Full Throttle",
+          "line": "Land twenty Blaze Rushes.",
+          "stat": "a2",
+          "need": 20,
+          "perk": {
+            "stat": "kbOut",
+            "amount": 0.08
+          }
+        },
+        {
+          "id": "burnout",
+          "name": "Burnout",
+          "line": "Finish three knights with Blaze Rush.",
+          "stat": "sig",
+          "need": 3,
+          "perk": {
+            "stat": "shield",
+            "amount": 0.06
+          }
+        },
+        {
+          "id": "fireproof",
+          "name": "Fireproof",
+          "line": "Win as Flare without losing a heart.",
+          "stat": "fl",
+          "need": 1,
+          "perk": {
+            "stat": "kbIn",
+            "amount": 0.07
+          }
+        },
+        {
+          "id": "forged",
+          "name": "Forged",
+          "line": "Beat a Hard or Expert knight as Flare.",
+          "stat": "hard",
+          "need": 1,
+          "perk": {
+            "stat": "kbIn",
+            "amount": 0.07
+          }
+        }
+      ]
+    },
+    {
+      "key": "bomb",
+      "name": "Cinder",
+      "achievements": [
+        {
+          "id": "fuselit",
+          "name": "Fuse Lit",
+          "line": "Win a match as Cinder.",
+          "stat": "w",
+          "need": 1,
+          "perk": {
+            "stat": "move",
+            "amount": 0.04
+          }
+        },
+        {
+          "id": "bombardier",
+          "name": "Bombardier",
+          "line": "Win five matches as Cinder.",
+          "stat": "w",
+          "need": 5,
+          "perk": {
+            "stat": "cd",
+            "amount": 0.05
+          }
+        },
+        {
+          "id": "blastrad",
+          "name": "Blast Radius",
+          "line": "Knock down twenty knights as Cinder.",
+          "stat": "ko",
+          "need": 20,
+          "perk": {
+            "stat": "kbOut",
+            "amount": 0.08
+          }
+        },
+        {
+          "id": "steadydrop",
+          "name": "Steady Drops",
+          "line": "Land seventy-five Drop Bombs.",
+          "stat": "a1",
+          "need": 75,
+          "perk": {
+            "stat": "cd",
+            "amount": 0.05
+          }
+        },
+        {
+          "id": "bignoise",
+          "name": "Big Noise",
+          "line": "Land twenty Big Bombs.",
+          "stat": "a2",
+          "need": 20,
+          "perk": {
+            "stat": "kbOut",
+            "amount": 0.08
+          }
+        },
+        {
+          "id": "demolition",
+          "name": "Demolition",
+          "line": "Finish three knights with a blast.",
+          "stat": "sig",
+          "need": 3,
+          "perk": {
+            "stat": "shield",
+            "amount": 0.06
+          }
+        },
+        {
+          "id": "noblowback",
+          "name": "No Blowback",
+          "line": "Win as Cinder without losing a heart.",
+          "stat": "fl",
+          "need": 1,
+          "perk": {
+            "stat": "kbIn",
+            "amount": 0.07
+          }
+        },
+        {
+          "id": "controlled",
+          "name": "Controlled Burn",
+          "line": "Beat a Hard or Expert knight as Cinder.",
+          "stat": "hard",
+          "need": 1,
+          "perk": {
+            "stat": "kbIn",
+            "amount": 0.07
+          }
+        }
+      ]
+    },
+    {
+      "key": "parasol",
+      "name": "Veil",
+      "achievements": [
+        {
+          "id": "curtainup",
+          "name": "Curtain Up",
+          "line": "Win a match as Veil.",
+          "stat": "w",
+          "need": 1,
+          "perk": {
+            "stat": "move",
+            "amount": 0.04
+          }
+        },
+        {
+          "id": "prima",
+          "name": "Prima",
+          "line": "Win five matches as Veil.",
+          "stat": "w",
+          "need": 5,
+          "perk": {
+            "stat": "cd",
+            "amount": 0.05
+          }
+        },
+        {
+          "id": "thorned",
+          "name": "Thorned",
+          "line": "Knock down twenty knights as Veil.",
+          "stat": "ko",
+          "need": 20,
+          "perk": {
+            "stat": "kbOut",
+            "amount": 0.08
+          }
+        },
+        {
+          "id": "needlework",
+          "name": "Needlework",
+          "line": "Land seventy-five Point Jabs.",
+          "stat": "a1",
+          "need": 75,
+          "perk": {
+            "stat": "cd",
+            "amount": 0.05
+          }
+        },
+        {
+          "id": "inbloom",
+          "name": "In Bloom",
+          "line": "Land twenty Blooms.",
+          "stat": "a2",
+          "need": 20,
+          "perk": {
+            "stat": "kbOut",
+            "amount": 0.08
+          }
+        },
+        {
+          "id": "turnabout",
+          "name": "Turnabout",
+          "line": "Send ten projectiles back as Veil.",
+          "stat": "sig",
+          "need": 10,
+          "perk": {
+            "stat": "shield",
+            "amount": 0.06
+          }
+        },
+        {
+          "id": "unruffled",
+          "name": "Unruffled",
+          "line": "Win as Veil without losing a heart.",
+          "stat": "fl",
+          "need": 1,
+          "perk": {
+            "stat": "kbIn",
+            "amount": 0.07
+          }
+        },
+        {
+          "id": "poised",
+          "name": "Poised",
+          "line": "Beat a Hard or Expert knight as Veil.",
+          "stat": "hard",
+          "need": 1,
+          "perk": {
+            "stat": "kbIn",
+            "amount": 0.07
+          }
+        }
+      ]
+    }
   ]
 }

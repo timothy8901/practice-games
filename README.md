@@ -75,9 +75,14 @@ two rounds — your hearts carry from round to round and nothing heals
 them, so the run ends when you are knocked out. Before either one you draw
 **a buff card**: three of twelve are dealt (art generated with Thrixel, see
 `card-art/`), and you take one or go in bare. **76 achievements** track as you
-play — twelve overall and eight for each core; the whole list is in
+play — twelve overall and eight for each core — and **each one unlocks a
+permanent buff**. A core's own eight only apply while you carry that core, so a
+full save is a strong Blade rather than one unstoppable knight; the twelve
+overall always apply. The whole list, with what each unlocks, is in
 [`achievements/`](achievements/README.md) and in the game under Achievements on
-the title screen. Move with WASD / arrows,
+the title screen. **Boosts** on the title screen turns the lot off — no cards
+before a match and no achievement buffs — for a run on the game as it ships;
+achievements still track. Move with WASD / arrows,
 **`Space` jump-dodges** over swings and projectiles, `P` pauses, `M`
 mutes. It pulls Three.js from a CDN but is still a single
 self-contained HTML page.
