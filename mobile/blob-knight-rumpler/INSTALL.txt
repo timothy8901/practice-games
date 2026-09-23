@@ -36,6 +36,11 @@ HOW TO PLAY
   survival run), or tap Ignore and fight without. The card you took shows under
   your name while you fight.
 
+  ACHIEVEMENTS - 76 of them, twelve overall and eight for each of the eight
+  knights. They tick over as you play; the list and your progress are on the
+  title screen under Achievements, and one pops up in the corner the moment you
+  earn it.
+
   TWO MODES
     1v1        pick your knight and the challenger's (or leave it random), then
                set the rules: 1, 2, 3 or 5 KOs to win, a clock (or none) and how

@@ -16,7 +16,10 @@ The page brings its own single-player modes - a 1v1 duel with the rules you set,
 and the survival ladder - so this build only has to make them work under a thumb.
 The twelve buff cards ride along the same way: their art is inlined in the page
 as WebP data URIs (about 60 KB for the set, see `card-art/` in the repo), so
-there is nothing extra for this build to package or for the app to fetch.
+there is nothing extra for this build to package or for the app to fetch. Same
+for the 76 achievements (`achievements/` in the repo): the page carries the list
+and keeps the counters in the WebView's own localStorage, so a phone's progress
+is its own.
 
 ```bash
 python3 build.py

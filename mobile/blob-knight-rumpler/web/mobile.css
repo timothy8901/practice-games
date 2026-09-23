@@ -55,6 +55,8 @@ button { touch-action: manipulation; }
   .opt-list { gap: 6px; }
   .opt-btn { padding: 8px 4px; font-size: 0.74rem; }
   .opt-label { min-width: 74px; font-size: 0.54rem; }
+  .achv-list { max-height: 42vh; }
+  .achv-toast { bottom: 8px; padding: 6px 14px; }
   .hud-center { padding: 5px 11px 6px; min-width: 92px; border-radius: 10px; }
   .hud-clock { font-size: 1rem; }
   .hud-score b { font-size: 0.88rem; }

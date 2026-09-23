@@ -249,6 +249,51 @@
   .buff-card span { font-size: 0.62rem; color: var(--muted); font-weight: 600; line-height: 1.35; }
   .buff-card:hover { border-color: var(--accent); transform: translateY(-3px); box-shadow: 0 10px 22px rgba(0,0,0,0.45); }
   .buff-card:active { transform: translateY(-1px); }
+  /* ---------- achievements ---------- */
+  .overlay-card.wide { max-width: 640px; }
+  .achv-list {
+    width: 100%; max-height: 300px; overflow-y: auto; text-align: left;
+    display: flex; flex-direction: column; gap: 5px; padding-right: 5px;
+  }
+  .achv-head {
+    font-size: 0.6rem; font-weight: 900; letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--accent); margin: 9px 0 1px;
+  }
+  .achv-head:first-child { margin-top: 0; }
+  .achv-row {
+    display: flex; align-items: center; gap: 9px;
+    background: #1a1a2e; border: 1px solid #33334a; border-left: 4px solid #33334a;
+    border-radius: 8px; padding: 7px 10px;
+  }
+  .achv-row.done { background: #23233c; border-left-color: var(--accent); }
+  .achv-row .mark { width: 14px; text-align: center; font-weight: 900; color: #44445c; }
+  .achv-row.done .mark { color: var(--accent); }
+  .achv-row .txt { flex: 1; }
+  .achv-row b { display: block; font-size: 0.76rem; font-weight: 800; color: #70708e; }
+  .achv-row.done b { color: var(--text); }
+  .achv-row .txt span { display: block; font-size: 0.62rem; color: var(--muted); font-weight: 600; }
+  .achv-row em {
+    font-style: normal; font-size: 0.6rem; font-weight: 800; color: var(--muted);
+    font-variant-numeric: tabular-nums; letter-spacing: 0.06em;
+  }
+  .achv-row.done em { color: var(--accent); }
+  .tally { color: #2b2b40; background: var(--accent); border-radius: 5px; padding: 1px 6px; font-size: 0.7rem; margin-left: 6px; }
+  .overlay-btn.ghost .tally { color: #2b2b40; }
+  /* the unlock, while you are still fighting */
+  .achv-toast {
+    position: absolute; left: 50%; bottom: 14px; z-index: 7;
+    transform: translate(-50%, 18px); opacity: 0; pointer-events: none;
+    background: linear-gradient(160deg, #3a3a58, #1c1c30);
+    border: 2px solid var(--accent); border-radius: 12px;
+    padding: 8px 18px; text-align: center; min-width: 200px;
+    box-shadow: 0 10px 26px rgba(0,0,0,0.55);
+    transition: opacity 0.25s, transform 0.25s;
+  }
+  .achv-toast.show { opacity: 1; transform: translate(-50%, 0); }
+  .achv-toast b { display: block; font-size: 0.52rem; font-weight: 900; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); }
+  .achv-toast strong { display: block; font-size: 0.95rem; font-weight: 900; color: var(--accent); margin-top: 2px; }
+  .achv-toast em { display: block; font-style: normal; font-size: 0.64rem; color: #b0b0c0; margin-top: 2px; }
+
   /* the card you are carrying, in the corner of your panel */
   .hud-buff { display: flex; align-items: center; gap: 5px; margin-top: 5px; }
   .hud-buff.hidden { display: none; }
@@ -373,6 +418,7 @@
       </div>
 
       <div class="hud-banner" id="hud-banner"></div>
+      <div class="achv-toast" id="achv-toast"></div>
       <div class="overlay" id="overlay"></div>
     </div>
 
@@ -1129,7 +1175,8 @@ function meleeResolve(f, def) {
     if (Math.abs(angNorm(dirA - f.group.rotation.y)) > def.arc / 2) return;
   }
   // spin & pound are 360°
-  applyHit(target, atkDmg(f, def), dx / (d || 1), dz / (d || 1), def.kb, ABIL[f.ability].accent);
+  applyHit(target, atkDmg(f, def), dx / (d || 1), dz / (d || 1), def.kb, ABIL[f.ability].accent,
+           { f, slot: slotOf(f, def) });
   f.attack.didHit = true;
 }
 
@@ -1164,7 +1211,7 @@ function spawnAttackProjectile(f, def, angleOffset = 0) {
     mesh, kind,
     vx: dx * def.speed, vz: dz * def.speed,
     vy: def.kind === 'lob' ? 5.5 : 0,
-    dmg: atkDmg(f, def), kb: def.kb,
+    dmg: atkDmg(f, def), kb: def.kb, slot: slotOf(f, def),
     owner: f, life: 2.6,
     pierce: !!def.pierce, boomerang: !!def.boomerang,
     aoe: def.aoe || 0, big: !!def.big,
@@ -1174,7 +1221,7 @@ function spawnAttackProjectile(f, def, angleOffset = 0) {
   sfx.shoot();
 }
 
-function explodeAt(x, z, aoe, dmg, kb, owner) {
+function explodeAt(x, z, aoe, dmg, kb, owner, slot) {
   spawnShockwave(x, z, aoe + 0.6, 0xff7a3a);
   spawnParticles(x, 0.6, z, 0xff7a3a, 14, 6);
   sfx.explode();
@@ -1183,11 +1230,12 @@ function explodeAt(x, z, aoe, dmg, kb, owner) {
     if (!t || t === owner || t.state === 'ko') continue;
     const dx = t.group.position.x - x, dz = t.group.position.z - z;
     const d = Math.hypot(dx, dz);
-    if (d < aoe + 0.85) applyHit(t, dmg, dx/(d||1), dz/(d||1), kb, '#ff7a3a');
+    if (d < aoe + 0.85) applyHit(t, dmg, dx/(d||1), dz/(d||1), kb, '#ff7a3a',
+                                 { f: owner, slot: slot, blast: true });
   }
 }
 
-function applyHit(target, dmg, dirx, dirz, kb, accent) {
+function applyHit(target, dmg, dirx, dirz, kb, accent, src) {
   if (target.invuln > 0 || target.state === 'ko') return;
   // shield block
   if (target.shield.active && target.shield.stamina > 0) {
@@ -1213,6 +1261,10 @@ function applyHit(target, dmg, dirx, dirz, kb, accent) {
   target.invuln = 0.55;
   target.flashT = 0.22;
   target.redT = 0.6;     // red hit-pulse window (spawn invuln stays uncolored)
+  if (target.isPlayer) {
+    game.hurt = true;                       // no longer a flawless match
+    if (target.hp <= 1) game.low = true;    // a win from here is a comeback
+  }
   target.squashT = 0.18; // brief squash-and-stretch on impact
   const tx = target.group.position.x, tz = target.group.position.z;
   const hex = new THREE.Color(accent).getHex();
@@ -1229,6 +1281,7 @@ function applyHit(target, dmg, dirx, dirz, kb, accent) {
     spawnHitFlash(tx, 1.2, tz, hex, 1.0);
   }
   spawnParticles(tx, 1.2, tz, hex, dmg >= 2 ? 13 : 9, dmg >= 2 ? 6.5 : 5);
+  noteHit(src, target);
   // Second Wind: one heart back the first time a fight has you on your last
   if (wears(target, 'secondwind') && !target.windUsed && target.hp === 1) {
     target.windUsed = true;
@@ -1238,7 +1291,10 @@ function applyHit(target, dmg, dirx, dirz, kb, accent) {
     spawnParticles(tx, 1.4, tz, 0xff5a7a, 12, 4);
   }
   updateHud();
-  if (target.hp <= 0) ko(target);
+  if (target.hp <= 0) {
+    if (!target.isPlayer) noteKO(src);
+    ko(target);
+  }
 }
 
 function ko(target) {
@@ -1409,7 +1465,8 @@ function updateFighter(f, dt, input) {
       D.hit = true;
       const dx = target.group.position.x - g.position.x, dz = target.group.position.z - g.position.z;
       const d = Math.hypot(dx, dz) || 1;
-      applyHit(target, atkDmg(f, D.def), dx/d, dz/d, D.def.kb, ABIL[f.ability].accent);
+      applyHit(target, atkDmg(f, D.def), dx/d, dz/d, D.def.kb, ABIL[f.ability].accent,
+               { f, slot: slotOf(f, D.def) });
     }
     if (D.t >= D.dur) f.dash = null;
   }
@@ -1655,7 +1712,7 @@ function updateProjectiles(dt) {
       pr.vy -= 14 * dt;
       pr.mesh.position.y += pr.vy * dt;
       if (pr.mesh.position.y <= 0.25) {
-        explodeAt(pr.mesh.position.x, pr.mesh.position.z, pr.aoe, pr.dmg, pr.kb, pr.owner);
+        explodeAt(pr.mesh.position.x, pr.mesh.position.z, pr.aoe, pr.dmg, pr.kb, pr.owner, pr.slot);
         pr.life = 0;
         continue;
       }
@@ -1687,6 +1744,7 @@ function updateProjectiles(dt) {
       const ddx = pr.mesh.position.x - def.group.position.x;
       const ddz = pr.mesh.position.z - def.group.position.z;
       if (Math.hypot(ddx, ddz) < 2.3) {
+        if (def.isPlayer && def.ability === 'parasol') { bump('parasol', 'sig'); checkAchievements(); }
         pr.owner = def;
         pr.vx *= -1.25; pr.vz *= -1.25;
         pr.hitSet.clear();
@@ -1703,11 +1761,14 @@ function updateProjectiles(dt) {
       const ddz = t.group.position.z - pr.mesh.position.z;
       if (Math.hypot(ddx, ddz) < 1.0) {
         if (pr.kind === 'bomb') {
-          explodeAt(pr.mesh.position.x, pr.mesh.position.z, pr.aoe, pr.dmg, pr.kb, pr.owner);
+          explodeAt(pr.mesh.position.x, pr.mesh.position.z, pr.aoe, pr.dmg, pr.kb, pr.owner, pr.slot);
           pr.life = 0;
         } else {
           const d = Math.hypot(ddx, ddz) || 1;
-          applyHit(t, pr.dmg, ddx/d, ddz/d, pr.kb, ABIL[pr.owner.ability].accent);
+          const thrown = Math.hypot(t.group.position.x - pr.owner.group.position.x,
+                                    t.group.position.z - pr.owner.group.position.z);
+          applyHit(t, pr.dmg, ddx/d, ddz/d, pr.kb, ABIL[pr.owner.ability].accent,
+                   { f: pr.owner, slot: pr.slot, back: pr.phase === 'back', dist: thrown });
           pr.hitSet.add(t);
           if (!pr.pierce && !pr.boomerang) pr.life = 0;
         }
@@ -1847,6 +1908,21 @@ function banner(text) {
   void bannerEl.offsetWidth;        // restart the animation
   bannerEl.classList.add('show');
 }
+const toastEl = document.getElementById('achv-toast');
+let toastBusy = false;
+function nextToast() {
+  if (toastBusy || !toastQueue.length || !toastEl) return;
+  const a = toastQueue.shift();
+  toastBusy = true;
+  toastEl.innerHTML = '<b>Achievement</b><strong>' + a.name + '</strong><em>' + a.line + '</em>';
+  toastEl.classList.add('show');
+  sfx.select();
+  setTimeout(() => {
+    toastEl.classList.remove('show');
+    setTimeout(() => { toastBusy = false; nextToast(); }, 320);
+  }, 2800);
+}
+
 function matchLive() {
   return game.phase === 'fight' || game.phase === 'paused'
       || game.phase === 'result' || game.phase === 'roundover';
@@ -1934,6 +2010,9 @@ function renderOverlay() {
             <span>Challenger after challenger, each one sharper. Your hearts carry over and nothing heals them.</span>
             ${best ? `<span class="mode-best">Best run: ${best} knight${best === 1 ? '' : 's'}</span>` : ''}</button>
         </div>
+        <div class="overlay-buttons">
+          <button class="overlay-btn ghost" data-act="achv">Achievements<span class="tally">${ACHV.filter(earned).length} / ${ACHV.length}</span></button>
+        </div>
         <div class="overlay-sub" id="menu-hint" style="font-size:0.72rem">Sound: press <kbd>M</kbd> &middot; Pause: <kbd>P</kbd></div>
       </div>`;
 
@@ -1980,6 +2059,27 @@ function renderOverlay() {
           <button class="overlay-btn primary" data-act="fight">${surv ? 'Start Run' : 'Fight'}</button>
           <button class="overlay-btn ghost" data-act="back">Back</button>
         </div>
+      </div>`;
+
+  } else if (game.phase === 'achv') {
+    const row = (a) => {
+      const got = earned(a);
+      return `<div class="achv-row ${got ? 'done' : ''}">
+          <span class="mark">${got ? '\u2714' : '\u25cb'}</span>
+          <span class="txt"><b>${a.name}</b><span>${a.line}</span></span>
+          <em>${got ? 'earned' : Math.min(statOf(a), a.need) + ' / ' + a.need}</em>
+        </div>`;
+    };
+    const section = (title, list) => `<div class="achv-head">${title}</div>` + list.map(row).join('');
+    overlayEl.innerHTML = `
+      <div class="overlay-card wide">
+        <div class="overlay-title">Achievements</div>
+        <div class="overlay-sub"><strong>${ACHV.filter(earned).length}</strong> of ${ACHV.length} earned</div>
+        <div class="achv-list">
+          ${section('Overall', ACHV.filter(a => !a.core))}
+          ${ABIL_KEYS.map(k => section(ABIL[k].name, ACHV.filter(a => a.core === k))).join('')}
+        </div>
+        <button class="overlay-btn ghost" data-act="menu">Back</button>
       </div>`;
 
   } else if (game.phase === 'draft') {
@@ -2083,6 +2183,8 @@ overlayEl.addEventListener('click', (e) => {
   if (buff) {
     sfx.select();
     game.buffKey = buff.dataset.buff === 'none' ? null : buff.dataset.buff;
+    addOnce(stats.cards, game.buffKey);
+    checkAchievements();
     beginMatch();
     return;
   }
@@ -2092,6 +2194,7 @@ overlayEl.addEventListener('click', (e) => {
   switch (act.dataset.act) {
     case 'menu':   quitToMenu(); break;
     case 'pick':   game.phase = 'pick'; renderOverlay(); break;
+    case 'achv':   game.phase = 'achv'; renderOverlay(); break;
     case 'rules':  game.phase = 'rules'; renderOverlay(); break;
     case 'back':   game.phase = game.mode === 'survival' ? 'pick' : 'foe'; renderOverlay(); break;
     case 'resume': game.phase = 'fight'; renderOverlay(); break;
@@ -2100,6 +2203,170 @@ overlayEl.addEventListener('click', (e) => {
     case 'fight': case 'again': case 'rematch': game.phase = 'draft'; rollOffer(); renderOverlay(); break;
   }
 });
+
+// ---------------------------------------------------------- ACHIEVEMENTS ----
+// Seventy-six of them: twelve overall and eight per core. The list itself is
+// generated from achievements/achievements.json, which is also where the
+// readable copy in achievements/README.md comes from - one source, no drift.
+
+// --- achievements: generated by achievements/inline.py, do not edit by hand ---
+const ACHV = [
+  {id:'field', name:'Take the Field', line:'Play ten matches.', stat:'matches', need:10},
+  {id:'champion', name:'Champion', line:'Win twenty-five matches.', stat:'wins', need:25},
+  {id:'armoury', name:'Full Armoury', line:'Win a match with all eight cores.', stat:'coresWon', need:8},
+  {id:'hundred', name:'Hundred Falls', line:'Knock down a hundred knights.', stat:'kos', need:100},
+  {id:'survivor', name:'Survivor', line:'Clear five rounds in one survival run.', stat:'survBest', need:5},
+  {id:'gauntlet', name:'The Gauntlet', line:'Clear ten rounds in one survival run.', stat:'survBest', need:10},
+  {id:'untouched', name:'Untouchable', line:'Win five matches without losing a heart.', stat:'flawless', need:5},
+  {id:'photo', name:'Photo Finish', line:'Win a match in sudden death.', stat:'sudden', need:1},
+  {id:'laststand', name:'Last Stand', line:'Win a match after being down to your last heart.', stat:'comeback', need:1},
+  {id:'collector', name:'Collector', line:'Take all twelve buff cards at least once.', stat:'cards', need:12},
+  {id:'expert', name:'Expert Class', line:'Beat an Expert knight.', stat:'expert', need:1},
+  {id:'barehand', name:'Bare-Handed', line:'Beat a Hard or Expert knight with no card taken.', stat:'bare', need:1},
+  {id:'sword:blooded', name:'Blooded', line:'Win a match as Blade.', stat:'w', need:1, core:'sword'},
+  {id:'sword:swordhand', name:'Swordhand', line:'Win five matches as Blade.', stat:'w', need:5, core:'sword'},
+  {id:'sword:thresher', name:'Thresher', line:'Knock down twenty knights as Blade.', stat:'ko', need:20, core:'sword'},
+  {id:'sword:cuts', name:'Hundred Cuts', line:'Land seventy-five Edge Slashes.', stat:'a1', need:75, core:'sword'},
+  {id:'sword:waxing', name:'Waxing Moon', line:'Land twenty Crescent Cleaves.', stat:'a2', need:20, core:'sword'},
+  {id:'sword:moonfall', name:'Moonfall', line:'Finish three knights with Crescent Cleave.', stat:'sig', need:3, core:'sword'},
+  {id:'sword:scratch', name:'Not a Scratch', line:'Win as Blade without losing a heart.', stat:'fl', need:1, core:'sword'},
+  {id:'sword:tempered', name:'Tempered', line:'Beat a Hard or Expert knight as Blade.', stat:'hard', need:1, core:'sword'},
+  {id:'beam:firstlight', name:'First Light', line:'Win a match as Arc.', stat:'w', need:1, core:'beam'},
+  {id:'beam:stormbring', name:'Stormbringer', line:'Win five matches as Arc.', stat:'w', need:5, core:'beam'},
+  {id:'beam:conductor', name:'Conductor', line:'Knock down twenty knights as Arc.', stat:'ko', need:20, core:'beam'},
+  {id:'beam:sweeping', name:'Sweeping Guard', line:'Land seventy-five Glaive Sweeps.', stat:'a1', need:75, core:'beam'},
+  {id:'beam:charged', name:'Charged', line:'Land twenty Thunderstrikes.', stat:'a2', need:20, core:'beam'},
+  {id:'beam:stormcall', name:'Stormcall', line:'Finish three knights with Thunderstrike.', stat:'sig', need:3, core:'beam'},
+  {id:'beam:earthed', name:'Earthed', line:'Win as Arc without losing a heart.', stat:'fl', need:1, core:'beam'},
+  {id:'beam:weathered', name:'Weathered', line:'Beat a Hard or Expert knight as Arc.', stat:'hard', need:1, core:'beam'},
+  {id:'cutter:opening', name:'Opening Throw', line:'Win a match as Disc.', stat:'w', need:1, core:'cutter'},
+  {id:'cutter:ringlead', name:'Ringleader', line:'Win five matches as Disc.', stat:'w', need:5, core:'cutter'},
+  {id:'cutter:sawtooth', name:'Sawtooth', line:'Knock down twenty knights as Disc.', stat:'ko', need:20, core:'cutter'},
+  {id:'cutter:goodarm', name:'Good Arm', line:'Land seventy-five Chakram Throws.', stat:'a1', need:75, core:'cutter'},
+  {id:'cutter:threering', name:'Three Rings', line:'Land twenty Triple Rings.', stat:'a2', need:20, core:'cutter'},
+  {id:'cutter:roundtrip', name:'Round Trip', line:'Hit fifteen times with a chakram on its way back.', stat:'sig', need:15, core:'cutter'},
+  {id:'cutter:cleancirc', name:'Clean Circle', line:'Win as Disc without losing a heart.', stat:'fl', need:1, core:'cutter'},
+  {id:'cutter:wellthrown', name:'Well Thrown', line:'Beat a Hard or Expert knight as Disc.', stat:'hard', need:1, core:'cutter'},
+  {id:'hammer:groundwork', name:'Groundwork', line:'Win a match as Maul.', stat:'w', need:1, core:'hammer'},
+  {id:'hammer:demolisher', name:'Demolisher', line:'Win five matches as Maul.', stat:'w', need:5, core:'hammer'},
+  {id:'hammer:flattener', name:'Flattener', line:'Knock down twenty knights as Maul.', stat:'ko', need:20, core:'hammer'},
+  {id:'hammer:heavyhands', name:'Heavy Hands', line:'Land seventy-five Crushers.', stat:'a1', need:75, core:'hammer'},
+  {id:'hammer:tremor', name:'Tremor', line:'Land twenty Earthshakers.', stat:'a2', need:20, core:'hammer'},
+  {id:'hammer:aftershock', name:'Aftershock', line:'Finish three knights with Earthshaker.', stat:'sig', need:3, core:'hammer'},
+  {id:'hammer:unmoved', name:'Unmoved', line:'Win as Maul without losing a heart.', stat:'fl', need:1, core:'hammer'},
+  {id:'hammer:immovable', name:'Immovable', line:'Beat a Hard or Expert knight as Maul.', stat:'hard', need:1, core:'hammer'},
+  {id:'archer:firstdraw', name:'First Draw', line:'Win a match as Bow.', stat:'w', need:1, core:'archer'},
+  {id:'archer:marksman', name:'Marksman', line:'Win five matches as Bow.', stat:'w', need:5, core:'archer'},
+  {id:'archer:quiver', name:'Quiver Empty', line:'Knock down twenty knights as Bow.', stat:'ko', need:20, core:'archer'},
+  {id:'archer:rapidfire', name:'Rapid Fire', line:'Land seventy-five Point Blanks.', stat:'a1', need:75, core:'archer'},
+  {id:'archer:trueaim', name:'True Aim', line:'Land twenty Heartseekers.', stat:'a2', need:20, core:'archer'},
+  {id:'archer:longshot', name:'Longshot', line:'Land ten Heartseekers from across the arena.', stat:'sig', need:10, core:'archer'},
+  {id:'archer:untouched', name:'Untouched', line:'Win as Bow without losing a heart.', stat:'fl', need:1, core:'archer'},
+  {id:'archer:steady', name:'Steady Hand', line:'Beat a Hard or Expert knight as Bow.', stat:'hard', need:1, core:'archer'},
+  {id:'fire:spark', name:'Spark', line:'Win a match as Flare.', stat:'w', need:1, core:'fire'},
+  {id:'fire:wildfire', name:'Wildfire', line:'Win five matches as Flare.', stat:'w', need:5, core:'fire'},
+  {id:'fire:scorched', name:'Scorched Earth', line:'Knock down twenty knights as Flare.', stat:'ko', need:20, core:'fire'},
+  {id:'fire:slowburn', name:'Slow Burn', line:'Land seventy-five Flame Bursts.', stat:'a1', need:75, core:'fire'},
+  {id:'fire:throttle', name:'Full Throttle', line:'Land twenty Blaze Rushes.', stat:'a2', need:20, core:'fire'},
+  {id:'fire:burnout', name:'Burnout', line:'Finish three knights with Blaze Rush.', stat:'sig', need:3, core:'fire'},
+  {id:'fire:fireproof', name:'Fireproof', line:'Win as Flare without losing a heart.', stat:'fl', need:1, core:'fire'},
+  {id:'fire:forged', name:'Forged', line:'Beat a Hard or Expert knight as Flare.', stat:'hard', need:1, core:'fire'},
+  {id:'bomb:fuselit', name:'Fuse Lit', line:'Win a match as Cinder.', stat:'w', need:1, core:'bomb'},
+  {id:'bomb:bombardier', name:'Bombardier', line:'Win five matches as Cinder.', stat:'w', need:5, core:'bomb'},
+  {id:'bomb:blastrad', name:'Blast Radius', line:'Knock down twenty knights as Cinder.', stat:'ko', need:20, core:'bomb'},
+  {id:'bomb:steadydrop', name:'Steady Drops', line:'Land seventy-five Drop Bombs.', stat:'a1', need:75, core:'bomb'},
+  {id:'bomb:bignoise', name:'Big Noise', line:'Land twenty Big Bombs.', stat:'a2', need:20, core:'bomb'},
+  {id:'bomb:demolition', name:'Demolition', line:'Finish three knights with a blast.', stat:'sig', need:3, core:'bomb'},
+  {id:'bomb:noblowback', name:'No Blowback', line:'Win as Cinder without losing a heart.', stat:'fl', need:1, core:'bomb'},
+  {id:'bomb:controlled', name:'Controlled Burn', line:'Beat a Hard or Expert knight as Cinder.', stat:'hard', need:1, core:'bomb'},
+  {id:'parasol:curtainup', name:'Curtain Up', line:'Win a match as Veil.', stat:'w', need:1, core:'parasol'},
+  {id:'parasol:prima', name:'Prima', line:'Win five matches as Veil.', stat:'w', need:5, core:'parasol'},
+  {id:'parasol:thorned', name:'Thorned', line:'Knock down twenty knights as Veil.', stat:'ko', need:20, core:'parasol'},
+  {id:'parasol:needlework', name:'Needlework', line:'Land seventy-five Point Jabs.', stat:'a1', need:75, core:'parasol'},
+  {id:'parasol:inbloom', name:'In Bloom', line:'Land twenty Blooms.', stat:'a2', need:20, core:'parasol'},
+  {id:'parasol:turnabout', name:'Turnabout', line:'Send ten projectiles back as Veil.', stat:'sig', need:10, core:'parasol'},
+  {id:'parasol:unruffled', name:'Unruffled', line:'Win as Veil without losing a heart.', stat:'fl', need:1, core:'parasol'},
+  {id:'parasol:poised', name:'Poised', line:'Beat a Hard or Expert knight as Veil.', stat:'hard', need:1, core:'parasol'},
+];
+// --- end achievements ---
+
+function blankCore() { return { w: 0, ko: 0, a1: 0, a2: 0, sig: 0, fl: 0, hard: 0 }; }
+function loadStats() {
+  const blank = { matches: 0, wins: 0, kos: 0, flawless: 0, sudden: 0, comeback: 0,
+                  expert: 0, bare: 0, survBest: 0, cards: [], coresWon: [], got: [], cores: {} };
+  let saved = {};
+  try { saved = JSON.parse(localStorage.getItem('bkr-stats') || '{}') || {}; } catch (_) {}
+  const s = Object.assign(blank, saved);
+  for (const k of ['cards', 'coresWon', 'got']) if (!Array.isArray(s[k])) s[k] = [];
+  s.cores = s.cores || {};
+  for (const k of ABIL_KEYS) s.cores[k] = Object.assign(blankCore(), s.cores[k]);
+  return s;
+}
+const stats = loadStats();
+function saveStats() { try { localStorage.setItem('bkr-stats', JSON.stringify(stats)); } catch (_) {} }
+function statOf(a) {
+  if (a.core) return (stats.cores[a.core] || {})[a.stat] || 0;
+  const v = stats[a.stat];
+  return Array.isArray(v) ? v.length : (v || 0);
+}
+function earned(a) { return stats.got.indexOf(a.id) >= 0; }
+function addOnce(list, v) { if (v && list.indexOf(v) < 0) list.push(v); }
+function bump(core, stat, n) { if (stats.cores[core]) stats.cores[core][stat] += (n || 1); }
+
+// Everything that moves a counter ends here: bank it, then see what it earned.
+const toastQueue = [];
+function checkAchievements() {
+  for (const a of ACHV) {
+    if (earned(a) || statOf(a) < a.need) continue;
+    stats.got.push(a.id);
+    toastQueue.push(a);
+  }
+  saveStats();
+  nextToast();
+}
+
+// A hit the player landed: which move it was, and the feats that are about how
+// it landed rather than how many.
+function noteHit(src, target) {
+  if (!src || !src.f || !src.f.isPlayer || target.isPlayer) return;
+  const k = src.f.ability;
+  if (src.slot === 'a2') bump(k, 'a2'); else if (src.slot === 'a1') bump(k, 'a1');
+  if (k === 'cutter' && src.back) bump(k, 'sig');                       // Round Trip
+  if (k === 'archer' && src.slot === 'a2' && src.dist >= 7) bump(k, 'sig');  // Longshot
+  checkAchievements();
+}
+// The challenger just went down, and what put them there.
+function noteKO(src) {
+  const p = game.player;
+  if (!p) return;
+  const k = p.ability, s = src || {};
+  stats.kos++;
+  bump(k, 'ko');
+  const finisher = { sword: 'a2', beam: 'a2', hammer: 'a2', fire: 'a2' }[k];
+  if (finisher && s.slot === finisher) bump(k, 'sig');   // Moonfall / Stormcall / Aftershock / Burnout
+  if (k === 'bomb' && s.blast) bump(k, 'sig');           // Demolition
+  checkAchievements();
+}
+function noteMatch(result) {
+  stats.matches++;
+  const p = game.player;
+  if (result === 'win' && p) {
+    const k = p.ability, d = game.opts.diff;
+    stats.wins++;
+    bump(k, 'w');
+    addOnce(stats.coresWon, k);
+    if (!game.hurt) { stats.flawless++; bump(k, 'fl'); }
+    if (game.low) stats.comeback++;
+    if (game.sudden) stats.sudden++;
+    if (d === 'expert') stats.expert++;
+    if (d === 'hard' || d === 'expert') {
+      bump(k, 'hard');
+      if (!game.buffKey) stats.bare++;
+    }
+  }
+  checkAchievements();
+}
+function slotOf(f, def) { return def === ABIL[f.ability].a2 ? 'a2' : 'a1'; }
 
 // ------------------------------------------------------------- GAME FLOW ----
 // A fight starts in one of three ways: a fresh match (beginMatch), the next life
@@ -2205,6 +2472,8 @@ function deploy(playerHp, cpuHp) {
 
 function beginMatch() {
   game.score = { p: 0, c: 0 };
+  game.hurt = false;      // a flawless match, until something lands
+  game.low = false;       // and no comeback to speak of yet
   game.sudden = false;
   game.newBest = false;
   game.endedBy = 'ko';
@@ -2247,6 +2516,7 @@ function timeUp() {
 }
 
 function endMatch(result, by) {
+  noteMatch(result);
   game.pendingKO = null;
   game.result = result;
   game.endedBy = by || 'ko';
@@ -2256,6 +2526,8 @@ function endMatch(result, by) {
 }
 
 function endRun() {
+  stats.survBest = Math.max(stats.survBest, game.score.p);
+  noteMatch('lose');      // a run counts as a match played, never as a win
   game.pendingKO = null;
   game.newBest = game.score.p > bestRun();
   saveBest(game.score.p);

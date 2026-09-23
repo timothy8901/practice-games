@@ -74,7 +74,10 @@ death on a tie, and an Easy / Medium / Hard / Expert CPU), and
 two rounds — your hearts carry from round to round and nothing heals
 them, so the run ends when you are knocked out. Before either one you draw
 **a buff card**: three of twelve are dealt (art generated with Thrixel, see
-`card-art/`), and you take one or go in bare. Move with WASD / arrows,
+`card-art/`), and you take one or go in bare. **76 achievements** track as you
+play — twelve overall and eight for each core; the whole list is in
+[`achievements/`](achievements/README.md) and in the game under Achievements on
+the title screen. Move with WASD / arrows,
 **`Space` jump-dodges** over swings and projectiles, `P` pauses, `M`
 mutes. It pulls Three.js from a CDN but is still a single
 self-contained HTML page.
