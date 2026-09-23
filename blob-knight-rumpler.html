@@ -2130,6 +2130,7 @@ function afterKO(playerDown) {
   if (game.mode === 'survival') {
     if (playerDown) { game.endedBy = 'ko'; return endRun(); }
     game.nextFoe = randomCore(game.sel.player, game.cpu.ability);
+    game.clock = game.opts.time;   // the badge should already show the next round's clock
     game.phase = 'roundover';
     sfx.win();
     renderOverlay();

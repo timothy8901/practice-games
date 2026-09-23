@@ -135,6 +135,9 @@ html.bkr-touch body.bkr-fighting #bkr-top { display: flex; }
   position: absolute; z-index: 5; gap: 10px;
   top: max(8px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%);
 }
+/* pause and sound own the top centre, so the clock/round badge sits under them */
+html.bkr-touch body.bkr-fighting .hud-center { margin-top: 46px; }
+@media (max-height: 520px) { html.bkr-touch body.bkr-fighting .hud-center { margin-top: 42px; } }
 #bkr-top button {
   width: 40px; height: 40px; padding: 0; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;

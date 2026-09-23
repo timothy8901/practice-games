@@ -269,8 +269,15 @@
       }
     }
     if (game.phase === 'menu' || game.phase === 'paused') {
-      const row = card.querySelector('.overlay-buttons');
-      if (row) row.insertAdjacentHTML('beforeend', '<button class="overlay-btn ghost" data-kb="sound"></button>');
+      // the title card's choices are the mode tiles, so it has no button row of
+      // its own to hang this on: give it one, since the top bar is fight-only.
+      let row = card.querySelector('.overlay-buttons');
+      if (!row) {
+        row = document.createElement('div');
+        row.className = 'overlay-buttons';
+        card.append(row);
+      }
+      row.insertAdjacentHTML('beforeend', '<button class="overlay-btn ghost" data-kb="sound"></button>');
       syncSound();
     }
   };
