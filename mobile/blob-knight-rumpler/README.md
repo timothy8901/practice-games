@@ -45,10 +45,9 @@ notes (`INSTALL.txt`) and `web/index.html`, the same page as a single web file.
   down the menus - rules to challenger to knight to title - and ends a survival
   run from the round or result card). They switch on
   for touchscreens; `?touch=1` / `?touch=0` force them on or off.
-- **The art** (`web/thrixel-art.js`, `web/models.js`, `models/`): each ability maps
-  to the core built from it for Mote Rumble - sword/Blade, beam/Arc, cutter/Disc,
-  hammer/Maul, archer/Bow, fire/Flare, bomb/Cinder, parasol/Veil, which is also how
-  they are named on screen (web/rename.js) - so a fighter is
+- **The art** (`web/thrixel-art.js`, `web/models.js`, `models/`): each fighter is
+  one of the eight cores built for Mote Rumble - Blade, Arc, Disc, Maul, Bow, Flare,
+  Cinder and Veil, which are also the engine's own keys for them - so a fighter is
   a Mote body, its two floating gauntlets and its weapon, on the stone arena with
   the floating islands behind it. The rig is untouched: the layer swaps what
   `parts.body`, the arm pivots and `parts.weapon` look like, nothing about how they

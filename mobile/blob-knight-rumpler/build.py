@@ -39,8 +39,8 @@ ZIP_FOLDER = 'Blob Knight Rumpler - Android'
 # The release these defaults build. Android refuses an install whose version code
 # is not higher than the one on the phone, so raise both together for every build
 # handed out, and keep them here rather than in whoever-typed-the-command's memory.
-VERSION_NAME = '3.4'
-VERSION_CODE = 7
+VERSION_NAME = '3.5'
+VERSION_CODE = 8
 
 
 def die(msg):
@@ -102,14 +102,14 @@ def stamp_source(origin):
 
 
 def mobile_html(game, origin, version):
-    """The engine page plus the mobile layer, renamed, with three.js inlined for offline play."""
+    """The engine page plus the mobile layer, with three.js inlined for offline play."""
     css = read(os.path.join(HERE, 'web', 'mobile.css'))
     three = read(THREE)
-    # Order matters: rename.js renames the cores before anything draws, the loader
-    # defines BKRModels, the art layer wraps buildFighter and startFight, and the touch
-    # layer wraps renderOverlay and starts its own frame loop.
+    # Order matters: the loader defines BKRModels, the art layer wraps buildFighter
+    # and startFight, and the touch layer wraps renderOverlay and starts its own
+    # frame loop.
     layers = [(name, read(os.path.join(HERE, 'web', name)))
-              for name in ('rename.js', 'models.js', 'thrixel-art.js', 'mobile.js')]
+              for name in ('models.js', 'thrixel-art.js', 'mobile.js')]
     js = '\n'.join('<script id="bkr-%s">\n%s</script>' % (name.replace('.js', ''), text) for name, text in layers)
     for name, text, bad in ([('three.js', three, '</script'), ('mobile.css', css, '</style')]
                             + [(n, t, '</script') for n, t in layers]):
@@ -134,6 +134,8 @@ def mobile_html(game, origin, version):
     # Let the mobile layer lower the resolution on phones that can't hold the frame rate.
     html = patch(html, 'resolution cap', 'renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));',
                  'renderer.setPixelRatio(Math.min(window.BKR_MAX_DPR || 2, window.devicePixelRatio || 1));')
+    # The site calls it "(3D)" to set it apart from its 2D neighbours; the app needs no qualifier.
+    html = patch(html, 'app title', '<title>Blob Knight Rumpler (3D)</title>', '<title>Blob Knight Rumpler</title>')
     html = patch(html, 'mobile stylesheet', '</head>', '<style id="bkr-mobile-css">\n' + css + '</style>\n</head>')
     html = patch(html, 'mobile layers', '</body>', js + '\n</body>')
     # Last, so none of the patches above can match inside the library.

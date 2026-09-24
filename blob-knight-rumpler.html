@@ -563,28 +563,28 @@ const sfx = (() => {
 //       | dash (move + damage) | pound (AoE around self)
 const DEG = Math.PI / 180;
 const ABIL = {
-  sword: { name: 'Blade', accent: '#6dd64d', color: 0x3aaa42,
+  blade: { name: 'Blade', accent: '#6dd64d', color: 0x3aaa42,
     a1: { kind:'melee', anim:'slash', label:'Edge Slash',      range:2.4, arc:115*DEG, dmg:1, kb:5,   cd:0.45, dur:0.34, hitAt:0.45 },
     a2: { kind:'spin',  anim:'spin',  label:'Crescent Cleave', range:2.6,              dmg:2, kb:7,   cd:1.7,  dur:0.6,  hitAt:0.4  } },
-  beam: { name: 'Arc', accent: '#ffd54d', color: 0xd23a4a,
+  arc: { name: 'Arc', accent: '#ffd54d', color: 0xd23a4a,
     a1: { kind:'melee', anim:'slash', label:'Glaive Sweep',  range:2.9, arc:130*DEG, dmg:1, kb:3.5, cd:0.5,  dur:0.36, hitAt:0.45 },
-    a2: { kind:'shot',  anim:'cast',  label:'Thunderstrike', proj:'beam', speed:13,  dmg:2, kb:5,   cd:1.8,  dur:0.4,  hitAt:0.4  } },
-  cutter: { name: 'Disc', accent: '#f5b939', color: 0xf5b939,
-    a1: { kind:'shot',  anim:'throw', label:'Chakram Throw', proj:'cutter', speed:11, dmg:1, kb:3, cd:0.8, dur:0.34, hitAt:0.4, boomerang:true },
-    a2: { kind:'shot',  anim:'throw', label:'Triple Ring', proj:'cutter', speed:11, dmg:1, kb:3, cd:1.9, dur:0.4,  hitAt:0.4, spread:[-24*DEG, 0, 24*DEG] } },
-  hammer: { name: 'Maul', accent: '#c44b30', color: 0x6e4d28,
+    a2: { kind:'shot',  anim:'cast',  label:'Thunderstrike', proj:'bolt', speed:13,  dmg:2, kb:5,   cd:1.8,  dur:0.4,  hitAt:0.4  } },
+  disc: { name: 'Disc', accent: '#f5b939', color: 0xf5b939,
+    a1: { kind:'shot',  anim:'throw', label:'Chakram Throw', proj:'disc', speed:11, dmg:1, kb:3, cd:0.8, dur:0.34, hitAt:0.4, boomerang:true },
+    a2: { kind:'shot',  anim:'throw', label:'Triple Ring', proj:'disc', speed:11, dmg:1, kb:3, cd:1.9, dur:0.4,  hitAt:0.4, spread:[-24*DEG, 0, 24*DEG] } },
+  maul: { name: 'Maul', accent: '#c44b30', color: 0x6e4d28,
     a1: { kind:'melee', anim:'overhead', label:'Crusher', range:2.5, arc:95*DEG, dmg:2, kb:6.5, cd:0.85, dur:0.5, hitAt:0.55 },
     a2: { kind:'pound', anim:'pound',    label:'Earthshaker', range:3.4,             dmg:2, kb:9,   cd:2.3,  dur:0.75, hitAt:0.55 } },
-  archer: { name: 'Bow', accent: '#4d8a3f', color: 0x4d8a3f,
+  bow: { name: 'Bow', accent: '#4d8a3f', color: 0x4d8a3f,
     a1: { kind:'shot', anim:'shoot', label:'Point Blank', proj:'arrow', speed:17, dmg:1, kb:2.5, cd:0.38, dur:0.26, hitAt:0.35 },
     a2: { kind:'shot', anim:'shoot', label:'Heartseeker',  proj:'arrow', speed:23, dmg:2, kb:5.5, cd:1.7,  dur:0.4,  hitAt:0.45, pierce:true, big:true } },
-  fire: { name: 'Flare', accent: '#ff5722', color: 0xff5722,
+  flare: { name: 'Flare', accent: '#ff5722', color: 0xff5722,
     a1: { kind:'melee', anim:'breathe', label:'Flame Burst', range:3.1, arc:80*DEG, dmg:1, kb:2.5, cd:0.5, dur:0.4, hitAt:0.35 },
     a2: { kind:'dash',  anim:'dash',    label:'Blaze Rush',  range:1.5, dist:5.2,   dmg:2, kb:6,   cd:2.1, dur:0.34, hitAt:0 } },
-  bomb: { name: 'Cinder', accent: '#7d6249', color: 0x2a2a3a,
+  cinder: { name: 'Cinder', accent: '#7d6249', color: 0x2a2a3a,
     a1: { kind:'lob', anim:'throw', label:'Drop Bomb', proj:'bomb', speed:9,  aoe:1.9, dmg:1, kb:5, cd:0.95, dur:0.36, hitAt:0.4 },
     a2: { kind:'lob', anim:'throw', label:'Big Bomb', proj:'bomb', speed:8,  aoe:2.8, dmg:2, kb:8, cd:2.3,  dur:0.45, hitAt:0.45, big:true } },
-  parasol: { name: 'Veil', accent: '#ec4899', color: 0xd63131,
+  veil: { name: 'Veil', accent: '#ec4899', color: 0xd63131,
     a1: { kind:'melee', anim:'jab',  label:'Point Jab',  range:2.2, arc:70*DEG, dmg:1, kb:3.5, cd:0.4, dur:0.28, hitAt:0.4 },
     a2: { kind:'spin',  anim:'spin', label:'Bloom', range:2.4,            dmg:1, kb:6,   cd:1.5, dur:0.7,  hitAt:0.35, reflect:true } },
 };
@@ -804,7 +804,7 @@ function buildHatAndWeapon(g, parts, key) {
   const add = (parent, mesh) => { mesh.castShadow = true; parent.add(mesh); return mesh; };
 
   switch (key) {
-    case 'sword': {
+    case 'blade': {
       const cone = add(hat, new THREE.Mesh(new THREE.ConeGeometry(0.62, 0.85, 7), mat(0x3aaa42)));
       cone.position.y = 0.32;
       const tip = add(hat, new THREE.Mesh(new THREE.SphereGeometry(0.13, 5, 4), mat(0xffd54d)));
@@ -816,7 +816,7 @@ function buildHatAndWeapon(g, parts, key) {
       guard.position.set(0, -0.28, 0.3);
       break;
     }
-    case 'beam': {
+    case 'arc': {
       const cone = add(hat, new THREE.Mesh(new THREE.ConeGeometry(0.58, 0.95, 7), mat(0xd23a4a)));
       cone.position.y = 0.36;
       const band = add(hat, new THREE.Mesh(new THREE.CylinderGeometry(0.46, 0.5, 0.16, 7), mat(0xf5d24b)));
@@ -829,14 +829,14 @@ function buildHatAndWeapon(g, parts, key) {
       orb.position.set(0, -1.05, 0.3);
       break;
     }
-    case 'cutter': {
+    case 'disc': {
       const cap = add(hat, new THREE.Mesh(new THREE.SphereGeometry(0.62, 8, 5, 0, Math.PI*2, 0, Math.PI/2), mat(0xf5b939)));
       cap.position.y = -0.02;
       const fin = add(hat, new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.5, 0.72), mat(0xffe18a)));
       fin.position.y = 0.42;
       break;
     }
-    case 'hammer': {
+    case 'maul': {
       const band = add(hat, new THREE.Mesh(new THREE.TorusGeometry(0.74, 0.1, 5, 12), mat(0xd63131)));
       band.rotation.x = Math.PI/2 - 0.18; band.position.y = -0.18;
       const handle = add(wep, new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 1.15, 6), mat(0x9b6a36)));
@@ -845,7 +845,7 @@ function buildHatAndWeapon(g, parts, key) {
       head.position.set(0, -1.3, 0.3);
       break;
     }
-    case 'archer': {
+    case 'bow': {
       const cone = add(hat, new THREE.Mesh(new THREE.ConeGeometry(0.56, 0.78, 7), mat(0x4d8a3f)));
       cone.position.y = 0.26; cone.rotation.z = 0.28;
       const feather = add(hat, new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.5, 0.18), mat(0xd63131)));
@@ -855,7 +855,7 @@ function buildHatAndWeapon(g, parts, key) {
       parts.bow = bow;
       break;
     }
-    case 'fire': {
+    case 'flare': {
       const colors = [0xff5722, 0xffaa42, 0xff7a3a];
       [[-0.3, 0.45, 0], [0, 0.7, 0.05], [0.3, 0.5, 0]].forEach(([x, h, z], i) => {
         const fl = add(hat, new THREE.Mesh(new THREE.ConeGeometry(0.24, h + 0.35, 6), mat(colors[i], { emissive: 0x431200 })));
@@ -865,7 +865,7 @@ function buildHatAndWeapon(g, parts, key) {
       band.position.y = -0.06;
       break;
     }
-    case 'bomb': {
+    case 'cinder': {
       const cap = add(hat, new THREE.Mesh(new THREE.SphereGeometry(0.66, 8, 5, 0, Math.PI*2, 0, Math.PI/2.1), mat(0x7d6249)));
       cap.position.y = -0.05;
       for (const side of [-1, 1]) {
@@ -877,7 +877,7 @@ function buildHatAndWeapon(g, parts, key) {
       held.position.set(0, -0.4, 0.3);
       break;
     }
-    case 'parasol': {
+    case 'veil': {
       const pole = add(wep, new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.5, 6), mat(0xf2ead8)));
       pole.position.set(0, -0.3, 0.3);
       const canopy = add(wep, new THREE.Mesh(new THREE.ConeGeometry(0.78, 0.5, 9), mat(0xd63131)));
@@ -935,7 +935,7 @@ function makeFighter(isPlayer, abilityKey) {
     hitT: 0, invuln: 0, flashT: 0, redT: 0, squashT: 0,
     landT: 0,                          // landing recovery left
     buf: null,                         // { slot, t } an attack pressed early
-    reflect: 0,                        // parasol twirl reflect window
+    reflect: 0,                        // Bloom's reflect window
     dash: null,                        // { dx, dz, t, dur, hitSet }
     anim: { run: 0 },
     ai: { think: 0, cool: 0.8, moveX: 0, moveZ: 0, shieldT: 0, strafe: 1, windup: 0, pendingA2: false,
@@ -1016,14 +1016,14 @@ const BUFF_KEYS = Object.keys(BUFFS);
 // What a core plays like, for the picker - the move names alone do not tell you
 // whether Blaze Rush is a dash or a projectile.
 const CORE_TAG = {
-  sword:   'Balanced melee \u00b7 wide arc',
-  beam:    'Long melee \u00b7 lightning bolt',
-  cutter:  'Zoner \u00b7 returning disc, triple spread',
-  hammer:  'Heavy bruiser \u00b7 huge knockback',
-  archer:  'Long-range zoner \u00b7 piercing shot',
-  fire:    'Close burner \u00b7 forward dash',
-  bomb:    'Trapper \u00b7 arcing blasts',
-  parasol: 'Quick jabs \u00b7 reflects projectiles',
+  blade:  'Balanced melee \u00b7 wide arc',
+  arc:    'Long melee \u00b7 lightning bolt',
+  disc:   'Zoner \u00b7 returning disc, triple spread',
+  maul:   'Heavy bruiser \u00b7 huge knockback',
+  bow:    'Long-range zoner \u00b7 piercing shot',
+  flare:  'Close burner \u00b7 forward dash',
+  cinder: 'Trapper \u00b7 arcing blasts',
+  veil:   'Quick jabs \u00b7 reflects projectiles',
 };
 
 // --- card art: generated by card-art/inline.py, do not edit by hand ---
@@ -1090,7 +1090,7 @@ const game = {
   phase: 'menu',          // menu | pick | foe | rules | fight | roundover | result | paused
   mode: '1v1',            // '1v1' | 'survival'
   opts: loadOpts(),       // { ko, time, diff } — remembered between visits
-  sel: { player: 'sword', foe: 'random' },
+  sel: { player: 'blade', foe: 'random' },
   buffKey: null,          // the card the player took for this match, or null
   offer: [],              // the three on the table
   keyNote: null,          // what the settings screen has to say about a rebind
@@ -1249,9 +1249,9 @@ function spawnAttackProjectile(f, def, angleOffset = 0) {
     const tip = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.26, 5), mat(0xc0c0c8));
     tip.rotation.x = Math.PI/2; tip.position.z = 0.5; mesh.add(tip);
     if (def.big) mesh.scale.setScalar(1.5);
-  } else if (kind === 'cutter') {
+  } else if (kind === 'disc') {
     mesh = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.09, 0.4), mat(0xffe18a, { emissive: 0x4a3a00 }));
-  } else if (kind === 'beam') {
+  } else if (kind === 'bolt') {
     mesh = new THREE.Mesh(new THREE.SphereGeometry(0.26, 7, 5), mat(0xfff04a, { emissive: 0x8a7000 }));
   } else if (kind === 'bomb') {
     mesh = new THREE.Group();
@@ -1515,7 +1515,7 @@ function updateFighter(f, dt, input) {
     if (A.t >= A.def.dur) { f.state = 'idle'; f.attack = null; resetPose(f); }
   }
 
-  // dash motion (fire special)
+  // dash motion (Blaze Rush)
   if (f.dash) {
     const D = f.dash;
     D.t += dt;
@@ -1790,12 +1790,12 @@ function updateProjectiles(dt) {
     }
     pr.mesh.position.x += pr.vx * dt;
     pr.mesh.position.z += pr.vz * dt;
-    if (pr.kind === 'cutter') pr.mesh.rotation.y += 18 * dt;
-    if (pr.kind === 'arrow' || pr.kind === 'beam') pr.mesh.rotation.y = Math.atan2(pr.vx, pr.vz);
+    if (pr.kind === 'disc') pr.mesh.rotation.y += 18 * dt;
+    if (pr.kind === 'arrow' || pr.kind === 'bolt') pr.mesh.rotation.y = Math.atan2(pr.vx, pr.vz);
 
-    // glowing motion trail (beam/cutter/bomb) — a few faint shrinking sparks
+    // glowing motion trail (bolt/disc/bomb) — a few faint shrinking sparks
     if (dt > 0 && pr.kind !== 'arrow' && Math.random() < 0.7) {
-      const tc = pr.kind === 'beam' ? 0xfff04a : (pr.kind === 'cutter' ? 0xffe18a : 0x556070);
+      const tc = pr.kind === 'bolt' ? 0xfff04a : (pr.kind === 'disc' ? 0xffe18a : 0x556070);
       const sp = new THREE.Mesh(new THREE.SphereGeometry(pr.kind === 'bomb' ? 0.1 : 0.14, 5, 4),
         new THREE.MeshBasicMaterial({ color: tc, transparent: true, opacity: 0.6, depthWrite: false }));
       sp.position.set(pr.mesh.position.x, pr.mesh.position.y || 1.0, pr.mesh.position.z);
@@ -1807,15 +1807,15 @@ function updateProjectiles(dt) {
     const r = Math.hypot(pr.mesh.position.x, pr.mesh.position.z);
     if (r > ARENA_R + 4) pr.life = 0;
 
-    // parasol reflect
+    // Bloom's reflect
     for (const def of [game.player, game.cpu]) {
       if (!def || def === pr.owner) continue;
-      // the parasol twirl, or a raised shield with the Deflector card behind it
+      // Bloom's twirl, or a raised shield with the Deflector card behind it
       if (def.reflect <= 0 && !(wears(def, 'deflect') && def.shield.active)) continue;
       const ddx = pr.mesh.position.x - def.group.position.x;
       const ddz = pr.mesh.position.z - def.group.position.z;
       if (Math.hypot(ddx, ddz) < 2.3) {
-        if (def.isPlayer && def.ability === 'parasol') { bump('parasol', 'sig'); checkAchievements(); }
+        if (def.isPlayer && def.ability === 'veil') { bump('veil', 'sig'); checkAchievements(); }
         pr.owner = def;
         pr.vx *= -1.25; pr.vz *= -1.25;
         pr.hitSet.clear();
@@ -2514,70 +2514,70 @@ const ACHV = [
   {id:'collector', name:'Collector', line:'Take all twelve buff cards at least once.', stat:'cards', need:12, perk:{stat:'cd',amt:0.05}},
   {id:'expert', name:'Expert Class', line:'Beat an Expert knight.', stat:'expert', need:1, perk:{stat:'kbOut',amt:0.08}},
   {id:'barehand', name:'Bare-Handed', line:'Beat a Hard or Expert knight with no card taken.', stat:'bare', need:1, perk:{stat:'shield',amt:0.06}},
-  {id:'sword:blooded', name:'Blooded', line:'Win a match as Blade.', stat:'w', need:1, perk:{stat:'move',amt:0.04}, core:'sword'},
-  {id:'sword:swordhand', name:'Swordhand', line:'Win five matches as Blade.', stat:'w', need:5, perk:{stat:'cd',amt:0.05}, core:'sword'},
-  {id:'sword:thresher', name:'Thresher', line:'Knock down twenty knights as Blade.', stat:'ko', need:20, perk:{stat:'kbOut',amt:0.08}, core:'sword'},
-  {id:'sword:cuts', name:'Hundred Cuts', line:'Land seventy-five Edge Slashes.', stat:'a1', need:75, perk:{stat:'cd',amt:0.05}, core:'sword'},
-  {id:'sword:waxing', name:'Waxing Moon', line:'Land twenty Crescent Cleaves.', stat:'a2', need:20, perk:{stat:'kbOut',amt:0.08}, core:'sword'},
-  {id:'sword:moonfall', name:'Moonfall', line:'Finish three knights with Crescent Cleave.', stat:'sig', need:3, perk:{stat:'shield',amt:0.06}, core:'sword'},
-  {id:'sword:scratch', name:'Not a Scratch', line:'Win as Blade without losing a heart.', stat:'fl', need:1, perk:{stat:'kbIn',amt:0.07}, core:'sword'},
-  {id:'sword:tempered', name:'Tempered', line:'Beat a Hard or Expert knight as Blade.', stat:'hard', need:1, perk:{stat:'kbIn',amt:0.07}, core:'sword'},
-  {id:'beam:firstlight', name:'First Light', line:'Win a match as Arc.', stat:'w', need:1, perk:{stat:'move',amt:0.04}, core:'beam'},
-  {id:'beam:stormbring', name:'Stormbringer', line:'Win five matches as Arc.', stat:'w', need:5, perk:{stat:'cd',amt:0.05}, core:'beam'},
-  {id:'beam:conductor', name:'Conductor', line:'Knock down twenty knights as Arc.', stat:'ko', need:20, perk:{stat:'kbOut',amt:0.08}, core:'beam'},
-  {id:'beam:sweeping', name:'Sweeping Guard', line:'Land seventy-five Glaive Sweeps.', stat:'a1', need:75, perk:{stat:'cd',amt:0.05}, core:'beam'},
-  {id:'beam:charged', name:'Charged', line:'Land twenty Thunderstrikes.', stat:'a2', need:20, perk:{stat:'kbOut',amt:0.08}, core:'beam'},
-  {id:'beam:stormcall', name:'Stormcall', line:'Finish three knights with Thunderstrike.', stat:'sig', need:3, perk:{stat:'shield',amt:0.06}, core:'beam'},
-  {id:'beam:earthed', name:'Earthed', line:'Win as Arc without losing a heart.', stat:'fl', need:1, perk:{stat:'kbIn',amt:0.07}, core:'beam'},
-  {id:'beam:weathered', name:'Weathered', line:'Beat a Hard or Expert knight as Arc.', stat:'hard', need:1, perk:{stat:'kbIn',amt:0.07}, core:'beam'},
-  {id:'cutter:opening', name:'Opening Throw', line:'Win a match as Disc.', stat:'w', need:1, perk:{stat:'move',amt:0.04}, core:'cutter'},
-  {id:'cutter:ringlead', name:'Ringleader', line:'Win five matches as Disc.', stat:'w', need:5, perk:{stat:'cd',amt:0.05}, core:'cutter'},
-  {id:'cutter:sawtooth', name:'Sawtooth', line:'Knock down twenty knights as Disc.', stat:'ko', need:20, perk:{stat:'kbOut',amt:0.08}, core:'cutter'},
-  {id:'cutter:goodarm', name:'Good Arm', line:'Land seventy-five Chakram Throws.', stat:'a1', need:75, perk:{stat:'cd',amt:0.05}, core:'cutter'},
-  {id:'cutter:threering', name:'Three Rings', line:'Land twenty Triple Rings.', stat:'a2', need:20, perk:{stat:'kbOut',amt:0.08}, core:'cutter'},
-  {id:'cutter:roundtrip', name:'Round Trip', line:'Hit fifteen times with a chakram on its way back.', stat:'sig', need:15, perk:{stat:'shield',amt:0.06}, core:'cutter'},
-  {id:'cutter:cleancirc', name:'Clean Circle', line:'Win as Disc without losing a heart.', stat:'fl', need:1, perk:{stat:'kbIn',amt:0.07}, core:'cutter'},
-  {id:'cutter:wellthrown', name:'Well Thrown', line:'Beat a Hard or Expert knight as Disc.', stat:'hard', need:1, perk:{stat:'kbIn',amt:0.07}, core:'cutter'},
-  {id:'hammer:groundwork', name:'Groundwork', line:'Win a match as Maul.', stat:'w', need:1, perk:{stat:'move',amt:0.04}, core:'hammer'},
-  {id:'hammer:demolisher', name:'Demolisher', line:'Win five matches as Maul.', stat:'w', need:5, perk:{stat:'cd',amt:0.05}, core:'hammer'},
-  {id:'hammer:flattener', name:'Flattener', line:'Knock down twenty knights as Maul.', stat:'ko', need:20, perk:{stat:'kbOut',amt:0.08}, core:'hammer'},
-  {id:'hammer:heavyhands', name:'Heavy Hands', line:'Land seventy-five Crushers.', stat:'a1', need:75, perk:{stat:'cd',amt:0.05}, core:'hammer'},
-  {id:'hammer:tremor', name:'Tremor', line:'Land twenty Earthshakers.', stat:'a2', need:20, perk:{stat:'kbOut',amt:0.08}, core:'hammer'},
-  {id:'hammer:aftershock', name:'Aftershock', line:'Finish three knights with Earthshaker.', stat:'sig', need:3, perk:{stat:'shield',amt:0.06}, core:'hammer'},
-  {id:'hammer:unmoved', name:'Unmoved', line:'Win as Maul without losing a heart.', stat:'fl', need:1, perk:{stat:'kbIn',amt:0.07}, core:'hammer'},
-  {id:'hammer:immovable', name:'Immovable', line:'Beat a Hard or Expert knight as Maul.', stat:'hard', need:1, perk:{stat:'kbIn',amt:0.07}, core:'hammer'},
-  {id:'archer:firstdraw', name:'First Draw', line:'Win a match as Bow.', stat:'w', need:1, perk:{stat:'move',amt:0.04}, core:'archer'},
-  {id:'archer:marksman', name:'Marksman', line:'Win five matches as Bow.', stat:'w', need:5, perk:{stat:'cd',amt:0.05}, core:'archer'},
-  {id:'archer:quiver', name:'Quiver Empty', line:'Knock down twenty knights as Bow.', stat:'ko', need:20, perk:{stat:'kbOut',amt:0.08}, core:'archer'},
-  {id:'archer:rapidfire', name:'Rapid Fire', line:'Land seventy-five Point Blanks.', stat:'a1', need:75, perk:{stat:'cd',amt:0.05}, core:'archer'},
-  {id:'archer:trueaim', name:'True Aim', line:'Land twenty Heartseekers.', stat:'a2', need:20, perk:{stat:'kbOut',amt:0.08}, core:'archer'},
-  {id:'archer:longshot', name:'Longshot', line:'Land ten Heartseekers from across the arena.', stat:'sig', need:10, perk:{stat:'shield',amt:0.06}, core:'archer'},
-  {id:'archer:untouched', name:'Untouched', line:'Win as Bow without losing a heart.', stat:'fl', need:1, perk:{stat:'kbIn',amt:0.07}, core:'archer'},
-  {id:'archer:steady', name:'Steady Hand', line:'Beat a Hard or Expert knight as Bow.', stat:'hard', need:1, perk:{stat:'kbIn',amt:0.07}, core:'archer'},
-  {id:'fire:spark', name:'Spark', line:'Win a match as Flare.', stat:'w', need:1, perk:{stat:'move',amt:0.04}, core:'fire'},
-  {id:'fire:wildfire', name:'Wildfire', line:'Win five matches as Flare.', stat:'w', need:5, perk:{stat:'cd',amt:0.05}, core:'fire'},
-  {id:'fire:scorched', name:'Scorched Earth', line:'Knock down twenty knights as Flare.', stat:'ko', need:20, perk:{stat:'kbOut',amt:0.08}, core:'fire'},
-  {id:'fire:slowburn', name:'Slow Burn', line:'Land seventy-five Flame Bursts.', stat:'a1', need:75, perk:{stat:'cd',amt:0.05}, core:'fire'},
-  {id:'fire:throttle', name:'Full Throttle', line:'Land twenty Blaze Rushes.', stat:'a2', need:20, perk:{stat:'kbOut',amt:0.08}, core:'fire'},
-  {id:'fire:burnout', name:'Burnout', line:'Finish three knights with Blaze Rush.', stat:'sig', need:3, perk:{stat:'shield',amt:0.06}, core:'fire'},
-  {id:'fire:fireproof', name:'Fireproof', line:'Win as Flare without losing a heart.', stat:'fl', need:1, perk:{stat:'kbIn',amt:0.07}, core:'fire'},
-  {id:'fire:forged', name:'Forged', line:'Beat a Hard or Expert knight as Flare.', stat:'hard', need:1, perk:{stat:'kbIn',amt:0.07}, core:'fire'},
-  {id:'bomb:fuselit', name:'Fuse Lit', line:'Win a match as Cinder.', stat:'w', need:1, perk:{stat:'move',amt:0.04}, core:'bomb'},
-  {id:'bomb:bombardier', name:'Bombardier', line:'Win five matches as Cinder.', stat:'w', need:5, perk:{stat:'cd',amt:0.05}, core:'bomb'},
-  {id:'bomb:blastrad', name:'Blast Radius', line:'Knock down twenty knights as Cinder.', stat:'ko', need:20, perk:{stat:'kbOut',amt:0.08}, core:'bomb'},
-  {id:'bomb:steadydrop', name:'Steady Drops', line:'Land seventy-five Drop Bombs.', stat:'a1', need:75, perk:{stat:'cd',amt:0.05}, core:'bomb'},
-  {id:'bomb:bignoise', name:'Big Noise', line:'Land twenty Big Bombs.', stat:'a2', need:20, perk:{stat:'kbOut',amt:0.08}, core:'bomb'},
-  {id:'bomb:demolition', name:'Demolition', line:'Finish three knights with a blast.', stat:'sig', need:3, perk:{stat:'shield',amt:0.06}, core:'bomb'},
-  {id:'bomb:noblowback', name:'No Blowback', line:'Win as Cinder without losing a heart.', stat:'fl', need:1, perk:{stat:'kbIn',amt:0.07}, core:'bomb'},
-  {id:'bomb:controlled', name:'Controlled Burn', line:'Beat a Hard or Expert knight as Cinder.', stat:'hard', need:1, perk:{stat:'kbIn',amt:0.07}, core:'bomb'},
-  {id:'parasol:curtainup', name:'Curtain Up', line:'Win a match as Veil.', stat:'w', need:1, perk:{stat:'move',amt:0.04}, core:'parasol'},
-  {id:'parasol:prima', name:'Prima', line:'Win five matches as Veil.', stat:'w', need:5, perk:{stat:'cd',amt:0.05}, core:'parasol'},
-  {id:'parasol:thorned', name:'Thorned', line:'Knock down twenty knights as Veil.', stat:'ko', need:20, perk:{stat:'kbOut',amt:0.08}, core:'parasol'},
-  {id:'parasol:needlework', name:'Needlework', line:'Land seventy-five Point Jabs.', stat:'a1', need:75, perk:{stat:'cd',amt:0.05}, core:'parasol'},
-  {id:'parasol:inbloom', name:'In Bloom', line:'Land twenty Blooms.', stat:'a2', need:20, perk:{stat:'kbOut',amt:0.08}, core:'parasol'},
-  {id:'parasol:turnabout', name:'Turnabout', line:'Send ten projectiles back as Veil.', stat:'sig', need:10, perk:{stat:'shield',amt:0.06}, core:'parasol'},
-  {id:'parasol:unruffled', name:'Unruffled', line:'Win as Veil without losing a heart.', stat:'fl', need:1, perk:{stat:'kbIn',amt:0.07}, core:'parasol'},
-  {id:'parasol:poised', name:'Poised', line:'Beat a Hard or Expert knight as Veil.', stat:'hard', need:1, perk:{stat:'kbIn',amt:0.07}, core:'parasol'},
+  {id:'blade:blooded', name:'Blooded', line:'Win a match as Blade.', stat:'w', need:1, perk:{stat:'move',amt:0.04}, core:'blade'},
+  {id:'blade:swordhand', name:'Swordhand', line:'Win five matches as Blade.', stat:'w', need:5, perk:{stat:'cd',amt:0.05}, core:'blade'},
+  {id:'blade:thresher', name:'Thresher', line:'Knock down twenty knights as Blade.', stat:'ko', need:20, perk:{stat:'kbOut',amt:0.08}, core:'blade'},
+  {id:'blade:cuts', name:'Hundred Cuts', line:'Land seventy-five Edge Slashes.', stat:'a1', need:75, perk:{stat:'cd',amt:0.05}, core:'blade'},
+  {id:'blade:waxing', name:'Waxing Moon', line:'Land twenty Crescent Cleaves.', stat:'a2', need:20, perk:{stat:'kbOut',amt:0.08}, core:'blade'},
+  {id:'blade:moonfall', name:'Moonfall', line:'Finish three knights with Crescent Cleave.', stat:'sig', need:3, perk:{stat:'shield',amt:0.06}, core:'blade'},
+  {id:'blade:scratch', name:'Not a Scratch', line:'Win as Blade without losing a heart.', stat:'fl', need:1, perk:{stat:'kbIn',amt:0.07}, core:'blade'},
+  {id:'blade:tempered', name:'Tempered', line:'Beat a Hard or Expert knight as Blade.', stat:'hard', need:1, perk:{stat:'kbIn',amt:0.07}, core:'blade'},
+  {id:'arc:firstlight', name:'First Light', line:'Win a match as Arc.', stat:'w', need:1, perk:{stat:'move',amt:0.04}, core:'arc'},
+  {id:'arc:stormbring', name:'Stormbringer', line:'Win five matches as Arc.', stat:'w', need:5, perk:{stat:'cd',amt:0.05}, core:'arc'},
+  {id:'arc:conductor', name:'Conductor', line:'Knock down twenty knights as Arc.', stat:'ko', need:20, perk:{stat:'kbOut',amt:0.08}, core:'arc'},
+  {id:'arc:sweeping', name:'Sweeping Guard', line:'Land seventy-five Glaive Sweeps.', stat:'a1', need:75, perk:{stat:'cd',amt:0.05}, core:'arc'},
+  {id:'arc:charged', name:'Charged', line:'Land twenty Thunderstrikes.', stat:'a2', need:20, perk:{stat:'kbOut',amt:0.08}, core:'arc'},
+  {id:'arc:stormcall', name:'Stormcall', line:'Finish three knights with Thunderstrike.', stat:'sig', need:3, perk:{stat:'shield',amt:0.06}, core:'arc'},
+  {id:'arc:earthed', name:'Earthed', line:'Win as Arc without losing a heart.', stat:'fl', need:1, perk:{stat:'kbIn',amt:0.07}, core:'arc'},
+  {id:'arc:weathered', name:'Weathered', line:'Beat a Hard or Expert knight as Arc.', stat:'hard', need:1, perk:{stat:'kbIn',amt:0.07}, core:'arc'},
+  {id:'disc:opening', name:'Opening Throw', line:'Win a match as Disc.', stat:'w', need:1, perk:{stat:'move',amt:0.04}, core:'disc'},
+  {id:'disc:ringlead', name:'Ringleader', line:'Win five matches as Disc.', stat:'w', need:5, perk:{stat:'cd',amt:0.05}, core:'disc'},
+  {id:'disc:sawtooth', name:'Sawtooth', line:'Knock down twenty knights as Disc.', stat:'ko', need:20, perk:{stat:'kbOut',amt:0.08}, core:'disc'},
+  {id:'disc:goodarm', name:'Good Arm', line:'Land seventy-five Chakram Throws.', stat:'a1', need:75, perk:{stat:'cd',amt:0.05}, core:'disc'},
+  {id:'disc:threering', name:'Three Rings', line:'Land twenty Triple Rings.', stat:'a2', need:20, perk:{stat:'kbOut',amt:0.08}, core:'disc'},
+  {id:'disc:roundtrip', name:'Round Trip', line:'Hit fifteen times with a chakram on its way back.', stat:'sig', need:15, perk:{stat:'shield',amt:0.06}, core:'disc'},
+  {id:'disc:cleancirc', name:'Clean Circle', line:'Win as Disc without losing a heart.', stat:'fl', need:1, perk:{stat:'kbIn',amt:0.07}, core:'disc'},
+  {id:'disc:wellthrown', name:'Well Thrown', line:'Beat a Hard or Expert knight as Disc.', stat:'hard', need:1, perk:{stat:'kbIn',amt:0.07}, core:'disc'},
+  {id:'maul:groundwork', name:'Groundwork', line:'Win a match as Maul.', stat:'w', need:1, perk:{stat:'move',amt:0.04}, core:'maul'},
+  {id:'maul:demolisher', name:'Demolisher', line:'Win five matches as Maul.', stat:'w', need:5, perk:{stat:'cd',amt:0.05}, core:'maul'},
+  {id:'maul:flattener', name:'Flattener', line:'Knock down twenty knights as Maul.', stat:'ko', need:20, perk:{stat:'kbOut',amt:0.08}, core:'maul'},
+  {id:'maul:heavyhands', name:'Heavy Hands', line:'Land seventy-five Crushers.', stat:'a1', need:75, perk:{stat:'cd',amt:0.05}, core:'maul'},
+  {id:'maul:tremor', name:'Tremor', line:'Land twenty Earthshakers.', stat:'a2', need:20, perk:{stat:'kbOut',amt:0.08}, core:'maul'},
+  {id:'maul:aftershock', name:'Aftershock', line:'Finish three knights with Earthshaker.', stat:'sig', need:3, perk:{stat:'shield',amt:0.06}, core:'maul'},
+  {id:'maul:unmoved', name:'Unmoved', line:'Win as Maul without losing a heart.', stat:'fl', need:1, perk:{stat:'kbIn',amt:0.07}, core:'maul'},
+  {id:'maul:immovable', name:'Immovable', line:'Beat a Hard or Expert knight as Maul.', stat:'hard', need:1, perk:{stat:'kbIn',amt:0.07}, core:'maul'},
+  {id:'bow:firstdraw', name:'First Draw', line:'Win a match as Bow.', stat:'w', need:1, perk:{stat:'move',amt:0.04}, core:'bow'},
+  {id:'bow:marksman', name:'Marksman', line:'Win five matches as Bow.', stat:'w', need:5, perk:{stat:'cd',amt:0.05}, core:'bow'},
+  {id:'bow:quiver', name:'Quiver Empty', line:'Knock down twenty knights as Bow.', stat:'ko', need:20, perk:{stat:'kbOut',amt:0.08}, core:'bow'},
+  {id:'bow:rapidfire', name:'Rapid Fire', line:'Land seventy-five Point Blanks.', stat:'a1', need:75, perk:{stat:'cd',amt:0.05}, core:'bow'},
+  {id:'bow:trueaim', name:'True Aim', line:'Land twenty Heartseekers.', stat:'a2', need:20, perk:{stat:'kbOut',amt:0.08}, core:'bow'},
+  {id:'bow:longshot', name:'Longshot', line:'Land ten Heartseekers from across the arena.', stat:'sig', need:10, perk:{stat:'shield',amt:0.06}, core:'bow'},
+  {id:'bow:untouched', name:'Untouched', line:'Win as Bow without losing a heart.', stat:'fl', need:1, perk:{stat:'kbIn',amt:0.07}, core:'bow'},
+  {id:'bow:steady', name:'Steady Hand', line:'Beat a Hard or Expert knight as Bow.', stat:'hard', need:1, perk:{stat:'kbIn',amt:0.07}, core:'bow'},
+  {id:'flare:spark', name:'Spark', line:'Win a match as Flare.', stat:'w', need:1, perk:{stat:'move',amt:0.04}, core:'flare'},
+  {id:'flare:wildfire', name:'Wildfire', line:'Win five matches as Flare.', stat:'w', need:5, perk:{stat:'cd',amt:0.05}, core:'flare'},
+  {id:'flare:scorched', name:'Scorched Earth', line:'Knock down twenty knights as Flare.', stat:'ko', need:20, perk:{stat:'kbOut',amt:0.08}, core:'flare'},
+  {id:'flare:slowburn', name:'Slow Burn', line:'Land seventy-five Flame Bursts.', stat:'a1', need:75, perk:{stat:'cd',amt:0.05}, core:'flare'},
+  {id:'flare:throttle', name:'Full Throttle', line:'Land twenty Blaze Rushes.', stat:'a2', need:20, perk:{stat:'kbOut',amt:0.08}, core:'flare'},
+  {id:'flare:burnout', name:'Burnout', line:'Finish three knights with Blaze Rush.', stat:'sig', need:3, perk:{stat:'shield',amt:0.06}, core:'flare'},
+  {id:'flare:fireproof', name:'Fireproof', line:'Win as Flare without losing a heart.', stat:'fl', need:1, perk:{stat:'kbIn',amt:0.07}, core:'flare'},
+  {id:'flare:forged', name:'Forged', line:'Beat a Hard or Expert knight as Flare.', stat:'hard', need:1, perk:{stat:'kbIn',amt:0.07}, core:'flare'},
+  {id:'cinder:fuselit', name:'Fuse Lit', line:'Win a match as Cinder.', stat:'w', need:1, perk:{stat:'move',amt:0.04}, core:'cinder'},
+  {id:'cinder:bombardier', name:'Bombardier', line:'Win five matches as Cinder.', stat:'w', need:5, perk:{stat:'cd',amt:0.05}, core:'cinder'},
+  {id:'cinder:blastrad', name:'Blast Radius', line:'Knock down twenty knights as Cinder.', stat:'ko', need:20, perk:{stat:'kbOut',amt:0.08}, core:'cinder'},
+  {id:'cinder:steadydrop', name:'Steady Drops', line:'Land seventy-five Drop Bombs.', stat:'a1', need:75, perk:{stat:'cd',amt:0.05}, core:'cinder'},
+  {id:'cinder:bignoise', name:'Big Noise', line:'Land twenty Big Bombs.', stat:'a2', need:20, perk:{stat:'kbOut',amt:0.08}, core:'cinder'},
+  {id:'cinder:demolition', name:'Demolition', line:'Finish three knights with a blast.', stat:'sig', need:3, perk:{stat:'shield',amt:0.06}, core:'cinder'},
+  {id:'cinder:noblowback', name:'No Blowback', line:'Win as Cinder without losing a heart.', stat:'fl', need:1, perk:{stat:'kbIn',amt:0.07}, core:'cinder'},
+  {id:'cinder:controlled', name:'Controlled Burn', line:'Beat a Hard or Expert knight as Cinder.', stat:'hard', need:1, perk:{stat:'kbIn',amt:0.07}, core:'cinder'},
+  {id:'veil:curtainup', name:'Curtain Up', line:'Win a match as Veil.', stat:'w', need:1, perk:{stat:'move',amt:0.04}, core:'veil'},
+  {id:'veil:prima', name:'Prima', line:'Win five matches as Veil.', stat:'w', need:5, perk:{stat:'cd',amt:0.05}, core:'veil'},
+  {id:'veil:thorned', name:'Thorned', line:'Knock down twenty knights as Veil.', stat:'ko', need:20, perk:{stat:'kbOut',amt:0.08}, core:'veil'},
+  {id:'veil:needlework', name:'Needlework', line:'Land seventy-five Point Jabs.', stat:'a1', need:75, perk:{stat:'cd',amt:0.05}, core:'veil'},
+  {id:'veil:inbloom', name:'In Bloom', line:'Land twenty Blooms.', stat:'a2', need:20, perk:{stat:'kbOut',amt:0.08}, core:'veil'},
+  {id:'veil:turnabout', name:'Turnabout', line:'Send ten projectiles back as Veil.', stat:'sig', need:10, perk:{stat:'shield',amt:0.06}, core:'veil'},
+  {id:'veil:unruffled', name:'Unruffled', line:'Win as Veil without losing a heart.', stat:'fl', need:1, perk:{stat:'kbIn',amt:0.07}, core:'veil'},
+  {id:'veil:poised', name:'Poised', line:'Beat a Hard or Expert knight as Veil.', stat:'hard', need:1, perk:{stat:'kbIn',amt:0.07}, core:'veil'},
 ];
 // --- end achievements ---
 
@@ -2590,8 +2590,29 @@ function loadStats() {
   const s = Object.assign(blank, saved);
   for (const k of ['cards', 'coresWon', 'got']) if (!Array.isArray(s[k])) s[k] = [];
   s.cores = s.cores || {};
+  adoptEarlierCoreKeys(s);
   for (const k of ABIL_KEYS) s.cores[k] = Object.assign(blankCore(), s.cores[k]);
   return s;
+}
+// Saves from before the cores had their own keys filed each core's progress under
+// the key the engine used then. Those saves always hold all eight, written in the
+// same order as ABIL today, so an unrecognised set of eight is matched by position:
+// progress carries across without the earlier keys ever needing to be named here.
+function adoptEarlierCoreKeys(s) {
+  const current = new Set(ABIL_KEYS);
+  const earlier = Object.keys(s.cores).filter((k) => !current.has(k));
+  if (earlier.length !== ABIL_KEYS.length) return;      // not that shape: leave it alone
+  const to = {};
+  earlier.forEach((k, i) => { to[k] = ABIL_KEYS[i]; });
+  for (const k of earlier) {
+    s.cores[to[k]] = Object.assign(blankCore(), s.cores[to[k]], s.cores[k]);
+    delete s.cores[k];
+  }
+  s.coresWon = s.coresWon.map((k) => to[k] || k).filter((k, i, all) => all.indexOf(k) === i);
+  s.got = s.got.map((id) => {
+    const cut = id.indexOf(':');
+    return cut > 0 && to[id.slice(0, cut)] ? to[id.slice(0, cut)] + id.slice(cut) : id;
+  });
 }
 const stats = loadStats();
 function saveStats() { try { localStorage.setItem('bkr-stats', JSON.stringify(stats)); } catch (_) {} }
@@ -2622,8 +2643,8 @@ function noteHit(src, target) {
   if (!src || !src.f || !src.f.isPlayer || target.isPlayer) return;
   const k = src.f.ability;
   if (src.slot === 'a2') bump(k, 'a2'); else if (src.slot === 'a1') bump(k, 'a1');
-  if (k === 'cutter' && src.back) bump(k, 'sig');                       // Round Trip
-  if (k === 'archer' && src.slot === 'a2' && src.dist >= 7) bump(k, 'sig');  // Longshot
+  if (k === 'disc' && src.back) bump(k, 'sig');                       // Round Trip
+  if (k === 'bow' && src.slot === 'a2' && src.dist >= 7) bump(k, 'sig');  // Longshot
   checkAchievements();
 }
 // The challenger just went down, and what put them there.
@@ -2633,9 +2654,9 @@ function noteKO(src) {
   const k = p.ability, s = src || {};
   stats.kos++;
   bump(k, 'ko');
-  const finisher = { sword: 'a2', beam: 'a2', hammer: 'a2', fire: 'a2' }[k];
+  const finisher = { blade: 'a2', arc: 'a2', maul: 'a2', flare: 'a2' }[k];
   if (finisher && s.slot === finisher) bump(k, 'sig');   // Moonfall / Stormcall / Aftershock / Burnout
-  if (k === 'bomb' && s.blast) bump(k, 'sig');           // Demolition
+  if (k === 'cinder' && s.blast) bump(k, 'sig');           // Demolition
   checkAchievements();
 }
 function noteMatch(result) {

@@ -11,8 +11,6 @@
  */
 (() => {
   'use strict';
-  const CORE = { sword: 'blade', beam: 'arc', cutter: 'disc', hammer: 'maul',
-                 archer: 'bow', fire: 'flare', bomb: 'cinder', parasol: 'veil' };
   const BASE = 'models/';
   const BODY_HEIGHT = 2.15;   // a little taller than the sphere it replaces: darker art, small screen
   const HAND_SIZE = 0.9;
@@ -25,7 +23,7 @@
     disc:   { length: 0.95, grip: 'middle', keepAxis: true },
     maul:   { length: 1.4, grip: 'end', tilt: -0.4 },
     bow:    { length: 1.7, grip: 'middle' },
-    flare:  null,            // fire breathes flame; the molten fist is its gauntlet
+    flare:  null,            // Flare breathes flame; the molten fist is its gauntlet
     cinder: { length: 0.75, grip: 'middle' },
     veil:   { length: 1.5, grip: 'end', tilt: -0.32 },
   };
@@ -84,7 +82,7 @@
 
   async function loadArt() {
     const jobs = [];
-    for (const core of Object.values(CORE)) {
+    for (const core of ABIL_KEYS) {        // the engine's keys are the core names
       jobs.push(['body', core], ['gauntlet', core]);
       if (WEAPONS[core]) jobs.push(['weapon', core]);
     }
@@ -105,7 +103,7 @@
     const built = buildOriginal(palette, abilityKey);
     if (!art.ready) return built;
     const { group, parts } = built;
-    const core = CORE[abilityKey];
+    const core = abilityKey;      // the engine's keys are the core names
     const dress = (mesh, key) => {
       mesh.geometry = art.geo[key];
       mesh.material = art.mat[key].clone();   // per fighter: the hit flash tints it
