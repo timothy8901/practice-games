@@ -1,0 +1,148 @@
+/* maze.css — additions for the playtest harness. Extends review.css. */
+
+body.playtest { overflow-x: hidden; }
+
+.play-main {
+  max-width: 1500px;
+  margin: 0 auto;
+  padding: 18px 20px 60px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 400px;
+  gap: 20px;
+  align-items: start;
+}
+
+/* ── stage ────────────────────────────────────────────────────────────── */
+
+.stage-wrap {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.seedbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  font-size: 12.5px;
+  color: var(--ink-2);
+  flex-wrap: wrap;
+}
+.seedbar label { display: flex; align-items: center; gap: 6px; }
+.seedbar input[type="date"], .seedbar select, .seedbar input[type="number"] {
+  font: inherit; font-size: 12.5px; color: var(--ink);
+  background: var(--bg); border: 1px solid var(--line-2);
+  border-radius: 5px; padding: 4px 7px; width: auto;
+}
+.seedbar button {
+  background: transparent; border: 1px solid var(--line-2); color: var(--ink-2);
+  border-radius: 5px; padding: 4px 10px; font-size: 12.5px;
+}
+.seedbar button:hover { border-color: var(--accent); color: var(--accent); }
+.seedbar .sep { width: 1px; height: 18px; background: var(--line); }
+.seedbar .spacer { flex: 1; }
+.dim { color: var(--ink-3); }
+.small { font-size: 12.5px; }
+
+.viewport {
+  position: relative;
+  background: #0d1014;
+  aspect-ratio: 16 / 9;
+  min-height: 380px;
+}
+.viewport canvas#stage { width: 100%; height: 100%; display: block; outline: none; cursor: grab; }
+.viewport canvas#stage:active { cursor: grabbing; }
+.viewport canvas#stage:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); }
+
+.hud {
+  position: absolute; left: 14px; top: 12px;
+  font-family: var(--mono); font-size: 12px; line-height: 1.7;
+  color: #dfe4e9; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+  pointer-events: none;
+}
+.hud .big { font-size: 22px; font-weight: 600; letter-spacing: -0.02em; }
+.hud .ok { color: #86e39a; }
+.hud .warn { color: #ffca5f; }
+.hud .bad { color: #ff8a7a; }
+
+.tiltgauge { position: absolute; right: 14px; top: 12px; opacity: 0.9; pointer-events: none; }
+
+.play-main .stage-tools {
+  position: absolute; left: 12px; right: 12px; bottom: 38px;
+  display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
+}
+.play-main .stage-hint { bottom: 14px; }
+.jump {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11.5px; color: #b9c1c9;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 5px; padding: 2px 8px;
+}
+.jump select {
+  font: inherit; font-size: 11.5px; background: transparent;
+  color: #e6eaee; border: 0; padding: 2px; max-width: 200px; width: auto;
+}
+.jump select option { background: #1b1e22; color: #e6eaee; }
+
+/* ── side column ──────────────────────────────────────────────────────── */
+
+.side { display: flex; flex-direction: column; gap: 16px; }
+.panel.tight { padding: 15px 16px; margin: 0; }
+.panel.tight h2 { font-size: 13.5px; margin-bottom: 8px; }
+
+.checks { font-size: 12.5px; }
+.check-row {
+  display: flex; gap: 8px; align-items: baseline;
+  padding: 3px 0; border-bottom: 1px solid var(--line);
+}
+.check-row:last-child { border-bottom: 0; }
+.check-row .mark { font-family: var(--mono); }
+.check-row.pass .mark { color: var(--ok); }
+.check-row.fail .mark { color: var(--must); }
+.check-row.warn .mark { color: var(--should); }
+.check-row .what { flex: 1; }
+.check-row .detail { font-family: var(--mono); font-size: 11px; color: var(--ink-3); text-align: right; }
+
+.sweep-controls { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
+.sweep-controls label { font-size: 12.5px; color: var(--ink-2); display: flex; gap: 6px; align-items: center; }
+.sweep-controls input {
+  width: 62px; font: inherit; font-size: 12.5px; color: var(--ink);
+  background: var(--bg); border: 1px solid var(--line-2); border-radius: 5px; padding: 4px 7px;
+}
+
+.sweep-grid { display: flex; flex-wrap: wrap; gap: 3px; margin-bottom: 10px; }
+.sweep-day {
+  width: 26px; height: 22px; border-radius: 3px;
+  font-family: var(--mono); font-size: 10px; line-height: 22px; text-align: center;
+  border: 1px solid var(--line-2); color: var(--ink-2); cursor: pointer;
+  background: transparent;
+}
+.sweep-day.clean { background: color-mix(in srgb, var(--ok) 30%, transparent); border-color: var(--ok); color: var(--ink); }
+.sweep-day.open { background: color-mix(in srgb, var(--should) 26%, transparent); border-color: var(--should); color: var(--ink); }
+.sweep-day.bad { background: color-mix(in srgb, var(--must) 28%, transparent); border-color: var(--must); color: var(--ink); }
+.sweep-day:hover { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.blockers { font-size: 12.3px; color: var(--ink-2); }
+.blockers li { margin-bottom: 3px; }
+.blockers .n { font-family: var(--mono); color: var(--ink-3); }
+
+/* ── aspect feedback ──────────────────────────────────────────────────── */
+
+.aspect { border-top: 1px solid var(--line); padding-top: 11px; margin-top: 11px; }
+.aspect:first-child { border-top: 0; padding-top: 0; margin-top: 0; }
+.aspect h3 { margin: 0 0 2px; font-size: 12.8px; }
+.aspect p.q { margin: 0 0 7px; font-size: 12px; color: var(--ink-3); }
+.aspect .controls { padding: 0; }
+.aspect .comments li { font-size: 12.3px; }
+.aspect .seedtag {
+  font-family: var(--mono); font-size: 10px; color: var(--ink-3);
+  border: 1px solid var(--line); border-radius: 3px; padding: 0 4px; margin-left: 6px;
+}
+
+@media (max-width: 1180px) {
+  .play-main { grid-template-columns: minmax(0, 1fr); }
+}

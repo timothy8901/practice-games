@@ -45,6 +45,7 @@
       --c-neonfable: #7a2ff2;
       --c-faleria: #b5612a;
       --c-punch: #3f3428;
+      --c-lumon:  #6fa4c8;
     }
 
     * { box-sizing: border-box; }
@@ -188,7 +189,9 @@
     .featured.emerald .preview { background: radial-gradient(circle at 50% 40%, #bdf5d6 0%, #2fd27a 55%, #0f7a44 100%); }
     .featured.neonfable { --accent: var(--c-neonfable); }
     .featured.neonfable .preview { background: radial-gradient(circle at 50% 42%, #2a1b5e 0%, #150b31 55%, #07030f 100%); }
-    .featured.faleria { --accent: var(--c-faleria); margin-top: 20px; }
+    .featured.lumon { --accent: var(--c-lumon); margin-top: 20px; }
+    .featured.lumon .preview { background: radial-gradient(circle at 50% 40%, #e9ebe6 0%, #c3ccc4 55%, #8e9a92 100%); }
+    .featured.faleria { --accent: var(--c-faleria); }
     .featured.faleria .preview { background: radial-gradient(circle at 50% 38%, #7d5a52 0%, #402c28 55%, #140f0d 100%); }
 
     /* "new game" flag on the freshest release */
@@ -278,10 +281,64 @@
 
     <h2 class="section-title" id="featured">Featured</h2>
 
+    <article class="featured lumon">
+      <div class="new-flag" aria-label="New game">NEW GAME!</div>
+      <div>
+        <span class="label">Just released · Rolling-ball maze</span>
+        <h2><a href="review/severed.html?play">The Escape from Lumon</a></h2>
+        <p>A <b>rolling-ball maze</b> through the severed floor from <i>Severance</i>. You are Mark S., a doll inside a marble — and you never push him. You <b>tilt the whole floor</b> and let gravity do the rest, the way a wooden labyrinth toy works. Roll out of <b>Macrodata Refinement</b>, past the four desks in their windmill, and go looking for the elevator down corridors that all look alike and quietly double back on themselves. <b>Three floors</b>, from one hallway and a single turn to a full grid of junctions you will lose track of. The character was modelled in Blender, the workstations in Thrixel, and the renderer is about 500 lines of WebGL written from scratch — no engine, no dependencies, nothing to install.</p>
+        <div class="meta">
+          <span>Keyboard &amp; mouse</span>
+          <span>Three floors — easy, medium, hard</span>
+          <span>Super Monkey Ball physics</span>
+          <span>Blender &amp; Thrixel art</span>
+          <span>No dependencies</span>
+        </div>
+        <div class="cta-row">
+          <span class="play-cta">Play now &rarr;</span>
+          <a class="shirt-chip" href="https://tims-store-12362.myshopify.com/" target="_blank" rel="noopener">👕 Shirt</a>
+        </div>
+      </div>
+      <div class="preview" aria-hidden="true">
+        <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+          <!-- a Lumon corridor in one-point perspective, with the marble in it -->
+          <rect x="0" y="0" width="200" height="200" fill="#e9ebe6"/>
+          <polygon points="0,200 62,96 138,96 200,200" fill="#cfe0ce"/>
+          <polygon points="0,0 62,96 138,96 200,0" fill="#d6d9d2"/>
+          <polygon points="0,0 0,200 62,96" fill="#e3e6e0"/>
+          <polygon points="200,0 200,200 138,96" fill="#dfe2dc"/>
+          <!-- the accent line every corridor in the building has -->
+          <polyline points="0,150 62,110" fill="none" stroke="#a7c8dc" stroke-width="5"/>
+          <polyline points="200,150 138,110" fill="none" stroke="#a7c8dc" stroke-width="5"/>
+          <!-- skirting -->
+          <polyline points="0,196 62,99" fill="none" stroke="#3d444a" stroke-width="4"/>
+          <polyline points="200,196 138,99" fill="none" stroke="#3d444a" stroke-width="4"/>
+          <!-- ceiling grid -->
+          <polyline points="0,34 62,90" fill="none" stroke="#b9bdb6" stroke-width="2"/>
+          <polyline points="200,34 138,90" fill="none" stroke="#b9bdb6" stroke-width="2"/>
+          <rect x="86" y="86" width="28" height="5" rx="1" fill="#fdfbf2"/>
+          <!-- the far end, and the elevator in it -->
+          <rect x="62" y="90" width="76" height="8" fill="#c6cac3"/>
+          <rect x="86" y="96" width="28" height="30" fill="#b4babf" stroke="#8d949a" stroke-width="1.5"/>
+          <line x1="100" y1="96" x2="100" y2="126" stroke="#8d949a" stroke-width="1.5"/>
+          <!-- Mark, in his marble -->
+          <ellipse cx="100" cy="176" rx="26" ry="8" fill="#000" opacity="0.13"/>
+          <circle cx="100" cy="158" r="25" fill="#3a3229" stroke="#25201a" stroke-width="2.5"/>
+          <circle cx="100" cy="150" r="15" fill="#d9b39b"/>
+          <ellipse cx="94" cy="148" rx="2.6" ry="3.4" fill="#211e1a"/>
+          <ellipse cx="106" cy="148" rx="2.6" ry="3.4" fill="#211e1a"/>
+          <path d="M 95 157 Q 100 160 105 157" fill="none" stroke="#8a6a58" stroke-width="1.8" stroke-linecap="round"/>
+          <path d="M 86 143 Q 100 133 114 143 Q 100 139 86 143 Z" fill="#3a3229"/>
+          <rect x="92" y="168" width="16" height="9" rx="2" fill="#232c3d"/>
+          <rect x="97" y="170" width="6" height="5" fill="#a7c8dc"/>
+        </svg>
+      </div>
+    </article>
+
     <article class="featured faleria">
       <div class="new-flag" aria-label="New game">NEW GAME!</div>
       <div>
-        <span class="label">Just released · Survival Sandbox</span>
+        <span class="label">New · Survival Sandbox</span>
         <h2><a href="faleria/index.html">FALERIA — Wasteland Sandbox</a></h2>
         <p>A <b>2D side-scrolling survival and settlement builder</b> set after the bombs. Dig a <b>seeded open world</b> of ruined cities, caves, bunkers and mineshafts; break junk down into <b>steel, screws, gears and circuitry</b>; then build a base, wire up <b>generators and power conduits</b>, and raise a radio beacon to pull in survivors. Assign them as farmers, guards, scavengers and traders — then hold the walls when the <b>raiders come</b>, because they will tear through anything you leave standing. Level up a full <b>S.P.E.C.I.A.L. perk chart</b>, fight ghouls, mutants and deathclaws, and go find what is sealed under the bedrock.</p>
         <div class="meta">

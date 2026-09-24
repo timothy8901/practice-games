@@ -2,14 +2,22 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "Static HTML server (python http.server)",
+      "name": "Game studio (all games)",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "review/serve.py"
+      ],
+      "autoPort": true
+    },
+    {
+      "name": "Games site (port 8767)",
       "runtimeExecutable": "python3",
       "runtimeArgs": [
         "-m",
         "http.server",
-        "8000"
+        "8767"
       ],
-      "port": 8000
+      "port": 8767
     },
     {
       "name": "Blob Knight Rumpler build",
@@ -24,14 +32,14 @@
       "port": 8766
     },
     {
-      "name": "Games site (port 8767)",
+      "name": "Theater of the Undead",
       "runtimeExecutable": "python3",
       "runtimeArgs": [
-        "-m",
-        "http.server",
-        "8767"
+        "theater-of-the-undead/serve.py",
+        "8124"
       ],
-      "port": 8767
+      "port": 8124,
+      "autoPort": false
     }
   ]
 }

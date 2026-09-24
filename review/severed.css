@@ -1,0 +1,406 @@
+/* severed.css — the harness dressed as the building it is reviewing.
+ *
+ * Overrides review.css and maze.css. Deliberately cold and over-lit: a lot of
+ * white space, one blue, one green, hairline rules, and a monospace that looks
+ * like it came off a terminal nobody has replaced since 1987.
+ */
+
+body.severed {
+  --bg: #eef0ec;
+  --panel: #ffffff;
+  --ink: #23282c;
+  --ink-2: #575f66;
+  --ink-3: #8b939a;
+  --line: #d8dcd6;
+  --line-2: #c2c8bf;
+  --accent: #3d7ea6;
+  --accent-soft: #e2edf4;
+  --ok: #4a7c59;
+  --must: #a8443a;
+  --should: #9a6b1f;
+  --question: #3d7ea6;
+  --stage: #dfe3dd;
+  --radius: 2px;
+  background:
+    repeating-linear-gradient(90deg, transparent 0 39px, rgba(0, 0, 0, 0.018) 39px 40px),
+    var(--bg);
+}
+
+@media (prefers-color-scheme: dark) {
+  body.severed {
+    --bg: #10161a;
+    --panel: #161d22;
+    --ink: #dfe5e6;
+    --ink-2: #9aa6ad;
+    --ink-3: #6c777e;
+    --line: #232d34;
+    --line-2: #32404a;
+    --accent: #7fb3d3;
+    --accent-soft: #1c2a34;
+    --ok: #79ad8b;
+    --must: #d9786c;
+    --should: #cfa155;
+    --stage: #0b1013;
+  }
+}
+
+/* ── masthead ─────────────────────────────────────────────────────────── */
+
+body.severed .bar {
+  border-bottom: 2px solid var(--ink);
+  background: var(--panel);
+  backdrop-filter: none;
+}
+body.severed .ident h1 {
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+body.severed .ident h1 .tag {
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  color: var(--panel);
+  background: var(--ink);
+  padding: 2px 7px;
+  margin-left: 10px;
+  vertical-align: 2px;
+}
+body.severed .sub { font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.02em; }
+
+body.severed button.primary {
+  border-radius: 2px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 600;
+  padding: 8px 14px;
+}
+body.severed .v,
+body.severed .tool,
+body.severed .add,
+body.severed .seedbar button {
+  border-radius: 2px;
+  font-family: var(--mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 10.5px;
+}
+body.severed .verdict-label,
+body.severed .counters { font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; }
+
+/* ── panels ───────────────────────────────────────────────────────────── */
+
+body.severed .panel,
+body.severed .stage-wrap {
+  border-radius: 2px;
+  border: 1px solid var(--line-2);
+  box-shadow: none;
+}
+body.severed .panel h2 {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 7px;
+}
+body.severed .panel .count { letter-spacing: 0.08em; text-transform: none; }
+body.severed .seedbar {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  background: color-mix(in srgb, var(--accent) 6%, var(--panel));
+}
+
+/* ── the floor itself ─────────────────────────────────────────────────── */
+
+body.severed .viewport { background: #0d1114; }
+body.severed .hud {
+  font-family: var(--mono);
+  letter-spacing: 0.05em;
+  color: #e7ebe6;
+}
+body.severed .hud .big { letter-spacing: 0.02em; }
+body.severed .hud .ok { color: #a8c8dd; }
+
+body.severed .tool[aria-pressed="true"] {
+  background: rgba(167, 200, 220, 0.28);
+  border-color: rgba(167, 200, 220, 0.7);
+  color: #e8f1f7;
+}
+
+/* ── feedback ─────────────────────────────────────────────────────────── */
+
+body.severed .aspect h3 {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+body.severed .comments li { border-left-width: 3px; }
+body.severed .seedtag { border-radius: 1px; letter-spacing: 0.06em; }
+
+body.severed .sweep-day { border-radius: 1px; }
+
+/* ── graphics controls ─────────────────────────────────────────────────── */
+
+/* Two tool rows now, so they go in a stacking container rather than each being
+   absolutely positioned over the canvas — pinned individually they collided the
+   moment either one wrapped, which at this page's width is most of the time.
+   Each row gets a scrim: unlike the dark outdoor track this kit was built for,
+   an office corridor is mostly bright, and pale controls on a white wall are
+   unreadable. */
+.stage-toolbar {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  pointer-events: none;
+}
+/* Wrap rather than shrink. Flex items default to flex-shrink:1, so a slider
+   label squeezed to a sliver and spilled its contents past the viewport edge
+   instead of moving to the next line. */
+.stage-toolbar .stage-tools > * { flex: 0 0 auto; }
+.stage-toolbar .stage-tools > .spacer { flex: 1 1 auto; }
+.stage-toolbar .stage-tools {
+  position: static;
+  flex-wrap: wrap;
+  row-gap: 5px;
+  padding: 5px 8px;
+  border-radius: 7px;
+  background: rgba(18, 21, 24, 0.6);
+  pointer-events: auto;
+}
+.gfx-label {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(232, 234, 236, 0.5);
+  align-self: center;
+}
+.stage-tools.gfx .slider {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: rgba(232, 234, 236, 0.62);
+}
+.stage-tools.gfx input[type=range] {
+  width: 82px;
+  accent-color: #79a8dd;
+}
+.stage-tools.gfx output {
+  min-width: 3.1em;
+  font-size: 10.5px;
+  color: rgba(232, 234, 236, 0.9);
+}
+.stage-tools .tool[aria-checked="true"] {
+  background: rgba(121, 168, 221, 0.28);
+  border-color: rgba(121, 168, 221, 0.5);
+  color: #fff;
+}
+#doll-stats {
+  align-self: center;
+  font-size: 10.5px;
+  color: rgba(232, 234, 236, 0.45);
+}
+
+/* ── character turntable ───────────────────────────────────────────────── */
+
+.turntable { position: relative; }
+.turntable canvas {
+  display: block;
+  width: 100%;
+  height: 190px;
+  border-radius: 7px;
+  background: #1d2124;
+  touch-action: none;
+  cursor: ew-resize;
+}
+.tt-labels {
+  position: absolute; left: 0; right: 0; bottom: 6px;
+  display: flex;
+  pointer-events: none;
+}
+.tt-labels span {
+  flex: 1;
+  text-align: center;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(232, 234, 236, 0.55);
+}
+.tt-note {
+  margin: 7px 0 0;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--ink-3);
+}
+
+/* ── which floor is loaded ─────────────────────────────────────────────── */
+
+/* The authored floor and the daily generator are different products sharing one
+   harness, so the switch between them sits at the far left of the bar, ahead of
+   the shift controls it disables. */
+.floor-switch { display: inline-flex; gap: 5px; }
+.floor-switch .tool {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--line);
+  color: var(--ink-2);
+  border-radius: 5px; padding: 4px 10px; font-size: 11.5px;
+}
+.floor-switch .tool[aria-checked="true"] {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--ink);
+  font-weight: 600;
+}
+#shift-controls { display: inline-flex; align-items: center; gap: 6px; }
+#shift-controls:has(:disabled) { opacity: 0.4; }
+
+/* ── title / results / menu ────────────────────────────────────────────── */
+
+/* Ported from the capture page, which had them first because the film needed
+   them and the game did not have them. Same type and palette; DOM rather than
+   canvas-2D, because a menu wants real focus, real key handling and real hit
+   targets, and this page is already a DOM page with a canvas in it.
+
+   The live view stays rendering behind the scrim rather than being replaced by
+   a black card — a corridor softly visible behind the title is a better way in
+   than a flat slab, and it costs nothing since the frame is drawn anyway. */
+.screen {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(13, 17, 20, 0.88);
+  backdrop-filter: blur(3px);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  text-align: center;
+  cursor: pointer;
+  animation: screen-in 0.22s ease-out;
+}
+.screen[hidden] { display: none; }
+@keyframes screen-in { from { opacity: 0; } to { opacity: 1; } }
+
+.screen-card { width: min(560px, 86%); }
+.screen-card .eyebrow {
+  font-size: 11px; letter-spacing: 0.42em; text-transform: uppercase;
+  color: rgba(160, 178, 190, 0.75); margin: 0 0 18px;
+}
+.screen-card h2 {
+  margin: 0; font-size: clamp(26px, 4.4vw, 44px); letter-spacing: 0.04em;
+  color: rgba(242, 246, 248, 0.97); font-weight: 700;
+}
+.screen-card .lede {
+  margin: 14px 0 0; font-size: 12.5px; letter-spacing: 0.22em;
+  text-transform: uppercase; color: rgba(111, 164, 200, 0.92);
+}
+.screen-card .rule {
+  height: 1px; background: rgba(111, 164, 200, 0.24); margin: 26px 0;
+}
+.screen-card .clock {
+  font-size: clamp(38px, 6.4vw, 62px); font-weight: 600;
+  color: rgba(111, 164, 200, 0.95); margin: 6px 0 0; letter-spacing: 0;
+}
+.screen-card .prompt {
+  margin: 30px 0 0; font-size: 13px; letter-spacing: 0.3em;
+  color: rgba(214, 226, 233, 0.82);
+}
+/* the attract-screen blink, and a solid state the moment a key lands */
+.screen-card .prompt.blink { animation: prompt-blink 1.15s steps(1, end) infinite; }
+@keyframes prompt-blink { 0%, 55% { opacity: 1; } 56%, 100% { opacity: 0.18; } }
+
+.screen-menu { list-style: none; margin: 0; padding: 0; }
+.screen-menu li { margin: 0; }
+.screen-menu button {
+  display: block; width: 100%; text-align: center;
+  background: transparent; border: 0; border-left: 3px solid transparent;
+  padding: 13px 18px; font: inherit; font-size: 15px; letter-spacing: 0.16em;
+  color: rgba(150, 166, 176, 0.62); cursor: pointer;
+}
+.screen-menu button:hover { color: rgba(214, 226, 233, 0.9); }
+.screen-menu li[aria-selected="true"] button {
+  background: rgba(111, 164, 200, 0.16);
+  border-left-color: rgba(111, 164, 200, 0.95);
+  color: rgba(242, 246, 248, 0.98);
+  font-weight: 600;
+}
+.screen-hint {
+  margin: 20px 0 0; font-size: 11px; letter-spacing: 0.2em;
+  color: rgba(150, 166, 176, 0.5); min-height: 1.2em;
+}
+.screen-stats {
+  display: grid; grid-template-columns: repeat(2, 1fr);
+  gap: 10px 26px; margin: 22px 0 0; text-align: left;
+}
+.screen-stats div {
+  display: flex; justify-content: space-between; gap: 12px;
+  font-size: 12px; letter-spacing: 0.12em;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07); padding-bottom: 7px;
+  color: rgba(160, 178, 190, 0.72);
+}
+.screen-stats b { color: rgba(238, 243, 246, 0.95); font-weight: 600; }
+.screen-card .motto {
+  margin: 30px 0 0; font-size: 10.5px; letter-spacing: 0.3em;
+  color: rgba(150, 166, 176, 0.4);
+}
+
+/* the stage list: name on the left, its length on the right */
+.screen-menu button { display: flex; justify-content: space-between; align-items: baseline; gap: 20px; }
+.stage-name { letter-spacing: 0.18em; }
+.stage-meta {
+  font-size: 11.5px; letter-spacing: 0.1em;
+  color: rgba(111, 164, 200, 0.75); font-weight: 400;
+}
+
+/* ── play-only view ────────────────────────────────────────────────────── */
+
+/* The page is a playtest harness with a game in the middle of it, which is
+   right for review and wrong for handing someone the game. `?play` — and the
+   offline build by default — drops everything but the view.
+
+   Hiding rather than not-building it: the harness is one class away, so a
+   reviewer can get at the collision mesh and the feedback form without a
+   reload, and there is no second page to keep in step with this one. */
+.view-toggle {
+  position: absolute; top: 10px; right: 12px; z-index: 45;
+  background: rgba(18, 21, 24, 0.55); color: rgba(232, 234, 236, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 5px;
+  padding: 4px 10px; font-size: 11px; letter-spacing: 0.08em;
+  opacity: 0.25; transition: opacity 0.15s ease;
+}
+.viewport:hover .view-toggle { opacity: 1; }
+.view-toggle:hover { background: rgba(18, 21, 24, 0.8); color: #fff; }
+
+body.play-only > header.bar,
+body.play-only .seedbar,
+body.play-only aside.side,
+body.play-only .stage-toolbar,
+body.play-only .stage-hint { display: none; }
+
+body.play-only .play-main {
+  max-width: none; padding: 0; gap: 0;
+  grid-template-columns: minmax(0, 1fr);
+  height: 100vh;
+}
+body.play-only .stage-wrap { border: 0; border-radius: 0; height: 100vh; }
+body.play-only .viewport { aspect-ratio: auto; height: 100vh; min-height: 0; }
+body.play-only { background: #0d1014; overflow: hidden; }
+
+/* The tilt gauge earns its place while you are learning the controls, so it
+   stays — just smaller and further out of the way. */
+body.play-only .tiltgauge { transform: scale(0.72); transform-origin: bottom right; opacity: 0.7; }
+
+/* The HUD's clock and distance mean nothing on a title or results screen, and
+   it shows through the scrim as ghost text. */
+body.screen-up .hud,
+body.screen-up .tiltgauge { display: none; }
