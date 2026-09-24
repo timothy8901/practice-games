@@ -136,6 +136,10 @@ def main():
             assets[name] = read(p)
 
     shim = (
+        '// The offline build is the hand-it-to-someone case, so it opens as the\n'
+        '// game rather than the playtest harness. The Harness button in the\n'
+        '// corner of the view still brings the rest back.\n'
+        'window.__PLAY_ONLY = true;\n'
         'const __ASSETS = {\n'
         + ''.join(f'  {json.dumps(k)}: {v},\n' for k, v in assets.items())
         + '};\n'

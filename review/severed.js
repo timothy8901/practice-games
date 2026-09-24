@@ -192,6 +192,37 @@ function angleDelta (a, b) {
 }
 const run = { t: 0, falls: 0, started: false, finished: false, best: null, checkpoint: null };
 
+/* ── play-only view ───────────────────────────────────────────────────────
+ *
+ * The page is a playtest harness with a game in the middle of it. That is the
+ * right shape for review and the wrong one for handing someone the game, so
+ * `?play` (and the offline build, which sets __PLAY_ONLY) hides everything but
+ * the view.
+ *
+ * Hidden by a class rather than built as a second page: a reviewer can reach
+ * the collision mesh and the feedback form without a reload, and there is no
+ * second copy of this layout to keep in step.
+ */
+const playOnly = {
+  on: new URLSearchParams(location.search).has('play')
+    || location.hash === '#play'
+    || window.__PLAY_ONLY === true,
+};
+
+function applyPlayOnly () {
+  document.body.classList.toggle('play-only', playOnly.on);
+  const b = $('#view-toggle');
+  if (b) {
+    b.textContent = playOnly.on ? 'Harness' : 'Play only';
+    b.title = playOnly.on
+      ? 'Show the playtest harness — toggles, checks and the feedback form'
+      : 'Hide the harness and play the game on its own';
+  }
+  // Without focus the first keypress goes nowhere, which reads as dead
+  // controls — the single most common complaint in the persona reviews.
+  if (playOnly.on) stage.focus();
+}
+
 /* ── title / results / menu ───────────────────────────────────────────────
  *
  * Ported from the capture page, which had these first: the film needed a start
@@ -237,6 +268,9 @@ function chooseStage (i) {
 function renderScreen () {
   const box = $('#screen'), card = $('#screen-card');
   if (!box || !card) return;
+  // The HUD reads the run's clock and distance, which mean nothing on a title
+  // or results screen — and it shows through the scrim as ghost text.
+  document.body.classList.toggle('screen-up', screen.at !== 'play');
   if (screen.at === 'play') { box.hidden = true; card.replaceChildren(); return; }
   box.hidden = false;
 
@@ -376,7 +410,7 @@ function buildWorld () {
   for (const el of $$('#shift-controls input, #shift-controls button, #shift-controls select')) {
     el.disabled = mode.floor === 'lumon';       // there is no "yesterday" on an authored floor
   }
-  for (const b of $$('#floor-tools [data-floor]')) {
+for (const b of $$('#floor-tools [data-floor]')) {
     b.setAttribute('aria-checked', String(mode.floor === b.dataset.floor));
   }
   if (!state.seedsPlayed.includes(seedInfo.iso)) { state.seedsPlayed.push(seedInfo.iso); save(); }
@@ -1462,6 +1496,16 @@ for (const key of ['toon', 'rim', 'ink']) {
 
 // The bake is fetched before the first world so the character is never briefly
 // the old one; a failed fetch flips gfx.model to 'boxes' and carries on.
+// Attached once, at module level. It lived inside buildWorld() for a while,
+// which added a fresh listener on every world rebuild — after two rebuilds a
+// single click toggled twice and appeared to do nothing at all.
+$('#view-toggle')?.addEventListener('click', () => {
+  playOnly.on = !playOnly.on;
+  applyPlayOnly();
+  stage.focus();
+});
+
+applyPlayOnly();
 await Promise.all([loadDoll(), loadDesk()]);
 initTurntable();
 applyGfx();

@@ -361,3 +361,46 @@ body.severed .sweep-day { border-radius: 1px; }
   font-size: 11.5px; letter-spacing: 0.1em;
   color: rgba(111, 164, 200, 0.75); font-weight: 400;
 }
+
+/* ── play-only view ────────────────────────────────────────────────────── */
+
+/* The page is a playtest harness with a game in the middle of it, which is
+   right for review and wrong for handing someone the game. `?play` — and the
+   offline build by default — drops everything but the view.
+
+   Hiding rather than not-building it: the harness is one class away, so a
+   reviewer can get at the collision mesh and the feedback form without a
+   reload, and there is no second page to keep in step with this one. */
+.view-toggle {
+  position: absolute; top: 10px; right: 12px; z-index: 45;
+  background: rgba(18, 21, 24, 0.55); color: rgba(232, 234, 236, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 5px;
+  padding: 4px 10px; font-size: 11px; letter-spacing: 0.08em;
+  opacity: 0.25; transition: opacity 0.15s ease;
+}
+.viewport:hover .view-toggle { opacity: 1; }
+.view-toggle:hover { background: rgba(18, 21, 24, 0.8); color: #fff; }
+
+body.play-only > header.bar,
+body.play-only .seedbar,
+body.play-only aside.side,
+body.play-only .stage-toolbar,
+body.play-only .stage-hint { display: none; }
+
+body.play-only .play-main {
+  max-width: none; padding: 0; gap: 0;
+  grid-template-columns: minmax(0, 1fr);
+  height: 100vh;
+}
+body.play-only .stage-wrap { border: 0; border-radius: 0; height: 100vh; }
+body.play-only .viewport { aspect-ratio: auto; height: 100vh; min-height: 0; }
+body.play-only { background: #0d1014; overflow: hidden; }
+
+/* The tilt gauge earns its place while you are learning the controls, so it
+   stays — just smaller and further out of the way. */
+body.play-only .tiltgauge { transform: scale(0.72); transform-origin: bottom right; opacity: 0.7; }
+
+/* The HUD's clock and distance mean nothing on a title or results screen, and
+   it shows through the scrim as ghost text. */
+body.screen-up .hud,
+body.screen-up .tiltgauge { display: none; }
