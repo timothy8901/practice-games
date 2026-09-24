@@ -16,11 +16,16 @@
  */
 
 import { generateMaze, seedForDate, isoToday } from './src/generator.js';
+import { lumonFloor, floorFingerprint } from './src/lumon.js';
 import { assembleMaze } from './src/assemble.js';
 import { runBot } from './src/validate.js';
 import { applyOfficeTheme } from './src/theme.js';
 
-const startIso = process.argv[2] || isoToday();
+/* `--lumon` records the ONE authored floor instead of hunting for a good daily
+ * seed. That is the floor the game now opens on, so it is the one worth
+ * filming; the seed search below stays for the daily generator. */
+const AUTHORED = process.argv.includes('--lumon');
+const startIso = process.argv.find(a => /^\d{4}-\d\d-\d\d$/.test(a)) || isoToday();
 const SEARCH_DAYS = 24;
 const SIZE = 6;
 
@@ -30,6 +35,27 @@ const day = i => {
   const d = new Date(`${startIso}T00:00:00Z`);
   return isoToday(new Date(d.getTime() + i * 86400000));
 };
+
+if (AUTHORED) {
+  const maze = lumonFloor();
+  const world = assembleMaze(maze, { theme: 'office', walls: true });
+  const bot = runBot(world, { trailEvery: 4, richTrail: true });
+  if (!bot.pass) { process.stderr.write('the authored floor did not drive\n'); process.exit(1); }
+  process.stderr.write(
+    `the severed floor  ${bot.clean ? 'clean' : 'assisted'}  ${bot.seconds}s  `
+    + `${bot.falls} falls  ${bot.trail.length} frames\n`);
+  process.stdout.write(JSON.stringify({
+    authored: true,
+    iso: 'the severed floor',
+    plan: floorFingerprint(maze),
+    seed: 0, size: maze.width, hz: 30,
+    seconds: bot.seconds, falls: bot.falls, clean: !!bot.clean,
+    rooms: maze.stats.occupied, routeRooms: maze.stats.pathLength,
+    metres: maze.stats.metres, landmarks: maze.stats.landmarks,
+    frames: bot.trail,
+  }));
+  process.exit(0);
+}
 
 let best = null;
 for (let i = 0; i < SEARCH_DAYS; i++) {

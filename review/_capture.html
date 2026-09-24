@@ -32,10 +32,11 @@
  * marble's shoulder, the playing camera *is* the cinematic one.
  */
 import { generateMaze } from '../3d-mazeball/src/generator.js';
-import { assembleMaze } from '../3d-mazeball/src/assemble.js';
+import { lumonFloor } from '../3d-mazeball/src/lumon.js';
+import { assembleMaze, cellCentre } from '../3d-mazeball/src/assemble.js';
 import { bodiesFor } from '../3d-mazeball/src/dynamics.js';
-import { applyOfficeTheme, OFFICE } from '../3d-mazeball/src/theme.js';
-import { BALL_R } from '../3d-mazeball/src/kit.js';
+import { applyOfficeTheme, OFFICE, mdrDesks } from '../3d-mazeball/src/theme.js';
+import { BALL_R, DELTA } from '../3d-mazeball/src/kit.js';
 import { Mesher, setPalette } from '../3d-mazeball/src/mesher.js';
 import { Viewer, multiply } from './gl.js';
 
@@ -48,10 +49,19 @@ const out = document.querySelector('#out');
 const octx = out.getContext('2d');
 const gl = document.querySelector('#gl');
 const viewer = new Viewer(gl, { background: [0.113, 0.124, 0.133] });
-const LIGHTING = { ambient: 0.66 };
+// Exposure and toon style, copied from severed.js. This page drifted once
+// already — it was still on the pre-rebalance ambient of 0.66, which clipped
+// every wall to white in the film while the game itself looked correct.
+const LIGHTING = { ambient: 0.52, keyGain: 0.55 };
+const INK = [0.055, 0.075, 0.105];
+viewer.style.toon = 0.8;
+viewer.style.rim = 0.16;
+viewer.style.keyGain = LIGHTING.keyGain;
 
 const run = await (await fetch('./_run.json')).json();
-const maze = generateMaze({ seed: run.seed, width: run.size, height: run.size });
+const maze = run.authored
+  ? lumonFloor()
+  : generateMaze({ seed: run.seed, width: run.size, height: run.size });
 const world = assembleMaze(maze, { theme: 'office', walls: true });
 const bodies = bodiesFor(world);
 
@@ -66,7 +76,50 @@ for (const g of world.groups) {
 }
 world.dynamicGroups.forEach((g, i) => viewer.uploadGroup(`dyn:${i}`, g));
 
-/* ── the doll, exactly as the game builds him ─────────────────────────── */
+/* ── the doll and the furniture, exactly as the game draws them ───────── */
+
+// The Blender bake. The game switched to it; this page was still meshing the
+// old box doll, so the film showed a character the game no longer has.
+let blenderDoll = null;
+try {
+  const d = await (await fetch('../3d-mazeball/assets/doll.json')).json();
+  const colors = new Float32Array(d.positions.length);
+  for (const part of d.parts) {
+    for (let v = part.start; v < part.start + part.count; v++) {
+      colors[v * 3] = part.color[0]; colors[v * 3 + 1] = part.color[1]; colors[v * 3 + 2] = part.color[2];
+    }
+  }
+  blenderDoll = { positions: new Float32Array(d.positions), normals: new Float32Array(d.normals), colors };
+} catch (e) { log('doll.json unavailable, falling back to boxes'); }
+
+// The MDR workstations, and where they stand.
+let deskPlacements = [];
+try {
+  const d = await (await fetch('../3d-mazeball/assets/desk.json')).json();
+  viewer.uploadGroup('desk', {
+    positions: new Float32Array(d.positions),
+    normals: new Float32Array(d.normals),
+    colors: new Float32Array(d.colors),
+  });
+  for (const c of maze.cells) {
+    if (!c.landmark || c.landmark.ch === 'E') continue;
+    const open = Object.keys(c.dirs);
+    if (open.length !== 1) continue;
+    const [dx, dz] = DELTA[open[0]];
+    const cc = cellCentre(c.cx, c.cz, maze.width, maze.height);
+    if (c.landmark.ch === 'S') {
+      for (const k of mdrDesks(dx, dz, cc.x, cc.z)) deskPlacements.push(k);
+    } else {
+      const [lx, lz] = [-dz, dx];
+      deskPlacements.push({
+        x: cc.x - dx * 1.15 + lx * 0.72,
+        z: cc.z - dz * 1.15 + lz * 0.72,
+        yaw: Math.atan2(-lx, -lz),
+      });
+    }
+  }
+} catch (e) { log('desk.json unavailable'); }
+
 setPalette(null);
 {
   const m = new Mesher();
@@ -89,7 +142,8 @@ setPalette(null);
   m.sphere(0, 0.185, 0.012, 0.079, 'doll', { color: hair, rows: 7, cols: 10 });
   m.box(0, 0.075, -0.02, 0.11, 0.03, 0.1, 'doll', { color: shirt });
   const g = m.build().find(x => x.material === 'doll');
-  viewer.uploadGroup('doll', { positions: g.positions, normals: g.normals, colors: g.colors });
+  viewer.uploadGroup('doll', blenderDoll
+    || { positions: g.positions, normals: g.normals, colors: g.colors });
 
   const b = new Mesher();
   b.box(0, -0.02, -0.082, 0.05, 0.07, 0.008, 'badge', { color: '#cfe3ee' });
@@ -188,7 +242,9 @@ function overlay (t, toGoal, frac) {
   octx.fillText('THE SEVERED FLOOR', 26, H - 34);
   octx.font = '12px ui-monospace, SFMono-Regular, Menlo, monospace';
   octx.fillStyle = 'rgba(200,212,220,.6)';
-  octx.fillText(`shift ${run.iso}`, 26, H - 16);
+  // `shift ${run.iso}` reads as "shift the severed floor" on the authored map,
+  // where `iso` is a name rather than a date.
+  octx.fillText(run.authored ? 'MDR  \u2192  THE ELEVATOR' : `shift ${run.iso}`, 26, H - 16);
 
   octx.textAlign = 'right';
   octx.font = '600 26px ui-monospace, SFMono-Regular, Menlo, monospace';
@@ -216,6 +272,133 @@ function card (lines, sub) {
   octx.textAlign = 'left';
 }
 
+/* ── front and back matter ────────────────────────────────────────────────
+ *
+ * The game itself currently boots straight into play and finishing only
+ * changes a line of HUD text — there is no title screen and no results screen
+ * in the build. These are authored here, for the film, in the building's own
+ * type and palette. If they earn their place they should move into the game.
+ */
+const MONO = 'ui-monospace, SFMono-Regular, Menlo, monospace';
+
+function backdrop () {
+  const W = out.width, H = out.height;
+  octx.fillStyle = '#0d1114';
+  octx.fillRect(0, 0, W, H);
+  // the accent hairline every Lumon surface has, at the same height as the
+  // corridor stripe
+  octx.fillStyle = 'rgba(111,164,200,.22)';
+  octx.fillRect(0, H * 0.62, W, 1);
+}
+
+/** Title screen, with the prompt blinking the way an idle attract screen does. */
+function startScreen (i, total) {
+  const W = out.width, H = out.height;
+  backdrop();
+  octx.textAlign = 'center';
+
+  octx.font = `500 13px ${MONO}`;
+  octx.fillStyle = 'rgba(160,178,190,.75)';
+  octx.letterSpacing = '6px';
+  octx.fillText('LUMON INDUSTRIES', W / 2, H * 0.34);
+
+  octx.font = `700 52px ${MONO}`;
+  octx.fillStyle = 'rgba(242,246,248,.97)';
+  octx.letterSpacing = '2px';
+  octx.fillText('THE SEVERED FLOOR', W / 2, H * 0.47);
+
+  octx.font = `14px ${MONO}`;
+  octx.fillStyle = 'rgba(111,164,200,.9)';
+  octx.letterSpacing = '3px';
+  octx.fillText(`MACRODATA REFINEMENT  ·  ${run.metres} M TO THE ELEVATOR`, W / 2, H * 0.555);
+
+  // blink, then hold solid for the last stretch as if a key had been pressed
+  const pressed = i > total - 14;
+  const on = pressed || Math.floor(i / 9) % 2 === 0;
+  if (on) {
+    octx.font = `600 15px ${MONO}`;
+    octx.fillStyle = pressed ? 'rgba(242,246,248,.98)' : 'rgba(200,214,222,.7)';
+    octx.letterSpacing = '4px';
+    octx.fillText(pressed ? 'BEGIN SHIFT' : 'PRESS ANY KEY TO BEGIN SHIFT', W / 2, H * 0.72);
+  }
+  octx.letterSpacing = '0px';
+  octx.textAlign = 'left';
+}
+
+/** Results card. The numbers are the run's own, not decoration. */
+function shiftComplete (i) {
+  const W = out.width, H = out.height;
+  backdrop();
+  octx.textAlign = 'center';
+  const fade = Math.min(1, i / 10);
+
+  octx.globalAlpha = fade;
+  octx.font = `700 46px ${MONO}`;
+  octx.fillStyle = 'rgba(242,246,248,.97)';
+  octx.letterSpacing = '2px';
+  octx.fillText('SHIFT COMPLETE', W / 2, H * 0.40);
+
+  octx.font = `600 64px ${MONO}`;
+  octx.fillStyle = 'rgba(111,164,200,.95)';
+  octx.letterSpacing = '0px';
+  octx.fillText(`${run.seconds}s`, W / 2, H * 0.545);
+
+  octx.font = `13px ${MONO}`;
+  octx.fillStyle = 'rgba(170,186,196,.8)';
+  octx.letterSpacing = '3px';
+  octx.fillText(
+    `${run.routeRooms} ROOMS  ·  ${run.metres} M  ·  ${run.falls} FALL${run.falls === 1 ? '' : 'S'}`
+    + `  ·  ${run.clean ? 'NO ASSISTS' : 'ASSISTED'}`,
+    W / 2, H * 0.655);
+  octx.globalAlpha = 1;
+  octx.letterSpacing = '0px';
+  octx.textAlign = 'left';
+}
+
+/** The post-shift menu, with the selection actually moving through it. */
+const MENU = ['REFINE ANOTHER FLOOR', 'VIEW SHIFT RECORD', 'RETURN TO THE ELEVATOR'];
+function menuScreen (i, total) {
+  const W = out.width, H = out.height;
+  backdrop();
+  octx.textAlign = 'center';
+
+  octx.font = `500 12px ${MONO}`;
+  octx.fillStyle = 'rgba(160,178,190,.7)';
+  octx.letterSpacing = '5px';
+  octx.fillText('SHIFT RECORD FILED  ·  PLEASE SELECT', W / 2, H * 0.30);
+  octx.letterSpacing = '0px';
+
+  // walk the cursor down the list, then back to the top and commit
+  let sel = 0;
+  if (i >= 22) sel = 1;
+  if (i >= 44) sel = 2;
+  if (i >= 66) sel = 0;
+  const committing = i >= total - 26;
+  const flash = committing && Math.floor((i - (total - 26)) / 4) % 2 === 0;
+
+  MENU.forEach((label, k) => {
+    const y = H * 0.44 + k * 46;
+    const on = k === sel;
+    if (on) {
+      octx.fillStyle = flash ? 'rgba(111,164,200,.34)' : 'rgba(111,164,200,.16)';
+      octx.fillRect(W / 2 - 250, y - 26, 500, 38);
+      octx.fillStyle = 'rgba(111,164,200,.95)';
+      octx.fillRect(W / 2 - 250, y - 26, 3, 38);
+    }
+    octx.font = `${on ? '600 ' : ''}17px ${MONO}`;
+    octx.fillStyle = on ? 'rgba(242,246,248,.98)' : 'rgba(150,166,176,.62)';
+    octx.letterSpacing = '2px';
+    octx.fillText(label, W / 2, y);
+  });
+
+  octx.font = `12px ${MONO}`;
+  octx.fillStyle = 'rgba(150,166,176,.45)';
+  octx.letterSpacing = '3px';
+  octx.fillText('THE WORK IS MYSTERIOUS AND IMPORTANT', W / 2, H * 0.80);
+  octx.letterSpacing = '0px';
+  octx.textAlign = 'left';
+}
+
 /* ── the capture loop ─────────────────────────────────────────────────── */
 let n = 0;
 const send = async () => {
@@ -230,9 +413,8 @@ window.captureState = () => ({ ...state, sent: n });
 window.startCapture = async () => {
   try {
     const dt = 1 / run.hz;
-    // title card
-    card(['THE SEVERED FLOOR'], `daily shift ${run.iso} · ${run.routeRooms} rooms · ${run.metres} m`);
-    for (let i = 0; i < 34; i++) await send();
+    const START = 78;
+    for (let i = 0; i < START; i++) { startScreen(i, START); await send(); }
 
     for (let i = 0; i < run.frames.length; i++) {
       const f = run.frames[i];
@@ -244,9 +426,15 @@ window.startCapture = async () => {
         const body = bodies.find(b => b.cell === g.cell && b.effect === g.effect);
         viewer.drawGroup(`dyn:${k}`, mvp, body ? body.modelMatrix(f.t) : T, LIGHTING);
       });
+      for (const d of deskPlacements) {
+        const c = Math.cos(d.yaw), sn = Math.sin(d.yaw);
+        viewer.drawGroup('desk', mvp, new Float32Array([
+          c, 0, -sn, 0, 0, 1, 0, 0, sn, 0, c, 0, d.x, 0, d.z, 1,
+        ]), LIGHTING);
+      }
       const M = dollMatrix(f.p, f.w, dt);
-      viewer.drawGroup('doll', mvp, M, { ambient: 0.55 });
-      viewer.drawGroup('badge', mvp, M, { ambient: 0.6 });
+      viewer.drawGroup('doll', mvp, M, { ambient: 0.55, outline: 0.011, ink: INK });
+      if (!blenderDoll) viewer.drawGroup('badge', mvp, M, { ambient: 0.6 });
 
       octx.drawImage(gl, 0, 0, out.width, out.height);
       const toGoal = Math.hypot(world.goal.x - f.p[0], world.goal.z - f.p[2]);
@@ -257,8 +445,9 @@ window.startCapture = async () => {
       if (i % 60 === 0) log(`frame ${i}/${run.frames.length}`);
     }
 
-    card(['ELEVATOR REACHED'], `${run.seconds}s · ${run.falls} falls · ${run.clean ? 'clean run' : 'assisted'}`);
-    for (let i = 0; i < 56; i++) await send();
+    const DONE = 66, MENUF = 124;
+    for (let i = 0; i < DONE; i++) { shiftComplete(i); await send(); }
+    for (let i = 0; i < MENUF; i++) { menuScreen(i, MENUF); await send(); }
 
     state.done = true;
     log(`done — ${n} frames`);
