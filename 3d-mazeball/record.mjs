@@ -25,6 +25,8 @@ import { applyOfficeTheme } from './src/theme.js';
  * seed. That is the floor the game now opens on, so it is the one worth
  * filming; the seed search below stays for the daily generator. */
 const AUTHORED = process.argv.includes('--lumon');
+/* Which of the three authored floors to film: `--lumon --hard`. */
+const DIFFICULTY = (process.argv.find(a => /^--(easy|medium|hard)$/.test(a)) || '--medium').slice(2);
 const startIso = process.argv.find(a => /^\d{4}-\d\d-\d\d$/.test(a)) || isoToday();
 const SEARCH_DAYS = 24;
 const SIZE = 6;
@@ -37,7 +39,7 @@ const day = i => {
 };
 
 if (AUTHORED) {
-  const maze = lumonFloor();
+  const maze = lumonFloor(DIFFICULTY);
   const world = assembleMaze(maze, { theme: 'office', walls: true });
   const bot = runBot(world, { trailEvery: 4, richTrail: true });
   if (!bot.pass) { process.stderr.write('the authored floor did not drive\n'); process.exit(1); }
@@ -46,7 +48,8 @@ if (AUTHORED) {
     + `${bot.falls} falls  ${bot.trail.length} frames\n`);
   process.stdout.write(JSON.stringify({
     authored: true,
-    iso: 'the severed floor',
+    iso: `the ${maze.floorName.toLowerCase()} floor`,
+    difficulty: maze.difficulty,
     plan: floorFingerprint(maze),
     seed: 0, size: maze.width, hz: 30,
     seconds: bot.seconds, falls: bot.falls, clean: !!bot.clean,

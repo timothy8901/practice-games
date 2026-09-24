@@ -15,7 +15,7 @@
  */
 
 import { generateMaze, dailySeed, seedForDate, isoToday, NOT_AUTO_PLACED } from '../3d-mazeball/src/generator.js';
-import { lumonFloor, floorFingerprint, FLOOR } from '../3d-mazeball/src/lumon.js';
+import { lumonFloor, floorFingerprint, floorSummary } from '../3d-mazeball/src/lumon.js';
 import { applyOfficeTheme, OFFICE, FLAVOUR, mdrDesks } from '../3d-mazeball/src/theme.js';
 import { assembleMaze, behavioursAt, cellCentre } from '../3d-mazeball/src/assemble.js';
 import { validateSeed, validateRun, validateMaze } from '../3d-mazeball/src/validate.js';
@@ -100,7 +100,8 @@ let checkResult = null;
  * 'daily'  — the seeded generator, kept because it still works and the publish
  *            gate still covers it.
  */
-const mode = { floor: 'lumon' };
+const mode = { floor: 'lumon', difficulty: 'medium' };
+const STAGES = ['easy', 'medium', 'hard'];
 
 const view = { follow: true, walls: true, ceiling: true, upright: false, worldTilt: true, route: false, collision: false, overhead: false };
 const input = { f: 0, r: 0, camYaw: 0, paused: false };
@@ -208,8 +209,7 @@ const run = { t: 0, falls: 0, started: false, finished: false, best: null, check
 const screen = { at: 'title', sel: 0, since: 0, record: false };
 
 const MENU = [
-  { key: 'floor', label: 'REFINE ANOTHER FLOOR',
-    hint: () => mode.floor === 'lumon' ? 'switch to the daily generator' : 'back to the authored floor' },
+  { key: 'floor', label: 'CHOOSE ANOTHER FLOOR', hint: () => 'back to the floor select' },
   { key: 'record', label: 'VIEW SHIFT RECORD', hint: () => 'the numbers from this run' },
   { key: 'again', label: 'RETURN TO THE ELEVATOR', hint: () => 'run this floor again' },
 ];
@@ -217,9 +217,22 @@ const MENU = [
 const setScreen = at => {
   screen.at = at;
   screen.since = performance.now();
-  if (at !== 'menu') { screen.sel = 0; screen.record = false; }
+  if (at !== 'menu') screen.record = false;
+  // The stage list opens on whichever floor you are already on, so coming back
+  // to it after a run does not silently move the cursor off your choice.
+  if (at === 'title') screen.sel = Math.max(0, STAGES.indexOf(mode.difficulty));
+  else if (at !== 'menu') screen.sel = 0;
   renderScreen();
 };
+
+/** Load a stage and drop straight into it. */
+function chooseStage (i) {
+  mode.difficulty = STAGES[i];
+  mode.floor = 'lumon';
+  buildWorld();                      // respawns and resets the run for us
+  setScreen('play');
+  stage.focus();
+}
 
 function renderScreen () {
   const box = $('#screen'), card = $('#screen-card');
@@ -234,15 +247,21 @@ function renderScreen () {
     el('div', {}, el('span', {}, 'ROOMS'), el('b', {}, String(maze?.stats.pathLength ?? 0))),
     el('div', {}, el('span', {}, 'DISTANCE'), el('b', {}, `${maze?.stats.metres ?? 0} m`)),
     el('div', {}, el('span', {}, 'FLOOR'),
-      el('b', {}, mode.floor === 'lumon' ? 'the severed floor' : seedInfo.iso)));
+      el('b', {}, mode.floor === 'lumon' ? (maze?.floorName ?? '—') : seedInfo.iso)));
 
   if (screen.at === 'title') {
     card.replaceChildren(
       el('p', { class: 'eyebrow' }, 'Lumon Industries'),
       el('h2', {}, 'THE SEVERED FLOOR'),
-      el('p', { class: 'lede' },
-        `Macrodata Refinement · ${maze?.stats.metres ?? 0} m to the elevator`),
-      el('p', { class: 'prompt blink' }, 'PRESS ANY KEY TO BEGIN SHIFT'));
+      el('p', { class: 'lede' }, 'Select a floor'),
+      el('div', { class: 'rule' }),
+      el('ul', { class: 'screen-menu' }, STAGES.map((d, i) => el('li',
+        { 'aria-selected': String(i === screen.sel) },
+        el('button', { type: 'button', onclick: () => chooseStage(i) },
+          el('span', { class: 'stage-name' }, floorSummary(d).name.toUpperCase()),
+          el('span', { class: 'stage-meta' }, `${floorSummary(d).metres} m`))))),
+      el('p', { class: 'screen-hint' }, floorSummary(STAGES[screen.sel]).blurb),
+      el('p', { class: 'motto' }, 'THE WORK IS MYSTERIOUS AND IMPORTANT'));
     return;
   }
 
@@ -279,13 +298,7 @@ function chooseMenu (i) {
   screen.sel = i;
   const m = MENU[i];
   if (m.key === 'record') { screen.record = !screen.record; renderScreen(); return; }
-  if (m.key === 'floor') {
-    mode.floor = mode.floor === 'lumon' ? 'daily' : 'lumon';
-    buildWorld();                       // respawns and resets the run for us
-    setScreen('play');
-    stage.focus();
-    return;
-  }
+  if (m.key === 'floor') { setScreen('title'); return; }
   run.checkpoint = null;                // "again" means from the start, not the checkpoint
   respawn(true);
   setScreen('play');
@@ -296,12 +309,18 @@ function chooseMenu (i) {
 function screenKey (e) {
   if (screen.at === 'play') return false;
   const k = e.key.toLowerCase();
-  if (screen.at === 'title' || screen.at === 'complete') {
+  if (screen.at === 'complete') {
     if (k === 'tab') return false;      // leave focus traversal alone
     e.preventDefault();
-    if (screen.at === 'title') { setScreen('play'); stage.focus(); }
-    else setScreen('menu');
+    setScreen('menu');
     return true;
+  }
+  if (screen.at === 'title') {
+    if (k === 'tab') return false;
+    if (k === 'arrowdown' || k === 's') { screen.sel = (screen.sel + 1) % STAGES.length; renderScreen(); e.preventDefault(); return true; }
+    if (k === 'arrowup' || k === 'w') { screen.sel = (screen.sel + STAGES.length - 1) % STAGES.length; renderScreen(); e.preventDefault(); return true; }
+    if (k === 'enter' || k === ' ') { chooseStage(screen.sel); e.preventDefault(); return true; }
+    return true;                        // swallow everything else; pick a floor first
   }
   if (screen.at === 'menu') {
     if (k === 'arrowdown' || k === 's') { screen.sel = (screen.sel + 1) % MENU.length; renderScreen(); e.preventDefault(); return true; }
@@ -319,14 +338,14 @@ function buildWorld () {
   // validated — `mode` picks between them, and everything downstream takes the
   // same shape either way.
   maze = mode.floor === 'lumon'
-    ? lumonFloor()
+    ? lumonFloor(mode.difficulty)
     : generateMaze({ seed: seedInfo.seed, width: seedInfo.size, height: seedInfo.size });
   world = assembleMaze(maze, { theme: 'office', walls: view.walls });
   bodies = bodiesFor(world);
   const ms = performance.now() - t0;
 
   $('#seed-label').textContent = mode.floor === 'lumon'
-    ? `the severed floor  ·  plan ${floorFingerprint(maze)}`
+    ? `${maze.floorName.toLowerCase()} floor  ·  plan ${floorFingerprint(maze)}`
     : `${seedInfo.iso}  ·  file 0x${seedInfo.seed.toString(16).toUpperCase()}`;
   $('#maze-stats').textContent =
     `${maze.stats.occupied} rooms · ${maze.stats.pathLength}-room route (${maze.stats.metres} m to the elevator) · `
@@ -721,9 +740,10 @@ document.addEventListener('keydown', e => {
   screenKey(e);
 });
 $('#screen').addEventListener('click', e => {
-  if (e.target.closest('button')) return;          // the menu's own buttons handle themselves
-  if (screen.at === 'title') { setScreen('play'); stage.focus(); }
-  else if (screen.at === 'complete') setScreen('menu');
+  if (e.target.closest('button')) return;          // the lists' own buttons handle themselves
+  // The title is a stage list now: clicking past it would start a floor you did
+  // not pick. Only the results card advances on a stray click.
+  if (screen.at === 'complete') setScreen('menu');
 });
 
 stage.addEventListener('keydown', e => {
