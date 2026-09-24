@@ -5,3 +5,4 @@ _run.json
 # to it — `review/frames*/` matches nothing from here, which is how 1,323 JPEGs
 # got committed once.
 frames*/
+_offline.html
