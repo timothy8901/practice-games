@@ -1,0 +1,1526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#f4f1ea">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>Cube Rings</title>
+<meta name="description" content="A Rubik's cube unrolled into nine rings. Swipe the dots to turn the 3D cube, learn it in the tutorial, then race the clock in Timed Mode.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-1.62 -1.7 3.24 3.12'%3E%3Cg fill='none' stroke='%23bdb5a7' stroke-width='.1'%3E%3Ccircle cx='.5' cy='.2887' r='1'/%3E%3Ccircle cx='0' cy='-.5774' r='1'/%3E%3Ccircle cx='-.5' cy='.2887' r='1'/%3E%3C/g%3E%3Cg stroke='%232b2724' stroke-width='.07'%3E%3Ccircle cx='0' cy='-.5774' r='.24' fill='%23fbfaf5'/%3E%3Ccircle cx='-.5' cy='.2887' r='.24' fill='%231f8a4a'/%3E%3Ccircle cx='.5' cy='.2887' r='.24' fill='%23d9372b'/%3E%3Ccircle cx='0' cy='1.1547' r='.24' fill='%23f7c11e'/%3E%3Ccircle cx='-1' cy='-.5774' r='.24' fill='%23f28322'/%3E%3Ccircle cx='1' cy='-.5774' r='.24' fill='%231f4ec2'/%3E%3C/g%3E%3C/svg%3E">
+<style>
+  :root {
+    --bg: #f4f1ea;
+    --bg-deep: #e8e1d3;
+    --card: #fffdf8;
+    --ink: #26221f;
+    --muted: #776e63;
+    --line: #ddd5c7;
+    --chip: #ece6da;
+    --accent: #6c47ff;
+    --accent-soft: #eee9ff;
+    --good: #1c8a4a;
+    --shadow: 0 14px 34px rgba(38, 34, 31, .16), 0 2px 8px rgba(38, 34, 31, .08);
+    --font: ui-rounded, "SF Pro Rounded", "Nunito", "Segoe UI Variable Display", "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); overscroll-behavior: none; }
+  body {
+    position: fixed; inset: 0; overflow: hidden;
+    font-family: var(--font);
+    -webkit-user-select: none; user-select: none;
+    -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none;
+    -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+  }
+  button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulation; -webkit-appearance: none; appearance: none; }
+  button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  [hidden] { display: none !important; }
+
+  #app {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    background: radial-gradient(130% 75% at 50% 0%, #fbf9f4 0%, var(--bg) 55%, var(--bg-deep) 100%);
+  }
+
+  /* ---------- HUD ---------- */
+  #hud { flex: none; display: flex; align-items: center; gap: 8px; padding: 8px 12px 2px; min-height: 62px; }
+  #hud.off { display: none; }
+  .icon-btn {
+    flex: none; width: 46px; height: 46px; border-radius: 15px; border: 0; padding: 0;
+    background: var(--card); box-shadow: 0 1px 0 rgba(0,0,0,.04), 0 4px 12px rgba(38,34,31,.10);
+    display: grid; place-items: center; transition: transform .12s ease, opacity .2s ease;
+  }
+  .icon-btn:active { transform: scale(.93); }
+  .icon-btn:disabled { opacity: .32; cursor: default; }
+  .icon-btn svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+  .hud-mid { flex: 1; min-width: 0; text-align: center; }
+  #timer { font-size: 31px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: .01em; line-height: 1; }
+  #timer.idle { color: #9a9185; }
+  #timer.done { color: var(--good); }
+  #timer.label { font-size: 22px; letter-spacing: 0; }
+  #hudSub { margin-top: 4px; font-size: 12.5px; font-weight: 700; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* ---------- Stage ---------- */
+  #stage {
+    flex: 1; min-height: 0; position: relative; display: grid;
+    grid-template-columns: 100%; grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-areas: "coach" "cube" "graph";
+  }
+  #stage.landscape {
+    grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto minmax(0, 1fr);
+    grid-template-areas: "coach graph" "cube graph";
+  }
+  #cubeWrap { grid-area: cube; position: relative; min-height: 0; min-width: 0; }
+  #graphWrap { grid-area: graph; position: relative; min-width: 0; min-height: 0; }
+  canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+  .title-mode #cubeHint { opacity: 0; }
+  #cubeHint {
+    position: absolute; right: 12px; bottom: 6px; font-size: 11.5px; font-weight: 700; color: #a39a8d;
+    pointer-events: none; transition: opacity .4s;
+  }
+
+  /* ---------- Tutorial coach ---------- */
+  #coach {
+    grid-area: coach; margin: 2px 12px 4px; padding: 12px 14px 12px; background: var(--card);
+    border-radius: 18px; box-shadow: var(--shadow); display: none;
+  }
+  #coach.show { display: block; animation: pop .28s ease-out; }
+  #stage.landscape #coach { margin: 4px 8px 4px 12px; max-width: 460px; }
+  .coach-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .coach-step { flex: none; font-size: 11px; font-weight: 800; letter-spacing: .08em; color: var(--accent); background: var(--accent-soft); padding: 3px 8px; border-radius: 99px; }
+  .coach-title { font-weight: 800; font-size: 16.5px; }
+  #coachText { margin: 0; font-size: 14.5px; line-height: 1.38; color: #3d372f; }
+  #coachText b { color: var(--ink); }
+  #coach.success .coach-step { background: #dff3e6; color: var(--good); }
+  .coach-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px; }
+  .coach-actions:empty { display: none; }
+
+  /* ---------- Buttons ---------- */
+  .btn {
+    border: 0; border-radius: 16px; padding: 12px 18px; font-weight: 800; font-size: 16px;
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px; text-decoration: none;
+    transition: transform .12s ease, box-shadow .2s ease, background .2s ease;
+  }
+  .btn:active { transform: scale(.97); }
+  .btn.primary { background: var(--ink); color: #fff; box-shadow: 0 8px 18px rgba(38,34,31,.24); }
+  .btn.accent { background: var(--accent); color: #fff; box-shadow: 0 8px 18px rgba(108,71,255,.28); }
+  .btn.ghost { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 2px var(--line); }
+  .btn.big { width: 100%; min-height: 58px; font-size: 19px; border-radius: 18px; }
+  .btn.small { padding: 9px 15px; font-size: 14.5px; border-radius: 12px; min-height: 42px; }
+  .btn svg { width: 20px; height: 20px; fill: currentColor; }
+
+  /* ---------- Overlays ---------- */
+  .overlay {
+    position: absolute; inset: 0; z-index: 20; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: calc(14px + env(safe-area-inset-top)) 16px calc(14px + env(safe-area-inset-bottom));
+    background: rgba(244, 241, 234, .72);
+    -webkit-backdrop-filter: blur(2.5px); backdrop-filter: blur(2.5px);
+    transition: opacity .25s ease, visibility .25s; overflow-y: auto;
+  }
+  .overlay.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+  .card {
+    width: 100%; max-width: 400px; background: var(--card); border-radius: 26px; box-shadow: var(--shadow);
+    padding: 22px 20px 18px; text-align: center; margin: auto 0;
+  }
+  .overlay:not(.hidden) .card { animation: pop .3s ease-out; }
+  @keyframes pop { from { transform: translateY(10px) scale(.97); opacity: 0; } to { transform: none; opacity: 1; } }
+
+  /* Title: the live cube spins above the menu card */
+  #titleScreen { justify-content: flex-end; -webkit-backdrop-filter: none; backdrop-filter: none; background: none; }
+  #stage.landscape ~ #titleScreen { justify-content: center; background: rgba(244, 241, 234, .6); }
+  .title-card { padding-top: 18px; margin: 0; }
+  .brand { display: flex; align-items: center; justify-content: center; gap: 10px; }
+  .logo { width: 52px; height: auto; flex: none; }
+  .title-card h1 { margin: 0; font-size: 40px; font-weight: 900; letter-spacing: -.025em; line-height: 1; }
+  .tagline { margin: 8px auto 16px; max-width: 310px; color: var(--muted); font-size: 15px; line-height: 1.38; font-weight: 600; }
+  .diff { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 12px; }
+  .diff button {
+    border: 0; background: var(--chip); border-radius: 13px; padding: 7px 2px; min-height: 50px;
+    font-weight: 800; font-size: 14px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+    transition: background .15s, color .15s, transform .12s;
+  }
+  .diff button:active { transform: scale(.95); }
+  .diff button small { font-size: 11px; font-weight: 700; color: var(--muted); }
+  .diff button[aria-checked="true"] { background: var(--ink); color: #fff; }
+  .diff button[aria-checked="true"] small { color: #d4ccbf; }
+  .best-line { font-size: 13.5px; color: var(--muted); font-weight: 700; min-height: 18px; margin: 9px 0 12px; font-variant-numeric: tabular-nums; }
+  .best-line b { color: var(--ink); }
+  .badge { font-size: 11.5px; font-weight: 800; color: #fff; background: var(--accent); padding: 3px 8px; border-radius: 99px; letter-spacing: .02em; }
+  .title-foot { display: flex; justify-content: center; gap: 16px; margin-top: 8px; font-size: 13.5px; font-weight: 700; }
+  .title-foot a, .title-foot button { color: var(--muted); text-decoration: none; background: none; border: 0; padding: 6px 4px; }
+
+  /* Results */
+  .result-kicker { font-weight: 900; font-size: 14px; letter-spacing: .16em; text-transform: uppercase; color: var(--good); }
+  .result-time { font-size: 60px; font-weight: 900; font-variant-numeric: tabular-nums; letter-spacing: -.02em; line-height: 1.05; margin: 6px 0 2px; }
+  .result-caption { font-size: 12px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+  .result-meta { color: var(--muted); font-weight: 700; font-size: 15px; margin-top: 8px; }
+  .result-best { margin: 14px 0 16px; font-weight: 800; font-size: 14.5px; background: #f1ecdf; border-radius: 12px; padding: 9px 10px; font-variant-numeric: tabular-nums; }
+  .result-best.new { background: #fff1bf; color: #7a5200; }
+  .stack { display: grid; gap: 10px; }
+
+  /* Confirm */
+  .confirm-card h2 { margin: 4px 0 6px; font-size: 22px; }
+  .confirm-card p { margin: 0 0 16px; color: var(--muted); font-weight: 600; }
+
+  /* Toast */
+  #toast {
+    position: absolute; left: 50%; top: 6px; z-index: 12; transform: translate(-50%, -6px);
+    background: var(--ink); color: #fff; padding: 9px 15px; border-radius: 99px; font-size: 14px; font-weight: 700;
+    opacity: 0; pointer-events: none; transition: opacity .2s ease, transform .2s ease;
+    width: max-content; max-width: calc(100% - 32px); text-align: center; line-height: 1.3;
+    box-shadow: 0 8px 20px rgba(38,34,31,.22);
+  }
+  #toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+  @media (max-height: 560px) {
+    .logo { width: 40px; }
+    .title-card h1 { font-size: 32px; }
+    .tagline { margin-bottom: 10px; font-size: 14px; }
+    .btn.big { min-height: 50px; font-size: 17px; }
+    .result-time { font-size: 46px; }
+    .card { padding: 14px 16px 12px; }
+    .best-line { margin: 7px 0 8px; }
+  }
+  @media (max-height: 460px) {
+    .tagline { display: none; }
+    .brand { margin-bottom: 10px; }
+  }
+  @media (max-width: 350px) {
+    .diff button { font-size: 12.5px; }
+    .title-card h1 { font-size: 36px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .overlay:not(.hidden) .card, #coach.show { animation: none; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <header id="hud" class="off">
+    <button id="btnHome" class="icon-btn" aria-label="Back to the menu">
+      <svg viewBox="0 0 24 24"><path d="M3.5 11.2 12 4l8.5 7.2"/><path d="M6 9.6V20h12V9.6"/></svg>
+    </button>
+    <div class="hud-mid">
+      <div id="timer" class="idle">0:00.00</div>
+      <div id="hudSub">&nbsp;</div>
+    </div>
+    <button id="btnUndo" class="icon-btn" aria-label="Undo last turn" disabled>
+      <svg viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>
+    </button>
+    <button id="btnSound" class="icon-btn" aria-label="Mute sound">
+      <svg viewBox="0 0 24 24"><path d="M4 9.5v5h3.5L12 18V6L7.5 9.5z"/><path class="wave" d="M15.5 9a4 4 0 0 1 0 6"/><path class="wave" d="M18 6.5a7.5 7.5 0 0 1 0 11"/><path class="mute" d="m16 9.5 5 5m0-5-5 5" hidden/></svg>
+    </button>
+  </header>
+
+  <main id="stage">
+    <aside id="coach" aria-live="polite">
+      <div class="coach-head"><span class="coach-step" id="coachStep">1 / 7</span><span class="coach-title" id="coachTitle"></span></div>
+      <p id="coachText"></p>
+      <div class="coach-actions" id="coachActions"></div>
+    </aside>
+    <div id="cubeWrap">
+      <canvas id="cubeCanvas" aria-label="3D cube. Drag to look around it; double-tap to reset the view."></canvas>
+      <div id="cubeHint">drag to look around</div>
+    </div>
+    <div id="graphWrap">
+      <canvas id="graphCanvas" aria-label="The cube unrolled into rings. Swipe a dot along a ring to turn that layer."></canvas>
+      <div id="toast" role="status"></div>
+    </div>
+  </main>
+
+  <!-- Start screen -->
+  <section id="titleScreen" class="overlay">
+    <div class="card title-card" id="titleCard">
+      <div class="brand">
+      <svg class="logo" viewBox="-1.62 -1.72 3.24 3.14" aria-hidden="true">
+        <g fill="none" stroke="#c4bcae" stroke-width=".075">
+          <circle cx=".5" cy=".2887" r="1"/><circle cx="0" cy="-.5774" r="1"/><circle cx="-.5" cy=".2887" r="1"/>
+        </g>
+        <g stroke="#2b2724" stroke-width=".055">
+          <circle cx="0" cy="-.5774" r=".2" fill="#fbfaf5"/><circle cx="-.5" cy=".2887" r=".2" fill="#1f8a4a"/>
+          <circle cx=".5" cy=".2887" r=".2" fill="#d9372b"/><circle cx="0" cy="1.1547" r=".2" fill="#f7c11e"/>
+          <circle cx="-1" cy="-.5774" r=".2" fill="#f28322"/><circle cx="1" cy="-.5774" r=".2" fill="#1f4ec2"/>
+        </g>
+      </svg>
+      <h1>Cube Rings</h1>
+      </div>
+      <p class="tagline">A Rubik's cube unrolled into nine rings. Swipe the dots to turn it.</p>
+      <button id="btnTimed" class="btn primary big">
+        <svg viewBox="0 0 24 24"><path d="M8 5.5v13l10.5-6.5z"/></svg> Timed Mode
+      </button>
+      <div class="diff" role="radiogroup" aria-label="Scramble difficulty">
+        <button role="radio" data-diff="easy" aria-checked="true">Easy<small>2 turns</small></button>
+        <button role="radio" data-diff="medium" aria-checked="false">Medium<small>4 turns</small></button>
+        <button role="radio" data-diff="hard" aria-checked="false">Hard<small>7 turns</small></button>
+        <button role="radio" data-diff="expert" aria-checked="false">Expert<small>20 turns</small></button>
+      </div>
+      <div class="best-line" id="bestLine">&nbsp;</div>
+      <button id="btnTutorial" class="btn ghost big">
+        <svg viewBox="0 0 24 24"><path d="M12 3.2 1.8 8.4 12 13.6l8.2-4.2V15h2V8.4z"/><path d="M5.5 12.2v3.9c0 1.5 3 3.2 6.5 3.2s6.5-1.7 6.5-3.2v-3.9L12 15.5z"/></svg> Tutorial <span class="badge" id="newHere">start here</span>
+      </button>
+      <div class="title-foot">
+        <a href="index.html">&larr; All games</a>
+        <button id="btnTitleSound" type="button">Sound: on</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Finish screen -->
+  <section id="resultScreen" class="overlay hidden" aria-live="polite">
+    <div class="card">
+      <div class="result-kicker">Solved!</div>
+      <div class="result-time" id="resTime">0:00.00</div>
+      <div class="result-caption">finishing time</div>
+      <div class="result-meta" id="resMeta"></div>
+      <div class="result-best" id="resBest"></div>
+      <div class="stack">
+        <button id="btnAgain" class="btn primary big">Play again?</button>
+        <button id="btnResMenu" class="btn ghost">Menu</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Leave mid-solve -->
+  <section id="confirmScreen" class="overlay hidden">
+    <div class="card confirm-card">
+      <h2>Leave this solve?</h2>
+      <p>Your clock is running. Leaving ends this attempt.</p>
+      <div class="stack">
+        <button id="btnStay" class="btn primary big">Keep solving</button>
+        <button id="btnLeave" class="btn ghost">Leave to menu</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+(() => {
+'use strict';
+
+// ===========================================================================
+// Helpers
+// ===========================================================================
+const TAU = Math.PI * 2;
+const SQ3 = Math.sqrt(3);
+const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
+const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
+const easeInOutCubic = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+const wrapPi = (a) => { a = (a + Math.PI) % TAU; if (a < 0) a += TAU; return a - Math.PI; };
+const now = () => performance.now();
+const $ = (id) => document.getElementById(id);
+const hexToRgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// ===========================================================================
+// Cube model
+// Axes: 0 = x (left -> right), 1 = y (down -> up), 2 = z (back -> front).
+// A sticker "slot" is a cubie position plus the face it sits on.
+// ===========================================================================
+const FACES = [
+  { k: 1, sign: 1, name: 'U' }, { k: 1, sign: -1, name: 'D' },
+  { k: 2, sign: 1, name: 'F' }, { k: 2, sign: -1, name: 'B' },
+  { k: 0, sign: 1, name: 'R' }, { k: 0, sign: -1, name: 'L' },
+];
+//                 U white    D yellow   F green    B blue     R red      L orange
+const FACE_HEX = ['#fbfaf5', '#f7c11e', '#1f8a4a', '#1f4ec2', '#d9372b', '#f28322'];
+const FACE_RGB = FACE_HEX.map(hexToRgb);
+const FACE_U = 0;
+
+const SLOTS = [];
+FACES.forEach((f, face) => {
+  const a = (f.k + 1) % 3, b = (f.k + 2) % 3;
+  for (let u = -1; u <= 1; u++) for (let v = -1; v <= 1; v++) {
+    const p = [0, 0, 0]; p[f.k] = f.sign; p[a] = u; p[b] = v;
+    SLOTS.push({ face, k: f.k, sign: f.sign, u, v, p });
+  }
+});
+const keyOf = (p, k, sign) => p.join(',') + '/' + k + (sign > 0 ? '+' : '-');
+const SLOT_AT = new Map(SLOTS.map((s, i) => [keyOf(s.p, s.k, s.sign), i]));
+const slotAt = (p, k, sign) => SLOT_AT.get(keyOf(p, k, sign));
+
+// Quarter turn of a vector about an axis; dir +1 is +90 degrees by the right-hand rule.
+function quarter(axis, dir, [x, y, z]) {
+  if (dir > 0) return axis === 0 ? [x, -z, y] : axis === 1 ? [z, y, -x] : [-y, x, z];
+  return axis === 0 ? [x, z, -y] : axis === 1 ? [-z, y, x] : [y, -x, z];
+}
+
+// The nine rings are the cube's nine layers: ring id = axis * 3 + (layer + 1).
+const ringId = (axis, layer) => axis * 3 + layer + 1;
+const ringAxis = (r) => (r / 3) | 0;
+const ringLayer = (r) => (r % 3) - 1;
+const pIdx = (r, dir) => r * 2 + (dir > 0 ? 1 : 0);
+
+const PERMS = [];
+for (let r = 0; r < 9; r++) for (const dir of [-1, 1]) {
+  const axis = ringAxis(r), layer = ringLayer(r), perm = new Int8Array(54);
+  SLOTS.forEach((s, i) => {
+    if (s.p[axis] !== layer) { perm[i] = i; return; }
+    const n = [0, 0, 0]; n[s.k] = s.sign;
+    const p2 = quarter(axis, dir, s.p), n2 = quarter(axis, dir, n);
+    const k2 = n2[0] ? 0 : n2[1] ? 1 : 2;
+    perm[i] = slotAt(p2, k2, n2[k2]);
+  });
+  PERMS[pIdx(r, dir)] = perm;
+}
+function applyMove(st, r, dir) {
+  const perm = PERMS[pIdx(r, dir)], out = new Uint8Array(54);
+  for (let i = 0; i < 54; i++) out[perm[i]] = st[i];
+  return out;
+}
+const solvedState = () => Uint8Array.from(SLOTS, (s) => s.face);
+function isSolved(st) {
+  for (let f = 0; f < 6; f++) {
+    const c = st[f * 9];
+    for (let i = 1; i < 9; i++) if (st[f * 9 + i] !== c) return false;
+  }
+  return true;
+}
+
+// ===========================================================================
+// The ring graph
+// Three families of three concentric rings, centered on the corners of a unit
+// equilateral triangle. The family centered on the white face holds the top,
+// middle and bottom layers; each sticker sits where two rings cross, and each
+// face is the 3x3 patch where two families meet.
+// ===========================================================================
+const GAP = 0.225;
+const CENTERS = [
+  { x: 0.5, y: 0.5 / SQ3 },   // x-family, around the red (right) face
+  { x: 0, y: -1 / SQ3 },      // y-family, around the white (top) face
+  { x: -0.5, y: 0.5 / SQ3 },  // z-family, around the green (front) face
+];
+const radiusFor = (axis, coord) => 1 - GAP * coord;
+
+function clusterPoint(k, sign) {
+  const a = (k + 1) % 3, b = (k + 2) % 3;
+  return sign > 0 ? CENTERS[k] : { x: CENTERS[a].x + CENTERS[b].x - CENTERS[k].x, y: CENTERS[a].y + CENTERS[b].y - CENTERS[k].y };
+}
+function circleCross(c1, r1, c2, r2, near) {
+  const dx = c2.x - c1.x, dy = c2.y - c1.y, d = Math.hypot(dx, dy);
+  const a = (r1 * r1 - r2 * r2 + d * d) / (2 * d);
+  const h = Math.sqrt(Math.max(0, r1 * r1 - a * a));
+  const mx = c1.x + (a * dx) / d, my = c1.y + (a * dy) / d;
+  const x1 = mx + (h * dy) / d, y1 = my - (h * dx) / d, x2 = mx - (h * dy) / d, y2 = my + (h * dx) / d;
+  return (x1 - near.x) ** 2 + (y1 - near.y) ** 2 < (x2 - near.x) ** 2 + (y2 - near.y) ** 2 ? { x: x1, y: y1 } : { x: x2, y: y2 };
+}
+// u, v are the sticker's coordinates on the face's two in-plane axes; they may be fractional mid-turn.
+function facePoint(k, sign, u, v) {
+  const a = (k + 1) % 3, b = (k + 2) % 3;
+  return circleCross(CENTERS[a], radiusFor(a, u), CENTERS[b], radiusFor(b, v), clusterPoint(k, sign));
+}
+
+const DOTS = SLOTS.map((s) => facePoint(s.k, s.sign, s.u, s.v));
+const RINGS = [];
+for (let r = 0; r < 9; r++) {
+  const axis = ringAxis(r), layer = ringLayer(r), slots = [];
+  SLOTS.forEach((s, i) => { if (s.k !== axis && s.p[axis] === layer) slots.push(i); });
+  RINGS.push({ axis, layer, c: CENTERS[axis], rad: radiusFor(axis, layer), slots });
+}
+const SLOT_RINGS = SLOTS.map((s) => [0, 1, 2].filter((a) => a !== s.k).map((a) => ringId(a, s.p[a])));
+const angleOn = (r, pt) => Math.atan2(pt.y - RINGS[r].c.y, pt.x - RINGS[r].c.x);
+
+// The turn direction that carries a ring's dots toward increasing screen angle.
+const RING_POS_DIR = RINGS.map((ring, r) => {
+  const order = ring.slots.slice().sort((i, j) => angleOn(r, DOTS[i]) - angleOn(r, DOTS[j]));
+  const perm = PERMS[pIdx(r, 1)];
+  return order.indexOf(perm[order[0]]) === 3 ? 1 : -1;
+});
+
+// How each sticker travels during a turn: along its ring, or spinning in place with its face.
+const PATHS = [], PATH_AT = [];
+for (let r = 0; r < 9; r++) for (const dir of [-1, 1]) {
+  const ring = RINGS[r], perm = PERMS[pIdx(r, dir)], sense = dir === RING_POS_DIR[r] ? 1 : -1;
+  const list = [], at = new Array(54).fill(null);
+  SLOTS.forEach((s, i) => {
+    if (s.p[ring.axis] !== ring.layer) return;
+    let e;
+    if (s.k === ring.axis) e = { slot: i, spin: true };
+    else {
+      const a0 = angleOn(r, DOTS[i]), a1 = angleOn(r, DOTS[perm[i]]);
+      const fwd = (((a1 - a0) % TAU) + TAU) % TAU;
+      e = { slot: i, spin: false, a0, da: sense > 0 ? fwd : fwd - TAU };
+    }
+    list.push(e); at[i] = e;
+  });
+  PATHS[pIdx(r, dir)] = list; PATH_AT[pIdx(r, dir)] = at;
+}
+function movingDot(e, r, dir, t, out) {
+  if (!e.spin) {
+    const ring = RINGS[r], a = e.a0 + e.da * t;
+    out.x = ring.c.x + ring.rad * Math.cos(a); out.y = ring.c.y + ring.rad * Math.sin(a);
+    return out;
+  }
+  const s = SLOTS[e.slot], phi = (dir * t * Math.PI) / 2, c = Math.cos(phi), sn = Math.sin(phi);
+  const p = facePoint(s.k, s.sign, s.u * c - s.v * sn, s.u * sn + s.v * c);
+  out.x = p.x; out.y = p.y;
+  return out;
+}
+const GRAPH_BOX = (() => {
+  const ext = radiusFor(0, -1), m = 0.03;
+  return { x0: CENTERS[2].x - ext - m, x1: CENTERS[0].x + ext + m, y0: CENTERS[1].y - ext - m, y1: CENTERS[0].y + ext + m };
+})();
+
+// ===========================================================================
+// Game state
+// ===========================================================================
+const DIFFS = {
+  easy: { label: 'Easy', turns: 2 },
+  medium: { label: 'Medium', turns: 4 },
+  hard: { label: 'Hard', turns: 7 },
+  expert: { label: 'Expert', turns: 20 },
+};
+const G = {
+  mode: 'title',        // 'title' | 'timed' | 'tutorial'
+  phase: 'idle',        // timed: 'scrambling' | 'ready' | 'running' | 'solved'
+  diff: 'easy',
+  state: solvedState(),
+  history: [],          // the player's turns, for undo and hints
+  scramble: [],
+  t0: 0,
+  elapsed: 0,
+};
+let anim = null;        // the turn being animated: { kind, r, dir, from, to, t, start, dur, ease, done }
+const queue = [];       // automated turns waiting to play (scrambles, the title-screen demo)
+let dirty = true;
+
+// Saved settings and best times -------------------------------------------------
+const SAVE_KEY = 'cubeRings.v1';
+const save = (() => {
+  let d = {};
+  try { d = JSON.parse(localStorage.getItem(SAVE_KEY)) || {}; } catch (e) { d = {}; }
+  d.best = d.best || {};
+  return d;
+})();
+function persist() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) { /* storage unavailable */ } }
+if (DIFFS[save.diff]) G.diff = save.diff;
+
+// ===========================================================================
+// Sound (Web Audio, generated on the fly) and haptics
+// ===========================================================================
+const Sound = {
+  ctx: null,
+  muted: !!save.muted,
+  unlock() {
+    if (!this.ctx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (AC) { try { this.ctx = new AC(); } catch (e) { this.ctx = null; } }
+    }
+    if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
+  },
+  tone(freq, dur, type, gain, slideTo, delay) {
+    if (this.muted || !this.ctx) return;
+    const t = this.ctx.currentTime + (delay || 0);
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(gain, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(this.ctx.destination);
+    o.start(t); o.stop(t + dur + 0.03);
+  },
+  turn() { this.tone(640, 0.09, 'triangle', 0.08, 380); },
+  tick() { this.tone(880, 0.05, 'triangle', 0.03, 620); },
+  undo() { this.tone(360, 0.1, 'triangle', 0.07, 520); },
+  deny() { this.tone(190, 0.14, 'square', 0.025, 150); },
+  click() { this.tone(560, 0.06, 'sine', 0.05); },
+  go() { this.tone(520, 0.09, 'sine', 0.06); this.tone(780, 0.14, 'sine', 0.06, null, 0.09); },
+  solve() { [523.25, 659.25, 783.99, 1046.5, 1318.5].forEach((f, i) => this.tone(f, 0.26, 'triangle', 0.08, null, i * 0.09)); },
+};
+const haptic = (p) => { if (!Sound.muted && navigator.vibrate) { try { navigator.vibrate(p); } catch (e) { /* ignore */ } } };
+
+// ===========================================================================
+// DOM
+// ===========================================================================
+const hudEl = $('hud'), timerEl = $('timer'), hudSubEl = $('hudSub');
+const btnUndo = $('btnUndo'), btnSound = $('btnSound');
+const stageEl = $('stage'), coachEl = $('coach'), graphWrap = $('graphWrap');
+const titleEl = $('titleScreen'), resultEl = $('resultScreen'), confirmEl = $('confirmScreen');
+const toastEl = $('toast'), cubeHintEl = $('cubeHint');
+const cubeCanvas = $('cubeCanvas'), graphCanvas = $('graphCanvas');
+const cv3 = { el: cubeCanvas, ctx: cubeCanvas.getContext('2d'), w: 1, h: 1, dpr: 1 };
+const cv2 = { el: graphCanvas, ctx: graphCanvas.getContext('2d'), w: 1, h: 1, dpr: 1 };
+const gv = { sc: 100, ox: 0, oy: 0, dotR: 10 };
+
+let toastTimer = 0;
+function toast(msg, ms) {
+  toastEl.textContent = msg;
+  toastEl.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toastEl.classList.remove('show'), ms || 2200);
+}
+function hideToast() { clearTimeout(toastTimer); toastEl.classList.remove('show'); }
+
+// ===========================================================================
+// Layout
+// ===========================================================================
+function layout() {
+  const W = stageEl.clientWidth, H = stageEl.clientHeight;
+  const landscape = W > H * 1.08;
+  stageEl.classList.toggle('landscape', landscape);
+  const aspect = (GRAPH_BOX.y1 - GRAPH_BOX.y0) / (GRAPH_BOX.x1 - GRAPH_BOX.x0);
+  if (landscape) {
+    graphWrap.style.height = '';
+    graphWrap.style.width = Math.round(Math.min(W * 0.62, (H - 12) / aspect + 12)) + 'px';
+  } else if (G.mode === 'title') {
+    // The menu card sits at the bottom; the cube spins in the space above it.
+    const cardH = $('titleCard').offsetHeight + 14;
+    graphWrap.style.width = '';
+    graphWrap.style.height = Math.round(clamp(cardH, 120, H - 140)) + 'px';
+  } else {
+    const coachH = coachEl.classList.contains('show') ? coachEl.offsetHeight + 6 : 0;
+    graphWrap.style.width = '';
+    graphWrap.style.height = Math.round(Math.min(W * aspect + 10, (H - coachH) * 0.66)) + 'px';
+  }
+  sizeCanvases();
+}
+function sizeCanvas(cv) {
+  const w = cv.el.clientWidth, h = cv.el.clientHeight, dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  if (w === cv.w && h === cv.h && dpr === cv.dpr) return;
+  cv.w = Math.max(1, w); cv.h = Math.max(1, h); cv.dpr = dpr;
+  cv.el.width = Math.max(1, Math.round(cv.w * dpr)); cv.el.height = Math.max(1, Math.round(cv.h * dpr));
+  dirty = true;
+}
+function sizeCanvases() {
+  sizeCanvas(cv3); sizeCanvas(cv2);
+  const pad = 6, bw = GRAPH_BOX.x1 - GRAPH_BOX.x0, bh = GRAPH_BOX.y1 - GRAPH_BOX.y0;
+  gv.sc = Math.max(10, Math.min((cv2.w - 2 * pad) / bw, (cv2.h - 2 * pad) / bh));
+  gv.ox = cv2.w / 2 - (GRAPH_BOX.x0 + bw / 2) * gv.sc;
+  gv.oy = cv2.h / 2 - (GRAPH_BOX.y0 + bh / 2) * gv.sc;
+  gv.dotR = GAP * gv.sc * 0.46;
+}
+
+// ===========================================================================
+// 3D cube renderer (Canvas 2D, painter's algorithm)
+// ===========================================================================
+const CAM = 11;
+const DEFAULT_AZ = Math.PI / 4, DEFAULT_EL = 0.6;
+const view = { az: DEFAULT_AZ, el: DEFAULT_EL, tween: null };
+const LIGHT = (() => { const v = [-0.35, 0.8, 0.5], l = Math.hypot(...v); return v.map((x) => x / l); })();
+
+const CUBIES = [];
+for (let x = -1; x <= 1; x++) for (let y = -1; y <= 1; y++) for (let z = -1; z <= 1; z++) {
+  if (!x && !y && !z) continue;
+  const p = [x, y, z], faces = [];
+  for (let k = 0; k < 3; k++) for (const sign of [1, -1]) {
+    const n = [0, 0, 0]; n[k] = sign;
+    const a = (k + 1) % 3, b = (k + 2) % 3;
+    const c = [x + n[0] * 0.5, y + n[1] * 0.5, z + n[2] * 0.5];
+    const quad = (h) => [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([su, sv]) => { const q = c.slice(); q[a] += su * h; q[b] += sv * h; return q; });
+    faces.push({ k, n, c, body: quad(0.5), sticker: quad(0.415), slot: p[k] === sign ? slotAt(p, k, sign) : -1 });
+  }
+  CUBIES.push({ p, faces });
+}
+
+function viewMatrix(az, el) {
+  // world -> camera: yaw about y by -az, then pitch about x by el
+  const ca = Math.cos(-az), sa = Math.sin(-az), ce = Math.cos(el), se = Math.sin(el);
+  return [ca, 0, sa, se * sa, ce, -se * ca, -ce * sa, se, ce * ca];
+}
+function rotAxis(axis, ang, v, out) {
+  const c = Math.cos(ang), s = Math.sin(ang), x = v[0], y = v[1], z = v[2];
+  if (axis === 0) { out[0] = x; out[1] = y * c - z * s; out[2] = y * s + z * c; }
+  else if (axis === 1) { out[0] = x * c + z * s; out[1] = y; out[2] = -x * s + z * c; }
+  else { out[0] = x * c - y * s; out[1] = x * s + y * c; out[2] = z; }
+  return out;
+}
+function roundedPath(ctx, pts, k) {
+  ctx.beginPath();
+  for (let i = 0; i < 4; i++) {
+    const p0 = pts[(i + 3) % 4], p1 = pts[i], p2 = pts[(i + 1) % 4];
+    const ax = p1.x + (p0.x - p1.x) * k, ay = p1.y + (p0.y - p1.y) * k;
+    const bx = p1.x + (p2.x - p1.x) * k, by = p1.y + (p2.y - p1.y) * k;
+    if (i === 0) ctx.moveTo(ax, ay); else ctx.lineTo(ax, ay);
+    ctx.quadraticCurveTo(p1.x, p1.y, bx, by);
+  }
+  ctx.closePath();
+}
+const shadeRgb = (rgb, s) => `rgb(${Math.round(rgb[0] * s)},${Math.round(rgb[1] * s)},${Math.round(rgb[2] * s)})`;
+
+const T0 = [0, 0, 0], T1 = [0, 0, 0], T2 = [0, 0, 0];
+const QP = [{ x: 0, y: 0 }, { x: 0, y: 0 }, { x: 0, y: 0 }, { x: 0, y: 0 }];
+const QS = [{ x: 0, y: 0 }, { x: 0, y: 0 }, { x: 0, y: 0 }, { x: 0, y: 0 }];
+
+function renderCube(tms) {
+  const { ctx, w: W, h: H, dpr } = cv3;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  if (W < 20 || H < 20) return;
+  const M = viewMatrix(view.az, view.el);
+  const scale = Math.min(W, H) / (G.mode === 'title' ? 6.6 : 5.7), cx = W / 2, cy = H / 2;
+  const project = (v, axis, ang, out) => {
+    let x = v[0], y = v[1], z = v[2];
+    if (axis >= 0) { rotAxis(axis, ang, v, T2); x = T2[0]; y = T2[1]; z = T2[2]; }
+    const X = M[0] * x + M[1] * y + M[2] * z, Y = M[3] * x + M[4] * y + M[5] * z, Z = M[6] * x + M[7] * y + M[8] * z;
+    const f = CAM / (CAM - Z);
+    out.x = cx + X * f * scale; out.y = cy - Y * f * scale;
+    return out;
+  };
+
+  // Soft floor shadow
+  if (view.el > 0.12) {
+    const fp = project([0, -2.05, 0], -1, 0, { x: 0, y: 0 });
+    const rx = scale * 2.1, ry = rx * Math.sin(view.el) * 0.9;
+    const g = ctx.createRadialGradient(fp.x, fp.y, 0, fp.x, fp.y, rx);
+    g.addColorStop(0, 'rgba(60,45,30,0.20)'); g.addColorStop(1, 'rgba(60,45,30,0)');
+    ctx.save(); ctx.translate(fp.x, fp.y); ctx.scale(1, ry / rx); ctx.translate(-fp.x, -fp.y);
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(fp.x, fp.y, rx, 0, TAU); ctx.fill(); ctx.restore();
+  }
+
+  const vm = visualMove();
+  const axis = vm ? ringAxis(vm.r) : -1, layer = vm ? ringLayer(vm.r) : 0;
+  const ang = vm ? (vm.dir * vm.t * Math.PI) / 2 : 0;
+  // Painter's order: slabs along the turning axis far-to-near, then cubies by grid distance from the eye.
+  const eyeW = [M[6] * CAM, M[7] * CAM, M[8] * CAM];
+  const eyeL = vm ? rotAxis(axis, -ang, eyeW, [0, 0, 0]) : eyeW;
+  const order = CUBIES.map((cu) => {
+    const moving = !!vm && cu.p[axis] === layer, e = moving ? eyeL : eyeW;
+    return {
+      cu, moving,
+      grp: vm ? Math.abs(cu.p[axis] - eyeW[axis]) : 0,
+      key: Math.abs(cu.p[0] - e[0]) + Math.abs(cu.p[1] - e[1]) + Math.abs(cu.p[2] - e[2]),
+    };
+  });
+  order.sort((A, B) => B.grp - A.grp || B.key - A.key);
+
+  const focus = focusSlot();
+  const pulse = 0.5 + 0.5 * Math.sin(tms / 240);
+  const bodyLine = Math.max(1, scale * 0.02);
+  for (const o of order) {
+    const rotA = o.moving ? axis : -1;
+    for (const f of o.cu.faces) {
+      if (f.slot < 0 && !(vm && f.k === axis)) continue; // inner faces only show mid-turn
+      const n = rotA >= 0 ? rotAxis(rotA, ang, f.n, T0) : f.n;
+      const c = rotA >= 0 ? rotAxis(rotA, ang, f.c, T1) : f.c;
+      const nx = M[0] * n[0] + M[1] * n[1] + M[2] * n[2];
+      const ny = M[3] * n[0] + M[4] * n[1] + M[5] * n[2];
+      const nz = M[6] * n[0] + M[7] * n[1] + M[8] * n[2];
+      const ccx = M[0] * c[0] + M[1] * c[1] + M[2] * c[2];
+      const ccy = M[3] * c[0] + M[4] * c[1] + M[5] * c[2];
+      const ccz = M[6] * c[0] + M[7] * c[1] + M[8] * c[2];
+      if (-nx * ccx - ny * ccy + nz * (CAM - ccz) <= 0) continue; // back-facing
+      const light = Math.max(0, nx * LIGHT[0] + ny * LIGHT[1] + nz * LIGHT[2]);
+      for (let i = 0; i < 4; i++) project(f.body[i], rotA, ang, QP[i]);
+      const bs = 0.6 + 0.4 * light;
+      ctx.fillStyle = shadeRgb([34, 31, 29], bs);
+      roundedPath(ctx, QP, 0.06);
+      ctx.fill();
+      ctx.lineWidth = bodyLine; ctx.strokeStyle = ctx.fillStyle; ctx.stroke();
+      if (f.slot < 0) continue;
+      for (let i = 0; i < 4; i++) project(f.sticker[i], rotA, ang, QS[i]);
+      const s = 0.83 + 0.19 * light;
+      roundedPath(ctx, QS, 0.2);
+      ctx.fillStyle = shadeRgb(FACE_RGB[G.state[f.slot]], Math.min(1.02, s));
+      ctx.fill();
+      if (f.slot === focus || hl.cube.has(f.slot)) {
+        ctx.lineWidth = Math.max(2.5, scale * 0.07);
+        ctx.strokeStyle = f.slot === focus ? '#ffffff' : `rgba(108,71,255,${0.65 + 0.35 * pulse})`;
+        ctx.stroke();
+        if (f.slot === focus) { ctx.lineWidth = Math.max(1.2, scale * 0.03); ctx.strokeStyle = '#6c47ff'; ctx.stroke(); }
+      }
+    }
+  }
+}
+
+// ===========================================================================
+// Ring graph renderer
+// ===========================================================================
+const hl = { dots: new Set(), rings: new Set(), cube: new Set(), hint: null, reject: null };
+const confetti = [];
+const TMP = { x: 0, y: 0 };
+
+function dotScreen(s, vm, out) {
+  const e = vm ? PATH_AT[pIdx(vm.r, vm.dir)][s] : null;
+  if (e) movingDot(e, vm.r, vm.dir, vm.t, out); else { out.x = DOTS[s].x; out.y = DOTS[s].y; }
+  out.x = gv.ox + out.x * gv.sc; out.y = gv.oy + out.y * gv.sc;
+  return out;
+}
+function drawDot(ctx, x, y, R, rgb, lw) {
+  ctx.beginPath(); ctx.arc(x, y, R, 0, TAU);
+  ctx.fillStyle = `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`; ctx.fill();
+  ctx.lineWidth = lw; ctx.strokeStyle = '#2b2724'; ctx.stroke();
+  ctx.beginPath(); ctx.arc(x - R * 0.3, y - R * 0.32, R * 0.36, 0, TAU);
+  ctx.fillStyle = 'rgba(255,255,255,0.22)'; ctx.fill();
+}
+function drawHint(ctx, h, tms) {
+  const e = PATH_AT[pIdx(h.r, h.dir)][h.slot];
+  if (!e || e.spin) return;
+  const ring = RINGS[h.r], X = gv.ox + ring.c.x * gv.sc, Y = gv.oy + ring.c.y * gv.sc, rad = ring.rad * gv.sc;
+  const R = gv.dotR, sgn = Math.sign(e.da);
+  const len = sgn * Math.min(Math.abs(e.da), 0.95);
+  const a0 = e.a0, a1 = a0 + len;
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = 'rgba(108,71,255,0.25)'; ctx.lineWidth = R * 1.55;
+  ctx.beginPath();
+  if (sgn > 0) ctx.arc(X, Y, rad, a0, a1); else ctx.arc(X, Y, rad, a1, a0);
+  ctx.stroke();
+  // arrowhead
+  const hx = X + rad * Math.cos(a1), hy = Y + rad * Math.sin(a1);
+  const tx = -Math.sin(a1) * sgn, ty = Math.cos(a1) * sgn, nx = -ty, ny = tx, hs = R * 1.25;
+  ctx.fillStyle = 'rgba(108,71,255,0.9)';
+  ctx.beginPath();
+  ctx.moveTo(hx + tx * hs * 0.9, hy + ty * hs * 0.9);
+  ctx.lineTo(hx - tx * hs * 0.5 + nx * hs * 0.85, hy - ty * hs * 0.5 + ny * hs * 0.85);
+  ctx.lineTo(hx - tx * hs * 0.5 - nx * hs * 0.85, hy - ty * hs * 0.5 - ny * hs * 0.85);
+  ctx.closePath(); ctx.fill();
+  // a ghost fingertip sliding along the ring
+  const ph = (tms % 1500) / 1500, k = easeInOutCubic(clamp(ph / 0.75, 0, 1));
+  const af = a0 + len * k, fx = X + rad * Math.cos(af), fy = Y + rad * Math.sin(af);
+  const alpha = ph < 0.75 ? Math.min(1, ph * 6) : Math.max(0, 1 - (ph - 0.75) / 0.25);
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = 'rgba(108,71,255,0.32)'; ctx.beginPath(); ctx.arc(fx, fy, R * 1.9, 0, TAU); ctx.fill();
+  ctx.lineWidth = 2.5; ctx.strokeStyle = 'rgba(255,255,255,0.95)'; ctx.stroke();
+  ctx.restore();
+}
+
+function renderGraph(tms) {
+  const { ctx, w: W, h: H, dpr } = cv2;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  const sc = gv.sc, R = gv.dotR;
+  const vm = visualMove();
+  const lw = Math.max(1.3, sc * 0.016);
+  const pulse = 0.5 + 0.5 * Math.sin(tms / 260);
+  const touched = drag.active && drag.ring < 0 ? SLOT_RINGS[drag.slot] : null;
+  const reject = hl.reject && tms < hl.reject.until ? hl.reject.r : -1;
+
+  // Rings
+  for (let r = 0; r < 9; r++) {
+    const ring = RINGS[r], X = gv.ox + ring.c.x * sc, Y = gv.oy + ring.c.y * sc, rad = ring.rad * sc;
+    const glow = hl.rings.has(r) || (hl.hint && hl.hint.r === r);
+    if (glow && !(vm && vm.r === r)) {
+      ctx.beginPath(); ctx.arc(X, Y, rad, 0, TAU);
+      ctx.lineWidth = lw * 7; ctx.strokeStyle = `rgba(108,71,255,${0.08 + 0.12 * pulse})`; ctx.stroke();
+    }
+    ctx.beginPath(); ctx.arc(X, Y, rad, 0, TAU);
+    if (r === reject) { ctx.lineWidth = lw * 2.2; ctx.strokeStyle = '#e0452f'; }
+    else if (vm && vm.r === r) { ctx.lineWidth = lw * 2.3; ctx.strokeStyle = '#5a534a'; }
+    else if (glow) { ctx.lineWidth = lw * 1.9; ctx.strokeStyle = '#6c47ff'; }
+    else if (touched && touched.includes(r)) { ctx.lineWidth = lw * 1.7; ctx.strokeStyle = '#968d80'; }
+    else { ctx.lineWidth = lw; ctx.strokeStyle = '#c9c1b3'; }
+    ctx.stroke();
+  }
+
+  if (hl.hint && !drag.active && !anim) drawHint(ctx, hl.hint, tms);
+
+  // Dots: resting ones first, the turning ones on top
+  const moving = vm ? PATHS[pIdx(vm.r, vm.dir)] : null;
+  const movingAt = vm ? PATH_AT[pIdx(vm.r, vm.dir)] : null;
+  const olw = Math.max(1.15, R * 0.15);
+  for (let s = 0; s < 54; s++) {
+    if (movingAt && movingAt[s]) continue;
+    drawDot(ctx, gv.ox + DOTS[s].x * sc, gv.oy + DOTS[s].y * sc, R, FACE_RGB[G.state[s]], olw);
+  }
+  if (moving) {
+    for (const e of moving) {
+      movingDot(e, vm.r, vm.dir, vm.t, TMP);
+      drawDot(ctx, gv.ox + TMP.x * sc, gv.oy + TMP.y * sc, R, FACE_RGB[G.state[e.slot]], olw);
+    }
+  }
+
+  // Tutorial highlights
+  if (hl.dots.size) {
+    ctx.lineWidth = Math.max(2, R * 0.28);
+    ctx.strokeStyle = `rgba(108,71,255,${0.55 + 0.45 * pulse})`;
+    for (const s of hl.dots) {
+      dotScreen(s, vm, TMP);
+      ctx.beginPath(); ctx.arc(TMP.x, TMP.y, R * (1.42 + 0.12 * pulse), 0, TAU); ctx.stroke();
+    }
+  }
+  // The dot under the finger
+  const focus = focusSlot();
+  if (focus >= 0) {
+    dotScreen(focus, vm, TMP);
+    ctx.beginPath(); ctx.arc(TMP.x, TMP.y, R * 1.55, 0, TAU);
+    ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.fill();
+    ctx.lineWidth = Math.max(2, R * 0.22); ctx.strokeStyle = '#26221f'; ctx.stroke();
+    drawDot(ctx, TMP.x, TMP.y, R * 1.2, FACE_RGB[G.state[focus]], olw * 1.2);
+  }
+
+  // Confetti
+  for (const c of confetti) {
+    ctx.save(); ctx.globalAlpha = clamp(c.life / c.max * 1.6, 0, 1);
+    ctx.translate(c.x, c.y); ctx.rotate(c.rot);
+    ctx.fillStyle = c.color;
+    if (c.round) { ctx.beginPath(); ctx.arc(0, 0, c.size * 0.55, 0, TAU); ctx.fill(); }
+    else ctx.fillRect(-c.size / 2, -c.size / 3, c.size, c.size * 0.66);
+    ctx.restore();
+  }
+}
+
+function burstConfetti() {
+  if (reduceMotion) return;
+  for (let i = 0; i < 110; i++) {
+    const s = (Math.random() * 54) | 0;
+    const x = gv.ox + DOTS[s].x * gv.sc, y = gv.oy + DOTS[s].y * gv.sc;
+    const a = Math.random() * TAU, sp = 120 + Math.random() * 420;
+    const max = 1.1 + Math.random() * 0.9;
+    confetti.push({
+      x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 260, rot: Math.random() * TAU, vr: (Math.random() - 0.5) * 12,
+      size: 5 + Math.random() * 7, color: FACE_HEX[(Math.random() * 6) | 0], life: max, max, round: Math.random() < 0.45,
+    });
+  }
+}
+function stepConfetti(dt) {
+  for (let i = confetti.length - 1; i >= 0; i--) {
+    const c = confetti[i];
+    c.life -= dt; c.vy += 820 * dt; c.vx *= 0.99; c.x += c.vx * dt; c.y += c.vy * dt; c.rot += c.vr * dt;
+    if (c.life <= 0 || c.y > cv2.h + 40) confetti.splice(i, 1);
+  }
+}
+
+// ===========================================================================
+// Turn animation
+// ===========================================================================
+function visualMove() {
+  if (drag.live) return drag.live;
+  if (anim) return anim;
+  return null;
+}
+function stepAnim(tms) {
+  if (!anim) return;
+  const p = anim.dur > 0 ? clamp((tms - anim.start) / anim.dur, 0, 1) : 1;
+  anim.t = anim.from + (anim.to - anim.from) * anim.ease(p);
+  if (p >= 1) finishAnim();
+}
+function finishAnim() {
+  const a = anim;
+  if (!a) return;
+  anim = null;
+  if (a.to === 1) G.state = applyMove(G.state, a.r, a.dir);
+  dirty = true;
+  if (a.done) a.done();
+  if (!anim && queue.length) startQueued();
+}
+// Complete a player-driven animation at once (so a new swipe or undo never waits on the last one).
+function settle() {
+  if (anim && (anim.kind === 'player' || anim.kind === 'cancel' || anim.kind === 'undo')) { anim.t = anim.to; finishAnim(); }
+}
+function runSequence(moves, onDone, kind) {
+  queue.length = 0;
+  moves.forEach((m, i) => queue.push({ ...m, kind, onDone: i === moves.length - 1 ? onDone : null }));
+  if (!anim) startQueued();
+}
+function startQueued() {
+  const q = queue.shift();
+  if (!q) return;
+  anim = {
+    kind: q.kind, r: q.r, dir: q.dir, from: 0, to: 1, t: 0, start: now() + (q.delay || 0), dur: q.dur || 300,
+    ease: easeInOutCubic,
+    done: () => { if (q.kind !== 'demo') Sound.tick(); if (q.onDone) q.onDone(); },
+  };
+}
+function clearAnimations() { queue.length = 0; anim = null; drag.active = false; drag.live = null; dirty = true; }
+
+function makeScramble(n) {
+  for (let attempt = 0; attempt < 40; attempt++) {
+    const seq = [];
+    let lastAxis = -1;
+    while (seq.length < n) {
+      const r = (Math.random() * 9) | 0;
+      if (ringAxis(r) === lastAxis) continue; // never twice on one axis in a row, so nothing cancels
+      seq.push({ r, dir: Math.random() < 0.5 ? 1 : -1 });
+      lastAxis = ringAxis(r);
+    }
+    let st = solvedState();
+    for (const m of seq) st = applyMove(st, m.r, m.dir);
+    if (!isSolved(st)) return seq;
+  }
+  return [{ r: ringId(1, 1), dir: 1 }];
+}
+// The quickest known way back: undo the net sequence (scramble + player turns) from the end.
+function nextHintMove() {
+  const stack = [];
+  for (const m of [...G.scramble, ...G.history]) {
+    const top = stack[stack.length - 1], below = stack[stack.length - 2];
+    if (top && top.r === m.r && top.dir === -m.dir) { stack.pop(); continue; }
+    if (top && below && top.r === m.r && below.r === m.r && top.dir === m.dir && below.dir === m.dir) {
+      stack.pop(); stack.pop(); stack.push({ r: m.r, dir: -m.dir }); continue;
+    }
+    stack.push(m);
+  }
+  const last = stack[stack.length - 1];
+  return last ? { r: last.r, dir: -last.dir } : null;
+}
+// Pick the dot a hint arrow starts from: the one with the shortest trip, preferring the lower half.
+function hintSlotFor(r, dir) {
+  let best = -1, bestScore = Infinity;
+  for (const e of PATHS[pIdx(r, dir)]) {
+    if (e.spin) continue;
+    const score = Math.abs(e.da) - DOTS[e.slot].y * 0.15;
+    if (score < bestScore) { bestScore = score; best = e.slot; }
+  }
+  return best;
+}
+
+// ===========================================================================
+// Swiping the graph
+// ===========================================================================
+const drag = { active: false, id: -1, slot: -1, sx: 0, sy: 0, ring: -1, cx: 0, cy: 0, radPx: 1, prevAng: 0, acc: 0, samples: [], live: null };
+const LOCK_PX = 9;
+
+function focusSlot() { return drag.active ? drag.slot : -1; }
+function graphPoint(e) {
+  const rect = graphCanvas.getBoundingClientRect();
+  return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+}
+function nearestDot(x, y) {
+  let best = -1, bd = Infinity;
+  for (let i = 0; i < 54; i++) {
+    const dx = gv.ox + DOTS[i].x * gv.sc - x, dy = gv.oy + DOTS[i].y * gv.sc - y, d = dx * dx + dy * dy;
+    if (d < bd) { bd = d; best = i; }
+  }
+  const reach = Math.max(22, GAP * gv.sc * 1.2);
+  return bd <= reach * reach ? best : -1;
+}
+function inputOpen() {
+  if (queue.length || (anim && (anim.kind === 'auto' || anim.kind === 'demo'))) return false;
+  if (G.mode === 'timed') return G.phase === 'ready' || G.phase === 'running';
+  if (G.mode === 'tutorial') return Tut.acceptsInput();
+  return false;
+}
+function ringAllowed(r) {
+  if (G.mode !== 'tutorial') return true;
+  return !Tut.allowed || Tut.allowed.has(r);
+}
+
+graphCanvas.addEventListener('pointerdown', (e) => {
+  Sound.unlock();
+  if (drag.active) return;
+  if (e.pointerType === 'mouse' && e.button !== 0) return;
+  settle();
+  if (!inputOpen()) {
+    if (G.mode === 'tutorial' && Tut.step && Tut.step.info) toast('Tap Next to continue');
+    return;
+  }
+  const pt = graphPoint(e);
+  const s = nearestDot(pt.x, pt.y);
+  if (s < 0) return;
+  e.preventDefault();
+  try { graphCanvas.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+  Object.assign(drag, { active: true, id: e.pointerId, slot: s, sx: pt.x, sy: pt.y, ring: -1, acc: 0, samples: [], live: null });
+  dirty = true;
+});
+graphCanvas.addEventListener('pointermove', (e) => {
+  if (!drag.active || e.pointerId !== drag.id) return;
+  const pt = graphPoint(e);
+  if (drag.ring < 0) {
+    const dx = pt.x - drag.sx, dy = pt.y - drag.sy;
+    if (Math.hypot(dx, dy) < LOCK_PX) return;
+    // The dot sits on two rings; the swipe direction picks the one it runs along.
+    const [ra, rb] = SLOT_RINGS[drag.slot];
+    const alignOn = (r) => { const a = angleOn(r, DOTS[drag.slot]); return Math.abs(dx * -Math.sin(a) + dy * Math.cos(a)); };
+    const al = alignOn(ra), bl = alignOn(rb);
+    let pick = al >= bl ? ra : rb;
+    // In the tutorial, give an in-between swipe to the ring being taught.
+    const other = pick === ra ? rb : ra;
+    if (!ringAllowed(pick) && ringAllowed(other) && Math.min(al, bl) >= 0.58 * Math.max(al, bl)) pick = other;
+    if (!ringAllowed(pick)) {
+      hl.reject = { r: pick, until: now() + 700 };
+      Sound.deny(); haptic(20);
+      toast(Tut.rejectMessage());
+      endDrag();
+      return;
+    }
+    drag.ring = pick;
+    const ring = RINGS[pick];
+    drag.cx = gv.ox + ring.c.x * gv.sc; drag.cy = gv.oy + ring.c.y * gv.sc; drag.radPx = ring.rad * gv.sc;
+    drag.prevAng = Math.atan2(drag.sy - drag.cy, drag.sx - drag.cx);
+    drag.acc = 0;
+    hideToast();
+    onTurnStarted();
+  }
+  const ang = Math.atan2(pt.y - drag.cy, pt.x - drag.cx);
+  drag.acc += wrapPi(ang - drag.prevAng);
+  drag.prevAng = ang;
+  const r = drag.ring, dir = drag.acc >= 0 ? RING_POS_DIR[r] : -RING_POS_DIR[r];
+  const e0 = PATH_AT[pIdx(r, dir)][drag.slot];
+  const t = clamp(Math.abs(drag.acc) / Math.abs(e0.da), 0, 1);
+  drag.live = { r, dir, t };
+  const tn = now();
+  drag.samples.push({ t: tn, a: drag.acc });
+  while (drag.samples.length > 2 && tn - drag.samples[0].t > 90) drag.samples.shift();
+  dirty = true;
+});
+function releaseDrag(e, cancelled) {
+  if (!drag.active || (e && e.pointerId !== drag.id)) return;
+  const live = drag.live;
+  if (live && drag.ring >= 0) {
+    const arcPx = Math.abs(drag.acc) * drag.radPx;
+    let vel = 0;
+    if (drag.samples.length >= 2) {
+      const a = drag.samples[0], b = drag.samples[drag.samples.length - 1];
+      if (b.t > a.t) vel = ((b.a - a.a) * drag.radPx) / (b.t - a.t); // px per ms along the ring
+    }
+    const flick = Math.abs(vel) > 0.45 && Math.sign(vel) === Math.sign(drag.acc) && arcPx > 6;
+    const commit = !cancelled && (live.t >= 0.45 || arcPx >= Math.max(20, gv.dotR * 2) || flick);
+    if (commit) {
+      const at = now();
+      anim = { kind: 'player', r: live.r, dir: live.dir, from: live.t, to: 1, t: live.t, start: at, dur: 70 + 170 * (1 - live.t), ease: easeOutCubic, done: () => onPlayerMove(live.r, live.dir, at) };
+    } else if (live.t > 0) {
+      anim = { kind: 'cancel', r: live.r, dir: live.dir, from: live.t, to: 0, t: live.t, start: now(), dur: 60 + 130 * live.t, ease: easeOutCubic, done: null };
+    }
+  }
+  endDrag();
+}
+function endDrag() {
+  drag.active = false; drag.live = null; drag.ring = -1; drag.id = -1;
+  dirty = true;
+}
+graphCanvas.addEventListener('pointerup', (e) => releaseDrag(e, false));
+graphCanvas.addEventListener('pointercancel', (e) => releaseDrag(e, true));
+graphCanvas.addEventListener('lostpointercapture', (e) => releaseDrag(e, false));
+graphCanvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+// ===========================================================================
+// Looking around the 3D cube
+// ===========================================================================
+const orbit = { active: false, id: -1, x: 0, y: 0, az: 0, el: 0, moved: 0, lastTap: 0 };
+cubeCanvas.addEventListener('pointerdown', (e) => {
+  Sound.unlock();
+  if (orbit.active || G.mode === 'title') return;
+  e.preventDefault();
+  try { cubeCanvas.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+  Object.assign(orbit, { active: true, id: e.pointerId, x: e.clientX, y: e.clientY, az: view.az, el: view.el, moved: 0 });
+  view.tween = null;
+});
+cubeCanvas.addEventListener('pointermove', (e) => {
+  if (!orbit.active || e.pointerId !== orbit.id) return;
+  const dx = e.clientX - orbit.x, dy = e.clientY - orbit.y;
+  orbit.moved = Math.max(orbit.moved, Math.hypot(dx, dy));
+  const k = 3.4 / Math.max(200, Math.min(cv3.w, cv3.h) * 1.4);
+  view.az = orbit.az - dx * k;
+  view.el = clamp(orbit.el + dy * k, -1.35, 1.35);
+  if (orbit.moved > 6 && !save.orbited) { save.orbited = true; persist(); cubeHintEl.hidden = true; }
+  dirty = true;
+});
+function endOrbit(e) {
+  if (!orbit.active || e.pointerId !== orbit.id) return;
+  orbit.active = false;
+  if (orbit.moved < 8) {
+    const t = now();
+    if (t - orbit.lastTap < 320) { tweenViewHome(450); orbit.lastTap = 0; } else orbit.lastTap = t;
+  }
+}
+cubeCanvas.addEventListener('pointerup', endOrbit);
+cubeCanvas.addEventListener('pointercancel', endOrbit);
+cubeCanvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+function tweenViewHome(dur, extraSpin) {
+  const toAz = DEFAULT_AZ + Math.round((view.az - DEFAULT_AZ) / TAU) * TAU + (extraSpin || 0);
+  view.tween = { fromAz: view.az, fromEl: view.el, toAz, toEl: DEFAULT_EL, start: now(), dur: dur || 500 };
+}
+function stepView(tms, dt) {
+  if (view.tween) {
+    const tw = view.tween, p = clamp((tms - tw.start) / tw.dur, 0, 1), k = easeInOutCubic(p);
+    view.az = tw.fromAz + (tw.toAz - tw.fromAz) * k;
+    view.el = tw.fromEl + (tw.toEl - tw.fromEl) * k;
+    if (p >= 1) view.tween = null;
+    return true;
+  }
+  if (G.mode === 'title' && !reduceMotion) { view.az += dt * 0.32; return true; }
+  return false;
+}
+
+// ===========================================================================
+// Game flow
+// ===========================================================================
+function fmtTime(ms) {
+  const cs = Math.floor(Math.max(0, ms) / 10);
+  const m = Math.floor(cs / 6000), s = Math.floor(cs / 100) % 60, c = cs % 100;
+  return `${m}:${String(s).padStart(2, '0')}.${String(c).padStart(2, '0')}`;
+}
+function setOverlay(el, show) { el.classList.toggle('hidden', !show); }
+
+function updateHud() {
+  const inTimed = G.mode === 'timed';
+  hudEl.classList.toggle('off', G.mode === 'title');
+  document.body.classList.toggle('title-mode', G.mode === 'title');
+  timerEl.classList.remove('idle', 'done', 'label');
+  if (inTimed) {
+    const d = DIFFS[G.diff].label, moves = G.history.length;
+    if (G.phase === 'scrambling') { timerEl.textContent = '0:00.00'; timerEl.classList.add('idle'); hudSubEl.textContent = `Scrambling… · ${d}`; }
+    else if (G.phase === 'ready') { timerEl.textContent = '0:00.00'; timerEl.classList.add('idle'); hudSubEl.textContent = `${d} · swipe to start`; }
+    else {
+      if (G.phase === 'solved') { timerEl.textContent = fmtTime(G.elapsed); timerEl.classList.add('done'); }
+      hudSubEl.textContent = `${moves} ${moves === 1 ? 'move' : 'moves'} · ${d}`;
+    }
+  } else if (G.mode === 'tutorial') {
+    timerEl.textContent = 'Tutorial'; timerEl.classList.add('label');
+    hudSubEl.textContent = `Step ${Tut.i + 1} of ${TUTORIAL.length}`;
+  }
+  btnUndo.disabled = !canUndo();
+}
+function canUndo() {
+  if (!G.history.length) return false;
+  if (G.mode === 'timed') return G.phase === 'ready' || G.phase === 'running';
+  if (G.mode === 'tutorial') return Tut.acceptsInput();
+  return false;
+}
+function tickTimer() {
+  if (G.mode === 'timed' && G.phase === 'running') timerEl.textContent = fmtTime(now() - G.t0);
+}
+
+// The first swipe of a timed solve starts the clock.
+function onTurnStarted() {
+  if (G.mode === 'timed' && G.phase === 'ready') {
+    G.phase = 'running';
+    G.t0 = now();
+    updateHud();
+  }
+}
+function onPlayerMove(r, dir, at) {
+  G.history.push({ r, dir });
+  Sound.turn(); haptic(8);
+  hl.hint = null;
+  updateHud();
+  if (G.mode === 'timed') {
+    if (G.phase === 'running' && isSolved(G.state)) onTimedSolved(at);
+  } else if (G.mode === 'tutorial') {
+    Tut.onMove();
+  }
+}
+function undo() {
+  if (!canUndo() || drag.active) return;
+  settle();
+  // Landing the last turn can finish the solve (or a tutorial step), so check again.
+  if (anim || !canUndo()) return;
+  const m = G.history.pop();
+  if (!m) return;
+  hl.hint = null;
+  anim = {
+    kind: 'undo', r: m.r, dir: -m.dir, from: 0, to: 1, t: 0, start: now(), dur: 210, ease: easeInOutCubic,
+    done: () => {
+      updateHud();
+      if (G.mode === 'tutorial') Tut.onMove();
+      else if (G.mode === 'timed' && G.phase === 'running' && isSolved(G.state)) onTimedSolved(now());
+    },
+  };
+  Sound.undo(); haptic(6);
+  updateHud();
+}
+
+function resetBoard() {
+  stopDemo();
+  clearAnimations();
+  G.state = solvedState(); G.history = []; G.scramble = []; G.elapsed = 0; G.t0 = 0;
+  hl.dots.clear(); hl.rings.clear(); hl.cube.clear(); hl.hint = null; hl.reject = null;
+  confetti.length = 0;
+}
+
+function showTitle() {
+  G.mode = 'title'; G.phase = 'idle';
+  resetBoard();
+  Tut.exit();
+  hideToast();
+  setOverlay(resultEl, false); setOverlay(confirmEl, false); setOverlay(titleEl, true);
+  refreshTitle();
+  updateHud();
+  layout();
+  startDemo();
+}
+// The title screen plays a few slow turns and then undoes them, on a loop.
+let demoToken = 0, demoTimer = 0;
+function startDemo() {
+  clearTimeout(demoTimer);
+  if (G.mode !== 'title') return;
+  const token = ++demoToken;
+  const seq = makeScramble(4), back = seq.slice().reverse().map((m) => ({ r: m.r, dir: -m.dir }));
+  const moves = [...seq, ...back].map((m, i) => ({ ...m, dur: 560, delay: i === 0 ? 700 : i === seq.length ? 1100 : 260 }));
+  runSequence(moves, () => {
+    if (G.mode === 'title' && token === demoToken) demoTimer = setTimeout(startDemo, 900);
+  }, 'demo');
+}
+function stopDemo() { clearTimeout(demoTimer); demoToken++; }
+
+function startTimed(diff) {
+  G.diff = diff; save.diff = diff; persist();
+  G.mode = 'timed';
+  resetBoard();
+  Tut.exit();
+  G.phase = 'scrambling';
+  setOverlay(titleEl, false); setOverlay(resultEl, false); setOverlay(confirmEl, false);
+  updateHud();
+  layout();
+  tweenViewHome(550);
+  const seq = makeScramble(DIFFS[diff].turns);
+  G.scramble = seq;
+  const per = clamp(1700 / seq.length, 95, 320);
+  runSequence(seq.map((m, i) => ({ ...m, dur: per, delay: i === 0 ? 600 : 25 })), () => {
+    if (G.mode !== 'timed') return;
+    G.phase = 'ready';
+    updateHud();
+    Sound.go();
+    toast('Go! The clock starts on your first swipe', 3000);
+  }, 'auto');
+}
+function onTimedSolved(at) {
+  G.phase = 'solved';
+  G.elapsed = Math.max(0, (at || now()) - G.t0);
+  const prev = save.best[G.diff];
+  const isNew = !prev || G.elapsed < prev;
+  if (isNew) { save.best[G.diff] = Math.round(G.elapsed); persist(); }
+  updateHud();
+  Sound.solve(); haptic([30, 60, 40]);
+  burstConfetti();
+  tweenViewHome(1300, TAU);
+  const moves = G.history.length;
+  $('resTime').textContent = fmtTime(G.elapsed);
+  $('resMeta').textContent = `${moves} ${moves === 1 ? 'move' : 'moves'} · ${DIFFS[G.diff].label} (${DIFFS[G.diff].turns}-turn scramble)`;
+  const bestEl = $('resBest');
+  bestEl.classList.toggle('new', isNew);
+  bestEl.textContent = isNew ? (prev ? `★ New best! (was ${fmtTime(prev)})` : '★ New best time!') : `Best: ${fmtTime(prev)}`;
+  setTimeout(() => { if (G.mode === 'timed' && G.phase === 'solved') { setOverlay(resultEl, true); $('btnAgain').focus({ preventScroll: true }); } }, 1150);
+}
+
+function goHome() {
+  if (G.mode === 'timed' && G.phase === 'running') { setOverlay(confirmEl, true); return; }
+  Sound.click();
+  showTitle();
+}
+
+// ===========================================================================
+// Tutorial
+// ===========================================================================
+const RING_TOP = ringId(1, 1);                 // turns the top layer: the ring around the white face
+const RING_RIGHT = ringId(0, 1);               // turns the right layer: the ring around the red face
+const TUT_DOT = slotAt([1, 1, 1], 2, 1);       // front face, top-right corner: on both of those rings
+const TOP_FACE = SLOTS.map((s, i) => i).filter((i) => SLOTS[i].face === FACE_U);
+
+const TUTORIAL = [
+  {
+    title: 'Every dot is a sticker',
+    text: 'Each cluster of nine dots is one face of the cube. The <b>white cluster</b> at the top is the white face on top of the cube.',
+    info: true,
+    enter() { TOP_FACE.forEach((s) => { hl.dots.add(s); hl.cube.add(s); }); },
+  },
+  {
+    title: 'Rings are layers',
+    text: 'Each ring turns one layer of the cube. Put a finger on a dot and <b>swipe along the glowing ring</b>.',
+    enter() {
+      Tut.allow([RING_TOP]); hl.rings.add(RING_TOP);
+      const dir = Math.abs(PATH_AT[pIdx(RING_TOP, 1)][TUT_DOT].da) < Math.abs(PATH_AT[pIdx(RING_TOP, -1)][TUT_DOT].da) ? 1 : -1;
+      hl.hint = { r: RING_TOP, dir, slot: TUT_DOT };
+    },
+    check: () => G.history.length > 0,
+    praise: 'The top layer turned!',
+  },
+  {
+    title: 'Turn it back',
+    text: 'The white face in the middle of that ring spun too, just like the top of the cube. <b>Swipe the ring the other way</b> to put it back.',
+    enter() { Tut.allow([RING_TOP]); hl.rings.add(RING_TOP); Tut.showHint(); },
+    onMove() { if (!isSolved(G.state)) Tut.showHint(); },
+    check: () => isSolved(G.state),
+    praise: 'Solved again!',
+  },
+  {
+    title: 'Two rings per dot',
+    text: 'Every dot sits where two rings cross, so <b>the way you swipe picks the ring</b>. Swipe the circled dot along the glowing ring.',
+    enter() {
+      Tut.allow([RING_RIGHT]); hl.rings.add(RING_RIGHT); hl.dots.add(TUT_DOT); hl.cube.add(TUT_DOT);
+      const dir = Math.abs(PATH_AT[pIdx(RING_RIGHT, 1)][TUT_DOT].da) < Math.abs(PATH_AT[pIdx(RING_RIGHT, -1)][TUT_DOT].da) ? 1 : -1;
+      hl.hint = { r: RING_RIGHT, dir, slot: TUT_DOT };
+    },
+    check: () => G.history.some((m) => m.r === RING_RIGHT),
+    praise: 'That one turned the right side!',
+  },
+  {
+    title: 'Fix it',
+    text: 'The cube is mixed up now. <b>Make every cluster one color</b> again. Any ring works; tap Hint if you want a nudge.',
+    hintButton: true,
+    enter() { Tut.allow(null); },
+    check: () => isSolved(G.state),
+    praise: 'Nicely done!',
+    celebrate: true,
+  },
+  {
+    title: 'Your turn',
+    text: 'We scrambled it with <b>two turns</b>. Solve it! Tap Hint if you get stuck, or ↶ to take a turn back.',
+    hintButton: true,
+    enter() {
+      Tut.allow(null);
+      G.history = [];
+      G.scramble = makeScramble(2);
+      runSequence(G.scramble.map((m, i) => ({ ...m, dur: 420, delay: i === 0 ? 500 : 180 })), () => { dirty = true; updateHud(); }, 'auto');
+    },
+    check: () => isSolved(G.state),
+    praise: 'You solved it!',
+    celebrate: true,
+  },
+  {
+    title: 'You’re ready!',
+    text: 'In <b>Timed Mode</b> the cube gets scrambled and the clock starts on your first swipe. Solve every face as fast as you can.',
+    info: true,
+    final: true,
+  },
+];
+
+const Tut = {
+  i: 0,
+  step: null,
+  allowed: null,
+  busy: false,
+  timer: 0,
+  acceptsInput() { return G.mode === 'tutorial' && !!this.step && !this.step.info && !this.busy; },
+  allow(list) { this.allowed = list ? new Set(list) : null; },
+  rejectMessage() { return G.mode === 'tutorial' ? 'Swipe along the glowing ring' : ''; },
+  showHint() {
+    const m = nextHintMove();
+    if (!m) { hl.hint = null; return; }
+    hl.hint = { r: m.r, dir: m.dir, slot: hintSlotFor(m.r, m.dir) };
+    dirty = true;
+  },
+  start() {
+    G.mode = 'tutorial'; G.phase = 'idle';
+    resetBoard();
+    setOverlay(titleEl, false); setOverlay(resultEl, false); setOverlay(confirmEl, false);
+    tweenViewHome(550);
+    this.go(0);
+  },
+  go(i) {
+    clearTimeout(this.timer);
+    hideToast();
+    this.i = i; this.step = TUTORIAL[i]; this.busy = false; this.allowed = new Set();
+    hl.dots.clear(); hl.rings.clear(); hl.cube.clear(); hl.hint = null;
+    coachEl.classList.remove('success');
+    $('coachStep').textContent = `${i + 1} / ${TUTORIAL.length}`;
+    $('coachTitle').textContent = this.step.title;
+    $('coachText').innerHTML = this.step.text;
+    const actions = $('coachActions');
+    actions.innerHTML = '';
+    const addBtn = (label, cls, fn) => { const b = document.createElement('button'); b.className = `btn small ${cls}`; b.textContent = label; b.addEventListener('click', () => { Sound.unlock(); Sound.click(); fn(); }); actions.appendChild(b); return b; };
+    if (this.step.final) {
+      addBtn('Menu', 'ghost', () => showTitle());
+      addBtn('Play Timed Mode', 'primary', () => { save.tutorialDone = true; persist(); startTimed(G.diff); });
+    } else if (this.step.info) {
+      addBtn('Next', 'primary', () => this.go(this.i + 1));
+    } else if (this.step.hintButton) {
+      addBtn('Hint', 'ghost', () => { this.showHint(); if (!hl.hint) toast('Already solved!'); });
+    }
+    coachEl.classList.add('show');
+    if (this.step.enter) this.step.enter();
+    if (this.step.final) { save.tutorialDone = true; persist(); }
+    updateHud();
+    layout();
+    dirty = true;
+  },
+  onMove() {
+    const st = this.step;
+    if (!st || st.info || this.busy) return;
+    if (st.check && st.check()) {
+      this.busy = true;
+      hl.hint = null; hl.rings.clear(); hl.dots.clear(); hl.cube.clear();
+      coachEl.classList.add('success');
+      $('coachStep').textContent = '✓ Nice';
+      $('coachText').innerHTML = `<b>${st.praise}</b>`;
+      $('coachActions').innerHTML = '';
+      if (st.celebrate) { burstConfetti(); Sound.solve(); }
+      updateHud();
+      this.timer = setTimeout(() => { if (G.mode === 'tutorial') this.go(this.i + 1); }, 1300);
+    } else if (st.onMove) st.onMove();
+    dirty = true;
+  },
+  exit() {
+    clearTimeout(this.timer);
+    this.step = null; this.busy = false; this.allowed = null;
+    coachEl.classList.remove('show', 'success');
+  },
+};
+
+// ===========================================================================
+// Title screen wiring
+// ===========================================================================
+const diffButtons = [...document.querySelectorAll('.diff button')];
+function refreshTitle() {
+  diffButtons.forEach((b) => b.setAttribute('aria-checked', String(b.dataset.diff === G.diff)));
+  const best = save.best[G.diff];
+  $('bestLine').innerHTML = best ? `Best on ${DIFFS[G.diff].label}: <b>${fmtTime(best)}</b>` : `No ${DIFFS[G.diff].label} time yet`;
+  $('newHere').hidden = !!save.tutorialDone;
+  $('btnTitleSound').textContent = Sound.muted ? 'Sound: off' : 'Sound: on';
+}
+diffButtons.forEach((b) => b.addEventListener('click', () => {
+  Sound.unlock(); Sound.click();
+  G.diff = b.dataset.diff; save.diff = G.diff; persist();
+  refreshTitle();
+}));
+$('btnTimed').addEventListener('click', () => { Sound.unlock(); Sound.click(); startTimed(G.diff); });
+$('btnTutorial').addEventListener('click', () => { Sound.unlock(); Sound.click(); Tut.start(); });
+$('btnAgain').addEventListener('click', () => { Sound.unlock(); Sound.click(); startTimed(G.diff); });
+$('btnResMenu').addEventListener('click', () => { Sound.click(); showTitle(); });
+$('btnHome').addEventListener('click', () => { Sound.unlock(); goHome(); });
+$('btnStay').addEventListener('click', () => { Sound.click(); setOverlay(confirmEl, false); });
+$('btnLeave').addEventListener('click', () => { Sound.click(); showTitle(); });
+btnUndo.addEventListener('click', () => { Sound.unlock(); undo(); });
+
+function setMuted(m) {
+  Sound.muted = m; save.muted = m; persist();
+  btnSound.setAttribute('aria-label', m ? 'Unmute sound' : 'Mute sound');
+  btnSound.querySelectorAll('.wave').forEach((p) => { p.hidden = m; });
+  btnSound.querySelector('.mute').hidden = !m;
+  refreshTitle();
+}
+btnSound.addEventListener('click', () => { Sound.unlock(); setMuted(!Sound.muted); Sound.click(); });
+$('btnTitleSound').addEventListener('click', () => { Sound.unlock(); setMuted(!Sound.muted); Sound.click(); });
+
+document.addEventListener('keydown', (e) => {
+  if ((e.key === 'z' || e.key === 'Z') && (e.ctrlKey || e.metaKey)) { e.preventDefault(); undo(); }
+  else if (e.key === 'Backspace' && G.mode !== 'title') { e.preventDefault(); undo(); }
+  else if (e.key === 'Escape') {
+    if (!confirmEl.classList.contains('hidden')) setOverlay(confirmEl, false);
+    else if (G.mode !== 'title') goHome();
+  }
+});
+document.addEventListener('pointerdown', () => Sound.unlock(), { passive: true });
+// Stop iOS from pinch-zooming or scrolling the page under the game.
+document.addEventListener('gesturestart', (e) => e.preventDefault());
+document.addEventListener('touchmove', (e) => { if (!e.target.closest('.overlay')) e.preventDefault(); }, { passive: false });
+
+// ===========================================================================
+// Main loop
+// ===========================================================================
+let lastT = now();
+function frame(tms) {
+  requestAnimationFrame(frame);
+  const dt = Math.min(0.05, Math.max(0, (tms - lastT) / 1000));
+  lastT = tms;
+  const hadAnim = !!anim || !!drag.live;
+  stepAnim(tms);
+  const viewMoving = stepView(tms, dt);
+  if (confetti.length) stepConfetti(dt);
+  tickTimer();
+  const pulsing = hl.dots.size || hl.rings.size || hl.cube.size || hl.hint || (hl.reject && tms < hl.reject.until + 50);
+  if (dirty || hadAnim || anim || viewMoving || confetti.length || pulsing || drag.active || orbit.active) {
+    renderCube(tms);
+    renderGraph(tms);
+    dirty = false;
+  }
+}
+
+// ===========================================================================
+// Boot
+// ===========================================================================
+if (typeof ResizeObserver !== 'undefined') {
+  new ResizeObserver(() => { sizeCanvases(); dirty = true; }).observe(stageEl);
+}
+window.addEventListener('resize', layout);
+window.addEventListener('orientationchange', () => setTimeout(layout, 120));
+setMuted(Sound.muted);
+cubeHintEl.hidden = !!save.orbited;
+showTitle();
+requestAnimationFrame(frame);
+
+// A small handle for automated tests.
+window.CubeRings = {
+  G, SLOTS, DOTS, RINGS, PERMS, PATHS, RING_POS_DIR, SLOT_RINGS, TUT_DOT, RING_TOP, RING_RIGHT,
+  applyMove, isSolved, solvedState, ringId, pIdx, facePoint, gv, view, Tut,
+  dotScreen: (s) => dotScreen(s, null, { x: 0, y: 0 }),
+  busy: () => !!anim || queue.length > 0 || drag.active,
+  preview: (r, dir, t) => { drag.live = r == null ? null : { r, dir, t }; dirty = true; },
+};
+})();
+</script>
+</body>
+</html>

@@ -142,6 +142,20 @@ fetched once; the menu holds the first fight until they arrive.
   live** with the Web Audio API — no audio files. Pure vanilla JS + Canvas 2D, no
   build step, no dependencies.
 
+## Cube Rings
+
+- **Cube Rings** (`cube-rings.html`) — a touch-first Rubik's cube puzzle played on
+  the cube's *graph*: three sets of three concentric rings, one ring per layer,
+  with every sticker a dot where two rings cross and every face a cluster of
+  nine dots. Swipe a dot along a ring and that layer turns, on the rings and on
+  the 3D cube above them (drag the cube to look around it; double-tap to reset
+  the view). **Timed Mode** scrambles the cube (Easy 2 turns, Medium 4, Hard 7,
+  Expert 20), starts the clock on your first swipe, and shows your finishing
+  time with a **Play again?** button; best times are kept per difficulty. The
+  **Tutorial** walks through faces, rings, turning back, and picking between a
+  dot's two rings, then has you solve a small scramble with hints. Undo, sound
+  and haptics included. Single file, vanilla JS + Canvas 2D, no dependencies.
+
 ## Dictionary / wordlist notes
 
 The Baker's Dozen game supports validating player words against a wordlist.
