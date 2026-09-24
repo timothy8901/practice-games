@@ -1,12 +1,12 @@
 # Token Maxxer's — Shirt Print Catalog
 
-17 game tees. Each has a **print file** (transparent PNG, 4500×4500, ready for DTG / Printful / Printify) and a **mockup** (preview image for the Shopify listing).
+16 game tees. Each has a **print file** (transparent PNG, 4500×4500, ready for DTG / Printful / Printify) and a **mockup** (preview image for the Shopify listing).
 
 ## How to publish
 
 **POD route (recommended — matches your existing tees):** in Printful/Printify, create a new product → upload `<slug>-print.png` as the front print → it generates real mockups and pushes the product to Shopify. Use the title/description/tags below.
 
-**Direct Shopify route:** Products → Import → upload `shopify-products.csv` (in this folder). It creates all 17 as **drafts** using the mockup images; review, then set each to Active. Note: Shopify products created this way still need a fulfillment/POD connection to actually ship.
+**Direct Shopify route:** Products → Import → upload `shopify-products.csv` (in this folder). It creates all 16 as **drafts** using the mockup images; review, then set each to Active. Note: Shopify products created this way still need a fulfillment/POD connection to actually ship.
 
 > Elder Story RPG is **already live** in your store (Pixel Knight Tee — Elder Quest); the print here is a refreshed version if you want to swap it.
 
@@ -47,15 +47,6 @@
 - **Price:** $20.00
 - **Print file:** `shirt-prints/kirby-abilities-print.png`
 - **Mockup:** `shirt-prints/kirby-abilities-mockup.png`
-
-### Kirby Brawler 2: Rumble Arena
-- **Tagline:** “No tokens left unmaxxed.”
-- **Suggested title:** Kirby Brawler 2: Rumble Arena Pixel Tee — Token Maxxer's
-- **Description:** Top-down rumble arena — low-poly toy-fighter pixel art.
-- **Tags:** pixel art tee, retro gaming tee, gamer shirt, gaming apparel, 8bit, video game fan, token maxxer, unisex shirt, graphic tee, geek gift, gamer gift, nerd fashion, arena fighter, brawler, 3d game
-- **Price:** $20.00
-- **Print file:** `shirt-prints/kirby-rumble-print.png`
-- **Mockup:** `shirt-prints/kirby-rumble-mockup.png`
 
 ### Street Cruiser
 - **Tagline:** “Real roads. Fake gas mileage.”

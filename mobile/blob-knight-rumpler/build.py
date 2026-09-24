@@ -31,11 +31,9 @@ KEYSTORE = os.path.expanduser('~/.android/blob-knight-rumpler.jks')
 KEYPASS = KEYSTORE + '.password'
 THREE = os.path.join(HERE, 'vendor', 'three-0.152.2.min.js')
 # The engine page this is built from: the published browser game, never modified
-# here. It was renamed on the site, so older refs still carry the Kirby-era name;
-# accept either, and rename whatever Kirby-era strings are still in it (none, on
-# any ref since the rename landed). ENGINE_MARK is what tells the game apart from
-# the redirect stub that now sits at the old name.
-ENGINE_PAGES = ('blob-knight-rumpler.html', 'kirby-rumble.html')
+# here. ENGINE_MARK is how a page is known to be the game rather than something
+# else sharing its name.
+ENGINE_PAGES = ('blob-knight-rumpler.html',)
 ENGINE_MARK = 'const ABIL = {'
 ZIP_FOLDER = 'Blob Knight Rumpler - Android'
 # The release these defaults build. Android refuses an install whose version code
@@ -95,67 +93,6 @@ def patch_all(html, what, old, new, expected):
     return html.replace(old, new)
 
 
-def rename_patch(html, what, old, new, expected=1):
-    """A rename that may already have happened upstream: applying it is optional,
-    finding it more than once is not."""
-    n = html.count(old)
-    if n == 0:
-        rename_patch.skipped.append(what)
-        return html
-    if n != expected:
-        die('the "%s" rename expected %d occurrences, found %d: %s' % (what, expected, n, old[:100]))
-    rename_patch.applied.append(what)
-    return html.replace(old, new)
-
-
-rename_patch.applied = []
-rename_patch.skipped = []
-
-
-def rename_patches(html):
-    """Every Kirby-era name the page carries, renamed for this build.
-
-    The published browser game keeps its own name; this build is Blob Knight
-    Rumpler, whose fighters are the armoured blob knights of the Thrixel art, so
-    nothing a player (or a view-source) can read may still say Kirby.
-    """
-    html = rename_patch(html, 'page title', '<title>Kirby Brawler 2 \u2014 Rumble Arena (3D)</title>',
-                 '<title>Blob Knight Rumpler</title>')
-    html = rename_patch(html, 'header title', '<h1>Kirby Brawler 2 \u2014 Rumble Arena</h1>',
-                 '<h1>Blob Knight Rumpler</h1>')
-    html = rename_patch(html, 'header blurb',
-                 'Top-down 3D arena duel. Blocky toy fighters, 8 copy abilities, 2 attacks each + shield.',
-                 'Top-down 3D arena duel. Armoured blob knights, 8 cores, 2 attacks each + shield.')
-    html = rename_patch(html, 'back link',
-                 '<a class="back-link" href="kirby-abilities.html">&larr; Play the original Kirby Brawler</a>', '')
-    # The site's page links across to the other game; the app is standalone and
-    # carries no link to it (either wording, depending on how renamed the page is).
-    html = rename_patch(html, 'sibling link',
-                        '<a class="back-link" href="kirby-abilities.html">&larr; Play Kirby Brawler</a>', '')
-    html = rename_patch(html, 'footer credit',
-                 ' &middot; sequel to <a href="kirby-abilities.html">Kirby Brawler</a>', '')
-    html = rename_patch(html, 'source banner', 'KIRBY BRAWLER 2 \u2014 RUMBLE ARENA', 'BLOB KNIGHT RUMPLER \u2014 RUMBLE ARENA')
-    html = rename_patch(html, 'builder banner', 'KIRBY BUILDER ----', 'KNIGHT BUILDER ---')
-    html = rename_patch(html, 'visible comment', '// Kirby always stays visible', '// The knight always stays visible')
-    html = rename_patch(html, 'menu blurb', 'You vs a CPU Kirby with a random ability.',
-                 'You vs a CPU knight carrying a random core.')
-    html = rename_patch(html, 'pick button', 'data-act="pick">Choose Your Kirby</button>',
-                 'data-act="pick">Choose Your Knight</button>')
-    html = rename_patch(html, 'pick title', '<div class="overlay-title">Choose Your Kirby</div>',
-                 '<div class="overlay-title">Choose Your Knight</div>')
-    html = rename_patch(html, 'victory line', '</strong> Kirby toppled the CPU', '</strong> knight toppled the CPU')
-    html = rename_patch(html, 'defeat line', '</strong> Kirby got the better of you.',
-                 '</strong> knight got the better of you.')
-    html = rename_patch(html, 'result button', '>Change Ability</button>', '>Change Knight</button>')
-    html = rename_patch(html, 'builder function', 'buildKirby', 'buildFighter', 3)
-    if rename_patch.applied:
-        print('  renamed in the page: %s' % ', '.join(rename_patch.applied))
-    if rename_patch.skipped:
-        print('  already renamed upstream: %d of %d' % (len(rename_patch.skipped),
-                                                        len(rename_patch.applied) + len(rename_patch.skipped)))
-    return html
-
-
 def stamp_source(origin):
     """Provenance for the build stamp: the commit, not the engine page's filename."""
     tail = origin.split(':')[-1]
@@ -197,7 +134,6 @@ def mobile_html(game, origin, version):
     # Let the mobile layer lower the resolution on phones that can't hold the frame rate.
     html = patch(html, 'resolution cap', 'renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));',
                  'renderer.setPixelRatio(Math.min(window.BKR_MAX_DPR || 2, window.devicePixelRatio || 1));')
-    html = rename_patches(html)
     html = patch(html, 'mobile stylesheet', '</head>', '<style id="bkr-mobile-css">\n' + css + '</style>\n</head>')
     html = patch(html, 'mobile layers', '</body>', js + '\n</body>')
     # Last, so none of the patches above can match inside the library.
