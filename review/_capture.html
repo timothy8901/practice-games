@@ -32,7 +32,7 @@
  * marble's shoulder, the playing camera *is* the cinematic one.
  */
 import { generateMaze } from '../3d-mazeball/src/generator.js';
-import { lumonFloor } from '../3d-mazeball/src/lumon.js';
+import { lumonFloor, floorSummary } from '../3d-mazeball/src/lumon.js';
 import { assembleMaze, cellCentre } from '../3d-mazeball/src/assemble.js';
 import { bodiesFor } from '../3d-mazeball/src/dynamics.js';
 import { applyOfficeTheme, OFFICE, mdrDesks } from '../3d-mazeball/src/theme.js';
@@ -60,7 +60,7 @@ viewer.style.keyGain = LIGHTING.keyGain;
 
 const run = await (await fetch('./_run.json')).json();
 const maze = run.authored
-  ? lumonFloor()
+  ? lumonFloor(run.difficulty)
   : generateMaze({ seed: run.seed, width: run.size, height: run.size });
 const world = assembleMaze(maze, { theme: 'office', walls: true });
 const bodies = bodiesFor(world);
@@ -239,7 +239,7 @@ function overlay (t, toGoal, frac) {
   octx.font = '600 15px ui-monospace, SFMono-Regular, Menlo, monospace';
   octx.fillStyle = 'rgba(240,244,246,.92)';
   octx.textBaseline = 'alphabetic';
-  octx.fillText('THE SEVERED FLOOR', 26, H - 34);
+  octx.fillText(`${floorSummary(run.difficulty).name.toUpperCase()} FLOOR`, 26, H - 34);
   octx.font = '12px ui-monospace, SFMono-Regular, Menlo, monospace';
   octx.fillStyle = 'rgba(200,212,220,.6)';
   // `shift ${run.iso}` reads as "shift the severed floor" on the authored map,
@@ -291,112 +291,131 @@ function backdrop () {
   octx.fillRect(0, H * 0.62, W, 1);
 }
 
-/** Title screen, with the prompt blinking the way an idle attract screen does. */
-function startScreen (i, total) {
-  const W = out.width, H = out.height;
-  backdrop();
-  octx.textAlign = 'center';
-
-  octx.font = `500 13px ${MONO}`;
-  octx.fillStyle = 'rgba(160,178,190,.75)';
-  octx.letterSpacing = '6px';
-  octx.fillText('LUMON INDUSTRIES', W / 2, H * 0.34);
-
-  octx.font = `700 52px ${MONO}`;
-  octx.fillStyle = 'rgba(242,246,248,.97)';
-  octx.letterSpacing = '2px';
-  octx.fillText('THE SEVERED FLOOR', W / 2, H * 0.47);
-
-  octx.font = `14px ${MONO}`;
-  octx.fillStyle = 'rgba(111,164,200,.9)';
-  octx.letterSpacing = '3px';
-  octx.fillText(`MACRODATA REFINEMENT  ·  ${run.metres} M TO THE ELEVATOR`, W / 2, H * 0.555);
-
-  // blink, then hold solid for the last stretch as if a key had been pressed
-  const pressed = i > total - 14;
-  const on = pressed || Math.floor(i / 9) % 2 === 0;
-  if (on) {
-    octx.font = `600 15px ${MONO}`;
-    octx.fillStyle = pressed ? 'rgba(242,246,248,.98)' : 'rgba(200,214,222,.7)';
-    octx.letterSpacing = '4px';
-    octx.fillText(pressed ? 'BEGIN SHIFT' : 'PRESS ANY KEY TO BEGIN SHIFT', W / 2, H * 0.72);
+/** The scene behind the screens, so the film matches the game's own scrim. */
+function sceneBackdrop () {
+  const f = run.frames[0];
+  const c = updateCam(f.p, [0, 0, -1], 1 / run.hz);
+  const mvp = viewer.beginFrame(c);
+  const T = I();
+  for (const g of world.groups) viewer.drawGroup(`static:${g.material}`, mvp, T, LIGHTING);
+  for (const d of deskPlacements) {
+    const cs = Math.cos(d.yaw), sn = Math.sin(d.yaw);
+    viewer.drawGroup('desk', mvp, new Float32Array([
+      cs, 0, -sn, 0, 0, 1, 0, 0, sn, 0, cs, 0, d.x, 0, d.z, 1,
+    ]), LIGHTING);
   }
+  octx.drawImage(gl, 0, 0, out.width, out.height);
+  octx.fillStyle = 'rgba(13,17,20,.88)';
+  octx.fillRect(0, 0, out.width, out.height);
+  octx.fillStyle = 'rgba(111,164,200,.22)';
+  octx.fillRect(0, out.height * 0.62, out.width, 1);
+}
+
+const STAGES = ['easy', 'medium', 'hard'];
+
+function label (text, x, y, { size = 14, weight = '', colour = 'rgba(242,246,248,.97)',
+                              track = '0px', align = 'center' } = {}) {
+  octx.textAlign = align;
+  octx.font = `${weight} ${size}px ${MONO}`;
+  octx.fillStyle = colour;
+  octx.letterSpacing = track;
+  octx.fillText(text, x, y);
   octx.letterSpacing = '0px';
   octx.textAlign = 'left';
+}
+
+/**
+ * The stage list, as the game now shows it. The cursor walks down to whichever
+ * floor this segment records and then commits, so the film shows the floor
+ * being chosen rather than appearing.
+ */
+function stageScreen (i, total) {
+  const W = out.width, H = out.height;
+  sceneBackdrop();
+  const want = Math.max(0, STAGES.indexOf(run.difficulty));
+  // one step every 16 frames until we reach it, then hold and flash
+  const sel = Math.min(want, Math.floor(i / 16));
+  const committing = i > total - 20 && sel === want;
+  const flash = committing && Math.floor((i - (total - 20)) / 4) % 2 === 0;
+
+  label('LUMON INDUSTRIES', W / 2, H * 0.24, { size: 12, colour: 'rgba(160,178,190,.75)', track: '6px' });
+  label('THE SEVERED FLOOR', W / 2, H * 0.34, { size: 44, weight: '700', track: '2px' });
+  label('SELECT A FLOOR', W / 2, H * 0.415, { size: 13, colour: 'rgba(111,164,200,.92)', track: '4px' });
+
+  octx.fillStyle = 'rgba(111,164,200,.24)';
+  octx.fillRect(W / 2 - 250, H * 0.455, 500, 1);
+
+  STAGES.forEach((d, k) => {
+    const y = H * 0.53 + k * 44;
+    const on = k === sel;
+    if (on) {
+      octx.fillStyle = flash ? 'rgba(111,164,200,.34)' : 'rgba(111,164,200,.16)';
+      octx.fillRect(W / 2 - 250, y - 24, 500, 36);
+      octx.fillStyle = 'rgba(111,164,200,.95)';
+      octx.fillRect(W / 2 - 250, y - 24, 3, 36);
+    }
+    const su = floorSummary(d);
+    label(su.name.toUpperCase(), W / 2 - 230, y, {
+      size: 16, weight: on ? '600' : '', align: 'left', track: '3px',
+      colour: on ? 'rgba(242,246,248,.98)' : 'rgba(150,166,176,.62)' });
+    label(`${su.metres} m`, W / 2 + 230, y, {
+      size: 12, align: 'right', colour: on ? 'rgba(111,164,200,.9)' : 'rgba(120,136,146,.5)' });
+  });
+
+  label(floorSummary(STAGES[sel]).blurb, W / 2, H * 0.755,
+    { size: 12, colour: 'rgba(150,166,176,.62)', track: '1px' });
+  label('THE WORK IS MYSTERIOUS AND IMPORTANT', W / 2, H * 0.845,
+    { size: 10.5, colour: 'rgba(150,166,176,.4)', track: '4px' });
 }
 
 /** Results card. The numbers are the run's own, not decoration. */
 function shiftComplete (i) {
   const W = out.width, H = out.height;
-  backdrop();
-  octx.textAlign = 'center';
-  const fade = Math.min(1, i / 10);
-
-  octx.globalAlpha = fade;
-  octx.font = `700 46px ${MONO}`;
-  octx.fillStyle = 'rgba(242,246,248,.97)';
-  octx.letterSpacing = '2px';
-  octx.fillText('SHIFT COMPLETE', W / 2, H * 0.40);
-
-  octx.font = `600 64px ${MONO}`;
-  octx.fillStyle = 'rgba(111,164,200,.95)';
-  octx.letterSpacing = '0px';
-  octx.fillText(`${run.seconds}s`, W / 2, H * 0.545);
-
-  octx.font = `13px ${MONO}`;
-  octx.fillStyle = 'rgba(170,186,196,.8)';
-  octx.letterSpacing = '3px';
-  octx.fillText(
-    `${run.routeRooms} ROOMS  ·  ${run.metres} M  ·  ${run.falls} FALL${run.falls === 1 ? '' : 'S'}`
-    + `  ·  ${run.clean ? 'NO ASSISTS' : 'ASSISTED'}`,
-    W / 2, H * 0.655);
+  sceneBackdrop();
+  octx.globalAlpha = Math.min(1, i / 10);
+  label('SHIFT COMPLETE', W / 2, H * 0.32, { size: 12, colour: 'rgba(160,178,190,.75)', track: '6px' });
+  label('ELEVATOR REACHED', W / 2, H * 0.44, { size: 44, weight: '700', track: '2px' });
+  label(`${run.seconds}s`, W / 2, H * 0.575, { size: 58, weight: '600', colour: 'rgba(111,164,200,.95)' });
+  label(`${run.falls} FALL${run.falls === 1 ? '' : 'S'}  ·  ${run.clean ? 'NO ASSISTS' : 'ASSISTED'}`
+        + `  ·  ${floorSummary(run.difficulty).name.toUpperCase()} FLOOR`,
+        W / 2, H * 0.66, { size: 12, colour: 'rgba(111,164,200,.92)', track: '3px' });
   octx.globalAlpha = 1;
-  octx.letterSpacing = '0px';
-  octx.textAlign = 'left';
 }
 
-/** The post-shift menu, with the selection actually moving through it. */
-const MENU = ['REFINE ANOTHER FLOOR', 'VIEW SHIFT RECORD', 'RETURN TO THE ELEVATOR'];
+/** The post-shift menu, with the selection moving through it. */
+const MENU = ['CHOOSE ANOTHER FLOOR', 'VIEW SHIFT RECORD', 'RETURN TO THE ELEVATOR'];
+const HINTS = ['back to the floor select', 'the numbers from this run', 'run this floor again'];
 function menuScreen (i, total) {
   const W = out.width, H = out.height;
-  backdrop();
-  octx.textAlign = 'center';
+  sceneBackdrop();
+  label('SHIFT RECORD FILED  ·  PLEASE SELECT', W / 2, H * 0.28,
+    { size: 12, colour: 'rgba(160,178,190,.7)', track: '5px' });
+  octx.fillStyle = 'rgba(111,164,200,.24)';
+  octx.fillRect(W / 2 - 250, H * 0.33, 500, 1);
 
-  octx.font = `500 12px ${MONO}`;
-  octx.fillStyle = 'rgba(160,178,190,.7)';
-  octx.letterSpacing = '5px';
-  octx.fillText('SHIFT RECORD FILED  ·  PLEASE SELECT', W / 2, H * 0.30);
-  octx.letterSpacing = '0px';
-
-  // walk the cursor down the list, then back to the top and commit
   let sel = 0;
-  if (i >= 22) sel = 1;
-  if (i >= 44) sel = 2;
-  if (i >= 66) sel = 0;
-  const committing = i >= total - 26;
-  const flash = committing && Math.floor((i - (total - 26)) / 4) % 2 === 0;
+  if (i >= 26) sel = 1;
+  if (i >= 52) sel = 2;
+  if (i >= 78) sel = 0;
+  const committing = i >= total - 24;
+  const flash = committing && Math.floor((i - (total - 24)) / 4) % 2 === 0;
 
-  MENU.forEach((label, k) => {
-    const y = H * 0.44 + k * 46;
+  MENU.forEach((m, k) => {
+    const y = H * 0.44 + k * 44;
     const on = k === sel;
     if (on) {
       octx.fillStyle = flash ? 'rgba(111,164,200,.34)' : 'rgba(111,164,200,.16)';
-      octx.fillRect(W / 2 - 250, y - 26, 500, 38);
+      octx.fillRect(W / 2 - 250, y - 24, 500, 36);
       octx.fillStyle = 'rgba(111,164,200,.95)';
-      octx.fillRect(W / 2 - 250, y - 26, 3, 38);
+      octx.fillRect(W / 2 - 250, y - 24, 3, 36);
     }
-    octx.font = `${on ? '600 ' : ''}17px ${MONO}`;
-    octx.fillStyle = on ? 'rgba(242,246,248,.98)' : 'rgba(150,166,176,.62)';
-    octx.letterSpacing = '2px';
-    octx.fillText(label, W / 2, y);
+    label(m, W / 2, y, { size: 15, weight: on ? '600' : '', track: '3px',
+      colour: on ? 'rgba(242,246,248,.98)' : 'rgba(150,166,176,.62)' });
   });
 
-  octx.font = `12px ${MONO}`;
-  octx.fillStyle = 'rgba(150,166,176,.45)';
-  octx.letterSpacing = '3px';
-  octx.fillText('THE WORK IS MYSTERIOUS AND IMPORTANT', W / 2, H * 0.80);
-  octx.letterSpacing = '0px';
-  octx.textAlign = 'left';
+  label(HINTS[sel], W / 2, H * 0.70, { size: 11, colour: 'rgba(150,166,176,.5)', track: '3px' });
+  label('THE WORK IS MYSTERIOUS AND IMPORTANT', W / 2, H * 0.82,
+    { size: 10.5, colour: 'rgba(150,166,176,.4)', track: '4px' });
 }
 
 /* ── the capture loop ─────────────────────────────────────────────────── */
@@ -413,8 +432,8 @@ window.captureState = () => ({ ...state, sent: n });
 window.startCapture = async () => {
   try {
     const dt = 1 / run.hz;
-    const START = 78;
-    for (let i = 0; i < START; i++) { startScreen(i, START); await send(); }
+    const START = 110;
+    for (let i = 0; i < START; i++) { stageScreen(i, START); await send(); }
 
     for (let i = 0; i < run.frames.length; i++) {
       const f = run.frames[i];
