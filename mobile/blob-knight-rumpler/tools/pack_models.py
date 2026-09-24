@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Shrink the Thrixel GLBs into phone-sized models for the web build.
+"""Shrink the Thrixel GLBs into the models the game loads, on the site and in the app.
 
     python3 tools/pack_models.py [--out DIR] [--src DIR]
 
@@ -8,7 +8,7 @@ This merges its primitives, makes the winding face outward (three.js and glTF
 agree on handedness; Unreal does not, which is why some files on disk are
 flipped for Unreal's benefit), rescales the base colour texture to a JPEG, and
 writes a minimal GLB - positions, normals, UVs, indices, one texture - that
-web/models.js can parse without a full glTF loader. About 250 KB each.
+the game page's own reader can parse without a full glTF loader. About 250 KB each.
 
 Measurements the game needs (bounding box, and for the arena the deck's height
 and radius) are written into the GLB's `extras`, so the game never guesses.
@@ -236,7 +236,7 @@ def pack(src, dst, texture_px, quality=84, arena=False):
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
     ap.add_argument('--src', default=SRC, help='thrixel_assets/mote_rumble')
-    ap.add_argument('--out', default=os.path.join(HERE, 'models'))
+    ap.add_argument('--out', default=os.path.join(REPO, 'knight-art'))
     ap.add_argument('--texture', type=int, default=512, help='texture size for the Mote bodies')
     ap.add_argument('--prop-texture', type=int, default=256, help='texture size for gauntlets and weapons')
     ap.add_argument('--arena-texture', type=int, default=1024)

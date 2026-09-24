@@ -39,8 +39,8 @@ ZIP_FOLDER = 'Blob Knight Rumpler - Android'
 # The release these defaults build. Android refuses an install whose version code
 # is not higher than the one on the phone, so raise both together for every build
 # handed out, and keep them here rather than in whoever-typed-the-command's memory.
-VERSION_NAME = '3.5'
-VERSION_CODE = 8
+VERSION_NAME = '3.6'
+VERSION_CODE = 9
 
 
 def die(msg):
@@ -105,11 +105,10 @@ def mobile_html(game, origin, version):
     """The engine page plus the mobile layer, with three.js inlined for offline play."""
     css = read(os.path.join(HERE, 'web', 'mobile.css'))
     three = read(THREE)
-    # Order matters: the loader defines BKRModels, the art layer wraps buildFighter
-    # and startFight, and the touch layer wraps renderOverlay and starts its own
-    # frame loop.
+    # The page carries its own model reader and art layer; the touch layer wraps
+    # renderOverlay and starts its own frame loop, so it goes in after them.
     layers = [(name, read(os.path.join(HERE, 'web', name)))
-              for name in ('models.js', 'thrixel-art.js', 'mobile.js')]
+              for name in ('mobile.js',)]
     js = '\n'.join('<script id="bkr-%s">\n%s</script>' % (name.replace('.js', ''), text) for name, text in layers)
     for name, text, bad in ([('three.js', three, '</script'), ('mobile.css', css, '</style')]
                             + [(n, t, '</script') for n, t in layers]):
@@ -196,9 +195,9 @@ def ensure_keystore(t, env):
 
 
 def model_files():
-    models = sorted(glob.glob(os.path.join(HERE, 'models', '*.glb')))
+    models = sorted(glob.glob(os.path.join(REPO, 'knight-art', '*.glb')))
     if not models:
-        die('no packed models in models/ - run: python3 tools/pack_models.py\n'
+        die('no packed models in knight-art/ - run: python3 mobile/blob-knight-rumpler/tools/pack_models.py\n'
             '(it needs the Thrixel art in thrixel_assets/mote_rumble, which is not in git)')
     return models
 
@@ -223,7 +222,7 @@ def build_apk(html, version_name, version_code, debuggable):
     os.makedirs(www)
     with open(os.path.join(www, 'index.html'), 'w', encoding='utf-8') as f:
         f.write(html)
-    copy_models(os.path.join(www, 'models'))
+    copy_models(os.path.join(www, 'knight-art'))
 
     android = os.path.join(HERE, 'android')
     res = os.path.join(BUILD, 'res.zip')
@@ -281,7 +280,7 @@ def package_zip(apk, html, version_name):
         z.writestr(ZIP_FOLDER + '/How to install.txt', notes)
         z.writestr(ZIP_FOLDER + '/web/index.html', html)
         for path in model_files():                                   # the web copy needs them too
-            z.write(path, ZIP_FOLDER + '/web/models/' + os.path.basename(path))
+            z.write(path, ZIP_FOLDER + '/web/knight-art/' + os.path.basename(path))
     return out
 
 

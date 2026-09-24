@@ -86,8 +86,9 @@ save string you can copy out and paste back, since progress otherwise lives only
 in that browser. Achievements keep tracking with the boosts off. Move with
 WASD / arrows,
 **`Space` jump-dodges** over swings and projectiles, `P` pauses, `M`
-mutes. It pulls Three.js from a CDN but is still a single
-self-contained HTML page.
+mutes. It pulls Three.js from a CDN, and its knights, arena and sky are
+Thrixel models loaded from `knight-art/` beside the page - about 10 MB,
+fetched once; the menu holds the first fight until they arrive.
 
 ## Grocery Tycoon
 
