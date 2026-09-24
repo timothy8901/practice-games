@@ -263,3 +263,93 @@ body.severed .sweep-day { border-radius: 1px; }
 }
 #shift-controls { display: inline-flex; align-items: center; gap: 6px; }
 #shift-controls:has(:disabled) { opacity: 0.4; }
+
+/* ── title / results / menu ────────────────────────────────────────────── */
+
+/* Ported from the capture page, which had them first because the film needed
+   them and the game did not have them. Same type and palette; DOM rather than
+   canvas-2D, because a menu wants real focus, real key handling and real hit
+   targets, and this page is already a DOM page with a canvas in it.
+
+   The live view stays rendering behind the scrim rather than being replaced by
+   a black card — a corridor softly visible behind the title is a better way in
+   than a flat slab, and it costs nothing since the frame is drawn anyway. */
+.screen {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(13, 17, 20, 0.88);
+  backdrop-filter: blur(3px);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  text-align: center;
+  cursor: pointer;
+  animation: screen-in 0.22s ease-out;
+}
+.screen[hidden] { display: none; }
+@keyframes screen-in { from { opacity: 0; } to { opacity: 1; } }
+
+.screen-card { width: min(560px, 86%); }
+.screen-card .eyebrow {
+  font-size: 11px; letter-spacing: 0.42em; text-transform: uppercase;
+  color: rgba(160, 178, 190, 0.75); margin: 0 0 18px;
+}
+.screen-card h2 {
+  margin: 0; font-size: clamp(26px, 4.4vw, 44px); letter-spacing: 0.04em;
+  color: rgba(242, 246, 248, 0.97); font-weight: 700;
+}
+.screen-card .lede {
+  margin: 14px 0 0; font-size: 12.5px; letter-spacing: 0.22em;
+  text-transform: uppercase; color: rgba(111, 164, 200, 0.92);
+}
+.screen-card .rule {
+  height: 1px; background: rgba(111, 164, 200, 0.24); margin: 26px 0;
+}
+.screen-card .clock {
+  font-size: clamp(38px, 6.4vw, 62px); font-weight: 600;
+  color: rgba(111, 164, 200, 0.95); margin: 6px 0 0; letter-spacing: 0;
+}
+.screen-card .prompt {
+  margin: 30px 0 0; font-size: 13px; letter-spacing: 0.3em;
+  color: rgba(214, 226, 233, 0.82);
+}
+/* the attract-screen blink, and a solid state the moment a key lands */
+.screen-card .prompt.blink { animation: prompt-blink 1.15s steps(1, end) infinite; }
+@keyframes prompt-blink { 0%, 55% { opacity: 1; } 56%, 100% { opacity: 0.18; } }
+
+.screen-menu { list-style: none; margin: 0; padding: 0; }
+.screen-menu li { margin: 0; }
+.screen-menu button {
+  display: block; width: 100%; text-align: center;
+  background: transparent; border: 0; border-left: 3px solid transparent;
+  padding: 13px 18px; font: inherit; font-size: 15px; letter-spacing: 0.16em;
+  color: rgba(150, 166, 176, 0.62); cursor: pointer;
+}
+.screen-menu button:hover { color: rgba(214, 226, 233, 0.9); }
+.screen-menu li[aria-selected="true"] button {
+  background: rgba(111, 164, 200, 0.16);
+  border-left-color: rgba(111, 164, 200, 0.95);
+  color: rgba(242, 246, 248, 0.98);
+  font-weight: 600;
+}
+.screen-hint {
+  margin: 20px 0 0; font-size: 11px; letter-spacing: 0.2em;
+  color: rgba(150, 166, 176, 0.5); min-height: 1.2em;
+}
+.screen-stats {
+  display: grid; grid-template-columns: repeat(2, 1fr);
+  gap: 10px 26px; margin: 22px 0 0; text-align: left;
+}
+.screen-stats div {
+  display: flex; justify-content: space-between; gap: 12px;
+  font-size: 12px; letter-spacing: 0.12em;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07); padding-bottom: 7px;
+  color: rgba(160, 178, 190, 0.72);
+}
+.screen-stats b { color: rgba(238, 243, 246, 0.95); font-weight: 600; }
+.screen-card .motto {
+  margin: 30px 0 0; font-size: 10.5px; letter-spacing: 0.3em;
+  color: rgba(150, 166, 176, 0.4);
+}

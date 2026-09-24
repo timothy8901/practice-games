@@ -191,6 +191,126 @@ function angleDelta (a, b) {
 }
 const run = { t: 0, falls: 0, started: false, finished: false, best: null, checkpoint: null };
 
+/* ── title / results / menu ───────────────────────────────────────────────
+ *
+ * Ported from the capture page, which had these first: the film needed a start
+ * screen and a screen after the level, and the game had neither — it booted
+ * straight into play and finishing only flipped a line of HUD text.
+ *
+ * Four states. `play` is the only one the simulation advances in, so the title
+ * is a real gate rather than a picture laid over a running game, and the
+ * results card cannot tick the clock past the time it is reporting.
+ *
+ * The menu items do the thing they say. In the film they were decoration and
+ * the selection moved on a timer; here they are buttons, and "refine another
+ * floor" genuinely swaps the floor.
+ */
+const screen = { at: 'title', sel: 0, since: 0, record: false };
+
+const MENU = [
+  { key: 'floor', label: 'REFINE ANOTHER FLOOR',
+    hint: () => mode.floor === 'lumon' ? 'switch to the daily generator' : 'back to the authored floor' },
+  { key: 'record', label: 'VIEW SHIFT RECORD', hint: () => 'the numbers from this run' },
+  { key: 'again', label: 'RETURN TO THE ELEVATOR', hint: () => 'run this floor again' },
+];
+
+const setScreen = at => {
+  screen.at = at;
+  screen.since = performance.now();
+  if (at !== 'menu') { screen.sel = 0; screen.record = false; }
+  renderScreen();
+};
+
+function renderScreen () {
+  const box = $('#screen'), card = $('#screen-card');
+  if (!box || !card) return;
+  if (screen.at === 'play') { box.hidden = true; card.replaceChildren(); return; }
+  box.hidden = false;
+
+  const stats = () => el('div', { class: 'screen-stats' },
+    el('div', {}, el('span', {}, 'TIME'), el('b', {}, `${run.t.toFixed(2)}s`)),
+    el('div', {}, el('span', {}, 'BEST'), el('b', {}, run.best != null ? `${run.best.toFixed(2)}s` : '—')),
+    el('div', {}, el('span', {}, 'FALLS'), el('b', {}, String(run.falls))),
+    el('div', {}, el('span', {}, 'ROOMS'), el('b', {}, String(maze?.stats.pathLength ?? 0))),
+    el('div', {}, el('span', {}, 'DISTANCE'), el('b', {}, `${maze?.stats.metres ?? 0} m`)),
+    el('div', {}, el('span', {}, 'FLOOR'),
+      el('b', {}, mode.floor === 'lumon' ? 'the severed floor' : seedInfo.iso)));
+
+  if (screen.at === 'title') {
+    card.replaceChildren(
+      el('p', { class: 'eyebrow' }, 'Lumon Industries'),
+      el('h2', {}, 'THE SEVERED FLOOR'),
+      el('p', { class: 'lede' },
+        `Macrodata Refinement · ${maze?.stats.metres ?? 0} m to the elevator`),
+      el('p', { class: 'prompt blink' }, 'PRESS ANY KEY TO BEGIN SHIFT'));
+    return;
+  }
+
+  if (screen.at === 'complete') {
+    card.replaceChildren(
+      el('p', { class: 'eyebrow' }, 'Shift complete'),
+      el('h2', {}, 'ELEVATOR REACHED'),
+      el('p', { class: 'clock' }, `${run.t.toFixed(2)}s`),
+      el('p', { class: 'lede' },
+        `${run.falls} fall${run.falls === 1 ? '' : 's'}`
+        + `${run.best != null && run.t <= run.best ? ' · personal best' : ''}`),
+      el('p', { class: 'prompt blink' }, 'PRESS ANY KEY'));
+    return;
+  }
+
+  // menu
+  //
+  // Filtered before it goes in: replaceChildren is the DOM's, not el()'s, and
+  // it stringifies a null child rather than skipping it — which put the word
+  // "null" on the menu where the stats block was not being shown.
+  card.replaceChildren(...[
+    el('p', { class: 'eyebrow' }, 'Shift record filed · please select'),
+    el('div', { class: 'rule' }),
+    el('ul', { class: 'screen-menu' }, MENU.map((m, i) => el('li',
+      { 'aria-selected': String(i === screen.sel) },
+      el('button', { type: 'button', onclick: () => chooseMenu(i) }, m.label)))),
+    el('p', { class: 'screen-hint' }, MENU[screen.sel].hint()),
+    screen.record ? stats() : null,
+    el('p', { class: 'motto' }, 'THE WORK IS MYSTERIOUS AND IMPORTANT'),
+  ].filter(Boolean));
+}
+
+function chooseMenu (i) {
+  screen.sel = i;
+  const m = MENU[i];
+  if (m.key === 'record') { screen.record = !screen.record; renderScreen(); return; }
+  if (m.key === 'floor') {
+    mode.floor = mode.floor === 'lumon' ? 'daily' : 'lumon';
+    buildWorld();                       // respawns and resets the run for us
+    setScreen('play');
+    stage.focus();
+    return;
+  }
+  run.checkpoint = null;                // "again" means from the start, not the checkpoint
+  respawn(true);
+  setScreen('play');
+  stage.focus();
+}
+
+/** Keys belong to whichever screen is up; only `play` hands them to the ball. */
+function screenKey (e) {
+  if (screen.at === 'play') return false;
+  const k = e.key.toLowerCase();
+  if (screen.at === 'title' || screen.at === 'complete') {
+    if (k === 'tab') return false;      // leave focus traversal alone
+    e.preventDefault();
+    if (screen.at === 'title') { setScreen('play'); stage.focus(); }
+    else setScreen('menu');
+    return true;
+  }
+  if (screen.at === 'menu') {
+    if (k === 'arrowdown' || k === 's') { screen.sel = (screen.sel + 1) % MENU.length; renderScreen(); e.preventDefault(); return true; }
+    if (k === 'arrowup' || k === 'w') { screen.sel = (screen.sel + MENU.length - 1) % MENU.length; renderScreen(); e.preventDefault(); return true; }
+    if (k === 'enter' || k === ' ') { chooseMenu(screen.sel); e.preventDefault(); return true; }
+  }
+  return false;
+}
+
 let ball = new Ball(BALL_R);
 
 function buildWorld () {
@@ -594,7 +714,20 @@ $('#sweep').addEventListener('click', () => {
 
 const keys = new Set();
 const stage = $('#stage');
+document.addEventListener('keydown', e => {
+  // A screen swallows the key before the ball ever sees it, so arrowing through
+  // the menu cannot also tilt the floor underneath it.
+  if (e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLInputElement) return;
+  screenKey(e);
+});
+$('#screen').addEventListener('click', e => {
+  if (e.target.closest('button')) return;          // the menu's own buttons handle themselves
+  if (screen.at === 'title') { setScreen('play'); stage.focus(); }
+  else if (screen.at === 'complete') setScreen('menu');
+});
+
 stage.addEventListener('keydown', e => {
+  if (screen.at !== 'play') return;
   if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) e.preventDefault();
   keys.add(e.key.toLowerCase());
   if (e.key.toLowerCase() === 'r') { run.falls++; respawn(); }
@@ -686,7 +819,9 @@ function frame (now) {
   readInput(dt);
   updateFollowCam(dt);
 
-  if (!input.paused && !run.finished) {
+  // The title gates the simulation rather than being laid over a running game,
+  // and the results card cannot tick the clock past the time it is reporting.
+  if (screen.at === 'play' && !input.paused && !run.finished) {
     acc += dt;
     let steps = 0;
     while (acc >= FIXED && steps < 8) {
@@ -708,8 +843,13 @@ function frame (now) {
     if (!run.finished && Math.hypot(ball.p.x - g.x, ball.p.z - g.z) < g.radius && Math.abs(ball.p.y - g.y) < 3) {
       run.finished = true;
       if (run.best == null || run.t < run.best) run.best = run.t;
+      setScreen('complete');
     }
   }
+
+  // The results card holds for a beat and then hands over to the menu, the way
+  // it does in the film. Any key skips the wait.
+  if (screen.at === 'complete' && performance.now() - screen.since > 2400) setScreen('menu');
 
   draw();
   drawHud();
@@ -1306,6 +1446,9 @@ await Promise.all([loadDoll(), loadDesk()]);
 initTurntable();
 applyGfx();
 buildWorld();
+// The title is raised once, here, rather than inside buildWorld — switching
+// floors from the toolbar mid-run should not throw you back to a title card.
+setScreen('title');
 if (!glError) raf = requestAnimationFrame(frame);
 
 /**
