@@ -1,4 +1,7 @@
 # Generated replay data for the video recorder. Regenerate with:
 #   node 3d-mazeball/record.mjs > review/_run.json
 _run.json
-review/frames/
+# Captured video frames. This file lives IN review/, so the pattern is relative
+# to it — `review/frames/` matches nothing from here, which is how 1,323 JPEGs
+# got committed once.
+frames/
