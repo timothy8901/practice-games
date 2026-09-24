@@ -80,12 +80,15 @@ permanent buff**. A core's own eight only apply while you carry that core, so a
 full save is a strong Blade rather than one unstoppable knight; the twelve
 overall always apply. The whole list, with what each unlocks, is in
 [`achievements/`](achievements/README.md) and in the game under Achievements on
-the title screen. **Boosts** on the title screen turns the lot off — no cards
-before a match and no achievement buffs — for a run on the game as it ships;
-achievements still track. Move with WASD / arrows,
+the title screen. **Settings** holds two boost switches — the pre-match cards
+and the achievement buffs, off independently — along with rebindable keys and a
+save string you can copy out and paste back, since progress otherwise lives only
+in that browser. Achievements keep tracking with the boosts off. Move with
+WASD / arrows,
 **`Space` jump-dodges** over swings and projectiles, `P` pauses, `M`
-mutes. It pulls Three.js from a CDN but is still a single
-self-contained HTML page.
+mutes. It pulls Three.js from a CDN, and its knights, arena and sky are
+Thrixel models loaded from `knight-art/` beside the page - about 10 MB,
+fetched once; the menu holds the first fight until they arrive.
 
 ## Grocery Tycoon
 

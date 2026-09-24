@@ -268,6 +268,12 @@
         subs[1].innerHTML = 'Pause with the button at the top of the screen' + (IN_APP ? ' or your phone\'s Back button.' : '.');
       }
     }
+    if (TOUCH && game.phase === 'settings') {
+      // there is no keyboard to rebind with on a phone, so the whole controls
+      // block would be a dead end: the buttons at the bottom of the screen are it.
+      const keys = card.querySelector('#set-controls');
+      if (keys) keys.remove();
+    }
     if (game.phase === 'menu' || game.phase === 'paused') {
       // the title card's choices are the mode tiles, so it has no button row of
       // its own to hang this on: give it one, since the top bar is fight-only.
@@ -407,7 +413,10 @@
         case 'foe': game.phase = 'pick'; break;
         case 'rules': game.phase = game.mode === 'survival' ? 'pick' : 'foe'; break;
         case 'draft': game.phase = 'rules'; break;
-        case 'achv': game.phase = 'menu'; break;
+        // Back out of the achievements list to wherever it was opened from - from
+        // the pause card that is the paused match, not the title screen.
+        case 'achv': game.phase = game.achvFrom === 'paused' ? 'paused' : 'menu'; break;
+        case 'settings': game.phase = 'menu'; break;
         // a run abandoned from these screens still counts what it cleared
         case 'result': case 'roundover': quitToMenu(); sfx.select(); return true;
         default: return false;   // title menu: let Android close the app

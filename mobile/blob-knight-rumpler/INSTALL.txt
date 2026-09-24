@@ -3,7 +3,7 @@ BLOB KNIGHT RUMPLER  (Android, version {version})
 
 WHAT'S IN HERE
   BlobKnightRumpler.apk   the game as an Android app. Plays offline.
-  web/                    the same game as a web page (index.html + models/),
+  web/                    the same game as a web page (index.html + knight-art/),
                           for putting on a website; see the bottom of this file
 
 INSTALL ON YOUR PHONE  (Android 7.0 or newer)
@@ -42,9 +42,13 @@ HOW TO PLAY
   earn it. Each one also unlocks a small permanent buff - a knight's own eight
   only help while you are carrying that knight, the twelve overall always count.
 
-  BOOSTS - the toggle on the title screen. Turn it off and you get no card
-  before a match and none of the achievement buffs: just the knight and the
-  arena. Achievements still tick over either way.
+  SETTINGS - on the title screen. Two boost switches, off independently: CARDS
+  (the three dealt before a match) and BUFFS (what your achievements have
+  unlocked). Turn both off for just the knight and the arena; achievements still
+  tick over either way. Settings also holds your SAVE - everything lives in this
+  phone's browser storage, so copy the string somewhere safe if you care about
+  it, and paste it back to restore. (Key rebinding is there on a computer; a
+  phone has no keyboard to rebind.)
 
   TWO MODES
     1v1        pick your knight and the challenger's (or leave it random), then
@@ -59,7 +63,7 @@ UPDATING
   A newer APK installs over this one (same signing key), no uninstall needed.
 
 PLAY IT IN A BROWSER INSTEAD
-  web/ holds the whole game: index.html plus its models. Put the folder on any
+  web/ holds the whole game: index.html plus its knight-art/ models. Put the folder on any
   website (your games page, itch.io as an HTML game) and open that link on a
   phone. It goes full screen on the first tap; hold the phone sideways. On a
   computer it plays with the keyboard: WASD or arrows to move, Space jump,

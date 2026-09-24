@@ -31,15 +31,16 @@ KEYSTORE = os.path.expanduser('~/.android/blob-knight-rumpler.jks')
 KEYPASS = KEYSTORE + '.password'
 THREE = os.path.join(HERE, 'vendor', 'three-0.152.2.min.js')
 # The engine page this is built from: the published browser game, never modified
-# here. It is being renamed on the site, so accept either name, and rename whatever
-# Kirby-era strings are still in it (none, once the renamed page reaches main).
-ENGINE_PAGES = ('blob-knight-rumpler.html', 'kirby-rumble.html')
+# here. ENGINE_MARK is how a page is known to be the game rather than something
+# else sharing its name.
+ENGINE_PAGES = ('blob-knight-rumpler.html',)
+ENGINE_MARK = 'const ABIL = {'
 ZIP_FOLDER = 'Blob Knight Rumpler - Android'
 # The release these defaults build. Android refuses an install whose version code
 # is not higher than the one on the phone, so raise both together for every build
 # handed out, and keep them here rather than in whoever-typed-the-command's memory.
-VERSION_NAME = '3.3'
-VERSION_CODE = 6
+VERSION_NAME = '3.6'
+VERSION_CODE = 9
 
 
 def die(msg):
@@ -68,10 +69,13 @@ def read_game(args):
             continue
         text = subprocess.run(git + ['show', args.ref + ':' + page], check=True,
                               capture_output=True, encoding='utf-8').stdout
+        if ENGINE_MARK not in text:
+            continue        # the redirect left at the old name, not the game
         last = subprocess.run(git + ['log', '-1', '--format=%h %cs', args.ref, '--', page],
                               check=True, capture_output=True, encoding='utf-8').stdout.strip()
         return text, '%s:%s (last changed %s)' % (args.ref, page, last)
-    die('none of %s exist at %s - pass --source FILE' % (' / '.join(ENGINE_PAGES), args.ref))
+    die('no game page at %s - looked for %s carrying "%s". Pass --source FILE.'
+        % (args.ref, ' / '.join(ENGINE_PAGES), ENGINE_MARK))
 
 
 def patch(html, what, old, new):
@@ -89,67 +93,6 @@ def patch_all(html, what, old, new, expected):
     return html.replace(old, new)
 
 
-def rename_patch(html, what, old, new, expected=1):
-    """A rename that may already have happened upstream: applying it is optional,
-    finding it more than once is not."""
-    n = html.count(old)
-    if n == 0:
-        rename_patch.skipped.append(what)
-        return html
-    if n != expected:
-        die('the "%s" rename expected %d occurrences, found %d: %s' % (what, expected, n, old[:100]))
-    rename_patch.applied.append(what)
-    return html.replace(old, new)
-
-
-rename_patch.applied = []
-rename_patch.skipped = []
-
-
-def rename_patches(html):
-    """Every Kirby-era name the page carries, renamed for this build.
-
-    The published browser game keeps its own name; this build is Blob Knight
-    Rumpler, whose fighters are the armoured blob knights of the Thrixel art, so
-    nothing a player (or a view-source) can read may still say Kirby.
-    """
-    html = rename_patch(html, 'page title', '<title>Kirby Brawler 2 \u2014 Rumble Arena (3D)</title>',
-                 '<title>Blob Knight Rumpler</title>')
-    html = rename_patch(html, 'header title', '<h1>Kirby Brawler 2 \u2014 Rumble Arena</h1>',
-                 '<h1>Blob Knight Rumpler</h1>')
-    html = rename_patch(html, 'header blurb',
-                 'Top-down 3D arena duel. Blocky toy fighters, 8 copy abilities, 2 attacks each + shield.',
-                 'Top-down 3D arena duel. Armoured blob knights, 8 cores, 2 attacks each + shield.')
-    html = rename_patch(html, 'back link',
-                 '<a class="back-link" href="kirby-abilities.html">&larr; Play the original Kirby Brawler</a>', '')
-    # The site's page links across to the other game; the app is standalone and
-    # carries no link to it (either wording, depending on how renamed the page is).
-    html = rename_patch(html, 'sibling link',
-                        '<a class="back-link" href="kirby-abilities.html">&larr; Play Kirby Brawler</a>', '')
-    html = rename_patch(html, 'footer credit',
-                 ' &middot; sequel to <a href="kirby-abilities.html">Kirby Brawler</a>', '')
-    html = rename_patch(html, 'source banner', 'KIRBY BRAWLER 2 \u2014 RUMBLE ARENA', 'BLOB KNIGHT RUMPLER \u2014 RUMBLE ARENA')
-    html = rename_patch(html, 'builder banner', 'KIRBY BUILDER ----', 'KNIGHT BUILDER ---')
-    html = rename_patch(html, 'visible comment', '// Kirby always stays visible', '// The knight always stays visible')
-    html = rename_patch(html, 'menu blurb', 'You vs a CPU Kirby with a random ability.',
-                 'You vs a CPU knight carrying a random core.')
-    html = rename_patch(html, 'pick button', 'data-act="pick">Choose Your Kirby</button>',
-                 'data-act="pick">Choose Your Knight</button>')
-    html = rename_patch(html, 'pick title', '<div class="overlay-title">Choose Your Kirby</div>',
-                 '<div class="overlay-title">Choose Your Knight</div>')
-    html = rename_patch(html, 'victory line', '</strong> Kirby toppled the CPU', '</strong> knight toppled the CPU')
-    html = rename_patch(html, 'defeat line', '</strong> Kirby got the better of you.',
-                 '</strong> knight got the better of you.')
-    html = rename_patch(html, 'result button', '>Change Ability</button>', '>Change Knight</button>')
-    html = rename_patch(html, 'builder function', 'buildKirby', 'buildFighter', 3)
-    if rename_patch.applied:
-        print('  renamed in the page: %s' % ', '.join(rename_patch.applied))
-    if rename_patch.skipped:
-        print('  already renamed upstream: %d of %d' % (len(rename_patch.skipped),
-                                                        len(rename_patch.applied) + len(rename_patch.skipped)))
-    return html
-
-
 def stamp_source(origin):
     """Provenance for the build stamp: the commit, not the engine page's filename."""
     tail = origin.split(':')[-1]
@@ -159,14 +102,13 @@ def stamp_source(origin):
 
 
 def mobile_html(game, origin, version):
-    """The engine page plus the mobile layer, renamed, with three.js inlined for offline play."""
+    """The engine page plus the mobile layer, with three.js inlined for offline play."""
     css = read(os.path.join(HERE, 'web', 'mobile.css'))
     three = read(THREE)
-    # Order matters: rename.js renames the cores before anything draws, the loader
-    # defines BKRModels, the art layer wraps buildFighter and startFight, and the touch
-    # layer wraps renderOverlay and starts its own frame loop.
+    # The page carries its own model reader and art layer; the touch layer wraps
+    # renderOverlay and starts its own frame loop, so it goes in after them.
     layers = [(name, read(os.path.join(HERE, 'web', name)))
-              for name in ('rename.js', 'models.js', 'thrixel-art.js', 'mobile.js')]
+              for name in ('mobile.js',)]
     js = '\n'.join('<script id="bkr-%s">\n%s</script>' % (name.replace('.js', ''), text) for name, text in layers)
     for name, text, bad in ([('three.js', three, '</script'), ('mobile.css', css, '</style')]
                             + [(n, t, '</script') for n, t in layers]):
@@ -191,7 +133,8 @@ def mobile_html(game, origin, version):
     # Let the mobile layer lower the resolution on phones that can't hold the frame rate.
     html = patch(html, 'resolution cap', 'renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));',
                  'renderer.setPixelRatio(Math.min(window.BKR_MAX_DPR || 2, window.devicePixelRatio || 1));')
-    html = rename_patches(html)
+    # The site calls it "(3D)" to set it apart from its 2D neighbours; the app needs no qualifier.
+    html = patch(html, 'app title', '<title>Blob Knight Rumpler (3D)</title>', '<title>Blob Knight Rumpler</title>')
     html = patch(html, 'mobile stylesheet', '</head>', '<style id="bkr-mobile-css">\n' + css + '</style>\n</head>')
     html = patch(html, 'mobile layers', '</body>', js + '\n</body>')
     # Last, so none of the patches above can match inside the library.
@@ -252,9 +195,9 @@ def ensure_keystore(t, env):
 
 
 def model_files():
-    models = sorted(glob.glob(os.path.join(HERE, 'models', '*.glb')))
+    models = sorted(glob.glob(os.path.join(REPO, 'knight-art', '*.glb')))
     if not models:
-        die('no packed models in models/ - run: python3 tools/pack_models.py\n'
+        die('no packed models in knight-art/ - run: python3 mobile/blob-knight-rumpler/tools/pack_models.py\n'
             '(it needs the Thrixel art in thrixel_assets/mote_rumble, which is not in git)')
     return models
 
@@ -279,7 +222,7 @@ def build_apk(html, version_name, version_code, debuggable):
     os.makedirs(www)
     with open(os.path.join(www, 'index.html'), 'w', encoding='utf-8') as f:
         f.write(html)
-    copy_models(os.path.join(www, 'models'))
+    copy_models(os.path.join(www, 'knight-art'))
 
     android = os.path.join(HERE, 'android')
     res = os.path.join(BUILD, 'res.zip')
@@ -337,7 +280,7 @@ def package_zip(apk, html, version_name):
         z.writestr(ZIP_FOLDER + '/How to install.txt', notes)
         z.writestr(ZIP_FOLDER + '/web/index.html', html)
         for path in model_files():                                   # the web copy needs them too
-            z.write(path, ZIP_FOLDER + '/web/models/' + os.path.basename(path))
+            z.write(path, ZIP_FOLDER + '/web/knight-art/' + os.path.basename(path))
     return out
 
 

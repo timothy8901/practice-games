@@ -6,11 +6,8 @@ every fighter renamed to the core it wears. Produces an installable Android app
 and a zip to hand around.
 
 The engine page is `blob-knight-rumpler.html` - the published browser game,
-which this build reads and never modifies. It still accepts the page under its
-old name (`kirby-rumble.html`) on a ref where the rename has not landed yet, and
-renames every name from that era on the way in (`rename_patches()` in build.py,
-and web/rename.js for the fighters), so nothing in the app or its page carries
-the old name.
+which this build reads and never modifies. The build checks the page it reads
+actually carries the engine before building it.
 
 The page brings its own single-player modes - a 1v1 duel with the rules you set,
 and the survival ladder - so this build only has to make them work under a thumb.
@@ -33,7 +30,7 @@ notes (`INSTALL.txt`) and `web/index.html`, the same page as a single web file.
 
 - **The page.** `build.py` takes the engine page from `origin/main` (or
   `--source FILE`), inlines three.js r152 from `vendor/` so it runs offline, and
-  injects `web/mobile.css` and the four layers in `web/`. It also patches lines of the
+  injects `web/mobile.css` and the touch layer, `web/mobile.js`. It also patches lines of the
   game: the viewport meta, the renderer height (full screen), the resolution cap
   (so slow phones can lower it) and the two lines that read movement keys (they
   also read the touch stick's `game.input.ax/az`).
@@ -48,10 +45,11 @@ notes (`INSTALL.txt`) and `web/index.html`, the same page as a single web file.
   down the menus - rules to challenger to knight to title - and ends a survival
   run from the round or result card). They switch on
   for touchscreens; `?touch=1` / `?touch=0` force them on or off.
-- **The art** (`web/thrixel-art.js`, `web/models.js`, `models/`): each ability maps
-  to the core built from it for Mote Rumble - sword/Blade, beam/Arc, cutter/Disc,
-  hammer/Maul, archer/Bow, fire/Flare, bomb/Cinder, parasol/Veil, which is also how
-  they are named on screen (web/rename.js) - so a fighter is
+- **The art** comes with the page: its model reader and art layer are inline in
+  `blob-knight-rumpler.html`, and the models in `knight-art/` at the repo root are
+  copied into the app. Each fighter is one of the eight cores built for Mote Rumble -
+  Blade, Arc, Disc, Maul, Bow, Flare, Cinder and Veil, which are also the engine's
+  own keys for them - so a fighter is
   a Mote body, its two floating gauntlets and its weapon, on the stone arena with
   the floating islands behind it. The rig is untouched: the layer swaps what
   `parts.body`, the arm pivots and `parts.weapon` look like, nothing about how they
@@ -60,7 +58,7 @@ notes (`INSTALL.txt`) and `web/index.html`, the same page as a single web file.
   `tools/pack_models.py` turns the 10 MB Thrixel GLBs into ~300 KB ones (the
   geometry is already small; the 2048px PBR textures are what weighed) and
   measures the arena's deck so the game seats it exactly. Run it after changing
-  the art; `models/` is committed, `thrixel_assets/` is not.
+  the art; `knight-art/` is committed, `thrixel_assets/` is not.
 - **The app** (`android/`): one Activity with a full-screen WebView. The page is
   served from a virtual https host backed by the APK's assets rather than from
   file://, so `fetch()` can read the models and nothing on the phone's filesystem
