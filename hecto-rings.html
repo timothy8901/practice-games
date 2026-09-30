@@ -1,0 +1,2569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#f4f1ea" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#191715" media="(prefers-color-scheme: dark)">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>Hecto Rings</title>
+<meta name="description" content="A 100-faced twisty puzzle: a round ball of 100 triangles tiled 32 to an edge, 102,400 tiles riding 1,664 rings. Swipe a ring on the dial or drag a tile on the 3D puzzle to turn it.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-1.12 -1.12 2.24 2.24'%3E%3Cg stroke='%23221f1d' stroke-width='.07' stroke-linejoin='round'%3E%3Cpath d='M0 0 0-1 .866-.5z' fill='%23d9372b'/%3E%3Cpath d='M0 0 .866-.5.866.5z' fill='%23f28322'/%3E%3Cpath d='M0 0 .866.5 0 1z' fill='%23f7c11e'/%3E%3Cpath d='M0 0 0 1-.866.5z' fill='%231f8a4a'/%3E%3Cpath d='M0 0-.866.5-.866-.5z' fill='%232862d8'/%3E%3Cpath d='M0 0-.866-.5 0-1z' fill='%237b45c9'/%3E%3C/g%3E%3Cg fill='none' stroke='%23fff' stroke-width='.08'%3E%3Ccircle r='.36'/%3E%3Ccircle r='.66'/%3E%3C/g%3E%3C/svg%3E">
+<style>
+  :root {
+    /* Layout: a HUD bar over the stage; the 3D puzzle fills the stage and the ring dial sits under it on phones, beside it when wide. */
+    --bg: #f4f1ea;
+    --bg-hi: #fbf9f4;
+    --bg-deep: #e8e1d3;
+    --card: #fffdf8;
+    --ink: #26221f;
+    --on-ink: #ffffff;
+    --muted: #776e63;
+    --faint: #a39a8d;
+    --line: #ddd5c7;
+    --chip: #ece6da;
+    --accent: #6c47ff;
+    --accent-soft: #eee9ff;
+    --on-accent: #ffffff;
+    --good: #1c8a4a;
+    --good-soft: #dff3e6;
+    --warn: #e0452f;
+    --prize: #fff1bf;
+    --prize-ink: #7a5200;
+    --scrim: rgba(244, 241, 234, .72);
+    --scrim-soft: rgba(244, 241, 234, .6);
+    --body: #221f1d;
+    --floor: rgba(60, 45, 30, .22);
+    --shadow: 0 14px 34px rgba(38, 34, 31, .16), 0 2px 8px rgba(38, 34, 31, .08);
+    --shadow-sm: 0 1px 0 rgba(0, 0, 0, .04), 0 4px 12px rgba(38, 34, 31, .10);
+    --font: ui-rounded, "SF Pro Rounded", "Nunito", "Segoe UI Variable Display", "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #191715; --bg-hi: #221f1c; --bg-deep: #100f0e; --card: #26231f; --ink: #f2ede5; --on-ink: #1a1816;
+      --muted: #a79d90; --faint: #7b7368; --line: #3b3631; --chip: #312d29; --accent: #9178ff; --accent-soft: #2d2550;
+      --on-accent: #ffffff; --good: #45c27a; --good-soft: #1d3a29; --warn: #ff6a52; --prize: #4a3b12; --prize-ink: #ffd878;
+      --scrim: rgba(25, 23, 21, .74); --scrim-soft: rgba(25, 23, 21, .6); --body: #0d0c0b; --floor: rgba(0, 0, 0, .5);
+      --shadow: 0 14px 34px rgba(0, 0, 0, .45), 0 2px 8px rgba(0, 0, 0, .3);
+      --shadow-sm: 0 1px 0 rgba(255, 255, 255, .03), 0 4px 12px rgba(0, 0, 0, .35);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #191715; --bg-hi: #221f1c; --bg-deep: #100f0e; --card: #26231f; --ink: #f2ede5; --on-ink: #1a1816;
+    --muted: #a79d90; --faint: #7b7368; --line: #3b3631; --chip: #312d29; --accent: #9178ff; --accent-soft: #2d2550;
+    --on-accent: #ffffff; --good: #45c27a; --good-soft: #1d3a29; --warn: #ff6a52; --prize: #4a3b12; --prize-ink: #ffd878;
+    --scrim: rgba(25, 23, 21, .74); --scrim-soft: rgba(25, 23, 21, .6); --body: #0d0c0b; --floor: rgba(0, 0, 0, .5);
+    --shadow: 0 14px 34px rgba(0, 0, 0, .45), 0 2px 8px rgba(0, 0, 0, .3);
+    --shadow-sm: 0 1px 0 rgba(255, 255, 255, .03), 0 4px 12px rgba(0, 0, 0, .35);
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); overscroll-behavior: none; }
+  body {
+    position: fixed; inset: 0; overflow: hidden;
+    font-family: var(--font);
+    -webkit-user-select: none; user-select: none;
+    -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none;
+    -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+  }
+  button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulation; -webkit-appearance: none; appearance: none; }
+  button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  [hidden] { display: none !important; }
+
+  #app {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    background: radial-gradient(130% 75% at 50% 0%, var(--bg-hi) 0%, var(--bg) 55%, var(--bg-deep) 100%);
+  }
+
+  /* ---------- HUD ---------- */
+  #hud { flex: none; display: flex; align-items: center; gap: 8px; padding: 8px 14px 2px; min-height: 62px; }
+  #hud.off { display: none; }
+  .icon-btn {
+    flex: none; width: 46px; height: 46px; border-radius: 15px; border: 0; padding: 0;
+    background: var(--card); box-shadow: var(--shadow-sm);
+    display: grid; place-items: center; transition: transform .12s ease, opacity .2s ease;
+  }
+  .icon-btn:active { transform: scale(.93); }
+  .icon-btn:disabled { opacity: .32; cursor: default; }
+  .icon-btn svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+  .hud-mid { flex: 1; min-width: 0; text-align: center; }
+  #timer { font-size: 31px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: .01em; line-height: 1; }
+  #timer.idle { color: var(--faint); }
+  #timer.done { color: var(--good); }
+  #timer.label { font-size: 22px; letter-spacing: 0; }
+  #hudSub { margin-top: 4px; font-size: 12.5px; font-weight: 700; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+
+  /* ---------- Stage ---------- */
+  #stage {
+    flex: 1; min-height: 0; position: relative; display: grid;
+    grid-template-columns: 100%; grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-areas: "coach" "view" "dial";
+  }
+  #stage.landscape {
+    grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto minmax(0, 1fr);
+    grid-template-areas: "coach dial" "view dial";
+  }
+  #viewWrap { grid-area: view; position: relative; min-height: 0; min-width: 0; overflow: hidden; }
+  canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+  #viewWrap canvas { position: absolute; inset: 0; }
+  #glCanvas { pointer-events: none; }
+  #floorShadow {
+    position: absolute; left: 0; top: 0; width: 100px; height: 100px; border-radius: 50%; pointer-events: none;
+    background: radial-gradient(closest-side, var(--floor), transparent); transform-origin: 0 0;
+  }
+  #glNote {
+    position: absolute; left: 16px; right: 16px; top: 40%; text-align: center; font-size: 14px; font-weight: 700;
+    color: var(--muted); line-height: 1.4; pointer-events: none;
+  }
+  #viewHint {
+    position: absolute; left: 14px; right: 14px; top: 2px; text-align: center;
+    font-size: 11.5px; font-weight: 700; color: var(--faint); pointer-events: none; transition: opacity .4s;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .title-mode #viewHint, .title-mode #viewTools { opacity: 0; pointer-events: none; }
+  @media (max-width: 440px) { #zoomHint { display: none; } }
+  #viewTools { position: absolute; left: 14px; right: 14px; bottom: 6px; display: flex; gap: 6px; justify-content: center; }
+  .pill {
+    border: 0; border-radius: 99px; padding: 7px 14px; min-height: 34px; font-size: 13.5px; font-weight: 800; white-space: nowrap;
+    background: var(--card); color: var(--ink); box-shadow: var(--shadow-sm); transition: transform .12s ease, opacity .2s;
+  }
+  .pill:active { transform: scale(.95); }
+  .pill:disabled { opacity: .4; cursor: default; }
+  .pill.strong { background: var(--ink); color: var(--on-ink); }
+
+  /* ---------- Ring dial ---------- */
+  #dialPanel { grid-area: dial; position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0; padding: 0 14px 6px; }
+  #stage.landscape #dialPanel { padding: 6px 14px 10px 4px; }
+  .dial-bar { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 42px; }
+  #dialWrap { flex: 1; min-height: 0; position: relative; }
+  .mini-btn {
+    flex: none; width: 36px; height: 36px; border: 0; border-radius: 11px; padding: 0;
+    background: var(--card); box-shadow: var(--shadow-sm); font-size: 19px; font-weight: 800; line-height: 1;
+    display: grid; place-items: center; transition: transform .12s ease, opacity .2s;
+  }
+  .mini-btn.wide { width: 46px; font-size: 21px; }
+  .mini-btn:active { transform: scale(.93); }
+  .mini-btn:disabled { opacity: .35; cursor: default; }
+  .picker { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .pick-label { min-width: 84px; text-align: center; line-height: 1.05; }
+  .pick-label b { display: block; font-size: 15px; font-weight: 800; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .pick-label small { display: block; font-size: 11px; font-weight: 700; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .seg { display: flex; background: var(--chip); border-radius: 12px; padding: 3px; gap: 2px; }
+  .seg button {
+    border: 0; background: transparent; border-radius: 9px; padding: 6px 11px; min-height: 32px;
+    font-size: 13.5px; font-weight: 800; color: var(--muted); transition: background .15s, color .15s;
+  }
+  .seg button[aria-checked="true"] { background: var(--card); color: var(--ink); box-shadow: var(--shadow-sm); }
+  .seg button:disabled { opacity: .45; cursor: default; }
+
+  /* ---------- Tutorial coach ---------- */
+  #coach {
+    grid-area: coach; margin: 2px 14px 4px; padding: 12px 14px 12px; background: var(--card);
+    border-radius: 18px; box-shadow: var(--shadow); display: none;
+  }
+  #coach.show { display: block; animation: pop .28s ease-out; }
+  #stage.landscape #coach { margin: 4px 8px 4px 14px; max-width: 480px; }
+  .coach-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .coach-step { flex: none; font-size: 11px; font-weight: 800; letter-spacing: .08em; color: var(--accent); background: var(--accent-soft); padding: 3px 8px; border-radius: 99px; }
+  .coach-title { font-weight: 800; font-size: 16.5px; }
+  #coachText { margin: 0; font-size: 14.5px; line-height: 1.38; color: var(--ink); opacity: .86; }
+  #coach.success .coach-step { background: var(--good-soft); color: var(--good); }
+  .coach-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px; flex-wrap: wrap; }
+  .coach-actions:empty { display: none; }
+
+  /* ---------- Buttons ---------- */
+  .btn {
+    border: 0; border-radius: 16px; padding: 12px 18px; font-weight: 800; font-size: 16px;
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px; text-decoration: none;
+    transition: transform .12s ease, box-shadow .2s ease, background .2s ease;
+  }
+  .btn:active { transform: scale(.97); }
+  .btn.primary { background: var(--ink); color: var(--on-ink); box-shadow: 0 8px 18px rgba(38, 34, 31, .24); }
+  .btn.accent { background: var(--accent); color: var(--on-accent); box-shadow: 0 8px 18px rgba(108, 71, 255, .28); }
+  .btn.ghost { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 2px var(--line); }
+  .btn.big { width: 100%; min-height: 56px; font-size: 18.5px; border-radius: 18px; }
+  .btn.small { padding: 9px 15px; font-size: 14.5px; border-radius: 12px; min-height: 42px; }
+  .btn svg { width: 20px; height: 20px; fill: currentColor; }
+
+  /* ---------- Overlays ---------- */
+  .overlay {
+    position: absolute; inset: 0; z-index: 20; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: calc(14px + env(safe-area-inset-top)) 16px calc(14px + env(safe-area-inset-bottom));
+    background: var(--scrim);
+    -webkit-backdrop-filter: blur(2.5px); backdrop-filter: blur(2.5px);
+    transition: opacity .25s ease, visibility .25s; overflow-y: auto;
+  }
+  .overlay.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+  .card {
+    width: 100%; max-width: 400px; background: var(--card); border-radius: 26px; box-shadow: var(--shadow);
+    padding: 22px 20px 18px; text-align: center; margin: auto 0;
+  }
+  .overlay:not(.hidden) .card { animation: pop .3s ease-out; }
+  @keyframes pop { from { transform: translateY(10px) scale(.97); opacity: 0; } to { transform: none; opacity: 1; } }
+
+  /* Title: the live puzzle spins above the menu card */
+  #titleScreen { justify-content: flex-end; -webkit-backdrop-filter: none; backdrop-filter: none; background: none; }
+  #stage.landscape ~ #titleScreen { justify-content: center; background: var(--scrim-soft); }
+  .title-card { padding-top: 18px; margin: 0; }
+  .brand { display: flex; align-items: center; justify-content: center; gap: 10px; }
+  .logo { width: 50px; height: 50px; flex: none; }
+  .title-card h1 { margin: 0; font-size: clamp(25px, 8vw, 34px); font-weight: 900; letter-spacing: -.025em; line-height: 1; white-space: nowrap; }
+  .tagline { margin: 8px auto 14px; max-width: 320px; color: var(--muted); font-size: 14.5px; line-height: 1.38; font-weight: 600; text-wrap: balance; }
+  .menu { display: grid; gap: 8px; }
+  .diff { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .diff button {
+    border: 0; background: var(--chip); border-radius: 13px; padding: 7px 2px; min-height: 48px;
+    font-weight: 800; font-size: 14px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+    transition: background .15s, color .15s, transform .12s;
+  }
+  .diff button:active { transform: scale(.95); }
+  .diff button small { font-size: 11px; font-weight: 700; color: var(--muted); }
+  .diff button[aria-checked="true"] { background: var(--ink); color: var(--on-ink); }
+  .diff button[aria-checked="true"] small { color: var(--on-ink); opacity: .72; }
+  .best-line { font-size: 13.5px; color: var(--muted); font-weight: 700; min-height: 18px; margin: 2px 0 2px; font-variant-numeric: tabular-nums; }
+  .best-line b { color: var(--ink); }
+  .badge { font-size: 11.5px; font-weight: 800; color: var(--on-accent); background: var(--accent); padding: 3px 8px; border-radius: 99px; letter-spacing: .02em; }
+  .title-foot { display: flex; flex-wrap: wrap; justify-content: center; gap: 2px 12px; margin-top: 8px; font-size: 13.5px; font-weight: 700; }
+  .title-foot a, .title-foot button { color: var(--muted); text-decoration: none; background: none; border: 0; padding: 6px 4px; white-space: nowrap; }
+
+  /* Results */
+  .result-kicker { font-weight: 900; font-size: 14px; letter-spacing: .16em; text-transform: uppercase; color: var(--good); }
+  .result-time { font-size: 60px; font-weight: 900; font-variant-numeric: tabular-nums; letter-spacing: -.02em; line-height: 1.05; margin: 6px 0 2px; }
+  .result-caption { font-size: 12px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+  .result-meta { color: var(--muted); font-weight: 700; font-size: 15px; margin-top: 8px; }
+  .result-best { margin: 14px 0 16px; font-weight: 800; font-size: 14.5px; background: var(--chip); border-radius: 12px; padding: 9px 10px; font-variant-numeric: tabular-nums; }
+  .result-best.new { background: var(--prize); color: var(--prize-ink); }
+  .stack { display: grid; gap: 10px; }
+
+  /* Confirm and help */
+  .confirm-card h2, .help-card h2 { margin: 4px 0 6px; font-size: 22px; text-wrap: balance; }
+  .confirm-card p { margin: 0 0 16px; color: var(--muted); font-weight: 600; }
+  .help-card { max-width: 440px; text-align: left; }
+  .help-card h2 { text-align: center; }
+  .help-list { margin: 10px 0 12px; padding: 0; list-style: none; display: grid; gap: 9px; }
+  .help-list li { font-size: 14px; line-height: 1.4; color: var(--muted); font-weight: 600; }
+  .help-list b { color: var(--ink); }
+  .facts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 0 0 14px; }
+  .fact { background: var(--chip); border-radius: 12px; padding: 7px 4px 6px; text-align: center; }
+  .fact b { display: block; font-size: 17px; font-weight: 900; font-variant-numeric: tabular-nums; }
+  .fact small { display: block; font-size: 10.5px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  kbd {
+    font-family: inherit; font-size: 12px; font-weight: 800; color: var(--ink); background: var(--chip);
+    border-radius: 6px; padding: 1px 6px; box-shadow: inset 0 -1px 0 var(--line);
+  }
+  .help-note { margin: 0 0 14px; font-size: 12.5px; line-height: 1.4; color: var(--muted); font-weight: 600; }
+
+  /* Toast */
+  #toast {
+    position: absolute; left: 50%; top: 4px; z-index: 12; transform: translate(-50%, -6px);
+    background: var(--ink); color: var(--on-ink); padding: 9px 15px; border-radius: 99px; font-size: 14px; font-weight: 700;
+    opacity: 0; pointer-events: none; transition: opacity .2s ease, transform .2s ease;
+    width: max-content; max-width: calc(100% - 32px); text-align: center; line-height: 1.3;
+    box-shadow: 0 8px 20px rgba(38, 34, 31, .22);
+  }
+  #toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+  @media (max-height: 600px) {
+    .logo { width: 40px; height: 40px; }
+    .title-card h1 { font-size: 28px; }
+    .tagline { margin-bottom: 10px; font-size: 13.5px; }
+    .btn.big { min-height: 48px; font-size: 17px; }
+    .diff button { min-height: 42px; }
+    .result-time { font-size: 46px; }
+    .card { padding: 14px 16px 12px; }
+  }
+  @media (max-height: 500px) {
+    .tagline { display: none; }
+    .brand { margin-bottom: 10px; }
+  }
+  @media (max-width: 360px) {
+    .diff button { font-size: 12.5px; }
+    .pick-label { min-width: 70px; }
+    .seg button { padding: 6px 8px; }
+    .mini-btn.wide { width: 40px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .overlay:not(.hidden) .card, #coach.show { animation: none; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <header id="hud" class="off">
+    <button id="btnHome" class="icon-btn" aria-label="Back to the menu">
+      <svg viewBox="0 0 24 24"><path d="M3.5 11.2 12 4l8.5 7.2"/><path d="M6 9.6V20h12V9.6"/></svg>
+    </button>
+    <div class="hud-mid">
+      <div id="timer" class="idle">0:00.00</div>
+      <div id="hudSub">&nbsp;</div>
+    </div>
+    <button id="btnHelp" class="icon-btn" aria-label="How to play">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.6"/><path d="M9.6 9.4a2.5 2.5 0 1 1 3.4 2.3c-.7.3-1 .8-1 1.5v.5"/><path d="M12 16.9v.2"/></svg>
+    </button>
+    <button id="btnUndo" class="icon-btn" aria-label="Undo last turn" disabled>
+      <svg viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>
+    </button>
+    <button id="btnSound" class="icon-btn" aria-label="Mute sound">
+      <svg viewBox="0 0 24 24"><path d="M4 9.5v5h3.5L12 18V6L7.5 9.5z"/><path class="wave" d="M15.5 9a4 4 0 0 1 0 6"/><path class="wave" d="M18 6.5a7.5 7.5 0 0 1 0 11"/><path class="mute" d="m16 9.5 5 5m0-5-5 5" hidden/></svg>
+    </button>
+  </header>
+
+  <main id="stage">
+    <aside id="coach" aria-live="polite">
+      <div class="coach-head"><span class="coach-step" id="coachStep">1 / 8</span><span class="coach-title" id="coachTitle"></span></div>
+      <p id="coachText"></p>
+      <div class="coach-actions" id="coachActions"></div>
+    </aside>
+    <div id="viewWrap">
+      <div id="floorShadow"></div>
+      <canvas id="glCanvas" aria-hidden="true"></canvas>
+      <canvas id="viewCanvas" aria-label="The 3D puzzle. Drag a tile to turn one of its rings; drag the space around it to look around; scroll or pinch to zoom; double-tap to reset the view."></canvas>
+      <div id="glNote" hidden>The 3D view needs WebGL, which this browser has switched off. The ring dial still turns every ring.</div>
+      <div id="viewTools" hidden>
+        <button id="btnScramble" class="pill strong" type="button">Scramble</button>
+        <button id="btnSolve" class="pill" type="button">Solve</button>
+        <button id="btnReset" class="pill" type="button">Reset</button>
+      </div>
+      <div id="viewHint">drag tiles to turn · drag around to look<span id="zoomHint"> · scroll to zoom</span></div>
+    </div>
+    <section id="dialPanel" aria-label="Ring dial">
+      <div class="dial-bar">
+        <div class="picker">
+          <button id="btnPrevCorner" class="mini-btn" type="button" aria-label="Previous corner">&lsaquo;</button>
+          <div class="pick-label" id="cornerLabel" aria-live="polite"><b>Corner 1</b><small>6 faces</small></div>
+          <button id="btnNextCorner" class="mini-btn" type="button" aria-label="Next corner">&rsaquo;</button>
+        </div>
+        <div class="seg" role="radiogroup" aria-label="What a turn moves">
+          <button id="segRing" type="button" role="radio" aria-checked="true">Ring</button>
+          <button id="segCap" type="button" role="radio" aria-checked="false">Cap</button>
+        </div>
+      </div>
+      <div id="dialWrap">
+        <canvas id="dialCanvas" aria-label="Ring dial: the rings around the chosen corner, one circle per ring. Swipe along a ring to turn it; slide in or out to pick a ring; tap a corner badge on the rim to move to that corner."></canvas>
+        <div id="toast" role="status"></div>
+      </div>
+      <div class="dial-bar">
+        <div class="picker">
+          <button id="btnRingIn" class="mini-btn" type="button" aria-label="Pick the next ring in">&minus;</button>
+          <div class="pick-label" id="ringLabel" aria-live="polite"><b>Ring 16</b><small>of 32</small></div>
+          <button id="btnRingOut" class="mini-btn" type="button" aria-label="Pick the next ring out">+</button>
+        </div>
+        <div class="picker">
+          <button id="btnTurnCCW" class="mini-btn wide" type="button" aria-label="Turn counterclockwise">&#8634;</button>
+          <button id="btnTurnCW" class="mini-btn wide" type="button" aria-label="Turn clockwise">&#8635;</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Start screen -->
+  <section id="titleScreen" class="overlay">
+    <div class="card title-card" id="titleCard">
+      <div class="brand">
+        <svg class="logo" viewBox="-1.12 -1.12 2.24 2.24" aria-hidden="true">
+          <g stroke="#221f1d" stroke-width=".06" stroke-linejoin="round">
+            <path d="M0 0 0-1 .866-.5z" fill="#d9372b"/><path d="M0 0 .866-.5.866.5z" fill="#f28322"/>
+            <path d="M0 0 .866.5 0 1z" fill="#f7c11e"/><path d="M0 0 0 1-.866.5z" fill="#1f8a4a"/>
+            <path d="M0 0-.866.5-.866-.5z" fill="#2862d8"/><path d="M0 0-.866-.5 0-1z" fill="#7b45c9"/>
+          </g>
+          <g fill="none" stroke="#fff" stroke-width=".07"><circle r=".36"/><circle r=".66"/></g>
+        </svg>
+        <h1>Hecto Rings</h1>
+      </div>
+      <p class="tagline">A 100-faced twisty puzzle: 102,400 tiles riding 1,664 rings. Swipe a ring to turn it.</p>
+      <div class="menu">
+        <button id="btnFree" class="btn accent big" type="button">
+          <svg viewBox="0 0 24 24"><path d="M8 5.5v13l10.5-6.5z"/></svg> Free Play
+        </button>
+        <button id="btnTimed" class="btn primary big" type="button">
+          <svg viewBox="0 0 24 24"><path d="M12 7.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13zm.9 6.6-2.7 2-1-1.3 2.2-1.6V10h1.5zM9.5 3h5v2h-5z"/></svg> Timed Mode
+        </button>
+        <div class="diff" role="radiogroup" aria-label="Scramble difficulty">
+          <button type="button" role="radio" data-diff="easy" aria-checked="true">Easy<small>2 turns</small></button>
+          <button type="button" role="radio" data-diff="medium" aria-checked="false">Medium<small>4 turns</small></button>
+          <button type="button" role="radio" data-diff="hard" aria-checked="false">Hard<small>8 turns</small></button>
+          <button type="button" role="radio" data-diff="expert" aria-checked="false">Expert<small>16 turns</small></button>
+        </div>
+        <div class="best-line" id="bestLine">&nbsp;</div>
+        <button id="btnTutorial" class="btn ghost big" type="button">
+          <svg viewBox="0 0 24 24"><path d="M12 3.2 1.8 8.4 12 13.6l8.2-4.2V15h2V8.4z"/><path d="M5.5 12.2v3.9c0 1.5 3 3.2 6.5 3.2s6.5-1.7 6.5-3.2v-3.9L12 15.5z"/></svg> Tutorial <span class="badge" id="newHere">start here</span>
+        </button>
+      </div>
+      <div class="title-foot">
+        <a id="linkGames" href="index.html">&larr; All games</a>
+        <button id="btnTitleHelp" type="button">How it works</button>
+        <button id="btnTitleSound" type="button">Sound: on</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Finish screen -->
+  <section id="resultScreen" class="overlay hidden" aria-live="polite">
+    <div class="card">
+      <div class="result-kicker">Solved!</div>
+      <div class="result-time" id="resTime">0:00.00</div>
+      <div class="result-caption">finishing time</div>
+      <div class="result-meta" id="resMeta"></div>
+      <div class="result-best" id="resBest"></div>
+      <div class="stack">
+        <button id="btnAgain" class="btn primary big" type="button">Play again?</button>
+        <button id="btnResMenu" class="btn ghost" type="button">Menu</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Leave mid-solve -->
+  <section id="confirmScreen" class="overlay hidden">
+    <div class="card confirm-card">
+      <h2>Leave this solve?</h2>
+      <p>Your clock is running. Leaving ends this attempt.</p>
+      <div class="stack">
+        <button id="btnStay" class="btn primary big" type="button">Keep solving</button>
+        <button id="btnLeave" class="btn ghost" type="button">Leave to menu</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- How it works -->
+  <section id="helpScreen" class="overlay hidden">
+    <div class="card help-card" role="dialog" aria-labelledby="helpTitle">
+      <h2 id="helpTitle">How it works</h2>
+      <div class="facts">
+        <div class="fact"><b>100</b><small>faces</small></div>
+        <div class="fact"><b>32</b><small>per edge</small></div>
+        <div class="fact"><b>102,400</b><small>tiles</small></div>
+        <div class="fact"><b>1,664</b><small>rings</small></div>
+      </div>
+      <ul class="help-list">
+        <li><b>Rings circle the corners.</b> Each of the 52 corners wears 32 rings: ring 1 is the few tiles touching the corner, ring 32 runs along the far edges of the faces that meet there. A turn slides a ring one face round its corner.</li>
+        <li><b>Turn a ring</b> by swiping along it on the dial, with the &#8634; &#8635; buttons, or by dragging a tile on the 3D puzzle. Every tile rides three rings, one round each corner of its face, and the direction you drag picks which.</li>
+        <li><b>Pick a corner</b> with &lsaquo; &rsaquo;, a corner badge on the dial's rim, or a tap on the puzzle near that corner. <b>Cap</b> turns every ring from the corner out to the one you touch.</li>
+        <li><b>Look around</b> by dragging the space around the puzzle (or right-drag, or two fingers). Scroll or pinch to zoom in on the tiles; double-tap to reset.</li>
+        <li><b>Keys:</b> <kbd>[</kbd> <kbd>]</kbd> corner, <kbd>&uarr;</kbd> <kbd>&darr;</kbd> ring, <kbd>&larr;</kbd> <kbd>&rarr;</kbd> turn, <kbd>C</kbd> cap, <kbd>Ctrl</kbd>+<kbd>Z</kbd> undo.</li>
+      </ul>
+      <p class="help-note">The solid is the convex hull of 52 points spread as evenly as a sphere allows: the lowest-energy arrangement of 52 like charges from the Thomson problem. That gives 100 near-equal triangles, with 5 meeting at 12 corners and 6 at the other 40.</p>
+      <div class="stack"><button id="btnHelpClose" class="btn primary big" type="button">Got it</button></div>
+    </div>
+  </section>
+</div>
+
+<script>
+(() => {
+'use strict';
+
+// ===========================================================================
+// Helpers
+// ===========================================================================
+const TAU = Math.PI * 2;
+const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
+const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
+const easeInOutCubic = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+const wrapPi = (a) => { a = (a + Math.PI) % TAU; if (a < 0) a += TAU; return a - Math.PI; };
+const now = () => performance.now();
+const $ = (id) => document.getElementById(id);
+const hexToRgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const vsub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+const vcross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const vdot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const vnorm = (a) => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
+const triples = (a) => { const out = []; for (let i = 0; i < a.length; i += 3) out.push([a[i], a[i + 1], a[i + 2]]); return out; };
+
+// ===========================================================================
+// Puzzle model
+// The solid is a round ball of 100 flat triangles: the convex hull of 52
+// points on the unit sphere, spread as evenly as possible (the lowest-energy
+// arrangement of 52 like charges, from the Thomson problem), stood on its
+// 3-fold axis. Every face is cut into an N x N triangular grid, so each edge
+// has N tiles along either side of it. A ring is the strip of tiles d steps
+// out from a corner, running through every face that meets there; a turn
+// slides the strip one face round that corner. Axes: y points up.
+// ===========================================================================
+const N = 32, NN = N * N;
+const VERTS = triples([
+  0, 1, 0, -.423381, .872352, -.244439, 0, .872352, .488878, .423381, .872352, -.244439, -.461222, .848466, .259575,
+  .455409, .848467, .269643, .005813, .848467, -.529217, -.461857, .602675, -.650746, -.332635, .602675, .725353,
+  .794491, .602676, -.074605, -.799875, .585609, -.131386, .286152, .585609, .758406, .51372, .58561, -.627019,
+  -.77608, .50187, .381872, .71875, .501871, .48117, .057327, .501871, -.863041, -.814868, .253445, -.521303,
+  -.044029, .253445, .966347, .858895, .253448, -.445044, -.392493, .189741, -.899971, -.583152, .189741, .789894,
+  .975644, .189742, .11008, -.990398, .133443, -.036115, .46392, .133442, .875769, .526476, .133444, -.839652,
+  -.896832, .029082, .441414, .830691, .029083, .555974, .06614, .029083, -.997386, -.652594, -.186934, -.734286,
+  -.309614, -.186934, .932306, .962208, -.186931, -.19802, -.905516, -.270003, -.32732, .16929, -.270005, .94786,
+  .736227, -.270002, -.62054, -.211117, -.387282, -.897464, -.671668, -.387283, .631565, .882786, -.387281, .265899,
+  -.902225, -.393808, .175802, .603361, -.393808, .693448, .298864, -.393806, -.869251, -.50568, -.648769, -.568671,
+  -.239642, -.648769, .722267, .745325, -.648767, -.153598, -.690214, -.711476, -.131933, .230851, -.711477,
+  .663709, .459366, -.711474, -.531777, -.021895, -.797073, -.603486, -.511685, -.797074, .320705, .533583,
+  -.797073, .282779, -.24718, -.95483, -.164927, -.019239, -.954831, .296527, .266422, -.95483, -.131602,
+]);
+const NV = VERTS.length;
+const V_NAME = VERTS.map((_, v) => `Corner ${v + 1}`);
+const V_SHORT = VERTS.map((_, v) => String(v + 1));
+const V_TOP = 0;
+const FACES = (() => {
+  const list = triples([
+    0, 6, 1, 0, 5, 3, 0, 3, 6, 0, 2, 5, 0, 1, 4, 0, 4, 2, 3, 5, 9, 1, 6, 7, 2, 4, 8, 3, 12, 6, 2, 11, 5, 1, 10, 4,
+    3, 9, 12, 1, 7, 10, 2, 8, 11, 5, 14, 9, 6, 15, 7, 4, 13, 8, 6, 12, 15, 5, 11, 14, 4, 10, 13, 9, 18, 12, 8, 17, 11,
+    7, 16, 10, 9, 14, 21, 7, 15, 19, 8, 13, 20, 12, 24, 15, 10, 22, 13, 11, 23, 14, 9, 21, 18, 7, 19, 16, 8, 20, 17,
+    12, 18, 24, 10, 16, 22, 11, 17, 23, 14, 26, 21, 15, 27, 19, 13, 25, 20, 15, 24, 27, 14, 23, 26, 13, 22, 25,
+    18, 21, 30, 16, 19, 28, 17, 20, 29, 18, 33, 24, 16, 31, 22, 17, 32, 23, 21, 26, 36, 19, 27, 34, 20, 25, 35,
+    18, 30, 33, 16, 28, 31, 17, 29, 32, 24, 39, 27, 22, 37, 25, 23, 38, 26, 21, 36, 30, 19, 34, 28, 20, 35, 29,
+    24, 33, 39, 22, 31, 37, 23, 32, 38, 27, 39, 34, 26, 38, 36, 25, 37, 35, 30, 42, 33, 28, 40, 31, 29, 41, 32,
+    30, 36, 42, 28, 34, 40, 29, 35, 41, 33, 45, 39, 31, 43, 37, 32, 44, 38, 34, 39, 46, 36, 38, 48, 35, 37, 47,
+    33, 42, 45, 31, 40, 43, 32, 41, 44, 36, 48, 42, 34, 46, 40, 35, 47, 41, 39, 45, 46, 37, 43, 47, 38, 44, 48,
+    42, 51, 45, 40, 49, 43, 41, 50, 44, 42, 48, 51, 40, 46, 49, 41, 47, 50, 45, 51, 46, 43, 49, 47, 44, 50, 48,
+    46, 51, 49, 48, 50, 51, 47, 49, 50, 49, 51, 50,
+  ]);
+  // Wind every face counterclockwise as seen from outside.
+  return list.map((f) => {
+    const [a, b, c] = f.map((i) => VERTS[i]);
+    const n = vcross(vsub(b, a), vsub(c, a)), g = [a[0] + b[0] + c[0], a[1] + b[1] + c[1], a[2] + b[2] + c[2]];
+    return vdot(n, g) > 0 ? f : [f[0], f[2], f[1]];
+  });
+})();
+// Solved colors (indices into FACE_HEX): faces that share a corner never match, and repeats sit at least 55 degrees apart.
+const FACE_COLOR = [
+  0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 14, 12, 8, 13, 15, 11, 9, 10, 7, 3, 6, 5, 1, 0, 4, 6, 2, 10, 9, 11, 8, 15, 7, 1,
+  5, 3, 14, 12, 4, 13, 2, 1, 2, 4, 0, 3, 5, 15, 0, 14, 12, 9, 11, 13, 6, 8, 3, 7, 10, 11, 15, 0, 8, 1, 13, 5, 12, 4, 6, 9, 13, 10, 8, 15,
+  14, 11, 14, 12, 2, 6, 7, 5, 1, 9, 4, 3, 2, 10, 7, 0, 11, 15, 13, 8,
+];
+const NF = FACES.length, NT = NF * NN;
+const FACE_N = FACES.map((f) => vnorm(vcross(vsub(VERTS[f[1]], VERTS[f[0]]), vsub(VERTS[f[2]], VERTS[f[0]]))));
+const faceOf = (t) => (t / NN) | 0;
+
+// Lattice points: a face's interior points are its own; points on an edge or at a corner are shared,
+// named by the edge's two corners and the weight on the lower-numbered one.
+const PT_LIST = [], PT_EDGE = new Map(), VERT_PT = new Int32Array(NV).fill(-1);
+const newPoint = (x, y, z) => { PT_LIST.push(x, y, z); return PT_LIST.length / 3 - 1; };
+function latticePoint(f, a, b, c) {
+  const [p0, p1, p2] = FACES[f];
+  if (a === N || b === N || c === N) {
+    const v = a === N ? p0 : b === N ? p1 : p2;
+    if (VERT_PT[v] < 0) VERT_PT[v] = newPoint(VERTS[v][0], VERTS[v][1], VERTS[v][2]);
+    return VERT_PT[v];
+  }
+  const pos = (j) => (a * VERTS[p0][j] + b * VERTS[p1][j] + c * VERTS[p2][j]) / N;
+  let u = -1, wu = 0, w = -1;
+  if (a === 0) { u = p1; wu = b; w = p2; } else if (b === 0) { u = p0; wu = a; w = p2; } else if (c === 0) { u = p0; wu = a; w = p1; }
+  if (u < 0) return newPoint(pos(0), pos(1), pos(2));
+  if (u > w) { const x = u; u = w; w = x; wu = N - wu; }
+  const key = (u * 64 + w) * 64 + wu;
+  let id = PT_EDGE.get(key);
+  if (id === undefined) { id = newPoint(pos(0), pos(1), pos(2)); PT_EDGE.set(key, id); }
+  return id;
+}
+
+// Tile t = face * N^2 + d^2 + i: ring level d around the face's first corner, position i along that strip.
+// Each tile also knows its level and position around the other two corners of its face.
+const TV = new Int32Array(NT * 3);   // the tile's three lattice points, counterclockwise
+const TL = new Uint8Array(NT * 3);   // its ring level around each corner of its face
+const TFLAG = new Uint8Array(NT);    // where it meets the face's own edges: bit k, the edge opposite its point k; bit 3 + k, just its point k
+const BY_CORNER = FACES.map(() => [new Int16Array(NN), new Int16Array(NN), new Int16Array(NN)]);
+for (let f = 0; f < NF; f++) {
+  const loc = new Int32Array((N + 1) * (N + 1));
+  for (let a = 0; a <= N; a++) for (let b = 0; a + b <= N; b++) loc[a * (N + 1) + b] = latticePoint(f, a, b, N - a - b);
+  const L = (a, b) => loc[a * (N + 1) + b];
+  const put = (up, a, b, c, pts) => {
+    const d = [N - 1 - a, N - 1 - b, N - 1 - c];
+    const i = up ? [2 * c, 2 * a, 2 * b] : [2 * c + 1, 2 * a + 1, 2 * b + 1];
+    const local = d[0] * d[0] + i[0], t = f * NN + local;
+    for (let k = 0; k < 3; k++) {
+      TV[t * 3 + k] = pts[k]; TL[t * 3 + k] = d[k];
+      BY_CORNER[f][k][d[k] * d[k] + i[k]] = local;
+    }
+    TFLAG[t] = up ? (a === 0 ? 1 : 0) | (b === 0 ? 2 : 0) | (c === 0 ? 4 : 0) : (a === 0 ? 8 : 0) | (b === 0 ? 16 : 0) | (c === 0 ? 32 : 0);
+  };
+  for (let a = 0; a < N; a++) for (let b = 0; a + b < N; b++) put(true, a, b, N - 1 - a - b, [L(a + 1, b), L(a, b + 1), L(a, b)]);
+  for (let a = 0; a < N - 1; a++) for (let b = 0; a + b < N - 1; b++) put(false, a, b, N - 2 - a - b, [L(a, b + 1), L(a + 1, b), L(a + 1, b + 1)]);
+}
+const PTS = Float64Array.from(PT_LIST);
+const NP = PTS.length / 3;
+
+// The faces round each corner, counterclockwise from outside. Sector s runs
+// from the edge toward star[s].next to the edge toward star[s].prev.
+const STAR = VERTS.map((_, v) => {
+  const around = [];
+  FACES.forEach((f, fi) => f.forEach((u, k) => { if (u === v) around.push({ f: fi, k, next: f[(k + 1) % 3], prev: f[(k + 2) % 3] }); }));
+  const order = [around[0]];
+  while (order.length < around.length) order.push(around.find((e) => e.next === order[order.length - 1].prev));
+  return order;
+});
+const DEG = STAR.map((s) => s.length);
+const MAX_DEG = Math.max(...DEG);
+// Corners that share a face: only their rings can reach each other's faces.
+const CORNER_TOUCH = new Uint8Array(NV * NV);
+STAR.forEach((star, v) => { CORNER_TOUCH[v * NV + v] = 1; star.forEach((e) => { CORNER_TOUCH[v * NV + e.next] = 1; }); });
+const VERT_N = STAR.map((star) => vnorm(star.reduce((acc, e) => [acc[0] + FACE_N[e.f][0], acc[1] + FACE_N[e.f][1], acc[2] + FACE_N[e.f][2]], [0, 0, 0])));
+// EDGE_PT[v][(s * (N + 1) + r) * 3]: the point r tile-steps out from corner v along the edge that opens sector s.
+const EDGE_PT = STAR.map((star, v) => {
+  const out = new Float64Array(star.length * (N + 1) * 3), p = VERTS[v];
+  star.forEach((e, s) => {
+    const q = VERTS[e.next];
+    for (let r = 0; r <= N; r++) for (let j = 0; j < 3; j++) out[(s * (N + 1) + r) * 3 + j] = p[j] + ((q[j] - p[j]) * r) / N;
+  });
+  return out;
+});
+
+// Rings: id = corner * N + level. Tiles are listed sector by sector, 2d + 1 per sector.
+const RINGS = [];
+const RING_AT = new Int16Array(NT * 3);   // the ring through tile t around corner k of its face
+const RING_POS = new Int16Array(NT * 3);  // where tile t sits in that ring
+for (let v = 0; v < NV; v++) for (let d = 0; d < N; d++) {
+  const deg = DEG[v], L = 2 * d + 1, tiles = new Int32Array(deg * L), id = v * N + d;
+  STAR[v].forEach((e, s) => {
+    for (let i = 0; i < L; i++) {
+      const t = e.f * NN + BY_CORNER[e.f][e.k][d * d + i];
+      tiles[s * L + i] = t; RING_AT[t * 3 + e.k] = id; RING_POS[t * 3 + e.k] = s * L + i;
+    }
+  });
+  // Where each tile's corners sit on the ring: r steps out from the corner, u sectors round it.
+  const rr = new Uint8Array(L * 3), uu = new Float32Array(L * 3);
+  for (let i = 0; i < L; i++) {
+    const c = i >> 1;
+    const spec = (i & 1) === 0
+      ? [[d, d ? c / d : 0], [d + 1, c / (d + 1)], [d + 1, (c + 1) / (d + 1)]]
+      : [[d + 1, (c + 1) / (d + 1)], [d, (c + 1) / d], [d, c / d]];
+    spec.forEach(([r, u], j) => { rr[i * 3 + j] = r; uu[i * 3 + j] = u; });
+  }
+  RINGS.push({ id, v, d, deg, L, tiles, rr, uu });
+}
+const NR = RINGS.length;
+const ringId = (v, d) => v * N + d;
+// Two rings interfere when they share a tile; turns on rings that never meet commute.
+const RING_MEET = new Uint8Array(NR * NR);
+for (let t = 0; t < NT; t++) {
+  const a = RING_AT[t * 3], b = RING_AT[t * 3 + 1], c = RING_AT[t * 3 + 2];
+  RING_MEET[a * NR + b] = RING_MEET[b * NR + a] = RING_MEET[b * NR + c] = RING_MEET[c * NR + b] = RING_MEET[a * NR + c] = RING_MEET[c * NR + a] = 1;
+  RING_MEET[a * NR + a] = RING_MEET[b * NR + b] = RING_MEET[c * NR + c] = 1;
+}
+
+// A move turns rings lo..hi round corner v by k sectors (counterclockwise from outside when k > 0).
+const normK = (k, deg) => { k = ((k % deg) + deg) % deg; return k > deg / 2 ? k - deg : k; };
+function turnRingInto(src, dst, ring, k) {
+  const { deg, L, tiles } = ring;
+  k = ((k % deg) + deg) % deg;
+  if (!k) return;
+  for (let s = 0; s < deg; s++) {
+    const s2 = (s + k) % deg;
+    for (let i = 0; i < L; i++) dst[tiles[s2 * L + i]] = src[tiles[s * L + i]];
+  }
+}
+function applyMove(st, m) {
+  const out = st.slice();
+  for (let d = m.lo; d <= m.hi; d++) turnRingInto(st, out, RINGS[ringId(m.v, d)], m.k);
+  return out;
+}
+const solvedState = () => Uint8Array.from({ length: NT }, (_, t) => FACE_COLOR[faceOf(t)]);
+function isSolved(st) {
+  for (let f = 0; f < NF; f++) {
+    const base = f * NN, c = st[base];
+    for (let j = 1; j < NN; j++) if (st[base + j] !== c) return false;
+  }
+  return true;
+}
+const sameRings = (a, b) => a.v === b.v && a.lo === b.lo && a.hi === b.hi;
+function movesCommute(a, b) {
+  for (let x = a.lo; x <= a.hi; x++) for (let y = b.lo; y <= b.hi; y++) if (RING_MEET[ringId(a.v, x) * NR + ringId(b.v, y)]) return false;
+  return true;
+}
+// Fold a move list down: merge turns of the same rings, sliding past turns they commute with.
+function reduceMoves(list) {
+  const stack = [];
+  for (const m of list) {
+    let j = stack.length - 1, merged = false;
+    while (j >= 0) {
+      const s = stack[j];
+      if (sameRings(s, m)) {
+        const k = normK(s.k + m.k, DEG[m.v]);
+        if (k) stack[j] = { v: s.v, lo: s.lo, hi: s.hi, k }; else stack.splice(j, 1);
+        merged = true;
+        break;
+      }
+      if (!movesCommute(s, m)) break;
+      j--;
+    }
+    if (!merged) stack.push({ v: m.v, lo: m.lo, hi: m.hi, k: m.k });
+  }
+  return stack;
+}
+const inverseOf = (list) => list.slice().reverse().map((m) => ({ v: m.v, lo: m.lo, hi: m.hi, k: -m.k }));
+
+// Sixteen tile colors, each used on six or seven faces.
+const FACE_HEX = [
+  '#72cdf4', '#f59ac2', '#f7f4ec', '#e2c28f',
+  '#f28322', '#98cc3a', '#12a198', '#7b45c9',
+  '#d9372b', '#f7c11e', '#1f8a4a', '#2862d8',
+  '#24357f', '#b41f78', '#7b4a26', '#5d6875',
+];
+const FACE_RGB = FACE_HEX.map(hexToRgb);
+
+// ===========================================================================
+// Game state
+// ===========================================================================
+const DIFFS = {
+  easy: { label: 'Easy', turns: 2 },
+  medium: { label: 'Medium', turns: 4 },
+  hard: { label: 'Hard', turns: 8 },
+  expert: { label: 'Expert', turns: 16 },
+};
+const G = {
+  mode: 'title',        // 'title' | 'free' | 'timed' | 'tutorial'
+  phase: 'idle',        // timed: 'scrambling' | 'ready' | 'running' | 'solved'
+  diff: 'easy',
+  state: solvedState(),
+  base: [],             // turns that can't be undone: scrambles, and earlier play
+  history: [],          // the player's turns since then, for undo and hints
+  t0: 0,
+  elapsed: 0,
+  wasSolved: true,
+};
+let stateVersion = 0;   // bumps whenever the tiles move, so cached drawings know to refresh
+const dialPending = { moves: [], full: true };  // what changed since the dial's cache was painted
+function setState(st, move) {
+  G.state = st; stateVersion++; dirty = true;
+  if (move) dialPending.moves.push(move); else dialPending.full = true;
+}
+const sel = { v: V_TOP, d: 15, cap: false };  // the corner on the dial and its chosen ring
+let anim = null;        // the turn being animated: { kind, v, lo, hi, k, from, to, t, start, dur, ease, done }
+const queue = [];       // automated turns waiting to play (scrambles, solves, the title-screen demo)
+let dirty = true;
+
+// Saved settings and best times -------------------------------------------------
+const SAVE_KEY = 'hectoRings.v1';
+const save = (() => {
+  let d = {};
+  try { d = JSON.parse(localStorage.getItem(SAVE_KEY)) || {}; } catch (e) { d = {}; }
+  d.best = d.best || {};
+  return d;
+})();
+function persist() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) { /* storage unavailable */ } }
+if (DIFFS[save.diff]) G.diff = save.diff;
+
+// ===========================================================================
+// Sound (Web Audio, generated on the fly) and haptics
+// ===========================================================================
+const Sound = {
+  ctx: null,
+  muted: !!save.muted,
+  unlock() {
+    if (!this.ctx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (AC) { try { this.ctx = new AC(); } catch (e) { this.ctx = null; } }
+    }
+    if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
+  },
+  tone(freq, dur, type, gain, slideTo, delay) {
+    if (this.muted || !this.ctx) return;
+    const t = this.ctx.currentTime + (delay || 0);
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(gain, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(this.ctx.destination);
+    o.start(t); o.stop(t + dur + 0.03);
+  },
+  turn() { this.tone(640, 0.09, 'triangle', 0.08, 380); },
+  tick() { this.tone(880, 0.05, 'triangle', 0.03, 620); },
+  undo() { this.tone(360, 0.1, 'triangle', 0.07, 520); },
+  deny() { this.tone(190, 0.14, 'square', 0.025, 150); },
+  click() { this.tone(560, 0.06, 'sine', 0.05); },
+  go() { this.tone(520, 0.09, 'sine', 0.06); this.tone(780, 0.14, 'sine', 0.06, null, 0.09); },
+  solve() { [523.25, 659.25, 783.99, 1046.5, 1318.5].forEach((f, i) => this.tone(f, 0.26, 'triangle', 0.08, null, i * 0.09)); },
+};
+const haptic = (p) => { if (!Sound.muted && navigator.vibrate) { try { navigator.vibrate(p); } catch (e) { /* ignore */ } } };
+
+// ===========================================================================
+// DOM and theme
+// ===========================================================================
+const hudEl = $('hud'), timerEl = $('timer'), hudSubEl = $('hudSub');
+const btnUndo = $('btnUndo'), btnSound = $('btnSound');
+const stageEl = $('stage'), coachEl = $('coach'), dialPanel = $('dialPanel');
+const titleEl = $('titleScreen'), resultEl = $('resultScreen'), confirmEl = $('confirmScreen'), helpEl = $('helpScreen');
+const toastEl = $('toast'), viewHintEl = $('viewHint'), viewTools = $('viewTools'), shadowEl = $('floorShadow');
+const viewCanvas = $('viewCanvas'), dialCanvas = $('dialCanvas'), glCanvas = $('glCanvas');
+const cvV = { el: viewCanvas, ctx: viewCanvas.getContext('2d'), w: 1, h: 1, dpr: 1 };
+const cvD = { el: dialCanvas, ctx: dialCanvas.getContext('2d'), w: 1, h: 1, dpr: 1 };
+
+const theme = {};
+let themeVersion = 0;
+function readTheme() {
+  const cs = getComputedStyle(document.documentElement);
+  const g = (n) => cs.getPropertyValue(n).trim();
+  theme.body = hexToRgb(g('--body') || '#221f1d');
+  theme.bodyHex = g('--body') || '#221f1d';
+  theme.ink = g('--ink'); theme.card = g('--card'); theme.line = g('--line');
+  theme.accent = g('--accent'); theme.accentRgb = hexToRgb(g('--accent') || '#6c47ff');
+  theme.warn = g('--warn');
+  theme.font = getComputedStyle(document.body).fontFamily;
+  themeVersion++;
+  dirty = true;
+}
+if (window.matchMedia) {
+  const mq = window.matchMedia('(prefers-color-scheme: dark)');
+  if (mq.addEventListener) mq.addEventListener('change', readTheme); else if (mq.addListener) mq.addListener(readTheme);
+}
+new MutationObserver(readTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+let toastTimer = 0;
+function toast(msg, ms) {
+  toastEl.textContent = msg;
+  toastEl.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toastEl.classList.remove('show'), ms || 2200);
+}
+function hideToast() { clearTimeout(toastTimer); toastEl.classList.remove('show'); }
+
+// ===========================================================================
+// Layout
+// ===========================================================================
+const dg = { cx: 0, cy: 0, R: 50, theta: -Math.PI / 2, target: null, chips: [] };
+function layout() {
+  const W = stageEl.clientWidth, H = stageEl.clientHeight;
+  const landscape = W > H * 1.05;
+  stageEl.classList.toggle('landscape', landscape);
+  if (landscape) {
+    dialPanel.style.height = '';
+    dialPanel.style.width = Math.round(clamp(Math.min(W * 0.46, H + 30), 250, 680)) + 'px';
+  } else if (G.mode === 'title') {
+    // The menu card sits at the bottom; the puzzle spins in the space above it.
+    const cardH = $('titleCard').offsetHeight + 14;
+    dialPanel.style.width = '';
+    dialPanel.style.height = Math.round(clamp(cardH, 120, H - 150)) + 'px';
+  } else {
+    const coachH = coachEl.classList.contains('show') ? coachEl.offsetHeight + 6 : 0;
+    dialPanel.style.width = '';
+    dialPanel.style.height = Math.round(clamp(Math.min(W * 0.8 + 84, (H - coachH) * 0.54), 210, 680)) + 'px';
+  }
+  sizeCanvases();
+  // On a wide title screen the menu card sits over the stage; spin the puzzle in the clear space left of it.
+  view.clearW = 0;
+  if (landscape && G.mode === 'title') {
+    const clear = $('titleCard').getBoundingClientRect().left - viewCanvas.getBoundingClientRect().left - 12;
+    if (clear > 180) view.clearW = clear;
+  }
+}
+function sizeCanvas(cv) {
+  const w = cv.el.clientWidth, h = cv.el.clientHeight, dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  if (w === cv.w && h === cv.h && dpr === cv.dpr) return;
+  cv.w = Math.max(1, w); cv.h = Math.max(1, h); cv.dpr = dpr;
+  cv.el.width = Math.max(1, Math.round(cv.w * dpr)); cv.el.height = Math.max(1, Math.round(cv.h * dpr));
+  if (cv === cvV) { glCanvas.width = cv.el.width; glCanvas.height = cv.el.height; }
+  dirty = true;
+}
+function sizeCanvases() {
+  sizeCanvas(cvV); sizeCanvas(cvD);
+  dg.cx = cvD.w / 2; dg.cy = cvD.h / 2;
+  dg.R = Math.max(30, Math.min(cvD.w, cvD.h) / 2 - 24);
+}
+
+// ===========================================================================
+// Camera. The ball is convex, so every face either fully faces the eye or
+// fully faces away, and front faces never overlap one another.
+// ===========================================================================
+const CAM = 9;
+const DEFAULT_AZ = 0.5, DEFAULT_EL = 0.42;
+const view = { az: DEFAULT_AZ, el: DEFAULT_EL, zoom: 1, tween: null, clearW: 0 };
+const ZOOM_MAX = 6;
+const LIGHT = vnorm([-0.35, 0.8, 0.5]);
+const MEAN_EDGE = 0.53;   // average edge of the ball's faces, in radii
+const faceVis = new Uint8Array(NF);
+let VMX = viewMatrix(view.az, view.el);
+const proj = { cx: 0, cy: 0, sc: 100 };
+
+function viewMatrix(az, el) {
+  // world -> camera: yaw about y by -az, then pitch about x by el
+  const ca = Math.cos(-az), sa = Math.sin(-az), ce = Math.cos(el), se = Math.sin(el);
+  return [ca, 0, sa, se * sa, ce, -se * ca, -ce * sa, se, ce * ca];
+}
+// Room kept clear above the puzzle (for the hint line) and below it (for the free-play tools).
+function viewInsets() {
+  return { top: G.mode === 'title' || viewHintEl.hidden ? 0 : 14, bottom: G.mode === 'free' ? 42 : 0 };
+}
+function toCam(x, y, z, out) {
+  const M = VMX;
+  out[0] = M[0] * x + M[1] * y + M[2] * z; out[1] = M[3] * x + M[4] * y + M[5] * z; out[2] = M[6] * x + M[7] * y + M[8] * z;
+  return out;
+}
+function camToScreen(c, out) {
+  const f = CAM / (CAM - c[2]);
+  out.x = proj.cx + c[0] * f * proj.sc; out.y = proj.cy - c[1] * f * proj.sc;
+  return out;
+}
+const C3 = [0, 0, 0];
+function screenOf(p, out) { toCam(p[0], p[1], p[2], C3); return camToScreen(C3, out || { x: 0, y: 0 }); }
+// Does a camera-space normal at camera-space point c face the eye?
+const facesEye = (nx, ny, nz, cx, cy, cz) => -nx * cx - ny * cy + nz * (CAM - cz) > 0;
+
+function prepareView() {
+  const W = cvV.w, H = cvV.h;
+  VMX = viewMatrix(view.az, view.el);
+  const ins = viewInsets(), He = Math.max(40, H - ins.top - ins.bottom);
+  const We = G.mode === 'title' && view.clearW ? Math.min(W, view.clearW) : W;
+  proj.sc = (Math.min(We, He) / 2.3) * view.zoom * (G.mode === 'title' ? 0.9 : 1);
+  proj.cx = We / 2; proj.cy = ins.top + He / 2;
+  const n = [0, 0, 0], c = [0, 0, 0];
+  for (let f = 0; f < NF; f++) {
+    toCam(FACE_N[f][0], FACE_N[f][1], FACE_N[f][2], n);
+    const p = VERTS[FACES[f][0]];
+    toCam(p[0], p[1], p[2], c);
+    faceVis[f] = facesEye(n[0], n[1], n[2], c[0], c[1], c[2]) ? 1 : 0;
+  }
+  dg.target = dialTargetAngle();
+}
+function vertexFacesEye(v) {
+  const n = toCam(VERT_N[v][0], VERT_N[v][1], VERT_N[v][2], [0, 0, 0]);
+  const c = toCam(VERTS[v][0], VERTS[v][1], VERTS[v][2], [0, 0, 0]);
+  return facesEye(n[0], n[1], n[2], c[0], c[1], c[2]);
+}
+// Turn the dial so its spokes point the way the corner's edges run on screen.
+function dialTargetAngle() {
+  const v = sel.v;
+  if (!vertexFacesEye(v)) return null;
+  const deg = DEG[v], alpha = TAU / deg, E = EDGE_PT[v], pv = screenOf(VERTS[v]), r = Math.round(N * 0.375);
+  let sx = 0, sy = 0;
+  for (let s = 0; s < deg; s++) {
+    const o = (s * (N + 1) + r) * 3, pe = screenOf([E[o], E[o + 1], E[o + 2]]);
+    const psi = Math.atan2(pe.y - pv.y, pe.x - pv.x) + s * alpha;
+    sx += Math.cos(psi); sy += Math.sin(psi);
+  }
+  return Math.hypot(sx, sy) > 0.3 * deg ? Math.atan2(sy, sx) : null;
+}
+// Where a tile corner sits mid-turn: r steps out from corner v, U sectors round it.
+function loopPoint(v, r, U, out, o) {
+  const deg = DEG[v], E = EDGE_PT[v];
+  let s = Math.floor(U);
+  const fr = U - s;
+  s = ((s % deg) + deg) % deg;
+  const s2 = s + 1 === deg ? 0 : s + 1;
+  const a = (s * (N + 1) + r) * 3, b = (s2 * (N + 1) + r) * 3;
+  out[o] = E[a] + (E[b] - E[a]) * fr;
+  out[o + 1] = E[a + 1] + (E[b + 1] - E[a + 1]) * fr;
+  out[o + 2] = E[a + 2] + (E[b + 2] - E[a + 2]) * fr;
+}
+// Tiles hidden from the resting draw because they are turning.
+const movingMask = new Uint8Array(NT);
+let movingKey = '';
+function syncMoving(vm) {
+  const key = vm ? `${vm.v}:${vm.lo}:${vm.hi}` : '';
+  if (key === movingKey) return;
+  movingKey = key;
+  movingMask.fill(0);
+  if (vm) for (let d = vm.lo; d <= vm.hi; d++) { const tiles = RINGS[ringId(vm.v, d)].tiles; for (let j = 0; j < tiles.length; j++) movingMask[tiles[j]] = 1; }
+  GLR.colorsDirty = true;
+}
+
+// ===========================================================================
+// 3D renderer: WebGL draws the ball; a 2D canvas above it draws outlines,
+// corner badges and confetti. Each face is a single triangle: its fragment
+// shader works out which of the face's 1,024 tiles a pixel falls in and looks
+// the color up in a 1024 x 128 texture (one row per face), drawing seams of a
+// fixed pixel width and heavier lines along the ball's own edges. Only tiles
+// that are turning get triangles of their own.
+// ===========================================================================
+const GLR = { ok: false, colorsDirty: true, colorsVersion: -1 };
+const TEX_W = NN, TEX_H = 128;
+const FACE_VS = `
+attribute vec3 aPos;
+attribute vec3 aNrm;
+attribute vec3 aBary;
+attribute float aFace;
+uniform mat3 uRot;
+uniform vec4 uProj;
+uniform float uCam;
+uniform vec3 uLight;
+varying vec3 vLat;
+varying float vFace;
+varying float vShade;
+void main() {
+  vec3 p = uRot * aPos;
+  float w = (uCam - p.z) / uCam;
+  gl_Position = vec4(p.x * uProj.x + uProj.z * w, p.y * uProj.y + uProj.w * w, -0.4 * p.z * w, w);
+  vShade = 0.83 + 0.19 * max(0.0, dot(normalize(uRot * aNrm), uLight));
+  vLat = aBary * ${N}.0;
+  vFace = aFace;
+}`;
+const FACE_FS = `
+uniform sampler2D uTiles;
+uniform vec3 uBody;
+uniform float uGap;
+uniform float uEdge;
+uniform float uSeamFade;
+varying vec3 vLat;
+varying float vFace;
+varying float vShade;
+const float N = ${N}.0;
+void main() {
+  // Which tile: the lattice cell under this pixel, an upward or a downward triangle
+  vec3 f = min(floor(vLat), vec3(N - 1.0));
+  float d = N - 1.0 - f.x;
+  float local = d * d + 2.0 * f.z + (f.x + f.y + f.z < N - 1.5 ? 1.0 : 0.0);
+  vec4 tile = texture2D(uTiles, vec2((local + 0.5) / ${TEX_W}.0, (vFace + 0.5) / ${TEX_H}.0));
+  vec3 col = tile.a < 0.5 ? uBody : min(tile.rgb * vShade, vec3(1.0));
+#ifdef HAS_DERIV
+  vec3 fw = max(fwidth(vLat), vec3(1e-6));
+#else
+  vec3 fw = vec3(0.05);
+#endif
+  // Seams: every grid line is some tile's edge; fade them toward the tile color when tiles are tiny
+  vec3 fr = fract(vLat);
+  vec3 grid = min(fr, 1.0 - fr) / fw;
+  float inTile = clamp(min(min(grid.x, grid.y), grid.z) - uGap + 0.5, 0.0, 1.0);
+  vec3 c = mix(mix(uBody, col, uSeamFade), col, inTile);
+  // The ball's own edges stay dark and heavier
+  vec3 edge = vLat / fw;
+  float inFace = clamp(min(min(edge.x, edge.y), edge.z) - (uGap + uEdge) + 0.5, 0.0, 1.0);
+  gl_FragColor = vec4(mix(uBody, c, inFace), 1.0);
+}`;
+const TILE_VS = `
+attribute vec3 aPos;
+attribute vec3 aNrm;
+attribute vec4 aBary;
+attribute vec4 aCol;
+uniform mat3 uRot;
+uniform vec4 uProj;
+uniform float uCam;
+uniform vec3 uLight;
+varying vec3 vBary;
+varying vec3 vFlags;
+varying vec3 vTips;
+varying vec3 vCol;
+void main() {
+  vec3 p = uRot * aPos;
+  float w = (uCam - p.z) / uCam;
+  gl_Position = vec4(p.x * uProj.x + uProj.z * w, p.y * uProj.y + uProj.w * w, -0.4 * p.z * w, w);
+  float light = max(0.0, dot(normalize(uRot * aNrm), uLight));
+  vCol = aCol.rgb * (0.83 + 0.19 * light);
+  vBary = aBary.xyz;
+  float f = floor(aBary.w * 255.0 + 0.5);
+  vFlags = vec3(mod(f, 2.0), mod(floor(f / 2.0), 2.0), mod(floor(f / 4.0), 2.0));
+  vTips = vec3(mod(floor(f / 8.0), 2.0), mod(floor(f / 16.0), 2.0), floor(f / 32.0));
+}`;
+const TILE_FS = `
+varying vec3 vBary;
+varying vec3 vFlags;
+varying vec3 vTips;
+varying vec3 vCol;
+uniform vec3 uBody;
+uniform float uGap;
+uniform float uEdge;
+uniform float uSeamFade;
+void main() {
+#ifdef HAS_DERIV
+  vec3 fw = max(fwidth(vBary), vec3(1e-6));
+#else
+  vec3 fw = vec3(1.0 / 60.0);
+#endif
+  vec3 px = vBary / fw;             // pixels to each of the tile's edges
+  vec3 tipPx = (1.0 - vBary) / fw;  // pixels to the line through each point, parallel to the far edge
+  vec3 col = min(vCol, vec3(1.0));
+  vec3 seam = px - vec3(uGap);
+  float inTile = clamp(min(min(seam.x, seam.y), seam.z) + 0.5, 0.0, 1.0);
+  vec3 c = mix(mix(uBody, col, uSeamFade), col, inTile);
+  // The ball's own edges stay dark, including where a tile only touches one with a point
+  vec3 edge = mix(vec3(1000.0), px - vec3(uGap + uEdge), vFlags);
+  vec3 tip = mix(vec3(1000.0), tipPx - vec3(uGap + uEdge), vTips);
+  float inFace = clamp(min(min(min(edge.x, edge.y), edge.z), min(min(tip.x, tip.y), tip.z)) + 0.5, 0.0, 1.0);
+  gl_FragColor = vec4(mix(uBody, c, inFace), 1.0);
+}`;
+function initGL() {
+  let gl = null;
+  try { gl = glCanvas.getContext('webgl', { antialias: true, alpha: true, premultipliedAlpha: true, depth: true, stencil: false }); } catch (e) { gl = null; }
+  if (!gl) return false;
+  const deriv = !!gl.getExtension('OES_standard_derivatives');
+  const hp = gl.getShaderPrecisionFormat(gl.FRAGMENT_SHADER, gl.HIGH_FLOAT);
+  const head = (deriv ? '#extension GL_OES_standard_derivatives : enable\n#define HAS_DERIV 1\n' : '') + `precision ${hp && hp.precision > 0 ? 'highp' : 'mediump'} float;\n`;
+  const compile = (type, src) => {
+    const sh = gl.createShader(type);
+    gl.shaderSource(sh, src); gl.compileShader(sh);
+    if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(sh));
+    return sh;
+  };
+  const program = (vs, fs, attrs, unis) => {
+    const pr = gl.createProgram();
+    gl.attachShader(pr, compile(gl.VERTEX_SHADER, vs)); gl.attachShader(pr, compile(gl.FRAGMENT_SHADER, head + fs));
+    gl.linkProgram(pr);
+    if (!gl.getProgramParameter(pr, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(pr));
+    const loc = { prog: pr };
+    for (const a of attrs) loc[a] = gl.getAttribLocation(pr, a);
+    for (const u of unis) loc[u] = gl.getUniformLocation(pr, u);
+    return loc;
+  };
+  const shared = ['uRot', 'uProj', 'uCam', 'uLight', 'uBody', 'uGap', 'uEdge', 'uSeamFade'];
+  const faceP = program(FACE_VS, FACE_FS, ['aPos', 'aNrm', 'aBary', 'aFace'], [...shared, 'uTiles']);
+  const tileP = program(TILE_VS, TILE_FS, ['aPos', 'aNrm', 'aBary', 'aCol'], shared);
+
+  // The ball: one triangle per face, 10 floats per corner
+  const fdata = new Float32Array(NF * 3 * 10);
+  for (let f = 0; f < NF; f++) for (let j = 0; j < 3; j++) {
+    const o = (f * 3 + j) * 10, p = VERTS[FACES[f][j]], n = FACE_N[f];
+    fdata.set([p[0], p[1], p[2], n[0], n[1], n[2], j === 0 ? 1 : 0, j === 1 ? 1 : 0, j === 2 ? 1 : 0, f], o);
+  }
+  const faceBuf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, faceBuf); gl.bufferData(gl.ARRAY_BUFFER, fdata, gl.STATIC_DRAW);
+  // Tile colors, one texel per tile; alpha 0 marks a tile that is turning
+  const texData = new Uint8Array(TEX_W * TEX_H * 4);
+  const tex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, TEX_W, TEX_H, 0, gl.RGBA, gl.UNSIGNED_BYTE, texData);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  // Turning tiles: rebuilt every frame, at most one whole cap round a six-face corner
+  const MAXM = MAX_DEG * NN * 3;
+  const mData = { pos: new Float32Array(MAXM * 3), nrm: new Int8Array(MAXM * 4), bary: new Uint8Array(MAXM * 4), col: new Uint8Array(MAXM * 4) };
+  const mk = (data) => { const b = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b); gl.bufferData(gl.ARRAY_BUFFER, data, gl.DYNAMIC_DRAW); return b; };
+  Object.assign(GLR, {
+    gl, faceP, tileP, faceBuf, tex, texData, mData, deriv,
+    mov: { pos: mk(mData.pos), nrm: mk(mData.nrm), bary: mk(mData.bary), col: mk(mData.col) },
+    ok: true, colorsDirty: true, colorsVersion: -1,
+  });
+  gl.enable(gl.CULL_FACE); gl.cullFace(gl.BACK); gl.frontFace(gl.CCW);
+  return true;
+}
+function refreshColors() {
+  const st = G.state, tx = GLR.texData;
+  for (let t = 0; t < NT; t++) {
+    const rgb = FACE_RGB[st[t]], o = t * 4;   // face f's tiles fill row f in order, so texel = tile id
+    tx[o] = rgb[0]; tx[o + 1] = rgb[1]; tx[o + 2] = rgb[2]; tx[o + 3] = movingMask[t] ? 0 : 255;
+  }
+  const gl = GLR.gl;
+  gl.bindTexture(gl.TEXTURE_2D, GLR.tex);
+  gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, TEX_W, NF, gl.RGBA, gl.UNSIGNED_BYTE, tx.subarray(0, TEX_W * NF * 4));
+  GLR.colorsDirty = false; GLR.colorsVersion = stateVersion;
+}
+function setUniforms(P) {
+  const gl = GLR.gl, W = cvV.w, H = cvV.h, dpr = cvV.dpr, M = VMX;
+  gl.uniformMatrix3fv(P.uRot, false, [M[0], M[3], M[6], M[1], M[4], M[7], M[2], M[5], M[8]]);
+  gl.uniform4f(P.uProj, (2 * proj.sc) / W, (2 * proj.sc) / H, (2 * proj.cx) / W - 1, 1 - (2 * proj.cy) / H);
+  gl.uniform1f(P.uCam, CAM);
+  gl.uniform3f(P.uLight, LIGHT[0], LIGHT[1], LIGHT[2]);
+  gl.uniform3f(P.uBody, theme.body[0] / 255, theme.body[1] / 255, theme.body[2] / 255);
+  const tilePx = (proj.sc * MEAN_EDGE) / N;
+  gl.uniform1f(P.uGap, (clamp(tilePx * 0.1, 0.3, 2.2) / 2) * dpr);
+  gl.uniform1f(P.uEdge, (clamp(tilePx * 0.28, 1.1, 3.4) / 2) * dpr);
+  gl.uniform1f(P.uSeamFade, clamp((9 - tilePx) / 8, 0, 0.6));
+}
+function drawGL(vm) {
+  const gl = GLR.gl;
+  gl.viewport(0, 0, glCanvas.width, glCanvas.height);
+  gl.clearColor(0, 0, 0, 0);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+  if (GLR.colorsDirty || GLR.colorsVersion !== stateVersion) refreshColors();
+  // The ball
+  const F = GLR.faceP;
+  gl.useProgram(F.prog);
+  setUniforms(F);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, GLR.tex); gl.uniform1i(F.uTiles, 0);
+  gl.bindBuffer(gl.ARRAY_BUFFER, GLR.faceBuf);
+  const attrs = [[F.aPos, 3, 0], [F.aNrm, 3, 12], [F.aBary, 3, 24], [F.aFace, 1, 36]];
+  for (const [loc, size, off] of attrs) { gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, size, gl.FLOAT, false, 40, off); }
+  gl.drawArrays(gl.TRIANGLES, 0, NF * 3);
+  for (const [loc] of attrs) gl.disableVertexAttribArray(loc);
+  // Turning tiles, drawn over the spots they left (the ball is convex, so nothing in front can hide them)
+  if (!vm) return;
+  const n = fillMoving(vm);
+  if (!n) return;
+  const T = GLR.tileP, md = GLR.mData, set = GLR.mov;
+  gl.useProgram(T.prog);
+  setUniforms(T);
+  const attr = (loc, buf, data, size, type, norm, stride) => {
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf); gl.bufferSubData(gl.ARRAY_BUFFER, 0, data);
+    gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, size, type, norm, stride, 0);
+  };
+  attr(T.aPos, set.pos, md.pos.subarray(0, n * 9), 3, gl.FLOAT, false, 0);
+  attr(T.aNrm, set.nrm, md.nrm.subarray(0, n * 12), 3, gl.BYTE, true, 4);
+  attr(T.aBary, set.bary, md.bary.subarray(0, n * 12), 4, gl.UNSIGNED_BYTE, true, 0);
+  attr(T.aCol, set.col, md.col.subarray(0, n * 12), 4, gl.UNSIGNED_BYTE, true, 0);
+  gl.drawArrays(gl.TRIANGLES, 0, n * 3);
+  for (const loc of [T.aPos, T.aNrm, T.aBary, T.aCol]) gl.disableVertexAttribArray(loc);
+}
+const MW = new Float64Array(9);
+// Turning tiles slide along their ring, bending over the edges as they cross.
+function fillMoving(vm) {
+  const { v, lo, hi, tau } = vm, md = GLR.mData, st = G.state;
+  let n = 0;
+  for (let d = lo; d <= hi; d++) {
+    const { deg, L, tiles, rr, uu } = RINGS[ringId(v, d)];
+    for (let s = 0; s < deg; s++) {
+      const k = STAR[v][s].k;
+      for (let i = 0; i < L; i++) {
+        const t = tiles[s * L + i];
+        for (let j = 0; j < 3; j++) loopPoint(v, rr[i * 3 + j], s + uu[i * 3 + j] + tau, MW, j * 3);
+        const ax = MW[3] - MW[0], ay = MW[4] - MW[1], az = MW[5] - MW[2], bx = MW[6] - MW[0], by = MW[7] - MW[1], bz = MW[8] - MW[2];
+        let nx = ay * bz - az * by, ny = az * bx - ax * bz, nz = ax * by - ay * bx;
+        const nl = Math.hypot(nx, ny, nz) || 1;
+        nx /= nl; ny /= nl; nz /= nl;
+        const rgb = FACE_RGB[st[t]], flags = TFLAG[t];
+        for (let j = 0; j < 3; j++) {
+          const o = n * 3 + j;
+          md.pos[o * 3] = MW[j * 3]; md.pos[o * 3 + 1] = MW[j * 3 + 1]; md.pos[o * 3 + 2] = MW[j * 3 + 2];
+          md.nrm[o * 4] = Math.round(nx * 127); md.nrm[o * 4 + 1] = Math.round(ny * 127); md.nrm[o * 4 + 2] = Math.round(nz * 127);
+          // This ring lists a tile's corners starting from the one nearest its own corner, k places into the face's order.
+          const which = (k + j) % 3;
+          md.bary[o * 4] = which === 0 ? 255 : 0; md.bary[o * 4 + 1] = which === 1 ? 255 : 0; md.bary[o * 4 + 2] = which === 2 ? 255 : 0; md.bary[o * 4 + 3] = flags;
+          md.col[o * 4] = rgb[0]; md.col[o * 4 + 1] = rgb[1]; md.col[o * 4 + 2] = rgb[2]; md.col[o * 4 + 3] = 255;
+        }
+        n++;
+      }
+    }
+  }
+  return n;
+}
+
+// The 2D layer over the WebGL canvas
+function renderView(tms) {
+  const { ctx, w: W, h: H, dpr } = cvV;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  if (W < 20 || H < 20) return;
+  prepareView();
+  const vm = visualMove();
+  syncMoving(vm);
+  if (GLR.ok) drawGL(vm);
+  // Soft floor shadow under the ball
+  if (view.el > 0.08) {
+    const fp = screenOf([0, -1.06, 0]), rx = proj.sc * 0.95, ry = rx * Math.sin(view.el) * 0.8;
+    shadowEl.style.opacity = String(clamp((view.el - 0.08) * 4, 0, 1));
+    shadowEl.style.transform = `translate(${fp.x - rx}px, ${fp.y - ry}px) scale(${(2 * rx) / 100}, ${(2 * ry) / 100})`;
+  } else shadowEl.style.opacity = '0';
+
+  // Ring outlines: the dial's chosen ring, tutorial glows, a rejected swipe, the hint
+  const pulse = 0.5 + 0.5 * Math.sin(tms / 250);
+  const lw = clamp((proj.sc * MEAN_EDGE) / N * 0.35, 1.6, 3.2), acc = theme.accentRgb.join(',');
+  if (G.mode !== 'title') ringOutline(ctx, sel.v, sel.cap ? 0 : sel.d, sel.d, `rgba(${acc},${hl.rings.size ? 0.35 : 0.85})`, lw);
+  for (const r of hl.rings) ringOutline(ctx, (r / N) | 0, r % N, r % N, `rgba(${acc},${0.55 + 0.45 * pulse})`, lw * 1.5);
+  if (hl.hint && !anim && !drag.live) ringOutline(ctx, hl.hint.v, hl.hint.lo, hl.hint.hi, `rgba(${acc},${0.6 + 0.4 * pulse})`, lw * 1.6);
+  if (hl.reject && tms < hl.reject.until) ringOutline(ctx, hl.reject.v, hl.reject.lo, hl.reject.hi, theme.warn, lw * 1.4);
+  for (const f of hl.faces) {
+    if (!faceVis[f]) continue;
+    const [a, b, c] = FACES[f].map((v) => screenOf(VERTS[v]));
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.lineTo(c.x, c.y); ctx.closePath();
+    ctx.lineWidth = lw * 1.6; ctx.strokeStyle = `rgba(${acc},${0.55 + 0.45 * pulse})`; ctx.stroke();
+  }
+  // The tile under the finger
+  const ft = focusTile(tms);
+  if (ft >= 0 && faceVis[faceOf(ft)] && !movingMask[ft]) {
+    const [a, b, c] = [0, 1, 2].map((j) => { const p = TV[ft * 3 + j]; return screenOf([PTS[p * 3], PTS[p * 3 + 1], PTS[p * 3 + 2]]); });
+    const gx = (a.x + b.x + c.x) / 3, gy = (a.y + b.y + c.y) / 3, grow = (p) => [gx + (p.x - gx) * 1.25, gy + (p.y - gy) * 1.25];
+    ctx.beginPath(); ctx.moveTo(...grow(a)); ctx.lineTo(...grow(b)); ctx.lineTo(...grow(c)); ctx.closePath();
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = 2.6; ctx.strokeStyle = '#ffffff'; ctx.stroke();
+    ctx.lineWidth = 1.2; ctx.strokeStyle = theme.accent; ctx.stroke();
+  }
+  // Corner badges
+  if (G.mode !== 'title') {
+    const small = view.zoom < 1.6 ? 2.6 : 3.4;
+    for (let v = 0; v < NV; v++) {
+      if (!vertexFacesEye(v)) continue;
+      const p = screenOf(VERTS[v]), on = v === sel.v;
+      ctx.beginPath(); ctx.arc(p.x, p.y, on ? 6.5 : small, 0, TAU);
+      ctx.fillStyle = on ? theme.accent : '#ffffff'; ctx.fill();
+      ctx.lineWidth = on ? 2.4 : 1.2; ctx.strokeStyle = on ? '#ffffff' : theme.bodyHex; ctx.stroke();
+    }
+  }
+}
+// Outline rings lo..hi round corner v on the faces the camera can see.
+function ringOutline(ctx, v, lo, hi, color, lw) {
+  const deg = DEG[v], E = EDGE_PT[v], star = STAR[v];
+  ctx.beginPath();
+  for (const r of lo > 0 ? [lo, hi + 1] : [hi + 1]) {
+    for (let s = 0; s < deg; s++) {
+      if (!faceVis[star[s].f]) continue;
+      const a = (s * (N + 1) + r) * 3, b = (((s + 1) % deg) * (N + 1) + r) * 3;
+      const p = screenOf([E[a], E[a + 1], E[a + 2]]), q = screenOf([E[b], E[b + 1], E[b + 2]]);
+      ctx.moveTo(p.x, p.y); ctx.lineTo(q.x, q.y);
+    }
+  }
+  ctx.lineWidth = lw; ctx.lineCap = 'round'; ctx.strokeStyle = color; ctx.stroke();
+}
+// The tile under a screen point, or -1: cast a ray from the eye and find where it meets the ball.
+function tileAt(x, y) {
+  const u = (x - proj.cx) / (proj.sc * CAM), w = (proj.cy - y) / (proj.sc * CAM);
+  const A = [0, 0, 0], B = [0, 0, 0], C = [0, 0, 0];
+  for (let f = 0; f < NF; f++) {
+    if (!faceVis[f]) continue;
+    const [i0, i1, i2] = FACES[f];
+    toCam(VERTS[i0][0], VERTS[i0][1], VERTS[i0][2], A); toCam(VERTS[i1][0], VERTS[i1][1], VERTS[i1][2], B); toCam(VERTS[i2][0], VERTS[i2][1], VERTS[i2][2], C);
+    const e1 = vsub(B, A), e2 = vsub(C, A), n = vcross(e1, e2);
+    const denom = n[0] * u + n[1] * w - n[2];
+    if (Math.abs(denom) < 1e-12) continue;
+    const s = (vdot(n, A) - n[2] * CAM) / denom;
+    if (!(s > 0)) continue;
+    const h = [u * s - A[0], w * s - A[1], CAM - s - A[2]];
+    const d00 = vdot(e1, e1), d01 = vdot(e1, e2), d11 = vdot(e2, e2), d20 = vdot(h, e1), d21 = vdot(h, e2), den = d00 * d11 - d01 * d01;
+    const wb = (d11 * d20 - d01 * d21) / den, wc = (d00 * d21 - d01 * d20) / den, wa = 1 - wb - wc;
+    if (wa < -1e-6 || wb < -1e-6 || wc < -1e-6) continue;
+    return f * NN + tileInFace(wa, wb, wc);
+  }
+  return -1;
+}
+// The tile holding barycentric point (wa, wb, wc) of a face, as its index within the face.
+function tileInFace(wa, wb, wc) {
+  const k = 1 - 1e-7, m = 1e-7 / 3;
+  const A = (clamp(wa, 0, 1) * k + m) * N, B = (clamp(wb, 0, 1) * k + m) * N, C = (clamp(wc, 0, 1) * k + m) * N;
+  const fa = Math.min(N - 1, Math.floor(A)), fb = Math.min(N - 1, Math.floor(B)), fc = Math.min(N - 1, Math.floor(C));
+  const sum = fa + fb + fc, d = N - 1 - fa;
+  if (sum === N - 1) return d * d + 2 * fc;
+  if (sum === N - 2) return d * d + 2 * fc + 1;
+  // Rounding put the point on a seam: take the nearest tile center instead.
+  let best = 0, bd = Infinity;
+  for (let a = 0; a < N; a++) for (let b = 0; a + b < N; b++) {
+    const c = N - 1 - a - b, e = (A - a - 1 / 3) ** 2 + (B - b - 1 / 3) ** 2 + (C - c - 1 / 3) ** 2;
+    if (e < bd) { bd = e; best = (N - 1 - a) ** 2 + 2 * c; }
+  }
+  return best;
+}
+function cornerAt(x, y, reach) {
+  let best = -1, bd = reach * reach;
+  for (let v = 0; v < NV; v++) {
+    if (!vertexFacesEye(v)) continue;
+    const p = screenOf(VERTS[v]), dx = p.x - x, dy = p.y - y, dd = dx * dx + dy * dy;
+    if (dd < bd) { bd = dd; best = v; }
+  }
+  return best;
+}
+
+// ===========================================================================
+// Ring dial: the corner's faces opened into a disc. Level d is the annulus
+// between radii d and d + 1 (in rings), each face a slice of the disc, and
+// U counts sectors counterclockwise, the same way the rings turn. A turn
+// rotates its annulus rigidly, so the resting rings and the turning ones are
+// each drawn once into a cache and rotated into place every frame.
+// ===========================================================================
+const rho = (r) => (dg.R * r) / N;
+function dialAngle(U, deg, theta) { return (theta === undefined ? dg.theta : theta) - (U * TAU) / deg; }
+function cellPath(p, d, s, i, tau, deg, theta) {
+  const c = i >> 1, base = s + tau, cx = dg.cx, cy = dg.cy;
+  if ((i & 1) === 0) {
+    const r1 = rho(d + 1), a0 = dialAngle(base + c / (d + 1), deg, theta), a1 = dialAngle(base + (c + 1) / (d + 1), deg, theta);
+    if (d === 0) p.moveTo(cx, cy);
+    else { const an = dialAngle(base + c / d, deg, theta), r0 = rho(d); p.moveTo(cx + r0 * Math.cos(an), cy + r0 * Math.sin(an)); }
+    p.lineTo(cx + r1 * Math.cos(a0), cy + r1 * Math.sin(a0));
+    p.arc(cx, cy, r1, a0, a1, true);
+    p.closePath();
+  } else {
+    const r0 = rho(d), r1 = rho(d + 1);
+    const af = dialAngle(base + (c + 1) / (d + 1), deg, theta), an1 = dialAngle(base + (c + 1) / d, deg, theta), an0 = dialAngle(base + c / d, deg, theta);
+    p.moveTo(cx + r1 * Math.cos(af), cy + r1 * Math.sin(af));
+    p.lineTo(cx + r0 * Math.cos(an1), cy + r0 * Math.sin(an1));
+    p.arc(cx, cy, r0, an1, an0, false);
+    p.closePath();
+  }
+}
+// Fill and seam the cells of rings lo..hi (skipping `skip`), turned tau sectors, with the dial at angle theta.
+function drawCells(ctx, v, d0, d1, skip, tau, theta) {
+  const deg = DEG[v], st = G.state, paths = new Array(16);
+  let any = false;
+  for (let d = d0; d <= d1; d++) {
+    if (skip && d >= skip.lo && d <= skip.hi) continue;
+    const { L, tiles } = RINGS[ringId(v, d)];
+    for (let s = 0; s < deg; s++) for (let i = 0; i < L; i++) {
+      const c = st[tiles[s * L + i]];
+      cellPath(paths[c] || (paths[c] = new Path2D()), d, s, i, tau, deg, theta);
+      any = true;
+    }
+  }
+  if (!any) return;
+  const cellPx = dg.R / N, b = theme.body;
+  ctx.lineWidth = clamp(dg.R / 320, 0.35, 1); ctx.lineJoin = 'round';
+  ctx.strokeStyle = `rgba(${b[0]},${b[1]},${b[2]},${clamp((cellPx - 2) / 7, 0.3, 1)})`;
+  for (let c = 0; c < 16; c++) {
+    if (!paths[c]) continue;
+    ctx.fillStyle = FACE_HEX[c]; ctx.fill(paths[c]); ctx.stroke(paths[c]);
+  }
+}
+const dialCache = document.createElement('canvas'), turnCache = document.createElement('canvas');
+let dialCacheKey = '', turnCacheKey = '';
+// Face edges: spokes through rings d0..d1
+function drawSpokes(ctx, v, d0, d1) {
+  const deg = DEG[v], { cx, cy, R } = dg;
+  ctx.beginPath();
+  for (let s = 0; s < deg; s++) {
+    const a = dialAngle(s, deg, 0), ca = Math.cos(a), sa = Math.sin(a);
+    ctx.moveTo(cx + rho(d0) * ca, cy + rho(d0) * sa); ctx.lineTo(cx + rho(d1 + 1) * ca, cy + rho(d1 + 1) * sa);
+  }
+  ctx.lineWidth = Math.max(1.8, R / 80); ctx.lineCap = 'round'; ctx.strokeStyle = theme.bodyHex; ctx.stroke();
+}
+// Paint the body color over rings lo..hi.
+function clearAnnulus(ctx, lo, hi) {
+  ctx.beginPath();
+  ctx.arc(dg.cx, dg.cy, rho(hi + 1), 0, TAU);
+  if (lo > 0) ctx.arc(dg.cx, dg.cy, rho(lo), 0, TAU, true);
+  ctx.fillStyle = theme.bodyHex; ctx.fill();
+}
+// The resting dial, drawn at angle 0. Turns round this corner repaint only their rings;
+// turns round a neighbouring corner repaint everything; turns farther away never reach these faces.
+function refreshDialCache() {
+  const v = sel.v, key = [v, cvD.el.width, cvD.el.height, themeVersion, dg.R].join('|');
+  const ctx = dialCache.getContext('2d');
+  let full = key !== dialCacheKey || dialPending.full;
+  const ranges = [];
+  if (!full) for (const m of dialPending.moves) {
+    if (m.v === v) ranges.push(m);
+    else if (CORNER_TOUCH[v * NV + m.v]) { full = true; break; }
+  }
+  dialPending.moves.length = 0; dialPending.full = false;
+  if (full) {
+    dialCacheKey = key;
+    dialCache.width = cvD.el.width; dialCache.height = cvD.el.height;
+    ctx.setTransform(cvD.dpr, 0, 0, cvD.dpr, 0, 0);
+    ctx.clearRect(0, 0, cvD.w, cvD.h);
+    ctx.beginPath(); ctx.arc(dg.cx, dg.cy, dg.R + 3, 0, TAU); ctx.fillStyle = theme.bodyHex; ctx.fill();
+    drawCells(ctx, v, 0, N - 1, null, 0, 0);
+    drawSpokes(ctx, v, 0, N - 1);
+    return;
+  }
+  ctx.setTransform(cvD.dpr, 0, 0, cvD.dpr, 0, 0);
+  for (const m of ranges) { clearAnnulus(ctx, m.lo, m.hi); drawCells(ctx, v, m.lo, m.hi, null, 0, 0); drawSpokes(ctx, v, m.lo, m.hi); }
+}
+function refreshTurnCache(mv) {
+  const key = [sel.v, mv.lo, mv.hi, stateVersion, cvD.el.width, cvD.el.height, themeVersion, dg.R].join('|');
+  if (key === turnCacheKey) return;
+  turnCacheKey = key;
+  turnCache.width = cvD.el.width; turnCache.height = cvD.el.height;
+  const ctx = turnCache.getContext('2d');
+  ctx.setTransform(cvD.dpr, 0, 0, cvD.dpr, 0, 0);
+  ctx.clearRect(0, 0, cvD.w, cvD.h);
+  drawCells(ctx, sel.v, mv.lo, mv.hi, null, 0, 0);
+}
+// Blit a cache drawn at angle 0, turned to angle a about the dial's center.
+function blitTurned(ctx, img, a) {
+  const dpr = cvD.dpr;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.translate(dg.cx * dpr, dg.cy * dpr); ctx.rotate(a); ctx.translate(-dg.cx * dpr, -dg.cy * dpr);
+  ctx.drawImage(img, 0, 0);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+function renderDial(tms) {
+  const { ctx, w: W, h: H, dpr } = cvD;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, cvD.el.width, cvD.el.height);
+  if (W < 40 || H < 40) return;
+  const v = sel.v, deg = DEG[v], { cx, cy, R } = dg;
+  const vm = visualMove(), mv = vm && vm.v === v ? vm : null;
+  refreshDialCache();
+  // The resting rings, turned to follow the 3D view, then the turning ones on top
+  blitTurned(ctx, dialCache, dg.theta);
+  if (mv) { refreshTurnCache(mv); clearAnnulus(ctx, mv.lo, mv.hi); blitTurned(ctx, turnCache, dg.theta - (mv.tau * TAU) / deg); }
+  const pulse = 0.5 + 0.5 * Math.sin(tms / 260), acc = theme.accentRgb.join(',');
+  // The chosen ring, glows, a rejected swipe
+  const ring2 = (lo, hi, color, lw) => {
+    ctx.beginPath();
+    if (lo > 0) { ctx.moveTo(cx + rho(lo), cy); ctx.arc(cx, cy, rho(lo), 0, TAU); }
+    ctx.moveTo(cx + rho(hi + 1), cy); ctx.arc(cx, cy, rho(hi + 1), 0, TAU);
+    ctx.lineWidth = lw; ctx.strokeStyle = color; ctx.stroke();
+  };
+  if (G.mode !== 'title') ring2(sel.cap ? 0 : sel.d, sel.d, `rgba(${acc},${hl.rings.size ? 0.45 : 0.95})`, 2);
+  for (const r of hl.rings) {
+    if (((r / N) | 0) !== v) continue;
+    const d = r % N;
+    if (!(mv && d >= mv.lo && d <= mv.hi)) {
+      ctx.beginPath(); ctx.arc(cx, cy, rho(d + 0.5), 0, TAU);
+      ctx.lineWidth = Math.max(8, rho(1) * 2.4); ctx.strokeStyle = `rgba(${acc},${0.12 + 0.12 * pulse})`; ctx.stroke();
+    }
+    ring2(d, d, `rgba(${acc},${0.6 + 0.4 * pulse})`, 2.6);
+  }
+  if (hl.reject && tms < hl.reject.until && hl.reject.v === v) ring2(hl.reject.lo, hl.reject.hi, theme.warn, 2.6);
+  if (hl.hint && hl.hint.v === v && !drag.active && !anim) drawDialHint(ctx, hl.hint, tms);
+  // The tile under the finger
+  const ft = focusTile(tms);
+  if (ft >= 0) {
+    const f = faceOf(ft), s = STAR[v].findIndex((e) => e.f === f);
+    if (s >= 0) {
+      const k = STAR[v][s].k, d = TL[ft * 3 + k], i = RING_POS[ft * 3 + k] - s * (2 * d + 1);
+      const moving = !!mv && d >= mv.lo && d <= mv.hi, p = new Path2D();
+      cellPath(p, d, s, i, moving ? mv.tau : 0, deg);
+      ctx.lineWidth = 3.2; ctx.strokeStyle = '#ffffff'; ctx.stroke(p);
+      ctx.lineWidth = 1.5; ctx.strokeStyle = theme.accent; ctx.stroke(p);
+    }
+  }
+  // Corner badges on the rim: the neighbor at the far end of each edge
+  dg.chips.length = 0;
+  ctx.font = '800 10.5px ' + theme.font;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (let s = 0; s < deg; s++) {
+    const a = dialAngle(s, deg), rr = R + 13, x = cx + rr * Math.cos(a), y = cy + rr * Math.sin(a), u = STAR[v][s].next;
+    ctx.beginPath(); ctx.arc(x, y, 11.5, 0, TAU);
+    ctx.fillStyle = theme.card; ctx.fill();
+    ctx.lineWidth = 1.5; ctx.strokeStyle = theme.line; ctx.stroke();
+    ctx.fillStyle = theme.ink; ctx.fillText(V_SHORT[u], x, y + 0.5);
+    dg.chips.push({ x, y, v: u });
+  }
+}
+function drawDialHint(ctx, h, tms) {
+  const deg = DEG[h.v], d = h.hi, rm = rho(d + 0.5), sgn = Math.sign(h.k) || 1;
+  // Start in the sector nearest the bottom of the dial, where a thumb rests.
+  let U0 = 0.5, best = Infinity;
+  for (let s = 0; s < deg; s++) { const a = dialAngle(s + 0.5, deg), e = Math.abs(wrapPi(a - Math.PI / 2)); if (e < best) { best = e; U0 = s + 0.5 - 0.4 * sgn; } }
+  const len = 0.8 * sgn, a0 = dialAngle(U0, deg), a1 = dialAngle(U0 + len, deg), cx = dg.cx, cy = dg.cy;
+  const R = Math.max(6, rho(1) * 1.4), acc = theme.accentRgb.join(',');
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = `rgba(${acc},0.3)`; ctx.lineWidth = R * 1.5;
+  ctx.beginPath(); ctx.arc(cx, cy, rm, a0, a1, sgn > 0); ctx.stroke();
+  // arrowhead
+  const hx = cx + rm * Math.cos(a1), hy = cy + rm * Math.sin(a1);
+  const tx = sgn > 0 ? Math.sin(a1) : -Math.sin(a1), ty = sgn > 0 ? -Math.cos(a1) : Math.cos(a1), nx = -ty, ny = tx, hs = R * 1.3;
+  ctx.fillStyle = `rgba(${acc},0.92)`;
+  ctx.beginPath();
+  ctx.moveTo(hx + tx * hs * 0.9, hy + ty * hs * 0.9);
+  ctx.lineTo(hx - tx * hs * 0.5 + nx * hs * 0.85, hy - ty * hs * 0.5 + ny * hs * 0.85);
+  ctx.lineTo(hx - tx * hs * 0.5 - nx * hs * 0.85, hy - ty * hs * 0.5 - ny * hs * 0.85);
+  ctx.closePath(); ctx.fill();
+  // a ghost fingertip sliding along the ring
+  const ph = (tms % 1500) / 1500, kk = easeInOutCubic(clamp(ph / 0.75, 0, 1));
+  const af = dialAngle(U0 + len * kk, deg), fx = cx + rm * Math.cos(af), fy = cy + rm * Math.sin(af);
+  ctx.globalAlpha = ph < 0.75 ? Math.min(1, ph * 6) : Math.max(0, 1 - (ph - 0.75) / 0.25);
+  ctx.fillStyle = `rgba(${acc},0.32)`; ctx.beginPath(); ctx.arc(fx, fy, R * 1.9, 0, TAU); ctx.fill();
+  ctx.lineWidth = 2.5; ctx.strokeStyle = 'rgba(255,255,255,0.95)'; ctx.stroke();
+  ctx.restore();
+}
+// Which ring (and tile) lies under a point on the dial.
+function dialHit(x, y) {
+  const dx = x - dg.cx, dy = y - dg.cy, r = Math.hypot(dx, dy);
+  if (r > dg.R + 3) return null;
+  const v = sel.v, deg = DEG[v], d = clamp(Math.floor((r / dg.R) * N), 0, N - 1);
+  let U = ((dg.theta - Math.atan2(dy, dx)) * deg) / TAU;
+  U = ((U % deg) + deg) % deg;
+  const s = Math.min(deg - 1, Math.floor(U)), x01 = U - s, q = clamp((r - rho(d)) / (rho(d + 1) - rho(d)), 0, 1);
+  // Find the cell: boundaries between neighbors run from the inner circle to the outer one.
+  let i = 0;
+  for (let c = 0; c <= d; c++) {
+    const upEnd = d ? (c / d) * (1 - q) + ((c + 1) / (d + 1)) * q : 1;  // up(c) | down(c)
+    if (x01 < upEnd || c === d) { i = 2 * c; break; }
+    const downEnd = ((c + 1) / d) * (1 - q) + ((c + 1) / (d + 1)) * q;   // down(c) | up(c + 1)
+    if (x01 < downEnd) { i = 2 * c + 1; break; }
+  }
+  const tile = RINGS[ringId(v, d)].tiles[s * (2 * d + 1) + i];
+  return { d, tile };
+}
+
+// ===========================================================================
+// Highlights and confetti
+// ===========================================================================
+const hl = { rings: new Set(), faces: new Set(), hint: null, reject: null, focus: null };
+const confetti = [];
+function focusTile(tms) {
+  if (drag.active && drag.tile >= 0) return drag.tile;
+  if (hl.focus && tms < hl.focus.until) return hl.focus.t;
+  return -1;
+}
+function burstConfetti() {
+  if (reduceMotion) return;
+  const cx = cvV.w / 2, cy = cvV.h / 2, sp0 = proj.sc * 0.5;
+  for (let i = 0; i < 130; i++) {
+    const a = Math.random() * TAU, rr = Math.random() * sp0;
+    const sp = 140 + Math.random() * 420, max = 1.1 + Math.random() * 0.9;
+    confetti.push({
+      x: cx + Math.cos(a) * rr * 0.6, y: cy + Math.sin(a) * rr, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 260,
+      rot: Math.random() * TAU, vr: (Math.random() - 0.5) * 12, size: 5 + Math.random() * 7,
+      color: FACE_HEX[(Math.random() * 16) | 0], life: max, max, round: Math.random() < 0.45,
+    });
+  }
+}
+function stepConfetti(dt) {
+  for (let i = confetti.length - 1; i >= 0; i--) {
+    const c = confetti[i];
+    c.life -= dt; c.vy += 820 * dt; c.vx *= 0.99; c.x += c.vx * dt; c.y += c.vy * dt; c.rot += c.vr * dt;
+    if (c.life <= 0 || c.y > cvV.h + 40) confetti.splice(i, 1);
+  }
+}
+function drawConfetti(ctx) {
+  for (const c of confetti) {
+    ctx.save(); ctx.globalAlpha = clamp((c.life / c.max) * 1.6, 0, 1);
+    ctx.translate(c.x, c.y); ctx.rotate(c.rot);
+    ctx.fillStyle = c.color;
+    if (c.round) { ctx.beginPath(); ctx.arc(0, 0, c.size * 0.55, 0, TAU); ctx.fill(); }
+    else ctx.fillRect(-c.size / 2, -c.size / 3, c.size, c.size * 0.66);
+    ctx.restore();
+  }
+}
+
+// ===========================================================================
+// Turn animation
+// ===========================================================================
+function visualMove() {
+  if (drag.live) return drag.live;
+  if (anim) return { v: anim.v, lo: anim.lo, hi: anim.hi, tau: anim.t };
+  return null;
+}
+function stepAnim(tms) {
+  if (!anim) return;
+  const p = anim.dur > 0 ? clamp((tms - anim.start) / anim.dur, 0, 1) : 1;
+  anim.t = anim.from + (anim.to - anim.from) * anim.ease(p);
+  if (p >= 1) finishAnim();
+}
+function finishAnim() {
+  const a = anim;
+  if (!a) return;
+  anim = null;
+  if (a.k) { const m = { v: a.v, lo: a.lo, hi: a.hi, k: a.k }; setState(applyMove(G.state, m), m); }
+  dirty = true;
+  if (a.done) a.done();
+  if (!anim && queue.length) startQueued();
+}
+// Complete a player-driven animation at once (so a new swipe or undo never waits on the last one).
+function settle() {
+  if (anim && (anim.kind === 'player' || anim.kind === 'cancel' || anim.kind === 'undo')) { anim.t = anim.to; finishAnim(); }
+}
+function runSequence(moves, onDone, kind) {
+  queue.length = 0;
+  if (!moves.length) { if (onDone) onDone(); return; }
+  moves.forEach((m, i) => queue.push({ ...m, kind, onDone: i === moves.length - 1 ? onDone : null }));
+  if (!anim) startQueued();
+}
+function startQueued() {
+  const q = queue.shift();
+  if (!q) return;
+  if (q.kind === 'demo') setCorner(q.v, false);
+  anim = {
+    kind: q.kind, v: q.v, lo: q.lo, hi: q.hi, k: q.k, from: 0, to: q.k, t: 0,
+    start: now() + (q.delay || 0), dur: (q.dur || 300) * (0.75 + 0.25 * Math.abs(q.k)),
+    ease: easeInOutCubic,
+    done: () => { if (q.kind === 'auto') Sound.tick(); if (q.onDone) q.onDone(); },
+  };
+}
+function clearAnimations() { queue.length = 0; anim = null; drag.active = false; drag.live = null; dirty = true; }
+
+function randomMove(avoidV) {
+  let v;
+  do v = (Math.random() * NV) | 0; while (v === avoidV);
+  const d = 1 + ((Math.random() * (N - 1)) | 0);
+  let k = Math.random() < 0.5 ? 1 : -1;
+  if (Math.random() < 0.3) k *= 2;
+  return { v, lo: d, hi: d, k };
+}
+function makeScramble(n) {
+  const seq = [];
+  let guard = 0;
+  while (seq.length < n && guard++ < n * 40) {
+    const m = randomMove(seq.length ? seq[seq.length - 1].v : -1);
+    // Keep every turn: skip any that would merge with an earlier one.
+    if (reduceMoves([...seq, m]).length === seq.length + 1) seq.push(m);
+  }
+  return seq;
+}
+// The quickest known way back: fold the net sequence, then undo it from the end.
+function nextHintMove() {
+  const net = reduceMoves([...G.base, ...G.history]);
+  const last = net[net.length - 1];
+  return last ? { v: last.v, lo: last.lo, hi: last.hi, k: -last.k } : null;
+}
+
+// ===========================================================================
+// Selecting a corner and a ring
+// ===========================================================================
+function setCorner(v, snap) {
+  v = ((v % NV) + NV) % NV;
+  if (v !== sel.v) {
+    sel.v = v;
+    if (snap !== false) { prepareView(); if (dg.target !== null) dg.theta = dg.target; }
+  }
+  updateDialLabels();
+  dirty = true;
+}
+function setRing(d) {
+  sel.d = clamp(d, 0, N - 1);
+  updateDialLabels();
+  dirty = true;
+}
+function setCap(on) {
+  if (G.mode === 'tutorial') on = false;
+  sel.cap = !!on;
+  $('segRing').setAttribute('aria-checked', String(!sel.cap));
+  $('segCap').setAttribute('aria-checked', String(sel.cap));
+  updateDialLabels();
+  dirty = true;
+}
+function updateDialLabels() {
+  $('cornerLabel').innerHTML = `<b>${V_NAME[sel.v]}</b><small>${DEG[sel.v]} faces</small>`;
+  $('ringLabel').innerHTML = sel.cap
+    ? `<b>Rings 1–${sel.d + 1}</b><small>cap of ${N}</small>`
+    : `<b>Ring ${sel.d + 1}</b><small>of ${N}</small>`;
+  $('btnRingIn').disabled = sel.d <= 0;
+  $('btnRingOut').disabled = sel.d >= N - 1;
+  updateHud();
+}
+// Point the dial at the corner nearest a tile, and pick the ring through it.
+function aimAtTile(t) {
+  const f = faceOf(t);
+  let k = 0;
+  for (let j = 1; j < 3; j++) if (TL[t * 3 + j] < TL[t * 3 + k]) k = j;
+  setCorner(FACES[f][k]);
+  setRing(TL[t * 3 + k]);
+  hl.focus = { t, until: now() + 1100 };
+}
+const currentMove = (k) => ({ v: sel.v, lo: sel.cap ? 0 : sel.d, hi: sel.d, k });
+
+// ===========================================================================
+// Input: shared turning logic
+// ===========================================================================
+const drag = { active: false, src: '', id: -1, tile: -1, sx: 0, sy: 0, mode: '', hitD: 0, coarse: false, v: 0, lo: 0, hi: 0, ux: 0, uy: 0, pxPer: 60, prevAng: 0, acc: 0, samples: [], live: null };
+const LOCK_PX = 9;
+
+function inputOpen() {
+  if (queue.length || (anim && (anim.kind === 'auto' || anim.kind === 'demo'))) return false;
+  if (G.mode === 'timed') return G.phase === 'ready' || G.phase === 'running';
+  if (G.mode === 'tutorial') return Tut.acceptsInput();
+  return G.mode === 'free';
+}
+function movesAllowed(v, lo, hi) {
+  if (G.mode !== 'tutorial' || !Tut.allowed) return true;
+  for (let d = lo; d <= hi; d++) if (!Tut.allowed.has(ringId(v, d))) return false;
+  return true;
+}
+function rejectTurn(v, lo, hi) {
+  hl.reject = { v, lo, hi, until: now() + 700 };
+  Sound.deny(); haptic(20);
+  toast(Tut.rejectMessage());
+  dirty = true;
+}
+function beginLive(v, lo, hi) {
+  drag.v = v; drag.lo = lo; drag.hi = hi; drag.mode = 'turn'; drag.acc = 0; drag.samples = [];
+  drag.live = { v, lo, hi, tau: 0 };
+  hideToast();
+  onTurnStarted();
+}
+function updateLive(tau) {
+  drag.live.tau = tau;
+  const tn = now();
+  drag.samples.push({ t: tn, tau });
+  while (drag.samples.length > 2 && tn - drag.samples[0].t > 90) drag.samples.shift();
+  dirty = true;
+}
+function releaseDrag(e, cancelled) {
+  if (!drag.active || (e && e.pointerId !== drag.id)) return;
+  const live = drag.live;
+  if (live && drag.mode === 'turn') {
+    const tau = live.tau, deg = DEG[live.v];
+    let vel = 0;
+    if (drag.samples.length >= 2) {
+      const a = drag.samples[0], b = drag.samples[drag.samples.length - 1];
+      if (b.t > a.t) vel = (b.tau - a.tau) / (b.t - a.t); // sectors per ms
+    }
+    let k = Math.round(tau);
+    const flick = Math.abs(vel) > 0.004 && Math.sign(vel) === Math.sign(tau) && Math.abs(tau) > 0.06;
+    if (!k && (Math.abs(tau) >= 0.3 || flick)) k = Math.sign(tau);
+    if (cancelled) k = 0;
+    const net = normK(k, deg), at = now(), src = drag.src;
+    if (net) {
+      const m = { v: live.v, lo: live.lo, hi: live.hi, k: net };
+      anim = { kind: 'player', v: live.v, lo: live.lo, hi: live.hi, k: net, from: tau, to: k, t: tau, start: at, dur: 80 + 160 * Math.min(1.5, Math.abs(k - tau)), ease: easeOutCubic, done: () => onPlayerMove(m, at, src) };
+    } else if (tau) {
+      anim = { kind: 'cancel', v: live.v, lo: live.lo, hi: live.hi, k: 0, from: tau, to: k, t: tau, start: now(), dur: 60 + 140 * Math.min(1, Math.abs(k - tau)), ease: easeOutCubic, done: null };
+    }
+  } else if (!drag.mode && !cancelled) {
+    // A tap, not a drag
+    if (drag.src === '3d' && drag.tile >= 0) aimAtTile(drag.tile);
+    else if (drag.src === 'dial' && drag.tile >= 0) hl.focus = { t: drag.tile, until: now() + 900 };
+  }
+  endDrag();
+}
+function endDrag() {
+  drag.active = false; drag.live = null; drag.mode = ''; drag.id = -1; drag.tile = -1;
+  dirty = true;
+}
+function canvasPoint(el, e) {
+  const rect = el.getBoundingClientRect();
+  return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+}
+
+// ===========================================================================
+// Input: the dial
+// ===========================================================================
+dialCanvas.addEventListener('pointerdown', (e) => {
+  Sound.unlock();
+  if (drag.active || G.mode === 'title') return;
+  if (e.pointerType === 'mouse' && e.button !== 0) return;
+  const pt = canvasPoint(dialCanvas, e);
+  for (const c of dg.chips) {
+    if ((pt.x - c.x) ** 2 + (pt.y - c.y) ** 2 <= 17 * 17) { e.preventDefault(); Sound.click(); setCorner(c.v); return; }
+  }
+  const hit = dialHit(pt.x, pt.y);
+  if (!hit) return;
+  e.preventDefault();
+  settle();
+  try { dialCanvas.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+  Object.assign(drag, { active: true, src: 'dial', id: e.pointerId, tile: hit.tile, hitD: hit.d, coarse: e.pointerType !== 'mouse', sx: pt.x, sy: pt.y, mode: '', live: null, prevAng: Math.atan2(pt.y - dg.cy, pt.x - dg.cx) });
+  dirty = true;
+});
+dialCanvas.addEventListener('pointermove', (e) => {
+  if (!drag.active || drag.src !== 'dial' || e.pointerId !== drag.id) return;
+  const pt = canvasPoint(dialCanvas, e);
+  if (!drag.mode) {
+    const mx = pt.x - drag.sx, my = pt.y - drag.sy;
+    if (Math.hypot(mx, my) < LOCK_PX) return;
+    const rx = drag.sx - dg.cx, ry = drag.sy - dg.cy, r0 = Math.hypot(rx, ry) || 1;
+    const radial = (mx * rx + my * ry) / r0, tangential = (-mx * ry + my * rx) / r0;
+    if (Math.abs(tangential) >= Math.abs(radial) * 0.75 && r0 > 3) {
+      // Rings are only a few pixels thick; a swipe that starts close to the chosen ring turns the chosen ring.
+      const ringPx = dg.R / N, sticky = drag.coarse ? (ringPx < 4 ? 2 : ringPx < 8 ? 1 : 0) : 0;
+      if (Math.abs(drag.hitD - sel.d) > sticky) setRing(drag.hitD);
+      const lo = sel.cap ? 0 : sel.d, hi = sel.d;
+      if (!inputOpen()) {
+        if (G.mode === 'tutorial' && Tut.step && Tut.step.info) toast('Tap Next to continue');
+        drag.mode = 'scrub';
+      } else if (!movesAllowed(sel.v, lo, hi)) {
+        rejectTurn(sel.v, lo, hi);
+        endDrag();
+        return;
+      } else {
+        drag.tile = -1;
+        beginLive(sel.v, lo, hi);
+      }
+    } else drag.mode = 'scrub';
+  }
+  if (drag.mode === 'scrub') {
+    const r = Math.hypot(pt.x - dg.cx, pt.y - dg.cy);
+    setRing(Math.floor((r / dg.R) * N));
+    drag.tile = -1;
+    return;
+  }
+  const ang = Math.atan2(pt.y - dg.cy, pt.x - dg.cx);
+  drag.acc += wrapPi(ang - drag.prevAng);
+  drag.prevAng = ang;
+  updateLive((-drag.acc * DEG[drag.v]) / TAU);
+});
+dialCanvas.addEventListener('pointerup', (e) => {
+  if (drag.active && drag.src === 'dial' && e.pointerId === drag.id && !drag.mode) setRing(drag.hitD);
+  releaseDrag(e, false);
+});
+dialCanvas.addEventListener('pointercancel', (e) => releaseDrag(e, true));
+dialCanvas.addEventListener('lostpointercapture', (e) => releaseDrag(e, false));
+dialCanvas.addEventListener('contextmenu', (e) => e.preventDefault());
+let wheelAt = 0;
+dialCanvas.addEventListener('wheel', (e) => {
+  // Scroll over the dial to step through the rings, one ring per notch however fast a trackpad fires.
+  if (G.mode === 'title') return;
+  e.preventDefault();
+  const t = now();
+  if (Math.abs(e.deltaY) < 2 || t - wheelAt < 60) return;
+  wheelAt = t;
+  setRing(sel.d + (e.deltaY < 0 ? 1 : -1));
+}, { passive: false });
+
+// ===========================================================================
+// Input: the 3D view (drag a tile to turn; drag around it to look; pinch or scroll to zoom)
+// ===========================================================================
+const orbit = { active: false, id: -1, x: 0, y: 0, az: 0, el: 0, moved: 0, lastTap: 0 };
+const touches = new Map();
+let pinch = null;
+const orbitRate = () => 3.4 / Math.max(200, Math.min(cvV.w, cvV.h) * 1.4) / Math.sqrt(view.zoom);
+
+viewCanvas.addEventListener('pointerdown', (e) => {
+  Sound.unlock();
+  if (G.mode === 'title') return;
+  const pt = canvasPoint(viewCanvas, e);
+  touches.set(e.pointerId, pt);
+  try { viewCanvas.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+  e.preventDefault();
+  if (touches.size === 2) {
+    // A second finger: drop any turn in progress and pinch instead.
+    if (drag.active && drag.src === '3d') releaseDrag({ pointerId: drag.id }, true);
+    orbit.active = false;
+    const [a, b] = [...touches.values()];
+    pinch = { d0: Math.max(10, Math.hypot(a.x - b.x, a.y - b.y)), zoom0: view.zoom, mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2, az: view.az, el: view.el };
+    view.tween = null;
+    return;
+  }
+  if (touches.size > 2 || drag.active) return;
+  const orbitOnly = (e.pointerType === 'mouse' && e.button !== 0) || e.shiftKey || e.altKey;
+  const t = orbitOnly ? -1 : tileAt(pt.x, pt.y);
+  if (t >= 0) {
+    settle();
+    Object.assign(drag, { active: true, src: '3d', id: e.pointerId, tile: t, sx: pt.x, sy: pt.y, mode: '', live: null });
+    dirty = true;
+    return;
+  }
+  Object.assign(orbit, { active: true, id: e.pointerId, x: pt.x, y: pt.y, az: view.az, el: view.el, moved: 0 });
+  view.tween = null;
+});
+viewCanvas.addEventListener('pointermove', (e) => {
+  if (!touches.has(e.pointerId)) return;
+  const pt = canvasPoint(viewCanvas, e);
+  touches.set(e.pointerId, pt);
+  if (pinch && touches.size >= 2) {
+    const [a, b] = [...touches.values()];
+    const d = Math.max(10, Math.hypot(a.x - b.x, a.y - b.y)), mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+    view.zoom = clamp((pinch.zoom0 * d) / pinch.d0, 0.6, ZOOM_MAX);
+    const k = orbitRate();
+    view.az = pinch.az - (mx - pinch.mx) * k;
+    view.el = clamp(pinch.el + (my - pinch.my) * k, -1.35, 1.35);
+    dirty = true;
+    return;
+  }
+  if (drag.active && drag.src === '3d' && e.pointerId === drag.id) { move3dDrag(pt); return; }
+  if (orbit.active && e.pointerId === orbit.id) {
+    const dx = pt.x - orbit.x, dy = pt.y - orbit.y;
+    orbit.moved = Math.max(orbit.moved, Math.hypot(dx, dy));
+    const k = orbitRate();
+    view.az = orbit.az - dx * k;
+    view.el = clamp(orbit.el + dy * k, -1.35, 1.35);
+    if (orbit.moved > 6 && !save.orbited) { save.orbited = true; persist(); viewHintEl.hidden = true; }
+    dirty = true;
+  }
+});
+function move3dDrag(pt) {
+  const mx = pt.x - drag.sx, my = pt.y - drag.sy;
+  if (!drag.mode) {
+    if (Math.hypot(mx, my) < LOCK_PX) return;
+    if (!inputOpen()) {
+      // Turns are locked (a scramble is playing, or the tutorial wants Next): look around instead.
+      const { id, sx, sy } = drag;
+      endDrag();
+      Object.assign(orbit, { active: true, id, x: sx, y: sy, az: view.az, el: view.el, moved: 0 });
+      view.tween = null;
+      return;
+    }
+    // The tile rides three rings; the one running most nearly along the drag wins.
+    const t = drag.tile, len = Math.hypot(mx, my), opts = [];
+    for (let k = 0; k < 3; k++) {
+      const ring = RINGS[RING_AT[t * 3 + k]], s = Math.floor(RING_POS[t * 3 + k] / ring.L), E = EDGE_PT[ring.v];
+      const mid = (ss) => {
+        const a = (ss * (N + 1) + ring.d) * 3, b = (ss * (N + 1) + ring.d + 1) * 3;
+        return screenOf([(E[a] + E[b]) / 2, (E[a + 1] + E[b + 1]) / 2, (E[a + 2] + E[b + 2]) / 2]);
+      };
+      const p = mid(s), q = mid((s + 1) % ring.deg), dx = q.x - p.x, dy = q.y - p.y, dl = Math.hypot(dx, dy) || 1;
+      opts.push({ ring, ux: dx / dl, uy: dy / dl, px: dl, al: Math.abs(mx * dx + my * dy) / (dl * len) });
+    }
+    opts.sort((a, b) => b.al - a.al);
+    let pick = opts[0];
+    const range = (o) => [sel.cap ? 0 : o.ring.d, o.ring.d];
+    // In the tutorial, give an in-between drag to a ring that is allowed.
+    if (!movesAllowed(pick.ring.v, ...range(pick)) && movesAllowed(opts[1].ring.v, ...range(opts[1])) && opts[1].al >= 0.5 * pick.al) pick = opts[1];
+    const [lo, hi] = range(pick);
+    if (!movesAllowed(pick.ring.v, lo, hi)) { rejectTurn(pick.ring.v, lo, hi); endDrag(); return; }
+    drag.ux = pick.ux; drag.uy = pick.uy; drag.pxPer = Math.max(44, pick.px);
+    setCorner(pick.ring.v); setRing(pick.ring.d);
+    beginLive(pick.ring.v, lo, hi);
+  }
+  if (drag.mode !== 'turn') return;
+  updateLive((mx * drag.ux + my * drag.uy) / drag.pxPer);
+}
+function endViewPointer(e, cancelled) {
+  touches.delete(e.pointerId);
+  if (pinch) { if (touches.size < 2) pinch = null; return; }
+  if (drag.active && drag.src === '3d' && e.pointerId === drag.id) { releaseDrag(e, cancelled); return; }
+  if (orbit.active && e.pointerId === orbit.id) {
+    orbit.active = false;
+    if (orbit.moved < 8 && !cancelled) {
+      const t = now();
+      if (t - orbit.lastTap < 320) { tweenViewHome(450); orbit.lastTap = 0; }
+      else {
+        orbit.lastTap = t;
+        const c = cornerAt(orbit.x, orbit.y, 16);
+        if (c >= 0) { setCorner(c); Sound.click(); }
+      }
+    }
+  }
+}
+viewCanvas.addEventListener('pointerup', (e) => endViewPointer(e, false));
+viewCanvas.addEventListener('pointercancel', (e) => endViewPointer(e, true));
+viewCanvas.addEventListener('lostpointercapture', (e) => { if (touches.has(e.pointerId)) endViewPointer(e, false); });
+viewCanvas.addEventListener('contextmenu', (e) => e.preventDefault());
+viewCanvas.addEventListener('wheel', (e) => {
+  if (G.mode === 'title') return;
+  e.preventDefault();
+  view.zoom = clamp(view.zoom * Math.exp(-e.deltaY * 0.0015), 0.6, ZOOM_MAX);
+  view.tween = null;
+  dirty = true;
+}, { passive: false });
+
+function tweenViewHome(dur, extraSpin) {
+  const toAz = DEFAULT_AZ + Math.round((view.az - DEFAULT_AZ) / TAU) * TAU + (extraSpin || 0);
+  view.tween = { fromAz: view.az, fromEl: view.el, fromZoom: view.zoom, toAz, toEl: DEFAULT_EL, toZoom: 1, start: now(), dur: dur || 500 };
+}
+function stepView(tms, dt) {
+  if (view.tween) {
+    const tw = view.tween, p = clamp((tms - tw.start) / tw.dur, 0, 1), k = easeInOutCubic(p);
+    view.az = tw.fromAz + (tw.toAz - tw.fromAz) * k;
+    view.el = tw.fromEl + (tw.toEl - tw.fromEl) * k;
+    view.zoom = tw.fromZoom + (tw.toZoom - tw.fromZoom) * k;
+    if (p >= 1) view.tween = null;
+    return true;
+  }
+  if (G.mode === 'title' && !reduceMotion) { view.az += dt * 0.26; return true; }
+  return false;
+}
+function stepDial(dt) {
+  if (dg.target === null) return false;
+  const diff = wrapPi(dg.target - dg.theta);
+  if (Math.abs(diff) < 0.002) return false;
+  dg.theta += diff * Math.min(1, dt * 12);
+  return true;
+}
+
+// ===========================================================================
+// Game flow
+// ===========================================================================
+function fmtTime(ms) {
+  const cs = Math.floor(Math.max(0, ms) / 10);
+  const m = Math.floor(cs / 6000), s = Math.floor(cs / 100) % 60, c = cs % 100;
+  return `${m}:${String(s).padStart(2, '0')}.${String(c).padStart(2, '0')}`;
+}
+function setOverlay(el, show) { el.classList.toggle('hidden', !show); }
+const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+
+function updateHud() {
+  hudEl.classList.toggle('off', G.mode === 'title');
+  document.body.classList.toggle('title-mode', G.mode === 'title');
+  timerEl.classList.remove('idle', 'done', 'label');
+  if (G.mode === 'timed') {
+    const d = DIFFS[G.diff].label, moves = G.history.length;
+    if (G.phase === 'scrambling') { timerEl.textContent = '0:00.00'; timerEl.classList.add('idle'); hudSubEl.textContent = `Scrambling… · ${d}`; }
+    else if (G.phase === 'ready') { timerEl.textContent = '0:00.00'; timerEl.classList.add('idle'); hudSubEl.textContent = `${d} · turn a ring to start`; }
+    else {
+      if (G.phase === 'solved') { timerEl.textContent = fmtTime(G.elapsed); timerEl.classList.add('done'); }
+      hudSubEl.textContent = `${plural(moves, 'move')} · ${d}`;
+    }
+  } else if (G.mode === 'tutorial') {
+    timerEl.textContent = 'Tutorial'; timerEl.classList.add('label');
+    hudSubEl.textContent = `Step ${Tut.i + 1} of ${TUTORIAL.length}`;
+  } else if (G.mode === 'free') {
+    timerEl.textContent = 'Free Play'; timerEl.classList.add('label');
+    const busy = queue.length > 0 || (anim && anim.kind === 'auto');
+    hudSubEl.textContent = busy ? (G.freeTask || 'Turning…') : `${plural(G.history.length, 'move')}${G.wasSolved ? ' · solved' : ''}`;
+  }
+  btnUndo.disabled = !canUndo();
+  const free = G.mode === 'free';
+  viewTools.hidden = !free;
+  const idle = !queue.length && !(anim && anim.kind === 'auto');
+  $('btnScramble').disabled = !free || !idle;
+  $('btnSolve').disabled = !free || !idle || G.wasSolved;
+  $('btnReset').disabled = !free;
+  const turnOk = G.mode !== 'title';
+  $('btnTurnCCW').disabled = !turnOk; $('btnTurnCW').disabled = !turnOk;
+  $('segCap').disabled = G.mode === 'tutorial';
+}
+function canUndo() {
+  if (!G.history.length) return false;
+  if (G.mode === 'timed') return G.phase === 'ready' || G.phase === 'running';
+  if (G.mode === 'tutorial') return Tut.acceptsInput();
+  if (G.mode === 'free') return inputOpen();
+  return false;
+}
+function tickTimer() {
+  if (G.mode === 'timed' && G.phase === 'running') timerEl.textContent = fmtTime(now() - G.t0);
+}
+
+// The first turn of a timed solve starts the clock.
+function onTurnStarted() {
+  if (G.mode === 'timed' && G.phase === 'ready') {
+    G.phase = 'running';
+    G.t0 = now();
+    updateHud();
+  }
+}
+function onPlayerMove(m, at, src) {
+  G.history.push({ ...m, src });
+  Sound.turn(); haptic(8);
+  hl.hint = null;
+  updateHud();
+  if (G.mode === 'timed') {
+    if (G.phase === 'running' && isSolved(G.state)) onTimedSolved(at);
+  } else if (G.mode === 'tutorial') {
+    Tut.onMove();
+  } else if (G.mode === 'free') {
+    checkFreeSolved();
+  }
+}
+function checkFreeSolved() {
+  const solved = isSolved(G.state);
+  if (solved && !G.wasSolved) {
+    Sound.solve(); haptic([30, 60, 40]); burstConfetti();
+    toast('Solved! Every face is one color again.', 2600);
+  }
+  // Once solved, the undoable turns alone explain the state: base becomes their inverse.
+  if (solved) G.base = inverseOf(G.history);
+  G.wasSolved = solved;
+  updateHud();
+}
+// Turn the dial's chosen ring (or cap) by k sectors, from the buttons or the keyboard.
+function turnSelected(k, capOverride) {
+  if (!inputOpen() || drag.active) return;
+  settle();
+  if (anim || !inputOpen()) return;
+  const m = currentMove(k);
+  if (capOverride && G.mode !== 'tutorial') m.lo = 0;
+  if (!movesAllowed(m.v, m.lo, m.hi)) { rejectTurn(m.v, m.lo, m.hi); return; }
+  onTurnStarted();
+  const at = now();
+  anim = { kind: 'player', v: m.v, lo: m.lo, hi: m.hi, k: m.k, from: 0, to: m.k, t: 0, start: at, dur: 230, ease: easeInOutCubic, done: () => onPlayerMove(m, at, 'button') };
+  dirty = true;
+}
+function undo() {
+  if (!canUndo() || drag.active) return;
+  settle();
+  // Landing the last turn can finish the solve (or a tutorial step), so check again.
+  if (anim || !canUndo()) return;
+  const m = G.history.pop();
+  if (!m) return;
+  hl.hint = null;
+  anim = {
+    kind: 'undo', v: m.v, lo: m.lo, hi: m.hi, k: -m.k, from: 0, to: -m.k, t: 0, start: now(), dur: 210, ease: easeInOutCubic,
+    done: () => {
+      updateHud();
+      if (G.mode === 'tutorial') Tut.onMove();
+      else if (G.mode === 'timed' && G.phase === 'running' && isSolved(G.state)) onTimedSolved(now());
+      else if (G.mode === 'free') checkFreeSolved();
+    },
+  };
+  Sound.undo(); haptic(6);
+  updateHud();
+}
+
+function resetBoard() {
+  stopDemo();
+  clearAnimations();
+  setState(solvedState());
+  G.history = []; G.base = []; G.elapsed = 0; G.t0 = 0; G.wasSolved = true; G.freeTask = null;
+  hl.rings.clear(); hl.faces.clear(); hl.hint = null; hl.reject = null; hl.focus = null;
+  confetti.length = 0;
+}
+
+function showTitle() {
+  G.mode = 'title'; G.phase = 'idle';
+  view.tween = null; view.zoom = 1; view.el = DEFAULT_EL;
+  resetBoard();
+  Tut.exit();
+  hideToast();
+  setOverlay(resultEl, false); setOverlay(confirmEl, false); setOverlay(helpEl, false); setOverlay(titleEl, true);
+  refreshTitle();
+  updateHud();
+  layout();
+  startDemo();
+}
+// The title screen plays a few slow turns and then undoes them, on a loop.
+let demoToken = 0, demoTimer = 0;
+function startDemo() {
+  clearTimeout(demoTimer);
+  if (G.mode !== 'title') return;
+  const token = ++demoToken;
+  const seq = [randomMove(-1)];
+  seq[0].lo = 0; seq[0].hi = N - 1;  // open with a whole cap spinning
+  while (seq.length < 4) {
+    const m = randomMove(seq[seq.length - 1].v);
+    m.lo = m.hi = 8 + ((Math.random() * (N - 9)) | 0);
+    seq.push(m);
+  }
+  const back = inverseOf(seq);
+  const moves = [...seq, ...back].map((m, i) => ({ ...m, dur: 640, delay: i === 0 ? 700 : i === seq.length ? 1100 : 280 }));
+  runSequence(moves, () => {
+    if (G.mode === 'title' && token === demoToken) demoTimer = setTimeout(startDemo, 900);
+  }, 'demo');
+}
+function stopDemo() { clearTimeout(demoTimer); demoToken++; }
+
+function enterPlay(mode) {
+  G.mode = mode;
+  resetBoard();
+  Tut.exit();
+  setOverlay(titleEl, false); setOverlay(resultEl, false); setOverlay(confirmEl, false); setOverlay(helpEl, false);
+  setCap(false);
+  setCorner(V_TOP); setRing(15);
+  tweenViewHome(550);
+}
+function startFree() {
+  enterPlay('free');
+  G.phase = 'idle';
+  updateHud();
+  layout();
+  if (!save.freeSeen) { save.freeSeen = true; persist(); setTimeout(() => { if (G.mode === 'free') toast('Swipe a ring on the dial, or drag a tile on the puzzle', 3200); }, 700); }
+}
+function startTimed(diff) {
+  G.diff = diff; save.diff = diff; persist();
+  enterPlay('timed');
+  G.phase = 'scrambling';
+  updateHud();
+  layout();
+  const seq = makeScramble(DIFFS[diff].turns);
+  G.base = seq;
+  const per = clamp(2000 / seq.length, 140, 420);
+  runSequence(seq.map((m, i) => ({ ...m, dur: per, delay: i === 0 ? 600 : 40 })), () => {
+    if (G.mode !== 'timed') return;
+    G.phase = 'ready';
+    G.wasSolved = false;
+    const last = seq[seq.length - 1];
+    setCorner(last.v); setRing(last.hi);
+    updateHud();
+    Sound.go();
+    toast('Go! The clock starts on your first turn', 3000);
+  }, 'auto');
+}
+function onTimedSolved(at) {
+  G.phase = 'solved';
+  G.elapsed = Math.max(0, (at || now()) - G.t0);
+  const prev = save.best[G.diff];
+  const isNew = !prev || G.elapsed < prev;
+  if (isNew) { save.best[G.diff] = Math.round(G.elapsed); persist(); }
+  updateHud();
+  Sound.solve(); haptic([30, 60, 40]);
+  burstConfetti();
+  tweenViewHome(1300, TAU);
+  const moves = G.history.length;
+  $('resTime').textContent = fmtTime(G.elapsed);
+  $('resMeta').textContent = `${plural(moves, 'move')} · ${DIFFS[G.diff].label} (${DIFFS[G.diff].turns}-turn scramble)`;
+  const bestEl = $('resBest');
+  bestEl.classList.toggle('new', isNew);
+  bestEl.textContent = isNew ? (prev ? `★ New best! (was ${fmtTime(prev)})` : '★ New best time!') : `Best: ${fmtTime(prev)}`;
+  setTimeout(() => { if (G.mode === 'timed' && G.phase === 'solved') { setOverlay(resultEl, true); $('btnAgain').focus({ preventScroll: true }); } }, 1150);
+}
+
+// Free-play tools ----------------------------------------------------------------
+function freeScramble() {
+  if (G.mode !== 'free' || !inputOpen()) return;
+  settle();
+  const seq = makeScramble(20);
+  G.base = [...G.base, ...G.history, ...seq];
+  G.history = [];
+  G.freeTask = 'Scrambling…';
+  runSequence(seq.map((m, i) => ({ ...m, dur: 90, delay: i === 0 ? 60 : 0 })), () => {
+    G.freeTask = null; G.wasSolved = isSolved(G.state);
+    const last = seq[seq.length - 1];
+    setCorner(last.v); setRing(last.hi);
+    updateHud();
+  }, 'auto');
+  updateHud();
+}
+function freeSolve() {
+  if (G.mode !== 'free' || !inputOpen()) return;
+  settle();
+  const back = inverseOf(reduceMoves([...G.base, ...G.history]));
+  if (!back.length || isSolved(G.state)) { G.base = []; G.history = []; G.wasSolved = true; updateHud(); toast('Already solved'); return; }
+  const per = clamp(3600 / back.length, 26, 240);
+  G.freeTask = `Solving · ${plural(back.length, 'turn')}`;
+  runSequence(back.map((m) => ({ ...m, dur: per })), () => {
+    G.freeTask = null; G.base = []; G.history = [];
+    G.wasSolved = isSolved(G.state);
+    updateHud();
+  }, 'auto');
+  updateHud();
+}
+function freeReset() {
+  if (G.mode !== 'free') return;
+  resetBoard();
+  G.freeTask = null;
+  updateHud();
+  toast('Reset to solved');
+}
+
+function goHome() {
+  if (G.mode === 'timed' && G.phase === 'running') { setOverlay(confirmEl, true); return; }
+  Sound.click();
+  showTitle();
+}
+
+// ===========================================================================
+// Tutorial
+// ===========================================================================
+const TUT_D = 15;                      // ring 16 of the top corner
+const TUT_RING = ringId(V_TOP, TUT_D);
+// The face turned most squarely toward the camera, to point at in step one.
+function frontFace() {
+  prepareView();
+  let best = 0, bz = -Infinity;
+  const n = [0, 0, 0];
+  for (let f = 0; f < NF; f++) { toCam(FACE_N[f][0], FACE_N[f][1], FACE_N[f][2], n); if (n[2] > bz) { bz = n[2]; best = f; } }
+  return best;
+}
+
+const TUTORIAL = [
+  {
+    title: 'A hundred faces',
+    text: 'This ball has <b>100 triangle faces</b>, each tiled 32 to an edge: <b>102,400 tiles</b> in all. Drag the space around it to look all the way round, and pinch or scroll to zoom in.',
+    info: true,
+    enter() { view.az = DEFAULT_AZ; view.el = DEFAULT_EL; hl.faces.add(frontFace()); },
+  },
+  {
+    title: 'Rings round every corner',
+    text: 'Each of the 52 corners wears <b>32 rings</b> of tiles. The dial shows the corner at the very top, opened flat: every circle on it is one ring.',
+    info: true,
+    enter() { setCorner(V_TOP); setRing(TUT_D); hl.rings.add(TUT_RING); },
+  },
+  {
+    title: 'Turn a ring',
+    text: 'Put a finger on the <b>glowing ring</b> in the dial and swipe along it. The same ring turns on the puzzle.',
+    enter() {
+      setCorner(V_TOP); setRing(TUT_D);
+      Tut.allow([TUT_RING]); hl.rings.add(TUT_RING);
+      hl.hint = { v: V_TOP, lo: TUT_D, hi: TUT_D, k: 1 };
+    },
+    check: () => G.history.some((m) => m.v === V_TOP && m.lo <= TUT_D && m.hi >= TUT_D),
+    praise: 'The ring slid one face round!',
+  },
+  {
+    title: 'Turn it back',
+    text: 'Its tiles slid onto the next face over. <b>Swipe the ring the other way</b> until every face is one color.',
+    enter() { Tut.allow([TUT_RING]); hl.rings.add(TUT_RING); Tut.showHint(); },
+    onMove() { if (!isSolved(G.state)) Tut.showHint(); },
+    check: () => isSolved(G.state),
+    praise: 'Solved again!',
+  },
+  {
+    title: 'Grab a tile',
+    text: 'Every tile rides <b>three rings</b>, one round each corner of its face. Drag a tile on the puzzle itself: <b>the direction you drag picks the ring</b>.',
+    enter() { Tut.allow(null); },
+    check: () => G.history.some((m) => m.src === '3d'),
+    praise: 'That ring turned right on the puzzle.',
+  },
+  {
+    title: 'Fix it',
+    text: 'Now <b>make every face one color</b> again. Any ring works; tap Hint if you want a nudge.',
+    hintButton: true,
+    enter() { Tut.allow(null); },
+    check: () => isSolved(G.state),
+    praise: 'Nicely done!',
+    celebrate: true,
+  },
+  {
+    title: 'Your turn',
+    text: 'We scrambled it with <b>two turns</b>. Solve it! Tap Hint if you get stuck, or ↶ to take a turn back.',
+    hintButton: true,
+    enter() {
+      Tut.allow(null);
+      G.history = [];
+      G.base = makeScramble(2);
+      runSequence(G.base.map((m, i) => ({ ...m, dur: 520, delay: i === 0 ? 500 : 220 })), () => {
+        const last = G.base[G.base.length - 1];
+        if (last) { setCorner(last.v); setRing(last.hi); }
+        dirty = true; updateHud();
+      }, 'auto');
+    },
+    check: () => isSolved(G.state),
+    praise: 'You solved it!',
+    celebrate: true,
+  },
+  {
+    title: 'You’re ready!',
+    text: '<b>Free Play</b> lets you turn any of the 1,664 rings and scramble as deep as you like. <b>Timed Mode</b> starts the clock on your first turn.',
+    info: true,
+    final: true,
+  },
+];
+
+const Tut = {
+  i: 0,
+  step: null,
+  allowed: null,
+  busy: false,
+  timer: 0,
+  acceptsInput() { return G.mode === 'tutorial' && !!this.step && !this.step.info && !this.busy; },
+  allow(list) { this.allowed = list ? new Set(list) : null; },
+  rejectMessage() { return G.mode === 'tutorial' ? 'Swipe along the glowing ring' : ''; },
+  showHint() {
+    const m = nextHintMove();
+    if (!m) { hl.hint = null; return; }
+    hl.hint = m;
+    setCorner(m.v); setRing(m.hi);
+    dirty = true;
+  },
+  start() {
+    enterPlay('tutorial');
+    G.phase = 'idle';
+    this.go(0);
+  },
+  go(i) {
+    clearTimeout(this.timer);
+    hideToast();
+    this.i = i; this.step = TUTORIAL[i]; this.busy = false; this.allowed = new Set();
+    hl.rings.clear(); hl.faces.clear(); hl.hint = null;
+    coachEl.classList.remove('success');
+    $('coachStep').textContent = `${i + 1} / ${TUTORIAL.length}`;
+    $('coachTitle').textContent = this.step.title;
+    $('coachText').innerHTML = this.step.text;
+    const actions = $('coachActions');
+    actions.innerHTML = '';
+    const addBtn = (label, cls, fn) => { const b = document.createElement('button'); b.type = 'button'; b.className = `btn small ${cls}`; b.textContent = label; b.addEventListener('click', () => { Sound.unlock(); Sound.click(); fn(); }); actions.appendChild(b); return b; };
+    if (this.step.final) {
+      addBtn('Menu', 'ghost', () => showTitle());
+      addBtn('Free Play', 'ghost', () => { save.tutorialDone = true; persist(); startFree(); });
+      addBtn('Timed Mode', 'primary', () => { save.tutorialDone = true; persist(); startTimed(G.diff); });
+    } else if (this.step.info) {
+      addBtn('Next', 'primary', () => this.go(this.i + 1));
+    } else if (this.step.hintButton) {
+      addBtn('Hint', 'ghost', () => { this.showHint(); if (!hl.hint) toast('Already solved!'); });
+    }
+    coachEl.classList.add('show');
+    if (this.step.enter) this.step.enter();
+    if (this.step.final) { save.tutorialDone = true; persist(); }
+    updateHud();
+    layout();
+    dirty = true;
+  },
+  onMove() {
+    const st = this.step;
+    if (!st || st.info || this.busy) return;
+    if (st.check && st.check()) {
+      this.busy = true;
+      hl.hint = null; hl.rings.clear(); hl.faces.clear();
+      coachEl.classList.add('success');
+      $('coachStep').textContent = '✓ Nice';
+      $('coachText').innerHTML = `<b>${st.praise}</b>`;
+      $('coachActions').innerHTML = '';
+      if (st.celebrate) { burstConfetti(); Sound.solve(); }
+      updateHud();
+      this.timer = setTimeout(() => { if (G.mode === 'tutorial') this.go(this.i + 1); }, 1300);
+    } else if (st.onMove) st.onMove();
+    dirty = true;
+  },
+  exit() {
+    clearTimeout(this.timer);
+    this.step = null; this.busy = false; this.allowed = null;
+    coachEl.classList.remove('show', 'success');
+  },
+};
+
+// ===========================================================================
+// Buttons and keys
+// ===========================================================================
+const diffButtons = [...document.querySelectorAll('.diff button')];
+function refreshTitle() {
+  diffButtons.forEach((b) => b.setAttribute('aria-checked', String(b.dataset.diff === G.diff)));
+  const best = save.best[G.diff];
+  $('bestLine').innerHTML = best ? `Best on ${DIFFS[G.diff].label}: <b>${fmtTime(best)}</b>` : `No ${DIFFS[G.diff].label} time yet`;
+  $('newHere').hidden = !!save.tutorialDone;
+  $('btnTitleSound').textContent = Sound.muted ? 'Sound: off' : 'Sound: on';
+}
+diffButtons.forEach((b) => b.addEventListener('click', () => {
+  Sound.unlock(); Sound.click();
+  G.diff = b.dataset.diff; save.diff = G.diff; persist();
+  refreshTitle();
+}));
+const click = (id, fn) => $(id).addEventListener('click', () => { Sound.unlock(); fn(); });
+click('btnFree', () => { Sound.click(); startFree(); });
+click('btnTimed', () => { Sound.click(); startTimed(G.diff); });
+click('btnTutorial', () => { Sound.click(); Tut.start(); });
+click('btnAgain', () => { Sound.click(); startTimed(G.diff); });
+click('btnResMenu', () => { Sound.click(); showTitle(); });
+click('btnHome', () => goHome());
+click('btnStay', () => { Sound.click(); setOverlay(confirmEl, false); });
+click('btnLeave', () => { Sound.click(); showTitle(); });
+click('btnUndo', () => undo());
+click('btnHelp', () => { Sound.click(); setOverlay(helpEl, true); $('btnHelpClose').focus({ preventScroll: true }); });
+click('btnTitleHelp', () => { Sound.click(); setOverlay(helpEl, true); $('btnHelpClose').focus({ preventScroll: true }); });
+click('btnHelpClose', () => { Sound.click(); setOverlay(helpEl, false); });
+click('btnPrevCorner', () => { Sound.click(); setCorner(sel.v - 1); });
+click('btnNextCorner', () => { Sound.click(); setCorner(sel.v + 1); });
+click('btnRingIn', () => { Sound.click(); setRing(sel.d - 1); });
+click('btnRingOut', () => { Sound.click(); setRing(sel.d + 1); });
+click('btnTurnCCW', () => turnSelected(1));
+click('btnTurnCW', () => turnSelected(-1));
+click('segRing', () => { Sound.click(); setCap(false); });
+click('segCap', () => { Sound.click(); setCap(true); });
+click('btnScramble', () => { Sound.click(); freeScramble(); });
+click('btnSolve', () => { Sound.click(); freeSolve(); });
+click('btnReset', () => { Sound.click(); freeReset(); });
+
+function setMuted(m) {
+  Sound.muted = m; save.muted = m; persist();
+  btnSound.setAttribute('aria-label', m ? 'Unmute sound' : 'Mute sound');
+  btnSound.querySelectorAll('.wave').forEach((p) => { p.hidden = m; });
+  btnSound.querySelector('.mute').hidden = !m;
+  refreshTitle();
+}
+btnSound.addEventListener('click', () => { Sound.unlock(); setMuted(!Sound.muted); Sound.click(); });
+$('btnTitleSound').addEventListener('click', () => { Sound.unlock(); setMuted(!Sound.muted); Sound.click(); });
+
+document.addEventListener('keydown', (e) => {
+  const open = (el) => !el.classList.contains('hidden');
+  if (e.key === 'Escape') {
+    if (open(helpEl)) setOverlay(helpEl, false);
+    else if (open(confirmEl)) setOverlay(confirmEl, false);
+    else if (G.mode !== 'title') goHome();
+    return;
+  }
+  if (open(helpEl) || open(confirmEl) || open(resultEl) || G.mode === 'title') return;
+  if ((e.key === 'z' || e.key === 'Z') && (e.ctrlKey || e.metaKey)) { e.preventDefault(); undo(); return; }
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  switch (e.key) {
+    case 'Backspace': e.preventDefault(); undo(); break;
+    case '[': setCorner(sel.v - 1); break;
+    case ']': setCorner(sel.v + 1); break;
+    case 'ArrowUp': e.preventDefault(); setRing(sel.d + 1); break;
+    case 'ArrowDown': e.preventDefault(); setRing(sel.d - 1); break;
+    case 'ArrowLeft': e.preventDefault(); turnSelected(1, e.shiftKey); break;
+    case 'ArrowRight': e.preventDefault(); turnSelected(-1, e.shiftKey); break;
+    case 'c': case 'C': setCap(!sel.cap); break;
+    default: break;
+  }
+});
+document.addEventListener('pointerdown', () => Sound.unlock(), { passive: true });
+// Stop iOS from pinch-zooming or scrolling the page under the game.
+document.addEventListener('gesturestart', (e) => e.preventDefault());
+document.addEventListener('touchmove', (e) => { if (!e.target.closest('.overlay')) e.preventDefault(); }, { passive: false });
+
+// ===========================================================================
+// Main loop
+// ===========================================================================
+let lastT = now();
+function frame(tms) {
+  requestAnimationFrame(frame);
+  const dt = Math.min(0.05, Math.max(0, (tms - lastT) / 1000));
+  lastT = tms;
+  const hadAnim = !!anim || !!drag.live;
+  stepAnim(tms);
+  const viewMoving = stepView(tms, dt);
+  const dialMoving = stepDial(dt);
+  if (confetti.length) stepConfetti(dt);
+  tickTimer();
+  const pulsing = hl.rings.size || hl.faces.size || hl.hint || (hl.reject && tms < hl.reject.until + 50) || (hl.focus && tms < hl.focus.until + 50);
+  if (dirty || hadAnim || anim || viewMoving || dialMoving || confetti.length || pulsing || drag.active || orbit.active || pinch) {
+    renderView(tms);
+    if (confetti.length) drawConfetti(cvV.ctx);
+    renderDial(tms);
+    dirty = false;
+  }
+}
+
+// ===========================================================================
+// Boot
+// ===========================================================================
+readTheme();
+try { initGL(); } catch (err) { GLR.ok = false; if (window.console) console.warn('WebGL setup failed:', err); }
+if (!GLR.ok) $('glNote').hidden = false;
+glCanvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); GLR.ok = false; });
+glCanvas.addEventListener('webglcontextrestored', () => { try { initGL(); } catch (err) { GLR.ok = false; } dirty = true; });
+if (typeof ResizeObserver !== 'undefined') {
+  new ResizeObserver(() => { sizeCanvases(); dirty = true; }).observe(stageEl);
+}
+window.addEventListener('resize', layout);
+window.addEventListener('orientationchange', () => setTimeout(layout, 120));
+setMuted(Sound.muted);
+viewHintEl.hidden = !!save.orbited;
+if (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) $('zoomHint').textContent = ' · pinch to zoom';
+updateDialLabels();
+showTitle();
+requestAnimationFrame(frame);
+
+// A small handle for automated tests.
+window.HectoRings = {
+  N, G, sel, VERTS, FACES, STAR, DEG, RINGS, TL, TV, RING_AT, RING_POS, view, dg, Tut, TUTORIAL, NP,
+  applyMove, isSolved, solvedState, ringId, reduceMoves, nextHintMove, makeScramble,
+  tileAt, dialHit, setCorner, setRing, setCap, turnSelected, startFree, startTimed, showTitle,
+  glOk: () => GLR.ok, glDeriv: () => !!GLR.deriv,
+  screenOfVertex: (v) => screenOf(VERTS[v]),
+  tileCenter: (t) => { const [a, b, c] = [0, 1, 2].map((j) => { const p = TV[t * 3 + j]; return screenOf([PTS[p * 3], PTS[p * 3 + 1], PTS[p * 3 + 2]]); }); return { x: (a.x + b.x + c.x) / 3, y: (a.y + b.y + c.y) / 3 }; },
+  faceVisible: (f) => !!faceVis[f],
+  dialPoint: (d, U) => { const a = dialAngle(U, DEG[sel.v]), r = rho(d + 0.5); return { x: dg.cx + r * Math.cos(a), y: dg.cy + r * Math.sin(a) }; },
+  busy: () => !!anim || queue.length > 0 || drag.active,
+  play: (moves, dur) => new Promise((res) => runSequence(moves.map((m) => ({ ...m, dur: dur || 60 })), res, 'auto')),
+  preview: (m) => { drag.live = m || null; dirty = true; },
+  // Render, then read back WebGL pixels at CSS-pixel points (same task, so the frame is still there).
+  glSample: (pts) => {
+    renderView(now());
+    const gl = GLR.gl, buf = new Uint8Array(4), dpr = cvV.dpr;
+    return pts.map(([x, y]) => { gl.readPixels(Math.round(x * dpr), Math.round(glCanvas.height - 1 - y * dpr), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, buf); return [buf[0], buf[1], buf[2], buf[3]]; });
+  },
+  faceShade: (f) => { prepareView(); const n = toCam(FACE_N[f][0], FACE_N[f][1], FACE_N[f][2], [0, 0, 0]); return 0.83 + 0.19 * Math.max(0, n[0] * LIGHT[0] + n[1] * LIGHT[1] + n[2] * LIGHT[2]); },
+  FACE_RGB,
+  renderNow: () => { const t0 = now(); renderView(t0); const t1 = now(); renderDial(t0); if (GLR.ok) GLR.gl.finish(); return [t1 - t0, now() - t1]; },
+};
+})();
+</script>
+</body>
+</html>
