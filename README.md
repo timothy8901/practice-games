@@ -90,6 +90,22 @@ mutes. It pulls Three.js from a CDN, and its knights, arena and sky are
 Thrixel models loaded from `knight-art/` beside the page - about 10 MB,
 fetched once; the menu holds the first fight until they arrive.
 
+## Hexadeca Rings
+
+A 16-faced twisty puzzle — `hexadeca-rings.html`. The solid is the
+gyroelongated square bipyramid (Johnson solid J17), the only convex solid
+whose 16 faces are all equilateral triangles. Every face is tiled 16 to an
+edge (256 tiles a face, 4,096 in all). Each of the 10 corners carries 16
+rings of tiles, 160 rings in total, and every tile rides three of them, one
+around each corner of its face. A turn slides a ring one face around its
+corner. Turn a ring by swiping it on the **ring dial** (the chosen corner's
+faces opened flat into a disc, one circle per ring) or by dragging a tile on
+the 3D puzzle; **Cap** turns every ring from the corner out to the one you
+touch. Modes: **Free Play** (scramble, solve, reset), **Timed Mode**
+(2/4/8/16-turn scrambles, best times saved in the browser) and a short
+**Tutorial**. Keys: `[` `]` corner, `↑` `↓` ring, `←` `→` turn, `C` cap,
+`Ctrl+Z` undo. Pure vanilla JS + Canvas 2D in one file, no dependencies.
+
 ## Grocery Tycoon
 
 - **Grocery Tycoon** (`grocery-tycoon.html`) — a single-file produce-store tycoon
