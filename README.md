@@ -106,6 +106,21 @@ touch. Modes: **Free Play** (scramble, solve, reset), **Timed Mode**
 **Tutorial**. Keys: `[` `]` corner, `↑` `↓` ring, `←` `→` turn, `C` cap,
 `Ctrl+Z` undo. Pure vanilla JS + Canvas 2D in one file, no dependencies.
 
+## Hecto Rings
+
+The 100-faced sibling of Hexadeca Rings — `hecto-rings.html`. The solid is a
+round ball of 100 near-equal triangles: the convex hull of 52 points spread as
+evenly as a sphere allows (the lowest-energy arrangement of 52 like charges,
+from the Thomson problem), with 5 faces meeting at 12 corners and 6 at the
+other 40. Every face is tiled 32 to an edge: 1,024 tiles a face, 102,400 in
+all, riding 1,664 rings (32 around each of the 52 corners). Same controls and
+modes as Hexadeca Rings: the 2D ring dial, dragging tiles on the 3D ball,
+Ring/Cap turns, Free Play, Timed Mode and a Tutorial, plus scroll or pinch to
+zoom in on the tiles. The 3D view is WebGL: each face is one triangle whose
+fragment shader picks the tile under every pixel from a color texture, so the
+ball costs 300 vertices however many tiles it carries; turning tiles are drawn
+as their own triangles. If WebGL is off, the dial still turns every ring.
+
 ## Grocery Tycoon
 
 - **Grocery Tycoon** (`grocery-tycoon.html`) — a single-file produce-store tycoon
