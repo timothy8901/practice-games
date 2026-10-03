@@ -229,6 +229,15 @@
   @media (max-width:700px) and (pointer:coarse){
     #hudTC{top:10px}
   }
+  /* Any touch screen, tablets included (the block above only caught phones): fingers
+     need 44px targets, and 9-10px hangar text is unreadable at arm's length. */
+  @media (pointer:coarse){
+    .btn{min-height:44px}
+    .btn.tog,.tog{min-height:44px;font-size:12px;padding:10px 14px}
+    .ship .buy,.shopItem .buy{min-height:44px;font-size:12px;padding:10px 16px}
+    .ship .ds,.shopItem .ds,.shopItem{font-size:12px}
+    .ship .st,.card .tag,#bhNote,.statGrid .k,#bestLbl,.hint{font-size:11px}
+  }
 </style>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E%F0%9F%91%BE%3C/text%3E%3C/svg%3E">
 <meta name="description" content="NEONFABLE — a synthwave bullet-heaven roguelite. 12 evolving weapons, four bosses, daily seeded runs and an unlockable BULLET HELL mode. Plays in your browser on desktop, mobile and gamepad.">
@@ -707,8 +716,10 @@ function enterTouchMode(){
   $('stage').classList.add('touch');
 }
 // left 60% of the screen = floating movement stick; right side = dash
+// Only cancel what the browser lets us cancel: a touch that starts while a list is
+// still scrolling is not cancelable, and trying anyway logs an intervention.
 cv.addEventListener('touchstart', e=>{
-  e.preventDefault(); enterTouchMode(); Sound.unlock();
+  if(e.cancelable) e.preventDefault(); enterTouchMode(); Sound.unlock();
   for(const t of e.changedTouches){
     const leftZone = t.clientX < innerWidth*0.6;
     if(leftZone && touch.id===null){
@@ -720,7 +731,7 @@ cv.addEventListener('touchstart', e=>{
   }
 },{passive:false});
 cv.addEventListener('touchmove', e=>{
-  e.preventDefault();
+  if(e.cancelable) e.preventDefault();
   for(const t of e.changedTouches) if(t.identifier===touch.id){
     touch.dx=t.clientX-touch.sx; touch.dy=t.clientY-touch.sy;
     const m=Math.hypot(touch.dx,touch.dy);
@@ -736,7 +747,7 @@ cv.addEventListener('touchend', endTouch); cv.addEventListener('touchcancel', en
 // on-screen buttons
 function bindTouchBtn(id, fn){
   const el=$(id); if(!el) return;
-  el.addEventListener('touchstart', e=>{ e.preventDefault(); e.stopPropagation(); enterTouchMode(); Sound.unlock(); fn(); },{passive:false});
+  el.addEventListener('touchstart', e=>{ if(e.cancelable) e.preventDefault(); e.stopPropagation(); enterTouchMode(); Sound.unlock(); fn(); },{passive:false});
   el.addEventListener('click', e=>{ e.preventDefault(); fn(); });
 }
 bindTouchBtn('touchDash', ()=>{ if(game.state==='play') tryDash(); });
