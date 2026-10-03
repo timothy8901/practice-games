@@ -78,6 +78,8 @@
   rotate.id = 'bkr-rotate';
   rotate.innerHTML = ICON.phone + '<div>Turn your phone sideways to play</div>';
   document.body.append(rotate);
+  // When the card above shows (browser only: the app is locked to landscape).
+  const upright = TOUCH && !IN_APP && window.matchMedia ? matchMedia('(orientation: portrait)') : null;
 
   // env(safe-area-inset-*) as numbers, for placing controls clear of notches.
   const probe = document.createElement('div');
@@ -245,8 +247,21 @@
     document.querySelectorAll('[data-kb="sound"]').forEach((b) => { b.textContent = 'Sound: ' + (on ? 'On' : 'Off'); });
   }
   function toggleSound() { sfx.toggle(); syncSound(); sfx.select(); }
-  pauseBtn.addEventListener('click', () => { if (pauseFight()) sfx.select(); });
-  soundBtn.addEventListener('click', toggleSound);
+  // A browser only turns a tap into a click when it is the only finger down, so a
+  // tap on Pause or Sound while the other thumb holds the stick never clicked.
+  // Act on the touch itself; the click that follows a lone tap is then ignored.
+  function onPress(button, fn) {
+    let touchedAt = -Infinity;
+    button.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'mouse') return;
+      e.preventDefault();
+      touchedAt = performance.now();
+      fn();
+    });
+    button.addEventListener('click', () => { if (performance.now() - touchedAt > 700) fn(); });
+  }
+  onPress(pauseBtn, () => { if (pauseFight()) sfx.select(); });
+  onPress(soundBtn, toggleSound);
 
   // ----------------------------------------------------------------- menus
   // Keep the game's renderOverlay, then touch up its cards for this edition.
@@ -374,6 +389,10 @@
     frameNo++;
     for (const act of releaseNextFrame) if (!held[act]) input[act] = false;
     releaseNextFrame.clear();
+    // Held upright, the rotate card covers the arena, and a fight carried on behind
+    // it: the CPU kept swinging at a player who could not see. Pause instead; the
+    // pause card's Resume is waiting when the device turns back.
+    if (upright && upright.matches && game.phase === 'fight') pauseFight();
     const now = game.phase === 'fight';
     if (now !== fighting) {
       fighting = now;

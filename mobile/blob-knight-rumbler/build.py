@@ -42,8 +42,8 @@ ZIP_FOLDER = 'Blob Knight Rumbler - Android'
 # The release these defaults build. Android refuses an install whose version code
 # is not higher than the one on the phone, so raise both together for every build
 # handed out, and keep them here rather than in whoever-typed-the-command's memory.
-VERSION_NAME = '3.7'
-VERSION_CODE = 10
+VERSION_NAME = '3.8'
+VERSION_CODE = 11
 
 
 def die(msg):
