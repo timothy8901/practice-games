@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Build Blob Knight Rumpler for Android: a signed APK, and a zip to hand around.
+"""Build Blob Knight Rumbler for Android: a signed APK, and a zip to hand around.
 
     python3 build.py                  # the current release from origin/main
     python3 build.py --source FILE    # or any copy of the engine page
     python3 build.py --debuggable     # test build that Chrome DevTools can attach to
 
-The zip (dist/BlobKnightRumpler-Android.zip) holds the APK, install notes, and the
+The zip (dist/BlobKnightRumbler-Android.zip) holds the APK, install notes, and the
 same page as a single web file. No Gradle: the Android SDK's own build tools
 (aapt2, d8, zipalign, apksigner) and a JDK 17 do the work. See README.md.
 """
@@ -23,9 +23,12 @@ REPO = os.path.normpath(os.path.join(HERE, '..', '..'))
 BUILD = os.path.join(HERE, 'build')
 DIST = os.path.join(HERE, 'dist')
 
-APP_NAME = 'Blob Knight Rumpler'
+APP_NAME = 'Blob Knight Rumbler'
 MIN_SDK = 24      # Android 7.0
 TARGET_SDK = 34   # 35+ would force edge-to-edge and put the game under the camera cutout
+# The key's alias and file, like the package id in AndroidManifest.xml, keep the
+# game's first spelling ("Rumpler") on purpose: they are the app's identity, and a
+# phone only updates an installed app from a build with the same id and key.
 KEY_ALIAS = 'blobknightrumpler'
 KEYSTORE = os.path.expanduser('~/.android/blob-knight-rumpler.jks')
 KEYPASS = KEYSTORE + '.password'
@@ -33,14 +36,14 @@ THREE = os.path.join(HERE, 'vendor', 'three-0.152.2.min.js')
 # The engine page this is built from: the published browser game, never modified
 # here. ENGINE_MARK is how a page is known to be the game rather than something
 # else sharing its name.
-ENGINE_PAGES = ('blob-knight-rumpler.html',)
+ENGINE_PAGES = ('blob-knight-rumbler.html',)
 ENGINE_MARK = 'const ABIL = {'
-ZIP_FOLDER = 'Blob Knight Rumpler - Android'
+ZIP_FOLDER = 'Blob Knight Rumbler - Android'
 # The release these defaults build. Android refuses an install whose version code
 # is not higher than the one on the phone, so raise both together for every build
 # handed out, and keep them here rather than in whoever-typed-the-command's memory.
-VERSION_NAME = '3.6'
-VERSION_CODE = 9
+VERSION_NAME = '3.7'
+VERSION_CODE = 10
 
 
 def die(msg):
@@ -134,7 +137,7 @@ def mobile_html(game, origin, version):
     html = patch(html, 'resolution cap', 'renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));',
                  'renderer.setPixelRatio(Math.min(window.BKR_MAX_DPR || 2, window.devicePixelRatio || 1));')
     # The site calls it "(3D)" to set it apart from its 2D neighbours; the app needs no qualifier.
-    html = patch(html, 'app title', '<title>Blob Knight Rumpler (3D)</title>', '<title>Blob Knight Rumpler</title>')
+    html = patch(html, 'app title', '<title>Blob Knight Rumbler (3D)</title>', '<title>Blob Knight Rumbler</title>')
     html = patch(html, 'mobile stylesheet', '</head>', '<style id="bkr-mobile-css">\n' + css + '</style>\n</head>')
     html = patch(html, 'mobile layers', '</body>', js + '\n</body>')
     # Last, so none of the patches above can match inside the library.
@@ -197,7 +200,7 @@ def ensure_keystore(t, env):
 def model_files():
     models = sorted(glob.glob(os.path.join(REPO, 'knight-art', '*.glb')))
     if not models:
-        die('no packed models in knight-art/ - run: python3 mobile/blob-knight-rumpler/tools/pack_models.py\n'
+        die('no packed models in knight-art/ - run: python3 mobile/blob-knight-rumbler/tools/pack_models.py\n'
             '(it needs the Thrixel art in thrixel_assets/mote_rumble, which is not in git)')
     return models
 
@@ -252,7 +255,7 @@ def build_apk(html, version_name, version_code, debuggable):
     run([t['zipalign'], '-f', '-p', '4', unsigned, aligned])
     ensure_keystore(t, env)
     os.makedirs(DIST, exist_ok=True)
-    apk = os.path.join(DIST, 'BlobKnightRumpler-debug.apk' if debuggable else 'BlobKnightRumpler.apk')
+    apk = os.path.join(DIST, 'BlobKnightRumbler-debug.apk' if debuggable else 'BlobKnightRumbler.apk')
     # PKCS12 keeps one password for the store and the key; apksigner reuses it for the key.
     run([t['apksigner'], 'sign', '--ks', KEYSTORE, '--ks-key-alias', KEY_ALIAS, '--ks-pass', 'file:' + KEYPASS,
          '--v4-signing-enabled', 'false', '--out', apk, aligned], env=env)
@@ -274,9 +277,9 @@ def build_apk(html, version_name, version_code, debuggable):
 # ------------------------------------------------------------------- the zip
 def package_zip(apk, html, version_name):
     notes = read(os.path.join(HERE, 'INSTALL.txt')).replace('{version}', version_name)
-    out = os.path.join(DIST, 'BlobKnightRumpler-Android.zip')
+    out = os.path.join(DIST, 'BlobKnightRumbler-Android.zip')
     with zipfile.ZipFile(out, 'w', zipfile.ZIP_DEFLATED) as z:
-        z.write(apk, ZIP_FOLDER + '/BlobKnightRumpler.apk', compress_type=zipfile.ZIP_STORED)  # already compressed
+        z.write(apk, ZIP_FOLDER + '/BlobKnightRumbler.apk', compress_type=zipfile.ZIP_STORED)  # already compressed
         z.writestr(ZIP_FOLDER + '/How to install.txt', notes)
         z.writestr(ZIP_FOLDER + '/web/index.html', html)
         for path in model_files():                                   # the web copy needs them too

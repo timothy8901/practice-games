@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Blob Knight Rumpler (3D)</title>
+<title>Blob Knight Rumbler (3D)</title>
 <style>
   :root {
     --bg: #1a1a2e;
@@ -417,7 +417,7 @@
         </svg>
       </a>
     </div>
-    <h1>Blob Knight Rumpler</h1>
+    <h1>Blob Knight Rumbler</h1>
     <p class="subtitle">Top-down 3D arena fighter. Duel a CPU knight under your own rules, or climb an endless survival ladder.</p>
   </header>
 
@@ -495,7 +495,7 @@
 <script src="https://unpkg.com/three@0.152.2/build/three.min.js"></script>
 <script>
 /* =========================================================================
-   BLOB KNIGHT RUMPLER — RUMBLE ARENA
+   BLOB KNIGHT RUMBLER — RUMBLE ARENA
    Top-down 3D duel. One circular arena, player vs CPU.
    All characters are original low-poly primitives (flat-shaded, toy-like).
    ========================================================================= */
@@ -2031,7 +2031,7 @@ function importSave(text) {
   catch (_) { return 'That does not look like a save string.'; }
   // The version marker is the signature. Requiring bkr-stats rejected the save of
   // anyone who had not finished a match yet - the string this very screen gave them.
-  if (!bag || bag.v !== 1) return 'That is not a Blob Knight Rumpler save.';
+  if (!bag || bag.v !== 1) return 'That is not a Blob Knight Rumbler save.';
   for (const k of SAVE_KEYS) {
     try {
       // A key the save does not carry was unset in the profile it came from, so

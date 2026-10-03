@@ -178,7 +178,7 @@ def write_glb(path, pos, nor, uv, idx, jpeg, factor, extras):
         views.append({'buffer': 0, 'byteOffset': offset, 'byteLength': len(blob)})
         offset += len(pad4(blob))
     js = {
-        'asset': {'version': '2.0', 'generator': 'pack_models.py (Blob Knight Rumpler)'},
+        'asset': {'version': '2.0', 'generator': 'pack_models.py (Blob Knight Rumbler)'},
         'scene': 0, 'scenes': [{'nodes': [0]}], 'nodes': [{'mesh': 0}],
         'meshes': [{'primitives': [{'attributes': {'POSITION': 1, 'NORMAL': 2, 'TEXCOORD_0': 3},
                                     'indices': 0, 'material': 0}], 'extras': extras}],

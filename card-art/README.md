@@ -1,7 +1,7 @@
 # Buff card art
 
-The twelve cards drafted before a match in **Blob Knight Rumpler**. Generated
-with Thrixel (project *Blob Knight Rumpler*, `254f5c0d-4ce4-465e-836c-24b49265c3a6`)
+The twelve cards drafted before a match in **Blob Knight Rumbler**. Generated
+with Thrixel (project *Blob Knight Rumbler*, `254f5c0d-4ce4-465e-836c-24b49265c3a6`)
 on 2026-09-23 as 512px PNGs, then resized to 256px and encoded as WebP — the
 whole deck is about 60 KB, small enough to live inside the page as data URIs so
 it works offline in the Android app with nothing to fetch.
@@ -9,9 +9,9 @@ it works offline in the Android app with nothing to fetch.
 ![the twelve cards](deck.webp)
 
 `python3 card-art/inline.py` rewrites the `BUFF_ART` block in
-`blob-knight-rumpler.html` from these files. Re-run it after replacing any card.
+`blob-knight-rumbler.html` from these files. Re-run it after replacing any card.
 
-The 512px originals are in `thrixel_assets/blob_knight_rumpler/cards/`, which is
+The 512px originals are in `thrixel_assets/blob_knight_rumbler/cards/`, which is
 git-ignored like the rest of `thrixel_assets/`. To rebuild one from scratch:
 regenerate the image in Thrixel from the prompt below, then
 

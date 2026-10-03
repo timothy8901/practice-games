@@ -20,14 +20,14 @@
       "port": 8767
     },
     {
-      "name": "Blob Knight Rumpler build",
+      "name": "Blob Knight Rumbler build",
       "runtimeExecutable": "python3",
       "runtimeArgs": [
         "-m",
         "http.server",
         "8766",
         "--directory",
-        "mobile/blob-knight-rumpler/build/assets/www"
+        "mobile/blob-knight-rumbler/build/assets/www"
       ],
       "port": 8766
     },

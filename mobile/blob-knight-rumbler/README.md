@@ -1,11 +1,11 @@
-# Blob Knight Rumpler (Android)
+# Blob Knight Rumbler (Android)
 
-Blob Knight Rumpler is the phone game built from the Rumble Arena engine: the
+Blob Knight Rumbler is the phone game built from the Rumble Arena engine: the
 same fighting, wearing the Thrixel art from Mote Rumble, with touch controls and
 every fighter renamed to the core it wears. Produces an installable Android app
 and a zip to hand around.
 
-The engine page is `blob-knight-rumpler.html` - the published browser game,
+The engine page is `blob-knight-rumbler.html` - the published browser game,
 which this build reads and never modifies. The build checks the page it reads
 actually carries the engine before building it.
 
@@ -23,7 +23,7 @@ phone's progress is its own.
 python3 build.py
 ```
 
-Output: `dist/BlobKnightRumpler-Android.zip` holding `BlobKnightRumpler.apk`, install
+Output: `dist/BlobKnightRumbler-Android.zip` holding `BlobKnightRumbler.apk`, install
 notes (`INSTALL.txt`) and `web/index.html`, the same page as a single web file.
 
 ## How it works
@@ -46,7 +46,7 @@ notes (`INSTALL.txt`) and `web/index.html`, the same page as a single web file.
   run from the round or result card). They switch on
   for touchscreens; `?touch=1` / `?touch=0` force them on or off.
 - **The art** comes with the page: its model reader and art layer are inline in
-  `blob-knight-rumpler.html`, and the models in `knight-art/` at the repo root are
+  `blob-knight-rumbler.html`, and the models in `knight-art/` at the repo root are
   copied into the app. Each fighter is one of the eight cores built for Mote Rumble -
   Blade, Arc, Disc, Maul, Bow, Flare, Cinder and Veil, which are also the engine's
   own keys for them - so a fighter is
@@ -76,6 +76,11 @@ signed with the same key. The release the defaults build is `VERSION_NAME` /
 `VERSION_CODE` at the top of build.py - raise both for each build you hand out,
 since Android refuses an install whose code is not higher than the phone's.
 
+The key, its alias and the package id (`com.tokenmaxxers.blobknightrumpler`) still
+spell the game's first name, Rumpler. That is deliberate: they are the app's
+identity, and changing any of them would make the next build a different app that
+cannot update the one already installed. Everything a player sees says Rumbler.
+
 ## Icons
 
 `icon/foreground.svg` and `icon/background.svg` are the adaptive icon's layers.
@@ -84,11 +89,11 @@ PNGs in `android/res/mipmap-*`, which are committed.
 
 ## Testing
 
-`python3 build.py --debuggable` writes `dist/BlobKnightRumpler-debug.apk`, which
+`python3 build.py --debuggable` writes `dist/BlobKnightRumbler-debug.apk`, which
 Chrome DevTools can attach to (`chrome://inspect`). An emulator works: the
 `KB_Phone` AVD in `~/.android/avd` (Android 14, arm64, 1080x2400, WebView 113) boots headless
 with `emulator -avd KB_Phone -no-window -gpu swiftshader_indirect`; then
-`adb install -r dist/BlobKnightRumpler.apk` and
+`adb install -r dist/BlobKnightRumbler.apk` and
 `adb shell am start -n com.tokenmaxxers.blobknightrumpler/.MainActivity`. The page's
-console goes to logcat under the tag `BlobKnightRumpler`. The emulator draws WebGL
+console goes to logcat under the tag `BlobKnightRumbler`. The emulator draws WebGL
 on the CPU at a few fps, so it proves behaviour, not speed.

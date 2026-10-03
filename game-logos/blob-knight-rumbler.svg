@@ -76,9 +76,9 @@
   <text x="220" y="56" text-anchor="middle" font-family="Impact, sans-serif" font-size="36" letter-spacing="3" fill="#06101e" transform="translate(2,2)">BLOB KNIGHT</text>
   <text x="220" y="56" text-anchor="middle" font-family="Impact, sans-serif" font-size="36" letter-spacing="3" fill="url(#chromeBlue)" stroke="#0a2b52" stroke-width="2" paint-order="stroke">BLOB KNIGHT</text>
 
-  <text x="221" y="223" text-anchor="middle" font-family="Impact, sans-serif" font-size="76" letter-spacing="1" fill="#06101e" transform="translate(3,3)">RUMPLER</text>
-  <text x="220" y="222" text-anchor="middle" font-family="Impact, sans-serif" font-size="76" letter-spacing="1" fill="url(#goldGrad)" stroke="#3d2400" stroke-width="3" paint-order="stroke">RUMPLER</text>
-  <text x="220" y="222" text-anchor="middle" font-family="Impact, sans-serif" font-size="76" letter-spacing="1" fill="none" stroke="#fff7d8" stroke-width="0.8" stroke-opacity="0.55">RUMPLER</text>
+  <text x="221" y="223" text-anchor="middle" font-family="Impact, sans-serif" font-size="76" letter-spacing="1" fill="#06101e" transform="translate(3,3)">RUMBLER</text>
+  <text x="220" y="222" text-anchor="middle" font-family="Impact, sans-serif" font-size="76" letter-spacing="1" fill="url(#goldGrad)" stroke="#3d2400" stroke-width="3" paint-order="stroke">RUMBLER</text>
+  <text x="220" y="222" text-anchor="middle" font-family="Impact, sans-serif" font-size="76" letter-spacing="1" fill="none" stroke="#fff7d8" stroke-width="0.8" stroke-opacity="0.55">RUMBLER</text>
 
   <g>
     <rect x="148" y="240" width="144" height="34" rx="6" fill="url(#plateGrad)" stroke="#7fd0ff" stroke-width="2"/>

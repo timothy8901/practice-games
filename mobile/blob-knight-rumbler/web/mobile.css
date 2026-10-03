@@ -1,4 +1,4 @@
-/* Blob Knight Rumpler - mobile edition. build.py injects this into the engine page. */
+/* Blob Knight Rumbler - mobile edition. build.py injects this into the engine page. */
 
 /* ---------- the game fills the screen ---------- */
 :root { --s: 1; }   /* control scale; mobile.js sets it from the screen size */

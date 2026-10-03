@@ -1,15 +1,15 @@
-BLOB KNIGHT RUMPLER  (Android, version {version})
+BLOB KNIGHT RUMBLER  (Android, version {version})
 =================================================
 
 WHAT'S IN HERE
-  BlobKnightRumpler.apk   the game as an Android app. Plays offline.
+  BlobKnightRumbler.apk   the game as an Android app. Plays offline.
   web/                    the same game as a web page (index.html + knight-art/),
                           for putting on a website; see the bottom of this file
 
 INSTALL ON YOUR PHONE  (Android 7.0 or newer)
-  1. Get BlobKnightRumpler.apk onto the phone: download this zip on the phone and
+  1. Get BlobKnightRumbler.apk onto the phone: download this zip on the phone and
      open it in the Files app, or copy the APK over by USB, Drive or email.
-  2. Tap BlobKnightRumpler.apk.
+  2. Tap BlobKnightRumbler.apk.
   3. The first time, Android asks to allow installs from that app (Files, Chrome,
      Drive...). Tap Settings, turn on "Allow from this source", then go back.
   4. Tap Install, then Open.

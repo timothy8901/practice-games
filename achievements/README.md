@@ -1,6 +1,6 @@
 # Achievements
 
-Every achievement in **Blob Knight Rumpler** — 76 in all: 12 overall and eight for each of the eight cores. They are tracked as you play, kept in your browser (the app keeps its own), and shown in the game under **Achievements** on the title screen, with progress on the ones you have started.
+Every achievement in **Blob Knight Rumbler** — 76 in all: 12 overall and eight for each of the eight cores. They are tracked as you play, kept in your browser (the app keeps its own), and shown in the game under **Achievements** on the title screen, with progress on the ones you have started.
 
 Each one also unlocks a **permanent buff**. A core’s own eight only apply while you are carrying that core, so mastering every knight does not stack into one unstoppable build; the twelve overall apply always. Fully earned, that is at most +7% move speed, −20% cooldowns, +1 heart, +42% knockback, +18% shield, −28% knockback taken, +6% jump on one core — and the **Boosts** toggle on the title screen turns all of it off, along with the pre-match cards, for a run on the game as it ships.
 

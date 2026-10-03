@@ -1,4 +1,4 @@
-/* Blob Knight Rumpler - mobile layer. build.py injects this after the game's own script.
+/* Blob Knight Rumbler - mobile layer. build.py injects this after the game's own script.
  *
  * It adds on-screen touch controls that write straight into game.input, pauses
  * the fight whenever the app or tab goes to the background, swaps the keyboard
@@ -256,7 +256,7 @@
     const card = overlayEl.querySelector('.overlay-card');
     if (!card) return;
     if (game.phase === 'menu') {
-      card.insertAdjacentHTML('afterbegin', '<div class="bkr-brand">Blob Knight Rumpler</div>');
+      card.insertAdjacentHTML('afterbegin', '<div class="bkr-brand">Blob Knight Rumbler</div>');
       const subs = [card.querySelector('#menu-controls'), card.querySelector('#menu-hint')];
       if (TOUCH && subs[0]) {
         subs[0].innerHTML = 'One circular arena, one CPU knight.<br>' +

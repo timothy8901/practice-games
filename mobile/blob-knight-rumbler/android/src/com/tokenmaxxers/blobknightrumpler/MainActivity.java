@@ -31,14 +31,14 @@ import java.io.InputStream;
 import java.util.HashMap;
 
 /**
- * Blob Knight Rumpler on Android: one full-screen WebView running the bundled game
+ * Blob Knight Rumbler on Android: one full-screen WebView running the bundled game
  * (assets/www/index.html, with three.js inlined, so it plays offline).
  *
  * The page does the game-side work (touch controls, pausing, menus) and exposes
  * window.BKR.back() and window.BKR.appPause() for this Activity to call.
  */
 public class MainActivity extends Activity {
-    private static final String TAG = "BlobKnightRumpler";
+    private static final String TAG = "BlobKnightRumbler";
     // The page is served from a virtual https host backed by the APK's assets rather
     // than from file://, so it is one ordinary origin: fetch() can read the Thrixel
     // models, and nothing on the phone's filesystem is reachable from the page.

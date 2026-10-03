@@ -58,6 +58,6 @@ unreal/MoteRumble/Content/Art/
 unreal/MoteRumble/Content/Audio/
 unreal/MoteRumble/Recordings/
 
-# Blob Knight Rumpler Android packaging: build output (the signing key lives in ~/.android)
-mobile/blob-knight-rumpler/build/
-mobile/blob-knight-rumpler/dist/
+# Blob Knight Rumbler Android packaging: build output (the signing key lives in ~/.android)
+mobile/blob-knight-rumbler/build/
+mobile/blob-knight-rumbler/dist/

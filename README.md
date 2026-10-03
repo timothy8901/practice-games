@@ -61,9 +61,9 @@ A GitHub Pages deploy workflow lives at `.github/workflows/pages.yml`. After
 merging into `main` and enabling Pages → Source: GitHub Actions, the site
 goes live at https://timothy8901.github.io/practice-games/.
 
-## Blob Knight Rumpler
+## Blob Knight Rumbler
 
-A top-down 3D arena fighter — `blob-knight-rumpler.html`. One circular
+A top-down 3D arena fighter — `blob-knight-rumbler.html`. One circular
 arena, chunky low-poly blob knights built in Three.js, and eight cores —
 Blade, Arc, Disc, Maul, Bow, Flare, Cinder and Veil — each with **two
 attacks** (`H` / `J`, or `X` / `Z`) and a **shield** (`K`, or `Shift` /
