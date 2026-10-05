@@ -1,0 +1,12 @@
+{
+  "appId": "io.github.timothy8901.dodecarings",
+  "appName": "Dodeca Rings",
+  "webDir": "www",
+  "backgroundColor": "#f4f1ea",
+  "plugins": {
+    "SystemBars": {
+      "insetsHandling": "native",
+      "initialViewportFitValueHint": "cover"
+    }
+  }
+}

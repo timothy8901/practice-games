@@ -1,0 +1,21 @@
+{
+  "name": "dodeca-rings",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Dodeca Rings, a twelve-faced twisty puzzle box, packaged as a mobile app with Capacitor.",
+  "scripts": {
+    "sync": "cap sync",
+    "open:android": "cap open android",
+    "open:ios": "cap open ios",
+    "assets": "capacitor-assets generate --iconBackgroundColor \"#221f1d\" --iconBackgroundColorDark \"#221f1d\" --splashBackgroundColor \"#f4f1ea\" --splashBackgroundColorDark \"#191715\""
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/core": "^8.5.2",
+    "@capacitor/ios": "^8.5.2"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^8.5.2"
+  }
+}

@@ -143,6 +143,11 @@ along with everything inside it: Cap on ring 3 is a real Gigaminx face turn.
 Same modes and keys as Hexadeca Rings (`[` `]` pick the face). Pure vanilla
 JS + Canvas 2D in one file.
 
+**Phone app:** [`mobile/dodeca-rings/`](mobile/dodeca-rings/README.md) packages
+it as an installable, offline web app (`www/`) and as Android Studio and Xcode
+projects built with Capacitor 8 (`android/`, `ios/`), with its own icon and
+launch screens. Its README covers installing and building each one.
+
 ## Grocery Tycoon
 
 - **Grocery Tycoon** (`grocery-tycoon.html`) — a single-file produce-store tycoon
