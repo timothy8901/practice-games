@@ -136,6 +136,7 @@
     display: grid; place-items: center; transition: transform .12s ease, opacity .2s;
   }
   .mini-btn.wide { width: 46px; font-size: 21px; }
+  .mini-btn svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linejoin: round; }
   .mini-btn:active { transform: scale(.93); }
   .mini-btn:disabled { opacity: .35; cursor: default; }
   .picker { display: flex; align-items: center; gap: 6px; min-width: 0; }
@@ -326,13 +327,17 @@
           <div class="pick-label" id="faceLabel" aria-live="polite"><b>White</b><small>face 1 of 12</small></div>
           <button id="btnNextFace" class="mini-btn" type="button" aria-label="Next face">&rsaquo;</button>
         </div>
+        <button id="btnDialView" class="mini-btn" type="button" aria-label="Show the face with its neighbors unfolded" title="Show the face with its neighbors unfolded">
+          <svg class="ico-net" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7.8 15.99 10.7 14.47 15.4 9.53 15.4 8.01 10.7zM12 7.8 15.99 10.7 19.99 7.8 18.46 3.1 13.53 3.1zM20.93 10.7 15.99 10.7 14.47 15.4 18.46 18.3 22.46 15.4zM12 23 15.99 20.09 14.47 15.4 9.53 15.4 8.01 20.09zM3.07 10.7 1.54 15.4 5.54 18.3 9.53 15.4 8.01 10.7zM12 7.8 10.47 3.1 5.54 3.1 4.01 7.8 8.01 10.7z"/></svg>
+          <svg class="ico-rings" viewBox="0 0 24 24" aria-hidden="true" hidden><circle cx="12" cy="12" r="2.6"/><circle cx="12" cy="12" r="6.2"/><circle cx="12" cy="12" r="9.8"/></svg>
+        </button>
         <div class="seg" role="radiogroup" aria-label="What a turn moves">
           <button id="segRing" type="button" role="radio" aria-checked="true">Ring</button>
           <button id="segCap" type="button" role="radio" aria-checked="false">Cap</button>
         </div>
       </div>
       <div id="dialWrap">
-        <canvas id="dialCanvas" aria-label="Ring dial: the chosen face in the middle with its five neighbors opened flat around it. Swipe along a ring to turn it; slide in or out to pick a ring; tap a neighbor, or its badge on the rim, to move to that face."></canvas>
+        <canvas id="dialCanvas" aria-label="Ring dial: the chosen face's four rings drawn as circles, ring 1 in the middle (or, in the other view, the face with its five neighbors unfolded flat around it). Swipe along a ring to turn it; slide in or out to pick a ring; tap a neighbor's badge on the rim to move to that face."></canvas>
         <div id="toast" role="status"></div>
       </div>
       <div class="dial-bar">
@@ -425,9 +430,10 @@
       <ul class="help-list">
         <li><b>Rings circle the faces.</b> Each of the 12 faces wears 4 rings: ring 1 is its center and the ten tiles round it, ring 2 its rim, and rings 3 and 4 the first and second rows of tiles across its five neighbors. A turn spins a ring a fifth of the way round.</li>
         <li><b>Turn a ring</b> by swiping along it on the dial, with the &#8634; &#8635; buttons, or by dragging a tile on the 3D puzzle. Most tiles ride two or three rings, and the direction you drag picks which.</li>
-        <li><b>Pick a face</b> with &lsaquo; &rsaquo;, a tap on a neighbor in the dial (or its badge on the rim), or a tap on the puzzle. <b>Cap</b> turns a ring along with everything inside it: Cap on ring 3 turns a whole face, the way a real Gigaminx does.</li>
+        <li><b>Two dials.</b> The ring dial draws the chosen face's rings as circles, ring 1 in the middle and ring 4 round the outside, with the edges between its neighbors marked across rings 3 and 4. The button beside the face picker swaps it for the face with its five neighbors unfolded flat around it.</li>
+        <li><b>Pick a face</b> with &lsaquo; &rsaquo;, a neighbor's badge on the dial's rim (or, unfolded, a tap on the neighbor itself), or a tap on the puzzle. <b>Cap</b> turns a ring along with everything inside it: Cap on ring 3 turns a whole face, the way a real Gigaminx does.</li>
         <li><b>Look around</b> by dragging the space around the puzzle (or right-drag, or two fingers). Scroll or pinch to zoom; double-tap to reset.</li>
-        <li><b>Keys:</b> <kbd>[</kbd> <kbd>]</kbd> face, <kbd>&uarr;</kbd> <kbd>&darr;</kbd> ring, <kbd>&larr;</kbd> <kbd>&rarr;</kbd> turn, <kbd>C</kbd> cap, <kbd>Ctrl</kbd>+<kbd>Z</kbd> undo.</li>
+        <li><b>Keys:</b> <kbd>[</kbd> <kbd>]</kbd> face, <kbd>&uarr;</kbd> <kbd>&darr;</kbd> ring, <kbd>&larr;</kbd> <kbd>&rarr;</kbd> turn, <kbd>C</kbd> cap, <kbd>V</kbd> dial view, <kbd>Ctrl</kbd>+<kbd>Z</kbd> undo.</li>
       </ul>
       <p class="help-note">The solid is the regular dodecahedron, and its faces carry the Gigaminx pattern: two cuts beside every edge, so each edge has five tiles along it (corner, wing, middle, wing, corner) and each face 31. Every cut is the trace of a plane parallel to a neighboring face, so every ring turns as a true rotation.</p>
       <div class="stack"><button id="btnHelpClose" class="btn primary big" type="button">Got it</button></div>
@@ -832,7 +838,8 @@ function hideToast() { clearTimeout(toastTimer); toastEl.classList.remove('show'
 // ===========================================================================
 // Layout
 // ===========================================================================
-const dg = { cx: 0, cy: 0, R: 50, S: 50, theta: -Math.PI / 2, target: null, chips: [] };
+// The dial draws the chosen face's rings as circles ('rings') or the face with its neighbors unfolded ('net').
+const dg = { cx: 0, cy: 0, R: 50, S: 50, theta: -Math.PI / 2, target: null, chips: [], view: save.dialView === 'net' ? 'net' : 'rings' };
 function layout() {
   const W = stageEl.clientWidth, H = stageEl.clientHeight;
   const landscape = W > H * 1.05;
@@ -1257,16 +1264,91 @@ function ringLoops(D, lo, hi) {
   if (lo === hi && hi > 1) return hi === 2 ? [...D.loops.inner, ...D.loops.face] : D.loops['strip' + hi];
   return hi === 1 ? D.loops.inner : hi === 2 ? D.loops.face : D.loops['star' + hi];
 }
-function renderDial(tms) {
-  const { ctx, w: W, h: H, dpr } = cvD;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.clearRect(0, 0, W, H);
-  if (W < 40 || H < 40) return;
-  const F = sel.f, D = dialGeom(F), { cx, cy, R } = dg;
-  const vm = visualMove(), mv = vm && vm.f === F ? vm : null;
-  const pulse = 0.5 + 0.5 * Math.sin(tms / 260), acc = theme.accentRgb.join(',');
-
-  ctx.save();
+// ---------------------------------------------------------------------------
+// The ring view: each ring drawn as a band of a disc round the chosen face, the
+// way the other ring puzzles' dials show theirs. A ring's tiles sit between two
+// loops round the face's axis (the rim's inner edge, the face's own edge, the
+// slices through its neighbors). Each loop becomes a circle and each of its
+// five sides a fifth of that circle, so every tile keeps its place, and its
+// slant, along its ring, and the edges between neighbors fall on five spokes.
+// ---------------------------------------------------------------------------
+const RING_RAD = [0.2, 0.4, 0.6, 0.8, 1];   // the loops' circles, as fractions of the dial's radius
+// How far each loop's sides sit from the axis, seen straight down it.
+const LOOP_APO = (() => {
+  const apo = (m) => {
+    const q = vsub([XS[0][m][0], XS[0][m][1], XS[0][m][2]], FACE_C[0]);
+    return Math.hypot(vdot(q, FU[0]), vdot(q, FW[0])) * Math.cos(Math.PI / 5);
+  };
+  return [RIN2 - 2 * DELTA, RIN2 - DELTA, RIN2, apo(1), apo(2)];
+})();
+let ringGeo = null;
+function ringGeom(F) {
+  if (ringGeo && ringGeo.F === F) return ringGeo;
+  // A point's place round F's axis: U fifths along the loops (0 at corner 0), and its distance out along that side's normal.
+  const polar = (p) => {
+    const q = vsub(p, FACE_C[F]), x = vdot(q, FU[F]), y = vdot(q, FW[F]);
+    const phi = (Math.atan2(y, x) + TAU) % TAU, k = Math.min(4, Math.floor(phi / (TAU / 5))), psi = phi - ((k + 0.5) * TAU) / 5;
+    return { U: k + (Math.tan(psi) / Math.tan(Math.PI / 5) + 1) / 2, a: Math.hypot(x, y) * Math.cos(psi) };
+  };
+  const cells = [];
+  for (let t = 0; t < NT; t++) {
+    const L = FLVL[F * NT + t];
+    if (L < 1) continue;
+    const g = faceOf(t), loc = LOCAL[t % NL];
+    if (g === F && t % NL === 0) { cells.push({ t, L, center: true }); continue; }
+    const mid = polar(to3(g, loc.cx, loc.cy)).U, inner = [], outer = [];
+    for (const p of loc.poly) {
+      const { U, a } = polar(to3(g, p[0], p[1]));
+      let V = U;
+      while (V - mid > 2.5) V -= 5;
+      while (mid - V > 2.5) V += 5;
+      (Math.abs(a - LOOP_APO[L - 1]) < Math.abs(a - LOOP_APO[L]) ? inner : outer).push(V);
+    }
+    cells.push({ t, L, inU: [Math.min(...inner), Math.max(...inner)], outU: [Math.min(...outer), Math.max(...outer)] });
+  }
+  ringGeo = { F, cells };
+  return ringGeo;
+}
+function ringCellPath(p, c, tau) {
+  const { cx, cy, R } = dg;
+  if (c.center) { const r = RING_RAD[0] * R; p.moveTo(cx + r, cy); p.arc(cx, cy, r, 0, TAU); p.closePath(); return; }
+  const r0 = RING_RAD[c.L - 1] * R, r1 = RING_RAD[c.L] * R;
+  const i0 = dialAngle(c.inU[0] + tau), i1 = dialAngle(c.inU[1] + tau), o0 = dialAngle(c.outU[0] + tau), o1 = dialAngle(c.outU[1] + tau);
+  p.moveTo(cx + r0 * Math.cos(i0), cy + r0 * Math.sin(i0));
+  p.lineTo(cx + r1 * Math.cos(o0), cy + r1 * Math.sin(o0));
+  p.arc(cx, cy, r1, o0, o1, true);
+  p.lineTo(cx + r0 * Math.cos(i1), cy + r0 * Math.sin(i1));
+  p.arc(cx, cy, r0, i1, i0, false);
+  p.closePath();
+}
+function drawRingView(ctx, F, mv) {
+  const { cx, cy, R } = dg, cells = ringGeom(F).cells, st = G.state;
+  ctx.beginPath(); ctx.arc(cx, cy, R + 2, 0, TAU); ctx.fillStyle = theme.bodyHex; ctx.fill();
+  ctx.lineJoin = 'round';
+  for (const moving of [false, true]) {
+    const paths = new Array(NF);
+    for (const c of cells) {
+      const turning = !!mv && c.L >= mv.lo && c.L <= mv.hi;
+      if (turning !== moving) continue;
+      ringCellPath(paths[st[c.t]] || (paths[st[c.t]] = new Path2D()), c, turning ? mv.tau : 0);
+    }
+    ctx.lineWidth = Math.max(1.2, R / 95); ctx.strokeStyle = theme.bodyHex;
+    for (let k = 0; k < NF; k++) if (paths[k]) { ctx.fillStyle = FACE_HEX[k]; ctx.fill(paths[k]); ctx.stroke(paths[k]); }
+  }
+  // The face's own edge, and where the rows cross from one neighbor to the next (on resting rings).
+  ctx.beginPath();
+  ctx.moveTo(cx + RING_RAD[2] * R, cy); ctx.arc(cx, cy, RING_RAD[2] * R, 0, TAU);
+  for (let L = 3; L <= NRF; L++) {
+    if (mv && L >= mv.lo && L <= mv.hi) continue;
+    for (let k = 0; k < 5; k++) {
+      const a = dialAngle(k), ca = Math.cos(a), sa = Math.sin(a);
+      ctx.moveTo(cx + RING_RAD[L - 1] * R * ca, cy + RING_RAD[L - 1] * R * sa); ctx.lineTo(cx + RING_RAD[L] * R * ca, cy + RING_RAD[L] * R * sa);
+    }
+  }
+  ctx.lineWidth = Math.max(2.2, R / 62); ctx.lineCap = 'round'; ctx.strokeStyle = theme.bodyHex; ctx.stroke();
+}
+function drawNetView(ctx, F, mv) {
+  const D = dialGeom(F), { cx, cy, R } = dg;
   ctx.beginPath(); ctx.arc(cx, cy, R, 0, TAU); ctx.fillStyle = theme.bodyHex; ctx.fill();
   ctx.clip();
   // The rest of each neighbor, dimmed: no ring of this face reaches it.
@@ -1284,16 +1366,35 @@ function renderDial(tms) {
     dialPolys(ctx, D.byLvl[L], moving ? (mv.tau * TAU) / 5 : 0, 1);
     if (moving && faceOnly) ctx.restore();
   }
+}
+// Where ring L runs through the middle of its band on the dial, in pixels from the center.
+const dialRingRadius = (L) => (dg.view === 'rings' ? ((RING_RAD[L - 1] + RING_RAD[L]) / 2) * dg.R : RING_R[L] * dg.S);
+function renderDial(tms) {
+  const { ctx, w: W, h: H, dpr } = cvD;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  if (W < 40 || H < 40) return;
+  const F = sel.f, { cx, cy, R } = dg, rings = dg.view === 'rings';
+  const vm = visualMove(), mv = vm && vm.f === F ? vm : null;
+  const pulse = 0.5 + 0.5 * Math.sin(tms / 260), acc = theme.accentRgb.join(',');
+
+  ctx.save();
+  if (rings) drawRingView(ctx, F, mv); else drawNetView(ctx, F, mv);
   // The chosen ring, glows, a rejected swipe
   const outline = (lo, hi, color, lw) => {
-    ctx.beginPath(); dialLoops(ctx, ringLoops(D, lo, hi));
+    ctx.beginPath();
+    if (rings) for (const b of lo > 1 ? [lo - 1, hi] : [hi]) { const r = RING_RAD[b] * R; ctx.moveTo(cx + r, cy); ctx.arc(cx, cy, r, 0, TAU); }
+    else dialLoops(ctx, ringLoops(dialGeom(F), lo, hi));
     ctx.lineWidth = lw; ctx.lineJoin = 'round'; ctx.strokeStyle = color; ctx.stroke();
   };
   if (G.mode !== 'title') outline(sel.cap ? 1 : sel.d, sel.d, `rgba(${acc},${hl.rings.size ? 0.45 : 0.95})`, 2.4);
   for (const r of hl.rings) {
     if (((r / NRF) | 0) !== F) continue;
     const L = (r % NRF) + 1;
-    outline(L, L, `rgba(${acc},${0.12 + 0.14 * pulse})`, 9);
+    if (rings) {
+      ctx.beginPath(); ctx.arc(cx, cy, dialRingRadius(L), 0, TAU);
+      ctx.lineWidth = (RING_RAD[L] - RING_RAD[L - 1]) * R * 0.95; ctx.strokeStyle = `rgba(${acc},${0.1 + 0.12 * pulse})`; ctx.stroke();
+    } else outline(L, L, `rgba(${acc},${0.12 + 0.14 * pulse})`, 9);
     outline(L, L, `rgba(${acc},${0.6 + 0.4 * pulse})`, 3);
   }
   if (hl.reject && tms < hl.reject.until && hl.reject.f === F) outline(hl.reject.lo, hl.reject.hi, theme.warn, 3);
@@ -1301,17 +1402,26 @@ function renderDial(tms) {
   // The tile under the finger
   const ft = focusTile(tms);
   if (ft >= 0) {
-    const p = D.all.find((q) => q.t === ft);
-    if (p) {
-      const turning = !!mv && p.lvl >= mv.lo && p.lvl <= mv.hi, ang = turning ? (mv.tau * TAU) / 5 : 0;
-      for (let k = 0; k < p.n; k++) dialXY(p.pts[k * 2], p.pts[k * 2 + 1], Math.cos(ang), Math.sin(ang), k);
-      ctx.beginPath(); roundPath(ctx, p.n, 3);
+    const L = FLVL[F * NT + ft], turning = !!mv && L >= mv.lo && L <= mv.hi, tau = turning ? mv.tau : 0;
+    let drawn = false;
+    if (rings) {
+      const c = ringGeom(F).cells.find((q) => q.t === ft);
+      if (c) { ctx.beginPath(); ringCellPath(ctx, c, tau); drawn = true; }
+    } else {
+      const p = dialGeom(F).all.find((q) => q.t === ft);
+      if (p) {
+        const ang = (tau * TAU) / 5;
+        for (let k = 0; k < p.n; k++) dialXY(p.pts[k * 2], p.pts[k * 2 + 1], Math.cos(ang), Math.sin(ang), k);
+        ctx.beginPath(); roundPath(ctx, p.n, 3); drawn = true;
+      }
+    }
+    if (drawn) {
       ctx.lineWidth = 3.2; ctx.strokeStyle = '#ffffff'; ctx.stroke();
       ctx.lineWidth = 1.5; ctx.strokeStyle = theme.accent; ctx.stroke();
     }
   }
   ctx.restore();
-  ctx.beginPath(); ctx.arc(cx, cy, R + 0.5, 0, TAU); ctx.lineWidth = 1.5; ctx.strokeStyle = theme.line; ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx, cy, R + (rings ? 2.5 : 0.5), 0, TAU); ctx.lineWidth = 1.5; ctx.strokeStyle = theme.line; ctx.stroke();
   // Neighbor badges on the rim, one off the middle of each edge
   dg.chips.length = 0;
   ctx.font = '800 10.5px ' + theme.font;
@@ -1327,12 +1437,12 @@ function renderDial(tms) {
   }
 }
 function drawDialHint(ctx, h, tms) {
-  const rm = RING_R[h.hi] * dg.S, sgn = Math.sign(h.k) || 1, cx = dg.cx, cy = dg.cy;
+  const rm = dialRingRadius(h.hi), sgn = Math.sign(h.k) || 1, cx = dg.cx, cy = dg.cy;
   // Start on the side of the dial nearest the bottom, where a thumb rests.
   let U0 = 0.5, best = Infinity;
   for (let s = 0; s < 5; s++) { const e = Math.abs(wrapPi(dialAngle(s + 0.5) - Math.PI / 2)); if (e < best) { best = e; U0 = s + 0.5 - 0.3 * sgn; } }
   const len = 0.6 * sgn, a0 = dialAngle(U0), a1 = dialAngle(U0 + len);
-  const R = Math.max(6, DELTA * dg.S * 0.45), acc = theme.accentRgb.join(',');
+  const R = Math.max(6, dg.view === 'rings' ? dg.R * 0.09 : DELTA * dg.S * 0.45), acc = theme.accentRgb.join(',');
   ctx.save();
   ctx.lineCap = 'round';
   ctx.strokeStyle = `rgba(${acc},0.3)`; ctx.lineWidth = R * 1.5;
@@ -1355,12 +1465,30 @@ function drawDialHint(ctx, h, tms) {
   ctx.restore();
 }
 // What lies under a point on the dial: the tile and its ring round the dial's face,
-// or (for the far part of a neighbor) the neighbor to move to.
+// or (for the far part of a neighbor, unfolded) the neighbor to move to.
 function dialHit(x, y) {
-  const dx = x - dg.cx, dy = y - dg.cy;
+  const dx = x - dg.cx, dy = y - dg.cy, F = sel.f;
   if (Math.hypot(dx, dy) > dg.R + 3) return null;
+  if (dg.view === 'rings') {
+    const rr = Math.hypot(dx, dy) / dg.R;
+    if (rr < RING_RAD[0]) return { t: F * NL, lvl: 1, nav: -1 };
+    let L = 1;
+    while (L < NRF && rr >= RING_RAD[L]) L++;
+    // Tiles meet along slanted lines; follow each one in from its outer end to this radius.
+    const q = clamp((rr - RING_RAD[L - 1]) / (RING_RAD[L] - RING_RAD[L - 1]), 0, 1);
+    const U = ((((dg.theta - Math.atan2(dy, dx)) * 5) / TAU) % 5 + 5) % 5;
+    for (const c of ringGeom(F).cells) {
+      if (c.L !== L || c.center) continue;
+      const lo = c.inU[0] + (c.outU[0] - c.inU[0]) * q, hi = c.inU[1] + (c.outU[1] - c.inU[1]) * q, m = (lo + hi) / 2;
+      let V = U;
+      while (V - m > 2.5) V -= 5;
+      while (m - V > 2.5) V += 5;
+      if (V >= lo - 1e-9 && V <= hi + 1e-9) return { t: c.t, lvl: L, nav: -1 };
+    }
+    return { t: -1, lvl: L, nav: -1 };
+  }
   const ct = Math.cos(dg.theta), st = Math.sin(dg.theta);
-  const fx = (dx * ct + dy * st) / dg.S, fy = (dx * st - dy * ct) / dg.S, F = sel.f;
+  const fx = (dx * ct + dy * st) / dg.S, fy = (dx * st - dy * ct) / dg.S;
   let i = localAt(fx, fy);
   if (i >= 0) return { t: F * NL + i, lvl: LOCAL[i].lvl, nav: -1 };
   for (const P of PETAL[F]) {
@@ -1530,6 +1658,15 @@ function setCap(on) {
   $('segRing').setAttribute('aria-checked', String(!sel.cap));
   $('segCap').setAttribute('aria-checked', String(sel.cap));
   updateDialLabels();
+  dirty = true;
+}
+function setDialView(v, keep) {
+  dg.view = v === 'net' ? 'net' : 'rings';
+  if (keep !== false) { save.dialView = dg.view; persist(); }
+  const net = dg.view === 'net', b = $('btnDialView'), label = net ? 'Show the rings as circles' : 'Show the face with its neighbors unfolded';
+  b.querySelector('.ico-net').hidden = net;
+  b.querySelector('.ico-rings').hidden = !net;
+  b.setAttribute('aria-label', label); b.title = label;
   dirty = true;
 }
 function updateDialLabels() {
@@ -2115,7 +2252,7 @@ const TUTORIAL = [
   },
   {
     title: 'Rings round every face',
-    text: 'Each face wears <b>4 rings</b>: its center and its rim, then two rows that run round it across its five neighbors. The dial shows the top face with its neighbors opened flat around it.',
+    text: 'Each face wears <b>4 rings</b>: its center and its rim, then two rows that run round it across its five neighbors. The dial shows all four round the top face, ring 1 in the middle.',
     info: true,
     enter() { setFace(TUT_F); setRing(TUT_L); hl.rings.add(TUT_RING); },
   },
@@ -2292,6 +2429,7 @@ click('btnRingIn', () => { Sound.click(); setRing(sel.d - 1); });
 click('btnRingOut', () => { Sound.click(); setRing(sel.d + 1); });
 click('btnTurnCCW', () => turnSelected(1));
 click('btnTurnCW', () => turnSelected(-1));
+click('btnDialView', () => { Sound.click(); setDialView(dg.view === 'net' ? 'rings' : 'net'); });
 click('segRing', () => { Sound.click(); setCap(false); });
 click('segCap', () => { Sound.click(); setCap(true); });
 click('btnScramble', () => { Sound.click(); freeScramble(); });
@@ -2328,6 +2466,7 @@ document.addEventListener('keydown', (e) => {
     case 'ArrowLeft': e.preventDefault(); turnSelected(1, e.shiftKey); break;
     case 'ArrowRight': e.preventDefault(); turnSelected(-1, e.shiftKey); break;
     case 'c': case 'C': setCap(!sel.cap); break;
+    case 'v': case 'V': setDialView(dg.view === 'net' ? 'rings' : 'net'); break;
     default: break;
   }
 });
@@ -2372,6 +2511,7 @@ setMuted(Sound.muted);
 viewHintEl.hidden = !!save.orbited;
 if (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) $('zoomHint').textContent = ' · pinch to zoom';
 updateDialLabels();
+setDialView(dg.view, false);
 showTitle();
 requestAnimationFrame(frame);
 
@@ -2379,11 +2519,11 @@ requestAnimationFrame(frame);
 window.DodecaRings = {
   NL, NT, NF, NRF, G, sel, VERTS, FACES, FACE_N, NB, NBE, LOCAL, FLVL, ROTP, RING_TILES, CUT, view, dg, Tut, TUTORIAL,
   applyMove, isSolved, solvedState, ringId, reduceMoves, nextHintMove, makeScramble,
-  pickAt, dialHit, dialGeom, setFace, setRing, setCap, turnSelected, startFree, startTimed, showTitle, TCEN,
+  pickAt, dialHit, dialGeom, ringGeom, setFace, setRing, setCap, setDialView, turnSelected, startFree, startTimed, showTitle, TCEN,
   tileCenter: (t) => screenOf(TCEN[t]),
   faceCenter: (f) => screenOf(FACE_C[f]),
   faceVisible: (f) => !!faceVis[f],
-  dialPoint: (L, U) => { const a = dialAngle(U), r = RING_R[L] * dg.S; return { x: dg.cx + r * Math.cos(a), y: dg.cy + r * Math.sin(a) }; },
+  dialPoint: (L, U) => { const a = dialAngle(U), r = dialRingRadius(L); return { x: dg.cx + r * Math.cos(a), y: dg.cy + r * Math.sin(a) }; },
   drag, busy: () => !!anim || queue.length > 0 || drag.active,
   preview: (m) => { drag.live = m || null; dirty = true; },
   play: (moves, dur) => new Promise((res) => runSequence(moves.map((m) => ({ ...m, dur: dur || 60 })), res, 'auto')),

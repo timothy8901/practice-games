@@ -131,12 +131,17 @@ its center and the ten tiles round it, ring 2 its rim, and rings 3 and 4 the
 first and second rows of tiles across its five neighbors. Every cut is the
 trace of a plane parallel to a neighboring face, so a turn is a true fifth of
 a rotation about the face's axis, and the 3D view animates it that way, with
-the turning layer standing proud of the rest mid-turn. The **ring dial** shows
-the chosen face with its five neighbors opened flat around it; the open net
-keeps the face's five-fold symmetry, so a ring turns on the dial as a plain
-rotation too. **Cap** turns a ring along with everything inside it: Cap on
-ring 3 is a real Gigaminx face turn. Same modes and keys as Hexadeca Rings
-(`[` `]` pick the face). Pure vanilla JS + Canvas 2D in one file.
+the turning layer standing proud of the rest mid-turn. The **ring dial** draws
+the chosen face's four rings as circles, ring 1 in the middle and ring 4 round
+the outside: each band's edges become circles and each of their five sides a
+fifth of a circle, so every tile keeps its place and slant along its ring, and
+the edges between the face's neighbors fall on five spokes across rings 3 and
+4. A button beside the face picker (or `V`) swaps it for the face with its
+five neighbors unfolded flat around it; that net keeps the face's five-fold
+symmetry, so a ring turns there as a plain rotation too. **Cap** turns a ring
+along with everything inside it: Cap on ring 3 is a real Gigaminx face turn.
+Same modes and keys as Hexadeca Rings (`[` `]` pick the face). Pure vanilla
+JS + Canvas 2D in one file.
 
 ## Grocery Tycoon
 
