@@ -121,6 +121,23 @@ fragment shader picks the tile under every pixel from a color texture, so the
 ball costs 300 vertices however many tiles it carries; turning tiles are drawn
 as their own triangles. If WebGL is off, the dial still turns every ring.
 
+## Dodeca Rings
+
+A twelve-faced puzzle box — `dodeca-rings.html`. The solid is the regular
+dodecahedron, and every pentagon face carries the Gigaminx pattern: two cuts
+beside each edge, so each edge has five tiles along it (corner, wing, middle,
+wing, corner) and each face 31, 372 in all. Each face wears 4 rings: ring 1 is
+its center and the ten tiles round it, ring 2 its rim, and rings 3 and 4 the
+first and second rows of tiles across its five neighbors. Every cut is the
+trace of a plane parallel to a neighboring face, so a turn is a true fifth of
+a rotation about the face's axis, and the 3D view animates it that way, with
+the turning layer standing proud of the rest mid-turn. The **ring dial** shows
+the chosen face with its five neighbors opened flat around it; the open net
+keeps the face's five-fold symmetry, so a ring turns on the dial as a plain
+rotation too. **Cap** turns a ring along with everything inside it: Cap on
+ring 3 is a real Gigaminx face turn. Same modes and keys as Hexadeca Rings
+(`[` `]` pick the face). Pure vanilla JS + Canvas 2D in one file.
+
 ## Grocery Tycoon
 
 - **Grocery Tycoon** (`grocery-tycoon.html`) — a single-file produce-store tycoon
