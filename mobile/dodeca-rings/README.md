@@ -10,6 +10,7 @@ view and a 2D ring dial. This folder packages it as a phone app three ways:
 | `android/` | An Android Studio project (Capacitor 8), app id `io.github.timothy8901.dodecarings` |
 | `ios/` | An Xcode project (Capacitor 8, Swift Package Manager) |
 | `assets/` | Sources for the app icon and launch screens |
+| `DodecaRings.apk` | The built Android app, in the downloadable zip only (see below) |
 
 The whole game is the one file `www/index.html`; the native apps show it in a
 full-screen web view, so all three versions play the same.
