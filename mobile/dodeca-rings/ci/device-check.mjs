@@ -100,27 +100,43 @@ const hist = await js('DodecaRings.G.history.map((m) => [m.f, m.lo, m.hi, m.k, m
 check(hist.length === 1 && hist[0][1] === 3 && hist[0][3] === 1 && hist[0][4] === 'dial',
   `a finger swipe along ring 3 on the dial turns it: ${JSON.stringify(hist)}`);
 
-// A 12-turn scramble played out with the turn animation (counting frames as it goes), then undone.
-await js('DodecaRings.startFree()');
-await sleep(800);
-const run = await js(`new Promise((done) => {
-  const R = window.DodecaRings, seq = R.makeScramble(12, R.G.state), t0 = performance.now();
-  let frames = 0, playing = true;
-  window.__scramble = seq;
-  (function tick() { frames++; if (playing) requestAnimationFrame(tick); })();
-  R.play(seq, 150).then(() => { playing = false; done({ turns: seq.length, frames, ms: Math.round(performance.now() - t0), solved: R.isSolved(R.G.state) }); });
-})`);
-console.log(JSON.stringify(run));
-check(run.turns === 12 && !run.solved, 'a 12-turn scramble plays out and mixes the puzzle');
-console.log(`animation: ${(run.frames / (run.ms / 1000)).toFixed(1)} frames a second on the emulator (software rendering)`);
+// Tap Scramble, then Solve, with a finger, as a player would (counting frames while the scramble plays).
+const tap = async (id) => {
+  const p = await js(`(() => { const r = document.getElementById('${id}').getBoundingClientRect();
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+  await touch('touchStart', p);
+  await sleep(80);
+  await touch('touchEnd');
+};
+const turning = async () => {
+  for (let i = 0; i < 30; i++) { if (await js('DodecaRings.busy()')) return true; await sleep(100); }
+  return false;
+};
+const stopped = async () => {
+  for (let i = 0; i < 240 && (await js('DodecaRings.busy()')); i++) await sleep(250);
+};
+const hud = () => js(`({ text: document.getElementById('hudSub').textContent,
+  solved: DodecaRings.isSolved(DodecaRings.G.state), solveButton: !document.getElementById('btnSolve').disabled })`);
+await stopped();
+await js(`(() => { const c = window.__frames = { n: 0, t0: performance.now(), on: true };
+  (function tick() { c.n++; if (c.on) requestAnimationFrame(tick); })(); })()`);
+await tap('btnScramble');
+check(await turning(), 'tapping Scramble starts a scramble');
+await stopped();
+const fps = await js(`(() => { const c = window.__frames; c.on = false; return c.n / ((performance.now() - c.t0) / 1000); })()`);
+console.log(`animation: ${fps.toFixed(1)} frames a second on the emulator (software rendering)`);
+const mixed = await hud();
+console.log(JSON.stringify(mixed));
+check(!mixed.solved && mixed.text === '0 moves' && mixed.solveButton,
+  'the scramble mixes the puzzle, and the header and the Solve button show it');
 await sleep(1200);
 screenshot('android-scrambled.png');
-const solved = await js(`(async () => {
-  const R = window.DodecaRings, back = window.__scramble.slice().reverse().map((m) => ({ ...m, k: -m.k }));
-  await R.play(back, 80);
-  return R.isSolved(R.G.state);
-})()`);
-check(solved, 'playing the scramble backwards solves it again');
+await tap('btnSolve');
+check(await turning(), 'tapping Solve starts solving');
+await stopped();
+const after = await hud();
+console.log(JSON.stringify(after));
+check(after.solved && after.text === '0 moves · solved' && !after.solveButton, 'Solve turns the puzzle back to solved');
 
 check(errors.length === 0, `no script errors${errors.length ? ': ' + errors.join(' | ') : ''}`);
 ws.close();
