@@ -14,6 +14,21 @@ view and a 2D ring dial. This folder packages it as a phone app three ways:
 The whole game is the one file `www/index.html`; the native apps show it in a
 full-screen web view, so all three versions play the same.
 
+## Get the Android app (APK)
+
+GitHub Actions builds the APK whenever this folder changes
+(`.github/workflows/dodeca-rings-apk.yml`). It installs each build on an
+Android 14 emulator, plays it through `ci/device-check.mjs`, and only then
+publishes it with screenshots as the release
+[`dodeca-rings-v1.0`](https://github.com/timothy8901/practice-games/releases/tag/dodeca-rings-v1.0).
+
+To install it, open
+[`DodecaRings.apk`](https://github.com/timothy8901/practice-games/releases/download/dodeca-rings-v1.0/DodecaRings.apk)
+on the phone, or copy it over. When Android asks, let your browser or
+Files app install apps, then tap **Install**. It's a debug-signed build for
+installing straight onto a phone. It isn't on the Play Store, so Play Protect
+may ask you to confirm.
+
 ## Quickest: install the web app (no build)
 
 1. Put the contents of `www/` on any HTTPS web host (GitHub Pages works).
@@ -70,6 +85,10 @@ The icons and launch screens are drawn from `assets/` (`icon-only.png`,
 After changing them, run `npm run assets` to regenerate every size for both platforms.
 
 ## Before publishing to a store
+
+- Sign with your own release key. Debug builds use `android/app/debug.keystore`,
+  which is kept in the repo so every build can install over the last one; anyone
+  with the repo can sign with it, so it is only for installing straight onto a phone.
 
 - Change the app id `io.github.timothy8901.dodecarings` if you want a different one:
   it is set in `capacitor.config.json`, `android/app/build.gradle`
