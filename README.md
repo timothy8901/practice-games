@@ -90,6 +90,64 @@ mutes. It pulls Three.js from a CDN, and its knights, arena and sky are
 Thrixel models loaded from `knight-art/` beside the page - about 10 MB,
 fetched once; the menu holds the first fight until they arrive.
 
+## Hexadeca Rings
+
+A 16-faced twisty puzzle — `hexadeca-rings.html`. The solid is the
+gyroelongated square bipyramid (Johnson solid J17), the only convex solid
+whose 16 faces are all equilateral triangles. Every face is tiled 16 to an
+edge (256 tiles a face, 4,096 in all). Each of the 10 corners carries 16
+rings of tiles, 160 rings in total, and every tile rides three of them, one
+around each corner of its face. A turn slides a ring one face around its
+corner. Turn a ring by swiping it on the **ring dial** (the chosen corner's
+faces opened flat into a disc, one circle per ring) or by dragging a tile on
+the 3D puzzle; **Cap** turns every ring from the corner out to the one you
+touch. Modes: **Free Play** (scramble, solve, reset), **Timed Mode**
+(2/4/8/16-turn scrambles, best times saved in the browser) and a short
+**Tutorial**. Keys: `[` `]` corner, `↑` `↓` ring, `←` `→` turn, `C` cap,
+`Ctrl+Z` undo. Pure vanilla JS + Canvas 2D in one file, no dependencies.
+
+## Hecto Rings
+
+The 100-faced sibling of Hexadeca Rings — `hecto-rings.html`. The solid is a
+round ball of 100 near-equal triangles: the convex hull of 52 points spread as
+evenly as a sphere allows (the lowest-energy arrangement of 52 like charges,
+from the Thomson problem), with 5 faces meeting at 12 corners and 6 at the
+other 40. Every face is tiled 32 to an edge: 1,024 tiles a face, 102,400 in
+all, riding 1,664 rings (32 around each of the 52 corners). Same controls and
+modes as Hexadeca Rings: the 2D ring dial, dragging tiles on the 3D ball,
+Ring/Cap turns, Free Play, Timed Mode and a Tutorial, plus scroll or pinch to
+zoom in on the tiles. The 3D view is WebGL: each face is one triangle whose
+fragment shader picks the tile under every pixel from a color texture, so the
+ball costs 300 vertices however many tiles it carries; turning tiles are drawn
+as their own triangles. If WebGL is off, the dial still turns every ring.
+
+## Dodeca Rings
+
+A twelve-faced puzzle box — `dodeca-rings.html`. The solid is the regular
+dodecahedron, and every pentagon face carries the Gigaminx pattern: two cuts
+beside each edge, so each edge has five tiles along it (corner, wing, middle,
+wing, corner) and each face 31, 372 in all. Each face wears 4 rings: ring 1 is
+its center and the ten tiles round it, ring 2 its rim, and rings 3 and 4 the
+first and second rows of tiles across its five neighbors. Every cut is the
+trace of a plane parallel to a neighboring face, so a turn is a true fifth of
+a rotation about the face's axis, and the 3D view animates it that way, with
+the turning layer standing proud of the rest mid-turn. The **ring dial** draws
+the chosen face's four rings as circles, ring 1 in the middle and ring 4 round
+the outside: each band's edges become circles and each of their five sides a
+fifth of a circle, so every tile keeps its place and slant along its ring, and
+the edges between the face's neighbors fall on five spokes across rings 3 and
+4. A button beside the face picker (or `V`) swaps it for the face with its
+five neighbors unfolded flat around it; that net keeps the face's five-fold
+symmetry, so a ring turns there as a plain rotation too. **Cap** turns a ring
+along with everything inside it: Cap on ring 3 is a real Gigaminx face turn.
+Same modes and keys as Hexadeca Rings (`[` `]` pick the face). Pure vanilla
+JS + Canvas 2D in one file.
+
+**Phone app:** [`mobile/dodeca-rings/`](mobile/dodeca-rings/README.md) packages
+it as an installable, offline web app (`www/`) and as Android Studio and Xcode
+projects built with Capacitor 8 (`android/`, `ios/`), with its own icon and
+launch screens. Its README covers installing and building each one.
+
 ## Grocery Tycoon
 
 - **Grocery Tycoon** (`grocery-tycoon.html`) — a single-file produce-store tycoon

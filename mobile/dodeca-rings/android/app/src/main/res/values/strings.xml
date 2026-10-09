@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Dodeca Rings</string>
+    <string name="title_activity_main">Dodeca Rings</string>
+    <string name="package_name">io.github.timothy8901.dodecarings</string>
+    <string name="custom_url_scheme">io.github.timothy8901.dodecarings</string>
+</resources>

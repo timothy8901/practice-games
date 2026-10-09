@@ -1,0 +1,115 @@
+name: Dodeca Rings APK
+
+# Builds the Android app in mobile/dodeca-rings (Capacitor 8) on GitHub's runners, which
+# come with the Android SDK; installs it on an Android 14 emulator and plays it for a
+# moment (mobile/dodeca-rings/ci/device-check.mjs); and only then publishes the APK, with
+# screenshots of it running, as the GitHub release dodeca-rings-v<versionName>.
+# Runs whenever the app's files change, and on demand from the Actions tab.
+
+on:
+  push:
+    paths:
+      - 'mobile/dodeca-rings/**'
+      - '.github/workflows/dodeca-rings-apk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One build per branch at a time; a newer push replaces a build still running.
+concurrency:
+  group: dodeca-rings-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile/dodeca-rings
+    outputs:
+      version: ${{ steps.version.outputs.name }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Install Capacitor
+        run: npm ci
+      - name: Copy the game into the Android project
+        run: npx cap sync android
+      - name: Build the APK
+        working-directory: mobile/dodeca-rings/android
+        run: ./gradlew --no-daemon assembleDebug
+      - name: Read the version
+        id: version
+        run: echo "name=$(sed -n 's/^ *versionName "\(.*\)"/\1/p' android/app/build.gradle)" >> "$GITHUB_OUTPUT"
+      - run: cp android/app/build/outputs/apk/debug/app-debug.apk DodecaRings.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: apk
+          path: mobile/dodeca-rings/DodecaRings.apk
+
+  device-test:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: apk
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Let the emulator use KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Install, launch and play the APK on an emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: node mobile/dodeca-rings/ci/device-check.mjs DodecaRings.apk
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screenshots
+          path: android-*.png
+          if-no-files-found: ignore
+
+  release:
+    needs: [build, device-test]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+      - name: Publish the APK as a GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: dodeca-rings-v${{ needs.build.outputs.version }}
+          VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          cat > notes.md <<EOF
+          Dodeca Rings ${VERSION}: the twelve-faced puzzle box as an Android app, for Android 7.0 or newer.
+
+          **Install:** open \`DodecaRings.apk\` on your phone (download it there, or copy it over), let your browser or Files app install apps when Android asks, then tap Install.
+
+          This is a debug-signed build for installing straight onto a phone; it isn't on the Play Store, so Play Protect may ask you to confirm. The screenshots were taken on an Android 14 emulator by the same build, after it played the game.
+
+          Built from ${GITHUB_SHA::7} on \`${GITHUB_REF_NAME}\`.
+          EOF
+          gh release delete "$TAG" -R "$GITHUB_REPOSITORY" --yes --cleanup-tag || true
+          gh release create "$TAG" -R "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "Dodeca Rings ${VERSION} for Android" --notes-file notes.md \
+            apk/DodecaRings.apk screenshots/android-*.png
