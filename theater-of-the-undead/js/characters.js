@@ -136,3 +136,136 @@ export function poseDog(d, dt, speed) {
   // menacing eye flicker — telegraphs the fast threat
   if (d.eyeMat) { const f = 0.6 + Math.abs(Math.sin(d.phase * 1.7)) * 0.5; d.eyeMat.color.setRGB(f, f * 0.28, f * 0.12); }
 }
+
+// ---- Pokémon survivor: a pixel-sprite billboard that carries the gun ----
+// The plane always faces the camera (yaw only, so the feet stay on the floor). It swaps
+// between the front and back sprite by which way the Pokémon is aiming relative to the
+// camera and mirrors left/right, so one pair of PokeAPI sprites reads as four directions.
+// Sprites stream in asynchronously; a type-coloured token stands in until they arrive.
+const TEXCACHE = new Map();   // url -> { tex, aspect, failed, waiters }
+
+function pixelTex(canvas) {
+  const t = new THREE.CanvasTexture(canvas);
+  // crisp when magnified; mipmapped when minified so a far-away sprite averages down to a clean
+  // silhouette instead of a noisy smudge (the low-res render target re-pixelates it anyway)
+  t.magFilter = THREE.NearestFilter; t.minFilter = THREE.LinearMipmapLinearFilter; t.generateMipmaps = true;
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+// crop the transparent border so every sprite stands on its feet at a consistent size
+function trimmed(img) {
+  const W = img.naturalWidth, H = img.naturalHeight;
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const x = c.getContext('2d'); x.drawImage(img, 0, 0);
+  const d = x.getImageData(0, 0, W, H).data;   // throws on a tainted (non-CORS) image -> caller falls back
+  let x0 = W, y0 = H, x1 = -1, y1 = -1;
+  for (let y = 0; y < H; y++) for (let i = 0; i < W; i++) {
+    if (d[(y * W + i) * 4 + 3] > 16) { if (i < x0) x0 = i; if (i > x1) x1 = i; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  }
+  if (x1 < 0) return { canvas: c, aspect: W / H };
+  const w = x1 - x0 + 1, h = y1 - y0 + 1;
+  const t = document.createElement('canvas'); t.width = w; t.height = h;
+  t.getContext('2d').drawImage(c, x0, y0, w, h, 0, 0, w, h);
+  return { canvas: t, aspect: w / h };
+}
+
+export function loadSpriteTex(url, cb) {
+  let e = TEXCACHE.get(url);
+  if (e) { if (e.tex) cb(e); else if (!e.failed) e.waiters.push(cb); return; }
+  e = { tex: null, aspect: 1, failed: false, waiters: [cb] };
+  TEXCACHE.set(url, e);
+  const img = new Image();
+  img.crossOrigin = 'anonymous';
+  img.onload = () => {
+    try { const t = trimmed(img); e.tex = pixelTex(t.canvas); e.aspect = t.aspect; } catch (err) { e.failed = true; }
+    const w = e.waiters; e.waiters = [];
+    if (e.tex) for (const f of w) f(e);
+  };
+  img.onerror = () => { e.failed = true; e.waiters = []; };
+  img.src = url;
+}
+
+function tokenCanvas(def) {
+  const size = 48, c = document.createElement('canvas'); c.width = c.height = size;
+  const x = c.getContext('2d');
+  x.fillStyle = '#' + (def.color || 0x888888).toString(16).padStart(6, '0');
+  x.beginPath(); x.arc(size / 2, size * 0.54, size * 0.36, 0, Math.PI * 2); x.fill();
+  x.lineWidth = 3; x.strokeStyle = '#fff'; x.stroke();
+  x.fillStyle = '#fff'; x.font = 'bold 20px Arial'; x.textAlign = 'center'; x.textBaseline = 'middle';
+  x.fillText((def.name || '?')[0], size / 2, size * 0.56);
+  return c;
+}
+
+function applyFace(s) {
+  const e = s.faces[s.cur] || s.faces.front || s.faces.back;
+  if (e) { s.parts.body.material.map = e.tex; s.aspect = e.aspect; }
+  s.parts.body.material.needsUpdate = true;
+  s.parts.body.scale.set(s.H * s.aspect * s.mirror, s.H, 1);
+  if (s.parts.shadow) s.parts.shadow.scale.set(Math.max(0.3, s.H * s.aspect * 0.42), Math.max(0.2, s.H * s.aspect * 0.26), 1);
+}
+
+// standing sprites tip their top this far AWAY from the overhead camera (negative X), which turns
+// the plane's face up toward it — like a card on a stand — so it isn't foreshortened flat
+export const POKE_LEAN = -0.45;
+
+export function buildPokemon(def) {
+  const g = new THREE.Group();
+  const lunge = new THREE.Group(); g.add(lunge);          // slides forward on a knife swing
+  const pivot = new THREE.Group(); lunge.add(pivot);      // billboard yaw + run bob
+  const geo = new THREE.PlaneGeometry(1, 1); geo.translate(0, 0.5, 0);   // feet at the origin
+  const fallback = pixelTex(tokenCanvas(def));
+  const bodyMat = new THREE.MeshLambertMaterial({ map: fallback, alphaTest: 0.5, side: THREE.DoubleSide, emissive: 0x141414 });
+  const body = new THREE.Mesh(geo, bodyMat); body.rotation.x = POKE_LEAN; pivot.add(body);
+  const H = def.height || 1.6;
+  // soft ground shadow anchors the billboard to the floor
+  const shadow = new THREE.Mesh(new THREE.CircleGeometry(1, 14), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.38, depthWrite: false }));
+  shadow.rotation.x = -Math.PI / 2; shadow.position.y = 0.02; shadow.scale.set(H * 0.3, H * 0.2, 1); shadow.renderOrder = 1; lunge.add(shadow);
+  const s = { group: g, parts: { body, pivot, lunge, shadow, gun: null, muzzle: null }, phase: 0, kind: 'pokemon', def,
+    H, faces: { front: null, back: null }, cur: 'front', _face: 'front', mirror: 1, fallback, aspect: 0.9 };
+  body.scale.set(H * s.aspect, H, 1);
+
+  // gun carried at the hip; barrel along +Z so it points down the aim once the group is yawed
+  const gun = new THREE.Group(); gun.position.set(Math.min(0.5, H * 0.28), H * 0.42, 0.15);
+  const gb = new THREE.Mesh(box('gunbody', 0.12, 0.16, 0.5), mat(0x222426)); gb.position.z = 0.12; gun.add(gb);
+  const gbar = new THREE.Mesh(box('gunbarrel', 0.07, 0.07, 0.4), mat(0x15171b)); gbar.position.z = 0.42; gun.add(gbar);
+  const muzzle = new THREE.Object3D(); muzzle.position.set(0, 0, 0.62); gun.add(muzzle);
+  lunge.add(gun); s.parts.gun = gun; s.parts.muzzle = muzzle; s.gunBase = gun.position.clone();
+
+  if (def.sprite) loadSpriteTex(def.sprite, (e) => { s.faces.front = e; applyFace(s); });
+  if (def.spriteBack) loadSpriteTex(def.spriteBack, (e) => { s.faces.back = e; applyFace(s); });
+  return s;
+}
+
+// camYaw/yaw: camera azimuth and the Pokémon's aim yaw (world); down: crawling pose
+export function posePokemon(s, dt, moving, aiming, recoil = 0, meleeSwing = 0, camYaw = 0, yaw = 0, down = false) {
+  s.phase += dt * (moving ? 11 : 2);
+  const p = s.parts;
+  // cancel the group's yaw, then face the camera's azimuth
+  p.pivot.rotation.y = camYaw - yaw;
+  // front sprite when facing the camera, back sprite when facing away — with hysteresis so it never flickers
+  const rel = yaw - camYaw, c = Math.cos(rel), sn = Math.sin(rel);
+  if (s.cur === 'front' && c < -0.15 && s.faces.back) s.cur = 'back';
+  else if (s.cur === 'back' && (c > 0.15 || !s.faces.back)) s.cur = 'front';
+  const m = s.mirror;
+  const want = s.cur === 'front' ? (sn > 0.2 ? -1 : sn < -0.2 ? 1 : m) : (sn < -0.2 ? -1 : sn > 0.2 ? 1 : m);
+  if (want !== s.mirror || s._face !== s.cur) { s.mirror = want; s._face = s.cur; applyFace(s); }
+  // run bob + a little lean; lunge on a knife swing; the gun kicks back on recoil
+  const bob = moving ? Math.abs(Math.sin(s.phase)) * 0.08 : Math.sin(s.phase) * 0.012;
+  p.pivot.position.y = down ? 0 : bob;
+  p.body.rotation.z = moving && !down ? Math.sin(s.phase) * 0.05 : 0;
+  // downed: all the way back so it lies face-up on the floor
+  p.body.rotation.x += ((down ? -1.35 : POKE_LEAN) - p.body.rotation.x) * Math.min(1, dt * 10);
+  p.lunge.position.z = meleeSwing * 0.35;
+  p.gun.position.z = s.gunBase.z - recoil * 0.14;
+  p.gun.visible = !down;
+  p.body.material.color.setHex(down ? 0x8a5a5a : 0xffffff);
+}
+
+// free a survivor model when the player swaps characters (shared box geometry and cached
+// sprite textures stay alive; per-model materials and the sprite plane go)
+export function disposeModel(m) {
+  if (!m) return;
+  m.group.traverse((o) => { if (o.isMesh && o.material) o.material.dispose(); });
+  if (m.kind === 'pokemon') { m.parts.body.geometry.dispose(); if (m.parts.shadow) m.parts.shadow.geometry.dispose(); if (m.fallback) m.fallback.dispose(); }
+}

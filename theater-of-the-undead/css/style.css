@@ -217,3 +217,66 @@ kbd {
 }
 #site-footer .links a:hover { color: #fff; border-color: var(--gold); }
 #site-footer .copy { font-size: 11px; letter-spacing: 0.06em; color: rgba(232, 220, 192, 0.32); text-align: center; max-width: 640px; }
+
+/* ---------- roster: survivors or any Pokémon ---------- */
+.hidden { display: none !important; }
+.tag2 { font-size: 12px; letter-spacing: 0.22em; color: var(--ink); opacity: 0.75; margin-top: -8px; }
+.cs-tabs { display: flex; gap: 10px; }
+.cs-tab, .pk-filter {
+  min-width: 0; padding: 7px 16px; font-size: 13px; letter-spacing: 0.16em;
+  border-color: #2a241c; background: rgba(20,16,12,0.7); color: var(--ink);
+}
+.cs-tab.sel, .pk-filter.sel { border-color: var(--gold); color: var(--gold); background: rgba(40,32,22,0.9); }
+.cs-tab:hover, .pk-filter:hover { background: var(--gold); color: #1a140e; }
+
+#poke-sel { display: flex; flex-direction: column; align-items: center; gap: 12px; width: min(960px, 94vw); }
+.pk-top { display: flex; gap: 18px; align-items: stretch; justify-content: center; flex-wrap: wrap; width: 100%; }
+.pk-preview {
+  display: flex; gap: 14px; align-items: center; padding: 12px 18px; text-align: left;
+  border: 2px solid var(--gold); background: rgba(20,16,12,0.82); min-width: 380px;
+  box-shadow: 0 0 24px rgba(200,162,74,0.12), inset 0 0 30px rgba(0,0,0,0.5);
+}
+.pk-preview img {
+  width: 128px; height: 128px; image-rendering: pixelated; flex: none;
+  background: radial-gradient(circle at 50% 60%, rgba(200,162,74,0.22), transparent 68%);
+}
+.pk-name { font-size: 19px; letter-spacing: 0.12em; color: var(--ink); text-shadow: 0 2px 0 #000; white-space: nowrap; }
+.pk-types { display: flex; gap: 6px; margin: 6px 0 9px; }
+.pk-type { font-size: 10px; letter-spacing: 0.14em; padding: 2px 7px; color: #fff; text-shadow: 0 1px 0 #000; border: 1px solid rgba(0,0,0,0.5); }
+.pk-stats { display: grid; grid-template-columns: 52px 1fr 30px; gap: 4px 8px; font-size: 11px; letter-spacing: 0.08em; align-items: center; min-width: 230px; }
+.pk-stats b { text-align: right; color: var(--gold); font-weight: normal; }
+.pk-bar { height: 7px; background: #120e0a; border: 1px solid #2a241c; }
+.pk-bar i { display: block; height: 100%; background: linear-gradient(90deg, #8a6a2a, var(--gold)); transition: width 0.15s; }
+.pk-move { margin-top: 9px; font-size: 11px; letter-spacing: 0.12em; color: var(--gold); opacity: 0.9; }
+.pk-controls { display: flex; flex-direction: column; gap: 10px; justify-content: center; }
+#pk-search {
+  font-family: inherit; font-size: 15px; letter-spacing: 0.06em; color: var(--ink);
+  background: #120e0a; border: 2px solid #2a241c; padding: 10px 14px; width: 300px; outline: none;
+}
+#pk-search:focus { border-color: var(--gold); box-shadow: 0 0 12px rgba(200,162,74,0.25); }
+#pk-search::placeholder { color: rgba(232,220,192,0.4); }
+.pk-filters { display: flex; gap: 8px; }
+#pk-grid {
+  position: relative; display: grid; grid-template-columns: repeat(auto-fill, 64px); gap: 6px; justify-content: center;
+  width: 100%; max-height: min(300px, 34vh); overflow-y: auto; padding: 6px;
+  border: 1px solid #2a241c; background: rgba(10,8,6,0.6); scrollbar-color: var(--gold) #1a140e;
+}
+#pk-grid.empty::after { content: 'NO POKÉMON MATCH'; grid-column: 1 / -1; padding: 24px; font-size: 13px; letter-spacing: 0.16em; opacity: 0.5; }
+.pk-tile { width: 64px; height: 64px; min-width: 0; padding: 0; position: relative; border: 2px solid #2a241c; background: rgba(20,16,12,0.7); color: var(--ink); content-visibility: auto; contain-intrinsic-size: 64px 64px; }
+.pk-tile img { width: 56px; height: 56px; image-rendering: pixelated; display: block; margin: 1px auto 0; pointer-events: none; }
+.pk-tile:hover { background: rgba(60,48,30,0.9); color: var(--ink); border-color: rgba(200,162,74,0.6); }
+.pk-tile.sel { border-color: var(--gold); box-shadow: 0 0 10px rgba(200,162,74,0.55); background: rgba(50,40,24,0.95); }
+.pk-tile.hide { display: none; }
+.pk-tile .n { position: absolute; bottom: 1px; right: 3px; font-size: 9px; opacity: 0.55; letter-spacing: 0; pointer-events: none; }
+
+/* HUD chip: who you are playing as */
+#charchip {
+  position: absolute; left: 18px; bottom: 18px; display: flex; align-items: center; gap: 10px;
+  padding: 6px 14px 6px 6px; background: linear-gradient(90deg, rgba(10,8,6,0.5), transparent);
+  border-left: 2px solid rgba(200,162,74,0.5); border-radius: 0 5px 5px 0;
+}
+#charchip img { width: 44px; height: 44px; image-rendering: pixelated; }
+#chip-name { font-size: 13px; letter-spacing: 0.12em; color: var(--gold); text-shadow: 0 1px 0 #000; }
+#chip-sub { font-size: 10px; letter-spacing: 0.1em; opacity: 0.7; margin-top: 2px; }
+.go-as { font-size: 14px; letter-spacing: 0.14em; opacity: 0.8; margin-top: -8px; }
+.go-as b { color: var(--gold); }

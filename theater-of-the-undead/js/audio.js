@@ -95,6 +95,26 @@ class AudioFX {
   revive() { const n = [262, 392, 523, 659]; n.forEach((f, i) => this._osc('triangle', f, f, 0.2, 0.14, { delay: i * 0.1 })); }
   ui() { this._osc('square', 880, 1100, 0.05, 0.1); }
 
+  // ---- streamed one-shot clips (Pokémon cries): fetched + decoded once, then cached ----
+  playClip(url, vol = 0.5) {
+    if (!url || !this.ensure()) return;
+    this._clips ||= new Map();
+    const play = (buf) => {
+      if (!buf || !this.ctx) return;
+      const src = this.ctx.createBufferSource(); src.buffer = buf;
+      const g = this.ctx.createGain(); g.gain.value = vol;
+      src.connect(g); g.connect(this.sfxGain); src.start();
+    };
+    const c = this._clips.get(url);
+    if (c) { if (c.buf) play(c.buf); return; }           // still loading or failed: skip this one
+    const entry = { buf: null }; this._clips.set(url, entry);
+    fetch(url, { mode: 'cors' })
+      .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(r.status)))
+      .then((ab) => this.ctx.decodeAudioData(ab))
+      .then((buf) => { entry.buf = buf; play(buf); })
+      .catch(() => { /* cries are optional: no network or no OGG support just means silence */ });
+  }
+
   // ---- ambient drone ----
   playMusic(kind) {
     if (!this.ctx) return;

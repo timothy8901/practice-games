@@ -103,6 +103,7 @@ class Input {
       I.aimVec.set(rx, ry);
       if (Math.abs(ax) + Math.abs(ay) + Math.abs(rx) + Math.abs(ry) > 0.05) this.usingGamepad = true;
       const b = gp.buttons, p = this.prevPad;
+      if (b.some((x) => x && x.pressed)) this.usingGamepad = true;
       const down = (i) => b[i] && b[i].pressed;
       const edge = (i) => b[i] && b[i].pressed && !p[i];
       if (down(7) || down(5)) { I.fireHeld = true; this.usingGamepad = true; }

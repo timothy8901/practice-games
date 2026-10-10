@@ -172,8 +172,14 @@ launch screens. Its README covers installing and building each one.
   low-poly style of classic **RuneScape** (Three.js, vendored — no build step).
   Round-based horde survival with the power switch, 4 perks, the moving Mystery
   Box, Pack-a-Punch, wall-buys, traps, hellhound rounds, power-ups, and 4
-  survivors. Keyboard + mouse **or** controller. A multi-file game, so it lives in
-  its own folder; the homepage links to `theater-of-the-undead/index.html`.
+  survivors — **or play as any of the 1,025 Pokémon**: a searchable roster
+  (ALL / ORIGINAL 151 / random), each one a camera-facing pixel sprite that
+  carries the gun, sized from its height, with HP, run speed, knife damage and
+  armor bent by its base stats and the knife renamed to a move of its type.
+  Sprites and cries stream from the PokeAPI archives (with offline fallbacks);
+  deep-link a pick with `?mon=25`. Keyboard + mouse **or** controller. A
+  multi-file game, so it lives in its own folder; the homepage links to
+  `theater-of-the-undead/index.html`.
 
 ## NEONFABLE — Void Survivor
 
