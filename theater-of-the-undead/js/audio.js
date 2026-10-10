@@ -95,6 +95,34 @@ class AudioFX {
   revive() { const n = [262, 392, 523, 659]; n.forEach((f, i) => this._osc('triangle', f, f, 0.2, 0.14, { delay: i * 0.1 })); }
   ui() { this._osc('square', 880, 1100, 0.05, 0.1); }
 
+  // ---- streamed one-shot clips (Pokémon cries): fetched + decoded once, small LRU cache ----
+  // opts.solo cuts the previous solo clip; opts.stillWanted() is asked before a late arrival plays
+  playClip(url, vol = 0.5, { solo = false, stillWanted = null } = {}) {
+    if (!url || !this.ensure()) return;
+    this._clips ||= new Map();
+    const play = (buf) => {
+      if (!buf || !this.ctx || (stillWanted && !stillWanted())) return;
+      if (solo && this._solo) { try { this._solo.stop(); } catch (e) { /* already ended */ } }
+      const src = this.ctx.createBufferSource(); src.buffer = buf;
+      const g = this.ctx.createGain(); g.gain.value = vol;
+      src.connect(g); g.connect(this.sfxGain); src.start();
+      if (solo) { this._solo = src; src.onended = () => { if (this._solo === src) this._solo = null; }; }
+    };
+    const c = this._clips.get(url);
+    if (c) {
+      this._clips.delete(url); this._clips.set(url, c);   // most recently used goes to the back
+      if (c.buf) play(c.buf); else c.waiters.push(play);  // still decoding: play when it lands
+      return;
+    }
+    const entry = { buf: null, waiters: [play] }; this._clips.set(url, entry);
+    if (this._clips.size > 24) this._clips.delete(this._clips.keys().next().value);
+    fetch(url, { mode: 'cors' })
+      .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(r.status)))
+      .then((ab) => this.ctx.decodeAudioData(ab))
+      .then((buf) => { entry.buf = buf; const w = entry.waiters; entry.waiters = []; for (const f of w) f(buf); })
+      .catch(() => { this._clips.delete(url); });   // optional: no network or no OGG support just means silence (and a retry next time)
+  }
+
   // ---- ambient drone ----
   playMusic(kind) {
     if (!this.ctx) return;

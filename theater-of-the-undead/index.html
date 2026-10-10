@@ -4,6 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>THEATER OF THE UNDEAD — a low-poly zombies survival</title>
+<meta name="description" content="A top-down Call of Duty Zombies tribute in a low-poly RuneScape look. Survive Kino der Toten as one of four survivors — or as any of 1,025 Pokémon." />
 <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
@@ -22,6 +23,11 @@
     </div>
 
     <div id="perks"></div>
+
+    <div id="charchip">
+      <img id="chip-img" alt="" />
+      <div><div id="chip-name"></div><div id="chip-sub"></div></div>
+    </div>
 
     <div id="ammobox">
       <div id="weapon-name">M1911</div>
@@ -44,15 +50,45 @@
       <div class="logo-bottom">UNDEAD</div>
     </div>
     <div class="tag">KINO&nbsp;DER&nbsp;TOTEN&nbsp;·&nbsp;SURVIVE&nbsp;THE&nbsp;HORDE</div>
+    <div class="tag2">AS A SURVIVOR — OR AS ANY OF 1,025 POKÉMON</div>
     <div class="press" id="press-start">CLICK&nbsp;OR&nbsp;PRESS&nbsp;ANY&nbsp;KEY</div>
-    <div class="foot">an original low-poly tribute — not affiliated with Activision / Treyarch or Jagex</div>
+    <div class="foot">an original low-poly tribute — not affiliated with Activision / Treyarch, Jagex or Nintendo</div>
   </div>
 
   <!-- ===================== CHARACTER SELECT ===================== -->
   <div id="charsel" class="panel hidden">
     <div class="cs-title">CHOOSE YOUR SURVIVOR</div>
+    <div class="cs-tabs">
+      <button class="cs-tab sel" data-roster="survivors">SURVIVORS</button>
+      <button class="cs-tab" data-roster="pokemon">POKÉMON</button>
+    </div>
+
     <div id="char-grid"></div>
-    <div class="cs-hint">◀ ▶ / A·D to choose · ENTER / A to begin · or click a survivor</div>
+
+    <div id="poke-sel" class="hidden">
+      <div class="pk-top">
+        <div class="pk-preview">
+          <img id="pk-img" alt="" />
+          <div class="pk-info">
+            <div class="pk-name" id="pk-name"></div>
+            <div class="pk-types" id="pk-types"></div>
+            <div class="pk-stats" id="pk-stats"></div>
+            <div class="pk-move" id="pk-move"></div>
+          </div>
+        </div>
+        <div class="pk-controls">
+          <input id="pk-search" type="search" placeholder="Search 1,025 Pokémon by name or number…" autocomplete="off" spellcheck="false" />
+          <div class="pk-filters">
+            <button class="pk-filter sel" data-f="all">ALL</button>
+            <button class="pk-filter" data-f="151">ORIGINAL 151</button>
+            <button class="pk-filter" data-f="rand">RANDOM</button>
+          </div>
+        </div>
+      </div>
+      <div id="pk-grid"></div>
+    </div>
+
+    <div class="cs-hint" id="cs-hint">◀ ▶ / A·D to choose · ENTER / A to begin · TAB / Y for Pokémon · or click a survivor</div>
   </div>
 
   <!-- ===================== PAUSE ===================== -->
@@ -65,6 +101,7 @@
   <!-- ===================== GAME OVER ===================== -->
   <div id="gameover" class="panel center hidden">
     <div class="go-title">YOU DIED</div>
+    <div class="go-as">as <b id="go-as"></b></div>
     <div class="go-stats">REACHED ROUND <b id="go-round">0</b><br>SCORE <b id="go-points">0</b></div>
     <button id="btn-restart">PLAY AGAIN</button>
   </div>
@@ -80,7 +117,7 @@
     <div class="cl-row"><span class="cl-keys"><kbd>LMB</kbd></span><span class="cl-act">Fire</span></div>
     <div class="cl-row"><span class="cl-keys"><kbd>R</kbd></span><span class="cl-act">Reload</span></div>
     <div class="cl-row"><span class="cl-keys"><kbd>F</kbd></span><span class="cl-act">Buy / Use</span></div>
-    <div class="cl-row"><span class="cl-keys"><kbd>V</kbd></span><span class="cl-act">Knife</span></div>
+    <div class="cl-row"><span class="cl-keys"><kbd>V</kbd></span><span class="cl-act">Knife / Move</span></div>
     <div class="cl-row"><span class="cl-keys"><kbd>G</kbd></span><span class="cl-act">Grenade</span></div>
     <div class="cl-row"><span class="cl-keys"><kbd>Q</kbd></span><span class="cl-act">Swap weapon</span></div>
     <div class="cl-row"><span class="cl-keys"><kbd>◀</kbd><kbd>▶</kbd></span><span class="cl-act">Rotate camera</span></div>
@@ -93,10 +130,20 @@
     <div class="cl-row"><span class="cl-keys"><kbd>RT</kbd></span><span class="cl-act">Fire</span></div>
     <div class="cl-row"><span class="cl-keys"><kbd>X</kbd></span><span class="cl-act">Reload</span></div>
     <div class="cl-row"><span class="cl-keys"><kbd>A</kbd></span><span class="cl-act">Buy / Use</span></div>
-    <div class="cl-row"><span class="cl-keys"><kbd>B</kbd></span><span class="cl-act">Knife</span></div>
+    <div class="cl-row"><span class="cl-keys"><kbd>B</kbd></span><span class="cl-act">Knife / Move</span></div>
     <div class="cl-row"><span class="cl-keys"><kbd>LT</kbd></span><span class="cl-act">Grenade</span></div>
-    <div class="cl-row"><span class="cl-keys"><kbd>Y</kbd></span><span class="cl-act">Swap</span></div>
+    <div class="cl-row"><span class="cl-keys"><kbd>Y</kbd></span><span class="cl-act">Monkey bomb</span></div>
+    <div class="cl-row"><span class="cl-keys"><kbd>L-Stick click</kbd></span><span class="cl-act">Swap weapon</span></div>
     <div class="cl-row"><span class="cl-keys"><kbd>D-Pad</kbd></span><span class="cl-act">Rotate camera</span></div>
+  </div>
+  <div class="cl-title" style="margin-top:6px">Roster</div>
+  <div class="cl-grid">
+    <div class="cl-row"><span class="cl-keys"><kbd>TAB</kbd> / <kbd>Y</kbd></span><span class="cl-act">Survivors ↔ Pokémon</span></div>
+    <div class="cl-row"><span class="cl-keys"><kbd>Type</kbd></span><span class="cl-act">Search by name or number</span></div>
+    <div class="cl-row"><span class="cl-keys"><kbd>◀</kbd><kbd>▶</kbd><kbd>▲</kbd><kbd>▼</kbd></span><span class="cl-act">Browse</span></div>
+    <div class="cl-row"><span class="cl-keys"><kbd>RANDOM</kbd> / <kbd>X</kbd></span><span class="cl-act">Random Pokémon</span></div>
+    <div class="cl-row"><span class="cl-keys"><kbd>ESC</kbd></span><span class="cl-act">Leave the search box</span></div>
+    <div class="cl-row"><span class="cl-keys"><kbd>ENTER</kbd> / <kbd>A</kbd></span><span class="cl-act">Begin</span></div>
   </div>
 </section>
 
@@ -106,8 +153,9 @@
   <img class="studio" src="assets/token-maxxers-banner.png" alt="Token Maxxer's Anonymous Game Studio" />
   <div class="links">
     <a href="https://github.com/timothy8901" target="_blank" rel="noopener">▸ More Token Maxxer's games</a>
+    <a href="https://github.com/PokeAPI/sprites" target="_blank" rel="noopener">▸ Sprites: PokeAPI archive</a>
   </div>
-  <div class="copy">THEATER OF THE UNDEAD · original code &amp; art · a fan tribute to Call of Duty Zombies &amp; RuneScape — not affiliated with Activision / Treyarch or Jagex</div>
+  <div class="copy">THEATER OF THE UNDEAD · original code &amp; art · a fan tribute to Call of Duty Zombies &amp; RuneScape — not affiliated with Activision / Treyarch or Jagex.<br>Pokémon, its names, sprites and cries are © Nintendo / Creatures / GAME FREAK, streamed from the PokeAPI archives; this is a non-commercial fan project.</div>
 </footer>
 
 <script type="importmap">

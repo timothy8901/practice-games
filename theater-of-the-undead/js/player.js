@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { G, clamp } from './core.js';
 import { MAP } from './mapdata.js';
 import { MAX_HP, JUG_HP, PERKS, WEAPONS } from './config.js';
-import { buildSurvivor, poseSurvivor } from './characters.js';
+import { buildSurvivor, poseSurvivor, buildPokemon, posePokemon, disposeModel, POKE_LEAN } from './characters.js';
 import { makeWeapon, fireKind } from './weapons.js';
 
 const _v = new THREE.Vector3();
@@ -11,19 +11,16 @@ const _dir = new THREE.Vector3();
 
 export class Player {
   constructor(scene, charDef) {
-    this.char = charDef;
-    this.model = buildSurvivor(charDef);
-    scene.add(this.model.group);
+    this.scene = scene;
+    this.model = null; this.char = null;
     this.pos = new THREE.Vector3(MAP.spawn[0], 0, MAP.spawn[1]);
     this.yaw = 0;
-    this.maxHp = MAX_HP; this.hp = MAX_HP;
     this.points = 500;
     this.perks = new Set();
     this.qrUses = 0;
     this.weapons = [makeWeapon('m1911')];
     this.slot = 0;
     this.grenades = 4; this.tacticals = 0;
-    this.speed = 5.2;
     this.fireCd = 0; this.reloadT = 0; this.reloadDur = 0; this.reloadFrom = null;
     this.regenT = 0;
     this.meleeCd = 0;
@@ -31,8 +28,28 @@ export class Player {
     this.hurtFlash = 0;
     this.meleeSwing = 0; this.recoil = 0;
     this.interactTarget = null;
-    this.model.group.position.copy(this.pos);
+    this.setCharacter(charDef);
+    this.maxHp = this.hp = this.baseHp;
   }
+
+  // swap in a survivor: rebuilds the model and takes the stat multipliers from the roster
+  // entry (the four humans are all 1x; a Pokémon's come from its base stats)
+  setCharacter(def) {
+    if (this.model) { this.scene.remove(this.model.group); disposeModel(this.model); }
+    this.char = def;
+    this.model = def.kind === 'pokemon' ? buildPokemon(def) : buildSurvivor(def);
+    this.scene.add(this.model.group);
+    const m = def.stats || {};
+    this.mult = { hp: m.hpMul || 1, spe: m.speMul || 1, atk: m.atkMul || 1, def: m.defMul || 1 };
+    this.baseHp = Math.round(MAX_HP * this.mult.hp);
+    this.jugHp = Math.round(JUG_HP * this.mult.hp);
+    this.speed = 5.2 * this.mult.spe;
+    this.model.group.position.copy(this.pos);
+    this.model.group.rotation.y = this.yaw;
+  }
+
+  isPokemon() { return !!(this.model && this.model.kind === 'pokemon'); }
+  playCry(vol = 0.45) { if (this.char && this.char.cry && G.audio) G.audio.playClip(this.char.cry, vol); }
 
   weapon() { return this.weapons[this.slot]; }
 
@@ -43,7 +60,7 @@ export class Player {
 
   addPerk(id) {
     this.perks.add(id);
-    if (id === 'juggernog') { this.maxHp = JUG_HP; this.hp = JUG_HP; }
+    if (id === 'juggernog') { this.maxHp = this.jugHp; this.hp = this.jugHp; }
     if (id === 'quickrevive') this.qrUses = 3;
     if (G.audio) G.audio.perk();
     G.hud && G.hud.flash(PERKS[id].name + '!');
@@ -79,6 +96,7 @@ export class Player {
   hurt(amount) {
     if (this.down || this.dead || G.invuln) return;
     if (G.godmode) return;
+    amount = Math.round(amount * this.mult.def);   // armor: tanky Pokémon shrug off part of a hit
     this.hp -= amount; this.regenT = 0; this.hurtFlash = 1;
     if (G.audio) G.audio.hurt();
     // shake scales with how big the hit was relative to max hp
@@ -88,6 +106,7 @@ export class Player {
 
   goDown() {
     this.hp = 0;
+    this.playCry(0.4);
     if (this.qrUses > 0) { this.down = true; this.bleed = 4.5; if (G.audio) G.audio.down(); G.hud && G.hud.flash('DOWNED — REVIVING'); }
     else { this.dead = true; if (G.audio) G.audio.down(); G.over(); }
   }
@@ -155,9 +174,11 @@ export class Player {
     if (G.audio) G.audio.knife();
     const aim = G.cam.aimDir;
     _v.set(this.pos.x, 1.0, this.pos.z);
-    // slash spark out in front so the swing reads even when it whiffs
-    if (G.fx) G.fx.spark(_dir.set(this.pos.x + aim.x * 1.4, 1.1, this.pos.z + aim.y * 1.4), 0xcfd6e0, 4);
-    G.weapons.hitscan(_v, { x: aim.x, z: aim.y }, 2.0, G.instakill ? 100000 : 200, { penetrate: 2, headMul: 1 });
+    // slash spark out in front so the swing reads even when it whiffs — in the Pokémon's type colour
+    const col = this.isPokemon() && this.char.color ? this.char.color : 0xcfd6e0;
+    if (G.fx) G.fx.spark(_dir.set(this.pos.x + aim.x * 1.4, 1.1, this.pos.z + aim.y * 1.4), col, this.isPokemon() ? 7 : 4);
+    const dmg = G.instakill ? 100000 : Math.round(200 * this.mult.atk);
+    G.weapons.hitscan(_v, { x: aim.x, z: aim.y }, 2.0, dmg, { penetrate: 2, headMul: 1 });
   }
 
   throwGrenade() {
@@ -174,6 +195,11 @@ export class Player {
     const aim = G.cam.aimDir;
     G.lure = { pos: new THREE.Vector3(this.pos.x + aim.x * 5, 0.4, this.pos.z + aim.y * 5), t: 6 };
     if (G.audio) G.audio.ui();
+  }
+
+  _pose(dt, moving, aiming, down) {
+    if (this.isPokemon()) posePokemon(this.model, dt, moving, aiming, this.recoil, this.meleeSwing, G.cam ? G.cam.yaw : 0, this.yaw, down);
+    else poseSurvivor(this.model, dt, moving, aiming, this.recoil, this.meleeSwing);
   }
 
   update(dt, input) {
@@ -194,9 +220,9 @@ export class Player {
       this.bleed -= dt;
       if (Math.floor(this.bleed * 2) % 2 === 0 && G.audio) { /* heartbeat handled by hud cadence */ }
       if (this.bleed <= 0) this.revive();
-      poseSurvivor(this.model, dt, false, false);
+      this._pose(dt, false, false, true);
       this.model.group.position.copy(this.pos);
-      this.model.group.position.y = -0.5; // crawling
+      this.model.group.position.y = this.isPokemon() ? 0 : -0.5; // humans sink to a crawl; the sprite lies flat instead
       return;
     }
     this.model.group.position.y = 0;
@@ -214,7 +240,7 @@ export class Player {
       this.pos.x = r.x; this.pos.z = r.z;
     }
     this.model.group.position.set(this.pos.x, 0, this.pos.z);
-    poseSurvivor(this.model, dt, moving, true, this.recoil, this.meleeSwing);
+    this._pose(dt, moving, true, false);
 
     // actions
     if (I.switchWeapon && this.weapons.length > 1) { this.slot = (this.slot + 1) % this.weapons.length; this.reloadT = 0; if (G.audio) G.audio.ui(); }
@@ -248,11 +274,13 @@ export class Player {
 
   reset() {
     this.pos.set(MAP.spawn[0], 0, MAP.spawn[1]);
-    this.hp = this.maxHp = MAX_HP; this.points = 500; this.perks.clear(); this.qrUses = 0;
+    this.hp = this.maxHp = this.baseHp; this.points = 500; this.perks.clear(); this.qrUses = 0;
     this.weapons = [makeWeapon('m1911')]; this.slot = 0;
     this.grenades = 4; this.tacticals = 0; this.down = false; this.dead = false;
     this.hurtFlash = 0; this.meleeSwing = 0; this.recoil = 0;
+    this.reloadT = 0; this.reloadDur = 0; this.reloadFrom = null; this.regenT = 0;
     this.model.group.position.copy(this.pos); this.model.group.position.y = 0;
     this.model.group.rotation.z = 0;
+    if (this.isPokemon()) { this.model.parts.body.rotation.x = POKE_LEAN; this.model.parts.gun.visible = true; }
   }
 }
