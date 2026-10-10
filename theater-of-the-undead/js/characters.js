@@ -178,11 +178,11 @@ export function loadSpriteTex(url, cb) {
   const img = new Image();
   img.crossOrigin = 'anonymous';
   img.onload = () => {
-    try { const t = trimmed(img); e.tex = pixelTex(t.canvas); e.aspect = t.aspect; } catch (err) { e.failed = true; }
+    try { const t = trimmed(img); e.tex = pixelTex(t.canvas); e.aspect = t.aspect; } catch (err) { TEXCACHE.delete(url); }   // tainted canvas: retry next time
     const w = e.waiters; e.waiters = [];
     if (e.tex) for (const f of w) f(e);
   };
-  img.onerror = () => { e.failed = true; e.waiters = []; };
+  img.onerror = () => { TEXCACHE.delete(url); e.waiters = []; };   // offline now doesn't mean offline next game
   img.src = url;
 }
 

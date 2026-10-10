@@ -34,7 +34,9 @@ class Input {
       if (!e.repeat) { this.keys.add(e.code); this.pressed.add(e.code); }
       this.usingGamepad = false;
       this._fireAny();
-      if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
+      // keep the page from scrolling on these, except a space typed into a text box (the roster search)
+      const inField = e.target && e.target.tagName === 'INPUT';
+      if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code) && !(inField && e.code === 'Space')) e.preventDefault();
     });
     addEventListener('keyup', (e) => this.keys.delete(e.code));
     addEventListener('blur', () => { this.keys.clear(); this.mmbDown = false; });
@@ -103,7 +105,7 @@ class Input {
       I.aimVec.set(rx, ry);
       if (Math.abs(ax) + Math.abs(ay) + Math.abs(rx) + Math.abs(ry) > 0.05) this.usingGamepad = true;
       const b = gp.buttons, p = this.prevPad;
-      if (b.some((x) => x && x.pressed)) this.usingGamepad = true;
+      if (b.some((x, i) => x && x.pressed && !p[i])) this.usingGamepad = true;   // a new press, not a held button
       const down = (i) => b[i] && b[i].pressed;
       const edge = (i) => b[i] && b[i].pressed && !p[i];
       if (down(7) || down(5)) { I.fireHeld = true; this.usingGamepad = true; }

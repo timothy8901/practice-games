@@ -32,13 +32,15 @@ Add `?debug` to the URL for an FPS counter. `?roster=pokemon` opens the Pokémon
 | Knife (a Pokémon's type move) | V | B |
 | Grenade | G / RMB | LT / LB |
 | Monkey bomb | T | Y |
-| Swap weapon | Q | R-stick click |
+| Swap weapon | Q | L-stick click |
 | Rotate / zoom camera | ◀ ▶ (or middle-mouse drag) / wheel | D-pad |
 | Pause | P / Esc | Start |
 
-**Roster screen:** TAB (or Y) flips between SURVIVORS and POKÉMON. On the Pokémon tab, type to
-search by name or number, browse with the arrow keys / d-pad / left stick, R (or X) picks a random
-one, ENTER (or A) begins. ALL / ORIGINAL 151 filters the grid.
+**Roster screen:** TAB (or Y) flips between SURVIVORS and POKÉMON. On the Pokémon tab the search box
+has focus: type to search by name or number (ESC leaves the box and keeps the query), browse with the
+arrow keys / d-pad / left stick, the RANDOM button (or X on a controller, or R once you've left the
+search box) picks one at random, ENTER (or A) begins. ALL / ORIGINAL 151 filters the grid for this
+visit.
 
 ## Features
 
@@ -77,5 +79,6 @@ unified intent · `camera.js` overhead orbit + aim raycast · `player.js` · `zo
 `audio.js` synth + streamed cries · `hud.js`.
 
 Original code & art — a fan tribute, not affiliated with Activision / Treyarch or Jagex. Pokémon, its
-names, sprites and cries are © Nintendo / Creatures / GAME FREAK; this is a non-commercial fan project
-that streams them from the community PokeAPI archives and ships none of them.
+names, sprites and cries are © Nintendo / Creatures / GAME FREAK; this is a non-commercial fan project.
+The sprites and cries stream from the community PokeAPI archives and are not shipped here; the species
+table (names, types, base stats, sizes) is built from PokeAPI's open data files.

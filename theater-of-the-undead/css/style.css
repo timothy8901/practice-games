@@ -233,17 +233,18 @@ kbd {
 .pk-top { display: flex; gap: 18px; align-items: stretch; justify-content: center; flex-wrap: wrap; width: 100%; }
 .pk-preview {
   display: flex; gap: 14px; align-items: center; padding: 12px 18px; text-align: left;
-  border: 2px solid var(--gold); background: rgba(20,16,12,0.82); min-width: 380px;
+  border: 2px solid var(--gold); background: rgba(20,16,12,0.82); min-width: min(380px, 100%); max-width: 100%;
   box-shadow: 0 0 24px rgba(200,162,74,0.12), inset 0 0 30px rgba(0,0,0,0.5);
 }
 .pk-preview img {
   width: 128px; height: 128px; image-rendering: pixelated; flex: none;
   background: radial-gradient(circle at 50% 60%, rgba(200,162,74,0.22), transparent 68%);
 }
+.pk-info { min-width: 0; flex: 1; }
 .pk-name { font-size: 19px; letter-spacing: 0.12em; color: var(--ink); text-shadow: 0 2px 0 #000; white-space: nowrap; }
 .pk-types { display: flex; gap: 6px; margin: 6px 0 9px; }
 .pk-type { font-size: 10px; letter-spacing: 0.14em; padding: 2px 7px; color: #fff; text-shadow: 0 1px 0 #000; border: 1px solid rgba(0,0,0,0.5); }
-.pk-stats { display: grid; grid-template-columns: 52px 1fr 30px; gap: 4px 8px; font-size: 11px; letter-spacing: 0.08em; align-items: center; min-width: 230px; }
+.pk-stats { display: grid; grid-template-columns: 52px 1fr 30px; gap: 4px 8px; font-size: 11px; letter-spacing: 0.08em; align-items: center; min-width: 0; }
 .pk-stats b { text-align: right; color: var(--gold); font-weight: normal; }
 .pk-bar { height: 7px; background: #120e0a; border: 1px solid #2a241c; }
 .pk-bar i { display: block; height: 100%; background: linear-gradient(90deg, #8a6a2a, var(--gold)); transition: width 0.15s; }

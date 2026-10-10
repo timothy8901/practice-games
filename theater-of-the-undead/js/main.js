@@ -101,7 +101,7 @@ const params = new URLSearchParams(location.search);
 G.roster = (params.get('roster') === 'pokemon' || params.has('mon')) ? 'pokemon' : (store.get('roster', 'survivors') === 'pokemon' ? 'pokemon' : 'survivors');
 G.charIndex = clamp(store.get('char', 0) | 0, 0, CHARACTERS.length - 1);
 G.monId = clamp((parseInt(params.get('mon'), 10) || (store.get('mon', 25) | 0)) || 25, 1, DEX.length);
-let pkFilter = store.get('filter', 'all') === '151' ? '151' : 'all';
+let pkFilter = 'all';       // ALL / ORIGINAL 151 is per visit: it is a mouse control, and remembering it trapped ?mon= links outside the 151
 let pkList = [];            // dex ids currently shown in the grid (filter + search)
 let selTile = null;
 let gridBuilt = false;
@@ -115,12 +115,18 @@ const pkImg = $('pk-img'), pkName = $('pk-name'), pkTypes = $('pk-types'), pkSta
 const csHint = $('cs-hint');
 const HINT = {
   survivors: '◀ ▶ / A·D to choose · ENTER / A to begin · TAB / Y for Pokémon · or click a survivor',
-  pokemon: 'TYPE to search · ◀ ▶ ▲ ▼ browse · R / X random · ENTER / A to begin · TAB / Y for survivors',
+  pokemon: 'TYPE to search (ESC leaves the box) · ◀ ▶ ▲ ▼ browse · RANDOM button or X · ENTER / A to begin · TAB / Y for survivors',
 };
 
 function currentChar() { return G.roster === 'pokemon' ? pokemonChar(G.monId) : CHARACTERS[G.charIndex]; }
 const typing = () => document.activeElement === pkSearch;
 const hex6 = (n) => '#' + (n >>> 0).toString(16).padStart(6, '0');
+// WCAG-style relative luminance picks dark ink for light type colours (electric, ice, ground, steel…)
+const chipInk = (hex) => {
+  const n = parseInt(hex.slice(1), 16), lin = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+  const L = 0.2126 * lin(n >> 16 & 255) + 0.7152 * lin(n >> 8 & 255) + 0.0722 * lin(n & 255);
+  return L > 0.183 ? '#1a140e' : '#fff';
+};
 const swatchSVG = (a, b) => 'data:image/svg+xml,' + encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='44' height='44'><rect width='44' height='44' fill='${hex6(a)}'/><rect y='26' width='44' height='18' fill='${hex6(b)}'/></svg>`);
 
 // -- survivor cards --
@@ -174,11 +180,11 @@ function selectMon(id, play) {
   pkImg.onerror = () => { pkImg.onerror = null; pkImg.src = fallbackSVG(m); };
   pkImg.src = c.sprite; pkImg.alt = m.name;
   pkName.textContent = `#${String(id).padStart(3, '0')}  ${c.name}`;
-  pkTypes.innerHTML = m.types.map((t) => `<span class="pk-type" style="background:${TYPE_COLOR[t]}">${t.toUpperCase()}</span>`).join('');
+  pkTypes.innerHTML = m.types.map((t) => { const ink = chipInk(TYPE_COLOR[t]); return `<span class="pk-type" style="background:${TYPE_COLOR[t]};color:${ink};text-shadow:${ink === '#fff' ? '0 1px 0 #000' : 'none'}">${t.toUpperCase()}</span>`; }).join('');
   pkStats.innerHTML = statBars(m).map((s) => `<span>${s.label}</span><div class="pk-bar"><i style="width:${Math.round(s.v * 100)}%"></i></div><b>${s.text}</b>`).join('');
   pkMove.textContent = `KNIFE → ${c.moveName}`;
   // the cry plays once the selection rests on a Pokémon, so holding an arrow doesn't fetch one per step
-  if (play) { audio.ensure(); clearTimeout(cryTimer); cryTimer = setTimeout(() => { if (G.monId === id && G.state === 'charsel') audio.playClip(c.cry, 0.35); }, 180); }
+  if (play) { audio.ensure(); clearTimeout(cryTimer); cryTimer = setTimeout(() => { if (G.monId === id && G.state === 'charsel') audio.playClip(c.cry, 0.35, { solo: true, stillWanted: () => G.monId === id && G.state === 'charsel' }); }, 180); }
 }
 function scrollToSel() {
   if (!selTile || selTile.classList.contains('hide')) return;
@@ -202,7 +208,7 @@ function randomMon() {
   selectMon(pick(pool), true); scrollToSel();
 }
 function setFilter(f) {
-  pkFilter = f; store.set('filter', f);
+  pkFilter = f;
   document.querySelectorAll('.pk-filter').forEach((b) => b.classList.toggle('sel', b.dataset.f === f));
   applyPokeFilter();
 }
@@ -223,10 +229,12 @@ function toggleRoster() { audio.ui(); setRoster(G.roster === 'pokemon' ? 'surviv
 csTabs.forEach((t) => t.addEventListener('click', () => setRoster(t.dataset.roster)));
 document.querySelectorAll('.pk-filter').forEach((b) => b.addEventListener('click', () => (b.dataset.f === 'rand' ? randomMon() : setFilter(b.dataset.f))));
 pkSearch.addEventListener('input', () => applyPokeFilter());
+pkSearch.addEventListener('search', () => applyPokeFilter());   // the box's own clear (✕) button
+pokeSel.addEventListener('click', (e) => { if (e.target !== pkSearch) pkSearch.focus({ preventScroll: true }); });
 document.querySelectorAll('.pk-filter').forEach((b) => b.classList.toggle('sel', b.dataset.f === pkFilter));
 addEventListener('keydown', (e) => {
   if (G.state === 'charsel' && e.code === 'Tab') e.preventDefault();      // TAB flips the roster, never the focus
-  if (e.code === 'Escape' && typing()) pkSearch.blur();
+  if (e.code === 'Escape' && typing()) { e.preventDefault(); pkSearch.blur(); }   // leave the box, keep the query (Chrome would clear it)
 });
 
 // HUD chip + game-over line: who you are playing as
@@ -249,13 +257,14 @@ function updateChip(def) {
 let state = 'title';
 const titleClock = { t: 0 };
 let titleArmT = 0;   // the title ignores input for a beat after a quit, so the click that quit doesn't also leave it
+let selArmT = 0;     // and the roster ignores input for a beat, so the key that left the title doesn't pick or start
 
 function setState(s) {
   state = s;
   G.state = s;
   hidePanels();
   if (s === 'title') { panels.title.classList.remove('hidden'); G.hud.hide(); audio.playMusic('title'); pkSearch.blur(); titleArmT = 0.35; }
-  if (s === 'charsel') { panels.charsel.classList.remove('hidden'); updateCharSel(); setRoster(G.roster, false); G.hud.hide(); }
+  if (s === 'charsel') { panels.charsel.classList.remove('hidden'); updateCharSel(); setRoster(G.roster, false); G.hud.hide(); selArmT = 0.25; }
   if (s === 'playing') { G.hud.show(); audio.playMusic('battle'); }
   if (s === 'pause') { panels.pause.classList.remove('hidden'); }
   if (s === 'gameover') {
@@ -270,6 +279,7 @@ G.over = () => { if (state === 'playing') setState('gameover'); };
 
 function startGame() {
   const def = currentChar();
+  store.set('roster', G.roster);
   pkSearch.blur();
   buildWorld();
   G.box.reset();
@@ -287,7 +297,7 @@ function startGame() {
 G.startGame = startGame;
 
 // title: any input -> character select
-input.onAny(() => { audio.ensure(); if (state === 'title') setState('charsel'); });
+input.onAny(() => { audio.ensure(); if (state === 'title') { setState('charsel'); input.pressed.clear(); } });
 
 // menu buttons
 $('btn-restart').addEventListener('click', () => setState('charsel'));
@@ -326,8 +336,9 @@ function updateTitleCam(dt) {
 
 // character select: keyboard / gamepad navigation
 function updateCharSelect(dt) {
+  selArmT -= dt; if (selArmT > 0) return;
   const I = input.intent, t = typing();
-  // TAB / Y / R-stick click flip the roster (while typing, only TAB and gamepad buttons count)
+  // TAB / Y / stick click flip the roster (while typing, only TAB and gamepad buttons count)
   const flip = t ? (input.hit('Tab') || (input.usingGamepad && (I.switchWeapon || I.tactical))) : (I.switchWeapon || I.tactical);
   if (flip) { toggleRoster(); return; }
 
