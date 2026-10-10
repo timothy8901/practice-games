@@ -46,6 +46,7 @@
       --c-faleria: #b5612a;
       --c-punch: #3f3428;
       --c-lumon:  #6fa4c8;
+      --c-a22:    #e3350d;
     }
 
     * { box-sizing: border-box; }
@@ -191,6 +192,8 @@
     .featured.neonfable .preview { background: radial-gradient(circle at 50% 42%, #2a1b5e 0%, #150b31 55%, #07030f 100%); }
     .featured.lumon { --accent: var(--c-lumon); margin-top: 20px; }
     .featured.lumon .preview { background: radial-gradient(circle at 50% 40%, #e9ebe6 0%, #c3ccc4 55%, #8e9a92 100%); }
+    .featured.a22 { --accent: var(--c-a22); margin-top: 20px; }
+    .featured.a22 .preview { background: radial-gradient(circle at 50% 40%, #74d98e 0%, #2f8a3c 60%, #1d5f2a 100%); }
     .featured.faleria { --accent: var(--c-faleria); }
     .featured.faleria .preview { background: radial-gradient(circle at 50% 38%, #7d5a52 0%, #402c28 55%, #140f0d 100%); }
 
@@ -280,6 +283,65 @@
     </section>
 
     <h2 class="section-title" id="featured">Featured</h2>
+
+    <article class="featured a22">
+      <div class="new-flag" aria-label="New game">NEW GAME!</div>
+      <div>
+        <span class="label">New · Arcade Football</span>
+        <h2><a href="all22-street.html">ALL-22 STREET</a></h2>
+        <p><b>Pokémon street football.</b> Draft an <b>All-22</b>, a full offense and defense of Pokémon, where every pick is graded on how well it fits its spot from its <b>base stats, size and typing</b>, and the team grade projects a 17-game record. Then take it to the street: arcade <b>7-on-7</b> (or full 11-on-11) with no kicking and no penalties, <b>jukes, spins, stiff arms and hurdles</b>, tackles swung by the <b>type chart</b>, and a <b>Max Breaker</b> meter that Dynamaxes your whole team for one play. Beat eight type-themed city teams, then the Indigo Dragons, in the <b>Gym Challenge</b>.</p>
+        <div class="meta">
+          <span>Keyboard, touch &amp; gamepad</span>
+          <span>All 1,025 Pokémon</span>
+          <span>Draft or free-pick builder</span>
+          <span>17-0 &amp; 151 challenges</span>
+          <span>10 plays · 7 defenses</span>
+          <span>9-team Gym Challenge</span>
+        </div>
+        <div class="cta-row">
+          <span class="play-cta">Play now &rarr;</span>
+        </div>
+      </div>
+      <div class="preview" aria-hidden="true">
+        <!-- a football in Poké Ball colors (original art) -->
+        <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <clipPath id="a22Ball"><ellipse cx="100" cy="100" rx="72" ry="44"/></clipPath>
+          </defs>
+          <!-- yard lines -->
+          <g stroke="#ffffff" stroke-opacity="0.35" stroke-width="3">
+            <line x1="40" y1="0" x2="40" y2="200"/>
+            <line x1="100" y1="0" x2="100" y2="200"/>
+            <line x1="160" y1="0" x2="160" y2="200"/>
+          </g>
+          <ellipse cx="104" cy="170" rx="58" ry="9" fill="#000000" opacity="0.22"/>
+          <!-- speed lines -->
+          <g stroke="#ffcb05" stroke-width="5" stroke-linecap="round">
+            <line x1="12" y1="122" x2="40" y2="130"/>
+            <line x1="8" y1="142" x2="32" y2="148"/>
+            <line x1="22" y1="102" x2="44" y2="110"/>
+          </g>
+          <g transform="rotate(-24 100 100)">
+            <g clip-path="url(#a22Ball)">
+              <rect x="20" y="50" width="160" height="50" fill="#e3350d"/>
+              <rect x="20" y="100" width="160" height="50" fill="#f4f1ea"/>
+              <rect x="20" y="95" width="160" height="10" fill="#1d1d1d"/>
+            </g>
+            <ellipse cx="100" cy="100" rx="72" ry="44" fill="none" stroke="#1d1d1d" stroke-width="5"/>
+            <!-- laces -->
+            <g stroke="#ffffff" stroke-width="4" stroke-linecap="round">
+              <line x1="60" y1="74" x2="92" y2="74"/>
+              <line x1="65" y1="67" x2="65" y2="81"/>
+              <line x1="73" y1="67" x2="73" y2="81"/>
+              <line x1="81" y1="67" x2="81" y2="81"/>
+              <line x1="89" y1="67" x2="89" y2="81"/>
+            </g>
+            <circle cx="122" cy="100" r="15" fill="#f4f1ea" stroke="#1d1d1d" stroke-width="6"/>
+            <circle cx="122" cy="100" r="6" fill="#ffffff" stroke="#1d1d1d" stroke-width="2"/>
+          </g>
+        </svg>
+      </div>
+    </article>
 
     <article class="featured lumon">
       <div class="new-flag" aria-label="New game">NEW GAME!</div>

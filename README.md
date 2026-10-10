@@ -200,6 +200,49 @@ launch screens. Its README covers installing and building each one.
   live** with the Web Audio API — no audio files. Pure vanilla JS + Canvas 2D, no
   build step, no dependencies.
 
+## ALL-22 STREET
+
+- **ALL-22 STREET** (`all22-street.html`) is Pokémon street football. It
+  takes the team-building idea of the *Pokémon All-22 Builder*
+  (all22pokemon.com) and the arcade rules of *NFL Street* and rebuilds both
+  from scratch in one file. No code or assets from either is used.
+  - **Build your All-22.** Every Pokémon (all 1,025) gets a 1–99 rating at
+    every position from its base stats, its height and weight, and its typing.
+    QB, edge rushers and corners weigh the most in the team grade, and the four
+    weakest spots drag it down. The grade projects a 17-game record. **Draft**
+    gives you 22 rounds of three random Pokémon and three re-deals (draft a
+    17-0 team to beat the challenge); **Free Pick** lets you search and choose
+    anyone. Also: an **Original 151** pool, a 4-3 or 3-4 front, drag (or tap)
+    to switch spots, and **Save image** for a shareable lineup card.
+  - **Street rules.** Street 7v7 sends out your best seven each way; Full
+    11v11 plays the whole All-22. There is no kicking, no penalties and no
+    sidelines, just walls. Drives start at the 20 and first-down markers sit
+    every 10 yards (extra yardage carries over). After a touchdown you get one
+    try from the 3: run it in for 1, pass it in for 2. First to 21/28/35/42
+    wins.
+  - **On the field.** 10 offensive plays (dive, toss, QB draw, slants, curls,
+    crossers, verticals, play action, screen, Hail Mary) and 7 defenses (man,
+    Cover 2, Cover 3, blitz, all-out blitz, prevent, run stop), every play
+    flippable. Blocks are tug-of-wars and tackles are rolls, and the **type
+    chart** tilts both (super-effective hits, "it barely had an effect…").
+    Ball carriers juke, spin, stiff-arm, hurdle, pitch and showboat; defenders
+    dive, hit-stick (forces fumbles), switch and jump for the ball.
+  - **Max Breaker.** Style moves, big plays, sacks and picks fill a meter;
+    when it is full your whole team **Dynamaxes** for one play.
+  - **Modes.** Exhibition against a random wild team or any of nine city
+    teams, each built only from one type (Pewter Boulders, Cerulean Tide …
+    Indigo Dragons), and the **Gym Challenge** ladder that earns badges.
+    Four difficulties, four venues (park, street lot, beach, rooftop), a CPU
+    demo game behind the title, stats and an MVP at the final whistle.
+  - Keyboard (arrows/WASD, Space turbo/snap, Z X C V B or J K L I U), touch
+    (thumbstick + context-labeled buttons, tap a receiver to throw) or
+    gamepad. Team, settings, draft-in-progress and badges save in
+    `localStorage`.
+  - Sprites stream from the [PokeAPI sprite archive](https://github.com/PokeAPI/sprites)
+    (stats, sizes and types come from PokeAPI's data, embedded in the file).
+    Offline, every Pokémon falls back to a type-colored token. Pokémon is
+    © Nintendo / Creatures / GAME FREAK; this is a fan project.
+
 ## Dictionary / wordlist notes
 
 The Baker's Dozen game supports validating player words against a wordlist.
