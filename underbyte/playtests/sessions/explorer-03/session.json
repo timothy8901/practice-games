@@ -1,0 +1,2256 @@
+{
+ "session": "explorer-03",
+ "startedAt": "2026-10-14T12:34:49.901Z",
+ "size": [
+  960,
+  540
+ ],
+ "pad": false,
+ "turns": [
+  {
+   "turn": 1,
+   "video": 1.78,
+   "cmd": {
+    "act": [
+     {
+      "tap": "confirm",
+      "ms": 120
+     },
+     {
+      "wait": 1500
+     }
+    ]
+   },
+   "room": "dc_shrine",
+   "hp": 5,
+   "events": [
+    {
+     "f": 36,
+     "type": "maxHp",
+     "maxHp": 5
+    },
+    {
+     "f": 36,
+     "type": "death",
+     "room": null
+    },
+    {
+     "f": 36,
+     "type": "bits",
+     "bits": 103,
+     "delta": 103
+    },
+    {
+     "f": 56,
+     "type": "screen",
+     "from": "title",
+     "to": "play"
+    },
+    {
+     "f": 56,
+     "type": "room",
+     "from": null,
+     "to": "dc_shrine"
+    }
+   ]
+  },
+  {
+   "turn": 2,
+   "video": 1.78,
+   "cmd": {
+    "debug": "UB.debug.warp(\"dc_loft\",\"R\")"
+   },
+   "room": "dc_loft",
+   "hp": 5,
+   "events": [
+    {
+     "f": 140,
+     "type": "room",
+     "from": "dc_shrine",
+     "to": "dc_loft"
+    }
+   ]
+  },
+  {
+   "turn": 3,
+   "video": 2.44,
+   "cmd": {
+    "act": [
+     {
+      "wait": 600
+     }
+    ]
+   },
+   "room": "dc_cross",
+   "hp": 5,
+   "events": [
+    {
+     "f": 160,
+     "type": "room",
+     "from": "dc_loft",
+     "to": "dc_cross"
+    }
+   ]
+  },
+  {
+   "turn": 4,
+   "video": 2.44,
+   "cmd": {
+    "debug": "UB.debug.warp(\"dc_loft\",\"B\")"
+   },
+   "room": "dc_loft",
+   "hp": 5,
+   "events": [
+    {
+     "f": 177,
+     "type": "room",
+     "from": "dc_cross",
+     "to": "dc_loft"
+    }
+   ]
+  },
+  {
+   "turn": 5,
+   "video": 3.49,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "tap": "jump",
+      "ms": 250
+     },
+     {
+      "wait": 500
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 200
+     }
+    ]
+   },
+   "room": "dc_loft",
+   "hp": 5,
+   "events": []
+  },
+  {
+   "turn": 6,
+   "video": 5.24,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "wait": 680
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 60
+     },
+     {
+      "down": "jump"
+     },
+     {
+      "wait": 340
+     },
+     {
+      "up": "jump"
+     },
+     {
+      "wait": 30
+     },
+     {
+      "down": "right"
+     },
+     {
+      "tap": "jump",
+      "ms": 300
+     },
+     {
+      "wait": 200
+     },
+     {
+      "up": "right"
+     }
+    ]
+   },
+   "room": "dc_loft",
+   "hp": 5,
+   "events": []
+  },
+  {
+   "turn": 7,
+   "video": 6.37,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "wait": 150
+     },
+     {
+      "tap": "jump",
+      "ms": 250
+     },
+     {
+      "wait": 450
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 200
+     }
+    ]
+   },
+   "room": "dc_loft",
+   "hp": 4,
+   "events": [
+    {
+     "f": 351,
+     "type": "hurt",
+     "hp": 4,
+     "maxHp": 5,
+     "room": "dc_loft",
+     "hazard": true
+    }
+   ]
+  },
+  {
+   "turn": 8,
+   "video": 6.37,
+   "cmd": {
+    "debug": "UB.debug.teleport(800,390)"
+   },
+   "room": "dc_loft",
+   "hp": 4,
+   "events": []
+  },
+  {
+   "turn": 9,
+   "video": 8.17,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "wait": 200
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 1500
+     }
+    ]
+   },
+   "room": "dc_loft",
+   "hp": 5,
+   "events": [
+    {
+     "f": 413,
+     "type": "heal",
+     "hp": 5
+    },
+    {
+     "f": 413,
+     "type": "maxHp",
+     "maxHp": 6
+    }
+   ]
+  },
+  {
+   "turn": 10,
+   "video": 9.47,
+   "cmd": {
+    "act": [
+     {
+      "wait": 1200
+     }
+    ]
+   },
+   "room": "dc_loft",
+   "hp": 5,
+   "events": []
+  },
+  {
+   "turn": 11,
+   "video": 9.47,
+   "cmd": {
+    "debug": "UB.debug.grant(\"burstLine\")"
+   },
+   "room": "dc_loft",
+   "hp": 5,
+   "events": [
+    {
+     "f": 582,
+     "type": "ability",
+     "ability": "burstLine"
+    }
+   ]
+  },
+  {
+   "turn": 12,
+   "video": 9.47,
+   "cmd": {
+    "debug": "UB.debug.warp(\"lw_belts\",\"L\")"
+   },
+   "room": "lw_belts",
+   "hp": 5,
+   "events": [
+    {
+     "f": 582,
+     "type": "room",
+     "from": "dc_loft",
+     "to": "lw_belts"
+    }
+   ]
+  },
+  {
+   "turn": 13,
+   "video": 10.99,
+   "cmd": {
+    "act": [
+     {
+      "wait": 1500
+     }
+    ]
+   },
+   "room": "lw_belts",
+   "hp": 5,
+   "events": [
+    {
+     "f": 673,
+     "type": "screen",
+     "from": "play",
+     "to": "lore"
+    }
+   ]
+  },
+  {
+   "turn": 14,
+   "video": 13.13,
+   "cmd": {
+    "act": [
+     {
+      "wait": 1500
+     },
+     {
+      "tap": "confirm",
+      "ms": 100
+     },
+     {
+      "wait": 500
+     }
+    ]
+   },
+   "room": "lw_belts",
+   "hp": 5,
+   "events": [
+    {
+     "f": 763,
+     "type": "screen",
+     "from": "lore",
+     "to": "play"
+    }
+   ]
+  },
+  {
+   "turn": 15,
+   "video": 13.7,
+   "cmd": {
+    "act": [
+     {
+      "tap": "map",
+      "ms": 120
+     },
+     {
+      "wait": 400
+     }
+    ]
+   },
+   "room": "lw_belts",
+   "hp": 5,
+   "events": [
+    {
+     "f": 801,
+     "type": "screen",
+     "from": "play",
+     "to": "map"
+    }
+   ]
+  },
+  {
+   "turn": 16,
+   "video": 15.78,
+   "cmd": {
+    "act": [
+     {
+      "tap": "map",
+      "ms": 120
+     },
+     {
+      "wait": 200
+     },
+     {
+      "down": "right"
+     },
+     {
+      "wait": 1500
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 200
+     }
+    ]
+   },
+   "room": "lw_belts",
+   "hp": 5,
+   "events": [
+    {
+     "f": 835,
+     "type": "screen",
+     "from": "map",
+     "to": "play"
+    }
+   ]
+  },
+  {
+   "turn": 17,
+   "video": 17.92,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "wait": 700
+     },
+     {
+      "tap": "jump",
+      "ms": 250
+     },
+     {
+      "wait": 100
+     },
+     {
+      "tap": "dash",
+      "ms": 100
+     },
+     {
+      "wait": 600
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 300
+     }
+    ]
+   },
+   "room": "lw_belts",
+   "hp": 4,
+   "events": [
+    {
+     "f": 1055,
+     "type": "hurt",
+     "hp": 4,
+     "maxHp": 6,
+     "room": "lw_belts",
+     "hazard": true
+    }
+   ]
+  },
+  {
+   "turn": 18,
+   "video": 17.92,
+   "cmd": {
+    "debug": "UB.debug.warp(\"bv_rest\",\"L\")"
+   },
+   "room": "bv_rest",
+   "hp": 4,
+   "events": [
+    {
+     "f": 1084,
+     "type": "room",
+     "from": "lw_belts",
+     "to": "bv_rest"
+    }
+   ]
+  },
+  {
+   "turn": 19,
+   "video": 19.54,
+   "cmd": {
+    "act": [
+     {
+      "wait": 1600
+     }
+    ]
+   },
+   "room": "bv_rest",
+   "hp": 4,
+   "events": [
+    {
+     "f": 1174,
+     "type": "screen",
+     "from": "play",
+     "to": "lore"
+    }
+   ]
+  },
+  {
+   "turn": 20,
+   "video": 23.39,
+   "cmd": {
+    "act": [
+     {
+      "wait": 1000
+     },
+     {
+      "tap": "confirm",
+      "ms": 100
+     },
+     {
+      "wait": 300
+     },
+     {
+      "down": "right"
+     },
+     {
+      "wait": 1500
+     },
+     {
+      "up": "right"
+     },
+     {
+      "tap": "up",
+      "ms": 100
+     },
+     {
+      "wait": 800
+     }
+    ]
+   },
+   "room": "bv_rest",
+   "hp": 4,
+   "events": [
+    {
+     "f": 1241,
+     "type": "screen",
+     "from": "lore",
+     "to": "play"
+    }
+   ]
+  },
+  {
+   "turn": 21,
+   "video": 25.19,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "tap": "jump",
+      "ms": 200
+     },
+     {
+      "wait": 450
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 100
+     },
+     {
+      "tap": "up",
+      "ms": 100
+     },
+     {
+      "wait": 900
+     }
+    ]
+   },
+   "room": "bv_rest",
+   "hp": 6,
+   "events": [
+    {
+     "f": 1488,
+     "type": "heal",
+     "hp": 6
+    }
+   ]
+  },
+  {
+   "turn": 22,
+   "video": 25.19,
+   "cmd": {
+    "debug": "UB.debug.grant(\"gripProtocol\")"
+   },
+   "room": "bv_rest",
+   "hp": 6,
+   "events": []
+  },
+  {
+   "turn": 23,
+   "video": 25.19,
+   "cmd": {
+    "debug": "UB.debug.warp(\"ns_rest\",\"L\")"
+   },
+   "room": "ns_rest",
+   "hp": 6,
+   "events": [
+    {
+     "f": 1518,
+     "type": "ability",
+     "ability": "gripProtocol"
+    },
+    {
+     "f": 1518,
+     "type": "room",
+     "from": "bv_rest",
+     "to": "ns_rest"
+    }
+   ]
+  },
+  {
+   "turn": 24,
+   "video": 26.81,
+   "cmd": {
+    "act": [
+     {
+      "wait": 1600
+     }
+    ]
+   },
+   "room": "ns_rest",
+   "hp": 6,
+   "events": [
+    {
+     "f": 1608,
+     "type": "screen",
+     "from": "play",
+     "to": "lore"
+    }
+   ]
+  },
+  {
+   "turn": 25,
+   "video": 28.61,
+   "cmd": {
+    "act": [
+     {
+      "wait": 800
+     },
+     {
+      "tap": "confirm",
+      "ms": 100
+     },
+     {
+      "wait": 300
+     },
+     {
+      "down": "left"
+     },
+     {
+      "wait": 250
+     },
+     {
+      "up": "left"
+     },
+     {
+      "wait": 300
+     }
+    ]
+   },
+   "room": "ns_rest",
+   "hp": 6,
+   "events": [
+    {
+     "f": 1664,
+     "type": "screen",
+     "from": "lore",
+     "to": "play"
+    }
+   ]
+  },
+  {
+   "turn": 26,
+   "video": 28.61,
+   "cmd": {
+    "debug": "UB.debug.warp(\"rw_rest\",\"L\")"
+   },
+   "room": "rw_rest",
+   "hp": 6,
+   "events": []
+  },
+  {
+   "turn": 27,
+   "video": 30.24,
+   "cmd": {
+    "act": [
+     {
+      "wait": 1600
+     }
+    ]
+   },
+   "room": "rw_rest",
+   "hp": 6,
+   "events": [
+    {
+     "f": 1721,
+     "type": "room",
+     "from": "ns_rest",
+     "to": "rw_rest"
+    },
+    {
+     "f": 1812,
+     "type": "screen",
+     "from": "play",
+     "to": "lore"
+    }
+   ]
+  },
+  {
+   "turn": 28,
+   "video": 34.73,
+   "cmd": {
+    "act": [
+     {
+      "wait": 800
+     },
+     {
+      "tap": "confirm",
+      "ms": 100
+     },
+     {
+      "wait": 300
+     },
+     {
+      "down": "right"
+     },
+     {
+      "wait": 2550
+     },
+     {
+      "up": "right"
+     },
+     {
+      "tap": "up",
+      "ms": 100
+     },
+     {
+      "wait": 600
+     }
+    ]
+   },
+   "room": "rw_rest",
+   "hp": 6,
+   "events": [
+    {
+     "f": 1866,
+     "type": "screen",
+     "from": "lore",
+     "to": "play"
+    },
+    {
+     "f": 2043,
+     "type": "screen",
+     "from": "play",
+     "to": "shop"
+    }
+   ]
+  },
+  {
+   "turn": 29,
+   "video": 35.16,
+   "cmd": {
+    "act": [
+     {
+      "tap": "back",
+      "ms": 100
+     },
+     {
+      "wait": 300
+     }
+    ]
+   },
+   "room": "rw_rest",
+   "hp": 6,
+   "events": [
+    {
+     "f": 2086,
+     "type": "screen",
+     "from": "shop",
+     "to": "play"
+    }
+   ]
+  },
+  {
+   "turn": 30,
+   "video": 35.16,
+   "cmd": {
+    "debug": "UB.debug.warp(\"dc_fall\",\"L\")"
+   },
+   "room": "dc_fall",
+   "hp": 6,
+   "events": [
+    {
+     "f": 2110,
+     "type": "room",
+     "from": "rw_rest",
+     "to": "dc_fall"
+    }
+   ]
+  },
+  {
+   "turn": 31,
+   "video": 35.89,
+   "cmd": {
+    "act": [
+     {
+      "wait": 700
+     }
+    ]
+   },
+   "room": "dc_fall",
+   "hp": 6,
+   "events": []
+  },
+  {
+   "turn": 32,
+   "video": 38.89,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "wait": 1000
+     },
+     {
+      "tap": "jump",
+      "ms": 250
+     },
+     {
+      "wait": 1100
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 600
+     }
+    ]
+   },
+   "room": "dc_fall",
+   "hp": 6,
+   "events": []
+  },
+  {
+   "turn": 33,
+   "video": 40.98,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "wait": 1100
+     },
+     {
+      "tap": "jump",
+      "ms": 300
+     },
+     {
+      "wait": 40
+     },
+     {
+      "tap": "jump",
+      "ms": 300
+     },
+     {
+      "wait": 300
+     }
+    ]
+   },
+   "room": "dc_fall",
+   "hp": 6,
+   "events": []
+  },
+  {
+   "turn": 34,
+   "video": 42.46,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "wait": 150
+     },
+     {
+      "tap": "jump",
+      "ms": 200
+     },
+     {
+      "up": "right"
+     },
+     {
+      "down": "left"
+     },
+     {
+      "wait": 200
+     },
+     {
+      "tap": "jump",
+      "ms": 200
+     },
+     {
+      "up": "left"
+     },
+     {
+      "down": "right"
+     },
+     {
+      "wait": 200
+     },
+     {
+      "tap": "jump",
+      "ms": 200
+     },
+     {
+      "up": "right"
+     },
+     {
+      "down": "left"
+     },
+     {
+      "wait": 250
+     },
+     {
+      "up": "left"
+     }
+    ]
+   },
+   "room": "dc_fall",
+   "hp": 6,
+   "events": [
+    {
+     "f": 2493,
+     "type": "bits",
+     "bits": 123,
+     "delta": 20
+    }
+   ]
+  },
+  {
+   "turn": 35,
+   "video": 44.79,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "wait": 100
+     },
+     {
+      "tap": "jump",
+      "ms": 200
+     },
+     {
+      "up": "right"
+     },
+     {
+      "down": "left"
+     },
+     {
+      "wait": 500
+     },
+     {
+      "up": "left"
+     },
+     {
+      "wait": 1500
+     }
+    ]
+   },
+   "room": "dc_fall",
+   "hp": 6,
+   "events": []
+  },
+  {
+   "turn": 36,
+   "video": 48.62,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "wait": 250
+     },
+     {
+      "tap": "jump",
+      "ms": 300
+     },
+     {
+      "wait": 40
+     },
+     {
+      "tap": "jump",
+      "ms": 300
+     },
+     {
+      "wait": 150
+     },
+     {
+      "tap": "jump",
+      "ms": 200
+     },
+     {
+      "up": "right"
+     },
+     {
+      "down": "left"
+     },
+     {
+      "wait": 200
+     },
+     {
+      "tap": "jump",
+      "ms": 200
+     },
+     {
+      "up": "left"
+     },
+     {
+      "down": "right"
+     },
+     {
+      "wait": 200
+     },
+     {
+      "tap": "jump",
+      "ms": 200
+     },
+     {
+      "up": "right"
+     },
+     {
+      "down": "left"
+     },
+     {
+      "wait": 200
+     },
+     {
+      "tap": "jump",
+      "ms": 200
+     },
+     {
+      "up": "left"
+     },
+     {
+      "down": "right"
+     },
+     {
+      "wait": 200
+     },
+     {
+      "tap": "jump",
+      "ms": 200
+     },
+     {
+      "up": "right"
+     },
+     {
+      "down": "left"
+     },
+     {
+      "wait": 600
+     },
+     {
+      "up": "left"
+     },
+     {
+      "wait": 300
+     }
+    ]
+   },
+   "room": "dc_fall",
+   "hp": 6,
+   "events": []
+  },
+  {
+   "turn": 37,
+   "video": 49.35,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "tap": "jump",
+      "ms": 300
+     },
+     {
+      "wait": 40
+     },
+     {
+      "tap": "jump",
+      "ms": 250
+     },
+     {
+      "wait": 100
+     }
+    ]
+   },
+   "room": "dc_fall",
+   "hp": 6,
+   "events": []
+  },
+  {
+   "turn": 38,
+   "video": 49.49,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "wait": 100
+     }
+    ]
+   },
+   "room": "dc_fall",
+   "hp": 6,
+   "events": []
+  },
+  {
+   "turn": 39,
+   "video": 49.87,
+   "cmd": {
+    "act": [
+     {
+      "tap": "jump",
+      "ms": 150
+     },
+     {
+      "up": "right"
+     },
+     {
+      "down": "left"
+     },
+     {
+      "wait": 200
+     }
+    ]
+   },
+   "room": "dc_fall",
+   "hp": 6,
+   "events": []
+  },
+  {
+   "turn": 40,
+   "video": 50.26,
+   "cmd": {
+    "act": [
+     {
+      "tap": "jump",
+      "ms": 150
+     },
+     {
+      "up": "left"
+     },
+     {
+      "down": "right"
+     },
+     {
+      "wait": 200
+     }
+    ]
+   },
+   "room": "dc_fall",
+   "hp": 6,
+   "events": []
+  },
+  {
+   "turn": 41,
+   "video": 50.75,
+   "cmd": {
+    "act": [
+     {
+      "tap": "jump",
+      "ms": 150
+     },
+     {
+      "up": "right"
+     },
+     {
+      "down": "left"
+     },
+     {
+      "wait": 300
+     }
+    ]
+   },
+   "room": "dc_fall",
+   "hp": 6,
+   "events": []
+  },
+  {
+   "turn": 42,
+   "video": 51.53,
+   "cmd": {
+    "act": [
+     {
+      "tap": "jump",
+      "ms": 120
+     },
+     {
+      "up": "left"
+     },
+     {
+      "wait": 60
+     },
+     {
+      "down": "left"
+     },
+     {
+      "tap": "jump",
+      "ms": 250
+     },
+     {
+      "wait": 300
+     }
+    ]
+   },
+   "room": "dc_fall",
+   "hp": 6,
+   "events": []
+  },
+  {
+   "turn": 43,
+   "video": 51.95,
+   "cmd": {
+    "act": [
+     {
+      "down": "up"
+     },
+     {
+      "wait": 400
+     }
+    ]
+   },
+   "room": "dc_fall",
+   "hp": 6,
+   "events": []
+  },
+  {
+   "turn": 44,
+   "video": 52.23,
+   "cmd": {
+    "act": [
+     {
+      "up": "up"
+     },
+     {
+      "wait": 250
+     }
+    ]
+   },
+   "room": "dc_fall",
+   "hp": 6,
+   "events": []
+  },
+  {
+   "turn": 45,
+   "video": 52.62,
+   "cmd": {
+    "act": [
+     {
+      "tap": "jump",
+      "ms": 150
+     },
+     {
+      "up": "left"
+     },
+     {
+      "down": "right"
+     },
+     {
+      "wait": 200
+     }
+    ]
+   },
+   "room": "dc_fall",
+   "hp": 6,
+   "events": []
+  },
+  {
+   "turn": 46,
+   "video": 53.01,
+   "cmd": {
+    "act": [
+     {
+      "tap": "jump",
+      "ms": 150
+     },
+     {
+      "up": "right"
+     },
+     {
+      "down": "left"
+     },
+     {
+      "wait": 200
+     }
+    ]
+   },
+   "room": "dc_fall",
+   "hp": 6,
+   "events": []
+  },
+  {
+   "turn": 47,
+   "video": 53.4,
+   "cmd": {
+    "act": [
+     {
+      "tap": "jump",
+      "ms": 150
+     },
+     {
+      "up": "left"
+     },
+     {
+      "down": "right"
+     },
+     {
+      "wait": 200
+     }
+    ]
+   },
+   "room": "dc_fall",
+   "hp": 7,
+   "events": [
+    {
+     "f": 3174,
+     "type": "heal",
+     "hp": 7
+    },
+    {
+     "f": 3174,
+     "type": "maxHp",
+     "maxHp": 7
+    }
+   ]
+  },
+  {
+   "turn": 48,
+   "video": 53.48,
+   "cmd": {
+    "act": [
+     {
+      "up": "right"
+     },
+     {
+      "wait": 50
+     }
+    ]
+   },
+   "room": "dc_fall",
+   "hp": 7,
+   "events": []
+  },
+  {
+   "turn": 49,
+   "video": 56.01,
+   "cmd": {
+    "act": [
+     {
+      "wait": 2500
+     }
+    ]
+   },
+   "room": "dc_fall",
+   "hp": 7,
+   "events": []
+  },
+  {
+   "turn": 50,
+   "video": 56.58,
+   "cmd": {
+    "act": [
+     {
+      "tap": "map",
+      "ms": 120
+     },
+     {
+      "wait": 400
+     }
+    ]
+   },
+   "room": "dc_fall",
+   "hp": 7,
+   "events": [
+    {
+     "f": 3339,
+     "type": "screen",
+     "from": "play",
+     "to": "map"
+    }
+   ]
+  },
+  {
+   "turn": 51,
+   "video": 57.75,
+   "cmd": {
+    "act": [
+     {
+      "tap": "right",
+      "ms": 100
+     },
+     {
+      "wait": 250
+     },
+     {
+      "tap": "right",
+      "ms": 100
+     },
+     {
+      "wait": 250
+     },
+     {
+      "tap": "up",
+      "ms": 100
+     },
+     {
+      "wait": 300
+     }
+    ]
+   },
+   "room": "dc_fall",
+   "hp": 7,
+   "events": []
+  },
+  {
+   "turn": 52,
+   "video": 58.13,
+   "cmd": {
+    "act": [
+     {
+      "tap": "map",
+      "ms": 120
+     },
+     {
+      "wait": 200
+     }
+    ]
+   },
+   "room": "dc_fall",
+   "hp": 7,
+   "events": [
+    {
+     "f": 3441,
+     "type": "screen",
+     "from": "map",
+     "to": "play"
+    }
+   ]
+  },
+  {
+   "turn": 53,
+   "video": 58.13,
+   "cmd": {
+    "debug": "UB.debug.warp(\"dc_loft\",\"B\")"
+   },
+   "room": "dc_loft",
+   "hp": 7,
+   "events": [
+    {
+     "f": 3462,
+     "type": "room",
+     "from": "dc_fall",
+     "to": "dc_loft"
+    }
+   ]
+  },
+  {
+   "turn": 54,
+   "video": 60.07,
+   "cmd": {
+    "act": [
+     {
+      "wait": 500
+     },
+     {
+      "down": "left"
+     },
+     {
+      "wait": 500
+     },
+     {
+      "up": "left"
+     },
+     {
+      "wait": 900
+     }
+    ]
+   },
+   "room": "dc_loft",
+   "hp": 7,
+   "events": []
+  },
+  {
+   "turn": 55,
+   "video": 61.41,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "wait": 380
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 900
+     }
+    ]
+   },
+   "room": "dc_cross",
+   "hp": 7,
+   "events": [
+    {
+     "f": 3632,
+     "type": "room",
+     "from": "dc_loft",
+     "to": "dc_cross"
+    }
+   ]
+  },
+  {
+   "turn": 56,
+   "video": 61.41,
+   "cmd": {
+    "debug": "UB.debug.warp(\"lw_belts\",\"R\")"
+   },
+   "room": "lw_belts",
+   "hp": 7,
+   "events": [
+    {
+     "f": 3656,
+     "type": "room",
+     "from": "dc_cross",
+     "to": "lw_belts"
+    }
+   ]
+  },
+  {
+   "turn": 57,
+   "video": 62.14,
+   "cmd": {
+    "act": [
+     {
+      "wait": 700
+     }
+    ]
+   },
+   "room": "lw_belts",
+   "hp": 7,
+   "events": []
+  },
+  {
+   "turn": 58,
+   "video": 65.11,
+   "cmd": {
+    "act": [
+     {
+      "down": "left"
+     },
+     {
+      "wait": 550
+     },
+     {
+      "up": "left"
+     },
+     {
+      "wait": 100
+     },
+     {
+      "tap": "jump",
+      "ms": 300
+     },
+     {
+      "wait": 40
+     },
+     {
+      "tap": "jump",
+      "ms": 300
+     },
+     {
+      "down": "right"
+     },
+     {
+      "wait": 400
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 1200
+     }
+    ]
+   },
+   "room": "lw_belts",
+   "hp": 7,
+   "events": []
+  },
+  {
+   "turn": 59,
+   "video": 66.16,
+   "cmd": {
+    "act": [
+     {
+      "down": "left"
+     },
+     {
+      "wait": 120
+     },
+     {
+      "up": "left"
+     },
+     {
+      "tap": "jump",
+      "ms": 300
+     },
+     {
+      "wait": 40
+     },
+     {
+      "tap": "jump",
+      "ms": 300
+     },
+     {
+      "down": "right"
+     },
+     {
+      "wait": 200
+     }
+    ]
+   },
+   "room": "lw_belts",
+   "hp": 7,
+   "events": []
+  },
+  {
+   "turn": 60,
+   "video": 66.35,
+   "cmd": {
+    "act": [
+     {
+      "wait": 150
+     }
+    ]
+   },
+   "room": "lw_belts",
+   "hp": 7,
+   "events": []
+  },
+  {
+   "turn": 61,
+   "video": 68.18,
+   "cmd": {
+    "act": [
+     {
+      "tap": "jump",
+      "ms": 200
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 120
+     },
+     {
+      "down": "right"
+     },
+     {
+      "tap": "jump",
+      "ms": 300
+     },
+     {
+      "wait": 350
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 800
+     }
+    ]
+   },
+   "room": "lw_belts",
+   "hp": 7,
+   "events": []
+  },
+  {
+   "turn": 62,
+   "video": 71.08,
+   "cmd": {
+    "act": [
+     {
+      "down": "left"
+     },
+     {
+      "wait": 1550
+     },
+     {
+      "up": "left"
+     },
+     {
+      "wait": 100
+     },
+     {
+      "tap": "jump",
+      "ms": 300
+     },
+     {
+      "wait": 40
+     },
+     {
+      "tap": "jump",
+      "ms": 300
+     },
+     {
+      "wait": 500
+     }
+    ]
+   },
+   "room": "lw_belts",
+   "hp": 5,
+   "events": [
+    {
+     "f": 4144,
+     "type": "hurt",
+     "hp": 5,
+     "maxHp": 7,
+     "room": "lw_belts",
+     "hazard": false
+    }
+   ]
+  },
+  {
+   "turn": 63,
+   "video": 74.29,
+   "cmd": {
+    "act": [
+     {
+      "down": "left"
+     },
+     {
+      "wait": 700
+     },
+     {
+      "up": "left"
+     },
+     {
+      "tap": "jump",
+      "ms": 300
+     },
+     {
+      "wait": 40
+     },
+     {
+      "tap": "jump",
+      "ms": 250
+     },
+     {
+      "wait": 500
+     },
+     {
+      "down": "right"
+     },
+     {
+      "tap": "jump",
+      "ms": 300
+     },
+     {
+      "wait": 40
+     },
+     {
+      "tap": "jump",
+      "ms": 250
+     },
+     {
+      "wait": 400
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 300
+     }
+    ]
+   },
+   "room": "lw_belts",
+   "hp": 5,
+   "events": [
+    {
+     "f": 4346,
+     "type": "bits",
+     "bits": 128,
+     "delta": 5
+    }
+   ]
+  },
+  {
+   "turn": 64,
+   "video": 76.35,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "wait": 300
+     },
+     {
+      "tap": "jump",
+      "ms": 150
+     },
+     {
+      "wait": 120
+     },
+     {
+      "tap": "dash",
+      "ms": 100
+     },
+     {
+      "wait": 500
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 800
+     }
+    ]
+   },
+   "room": "lw_belts",
+   "hp": 5,
+   "events": []
+  },
+  {
+   "turn": 65,
+   "video": 76.35,
+   "cmd": {
+    "debug": "UB.debug.teleport(2770,210)"
+   },
+   "room": "lw_belts",
+   "hp": 5,
+   "events": []
+  },
+  {
+   "turn": 66,
+   "video": 78.14,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "wait": 250
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 1500
+     }
+    ]
+   },
+   "room": "lw_belts",
+   "hp": 6,
+   "events": [
+    {
+     "f": 4551,
+     "type": "heal",
+     "hp": 6
+    },
+    {
+     "f": 4551,
+     "type": "maxHp",
+     "maxHp": 8
+    }
+   ]
+  },
+  {
+   "turn": 67,
+   "video": 79.67,
+   "cmd": {
+    "act": [
+     {
+      "wait": 1500
+     }
+    ]
+   },
+   "room": "lw_belts",
+   "hp": 6,
+   "events": []
+  }
+ ],
+ "marks": [
+  {
+   "turn": 7,
+   "video": 6.37,
+   "note": "4th spike hit in dc_loft trying to chain crumble blocks; teleporting to the core to confirm the pickup (logged)"
+  },
+  {
+   "turn": 13,
+   "video": 10.99,
+   "note": "Loomworks: rust/amber spools and pipes, instantly distinct from Driftcache blue. But the lore card text is tan-on-tan over a busy background and hard to read"
+  },
+  {
+   "turn": 16,
+   "video": 15.78,
+   "note": "Loomworks clarity: background pipes and spools are the same rust tone as real platforms; hard to tell what is solid"
+  },
+  {
+   "turn": 28,
+   "video": 34.73,
+   "note": "Rootwell vendor charges exactly the same 90/160/120 as the Driftcache one, even though the first vendor said the deeper you go, the cheaper I get"
+  },
+  {
+   "turn": 48,
+   "video": 53.48,
+   "note": "DELIGHT: Grip Protocol wall-jumps up the Long Drop shaft into the alcove I spotted in clip 1 - core #2 (Long Drop). Best backtrack payoff so far, though the wall-jump rhythm took a while to find"
+  },
+  {
+   "turn": 50,
+   "video": 56.58,
+   "note": "MAP: CORE FOUND banner shows through the map panel; small orange dots on the map (Long Drop floor, Loft) are not explained by the legend and stay after both cores are taken"
+  },
+  {
+   "turn": 55,
+   "video": 61.41,
+   "note": "Stuck test OK: dropping into the Loft chute puts me back on Crossrack top platform, crumbles cannot strand you here"
+  },
+  {
+   "turn": 64,
+   "video": 76.35,
+   "note": "Could not find the honest route up to the Belt Floor core after ~5 tries (crawlspace + Burst Line I think); teleporting onto the ledge to confirm the pickup (logged)"
+  },
+  {
+   "turn": 66,
+   "video": 78.14,
+   "note": "All three max-heart cores collected: 8 max hearts (5 base + 3 diamonds)"
+  }
+ ],
+ "debugCalls": [
+  {
+   "turn": 2,
+   "video": 1.78,
+   "code": "UB.debug.warp(\"dc_loft\",\"R\")"
+  },
+  {
+   "turn": 4,
+   "video": 2.44,
+   "code": "UB.debug.warp(\"dc_loft\",\"B\")"
+  },
+  {
+   "turn": 8,
+   "video": 6.37,
+   "code": "UB.debug.teleport(800,390)"
+  },
+  {
+   "turn": 11,
+   "video": 9.47,
+   "code": "UB.debug.grant(\"burstLine\")"
+  },
+  {
+   "turn": 12,
+   "video": 9.47,
+   "code": "UB.debug.warp(\"lw_belts\",\"L\")"
+  },
+  {
+   "turn": 18,
+   "video": 17.92,
+   "code": "UB.debug.warp(\"bv_rest\",\"L\")"
+  },
+  {
+   "turn": 22,
+   "video": 25.19,
+   "code": "UB.debug.grant(\"gripProtocol\")"
+  },
+  {
+   "turn": 23,
+   "video": 25.19,
+   "code": "UB.debug.warp(\"ns_rest\",\"L\")"
+  },
+  {
+   "turn": 26,
+   "video": 28.61,
+   "code": "UB.debug.warp(\"rw_rest\",\"L\")"
+  },
+  {
+   "turn": 30,
+   "video": 35.16,
+   "code": "UB.debug.warp(\"dc_fall\",\"L\")"
+  },
+  {
+   "turn": 53,
+   "video": 58.13,
+   "code": "UB.debug.warp(\"dc_loft\",\"B\")"
+  },
+  {
+   "turn": 56,
+   "video": 61.41,
+   "code": "UB.debug.warp(\"lw_belts\",\"R\")"
+  },
+  {
+   "turn": 65,
+   "video": 76.35,
+   "code": "UB.debug.teleport(2770,210)"
+  }
+ ],
+ "errors": [],
+ "segments": [
+  [
+   0.959,
+   2.738
+  ],
+  [
+   9.323,
+   9.987
+  ],
+  [
+   17.712,
+   18.756
+  ],
+  [
+   25.917,
+   27.675
+  ],
+  [
+   37.822,
+   38.949
+  ],
+  [
+   46.653,
+   48.453
+  ],
+  [
+   60.163,
+   61.457
+  ],
+  [
+   69.077,
+   70.606
+  ],
+  [
+   81.183,
+   83.32
+  ],
+  [
+   89.367,
+   89.936
+  ],
+  [
+   101.352,
+   103.433
+  ],
+  [
+   115.313,
+   117.448
+  ],
+  [
+   128.603,
+   130.23
+  ],
+  [
+   139.762,
+   143.611
+  ],
+  [
+   152.913,
+   154.708
+  ],
+  [
+   160.898,
+   162.523
+  ],
+  [
+   172.834,
+   174.63
+  ],
+  [
+   183.586,
+   185.216
+  ],
+  [
+   194.773,
+   199.266
+  ],
+  [
+   211.29,
+   211.723
+  ],
+  [
+   212.138,
+   212.864
+  ],
+  [
+   221.742,
+   224.739
+  ],
+  [
+   230.031,
+   232.127
+  ],
+  [
+   243.1,
+   244.573
+  ],
+  [
+   253.2,
+   255.538
+  ],
+  [
+   265.312,
+   269.138
+  ],
+  [
+   275.041,
+   275.77
+  ],
+  [
+   281.783,
+   281.921
+  ],
+  [
+   287.466,
+   287.853
+  ],
+  [
+   296.008,
+   296.396
+  ],
+  [
+   296.565,
+   297.056
+  ],
+  [
+   310.597,
+   311.369
+  ],
+  [
+   321.015,
+   321.441
+  ],
+  [
+   328.261,
+   328.543
+  ],
+  [
+   337.979,
+   338.367
+  ],
+  [
+   338.544,
+   338.935
+  ],
+  [
+   339.1,
+   339.484
+  ],
+  [
+   351.256,
+   351.34
+  ],
+  [
+   351.681,
+   354.21
+  ],
+  [
+   362.059,
+   362.626
+  ],
+  [
+   385.39,
+   386.561
+  ],
+  [
+   405.003,
+   405.385
+  ],
+  [
+   405.881,
+   407.825
+  ],
+  [
+   423.587,
+   424.919
+  ],
+  [
+   432.852,
+   433.588
+  ],
+  [
+   445.866,
+   448.837
+  ],
+  [
+   459.004,
+   460.054
+  ],
+  [
+   465.821,
+   466.01
+  ],
+  [
+   473.35,
+   475.18
+  ],
+  [
+   488.319,
+   491.215
+  ],
+  [
+   502.194,
+   505.403
+  ],
+  [
+   511.214,
+   513.281
+  ],
+  [
+   521.164,
+   522.953
+  ],
+  [
+   533.371,
+   534.902
+  ]
+ ],
+ "endedAt": "2026-10-14T12:43:56.762Z",
+ "liveSeconds": 79.67,
+ "video": "recordings/explorer-03-zone-tour-and-cores.mp4",
+ "convertError": null
+}

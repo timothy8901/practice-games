@@ -1,0 +1,4 @@
+{
+ "underbyte.save": "{\"version\":1,\"fighter\":\"tessik\",\"roomId\":\"dc_wake\",\"spawn\":{\"nodeId\":\"node_dc_wake\"},\"hearts\":5,\"maxHearts\":5,\"baseHearts\":5,\"cores\":[],\"abilities\":{\"echoJump\":false,\"burstLine\":false,\"gripProtocol\":false},\"bits\":4,\"bitsLifetime\":4,\"discovered\":[\"dc_wake\",\"dc_fall\",\"dc_cross\",\"dc_shrine\",\"dc_sentinel\",\"lw_hoist\"],\"visited\":[\"dc_wake\",\"dc_fall\",\"dc_shrine\",\"dc_sentinel\"],\"bossesDefeated\":[],\"bitsCollected\":[\"dc_fall:14,7\",\"dc_fall:15,7\"],\"vendor\":[],\"nodesUsed\":[\"node_dc_wake\"],\"loreSeen\":[\"driftcache\"],\"hints\":{\"move\":true,\"jump\":true,\"light\":true,\"heavy\":true,\"special\":false,\"dash\":false,\"overclock\":false},\"enemiesPurged\":1,\"playTimeFrames\":2340,\"deaths\":1,\"victory\":false,\"savedAt\":1791982405419}",
+ "underbyte.settings": null
+}
