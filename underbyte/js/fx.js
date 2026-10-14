@@ -14,7 +14,8 @@
  *   • Floating text ('+1', '+25' …), 16 slots.
  *   • Screen shake (decaying random offset, larger mag·remaining wins, never stacks), the world
  *     hitstop request counter (the engine decrements it), up to four overlapping full-screen
- *     flashes, the 1-frame 2 % impact zoom for hitstop > 5 f, the low-HP vignette layer (cached
+ *     flashes (scaled by FX.flashScale; drawn as a thin edge pulse while game.settings.reducedFlashing
+ *     is true — playtest B42), the 1-frame 2 % impact zoom for hitstop > 5 f, the low-HP vignette layer (cached
  *     radial canvas; the UI drives its pulse) and the transition seam shadow.
  *
  * The engine calls UB.FX.update() every logic frame (also during hitstop), UB.FX.draw(ctx) in
@@ -73,8 +74,12 @@
     shakeX: 0, shakeY: 0,
     _shakeMag: 0, _shakeFrames: 1, _shakeLeft: 0,
     _zoom: 0, _zoomSet: false, _zoomX: 480, _zoomY: 270,   // impact zoom (§11.3.3): 2 logic frames of flag = 1 rendered frame
+    /** Full-screen flash intensity 0..1 (playtest B42): multiplies every flash's alpha (FX.setFlashScale). */
+    flashScale: 1,
     KIND: K,
   };
+  /** Thickness (px) of the edge pulse that replaces a full-screen wash while flashes are reduced. */
+  const EDGE_PULSE = 10, EDGE_PULSE_MAX = 0.45;
 
   FX.init = function () {
     count = 0; FX.hitstopFrames = 0; FX._zoom = 0;
@@ -106,6 +111,13 @@
     slot.color = color || '#FFFFFF'; slot.alpha = alpha === undefined ? 0.5 : alpha; slot.frames = Math.max(1, frames | 0); slot.left = slot.frames;
   };
   FX.setShakeEnabled = function (on) { FX.shakeEnabled = !!on; if (!on) { FX._shakeLeft = 0; FX.shakeX = 0; FX.shakeY = 0; } };
+  /** Intensity hook for the full-screen flashes (hurt, hazard, boss death, Overclock …): 0 = none, 1 = as designed. */
+  FX.setFlashScale = function (k) { FX.flashScale = k > 0 ? (k < 1 ? k : 1) : 0; };
+  /**
+   * Reduced flashing (playtest B42 / the comfort "REDUCED FLASHING" setting): true while `game.settings.reducedFlashing`
+   * is true. Read live from the settings object, so the setting row only has to store the boolean (setSetting).
+   */
+  FX.reducedFlashing = function () { const g = UB.game, s = g && g.settings; return !!(s && s.reducedFlashing === true); };
 
   /**
    * Spawn one particle. kind: 'spark'|'ring'|'chip'|'dust'|'glitter'|'dot'|'aura'|'telegraph'.
@@ -297,12 +309,23 @@
       ctx.restore();
     }
     if (g && g.mode === 'transition' && g.transition.phase === 'slide') drawSeam(ctx, g);
+    const level = FX.flashScale;
+    if (level <= 0) return;
+    const reduced = FX.reducedFlashing();
     for (let i = 0; i < FLASH_N; i++) {
       const f = flashes[i];
       if (f.left <= 0) continue;
+      const a = f.alpha * (f.left / f.frames) * level;
+      if (a <= 0.002) continue;
       ctx.save();
-      ctx.globalAlpha = f.alpha * (f.left / f.frames);
-      ctx.fillStyle = f.color; ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = f.color;
+      if (reduced) {   // a thin pulse along the screen edges instead of a full-screen wash (no large-area flash)
+        ctx.globalAlpha = a < EDGE_PULSE_MAX ? a : EDGE_PULSE_MAX;
+        ctx.fillRect(0, 0, W, EDGE_PULSE); ctx.fillRect(0, H - EDGE_PULSE, W, EDGE_PULSE);
+        ctx.fillRect(0, EDGE_PULSE, EDGE_PULSE, H - 2 * EDGE_PULSE); ctx.fillRect(W - EDGE_PULSE, EDGE_PULSE, EDGE_PULSE, H - 2 * EDGE_PULSE);
+      } else {
+        ctx.globalAlpha = a; ctx.fillRect(0, 0, W, H);
+      }
       ctx.restore();
     }
   };

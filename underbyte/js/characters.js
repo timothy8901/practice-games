@@ -245,7 +245,7 @@
    * keeps a 1.5 px ink border), fill pass (fills / coloured strokes), glow pass ('lighter', halo),
    * then an optional tint pass (hurt white/red re-draw at `tintAlpha`).
    */
-  function drawRig(ctx, shapes, pal, tint, tintAlpha) {
+  function drawRig(ctx, shapes, pal, tint, tintAlpha, outline) {
     const n = shapes.length;
     ctx.lineJoin = 'round'; ctx.lineCap = 'round';
     ctx.strokeStyle = P.INK;
@@ -291,6 +291,15 @@
         if (isStroke(s)) { ctx.lineWidth = s.lw; ctx.stroke(); } else ctx.fill();
       }
       ctx.globalAlpha = baseAlpha;
+    }
+    if (outline) {   // the i-frame silhouette edge: every body shape stroked in `outline` at near-full opacity
+      ctx.save(); ctx.globalAlpha = 0.9; ctx.strokeStyle = outline;
+      for (let i = 0; i < n; i++) {
+        const s = shapes[i];
+        if (s.off || s.glow || !s.ink) continue;
+        pathOf(ctx, s); ctx.lineWidth = isStroke(s) ? s.lw + 1 : 1.5; ctx.stroke();
+      }
+      ctx.restore();
     }
   }
   /** Motion smear: 3 concentric arcs at alpha ×1, ×0.6, ×0.3 (DESIGN §11.2.2 UB.Draw.smear). */
@@ -847,6 +856,27 @@
     return p;
   }
 
+  /**
+   * How far (px, up to `max`) a Pulse Line fired now would travel before its floor runs out: the same footing rule as
+   * its update (the feet row, a one-tile step down, or a mover) sampled at its 7 px/frame stride from the spawn point.
+   */
+  const PULSE_MIN_RUN = 30;
+  function pulseRunway(pl, game, max) {
+    const lv = game.level, f = pl.facing, hw = 13, step = pl.data.moves.special.proj.speed / 60, ps = lv.platforms;
+    let y = pl.y;
+    for (let t = step; t <= max + step; t += step) {
+      const x = pl.x + 16 * f + t * f, c0 = Math.floor((x - hw) / TILE), c1 = Math.floor((x + hw - 0.001) / TILE);
+      const row = Math.floor((y + 0.5) / TILE);
+      let fy = Infinity;
+      for (let tx = c0; tx <= c1; tx++) if (footingAt(lv, tx, row)) { fy = row * TILE; break; }
+      for (let i = 0; i < ps.length; i++) { const q = ps[i]; if (x + hw <= q.x || x - hw >= q.x + q.w || q.y < y - 8 || q.y > y + TILE + 0.5) continue; if (q.y < fy) fy = q.y; }
+      if (fy === Infinity) for (let tx = c0; tx <= c1; tx++) if (footingAt(lv, tx, row + 1)) { fy = (row + 1) * TILE; break; }
+      if (fy === Infinity) return t - step;
+      y = fy;
+    }
+    return max;
+  }
+
   // ---- Orrubel: Ring Toss — out 220 px, then homes back to the body ----
   function Ring(owner) {
     const spec = owner.data.moves.heavy.ring;
@@ -996,6 +1026,7 @@
     this.landLag = 0; this.lockout = 0; this.guard = 0; this.armor = false;
     this.pogoActive = false; this.pogoGrace = false;
     this.contactImmune = false;             // set per frame by a special whose body is meant to collide with its victim (dive, grab-press)
+    this.denyT = 0; this.denyKind = ''; this.denyArm = [false, false, false];   // refused-press cue (B31)
     this.squashX = 1; this.squashY = 1; this.squashT = 0; this.squashMax = 1;
     this.hurtRot = 0; this.lastVy = 0; this.stepT = 0; this.wantJump = false; this.canJumpCancel = false; this.canDashCancel = false;
     this.curPal = data.pal;                  // palette in use this frame (Overclock ramp / death ramp)
@@ -1154,6 +1185,7 @@
     this.cancelMove(); this.dashing = false; this.dashT = 0; this.dashCd = 0; this.clinging = false;
     this.overclock = 0; this.ocTransform = 0; this.ocRevert = 0; this.ocActive = false; this.ocWarnT = 0; this.curPal = this.data.pal;
     this.landLag = 0; this.lockout = 0; this.wallLock = 0; this.coyote = 0; this.wallCoyote = 0; this.jumpCutAvail = false; this.contactImmune = false;
+    this.denyT = 0;
     this.airJumps = opts.airJumps !== undefined ? opts.airJumps : 1; this.airDash = this.airJumps;
     this.onGround = false; this.ground = null; this.dropThrough = 0;
     this.squashX = this.squashY = 1; this.squashT = 0; this.pogoActive = false; this.pogoGrace = false;
@@ -1184,8 +1216,34 @@
     return false;
   }
   const STATES_OC = { idle: 1, run: 1, jump: 1, fall: 1, cling: 1 };
+  const REFUSABLE = ['special', 'overclock', 'dash'], DENY_FRAMES = 18;
 
+  /**
+   * One logic frame: the body update, then the refused-input check (DESIGN §3.7, playtest B31): a Special, Overclock
+   * or Dash press whose 6 f buffer runs out without starting anything — airborne for a floor-bound special, during
+   * the special's own move, at a light's chain end, a meter short of full, no Burst Line, the dash cooldown — plays
+   * the deny sfx and shows the refusal cue over the fighter, so no input is silently swallowed. Presses lost to a
+   * hurt, a lock (intro card, pickup), death or the Overclock transform stay silent: the player is not in control.
+   */
   Player.prototype.update = function (game) {
+    this.updateBody(game);
+    if (this.denyT > 0) this.denyT--;
+    for (let i = 0; i < REFUSABLE.length; i++) {
+      const s = In.state[REFUSABLE[i]];
+      if (!s) continue;
+      if (s.buffer > 1) this.denyArm[i] = true;
+      else if (s.buffer === 1 && this.denyArm[i]) { this.denyArm[i] = false; if (this.canAct()) this.deny(game, REFUSABLE[i], false); }
+      else if (s.buffer <= 0) this.denyArm[i] = false;
+    }
+  };
+  /** A refused press: the deny sfx, the cue over the fighter (`denyT`/`denyKind`), the energy-bar flash for a special. */
+  Player.prototype.deny = function (game, kind, lockout) {
+    Au.sfx('deny');
+    this.denyT = DENY_FRAMES; this.denyKind = kind;
+    if (lockout) this.lockout = 10;
+    if (game) { if (kind === 'special') game.denyFlash = 6; game.denyKind = kind; }
+  };
+  Player.prototype.updateBody = function (game) {
     const d = this.data, inp = In.state, sp = this.sp;
     this.t++; this.stateT++;
     if (this.pogoGrace) { this.pogoGrace = false; this.pogoActive = false; }
@@ -1207,10 +1265,14 @@
       this.ocTransform--;
       if (this.ocTransform === 0) { this.ocActive = true; this.overclock = R.ocFrames; this.ocWarnT = 0; }
     } else if (this.ocActive) {
-      this.overclock--; this.meter = this.meterMax * this.overclock / R.ocFrames;
+      // the clock stands still while the fighter is locked (boss intro card, the 120 f ability pickup): those frames
+      // are not play time, so they never eat the transformation (playtest B10)
+      if (!this.locked) {
+        this.overclock--; this.meter = this.meterMax * this.overclock / R.ocFrames;
+        if (this.overclock <= 180 && this.overclock > 0 && (this.overclock % 12) === 0) Au.sfx('overclockWarn');
+        if (this.overclock <= 0) { this.ocActive = false; this.ocRevert = R.ocRevert; this.meter = 0; Au.sfx('overclockEnd'); }
+      }
       if ((this.t % 3) === 0) FX.burst('aura', this.x, this.y, 1, d.auraOpts);
-      if (this.overclock <= 180 && this.overclock > 0 && (this.overclock % 12) === 0) Au.sfx('overclockWarn');
-      if (this.overclock <= 0) { this.ocActive = false; this.ocRevert = R.ocRevert; this.meter = 0; Au.sfx('overclockEnd'); }
     } else if (this.ocRevert > 0) this.ocRevert--;
     // energy regen: 3/s, 6/s in Overclock
     this.energy = Math.min(this.energyMax, this.energy + R.energyRegen * DT * (this.ocActive ? 2 : 1));
@@ -1448,7 +1510,7 @@
           if (this.canStartSpecial()) { this.cancelMove(); return; }
           // DESIGN §3.7: a press that cannot start (energy, a second Pulse Line) is only the deny — sfx, bar flash,
           // 10 f lockout — and never cancels the light, which runs to its end
-          In.consume('special'); this.lockout = 10; Au.sfx('deny'); game.denyFlash = 6;
+          In.consume('special'); this.deny(game, 'special', true);
         }
       }
     } else if (act && name === 'heavy' && m.jumpCancel > 0 && this.connected && mt >= m.jumpCancel && inp.jump.buffer > 0 && this.onGround) { this.cancelMove(); return; }
@@ -1476,7 +1538,7 @@
   // moved the body itself), onHit() reacts to the special descriptors, onLand() for dive landings.
   // =====================================================================================
   function spend(pl, game, cost) {
-    if (pl.energy < cost) { pl.lockout = 10; Au.sfx('deny'); game.denyFlash = 6; return false; }
+    if (pl.energy < cost) { pl.deny(game, 'special', true); return false; }
     pl.energy -= cost; return true;
   }
   function beginSpecial(pl, name, dir) {
@@ -1516,7 +1578,9 @@
       if (!pl.onGround) return false;                       // grounded only; the 6 f buffer fires on landing
       In.consume('special');
       const oc = pl.ocActive, m = oc ? pl.data.moves.ultimate : pl.data.moves.special;
-      if (!oc && pl.pulse && !pl.pulse.dead) { pl.lockout = 10; Au.sfx('deny'); game.denyFlash = 6; return true; }   // only one Pulse Line: a second press is refused (deny, no energy)
+      if (!oc && pl.pulse && !pl.pulse.dead) { pl.deny(game, 'special', true); return true; }   // only one Pulse Line: a second press is refused (deny, no energy)
+      // a wave with no floor ahead would die at the drop within a tile: refused (deny, no energy) instead of a silent fizzle (B31)
+      if (!oc && pulseRunway(pl, game, PULSE_MIN_RUN) < PULSE_MIN_RUN) { pl.deny(game, 'special', true); return true; }
       if (!spend(pl, game, m.cost)) return true;
       beginSpecial(pl, oc ? 'ultimate' : 'special', dir);
       pl.beamT = 0;
@@ -1621,6 +1685,27 @@
     onLand: NOOP,
   };
 
+  /**
+   * Blink Strike vs. a boss body (DESIGN §4.2.3, playtest B16): the slide either carries the whole body past the boss
+   * or stops flush at its near side — it never ends inside it (where the guard runs out and the body touch lands).
+   * Decided on the frame the slide would enter the body: `later` px of slide remain after this frame; passing needs
+   * room on the far side (footing for half the body, no wall). Returns the (possibly shortened) step.
+   */
+  function blinkPastBoss(pl, game, bx, fy, step, later) {
+    const b = game.boss, f = pl.facing, hw = pl.w / 2;
+    if (!b || !b.active || b.dead || !(b.contact > 0) || step <= 0) return step;
+    if (!(pl.y > b.y - b.h && pl.y - pl.h < b.y)) return step;                               // not at the body's height
+    const bl = b.x - b.w / 2, br = b.x + b.w / 2, nx = bx + step * f;
+    if (bx - hw < br && bx + hw > bl) return step;                                         // already inside: carry on through
+    if (!(nx - hw < br && nx + hw > bl)) return step;                                      // not reaching it this frame
+    const exitX = f > 0 ? br + hw + 0.5 : bl - hw - 0.5, need = (exitX - bx) * f;
+    const lv = game.level;
+    const pass = need <= step + later && footOverlap(lv, fy, exitX, hw) >= hw && !E.overlapsSolid(lv, exitX - hw, pl.y - pl.h, pl.w, pl.h - 1);
+    if (pass) return step;
+    const stopX = f > 0 ? bl - hw - 0.5 : br + hw + 0.5;
+    return Math.max(0, Math.min(step, (stopX - bx) * f));
+  }
+
   // ---- VELLIX: Blink Strike (floor slide) / Afterimage Storm (4 homing blinks) ----
   SPECIALS.vellix = {
     press: function (pl, game, dir) {
@@ -1648,6 +1733,7 @@
             const lim = footEdge(lv, fy, bx + f * (hw - 0.001), f) - f * hw;   // front edge flush with the ledge edge
             step = Math.max(0, Math.min(step, (lim - bx) * f));
           }
+          step = blinkPastBoss(pl, game, bx, fy, step, (m.s + m.a - mt) * m.slide);
           pl.vx = step * 60 * f; pl.vy = 0; pl.lastVy = 0;
           pl.moveAndCollide(lv);
           if (!pl.onGround) { pl.vy = 0; }
@@ -1817,9 +1903,11 @@
   // =====================================================================================
   // Draw (DESIGN §11.2.3): squash/stretch, Overclock scale + palette crossfade, death, afterimages
   // =====================================================================================
-  const WHITE = '#FFFFFF';
+  const WHITE = '#FFFFFF', GHOST_ALPHA = 0.4;
   Player.prototype.draw = function (ctx, game, alpha) {
-    if (this.iframes > 0 && ((this.iframes >> 2) & 1) === 1 && !this.dead) return;
+    // i-frame blink (playtest B43): the "off" beats draw a dimmed silhouette with a bright outline instead of nothing,
+    // so the fighter is never lost on screen
+    const ghost = this.iframes > 0 && ((this.iframes >> 2) & 1) === 1 && !this.dead;
     const d = this.data, x = U.lerp(this.px, this.x, alpha), y = U.lerp(this.py, this.y, alpha);
     // palette: Overclock ramp (transform / active / revert) or the death desaturation
     let pal = d.pal;
@@ -1834,6 +1922,7 @@
     const ocK = this.ocActive ? 1 : (this.ocTransform > 0 ? 1 - this.ocTransform / (R.ocTransform - 8) : (this.ocRevert > 0 ? this.ocRevert / R.ocRevert : 0));
     if (ocK > 0) { sx *= 1 + 0.25 * ocK; sy *= 1 + 0.25 * ocK; }
     if (this.dead) { const k = Math.min(1, this.deathTimer / 40); sy *= 1 - 0.7 * k; rot = 25 * k * DEG; a = this.deathTimer > 40 ? 1 - (this.deathTimer - 40) / 20 : 1; }
+    if (ghost) a *= GHOST_ALPHA;
     if (this.program.drawWorld) this.program.drawWorld(ctx, this, alpha);
     ctx.save();
     ctx.globalAlpha = Math.max(0, a);
@@ -1857,37 +1946,84 @@
         drawRig(ctx, shapes, pal, null, 0); ctx.restore();
       }
     }
-    drawRig(ctx, shapes, pal, tint, 0.6);
+    drawRig(ctx, shapes, pal, tint, 0.6, ghost ? pal.glow : null);
     rigDef.extras(ctx, this, pal);
     ctx.restore();
+    if (this.denyT > 0 && !this.dead) drawDenyCue(ctx, x, y - this.h * sy - 16, this.denyT);
   };
+  /** The refused-press cue (B31): a small ringed slash over the head, popping in and fading out. */
+  function drawDenyCue(ctx, x, y, t) {
+    const k = t / DENY_FRAMES, r = 8 + 3 * Math.max(0, k - 0.75) * 4;
+    ctx.save(); ctx.globalAlpha = Math.min(1, k * 2.5); ctx.lineCap = 'round';
+    ctx.strokeStyle = P.INK; ctx.lineWidth = 6;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.moveTo(x - r * 0.7, y + r * 0.7); ctx.lineTo(x + r * 0.7, y - r * 0.7); ctx.stroke();
+    ctx.strokeStyle = P.DANGER; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.moveTo(x - r * 0.7, y + r * 0.7); ctx.lineTo(x + r * 0.7, y - r * 0.7); ctx.stroke();
+    ctx.restore();
+  }
 
   // --- select-screen preview: idle rig (x, y = feet) --------------------------------------------
-  const previews = {};
+  const previews = {}, idleTops = {};
+  /** Highest point (min local y, body centre = 0) of a posed rig's shapes — line widths included, approximately. */
+  function rigTop(shapes) {
+    let top = 0;
+    for (let i = 0; i < shapes.length; i++) {
+      const s = shapes[i]; if (s.off) continue;
+      let y = 0;
+      switch (s.k) {
+        case K_ELL: case K_ARC: y = s.y - (s.rot || s.k === K_ARC ? Math.max(s.w, s.h) : s.h); break;
+        case K_RR: y = s.y - (s.rot ? Math.max(s.w, s.h) : s.h) / 2; break;
+        case K_DOT: y = s.y - s.r; break;
+        case K_WEDGE: { const c = Math.cos(s.rot * DEG), sn = Math.sin(s.rot * DEG), hy = Math.abs(c * s.h / 2); y = Math.min(s.y - hy, s.y + sn * s.w); break; }
+        case K_POLY: { y = 1e9; for (let j = 0; j < s.n; j++) if (s.pts[j * 2 + 1] + s.y < y) y = s.pts[j * 2 + 1] + s.y; break; }
+        default: { const p = s.pts; y = 1e9; for (let j = 1; j < p.length; j += 2) if (p[j] < y) y = p[j]; y -= s.lw / 2; }
+      }
+      if (y < top) top = y;
+    }
+    return top;
+  }
+  /** The idle pose's highest point per fighter (cached; posing is deterministic). */
+  function idleTop(rigDef, d) {
+    if (idleTops[d.id] === undefined) {
+      const v = previews[d.id], st = v.state, t = v.t, stT = v.stateT, og = v.onGround;
+      v.state = 'idle'; v.t = 0; v.stateT = 0; v.onGround = true;
+      rigDef.pose(rigDef.rig, v); idleTops[d.id] = rigTop(rigDef.rig.shapes);
+      v.state = st; v.t = t; v.stateT = stT; v.onGround = og;
+      rigDef.pose(rigDef.rig, v);
+    }
+    return idleTops[d.id];
+  }
   function previewView(d) {
     return { state: 'idle', stateT: 0, t: 0, moveName: '', move: null, moveT: 0, vx: 0, vy: 0, onGround: true, facing: 1, ocActive: false, ocTransform: 0,
       connected: false, hurtTimer: 0, flash: 0, dashing: false, clinging: false, w: d.box.w, h: d.box.h, data: d, sp: { phase: '', ringOut: false, flash: 0 }, beamT: 0 };
   }
   for (const id in DATA) previews[id] = previewView(DATA[id]);
   // DESIGN §12.10 showcase: 180 f of idle, then one pose of the cycle held for its §4.2 frames (48 f slot)
-  const POSES = ['run', 'light1', 'light2', 'light3', 'jump', 'heavy'], POSE_SLOT = 228, POSE_IDLE = 180;
+  const POSES = ['run', 'light1', 'light2', 'light3', 'jump', 'heavy'], POSE_SLOT = 228, POSE_IDLE = 180, PREVIEW_HOP = 0.25;
   function drawPreview(ctx, id, x, y, scale, t, showcase) {
     const d = DATA[id] || list[0], v = previews[d.id], rigDef = RIGS[d.id];
     t = t | 0;
     v.t = v.stateT = t;
-    let bob = 1 + 0.015 * Math.sin(t / 40 * TAU), dy = 0;
+    let bob = 1 + 0.015 * Math.sin(t / 40 * TAU), dy = 0, hop = 0;
     if (showcase) {
       const slot = t % POSE_SLOT, k = slot - POSE_IDLE, pose = POSES[Math.floor(t / POSE_SLOT) % POSES.length];
       if (k >= 0) {
         if (pose === 'run') { v.state = 'run'; v.vx = d.run; v.stateT = k; bob = 1; }
-        else if (pose === 'jump') { const a = k / 47; v.state = a < 0.5 ? 'jump' : 'fall'; v.onGround = false; v.vy = -600 + a * 1200; v.stateT = k; dy = -4 * Math.sin(a * Math.PI) * d.jumpHeight / 3; bob = 1; }
+        else if (pose === 'jump') { const a = k / 47; v.state = a < 0.5 ? 'jump' : 'fall'; v.onGround = false; v.vy = -600 + a * 1200; v.stateT = k; hop = Math.sin(a * Math.PI); bob = 1; }
         else { const m = d.moves[pose], total = m.s + m.a + m.r; if (k < total) { v.state = 'attack'; v.moveName = pose; v.move = m; v.moveT = k + 1; v.stateT = k; bob = 1; } }
       }
+    }
+    rigDef.pose(rigDef.rig, v);
+    if (hop > 0) {
+      // the showcase hop (playtest B32): the rig's highest point rises at most a quarter of the fighter's real apex at the
+      // preview scale (Tessik ≈ 28 px at ×3) — the airborne pose's own reach (raised arms) counts toward it — so the jump
+      // reads (and compares between fighters) while the rig stays inside its portrait, never over the select header
+      const reach = Math.max(0, (idleTop(rigDef, d) - rigTop(rigDef.rig.shapes)) * scale);
+      dy = -hop * Math.max(0, d.jumpHeight * PREVIEW_HOP * scale / 3 - reach);
     }
     ctx.save();
     ctx.translate(x, y + dy); ctx.scale(scale, scale * bob);
     ctx.translate(0, -d.box.h / 2);
-    rigDef.pose(rigDef.rig, v);
     drawRig(ctx, rigDef.rig.shapes, d.pal, null, 0);
     rigDef.extras(ctx, v, d.pal);
     ctx.restore();

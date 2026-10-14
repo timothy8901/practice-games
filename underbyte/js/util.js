@@ -92,6 +92,16 @@ window.UB = window.UB || {};
     return lines;
   };
 
+  /**
+   * Vendor price of `item` (an UB.IDS.vendorItems row) at the vendor in `roomId`: `deepPrice` in the
+   * UB.IDS.vendorDeepRooms (rw_rest), else the §9.5 `price`. Pure; the shop panel and game.buy() share it.
+   */
+  Util.vendorPrice = function (item, roomId) {
+    if (!item) return 0;
+    const deep = UB.IDS && UB.IDS.vendorDeepRooms;
+    return deep && roomId && deep.indexOf(roomId) >= 0 && item.deepPrice > 0 ? item.deepPrice : item.price;
+  };
+
   UB.Util = Util;
 
   // --- shared palette + fonts (DESIGN.md §11.1.2, §11.0) ----------------------
@@ -101,7 +111,9 @@ window.UB = window.UB || {};
     HEART: '#E8484F', HEART_EMPTY: '#4A2A2E', CORE_HEART: '#F2B13C',
     ENERGY: '#3FD3FF', ENERGY_DIM: '#174A5A', METER: '#B86BFF', METER_READY: '#FFFFFF',
     METER_DIM: '#2A1A3A', BITS: '#8FE388', DANGER: '#FF3B3B',
-    PANEL: 'rgba(20,16,24,0.82)', PANEL_EDGE: '#F2EBDD', SELECT: '#FFD166',
+    // PANEL is opaque (playtest B05): a translucent panel let banners, the boss card and the HUD bleed through
+    // pause, map, shop and the YES/NO dialogs. The colour is the old 82 % INK panel as it read over the dimmed game.
+    PANEL: '#17131C', PANEL_EDGE: '#F2EBDD', SELECT: '#FFD166',
     LOGO_A: '#3FD3FF', LOGO_B: '#B86BFF', LETTERBOX: '#0A080C', SPIKE: '#C9C2B4',
   };
   UB.Fonts = {
@@ -137,12 +149,17 @@ window.UB = window.UB || {};
     groundEnemies: ['scuttlebit', 'hopnode', 'rambyte', 'platewalker', 'broodcell', 'voltwheel', 'walker'],
     /** `spawn.variant` values (DESIGN §7 zone variants). */
     enemyVariants: ['brinecrab', 'staticshot', 'rootbound', 'dripnode', 'nullnode', 'rootwisp', 'acidvalve', 'twinvalve', 'rootram', 'rootplate'],
-    /** Vendor stock (DESIGN §9.5 / §15.5), in panel order; ids are what save.vendor stores. */
+    /** Vendor stock (DESIGN §9.5 / §15.5), in panel order; ids are what save.vendor stores. `price` is the
+     *  §9.5 price (dc_shrine); `deepPrice` is what Scrivvet asks at the deeper vendor rooms below (playtest B25:
+     *  "The deeper you go, the cheaper I get" — about 25 % off, rounded to 5). Read prices through
+     *  UB.Util.vendorPrice(item, roomId); save.vendor still stores ids only, so saves are unaffected. */
     vendorItems: [
-      { id: 'spare_cell', name: 'SPARE CELL', price: 90, effect: 'Max energy 100 → 125' },
-      { id: 'hot_clock', name: 'HOT CLOCK', price: 160, effect: 'Overclock gains ×1.5 from hits and shards' },
-      { id: 'deep_ping', name: 'DEEP PING', price: 120, effect: 'Map shows every room, node and core of zones you have entered' },
+      { id: 'spare_cell', name: 'SPARE CELL', price: 90, deepPrice: 70, effect: 'Max energy 100 → 125' },
+      { id: 'hot_clock', name: 'HOT CLOCK', price: 160, deepPrice: 120, effect: 'Overclock gains ×1.5 from hits and shards' },
+      { id: 'deep_ping', name: 'DEEP PING', price: 120, deepPrice: 90, effect: 'Map shows every room, node and core of zones you have entered' },
     ],
+    /** Vendor rooms that sell at `deepPrice` (Scrivvet's Rootwell stand, DESIGN §9.5 / §15.9). */
+    vendorDeepRooms: ['rw_rest'],
     /** SFX recipe names (DESIGN §13.8) → the module that triggers them. UB.Audio.sfx is a
      *  silent no-op for any other name, so modules may add private names without breaking. */
     sfx: {

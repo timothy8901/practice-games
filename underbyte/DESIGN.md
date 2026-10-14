@@ -174,7 +174,7 @@ Wall-jump numbers per fighter `(vx, vy)`: Tessik (275, −608), Brackmaw (220, �
 
 * Player contact damage from a normal enemy = **1 heart**. Boss attacks = 1 or 2 hearts as flagged per attack in §8. Enemy projectiles = 1 heart.
 * **Hurt state:** 16 f with no input (attacks, dashes and stances are cancelled; a placed sentry, ring or Pulse Line persists). Knockback on hurt: `(240 * away, −300) * weight`, where `away` points from the damage source centre to the player centre (0 → opposite facing).
-* **i-frames:** 60 f from the hit frame, flashing 4 f on / 4 f off. Contact damage, enemy hitboxes and projectiles are ignored during i-frames. Hazards are NOT ignored (§3.3).
+* **i-frames:** 60 f from the hit frame, flashing 4 f on / 4 f off — the "off" beats draw a dimmed silhouette (α 0.4) outlined in the fighter's `glow` colour, never nothing, so the fighter is never lost on screen (playtest B43). Contact damage, enemy hitboxes and projectiles are ignored during i-frames. Hazards are NOT ignored (§3.3).
 * Hurt world hitstop: 6 f. Screen shake 5 px / 10 f. Red tint flash 6 f. Music bus dips to 0.6 for 0.9 s.
 * Being hurt during Overclock: knockback ×0.5; i-frames unchanged; Overclock keeps ticking.
 * HP 0 → death: 60 f death animation (fighter collapses, palette desaturates, 12 chips), then Game Over → respawn at the last restore node with full HP, energy 50, meter 0. Bits, abilities, cores, defeated bosses, opened seals, vendor purchases and discovered map are kept in memory (and were already saved at the node, except bits/discoveries gained since, which survive in memory and are written at the next node). All non-boss enemies respawn; room-entry history is cleared. Deaths stat +1 on death.
@@ -208,6 +208,7 @@ Enemies flash white 4 f on hit. Non-boss enemies enter hitstun for `10 + hitstop
 ### 3.5 Light chain, heavy, air attack
 
 * **Light chain.** Grounded only. Pressing Light while airborne is an Air Attack or Down-Strike (with Down). L1 → L2 → L3 → (re-chain to L1). "Hit-cancel" frames apply only if the move connected with at least one enemy, boss, destructible projectile or breakable; "whiff-cancel" frames apply otherwise. L3 has no whiff-cancel: it must finish. From the hit-cancel frame a light may also be cancelled into **Jump**, **Dash** (if owned) or **Special**. Heavies cancel into nothing (exception: Vellix's heavy jump-cancel on hit). Chain timeout: the chain index resets to L1 if the next light is not started within 20 f after the current move ends, or on jump/dash/hurt/special/landing. Grounded attacks: on f1 `vx *= 0.5`, then the Lunge value (if any) is added along facing; friction applies; movement input is ignored until the move ends or is cancelled.
+* **Chain shove (playtest B29).** An L1 or L2 hit is a shove, not a launch: the victim takes the sheet knockback (§4.2) and slides as usual, but never further from the attacker than the reach of the attacker's **next** light (that box's front edge — Overclock reach included — plus the victim's half width, minus 8 px); there it stops. So a `kbResist` 1 target stays inside the next light's reach and a grounded L1 → L2 → L3 connects for every fighter. A victim already beyond that distance is never pulled back. L3, heavies, specials and ultimates keep the full slide and launch.
 * **Heavy.** Grounded only (airborne press = Down-Strike). No cancels. Highest meter/energy gain.
 * **Air attack.** Any time airborne except during dash/hurt/cling; momentum preserved; gravity continues. Landing during startup cancels the move (no hit, no lag). Landing during active/recovery ends the move with 4 f landing lag. No cooldown beyond recovery.
 
@@ -220,6 +221,8 @@ Enemies flash white 4 f on hit. Non-boss enemies enter hitstun for `10 + hitstop
 ### 3.7 Specials & ultimates
 
 * A press with insufficient energy does nothing except the `deny` SFX, the energy-bar deny flash, and a 10 f lockout.
+* **No silent refusals (playtest B31).** A Special, Overclock or Dash press whose 6 f buffer (§2.5) runs out without starting anything — airborne for a floor-bound special, during the special's own move, at a light's chain end, a meter short of 100, no Burst Line, the dash cooldown — plays `deny` and shows the refusal cue over the fighter's head (a small inked `DANGER` ring with a slash, 18 f; `player.denyT` / `player.denyKind`); a special refusal also flashes the energy bar, an Overclock refusal the Overclock meter (§12.3). No lockout on these. A press lost to hurt, a lock (intro card, pickup), death or the Overclock transform stays silent (the player was not in control).
+* A Pulse Line with less than one tile (30 px) of floor ahead of its spawn point (the wave's own footing rule: the feet row, a one-tile step down, a mover) is refused the same way — `deny`, no energy — instead of spending 30 energy on a wave that fizzles at the drop.
 * Energy is charged on the press (f1). Ultimates cost 40 for every fighter.
 * Specials can be hurt-interrupted (except where i-frames are listed). Projectiles and sentries already spawned persist through hurt.
 * Only one Pulse Line, one Ring, one Sentry set, one Blink/Storm may exist at a time.
@@ -248,7 +251,7 @@ Enemies flash white 4 f on hit. Non-boss enemies enter hitstun for `10 + hitstop
 | During Overclock | no meter gain; meter drains linearly 100→0 over the duration (it is the timer) |
 | Activate | `Overclock` with meter = 100, while idle/run/jump/fall/cling only (not during attacks, dash, hurt, hazard freeze, transitions or boss intro) |
 | Transform | 20 f: f1–8 world hitstop + white flash alpha 0.6→0 + ring r0→120; f9–20 scale 1.0→1.25 and palette crossfade; invulnerable f1–20; enemies within 60 px pushed `(300 away, −200)` with 0 dmg (a 0-damage hit is never rounded up by a boss's ×1.5 / ×0.5 multiplier) |
-| Duration | **12 s = 720 f** after the transform |
+| Duration | **12 s = 720 f** after the transform; the clock stands still while the fighter is locked (the boss intro card, the 120 f ability pickup — those frames are not play time, playtest B10) |
 | Damage | `floor(d * 1.5)`: 2→3, 3→4, 4→6, 5→7, 6→9, 7→10, 8→12, 9→13, 11→16, 12→18, 14→21, 16→24, 26→39, 32→48 |
 | Speed | run ×1.15 (Tessik 270, Brackmaw 207, Vellix 345, Orrubel 247, Korvask 230); dash distance ×1.15 (same frames: Tessik 207, Brackmaw 207, Vellix 242, Orrubel 207, Korvask 207); jump unchanged |
 | Reach | attack hitbox `w,h` ×1.2 and `cx` ×1.1 (body box unchanged) |
@@ -586,7 +589,11 @@ travel is forfeited). The hitbox `(6,0,34,40)` travels with the body; enemies ar
 through (no enemy-collision push-out) and each is hit once for 7, KB (220,−120), 4 f local
 hitstop (Vellix never freezes). i-frames on f5–12 only (contact damage and enemy attacks
 ignored; hazards still hurt). f13–20 recovery. Cost 25 energy. Does not consume the air
-dash. Because it never leaves footing it can never cross a gap (§3.7).
+dash. Because it never leaves footing it can never cross a gap (§3.7). Against a **boss body**
+the slide either carries the whole body past it (decided on the frame it would enter the body:
+the remaining slide reaches the far side, with footing for half the body and no wall there) or
+stops flush at its near side — it never ends inside the boss, where the i-frames run out and the
+body touch lands (playtest B16); stopped flush, the hitbox still reaches the boss.
 
 **Ultimate — Afterimage Storm.** Ground or air. S6, then 4 consecutive blinks of 8 f each:
 each blink auto-aims at the nearest enemy or boss within 260 px and travels toward and
@@ -991,7 +998,7 @@ Tilemap fixes relative to `design/world.md` are listed in §10.6; everything els
 #############..................#
 #.vvvvv........................#
 #..............................#
-#...............----...........#
+#............-------...........#
 #..........................B...#
 #..........................B...#
 #.....................##########
@@ -1378,7 +1385,7 @@ Tilemap fixes relative to `design/world.md` are listed in §10.6; everything els
 ### 6.12 `bv_sluice` — Sluice Run
 
 * **Zone:** Brinevault (`brinevault`) · **Size:** 64×18 tiles (1920×540 px) · **Map grid:** gx 11.75, gy 5, 2×1 screens
-* **On entering:** Pale green coolant drips from every pipe. You land on a high shelf above a 2-tile crawlspace; its floor is missing for 6 tiles above an acid channel. Beyond, the run drops to a flooded floor patrolled by hoppers under a spiked slab, and a spitter on a raised pipe.
+* **On entering:** Pale green coolant drips from every pipe. You land on a high shelf above a 2-tile crawlspace; its floor gives way for 6 tiles to an acid channel. Beyond, the run drops to a flooded floor patrolled by hoppers under a spiked slab, and a spitter on a raised pipe.
 * **Exits** (id · edge · opening · → target.exit · ability expected · arrival spawn tile):
   * `T` · top · cols 2–4 (y=0) · → `lw_weftyr.B` · **none** · spawn (3, 1)
   * `R` · right · rows 12–14 (x=63) · → `bv_cistern.L` · **BURST LINE** · spawn (61, 14)
@@ -1387,27 +1394,27 @@ Tilemap fixes relative to `design/world.md` are listed in §10.6; everything els
   * `brinejelly` · (56,9) · stationary / own logic
   * `hopnode` (dripnode variant) · (38,14) · patrol x 31–46
   * `spitvalve` (acid valve variant) · (50,10) · stationary / own logic — faces left
-* **Hazards:** 9 ceiling-spike tiles, 16 hazard-pool tiles (acid).
+* **Hazards:** 9 ceiling-spike tiles, 6 hazard-pool tiles (acid: the gap's channel, row 8 x15–20, level with the crawlspace floor).
 * **Bits placed (one-time, saved per tile):** (10,7) small (1), (12,7) small (1), (23,7) medium (5), (53,5) medium (5), (54,5) small (1)
 * **Tilemap** (64 cols × 18 rows; row 0 is the top; every row is exactly 64 characters):
 
 ```
 ##...###########################################################
 ##...###########################################################
-##...###########################################################
+##.......#######################################################
 #........######################................................#
 #.----...######################................................#
 #........######################................................#
 #.................................................-------......#
 #..............................................................#
-###############......##########...###########..................#
-###############......##########...###########..................#
-#########............####..........vvvvvvvvv...................#
-#########............####.......................#####..........#
-#########............####...B.................B.............B...
-#########............####...B.................B.............B...
-#########............####...B.................B.............B...
-#########~~~~~~~~~~~~~~~~#######################################
+###############~~~~~~##########...###########..................#
+###############################...###########..................#
+#########################..........vvvvvvvvv...................#
+#########################.......................#####..........#
+#########################...B.................B.............B...
+#########################...B.................B.............B...
+#########################...B.................B.............B...
+################################################################
 ################################################################
 ################################################################
 ```
@@ -1494,9 +1501,9 @@ Tilemap fixes relative to `design/world.md` are listed in §10.6; everything els
 #..............#################
 #..............................#
 #########......................#
-###############......######....#
-###############......######....#
 ###############~~~~~~######....#
+###########################....#
+###########################....#
 ###########################....#
 ###########################---.#
 ###########################....#
@@ -1982,7 +1989,7 @@ Tilemap fixes relative to `design/world.md` are listed in §10.6; everything els
 ### 7.0 Shared rules
 * Sizes are hit-box width×height in px; the sprite may overdraw by up to 4 px. Enemies stand with their hit-box bottom on the tile listed in the room's placement (tile (x,y) is the tile their feet occupy; they stand on (x,y+1)). Flyers are centred on the listed tile.
 * **Contact damage** is in hearts and applies when the enemy's hit-box overlaps the player's body box and the player has no i-frames; the player then takes the hurt state of §3.2 (16 f hurt, 60 i-frames, knockback `(240 away, −300) × weight`, 6 f hitstop).
-* **Hurt:** on taking damage an enemy flashes white for 4 frames and, if its `kbResist` is above 0, enters HURT (hitstun) for `10 + hitstop` frames (no movement, no attack) while the move's knockback `(kx, ky) × kbResist` is applied as its velocity (gravity continues for walkers/hoppers; flyers decelerate at 0.3 px/frame²). `kbResist`: scuttlebit 1.0 · hopnode 1.0 · driftmoth/brinejelly 1.0 · glarewisp 1.0 · spitvalve **0** · rambyte 0.5 (**0** during CHARGE) · platewalker 0.5 (**0** while guarding or bashing) · broodcell **0** · droplatch 1.0 · voltwheel **0** · motes 1.0. Enemies with `kbResist` 0 flash only and are never interrupted. Enemies never damage each other.
+* **Hurt:** on taking damage an enemy flashes white for 4 frames and, if its `kbResist` is above 0, enters HURT (hitstun) for `10 + hitstop` frames (no movement, no attack) while the move's knockback `(kx, ky) × kbResist` is applied as its velocity (gravity continues for walkers/hoppers, sliding at 0.15 px/frame²; flyers decelerate at 0.3 px/frame²; a fighter's L1/L2 shove stops at the edge of the attacker's next light, §3.5). `kbResist`: scuttlebit 1.0 · hopnode 1.0 · driftmoth/brinejelly 1.0 · glarewisp 1.0 · spitvalve **0** · rambyte 0.5 (**0** during CHARGE) · platewalker 0.5 (**0** while guarding or bashing) · broodcell **0** · droplatch 1.0 · voltwheel **0** · motes 1.0. Enemies with `kbResist` 0 flash only and are never interrupted. Enemies never damage each other.
 * **Death:** the killing blow's world hitstop is the move's hitstop **+2** (§3.4); 14-frame burst of 12 chips in the enemy's accent colour plus 2 px / 4 f shake; drops per §9.2; the `enemiesPurged` stat increments. Enemies are removed on death and respawn on room re-entry (bosses never).
 * Enemies ignore `~` pools and `^`/`v` spikes. Walkers turn around at patrol bounds, walls, and ledge edges (no floor tile under their leading edge). Patrol bounds are inclusive tile x values.
 * The player's **down-strike** bouncing off an enemy deals the down-strike damage and counts as a hit "from above" for Platewalker.
@@ -2081,6 +2088,9 @@ Tilemap fixes relative to `design/world.md` are listed in §10.6; everything els
 * Boss HP bar: §12.6 (bottom centre, 600 px wide, 20-frame lag ghost). Bosses have **no i-frames**: every hit counts; bosses are never knocked back or interrupted (`kbResist` 0) and only flash white 4 f (§3.4). Boss attacks carry three flags consumed by §4: `damage` (1|2), `unblockable` (not caught by Korvask's Bulwark Catch) and `projectile` (caught = destroyed). Flags per attack are in the table of §8.5.
 * Damage reference: per-fighter numbers in §4 (lights 2–8, heavies 6–14, specials 6–16); Overclock multiplies by 1.5. The fight-length estimates assume Tessik landing ~1.6 light hits per second during punish windows and taking 0–3 hits total.
 * Boss contact damage (touching the body) is 1 heart unless an attack says otherwise. Boss projectiles and hazards obey the same 60 i-frames as enemies.
+* **Knockback origin (playtest B34):** a registered boss or enemy hit knocks the fighter away from the hit box centre, except a melee box held out from the attacker's own body (it touches the body — Tallock's Slab Swing): a fighter standing between that body and the box centre is knocked away from the **body**, never into it. Projectiles and boxes away from the body (spikes, needles, the cable tip) keep the box centre.
+* **Camera focus:** every boss sets `focusX/focusY` each tick (the body; Corrosant's head; Kernauth's chest core / flying core, §8.3) and the boss-room camera frames it with the player (§11.3.1).
+* **Debug defeat** (`UB.debug.defeatBoss`, §16.9) runs this same death path for a boss live in the room (playtest B22).
 * **Enrage** triggers once, when HP first drops to or below the listed threshold: 45-frame roar (boss invulnerable, `bossPhase` SFX, screen shake 9 px / 20 f, the HP bar takes its phase-2 colours, §12.6), palette shifts toward the zone accent, then the listed changes apply for the rest of the fight. **Fairness floor:** an enrage tell cut never takes a telegraph below **20 frames** (`max(20, tell − cut)`), so every attack keeps a readable warning.
 * When a boss dies its shots in flight pop at once (nothing of a dead boss can hurt the player during the death animation or the reward), the defeat is recorded in `bossesDefeated` and the save is written right away; if the module is never collected (the player dies during the reward or quits), the arena reloads empty with the module waiting at its pickup tile.
 * **Defeat:** boss HP ≤ 0 → 10-frame hitstop, `bossBurst` particles and shake 12 px / 40 f, the death animation listed, bits burst (§9.3: large coins + 3 sparks), `{NAME} PURGED` toast, then the ability module (drawn as the §11.3.7 core diamond in the zone `glow`) floats to the pickup tile and bobs (±4 px, 60-frame period) until touched. Touching it: 120-frame **pickup sequence** — the world keeps running but the player is invulnerable and locked; screen darkens to 40 %, the module orbits the player twice (r 40, 1 rev per 60 f), the ability banner of §12.7 slides in with the ability name, its control hint and flavour line, `ability` SFX chord; on f120 the ability is granted, the seal lifts (opening tiles return to `.`), the boss is recorded in `bossesDefeated`, and the save is written (the only save outside a restore node). Boss music crossfades to the zone song over 120 frames. Bosses never respawn.
@@ -2091,15 +2101,18 @@ Tilemap fixes relative to `design/world.md` are listed in §10.6; everything els
 * **HP 120** · **Size** 90×120 (hit-box) · **Phases:** 1 (+ enrage) · **Ground boss**, walks at 1.5 px/frame, cannot jump except in Stack Slam. Starts at x=25 tiles (centre), facing the player.
 * **Intro title card:** `TALLOCK` / `WARDEN OF THE STACK`.
 * **Pattern:** after each attack's recovery, `WALK` toward the player for 45 frames — it halts 16 px short of the player's body (its walk is never an attack: a 120 px stack cannot be jumped, so a cornered fighter is not shoved into contact) — then choose: player within 3 tiles → Slab Swing (60%) or Stomp Quake (40%); 3–6 tiles → Stomp Quake (50%) or Stack Slam (50%); > 6 tiles → Disc Toss (70%) or Stack Slam (30%). Never the same attack three times in a row.
+* **Fighters above him (playtest B26/B27).** A fighter standing on a grate ≥ 60 px above his feet (the row-12 shelves) is never answered with the floor-only Swing or Quake: within 95 px → Stack Shrug (60%) or Stack Slam (40%), farther → Stack Slam (50%) or Disc Toss (50%). **Three head pogos in a row** (down-strikes landing on him with no touch of the ground between) bring the Stack Shrug: as the next pick, or at once if he is walking or recovering.
+* **Never pinned (playtest B34).** When a Stack Slam lands on a fighter (cornered at a wall, under a shelf), or one of his hits knocks the fighter into the stack (the Swing's knockback runs from its box centre, in front of the body), the fighter is pushed clear on the next frame — to the side of its centre, or the other side when that is a wall — so the landing touch is the slam's only body hit; no repeated contact.
 
 | Attack | Tell (frames) | Active | Damage | Recovery | Movement / how to punish |
 |---|---|---|---|---|---|
 | **Slab Swing** | 30: raises the near slab-arm, arm rim glows accent | 12: arc hit-box 70×40 in front, sweeping top→bottom — its top edge runs from 90 px to 40 px above the floor over the 12 frames | 1 | 40 | Stationary. Dodge: a jump started mid-tell (≈ f10–18 of the 30) sails over the arc even with the back to a wall; a standing fighter is caught as it comes down. Punish: step behind it during the swing (it does not turn for 40 frames) and hit the back; or down-strike its top disc from a grate. |
 | **Stomp Quake** | 36: rises 20 px onto its base disc's edge, dust ring | lands: two shockwaves (30×20 each) run left and right along the floor at 5 px/frame, lifetime 80 | 1 each | 50 | Stationary. Jump the wave (it is 20 px tall) or stand on a row-12 grate. Punish: 50 frames of recovery at melee range. |
 | **Disc Toss** | 24: the top disc spins up (visible rotation, rising whir) | fires one disc 30×10 at 4.5 px/frame horizontal, vy −4, gravity 0.2; bounces once on the floor (vy ×−0.6), dies on the second contact or after 150 frames | 1 | 30 | Stationary. The disc can be destroyed by any attack. Punish: close in while the disc is in the air. |
-| **Stack Slam** | 40: crouches (height ×0.8), base disc glows | jumps to the player's x recorded at tell end: 50-frame arc (vy −11, gravity 0.44, vx set to arrive); a ground boss, it passes through the one-way grates and always lands on the floor; landing shock 40×30 on each side for 10 frames | 2 (shock), 1 (body while airborne) | 60 | Big movement. Dodge: move 3+ tiles from the recorded x during the arc. Punish: the longest window — 60 frames while the stack wobbles; heavy attacks here. |
+| **Stack Slam** | 40: crouches (height ×0.8), base disc glows; a landing marker (accent ellipse 100×12 on the floor) follows the player | jumps to the player's x recorded at tell end (clamped so the stack fits the arena): the marker freezes there and stays on the floor — brighter, ink rim — for the whole arc (playtest B33); 50-frame arc (vy −11, gravity 0.44, vx set to arrive); a ground boss, it passes through the one-way grates and always lands on the floor; landing shock 40×30 on each side for 10 frames | 2 (shock), 1 (body while airborne) | 60 | Big movement. Dodge: move 3+ tiles from the marker during the arc. Punish: the longest window — 60 frames while the stack wobbles; heavy attacks here. |
+| **Stack Shrug** (only against a fighter above him, see Pattern) | 24: the stack squats (height ×0.86), the top two discs and the visor glow, accent chevrons rise over the top | 8: the stack heaves — a box 170 wide centred on him, from 90 px above his top down to 40 px below it (the shelf height: never the floor) | 1 | 40 | Dodge: drop off his head / step back along the shelf during the tell. Punish: 40 frames of recovery at melee range. |
 
-* **Enrage at HP ≤ 36:** walk 2.2 px/frame, all tells −6 frames (Disc Toss stays at the 20 f floor), Disc Toss fires two discs (second 15 frames later, vx ×0.8), Stomp Quake waves 6.5 px/frame, WALK gap 30 frames.
+* **Enrage at HP ≤ 36:** walk 2.2 px/frame, all tells −6 frames (Disc Toss and the Stack Shrug stay at the 20 f floor), Disc Toss fires two discs (second 15 frames later, vx ×0.8), Stomp Quake waves 6.5 px/frame, WALK gap 30 frames.
 * **Reward:** death animation 90 frames — discs drop one by one from the top with a thud and a 4-px shake each, the base disc cracks open revealing the module. Module → pickup tile (20,14). Banner: `ECHO JUMP ACQUIRED` / `Press JUMP again in the air` / `A second thought, taken mid-fall.` `L` unseals (and `R2` was never sealed: it is simply unreachable without the ability).
 * **Visual:** a tower of six flat discs of decreasing width (ellipses 90, 84, 78, 72, 66, 60 wide × 18 tall, stacked with 2-px gaps so the stack visibly wobbles), two slab-arms (rects 16×50, hanging from the third disc, swinging with walk cycle), a single horizontal visor slit (rect 30×6) on the top disc that glows. Colours: discs `#2a3a5c`, disc rims `#6c86b8`, visor/glow `#8fd3ff`, arm slabs `#15213a`. Silhouette: tall tapering stack with two hanging bars; nothing round-bodied or humanoid. ~20 ops.
 * **Fair fight length:** ~65 s (120 HP; ~55% of the fight is punish windows).
@@ -2113,7 +2126,7 @@ Tilemap fixes relative to `design/world.md` are listed in §10.6; everything els
 | Attack | Tell | Active | Damage | Recovery | Movement / punish |
 |---|---|---|---|---|---|
 | **Thread Dash** | 30: parks at the left or right arena edge at the player's current y (clamped rows 4–13), a taut thread line is drawn across the arena at that y, flickering | crosses the arena at 12 px/frame (≈100 frames) exactly along the drawn line (the shuttle snaps onto it as the pass begins — a far start cannot always reach it during the tell), hit-box 110×40 | 1 | 36: hovers at the far edge, drooping to y = row 12 | Dodge: change height (jump or drop) once the thread stops flickering (frame 30). Punish: it droops within melee reach at the far edge for 36 frames. |
-| **Snare Line** | 24: hovers at the arena centre, both blade-arms spread | lays a horizontal trip-thread at knee height (8 px tall, its bottom 14 px above the floor — every standing fighter overlaps it, any jump clears it) across x 1–39 that persists up to 240 frames; contact = 1: the first fighter it catches takes 1 and the thread snaps | 1 | 20 | The line blocks ground movement across the arena: jump it or use the grates. Punish: it hovers low at centre for the 20-frame recovery and the following Thread Dash tell. |
+| **Snare Line** | 24: hovers at the arena centre, both blade-arms spread | lays a horizontal trip-thread at knee height (8 px tall, its bottom 14 px above the floor — every standing fighter overlaps it, any jump clears it) across x 1–39 that persists up to 240 frames; contact = 1: the first fighter it catches takes 1 and the thread snaps. A fighter who comes **down onto it from above** — who jumped it as it was laid, or drops from a grate — treads it flat: it snaps with no damage (playtest B36) | 1 | 20 | The line blocks ground movement across the arena: jump it as it is laid (land on it) or use the grates. Punish: it hovers low at centre for the 20-frame recovery and the following Thread Dash tell. |
 | **Needle Rain** | 40: rises to row 3 at centre, shudders; six needle silhouettes blink at random x (≥ 2 tiles apart) above the arena | six needles (8×24) fall at 7 px/frame from row 0 at the marked x; each sticks in the floor as a 1-tile hazard for 90 frames | 1 (falling or stuck) | 50: descends to row 11 at centre | Dodge: stand between marks. Punish: 50 frames at row 11 — reachable from the centre grate or with an air attack. |
 | **Spool Spin** | 30: a shadow ellipse appears on the floor at the player's x; the shuttle rotates to vertical | drops to the floor at that x and spins for 60 frames: hit-box 130×60, drifting toward the player at 2 px/frame | 1 | 60: lies on the floor, dizzy stars | Dodge: get 3+ tiles from the shadow or onto a grate. Punish: 60 frames on the floor = the best window; heavies and specials here. |
 
@@ -2135,6 +2148,7 @@ Tilemap fixes relative to `design/world.md` are listed in §10.6; everything els
 | **Ceiling Drip** | 36: crawls to the player's x on the ceiling, body shudders; ten drip silhouettes blink below it across a 6-tile span | ten drips (6×12) fall at 6 px/frame, one every 6 frames, at random x in the span | 1 | 40: head droops 2 tiles down from the ceiling | Dodge: leave the 6-tile span. Punish: the drooping head reaches row 4 — hit it from a row-11 grate with jump attacks (×1.5). |
 | **Coil Sweep** | 40: drops to the floor at the arena's left or right end and coils (segments bunch up) | sweeps the floor to the other end at 5 px/frame, body hit-box 1 tile tall along its whole length | 1 | 50: lies stretched along the floor | Dodge: be on any row-16 grate. Punish: 50 frames with the whole body on the floor — down-strikes from the grate chain into ground combos. |
 
+* **Edge beacon (playtest B38):** from the floor the camera can sit below the ceiling the Keeper crawls on; while its head is above the view, a beacon at the view's top edge marks its x (an inked fin-coloured chevron over a small head wedge, pulsing; below the HUD block when the head is over it). Every boss exposes `focusX/focusY` (Corrosant: its head; Tallock/Weftyr: the body; Kernauth: the chest core / the flying core) for the engine's boss framing.
 * **Enrage at HP ≤ 72 — Flood:** roar 90 frames; then every 420 frames the arena's floor row (row 20, the tile row above the solid floor) becomes acid for 120 frames. Fairness floor (§8.0): the brine stirs for 30 frames first (bubbles along the floor row, shake 5/20, `bossPhase` SFX), and the acid then rises over 20 frames, drawn pale and harmless; it burns for the remaining 100 frames (hazard, −1 HP ignoring i-frames, the §3.3 freeze, respawn on the nearest row-16 grate instead of the exit) — 50 frames of warning before it can hurt, so a floor-standing fighter always has time to reach a grate. Tells −8 frames (Acid Spit stays at the 20 f floor), crawl 4.5 px/frame, Acid Spit puddles last 240 frames.
 * **Reward:** death animation 120 frames — segments burst into bubbles from tail to head, the head sinks into a spreading puddle that dries into the module. Banner: `GRIP PROTOCOL ACQUIRED` / `Hold toward a wall in the air to cling · JUMP to kick off` / `The walls were never the problem.` `L` unseals; the brine crust over the hatch cracks (tiles (42..44,21..23) return to `.`).
 * **Visual:** a flat triangular head (polygon 50×40, point forward) with a wide underslung jaw (second polygon that hinges open), four small eye dots in a row, seven body segments (rounded squares 30×30, each with a dorsal fin triangle), drip particles from every third segment. Colours: head `#1d4d3a`, segments `#0d2a20`, fins/eyes `#a8ffcf`, acid/jaw interior `#4fae84`. Silhouette: a long segmented line ending in a wedge, hugging the room edges. ~24 ops.
@@ -2170,6 +2184,7 @@ Tilemap fixes relative to `design/world.md` are listed in §10.6; everything els
 
 * **Enrage at HP ≤ 60 — Panic Loop:** the HOVER gap is removed (attacks chain directly), Static Beam fires **twice** (the second at the player's new y, 30 frames apart, 15-frame tell), tells −8 frames (Fragment Burst and the Blink reappear stay at the 20 f floor), flight 5.5 px/frame, the tail grows to 160 px.
 * **Defeat:** §12.16 (victory sequence). No ability module. `kernauth` is recorded in `bossesDefeated` and the save is written with `victory: true`.
+* **Readable on red (playtest B41):** Rootwell is red on red, so the hazards read by luminance and an ink outline, not hue: the Root Spikes are bleached bone `#f2e4c2` with a 4 px ink outline and a white edge (≥ 3:1 against the arena background and the red floor edge); each spike mark is a bone ellipse with an ink outline and a dashed `hot` riser rising above it (visible around a fighter standing on it); both cable-arms lie on a pale rim `#e8c79a` under their ink, so the dark cables read on the dark-red floor (the glowing whip-tip is the only part that hurts).
 * **Visual, phase 1:** a seated mass (rounded trapezoid 150×180 with a slight lean), a crown of seven spikes (triangles) on top, two cable-arms (thick wavy strokes, 12 px, with three knot circles each) resting on the floor to either side, the chest core (circle r 30 with a five-point star inside, pulsing scale 0.9–1.1 at 1 Hz), a lattice of thin lines across the mass. Colours: mass `#4d1018`, cables `#2a080c`, core `#ffcf5a`, crown `#b32a2a`. Silhouette: a crowned seated mountain with two arms on the floor.
 * **Visual, phase 2:** the core (circle r 35 with the star, plus an inner white-hot circle r 14 `#fff4d6`), the five crown spikes orbiting it at radius 46 (rotation 2°/frame), a cable tail of six fading circles following its path. Same colours. Silhouette: a spiked sun with a tail.
 * **Fair fight length:** phase 1 ~85 s + transition 3 s + phase 2 ~95 s ≈ **3 min**.
@@ -2239,15 +2254,15 @@ Tallock 60 bits (3 large) · Weftyr 100 bits (5 large) · Corrosant 140 bits (7 
 ### 9.5 Vendor — Scrivvet
 
 * **Who:** a jittery data-broker: a hunched figure the size of the player, wrapped in a cloak of cable scraps, with a lantern-eye on a stalk and six small hands that never stop sorting. Colours: cloak `#2a3a5c`, hands/stalk `#6c86b8`, lantern-eye `#ffcf5a`. Idle: hands shuffle (3-frame loop), eye tracks the player.
-* **Where:** `dc_shrine` tile (21,14) and `rw_rest` tile (21,14). Same stock and purchase state in both (one-time purchases, saved).
-* **Interaction:** stand within 1 tile and press Up/Interact (`▲ TRADE` prompt, §12.8): a shop panel (§12.17) lists the three items with price, a one-line effect, and `SOLD` once bought. Up/Down selects, Confirm buys, Back closes; the game is paused while the panel is open. Buying: bits bump down, `vendorBuy` chime, the item line greys out, the `{ITEM} PURCHASED` banner shows after the panel closes. Purchases are saved immediately (the second save trigger outside a node, with the boss pickup).
+* **Where:** `dc_shrine` tile (21,14) and `rw_rest` tile (21,14). Same stock and purchase state in both (one-time purchases, saved). "The deeper you go, the cheaper I get" is true (playtest B25): `rw_rest` sells at about 25 % off — Spare Cell 70, Hot Clock 120, Deep Ping 90 (`UB.IDS.vendorItems[].deepPrice`, `UB.IDS.vendorDeepRooms = ['rw_rest']`, read through `UB.Util.vendorPrice(item, roomId)`); `game.buy()` charges that price. `save.vendor` still stores ids only.
+* **Interaction:** stand within 1 tile and press Up/Interact (`TRADE` prompt, §12.8): a shop panel (§12.17) lists the three items with price, a one-line effect, and `SOLD` once bought. Up/Down selects, Confirm buys, Back closes; the game is paused while the panel is open. Buying: bits bump down, `vendorBuy` chime, the item line greys out, the `{ITEM} PURCHASED` banner shows after the panel closes. Purchases are saved immediately (the second save trigger outside a node, with the boss pickup).
 * **Lines (original; shown above the panel, random per opening):** "Everything down here was somebody's, once. Now it's mine. Now it's yours." · "You pay in bits because that's all that's left to pay in." · "The deeper you go, the cheaper I get. Don't ask why I'm down here." Can't afford: "Come back heavier." Sold out: "Nothing left you'd want. Nothing left I'd sell."
 
 | Item | Price | Effect |
 |---|---|---|
-| **Spare Cell** | 90 bits | Max energy 100 → 125; energy orbs fill +25 as before (so specials can be used one more time per refill). |
-| **Hot Clock** | 160 bits | Overclock meter gains ×1.5 from landed hits and shards. |
-| **Deep Ping** | 120 bits | The map screen reveals every room of every zone the player has set foot in (all rooms of a visited zone become "discovered"), marks all restore nodes, and marks each **uncollected** hidden core with a `?` on its room. |
+| **Spare Cell** | 90 bits (70 at `rw_rest`) | Max energy 100 → 125; energy orbs fill +25 as before (so specials can be used one more time per refill). |
+| **Hot Clock** | 160 bits (120 at `rw_rest`) | Overclock meter gains ×1.5 from landed hits and shards. |
+| **Deep Ping** | 120 bits (90 at `rw_rest`) | The map screen reveals every room of every zone the player has set foot in (all rooms of a visited zone become "discovered"), marks all restore nodes, and marks each **uncollected** hidden core with a `?` on its room. |
 
 
 ---
@@ -2327,7 +2342,7 @@ Abilities: **EJ** = Echo Jump (boss 1) · **BL** = Burst Line (boss 2) · **GP**
 **Tier 0 — no abilities (Driftcache → boss 1).** New game: `dc_wake` start tile (3,12) on the dais, restore node (5,12).
 
 1. `dc_wake` → `R`. Walk off the dais (2-tile drop) past the tutorial scuttlebit; the exit is at floor level (rows 12–14).
-2. `dc_fall` (`L` arrival (2,4) on the entry ledge x1–10, row 4) → `R`. Pure descent: entry ledge → grate row 8 (x13–16; fall) → straight down the well (x11–18) to the grate row 24 (x12–15) → ledge C (x18–23, row 26; fall right 3 tiles, 3 rows) → drop down the x13–17 gap to the grate row 40 (x16–19) (or onto the crumble planks at rows 31/34) → ledge row 42 (x22–30; fall right) → the floor row 49 at x22–30 → `R` (rows 47–49, floor level). The 5-wide spike bed at x12–16 on the floor is **left** of this landing and is never crossed (pogo-able if curious).
+2. `dc_fall` (`L` arrival (2,4) on the entry ledge x1–10, row 4) → `R`. Pure descent: entry ledge → grate row 8 (x13–16; fall) → straight down the well (x11–18) to the grate row 24 (x12–15) → ledge C (x18–23, row 26; fall right 3 tiles, 3 rows) → drop down the x13–17 gap to the grate row 40 (x13–19) (or onto the crumble planks at rows 31/34 — a plank that gives way drops onto the same grate, on camera) → ledge row 42 (x22–30; fall right) → the floor row 49 at x22–30 → `R` (rows 47–49, floor level). The 5-wide spike bed at x12–16 on the floor is **left** of this landing and is never crossed (pogo-able if curious).
 3. `dc_cross` (`L` arrival (2,14)) → `R`. Pit 1 (x14–18, spikes one tile **below** the floor): hop onto the row-12 grate (x15–17, 3 tiles up: 90 px ≤ 96) and off its right end to x19 — or jump it directly (Tessik 167 / Vellix 211 px reach ≥ 130/126 needed; Brackmaw's 112 < 118, so the grate). Mound x26–34 (2 up). Pit 2 (x40–43, 4 wide): needed `(5−1)·30 − 34 + 2 = 88 px` ≤ Brackmaw's 112 ✓ for everyone. `R` at floor level.
 4. `dc_shrine` (flat; node (9,14); Scrivvet (21,14)) → `R`.
 5. `dc_sentinel`: Tallock. Fight bounds x1–39; `L` seals; the row-12 grates (x8–11, x28–31) are the dodge platforms. Reward: **ECHO JUMP** at (20,14).
@@ -2344,7 +2359,7 @@ Abilities: **EJ** = Echo Jump (boss 1) · **BL** = Burst Line (boss 2) · **GP**
 **Gate 2 — Burst Line.**
 
 10. `lw_weftyr.B`: hop the 1-wide wall x40 (rows 10–14, top at row 10: 150 px → Echo Jump) into the hatch pocket x41–46, drop into the chute x42–44. ✓ with EJ only.
-11. `bv_sluice` (`T` arrival (3,1) lands on the row-4 grate x2–5; Down+Jump drops through to the crawlspace floor rows 8–9) → `R`. The crawlspace rows 6–7 (ceiling rows 3–5 at x9–30, so it cannot be walked over) has its floor **missing for 6 tiles (x15–20)** over the acid channel (row 15). This is the dash gate: a ground or hop dash of 180 px from the ledge edge lands on x21 (the body hangs over the edge by up to half its width; a 4–6 px hop plus the 6 px step-up adds ~25 px of tolerance for the heavies; Vellix's 210 px is trivial). Without the dash: the corridor is 60 px tall, so the tallest hop is 20 px (Vellix) and the airtime carries 129 px (Vellix, needs 164) or 45 px (Brackmaw, needs 148) — **fails**. Falling in: the cavity under the gap is sealed (rows 10–14 x21–24 solid) and floored with acid (row 15 x9–24) → −1 HP and respawn on the shelf, never a soft-lock. After the gap, walk x21–30, drop at x31–33 to the lower hall (floor row 15 x25–62) under the ceiling spikes (row 10 x35–43, 3 rows above the body) and walk to `R` (rows 12–14).
+11. `bv_sluice` (`T` arrival (3,1) lands on the row-4 grate x2–5 in an open chamber (rows 2–7, x1–8): walking right off the grate's end drops to the crawlspace floor rows 8–9 — no Down+Jump needed (Down+Jump also drops through)) → `R`. The crawlspace rows 6–7 (ceiling rows 3–5 at x9–30, so it cannot be walked over) has its floor **replaced for 6 tiles (x15–20) by an acid channel level with the floor** (row 8; solid beneath). This is the dash gate: a ground or hop dash of 180 px from the ledge edge lands on x21 (the body hangs over the edge by up to half its width; a 4–6 px hop plus the 6 px step-up adds ~25 px of tolerance for the heavies; Vellix's 210 px is trivial). Without the dash: the corridor is 60 px tall, so the tallest hop is 20 px (Vellix) and the airtime carries 129 px (Vellix, needs 164) or 45 px (Brackmaw, needs 148) — **fails**; and since the acid lies level with the floor there is no cavity to fall into and Echo-Jump back out of (a Jump + Echo Jump pair carried Vellix across the old 5-row cavity, playtest B15) — the body touches acid the moment it drops below the floor line. Falling in → −1 HP and respawn on the shelf, never a soft-lock. After the gap, walk x21–30, drop at x31–33 to the lower hall (floor row 15 x25–62) under the ceiling spikes (row 10 x35–43, 3 rows above the body) and walk to `R` (rows 12–14).
 
 **Tier 2 — Echo Jump + Burst Line (Brinevault → boss 3).**
 
@@ -2368,7 +2383,7 @@ Abilities: **EJ** = Echo Jump (boss 1) · **BL** = Burst Line (boss 2) · **GP**
 ### 10.4 Loops, shortcuts, cores and nodes
 
 * **Loop A (zones 1–2):** dc_cross → dc_shrine → dc_sentinel → lw_hoist → lw_belts → lw_shaft → dc_cross.L2. `lw_shaft` is climbed with Echo Jump (floor → grate row 28 is a 6-tile rise, or ride **S1** (x8–10, rows 30→10) up the left wall; grate row 9 → ledge row 5 is a 4-tile hop). Returning dc_cross → lw_shaft needs the 6-tile shelf (`dc_cross.L2`, rows 9–10 x0–8: 180 px, Echo Jump ≥ 190 ✓; from the row-12 grate x15–17 the hop is 3 tiles up and 7 across — Vellix's old 660 jump made this reachable with no abilities, hence the 615 ruling). This is how the player returns to Driftcache for cores 1 and 3 without re-crossing boss 1's arena (which is open after the boss anyway).
-* **Loop B (zones 2–3):** lw_rest.B → bv_catwalk → bv_cistern → bv_sluice → lw_weftyr → lw_rest. `bv_catwalk` from above: the arrival ledge (x1–8, row 3) steps down into a 4-tall antechamber (x9–14, floor row 5), then the 2-tall crawlspace (rows 3–4, ceiling row 2) whose floor is missing for 6 tiles (x15–20) over acid: **Burst Line** (the ceiling at x≥15 is 90 px, so no height from the antechamber can be carried into the corridor; the gap maths is exactly `bv_sluice`'s). Falling in = acid → respawn on the ledge, which is a launch pad straight back up to `lw_rest`: no soft-lock, no sequence break. From below: chute auto-launch → grates rows 29/25/21/17 → the right shaft (x27–30) grates rows 13/9 → the crawlspace right end (x21–26, row 4; a 4-tile rise from the row-9 grate: Echo Jump) → dash the gap leftward → antechamber → ledge → `bv_catwalk.T`.
+* **Loop B (zones 2–3):** lw_rest.B → bv_catwalk → bv_cistern → bv_sluice → lw_weftyr → lw_rest. `bv_catwalk` from above: the arrival ledge (x1–8, row 3) steps down into a 4-tall antechamber (x9–14, floor row 5), then the 2-tall crawlspace (rows 3–4, ceiling row 2) whose floor is an acid channel for 6 tiles (x15–20, row 5, level with the floor; solid beneath): **Burst Line** (the ceiling at x≥15 is 90 px, so no height from the antechamber can be carried into the corridor; the gap maths is exactly `bv_sluice`'s). Falling in = acid → respawn on the ledge, which is a launch pad straight back up to `lw_rest`: no soft-lock, no sequence break. From below: chute auto-launch → grates rows 29/25/21/17 → the right shaft (x27–30) grates rows 13/9 → the crawlspace right end (x21–26, row 4; a 4-tile rise from the row-9 grate: Echo Jump) → dash the gap leftward → antechamber → ledge → `bv_catwalk.T`.
 * **Loop C (zone 4):** ns_climb → ns_rest → ns_plunge → `ns_plunge.L2` (row 23 ledge) → `ns_climb.R` (right ledge row 37): reach the restore node and come back without re-climbing from the floor.
 * `lw_weftyr` ↔ `bv_sluice` is two-way (the shelf's row-4 grate launches back up; the hatch pocket is left over the 5-tall wall with Echo Jump), so Loomworks' node and core 2 are reachable from Brinevault without crossing the catwalk.
 
@@ -2376,7 +2391,7 @@ Abilities: **EJ** = Echo Jump (boss 1) · **BL** = Burst Line (boss 2) · **GP**
 |---|---|---|---|---|
 | 1 | `dc_loft` (27,12) | **EJ** | after boss 1 | dc_sentinel → dc_shrine → dc_cross: Echo Jump onto the hanging slab (rows 9–10, x54–60; 180 px from the floor, single max 113.8 fails), grate row 6 (3 up), grate row 2 (4 up: Echo Jump), up through `dc_cross.T`. In `dc_loft` the chute (x5–7, nine tiles left of the spike bed) auto-launches you onto the floor whichever way you hold — RIGHT lands on x8–17, LEFT on x1–4; the 7-wide spike bed (x18–24, row 14) is crossed on the two crumble planks (x19–20 and x23–24, row 11: a 4-tile rise then a 3-tile hop; the droplatch at (21,4) drops onto the planks) to the pedestal x26–28 (rows 13–14). Nobody can jump the 7-wide bed directly except by pogo. |
 | 2 | `lw_belts` (93,6) | **BL** | after boss 2 | lw_weftyr → lw_rest → lw_belts: grate row 10 (x73–76; 5 tiles up: Echo Jump) and grate row 7 (x74–77) into the crawlspace (rows 5–6, ceiling row 4); dash the 6-tile floor gap (x84–89, rows 5–6 corridor, open below so a miss is only a fall) onto the ledge x90–94. The ledge is 8 tiles (240 px) above the floor with solid mass under it: Echo Jump maximum 196 cannot reach it from below. |
-| 3 | `dc_fall` (24,4) | **GP** | after boss 3 | bv_corrosant → bv_rest → bv_cistern → bv_catwalk (dash) → lw_rest → lw_belts → lw_shaft → dc_cross → dc_fall (arrive at the bottom). Climb: floor → grate row 46 (x10–13; 4 up: Echo Jump) → ledge row 42 (x22–30) → grate row 40 (x16–19) → ledge E (x1–12, row 35; 4 up) → crumble row 34 (x14–16) → crumble row 31 (x8–10) → ledge C (x18–23, row 26) → grate row 24 (x12–15) → **cling** on ledge B's left face (x19, rows 14–19, 6 tiles sheer) and wall-jump onto ledge B's top (row 13, x19–29) → walk right into the shaft x27–29 (walls x26 rows 5–11 and x30 rows 2–13) → wall-jump **9 tiles (270 px)** to the pocket (x23–29, rows 2–4) → the core at (24,4) (the large bit (28,3) beside it). Echo Jump maximum 196 < 270: fails without Grip Protocol. |
+| 3 | `dc_fall` (24,4) | **GP** | after boss 3 | bv_corrosant → bv_rest → bv_cistern → bv_catwalk (dash) → lw_rest → lw_belts → lw_shaft → dc_cross → dc_fall (arrive at the bottom). Climb: floor → grate row 46 (x10–13; 4 up: Echo Jump) → ledge row 42 (x22–30) → grate row 40 (x13–19) → ledge E (x1–12, row 35; 4 up) → crumble row 34 (x14–16) → crumble row 31 (x8–10) → ledge C (x18–23, row 26) → grate row 24 (x12–15) → **cling** on ledge B's left face (x19, rows 14–19, 6 tiles sheer) and wall-jump onto ledge B's top (row 13, x19–29) → walk right into the shaft x27–29 (walls x26 rows 5–11 and x30 rows 2–13) → wall-jump **9 tiles (270 px)** to the pocket (x23–29, rows 2–4) → the core at (24,4) (the large bit (28,3) beside it). Echo Jump maximum 196 < 270: fails without Grip Protocol. |
 
 Restore nodes (6): `dc_wake` (5,12) · `dc_shrine` (9,14) · `lw_rest` (15,14) · `bv_rest` (15,13) · `ns_rest` (15,14) · `rw_rest` (9,14) — zones have 2/1/1/1/1 (Driftcache two because it holds the start). Vendor: `dc_shrine` (21,14) and `rw_rest` (21,14).
 
@@ -2410,6 +2425,9 @@ Every restore node and both vendor tiles are reached at the tier in which their 
 | F11 (QA 3) | `bv_catwalk` | row 33, x19–22: `~` → `#` (the trough is x8–18, the dry rim x19–25) | Arriving from `bv_cistern.T` (loop B) with LEFT held through the auto-launch, Tessik and Vellix came down in the acid trough at x20–22 (the rim beside the hatch was 3 tiles) — the F9 defect class. Seven dry tiles now lie left of the hatch; the row-31 grate still stands in the trough for the large-bit pocket. |
 | F12 (QA 3) | `ns_plunge` | row 49, x20–23: `~` → `.` (the floor pool is x24–28) | Arriving from `rw_gate.T` with RIGHT held, Tessik and Vellix landed in the floor pool at x20 (3 dry tiles right of the hatch). Seven dry tiles now lie right of the hatch. |
 | F13 (QA 3) | `lw_hoist` | row 30, x7–12 and x18–23: `.` → `-` | The return from `lw_belts.T` needs an Echo Jump at the launch apex to reach the pillar crown (row 30), and the 1-tile rims x13/x17 were the only footing: with a direction held every fighter but Brackmaw overshot into the static pools. Two grate shelves at the crown height now flank the rims (H2 at its lowest point is a 2-row hop from the right one). |
+| F15 (playtest B15) | `bv_sluice`, `bv_catwalk` | `bv_sluice`: row 8, x15–20: `.` → `~`; row 9, x15–20 and rows 10–14, x9–20: `.` → `#`; row 15, x9–24: `~` → `#`. `bv_catwalk`: row 5, x15–20: `.` → `~`; rows 6–7, x15–20: `.`/`~` → `#` | Both Burst Line gaps opened onto an acid pit 2–5 rows deep: a Jump at the lip then an Echo Jump from inside the pit carried Vellix (and Tessik in `bv_catwalk`) across — `bv_catwalk` is reachable from `lw_rest` before Weftyr, so Brinevault (boss 3, core 3) was reachable without the dash. The gap is now an acid channel level with the crawlspace floor: dropping below the floor line is the hazard at once, so a jump pair in the 60 px corridor carries ≤ 130 px of the 164 needed; the dash still crosses (unchanged gap width). |
+| F16 (playtest B17) | `dc_fall` | row 40, x13–15: `.` → `-` (the grate is x13–19) | The row-34 crumble planks (x14–16) dropped a fighter standing on x14–15 past every footing onto the spike bed at row 49 — 450 px below, off camera — and the hazard reset was the top of the Long Drop. The row-40 grate now runs under the planks: a plank that gives way drops the fighter 6 rows onto it, in view, on the descent route. |
+| F17 (playtest B19) | `bv_sluice` | row 2, x5–8: `#` → `.` | The `T` arrival landed on the row-4 grate with the head in the 3-wide entry shaft (row 2): holding RIGHT stopped at x≈140 and only an untaught Down+Jump continued the critical path after Weftyr. The chamber is now open at rows 2–7 over x1–8: the fighter walks off the grate's end onto the crawlspace floor. |
 | F14 (QA 3) | `ns_climb` | rows 67–69, x32–33: `#` → `.`; rows 49–50, x34–35: `#` → `.` | The pit of static (x34–46, rows 53–69, with the pillar's large + medium bits and a droplatch) was a sealed cavity — 25 of the 331 placed bits could never be collected; the floor now walks on to its brink. Shaft 2 was a pit open only at the top (its left wall x34–35 was solid for rows 39–50), so the §10.3 #16 "slab → shaft 2" route did not exist; its foot now has the doorway the other shafts have. |
 
 No exit needed moving: all 25 pairs lined up as authored. No tilemap row had a wrong length. Every change above is mirrored in the §6 tilemaps (which `test/world.cjs` compares byte for byte with `js/world.js`).
@@ -2467,7 +2485,7 @@ anti-aliased off; we rely on the browser's path rasteriser.
 | `METER_READY` | `#FFFFFF` | ready pulse |
 | `BITS` | `#8FE388` | bits icon/counter |
 | `DANGER` | `#FF3B3B` | low-HP vignette, hurt tint |
-| `PANEL` | `rgba(20,16,24,0.82)` | menu panel fill |
+| `PANEL` | `#17131C` | menu panel fill — opaque (playtest B05: a translucent panel let banners, the boss card and the HUD bleed through pause, map, shop and the YES/NO dialogs; this is the old 82 % `INK` panel as it read over the dimmed game) |
 | `PANEL_EDGE` | `#F2EBDD` | menu panel stroke (lineWidth 3) |
 | `SELECT` | `#FFD166` | menu highlight |
 | `LOGO_A` | `#3FD3FF` | logo top gradient stop |
@@ -2707,8 +2725,24 @@ clamp: cam.x ∈ [0, roomW - 960], cam.y ∈ [0, roomH - 540]   (rooms smaller t
 * Camera is interpolated at render time with `alpha`; shake is added after interpolation
   and is NOT part of `cam` (so clamping never eats the shake). Final draw offset is rounded
   to integers to keep tile edges crisp.
-* Boss rooms: lookahead 0; camera centres the midpoint between the player and the boss,
-  clamped to the room.
+* Boss rooms (intro and fight): lookahead 0. The camera frames the boss's **focus point** `boss.focusX/focusY`
+  (§8.0, §8.3 — the body, Corrosant's head, Kernauth's chest core / flying core; the body centre if a boss sets none) with
+  the player (playtest B38):
+  * x: the midpoint between the player and the focus, but never with the player closer than 40 px to a side edge
+    (only bites when the two are too far apart to share the view, e.g. Kernauth's core across the 1920 px `rw_throne`).
+  * y: the normal dead-zone camera while the focus sits inside `[70, 540 − 110]` of the view; otherwise the camera eases
+    (0.12/frame) toward the y that puts the focus 70 px under the top edge (or 110 px over the bottom), as far as the
+    player allows: the player's feet stay at screen y ≤ 444 (above the boss bar, §12.6) and its head ≥ 70 px under the
+    top edge — a hard limit, so a fast fall never outruns the view. The room clamp still wins at the room's own edges
+    (on `bv_corrosant`'s floor the view is the lowest the room allows and the feet sit at screen y 450, still above the
+    bar at 486).
+  * In `bv_corrosant` the view therefore rises to show the ceiling from the row-16 / row-11 grates; from the floor the
+    feet limit keeps the floor framing and Corrosant's **edge beacon** (§8.3) marks the head above the view.
+  * **Side marker:** a boss whose focus lies off the view to the left or right (more than ~880 px from the player) is
+    marked by a pulsing chevron at that side edge (inset 12 px, `INK` 3 outline, the boss's `accent` fill, α 0.7↔1 at
+    30 f), at the focus's height clamped to y 140–466 (under the hearts block, over the boss bar); a boss with its own
+    top beacon (Corrosant, `beaconTop`) marks the above-the-view case itself. Never drawn under an overlay.
+  * Clamped to the room as everywhere.
 
 #### 11.3.2 Room transitions
 
@@ -2761,6 +2795,10 @@ Decaying random offset: each frame `ox = rand(-1,1)*mag*(remaining/frames)`,
 
 * Player hurt: entity white/red re-draw per §2.3; plus a full-screen `DANGER` `fillRect` at
   α 0.25 on the hit frame fading to 0 over 6 f.
+* **Reduced flashing** (playtest B42, settings `reducedFlashing`, §12.14 / §14.2): every full-screen flash (hurt, hazard,
+  boss death, Overclock, Kernauth's phase change) is drawn as a 10 px pulse along the screen edges (α ≤ 0.45) instead of a
+  full-screen fill. `UB.FX.setFlashScale(k)` (0..1) scales every flash's alpha (0 = none); `UB.FX.reducedFlashing()` reads
+  the setting live. Screen shake is separate (`screenShake`).
 * **Heartbeat vignette** at HP ≤ 1 (or ≤ 2 when maxHearts ≥ 7): a second vignette layer in
   `DANGER`, radial from r 260 to r 640, alpha `0.10 + 0.14 * pulse` where
   `pulse = max(0, sin(t/36*2π))^3` (a "lub" every 0.6 s); a low thump SFX (§13.8 `heartbeat`)
@@ -2840,6 +2878,8 @@ hand-drawn ±1 px vertex jitter (seeded by panel id, static).
   toward the budget).
 * During Overclock the bar drains (it is the timer, §3.9) in `ocPalette.glow` of the
   fighter and the label reads `OVERCLOCKED`; last 3 s (180 f): bar blinks 6 f on / 6 f off.
+* A refused Overclock press (meter short of 100, §3.7 "no silent refusals", playtest B31): for the first 6 f of the
+  18 f refusal cue the bar shakes ±2 px and its trough and rim turn `DANGER` (the energy bar's refusal flash, §12.2).
 
 ### 12.4 Bits counter — top-right
 
@@ -2858,7 +2898,9 @@ hand-drawn ±1 px vertex jitter (seeded by panel id, static).
   overlay (pause/map/settings/shop/lore) is open in play and resume where they were. One-line system toasts (§15.8:
   `SAVE ERASED`, the gamepad toasts, the storage warning) are drawn on every screen — title, select, game over,
   victory — and above an open overlay (`Gamepad disconnected — paused` stays up over the pause menu); the zone
-  toast and banners belong to play and sit under an overlay.
+  toast, banners, the boss card, the interaction prompt and the hint lines belong to play and are not drawn while an
+  overlay is open (timers frozen; they return when it closes — playtest B05/B06). Under an overlay only the status HUD
+  (hearts, energy, meter, bits, boss bar) shows beneath the opaque panel.
 
 ### 12.6 Boss HP bar — bottom centre
 
@@ -2870,6 +2912,8 @@ hand-drawn ±1 px vertex jitter (seeded by panel id, static).
 * Damage: a `PAPER` "lost chunk" lingers 20 f then shrinks. Phase 2: trough colour becomes
   `#3A1020` and the fill gradient flips to `#FF3B5C`→`#B86BFF`; bar shakes ±3 px 20 f.
 * Intro: bar draws out from the centre over 30 f while the boss title card shows (§12.13).
+* Death (playtest B11): after the killing hit the lost chunk drains for 40 f, then the whole bar fades out over 20 f;
+  nothing is drawn in the reward state (no empty trough under `{NAME} PURGED`), and the hint strip returns.
 
 ### 12.7 Ability banner / pickup banner
 
@@ -2879,13 +2923,30 @@ hand-drawn ±1 px vertex jitter (seeded by panel id, static).
 * Line 2 (480, 268): `16px MONO PAPER` the control hint, e.g. `Press JUMP again in the air`.
 * Line 3 (480, 296): `13px MONO PAPER_DIM` the flavour line (§15.5).
 * 10 `glitter` burst from the panel corners on open; `ability` SFX.
-* Boss ability rewards use this panel inside the 120 f pickup sequence of §8.0 (player locked, screen darkened to 40 %, module orbiting); the panel then holds its normal 150 f after the sequence. Cores, vendor purchases and `RESTORED` use the plain non-blocking banner.
+* Boss ability rewards use this panel inside the 120 f pickup sequence of §8.0 (player locked, screen darkened to 40 %, module orbiting).
+* **Top strip (playtest B04):** the centre panel is used only inside that locked sequence. Any banner shown while the
+  player has control — `CORE FOUND`, `{ITEM} PURCHASED`, `RESTORED`, and the ability banner's 150 f after the sequence
+  (the panel eases out over 10 f as the strip slides in) — is a strip at (240, 8), 480 wide, between the hearts block
+  and the bits counter: line 1 `bold 16px UI SELECT`; line 2 `12px MONO PAPER` (two rows when wider than 456 px);
+  line 3 `11px MONO PAPER_DIM`. It slides down over 12 f and dims to α 0.35 while the fighter stands behind it (as the
+  hearts block, §12.1). Any banner ends on a room change (a transition, a warp, a respawn): it never follows the player
+  into the next room.
 
 ### 12.8 Prompts & misc HUD
 
-* Interaction prompt (restore node, vendor): `bold 14px UI PAPER` `▲ REST` / `▲ TRADE`
-  floating 24 px above the object, bobbing 2 px; the key glyph shows the bound key
-  (`UP` or the gamepad glyph).
+* Interaction prompt (restore node, vendor): `bold 14px UI PAPER` `REST` / `TRADE`
+  floating 24 px above the object, bobbing 2 px, with the bound up key under it (`11px MONO PAPER_DIM`, `↑` on both
+  devices). No `▲` glyph (playtest B12: it read as a console face button).
+* **Device-aware footers (playtest B12):** the title footer, the select sub-line, the map footer, the shop footer and
+  the game-over / victory prompts follow the last-used device. The gamepad wording is the §15 string with the key names
+  swapped: `Enter` → `A`, `Esc` → `B`, `Esc / M close` → `B / BACK close`, `R recentre` → `A recentre`,
+  `JUMP or CONFIRM` / `CONFIRM` → `A` (as §15.5 does for the banner hints).
+* **Drop-through hint (playtest B19):** once per run, `Down + Jump drops through` (`bold 14px UI PAPER`, the §5.5 legend
+  line) with the bound keys under it (`↓ + SPACE` / `↓ + A`, `bold 12px MONO SELECT`) floats over the fighter (below
+  the feet when it would sit on the hearts block or the bits) when the player stands 30 f on a droppable grate walled
+  in on both sides (no ledge, no room edge — the `dc_cross` chute box x56–58, the `bv_cistern` boxed grate x50–52) or
+  holds Down 20 f on any droppable grate. It stays until they drop or step off (600 f at most), is not drawn under an
+  overlay, and is recorded in `save.hints.drop` (§14.1).
 * Control hints during the first 3 rooms of a new game: a bottom-left line at (24, 520)
   `13px MONO PAPER_DIM` cycling `MOVE  ←→   JUMP  Space   LIGHT  Z   HEAVY  X   SPECIAL  C`,
   dismissed forever once each action has been used once (stored in save `hints`); the DASH and OVERCLOCK items appear only once owned/ready.
@@ -2927,15 +2988,21 @@ hand-drawn ±1 px vertex jitter (seeded by panel id, static).
   y+78). Hovered card: `SELECT` edge, lifts 4 px, scale 1.05; others α 0.75.
 * **Big preview** standing at (300, 300): the hovered fighter's rig at scale 3.0 running its
   idle animation; every 180 f it plays the next pose of the cycle `run → light1 → light2 → light3 →
-  jump → heavy` (each pose held for its §4.2 total frames, within a 48 f slot, at scale 3), then idle. A
+  jump → heavy` (each pose held for its §4.2 total frames, within a 48 f slot, at scale 3), then idle. The jump pose
+  lifts the rig's highest point by at most a quarter of the fighter's real apex at ×3 (Tessik ≈ 28 px; the airborne
+  pose's own reach counts toward it), so it reads and compares between fighters while staying inside the halo, never
+  over the header (playtest B32). A
   ground shadow ellipse 120×14 at (300, 300). Behind it a `glow` affinity halo r 110 α 0.10 centred at (300, 202).
+  Everything the big preview draws is clipped to the portrait area x 20..550, y 88..316 (under the header and sub-line,
+  above the bio), so no showcase pose can paint over `CHOOSE YOUR SPIRIT` (playtest B32).
   Switching fighters: old rig slides out 40 px and fades 8 f, new one slides in.
 * **Stat panel** at (560, 130) size 360×150: 4 bars, label `bold 13px UI PAPER` left at
   x 580, bar from x 680 to 900 (220 wide, 10 tall, radius 5), trough `#2A2230`, fill
   `SELECT`, ink 2; rows y 160, 190, 220, 250 for `HEARTS`, `SPEED`, `JUMP`, `WEIGHT`.
   Values normalised to the roster: hearts `hp/6`, speed `run/300`, jump
-  `jumpHeight/113.8`, weight `weight/1.3` (§4.1). Bars animate to target at
-  0.2/frame.
+  `jumpHeight/113.8`, weight `0.60 / weight` — real weight: `weight` is the knockback multiplier taken (§4.1), so the
+  bar is the lightest multiplier in the roster over this fighter's (Brackmaw 1.0, Korvask 0.8, Tessik 0.6, Orrubel 0.55,
+  Vellix 0.46; playtest B18). Bars animate to target at 0.2/frame.
 * **Moveset panel** at (560, 292) size 360×72: 3 lines `12px MONO PAPER`, from the §4.2
   move names: `LIGHT  L1 / L2 / L3 names`, `HEAVY  name   SPECIAL  name`, `ULTIMATE  name`.
 * **Bio** at (60, 322) width 490, `11px MONO PAPER_DIM`, word-wrapped 4 lines max (§4.3), pitch 13: it sits below the halo and clear of the lifted card (top 373).
@@ -2969,11 +3036,14 @@ hand-drawn ±1 px vertex jitter (seeded by panel id, static).
   edges that have exits. Discovered-but-unvisited neighbour (seen through an exit): fill
   `#1A1620` dashed outline (`[4,4]`). Unknown: not drawn, and the panel background has a
   faint `INK` hatch so the fog reads as "paper".
-* Icons inside rooms: restore node = `CORE_HEART` diamond 8 px; boss room = `DANGER` skull
-  glyph drawn as a circle r 5 with two 2×2 ink eye dots (defeated → `PAPER_DIM`); vendor =
-  `BITS` hexagon; core found = small `CORE_HEART` dot. Player = `ENERGY` dot r 5 with a
-  pulsing ring r 5→12 every 40 f.
-* Legend at the bottom (60, 500) `11px MONO PAPER_DIM`: `◆ node  ● boss  ⬢ vendor  · you`; above it, on an `INK` α 0.8 plate, the owned abilities' §15.10 lines (pitch 14, the last at y 470).
+* Icons inside rooms, in a fixed row at the top of the cell (playtest B23): restore node = `CORE_HEART` diamond 8 px
+  top-left; boss room = `DANGER` skull glyph drawn as a circle r 5 with two 2×2 ink eye dots (defeated → `PAPER_DIM`)
+  top-right; vendor = `BITS` hexagon top-right (top-centre beside a boss). A found core = `CORE_HEART` dot r 3 (ink 1)
+  at the core's own tile, clamped inside the cell; Deep Ping's `?` for an uncollected core sits at the same spot
+  (playtest B24). Player = `ENERGY` dot r 5 with a pulsing ring r 5→12 every 40 f, drawn **under** the room's icons so
+  it never hides one.
+* Legend at the bottom-left from x 60 `11px MONO PAPER_DIM`: each icon as the map draws it, then its word — `node` ·
+  `boss` · `vendor` on the first row (y 493), `core` · `you` on the second (y 507); above it, on an `INK` α 0.8 plate, the owned abilities' §15.10 lines (pitch 14, the last at y 470).
   Footer centre: the cursor room's name (`?` while unvisited) and under it the **bestiary line** (§15.11):
   a boss room shows `NAME · EPITHET` (`· purged` once beaten); a visited room lists the distinct enemy
   names it spawns (`no enemies` for safe rooms). Footer right: `Esc / M close`.
@@ -2987,15 +3057,17 @@ hand-drawn ±1 px vertex jitter (seeded by panel id, static).
 
 ### 12.14 Settings
 
-* Panel (230, 90) size 500×360. Title `SETTINGS`. Rows pitch 44 starting y 150, label left at
-  x 260 `bold 16px UI PAPER`, control right-aligned to x 700:
+* Panel (230, 90) size 500×360. Title `SETTINGS`. Rows pitch 44 starting y 150 (pitch 40 for the eight rows shown
+  from the title, so `BACK` stays inside the panel), label left at x 260 `bold 16px UI PAPER`, control right-aligned
+  to x 700:
   1. `MASTER VOLUME` slider 0–10 (bar 160×10, knob r 8 `SELECT`), default 8
   2. `MUSIC VOLUME` slider, default 7
   3. `SFX VOLUME` slider, default 8
   4. `SCREEN SHAKE` toggle `ON/OFF` (pill 56×22), default ON
-  5. `SHOW HITBOXES` toggle, default OFF
-  6. `RESET SAVE` (only from the title) → confirm dialog; drawn disabled (`PAPER_DIM` α 0.4) and only denies while no run is saved
-  7. `BACK`
+  5. `REDUCED FLASHING` toggle, default OFF — full-screen flashes become a thin edge pulse (§11.3.5; playtest B42)
+  6. `SHOW HITBOXES` toggle, default OFF
+  7. `RESET SAVE` (only from the title) → confirm dialog; drawn disabled (`PAPER_DIM` α 0.4) and only denies while no run is saved
+  8. `BACK`
 * Left/Right adjust sliders by 1 and play `menuMove` at the new volume so the user hears it;
   toggles flip on Enter/Left/Right. Changes save to `underbyte.settings` immediately.
 
@@ -3022,7 +3094,7 @@ hand-drawn ±1 px vertex jitter (seeded by panel id, static).
 ### 12.17 Vendor panel (Scrivvet)
 
 * Opens on Up within 1 tile of Scrivvet; the game pauses (music duck 0.4). Panel (230, 120) size 500×300. Scrivvet's line (random per opening, §15.9) at (480, 150) `13px MONO PAPER_DIM` word-wrapped to 460 px. Bits owned right-aligned at (700, 182) `bold 16px MONO BITS` with the hexagon icon.
-* 3 rows, pitch 56, starting y 220: item name `bold 18px UI PAPER` at x 260, price right-aligned at x 700 `bold 16px MONO BITS` (or `SOLD` in `PAPER_DIM`), effect line `12px MONO PAPER_DIM` at x 260, y+22. Selected row: `SELECT` name and a `▶` marker as in menus. Unaffordable rows: price in `DANGER`; confirming plays `deny` and shows the can't-afford line for 90 f.
+* 3 rows, pitch 56, starting y 220: item name `bold 18px UI PAPER` at x 260, price right-aligned at x 700 `bold 16px MONO BITS` (or `SOLD` in `PAPER_DIM`), effect line `12px MONO PAPER_DIM` at x 260, y+22. Prices are the vendor room's (§9.5): at `rw_rest` the `dc_shrine` price is shown struck through (`12px MONO PAPER_DIM`) left of the discounted one, and the poor/`DANGER` colouring uses the room price. Selected row: `SELECT` name and a `▶` marker as in menus. Unaffordable rows: price in `DANGER`; confirming plays `deny` and shows the can't-afford line for 90 f.
 * Footer (480, 400) `11px MONO PAPER_DIM`: `↑↓ select · Enter buy · Esc close`.
 
 ### 12.18 Zone lore card (first entry only)
@@ -3293,7 +3365,7 @@ failure shows a 90 f toast `Could not save (storage blocked)` and continues.
   "vendor": ["spare_cell"],
   "nodesUsed": ["node_dc_wake", "node_dc_shrine"],
   "loreSeen": ["driftcache"],
-  "hints": { "move": true, "jump": true, "light": true, "heavy": false, "special": false, "dash": false, "overclock": false },
+  "hints": { "move": true, "jump": true, "light": true, "heavy": false, "special": false, "dash": false, "overclock": false, "drop": false },
   "enemiesPurged": 41,
   "playTimeFrames": 83211,
   "deaths": 2,
@@ -3314,6 +3386,8 @@ Rules:
   `maxHearts` on load (you always load at a node).
 * `discovered` = rooms shown on the map (visited + the target rooms of every exit of a visited room); `visited` ⊆ discovered. With **Deep Ping**, every room whose zone has a visited room counts as discovered at load and on each room entry.
 * `playTimeFrames` counts logic frames in the `PLAY` state only (not menus or pauses).
+* `hints`: the seven control-hint-strip actions (§12.8) plus `drop`, set once the one-time `Down + Jump drops through`
+  hint has shown (playtest B19); a save written before the key existed loads it `false` (the hint shows once more).
 * Load: unknown `version` → ignore and treat as no save; `fighter` not in the roster →
   `tessik`; `roomId` unknown or `spawn.nodeId` unknown → `dc_wake` with `node_dc_wake`. Energy
   starts at 50 and meter at 0 on load (§3.8, §3.9). Seals of every boss in `bossesDefeated`
@@ -3329,6 +3403,7 @@ Rules:
   "music": 7,
   "sfx": 8,
   "screenShake": true,
+  "reducedFlashing": false,
   "showHitboxes": false,
   "touchControls": "auto"
 }
@@ -3407,7 +3482,7 @@ The long lore paragraphs for the first-entry card are in §5.3.
 | Vendor item | `{ITEM} PURCHASED` | `{EFFECT}` | — |
 | Restore node | `RESTORED` | `Saved · hearts full · energy full` | — |
 
-Vendor items (§9.5): `SPARE CELL` — `Max energy 100 → 125` (90 bits); `HOT CLOCK` — `Overclock gains ×1.5 from hits and shards` (160 bits); `DEEP PING` — `Map shows every room, node and core of zones you have entered` (120 bits). Vendor lines are in §15.9.
+Vendor items (§9.5): `SPARE CELL` — `Max energy 100 → 125` (90 bits; 70 at `rw_rest`); `HOT CLOCK` — `Overclock gains ×1.5 from hits and shards` (160; 120); `DEEP PING` — `Map shows every room, node and core of zones you have entered` (120; 90). Vendor lines are in §15.9.
 
 ### 15.6 Boss title cards
 
@@ -3445,19 +3520,20 @@ Thank you for playing.
 * Pause: `PAUSED` · `RESUME` · `MAP` · `SETTINGS` · `QUIT TO TITLE`; quit confirm: `Unsaved
   progress since the last node is lost. Quit?` `YES` / `NO`.
 * Settings: `SETTINGS` · `MASTER VOLUME` · `MUSIC VOLUME` · `SFX VOLUME` · `SCREEN SHAKE` ·
-  `SHOW HITBOXES` · `RESET SAVE` · `BACK` · `ON` / `OFF`; reset confirm: `Erase the saved
+  `REDUCED FLASHING` · `SHOW HITBOXES` · `RESET SAVE` · `BACK` · `ON` / `OFF`; reset confirm: `Erase the saved
   run? This cannot be undone.`; after the erase a 90 f toast `SAVE ERASED`.
-* Map: `MAP` · legend `◆ node  ● boss  ⬢ vendor  · you` · `Esc / M close` · `R recentre`.
+* Map: `MAP` · legend (each word after its icon swatch, §12.12) `node` · `boss` · `vendor` · `core` · `you` · `Esc / M close` · `R recentre` (gamepad: `B / BACK close` · `A recentre`).
 * Game over: `SIGNAL LOST` · `Rebooting at the last restore node…` · `Press JUMP or CONFIRM
   to continue`.
 * Victory: `ROOT PROCESS PURGED` · stats `FIGHTER` `TIME` `DEATHS` `BITS COLLECTED` `CORES
   FOUND` `ROOMS DISCOVERED` `ENEMIES PURGED` `BOSSES` · `Press CONFIRM for the title`.
-* Prompts: `▲ REST` · `▲ TRADE` · storage toast `Could not save (storage blocked)` ·
+* Prompts: `REST` · `TRADE` · storage toast `Could not save (storage blocked)` ·
   gamepad toast `Gamepad connected` / `Gamepad disconnected — paused`.
 * Hint strip: `MOVE ←→  JUMP Space  LIGHT Z  HEAVY X  SPECIAL C  DASH Shift  OVERCLOCK V` (gamepad: `MOVE stick  JUMP A  LIGHT X  HEAVY Y  SPECIAL B  DASH RB  OVERCLOCK LT`).
 * Boss defeated toast: `{NAME} PURGED` (e.g. `TALLOCK PURGED`), bottom centre, 120 f.
 * Pickup float text: `+1`, `+5`, `+20` (bits), `+25` (spark, in `ENERGY`), `+1 ♥` (heart), `+15` (shard, in `METER`).
-* Interaction prompts: `▲ REST` (node), `▲ TRADE` (vendor); gamepad glyph `↑`.
+* Interaction prompts: `REST` (node), `TRADE` (vendor), with the bound up key `↑` under the label (§12.8).
+* Drop-through hint: `Down + Jump drops through`, keys `↓ + SPACE` / `↓ + A` (§12.8).
 
 ### 15.9 Scrivvet (vendor) lines
 
@@ -3519,6 +3595,7 @@ Every conflict between `design/combat.md` (C), `design/world.md` (W) and `design
 * Placement: `lw_belts` bits (10,4),(12,4) were inside platform tiles → (10,3),(12,3); `ns_climb` bit (40,50) was inside a wall → (38,50); `ns_plunge` droplatches at (24,17),(22,32) sat on ceiling-spike tiles → (19,17),(18,32).
 * W's claim "dc_fall spike bed x12–16 is a 5-wide pit: single jump clears" is false for everyone but Vellix; the bed is **off the critical path** (the floor to its right is reached from ledge E) and is crossable by pogo. Documented, not changed.
 * W's §3.1 said `bv_sluice`'s shelf is "row 8"; the shelf is the row-4 grate and the crawlspace floor is rows 8–9. Text corrected in §6.
+* Playtest (§10.6 F15–F17): the two Burst Line gaps were crossable with Jump + Echo Jump out of their acid pits (Brinevault reachable before Weftyr) — the gaps are now acid channels level with the floor; the `dc_fall` row-34 crumble planks dropped a fighter blind onto the off-screen spike bed — the row-40 grate now runs under them; the `bv_sluice` arrival grate was boxed in by the entry shaft (critical path behind an untaught Down+Jump) — the chamber is open at rows 2–7.
 * QA round 3 (§10.6 F11–F14): two more chute arrivals landed a held direction in a hazard (`bv_catwalk.B` LEFT → the acid trough, `ns_plunge.B` RIGHT → the floor pool) and are widened to seven dry tiles; `lw_hoist.B` gets grate shelves beside its 1-tile pillar rims; `ns_climb`'s pit of static (25 placed bits, a droplatch) was sealed and shaft 2 had no way in at its foot — both now have doorways.
 
 ### 16.4 Presentation and flow
@@ -3565,7 +3642,12 @@ UB.debug.warp(roomId, exitId)    // enter roomId as if arriving through its exit
 UB.debug.teleport(x, y)          // set the body bottom-centre (pixels) in the current room
 UB.debug.grant(abilityId, on)    // 'echoJump' | 'burstLine' | 'gripProtocol' (on defaults true)
 UB.debug.setHp(n) / setMaxHp(n) / setEnergy(n) / setMeter(n) / addBits(n)
-UB.debug.defeatBoss(bossId)      // 'tallock'|'weftyr'|'corrosant'|'kernauth': marks defeated, lifts seals, grants the ability
+UB.debug.defeatBoss(bossId)      // 'tallock'|'weftyr'|'corrosant'|'kernauth' (omitted: the boss live in this room):
+                                 //  the faithful defeat (playtest B22) — a boss live here dies through the real kill
+                                 //  path (intro ended, remaining phases spent, startBossDeath: shots popped, defeat
+                                 //  recorded + saved; then dying → reward → module / the final boss's victory);
+                                 //  always: marks defeated, lifts the arena's seals, grants the ability, writes the
+                                 //  save. Unknown id / nothing to defeat → false
 UB.debug.killEnemies()           // removes every enemy in the room
 UB.debug.god(on)                 // invulnerable to everything incl. hazards
 UB.debug.step(n)                 // advance n logic frames synchronously (rendering continues)

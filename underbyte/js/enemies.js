@@ -228,16 +228,20 @@
   }
   /**
    * Hitstun handling (DESIGN §7.0): while `hitstun > 0` the enemy neither acts nor steers; its
-   * knockback velocity plays out (walkers under gravity, flyers decelerating 0.3 px/f²).
+   * knockback velocity plays out (walkers under gravity, flyers decelerating 0.3 px/f²). A chain light's
+   * shove stops at the edge of the attacker's next light (UB.Entity.chainShove — playtest B29).
    * Returns true when the caller must skip its AI this frame.
    */
   function hurtTick(e, game, grounded, g, maxFall) {
     if (e.flash > 0) e.flash--;
-    if (e.hitstun <= 0) return false;
+    if (e.hitstun <= 0) { e.shoveMax = 0; return false; }
     e.hitstun--;
     if (grounded) { e.gravity(g, maxFall); e.vx = U.approach(e.vx, 0, 0.15); }
     else { e.vx = U.approach(e.vx, 0, 0.3); e.vy = U.approach(e.vy, 0, 0.3); }
     e.moveAndCollide(game.level);
+    if (e.shoveMax > 0 && (e.x - e.shoveX) * e.shoveDir > e.shoveMax) {   // back along its own path: never into a wall
+      e.x = e.shoveX + e.shoveDir * e.shoveMax; if (e.vx * e.shoveDir > 0) e.vx = 0;
+    }
     return true;
   }
   /** Mirror of UB.Entity.applyHit with an explicit damage value (multipliers, shields). */
@@ -248,6 +252,7 @@
       e.hitstun = 10 + hit.hitstop;
       const k = e.kbResist / 60;
       e.vx = hit.kbx * hit.facing * k; e.vy = hit.kby * k;
+      E.chainShove(e, hit);
     }
     if (e.hp <= 0) { e.hp = 0; e.dead = true; res.killed = true; }
     return res;

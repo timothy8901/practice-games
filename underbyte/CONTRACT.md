@@ -190,6 +190,41 @@ Every item names the section it changes. Nothing was removed; signatures were on
 8. **World data (DESIGN §10.6 F11–F14)**: `bv_catwalk` row 33 x19–22 dry; `ns_plunge` row 49 x20–23 dry; `lw_hoist` grates
    row 30 x7–12 / x18–23; `ns_climb` doorways x32–33 rows 67–69 and x34–35 rows 49–50.
 
+## Changes since v6 (v7 — playtest round, `playtests/REPORT.md`; everything additive)
+
+1. **§1.1 / §4.1 vendor prices (B25)**: `UB.IDS.vendorItems` rows gain `deepPrice` (70 / 120 / 90) and
+   `UB.IDS.vendorDeepRooms = ['rw_rest']`; `UB.Util.vendorPrice(item, roomId)` (pure) is the price at that vendor room.
+   `game.buy()` charges it (the shop panel shows it); `save.vendor` still stores ids only.
+2. **§4.0 `PANEL` is opaque** `#17131C` (B05).
+3. **§4.5 `UB.FX`** gains `flashScale` (0..1, multiplies every full-screen flash), `setFlashScale(k)` and
+   `reducedFlashing()` (reads `game.settings.reducedFlashing` live: flashes become a 10 px edge pulse, B42).
+4. **§10 settings**: `reducedFlashing` (boolean, default false, validated like the other toggles); the settings
+   overlay has a `REDUCED FLASHING` row after `SCREEN SHAKE` (B42). **Save**: `save.hints.drop` (boolean; the UI sets
+   it when the one-time "Down + Jump drops through" hint shows, B19; old saves load it false).
+5. **§5 player (B31, B10, B43)**: `player.deny(game, kind, lockout)` — `deny` sfx, `player.denyT` (18 → 0) /
+   `player.denyKind` (`'special'|'overclock'|'dash'`), `game.denyKind`, `game.denyFlash` for a special; a Special /
+   Overclock / Dash press whose buffer expires unused while the fighter `canAct()` is denied. The Overclock clock stands
+   still while `player.locked`. The i-frame blink-off beats draw an α 0.4 silhouette outlined in `glow`.
+6. **§6.2 bosses (B38)**: every boss sets `focusX/focusY` each tick (body; Corrosant's head; Kernauth's chest core /
+   flying core) — the engine's boss camera frames it (fallback `x` / `cy()`); the HUD marks a focus off the view's left /
+   right edge with a side chevron; `beaconTop` (Corrosant) = the boss marks the above-the-view case itself.
+7. **§7 / §8 knockback origin (B34 root)**: `game.knockOrigin(hit, player)` → the x a registered enemy/boss hit knocks
+   the fighter from: the box centre, except a melee box touching the attacker's own body (`hit.src` = the boss or a
+   listed enemy) with the fighter between that body and the box centre → the body's x.
+8. **§8 engine**: `game.defeatBoss(bossId)` — the faithful defeat used by `UB.debug.defeatBoss` (B22): a boss live in
+   the room ends its intro, spends its remaining phases (`nextPhase`) and dies through `startBossDeath` (the dying →
+   reward flow then runs as after a real kill); always records the defeat, grants the ability, lifts that arena's
+   `seal` + `locked` exits and writes the save; false for an unknown id. `game.toTitle()` resets the fight, pickup
+   sequence, transition and hazard state. `game.bossCam()` → true in a boss intro/fight; the boss camera (DESIGN
+   §11.3.1) frames `boss.focusX/focusY` with the player (feet above the boss bar, player ≥ 40 px inside the sides).
+9. **§8.1 UI**: banners are a top strip (240, 8) once the player has control and end on a room change (B04); nothing
+   but the status HUD is drawn under an overlay (B05/B06); the boss bar drains and fades after the death (B11);
+   device-aware footers and the `REST` / `TRADE` prompt without `▲` (B12); the map icon row / core dots / legend
+   swatches (B23/B24); the big select preview is clipped to x 20..550, y 88..316 (B32); a refused Overclock flashes the
+   Overclock meter (B31).
+10. **World data (DESIGN §10.6 F15–F17)**: the `bv_sluice` / `bv_catwalk` Burst Line gaps are floor-level acid channels;
+    the `dc_fall` row-40 grate runs x13–19; the `bv_sluice` arrival chamber is open at rows 2–7 over x1–8.
+
 ## 0. Ground rules (from `BRIEF.md`, non-negotiable)
 
 * 100 % original content. No franchise names, designs, terms or lookalikes anywhere (code,
@@ -245,9 +280,10 @@ UB.IDS.enemies    = ['scuttlebit','hopnode','driftmoth','brinejelly','glarewisp'
                      'platewalker','broodcell','mote','droplatch','voltwheel','walker']
 UB.IDS.groundEnemies = ['scuttlebit','hopnode','rambyte','platewalker','broodcell','voltwheel','walker']  // validate() demands footing
 UB.IDS.enemyVariants = ['brinecrab','staticshot','rootbound','dripnode','nullnode','rootwisp','acidvalve','twinvalve','rootram','rootplate']
-UB.IDS.vendorItems= [{id:'spare_cell', name:'SPARE CELL', price:90,  effect:'Max energy 100 → 125'},
-                     {id:'hot_clock',  name:'HOT CLOCK',  price:160, effect:'Overclock gains ×1.5 from hits and shards'},
-                     {id:'deep_ping',  name:'DEEP PING',  price:120, effect:'Map shows every room, node and core of zones you have entered'}]
+UB.IDS.vendorItems= [{id:'spare_cell', name:'SPARE CELL', price:90,  deepPrice:70,  effect:'Max energy 100 → 125'},
+                     {id:'hot_clock',  name:'HOT CLOCK',  price:160, deepPrice:120, effect:'Overclock gains ×1.5 from hits and shards'},
+                     {id:'deep_ping',  name:'DEEP PING',  price:120, deepPrice:90,  effect:'Map shows every room, node and core of zones you have entered'}]
+UB.IDS.vendorDeepRooms = ['rw_rest']                                  // vendor rooms that sell at deepPrice (UB.Util.vendorPrice)
 UB.IDS.sfx        = { name → 'characters'|'engine'|'enemies'|'ui' }   // see §4.6
 ```
 `brinejelly` is placed by its own type name in DESIGN §6 (it is a driftmoth variant; `create('brinejelly')`
@@ -272,7 +308,7 @@ and `console.warn`s each error line.
 5. World hitstop active → decrement, `UB.FX.update()`, snapshot, return (particles/shake/UI still animate; nothing else moves; input buffers do not tick).
 6. Store previous positions (`px, py`) of player, enemies, boss, projectiles, pickups; step moving platforms (`dx, dy` for this frame).
 7. Mode handlers: hazard freeze / node use / boss intro / ability pickup sequence timers.
-8. Node/vendor interaction (`▲ REST` / `▲ TRADE`, Up press) — runs **before** the player so Up at a node rests instead of jumping; the vendor opens the `shop` overlay (return after the snapshot). Control hints (`save.hints`) are recorded here.
+8. Node/vendor interaction (`REST` / `TRADE` prompts, Up press) — runs **before** the player so Up at a node rests instead of jumping; the vendor opens the `shop` overlay (return after the snapshot). Control hints (`save.hints`) are recorded here.
 9. `player.update(game)` — skipped only during the hazard freeze (`mode === 'hazard'`).
 10. `enemy.update(game, player)` for every live enemy; `boss.update(game, player)` while `bossFight.state === 'fight'` (during `none`/`intro` the engine only applies gravity/collision to it; during `dying` it ticks `boss.t`); `projectile.update(game)` then off-room cull (64 px margin).
 11. `resolveHits()` — every hit registered this frame (see §7). Then enemy/boss **contact** vs player, then **hazards** vs player. Dead enemies/projectiles are removed.
@@ -322,7 +358,7 @@ same hanging from the tile top; `~` = full tile. Hazards never block movement.
 ### 4.0 `UB.Palette`, `UB.Fonts`, `UB.font(px, 'UI'|'MONO', bold)` (util.js)
 Global colours of DESIGN §11.1.2 (`INK, PAPER, PAPER_DIM, HEART, HEART_EMPTY, CORE_HEART,
 ENERGY, ENERGY_DIM, METER, METER_READY, METER_DIM, BITS, DANGER, PANEL, PANEL_EDGE, SELECT,
-LOGO_A, LOGO_B, LETTERBOX, SPIKE`). Zone palettes live in `UB.World.zones[id].palette`.
+LOGO_A, LOGO_B, LETTERBOX, SPIKE`). `PANEL` is opaque (`#17131C`). Zone palettes live in `UB.World.zones[id].palette`.
 Never inline hex in draw code outside a rig's own palette data.
 
 ### 4.1 `UB.Util` (util.js)
@@ -330,7 +366,8 @@ Never inline hex in draw code outside a rig's own palette data.
 easeInQuad easeOutQuad easeInOutQuad easeOutBack` · `rng(seed) → fn()` (mulberry32) ·
 `hash(a,b,c,d) → uint32` · `jitter(seed, i, amp)` · `pick(rng, arr)` · `rand(rng, lo, hi)` ·
 `aabb(ax,ay,aw,ah,bx,by,bw,bh)` (top-left boxes) · `dist` · `pad2(n)` · `fmtTime(frames) →
-'HH:MM:SS'` · `wrapText(ctx, text, maxWidth) → lines[]` (allocates — cache the result, never call per frame) · `TAU`, `DEG`.
+'HH:MM:SS'` · `wrapText(ctx, text, maxWidth) → lines[]` (allocates — cache the result, never call per frame) ·
+`vendorPrice(item, roomId) → bits` (`deepPrice` in `UB.IDS.vendorDeepRooms`, else `price`; pure) · `TAU`, `DEG`.
 
 ### 4.2 `UB.Input` (input.js) — DESIGN §2
 * `ACTIONS = ['left','right','up','down','jump','light','heavy','special','dash','overclock','pause','map','confirm','back']`.
@@ -452,8 +489,9 @@ UB.FX.burst(kind, x, y, n, {color, dir, radius, life})   // presets: spark chip 
 UB.FX.text(str, x, y, color, frames)                     // floating text ('+1')
 UB.FX.shake(mag, frames)   UB.FX.shakeX / shakeY         // decaying random offset; overlapping keeps the larger mag·remaining
 UB.FX.hitstop(frames)      UB.FX.hitstopFrames           // world hitstop request (max, never stacks); the engine decrements
-UB.FX.flash(color, alpha, frames)                        // full-screen tint
+UB.FX.flash(color, alpha, frames)                        // full-screen tint (× flashScale; an edge pulse while reducedFlashing())
 UB.FX.setShakeEnabled(bool)  UB.FX.count()
+UB.FX.flashScale  UB.FX.setFlashScale(k /*0..1*/)  UB.FX.reducedFlashing() /* game.settings.reducedFlashing, read live */
 ```
 Pool of 512 particles in typed arrays; `dust`/`aura` are recycled first when full. The UI/FX
 implementer may redesign the drawing and add kinds/presets but must keep every name above.
@@ -582,7 +620,9 @@ The boss **starts at `spec.spawn`** (feet on `(x, y+1)`; flyers may treat it as 
 drops its module at `spec.pickup` — never hard-code arena coordinates. `spec === game.level.boss`.
 Boss = `UB.Entity` (`units:'pxf'`, `kbResist: 0`) with `id` (= bossId), `name, subtitle, hp, maxHp, phase,
 state, attack` (HUD/debug), `contact`, `active` (engine sets true when the fight starts),
-`final` (true → `game.victory()` after death instead of a module), `deathFrames`, `accent`.
+`final` (true → `game.victory()` after death instead of a module), `deathFrames`, `accent`, and `focusX/focusY`
+(updated every tick: the point the boss camera frames — body, Corrosant's head, Kernauth's core; DESIGN §11.3.1),
+optional `beaconTop` (the boss draws its own beacon while its focus is above the view; the HUD's side marker skips that case).
 Hooks: `onIntro(game)` (seal dropped, 150 f card starts), `onFightStart(game)`,
 `update(game, player)` (fight only), `draw(ctx, game, alpha)` (every frame, also idle/dying — use
 `this.t` which the engine resets to 0 at death), optional `takeHit`, and **`onDefeated(game)`**:
@@ -643,18 +683,20 @@ are drawn. Popping an enemy projectile gives +2 meter and 4 sparks.
 | `game.screen` `'title'|'select'|'play'|'gameover'|'victory'`; `game.overlay` `null|'pause'|'map'|'settings'|'shop'|'lore'`; `game.mode` `'normal'|'transition'|'hazard'|'nodeUse'|'bossIntro'|'pickupSeq'|'dying'`; `game.busy` | state (read) |
 | `game.frame`, `game.screenT`, `game.fps` | counters |
 | `game.save` (DESIGN §14 object), `game.settings` (§14.2), `game.hasSave()`, `game.saveSummary()`, `game.writeSave()`, `game.resetSave()` (→ false, no toast, when there is no saved run), `game.eraseSlot()`, `game.setSetting(key, value)` | save/settings |
-| `game.level`, `game.zone`, `game.player`, `game.enemies[]`, `game.boss`, `game.projectiles[]`, `game.pickups[]`, `game.cam {x,y,px,py}`, `game.hazardRespawn`, `game.bossFight {state,timer}`, `game.nearNode`, `game.nearVendor`, `game.prompt` (`null` or `{text:'REST'|'TRADE', x, y}`), `game.denyFlash`, `game.loreCard` (zone shown by the `lore` overlay) | world (read) |
+| `game.level`, `game.zone`, `game.player`, `game.enemies[]`, `game.boss`, `game.projectiles[]`, `game.pickups[]`, `game.cam {x,y,px,py}`, `game.hazardRespawn`, `game.bossFight {state,timer}`, `game.nearNode`, `game.nearVendor`, `game.prompt` (`null` or `{text:'REST'|'TRADE', x, y}`), `game.denyFlash`, `game.denyKind`, `game.loreCard` (zone shown by the `lore` overlay), `game.bossCam()` | world (read) |
 | `game.registerHit(hit)` · `game.spawnProjectile(obj)` · `game.spawnEnemy(type, tx, ty, opts)` · `game.spawnPickup(type, x, y, opts)` (`bit heart spark shard core ability`; opts `{size, placed, key, id, ability, bossId, glow, permanent, vx, vy}`) · `game.addBits(n)` `addEnergy(n)` `addMeter(n, fromHit)` · `game.grantAbility(id, on)` · `game.rng()` · `game.triggerHazard(kind, rx, ry)` (module-owned hazard → the §3.3 freeze + respawn at (rx, ry); false unless alive, mode normal, god off) · `game.hideProp(tag, quiet)` (hide a tagged composite prop for the visit) · `game.impactZoom(x, y)` | gameplay |
 | `game.buy(itemId) → 'bought'|'poor'|'sold'|'unknown'` · `game.hasDeepPing()` · `game.applyDeepPing()` · `UB.Engine.Game.VENDOR` (= `UB.IDS.vendorItems`) | vendor (UI) |
 | `game.toSelect()` `toTitle()` `newGame(fighterId, fromMenu)` `continueGame()` `openOverlay(name)` `closeOverlay()` `respawnAtNode()` `victory()` `victoryStats()` | flow (UI) |
+| `game.knockOrigin(hit, player)` (knockback x of a registered enemy/boss hit, §7) · `game.defeatBoss(bossId)` (the faithful defeat behind `UB.debug.defeatBoss`) | engine (tests may read) |
 | `game.loadRoom(roomId, arrival)` `startTransition(exit)` `defeat flow…` `snapInterp()` | engine-internal; use `UB.debug` in tests |
 | `UB.Engine.T` | pinned timings (transition 6/18/4, hazard 30+10/45, boss intro 150, pickup 120, crumble 20/180/6, loreDelay 90, shopBanner 150, …) |
 
 The engine saves at: node use, boss ability pickup (f120), core pickup, **vendor purchase**, victory.
 
-**Vendor flow (engine side).** Standing within 1 tile of `room.vendor` shows `▲ TRADE`
+**Vendor flow (engine side).** Standing within 1 tile of `room.vendor` shows the `TRADE` prompt
 (`game.prompt.text === 'TRADE'`, `game.nearVendor`); Up opens `'shop'` (world frozen, music ducked).
-The UI panel calls `game.buy(id)`: `'bought'` deducts the price, appends to `save.vendor`, applies the
+The UI panel calls `game.buy(id)`: `'bought'` deducts `UB.Util.vendorPrice(item, roomId)` (the room's price — 25 % off at
+`rw_rest`; `'poor'` compares against the same price), appends to `save.vendor`, applies the
 effect (Spare Cell → `player.energyMax = 125`; Hot Clock → `addMeter(n, fromHit)` ×1.5 rounded up;
 Deep Ping → `applyDeepPing()` marks every real room of every zone with a visited room as discovered,
 also on each later room entry), writes the save and queues the `{ITEM} PURCHASED` / effect banner,
@@ -668,7 +710,8 @@ The UI draws it and calls `closeOverlay()` after 240 f or any key.
 **Control hints.** While in normal play the engine sets `save.hints.move/jump/light/heavy/special`
 on the first press of that action, `hints.dash` on the first dash once Burst Line is owned, and
 `hints.overclock` on the first Overclock. The UI shows the strip (DESIGN §12.8) during the first 3
-rooms for every hint still false.
+rooms for every hint still false. `hints.drop` (not in the strip) is set by the UI when the one-time
+"Down + Jump drops through" hint shows (DESIGN §12.8); `sanitizeSave` keeps it.
 
 **Frozen frames.** Whenever a play tick returns early (overlay opened, transition, hitstop) and at the
 end of a tick in which a hit requested hitstop, the engine snapshots `px/py = x/y` for the player,
@@ -696,7 +739,7 @@ paragraph word-wrapped once and cached, `Press any key` after 60 f; `closeOverla
 `UB.Input.anyPressed`), `gameover` (→ `respawnAtNode()`), `victory` (→ `toTitle()`). The engine opens
 pause/map/shop/lore from play; the UI closes them.
 HUD data: `player.hp/maxHp/baseHp/energy/energyMax/meter/meterMax/ocActive/overclock`,
-`save.bits`, `game.boss` + `game.bossFight.state`, `game.prompt` (`▲ REST` / `▲ TRADE`), `game.denyFlash`,
+`save.bits`, `game.boss` + `game.bossFight.state`, `game.prompt` (`REST` / `TRADE`, the bound up key under it), `game.denyFlash`, `player.denyT/denyKind`,
 the control-hint strip from `save.hints` (first 3 rooms), the low-HP vignette + `heartbeat` sfx (in `tick`,
 one per 36 f pulse at 1 heart). Gradients, the vignette canvas, wrapped bios/lore and the hint string are
 cached — `drawHUD`/`drawScreen` allocate nothing per frame.
@@ -711,7 +754,8 @@ state() → {screen (overlay or screen), baseScreen, overlay, mode, busy, roomId
 warp(roomId, exitId | {x,y} | null)   /* exitId: arrival side derived from the exit (chute launch / top arrival as in play) */
 teleport(x, y)   grant(abilityId, on=true)
 setHp(n) setMaxHp(n) setEnergy(n) setMeter(n) addBits(n) setBits(n)
-defeatBoss(bossId)   killEnemies()   god(on) / godmode(on)
+defeatBoss(bossId?)  /* game.defeatBoss: the faithful defeat (live boss → real death path); no id = the boss live here; false if unknown */
+killEnemies()   god(on) / godmode(on)
 spawnEnemy(type, tx, ty, opts) → {type,x,y,hp,state}|null     // places an enemy in the current room (feet tile; opts = spawn fields)
 spawnBoss(bossId, {x, y, fight}) → boss()|null                // creates the boss here; default: live fight at once; fight:true runs seal→intro→fight;
                                                               // rooms without a boss record get a synthesized spec (bounds = room, no seals)

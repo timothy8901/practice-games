@@ -9,7 +9,7 @@
  * its module at spec.pickup — arena geometry (fight bounds, floor and ceiling) is derived from
  * `spec.bounds` and the room tiles, never hard-coded.
  *
- *   tallock   — ground stack: Slab Swing · Stomp Quake · Disc Toss · Stack Slam; enrage ≤ 36.
+ *   tallock   — ground stack: Slab Swing · Stomp Quake · Disc Toss · Stack Slam (+ the Stack Shrug anti-air); enrage ≤ 36.
  *   weftyr    — flying spindle: Thread Dash · Snare Line · Needle Rain · Spool Spin; enrage ≤ 54.
  *   corrosant — surface crawler (head + 7 segments as hit proxies, see enemies.js bossSegment):
  *               Wall Lunge · Acid Spit · Ceiling Drip · Coil Sweep; enrage ≤ 72 = Flood.
@@ -32,7 +32,7 @@
   const res = { dmg: 0, killed: false, blocked: false };
   const DASH = [6, 6], NODASH = [];
   const RING80 = { radius: 80, life: 20 }, RING40 = { radius: 40, life: 14 };
-  const CHIP_O = { color: WHITE, dir: 0 };
+  const CHIP_O = { color: WHITE, dir: 0 }, SNAP_O = { color: WHITE, dir: 0 };
   const PK_BIT = { size: 'large', vx: 0, vy: 0, permanent: true };
   const PK_SPARK = { vx: 0, vy: 0, permanent: true };
   const PK_ABIL = { ability: null, bossId: null, glow: null };
@@ -54,7 +54,7 @@
       cols: { head: '#1d4d3a', seg: '#0d2a20', fins: '#a8ffcf', acid: '#4fae84' } },
     kernauth: { name: 'KERNAUTH', subtitle: 'THE ROOT PROCESS', hp: 200, hp2: 240, w: 150, h: 180, ability: null, bits: 0, sparks: 3,
       deathFrames: 120, final: true, enrage: 60, accent: '#ffcf5a', glow: '#ffcf5a',
-      cols: { mass: '#4d1018', cables: '#2a080c', core: '#ffcf5a', crown: '#b32a2a', hot: '#fff4d6' } },
+      cols: { mass: '#4d1018', cables: '#2a080c', core: '#ffcf5a', crown: '#b32a2a', hot: '#fff4d6', bone: '#f2e4c2', rim: '#e8c79a' } },
   };
 
   // ==========================================================================================
@@ -204,8 +204,17 @@
       ctx.beginPath(); ctx.moveTo(-4, -24); ctx.lineTo(4, -24); ctx.lineTo(1, 0); ctx.lineTo(-1, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
       ctx.fillStyle = WHITE; ctx.globalAlpha = 0.6 * k; ctx.fillRect(-1, -22, 1.5, 10);
     } };
-  // a trip-thread: the first fighter it catches takes 1 and the thread snaps (popSelf) — a floor you can jump back onto, not a 240 f damage field
+  // a trip-thread: the first fighter it catches takes 1 and the thread snaps (popSelf) — a floor you can jump back onto, not a 240 f damage field.
+  // A fighter who comes DOWN onto it — who jumped it as it was laid, or drops from a grate — treads it flat: it snaps with no damage
+  // (DESIGN §8.2 "jump it", playtest B36). Only a fighter standing or walking in it at knee height is caught.
   SHOTS.snare = { w: 300, h: 8, grav: 0, life: 240, tiles: 'none', destructible: false, multi: true, dmg: 1, flags: 1, onHit: popSelf,
+    step: function (s, game) {
+      const pl = game.player, top = s.y - s.h;
+      if (!pl || pl.dead || pl.py > top + 0.5 || !E.overlapBox(pl, s.x - s.w / 2, top, s.w, s.h)) return;
+      s.dead = true;
+      SNAP_O.color = s.col; FX.burst('spark', pl.x, s.y - 4, 8, SNAP_O); FX.burst('dust', pl.x, s.y, 3, DUST_N);
+      Au.sfx('whiff', pl.x);
+    },
     draw: function (ctx, s, x, y) {
       const k = s.life < 30 ? s.life / 30 : 1, fl = (s.t & 4) ? 1 : 0.7;
       ctx.globalAlpha = k;
@@ -303,8 +312,12 @@
   // ==========================================================================================
   // 8.1 TALLOCK — Warden of the Stack (ground boss, 90×120)
   // ==========================================================================================
-  const TAL_NAME = ['', 'slabSwing', 'stompQuake', 'discToss', 'stackSlam'];
-  const TAL_TELL = [0, 30, 36, 24, 40];
+  const TAL_NAME = ['', 'slabSwing', 'stompQuake', 'discToss', 'stackSlam', 'stackShrug'];
+  const TAL_TELL = [0, 30, 36, 24, 40, 24];
+  // Stack Shrug (playtest B26/B27): the anti-air answer to a fighter above him — on his head (pogo-lock) or on a row-12
+  // shelf in reach. Tell 24 f (the top discs flare, chevrons rise over the visor), then the stack heaves for 8 f: a box over
+  // and around its top (170 wide, from 90 px above the top down to 40 px below it — the shelf height, never the floor).
+  const SHRUG_POGOS = 3, SHRUG_ACTIVE = 8, SHRUG_RECOVER = 40, SHRUG_W = 170, SHRUG_UP = 90, SHRUG_DOWN = 40;
   const TAL_W = [90, 84, 78, 72, 66, 60];
   const TAL_GAP = 16;   // the walk halts this many px short of the player's body
   function createTallock(id, d, room, game, spec) {
@@ -316,6 +329,12 @@
     b.hitA = mkHit('heavy', 'swing', 1, 0); b.hitA.src = b;
     b.hitL = mkHit('heavy', 'shock', 2, 1); b.hitL.src = b;
     b.hitR = mkHit('heavy', 'shock', 2, 1); b.hitR.src = b;
+    b.hitS = mkHit('heavy', 'shrug', 1, 0); b.hitS.src = b; b.hitS.kby = -420;
+    // a fighter one of his hits knocks INTO the stack (the Slab Swing's knockback runs away from its box centre, in front of
+    // the body) is pushed clear on the next frame, like one the Slam lands on (B34)
+    b.hitA.onHit = b.hitS.onHit = b.hitL.onHit = b.hitR.onHit = function () { b.pinCheck = true; };
+    b.pogoN = 0; b.pinCheck = false; b.markX = 0; b.focusX = b.x; b.focusY = b.y - 60;
+    b.takeHit = tallockTakeHit;
     const r = b.rig = [];
     b.armB = shape('rrect', K.arm); b.armB.w = 16; b.armB.h = 50; b.armB.r = 3; r.push(b.armB);
     b.discs = []; b.rims = [];
@@ -332,15 +351,51 @@
     return b;
   }
   function tallockRecover(b, n) { b.state = 'recover'; b.timer = n; b.vx = 0; }
+  /** Head pogos count toward the Stack Shrug (a down-strike landing on him); the generic boss damage path does the rest. */
+  function tallockTakeHit(hit, game) {
+    const r = bossTakeHit.call(this, hit, game);
+    if (hit.kind === 'down' && !r.blocked) this.pogoN++;
+    return r;
+  }
+  /** A fighter standing on a grate above his feet (the row-12 shelves: 90 px) — out of reach of the Swing and the Quake. */
+  function onShelf(b, pl) { return !!pl && pl.onGround && pl.y <= b.y - 60; }
   function tallockPick(b, game, adx) {
-    const r = game.rng();
+    const r = game.rng(), pl = game.player;
     let a;
-    if (adx < 90) a = r < 0.6 ? 1 : 2;
+    // DESIGN §8.1 (playtest B26/B27): a pogo-lock (3 head pogos in a row) gets the Shrug; a fighter on a shelf gets the attacks
+    // that reach up there — the Shrug in reach, else the Slam (it lands under the shelf, the stack's body reaching the grate) or
+    // the Disc — never the floor-only Swing / Quake
+    if (b.pogoN >= SHRUG_POGOS) a = 5;
+    else if (onShelf(b, pl)) {
+      if (adx < SHRUG_W / 2 + 10) a = r < 0.6 ? 5 : 4;
+      else a = r < 0.5 ? 4 : 3;
+    } else if (adx < 90) a = r < 0.6 ? 1 : 2;
     else if (adx < 180) a = r < 0.5 ? 2 : 4;
     else a = r < 0.7 ? 3 : 4;
-    if (a === b.last1 && a === b.last2) a = adx < 90 ? (a === 1 ? 2 : 1) : (adx < 180 ? (a === 2 ? 4 : 2) : (a === 3 ? 4 : 3));
+    if (a === b.last1 && a === b.last2) {
+      if (a === 5) a = 4;
+      else if (onShelf(b, pl)) a = a === 4 ? 3 : 4;
+      else a = adx < 90 ? (a === 1 ? 2 : 1) : (adx < 180 ? (a === 2 ? 4 : 2) : (a === 3 ? 4 : 3));
+    }
     b.last2 = b.last1; b.last1 = a; b.atk = a; b.attack = TAL_NAME[a];
     b.state = 'tell'; b.timer = tellOf(b, TAL_TELL[a]); b.vx = 0;
+    if (a === 4) b.markX = tallockMarkX(b, pl);
+  }
+  /**
+   * DESIGN §8.1 (playtest B34): a Stack Slam that lands on a fighter (cornered at a wall, under a shelf) — or one of his hits
+   * that knocks the fighter into him — leaves the bodies overlapping. From the next frame (the landing touch itself is the
+   * slam's hit) the fighter is pushed clear of the stack — to the side of its centre, or the other side when that one is a
+   * wall — so no repeated body contact.
+   */
+  function tallockUnpin(b, game, pl) {
+    if (!pl || pl.dead || !E.overlap(b, pl)) { b.pinCheck = false; return; }
+    const A = b.A, lv = game.level, hw = pl.w / 2;
+    const free = function (x) { return x - hw >= A.x0 && x + hw <= A.x1 && !E.overlapsSolid(lv, x - hw, pl.y - pl.h, pl.w, pl.h - 1); };
+    let side = pl.x < b.x ? -1 : 1, x = side < 0 ? b.x - b.w / 2 - hw - 0.5 : b.x + b.w / 2 + hw + 0.5;
+    if (!free(x)) { side = -side; x = side < 0 ? b.x - b.w / 2 - hw - 0.5 : b.x + b.w / 2 + hw + 0.5; if (!free(x)) return; }
+    pl.x = x; pl.px = x; if (pl.vx * side < 0) pl.vx = 0;
+    FX.burst('dust', pl.x, pl.y, 4, DUST_N);
+    b.pinCheck = false;
   }
   function tallockActive(b, game, player) {
     const K = b.data.cols;
@@ -353,9 +408,12 @@
         tallockRecover(b, 50); break;
       }
       case 3: tallockDisc(b, game, 1); if (b.enraged) { b.state = 'tossWait'; b.timer = 15; } else tallockRecover(b, 30); break;
-      case 4: b.slamX = player.x; b.vy = -11; b.vx = (b.slamX - b.x) / 50; b.state = 'slam'; b.timer = 0; b.contact = 1; break;
+      // the landing x is the fighter's x at tell end (clamped so the stack fits the arena) — the marker freezes there (B33)
+      case 4: b.slamX = tallockMarkX(b, player); b.markX = b.slamX; b.vy = -11; b.vx = (b.slamX - b.x) / 50; b.state = 'slam'; b.timer = 0; b.contact = 1; break;
+      case 5: b.state = 'shrug'; b.timer = SHRUG_ACTIVE; b.hitS.hitList.length = 0; FX.shake(5, 10); Au.sfx('heavyHit', b.x); FX.burst('dust', b.x, b.y - b.h, 6, DUST_N); break;
     }
   }
+  function tallockMarkX(b, pl) { return U.clamp(pl ? pl.x : b.x, b.A.x0 + b.w / 2, b.A.x1 - b.w / 2); }
   function tallockDisc(b, game, mul) {
     const K = b.data.cols;
     const s = makeShot(game, 'disc', b.x, b.y - 112, b.facing * 4.5 * mul, -4, K.disc);
@@ -365,8 +423,15 @@
   function tallockUpdate(game, player) {
     const b = this; b.t++;
     if (b.flash > 0) b.flash--; if (b.coreBright > 0) b.coreBright--;
+    b.focusX = b.x; b.focusY = b.y - b.h / 2;
+    if (b.pinCheck) tallockUnpin(b, game, player);
+    // consecutive head pogos: a fighter who touches the ground (or a grate) starts over
+    if (player.onGround) b.pogoN = 0;
     if (b.roar > 0) { b.vx = 0; if (--b.roar === 0) { b.state = 'walk'; b.timer = b.gap; b.attack = ''; } b.gravity(0.5, 12); b.moveAndCollide(game.level); return; }
     const dx = player.x - b.x, adx = Math.abs(dx);
+    // a pogo-lock (DESIGN §8.1, playtest B27): the third head pogo in a row cuts a walk or a recovery short with the Shrug's tell
+    if (b.pogoN >= SHRUG_POGOS && (b.state === 'walk' || b.state === 'recover')) { b.atk = 5; b.attack = TAL_NAME[5]; b.last2 = b.last1; b.last1 = 5; b.state = 'tell'; b.timer = tellOf(b, TAL_TELL[5]); b.vx = 0; }
+    if (b.state === 'tell' && b.atk === 4) b.markX = tallockMarkX(b, player);   // the Slam marker follows the fighter until the tell ends
     switch (b.state) {
       case 'walk':
         // DESIGN §8.1: it walks toward the player but halts a short step (16 px) from the body — the walk is never an
@@ -392,6 +457,11 @@
         b.vx = 0;
         if (--b.timer <= 0) { tallockDisc(b, game, 0.8); tallockRecover(b, 30); }
         break;
+      case 'shrug':
+        b.vx = 0;
+        regBox(game, b.hitS, b.x - SHRUG_W / 2, b.y - b.h - SHRUG_UP, SHRUG_W, SHRUG_UP + SHRUG_DOWN, b.facing);
+        if (--b.timer <= 0) { b.pogoN = 0; tallockRecover(b, SHRUG_RECOVER); }
+        break;
       case 'slam':
         b.timer++;
         break;
@@ -409,7 +479,7 @@
     }
     b.gravity(b.state === 'slam' ? 0.44 : 0.5, 12); b.moveAndCollide(game.level);
     if (b.state === 'slam' && b.timer > 4 && b.onGround) {
-      b.state = 'shock'; b.timer = 10; b.vx = 0; b.hitL.hitList.length = 0; b.hitR.hitList.length = 0;
+      b.state = 'shock'; b.timer = 10; b.vx = 0; b.hitL.hitList.length = 0; b.hitR.hitList.length = 0; b.pinCheck = true;
       FX.shake(8, 14); FX.burst('dust', b.x - 45, b.y, 6, DUST_N); FX.burst('dust', b.x + 45, b.y, 6, DUST_N); Au.sfx('heavyHit', b.x);
     }
   }
@@ -422,8 +492,10 @@
       if (b.atk === 2) rise = 20 * (1 - b.timer / 36);
       else if (b.atk === 4) sy = 0.8 + 0.2 * (b.timer / 40);
       else if (b.atk === 1) wob = Math.sin(t * 0.8) * 2;
+      else if (b.atk === 5) { sy = 0.86 + 0.14 * (b.timer / 24); wob = Math.sin(t * 1.4) * 1.5; }
     } else if (st === 'recover' || st === 'walk') wob = Math.sin(t / 6) * (st === 'recover' && b.atk === 4 ? 4 : 1.5);
     else if (st === 'slam') sy = 1.1;
+    else if (st === 'shrug') sy = 1.12;
     if (b.roar > 0) wob = Math.sin(t * 1.2) * 4;
     if (dying) a = 1 - Math.max(0, (t - 70) / 20);
     // discs + rims
@@ -437,7 +509,7 @@
         cy += dy; cx += (i - 2.5) * 11 * Math.min(1, dy / Math.max(1, maxDy));
       }
       ds.x = cx; ds.y = cy; rm.x = cx; rm.y = cy - 3;
-      ds.tell = (st === 'tell' && ((b.atk === 2 && i === 0) || (b.atk === 4 && i === 0) || (b.atk === 3 && i === 5)));
+      ds.tell = (st === 'tell' && ((b.atk === 2 && i === 0) || (b.atk === 4 && i === 0) || (b.atk === 3 && i === 5) || (b.atk === 5 && i >= 4)));
     }
     // arms hang from the third disc (pivot at its edge), swing with the walk / raise for the swing
     const walkSw = st === 'walk' ? Math.sin(t / 8) * 0.35 : 0;
@@ -453,17 +525,33 @@
     // visor on the top disc
     const spin = st === 'tell' && b.atk === 3 ? Math.abs(Math.cos(t * 0.5 * (1 + (24 - b.timer) / 12))) : 1;
     b.visor.x = b.discs[5].x; b.visor.y = b.discs[5].y - 2; b.visor.w = 30 * (0.2 + 0.8 * spin);
-    b.visor.tell = st === 'tell' && b.atk === 3;
+    b.visor.tell = st === 'tell' && (b.atk === 3 || b.atk === 5);
     if (dying) { b.visor.on = t < 60; }
     ctx.save(); ctx.translate(x, y - rise); ctx.scale(b.facing, sy); ctx.translate(0, -60); ctx.globalAlpha = a;
     ctx.lineJoin = 'round'; ctx.lineCap = 'round';
     drawRig(ctx, b.rig, b.flash > 0, st === 'tell', b.accent, t);
     if (b.coreBright > 0 && !dying) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = b.coreBright / 10 * 0.5; ctx.fillStyle = K.glow; ctx.fillRect(b.visor.x - 20, b.visor.y - 6, 40, 12); ctx.restore(); }
     ctx.restore();
-    // stack slam target marker (world space) during the tell
-    if (st === 'tell' && b.atk === 4 && game.player) {
-      ctx.save(); ctx.globalAlpha = 0.35 + 0.25 * Math.cos(t * TAU / 8); ctx.fillStyle = b.accent;
-      ctx.beginPath(); ctx.ellipse(game.player.x, b.A.floorY - 2, 50, 6, 0, 0, TAU); ctx.fill(); ctx.restore();
+    // Stack Slam landing marker (world space, playtest B33): it follows the fighter through the tell, freezes at the landing x
+    // when the tell ends and stays — brighter, inked rim — for the whole arc, until the stack lands on it
+    if (b.atk === 4 && (st === 'tell' || st === 'slam') && !dying) {
+      const arc = st === 'slam';
+      ctx.save(); ctx.globalAlpha = arc ? 0.6 + 0.3 * Math.cos(t * TAU / 6) : 0.35 + 0.25 * Math.cos(t * TAU / 8); ctx.fillStyle = b.accent;
+      ctx.beginPath(); ctx.ellipse(b.markX, b.A.floorY - 2, 50, 6, 0, 0, TAU); ctx.fill();
+      if (arc) { ctx.globalAlpha = 0.9; ctx.strokeStyle = INK; ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(b.markX, b.A.floorY - 2, 50, 6, 0, 0, TAU); ctx.stroke(); }
+      ctx.restore();
+    }
+    // Stack Shrug tell: chevrons rising over the top disc (it heaves at whatever is above it)
+    if (st === 'tell' && b.atk === 5 && !dying) {
+      const k = 1 - b.timer / 24, top = y - b.h * sy - 10;
+      ctx.save(); ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+      for (let i = 0; i < 3; i++) {
+        const cy = top - 8 - i * 14 - (t % 12) * 1.2;
+        ctx.globalAlpha = (0.45 + 0.4 * k) * (1 - i * 0.22);
+        ctx.strokeStyle = INK; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(x - 22, cy + 8); ctx.lineTo(x, cy - 4); ctx.lineTo(x + 22, cy + 8); ctx.stroke();
+        ctx.strokeStyle = b.accent; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x - 22, cy + 8); ctx.lineTo(x, cy - 4); ctx.lineTo(x + 22, cy + 8); ctx.stroke();
+      }
+      ctx.restore();
     }
   }
 
@@ -530,6 +618,7 @@
   }
   function weftyrUpdate(game, player) {
     const b = this, A = b.A, K = b.data.cols; b.t++;
+    b.focusX = b.x; b.focusY = b.y - 20;
     if (b.flash > 0) b.flash--; if (b.coreBright > 0) b.coreBright--;
     if ((b.t & 7) === 0) { const tr = b.trail; for (let i = 3; i > 0; i--) { tr[i * 2] = tr[i * 2 - 2]; tr[i * 2 + 1] = tr[i * 2 - 1]; } tr[0] = b.x - b.facing * 50; tr[1] = b.y - 20; }
     if (b.roar > 0) { b.vx = 0; b.vy = 0; if (--b.roar === 0) weftyrCruise(b, game); return; }
@@ -656,6 +745,7 @@
     const K = d.cols;
     b.A = arenaOf(spec, room);
     b.gravity = noop; b.moveAndCollide = noop; b.collideTiles = false; b.ignoreOneWay = true;
+    b.beaconTop = true;   // its head above the view is marked by its own beacon (corroBeacon); the HUD's side marker skips that case
     b.W = Math.max(60, b.A.x1 - b.A.x0 - 2 * INS); b.H = Math.max(60, b.A.floorY - b.A.ceilY - 2 * INS); b.per = 2 * (b.W + b.H);
     b.speed = 3.5; b.crawlSpeed = 3.5; b.puddleLife = 180; b.roarFrames = 90;
     b.path = new Float32Array(PATH_N * 3); b.pathI = 0; b.pathLen = 0; b.headD = 0; b.lastX = 0; b.lastY = 0;
@@ -746,7 +836,7 @@
     out.x = nx; out.y = ny; return out;
   }
   function corroPlaceHead(b) {
-    b.x = b.hx; b.y = b.hy + 20;
+    b.x = b.hx; b.y = b.hy + 20; b.focusX = b.hx; b.focusY = b.hy;
     for (let i = 0; i < SEGS; i++) {
       pathAt(b, b.spacing * (i + 1), pathOut); b.segX[i] = pathOut.x; b.segY[i] = pathOut.y;
       pathAt(b, b.spacing * (i + 1) - 6, pathOut);
@@ -988,6 +1078,26 @@
     ctx.restore();
     if (dying && t > 84) { ctx.fillStyle = K.acid; ctx.globalAlpha = 0.7; ctx.beginPath(); ctx.ellipse(hx, hy + 20, 30 + (t - 84) * 2, 6, 0, 0, TAU); ctx.fill(); }
     ctx.restore();
+    if (!dying && !b.noBeacon && game && game.cam) corroBeacon(ctx, b, game, alpha, hx, hy);
+  }
+  /**
+   * Playtest B38: from the floor the camera can sit below the ceiling the Keeper crawls on. While its head is above the
+   * view, a beacon at the view's top edge marks its x — an inked chevron pointing up over a small head wedge, pulsing in
+   * the fin colour (below the HUD block when the head is over it). The engine's boss framing reads `focusX/focusY`.
+   */
+  const BEACON_HUD_X = 236, BEACON_HUD_Y = 128;
+  function corroBeacon(ctx, b, game, alpha, hx, hy) {
+    const cam = game.cam, cx = U.lerp(cam.px, cam.x, alpha), cy = U.lerp(cam.py, cam.y, alpha);
+    if (hy + 22 >= cy + 4) return;   // the head is (at least partly) in view
+    const K = b.data.cols, bx = U.clamp(hx, cx + 24, cx + 936);
+    const by = cy + (bx - cx < BEACON_HUD_X ? BEACON_HUD_Y : 14);
+    const pulse = 0.7 + 0.3 * Math.cos(b.t * TAU / 30);
+    ctx.save(); ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.globalAlpha = pulse;
+    ctx.fillStyle = K.fins; ctx.strokeStyle = INK; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(bx + 12, by + 14); ctx.lineTo(bx - 12, by + 14); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = K.head; ctx.beginPath(); ctx.moveTo(bx - 10, by + 20); ctx.lineTo(bx + 10, by + 20); ctx.lineTo(bx, by + 32); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = K.fins; for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc(bx - 4 + i * 4, by + 23, 1.3, 0, TAU); ctx.fill(); }
+    ctx.restore();
   }
 
   // ==========================================================================================
@@ -1003,7 +1113,7 @@
     b.A = arenaOf(spec, room);
     b.enrageHp = 0;   // phase 1 has no enrage; Panic Loop is phase 2's (≤ 60)
     b.last1 = 0; b.atk = 0; b.motes = 0; b.moteOpts = { parent: b, color: K.core };
-    b.cableSide = 1; b.cableTip = 0; b.spots = new Float32Array(5); b.coreDark = 0;
+    b.cableSide = 1; b.cableTip = b.x + 75; b.spots = new Float32Array(5); b.coreDark = 0;   // the tip starts at home (a 0 tip drew the cable across the arena)
     b.hitCable = mkHit('heavy', 'cable', 1, 0); b.hitCable.src = b;
     b.hitSpikes = [];
     for (let i = 0; i < 5; i++) { const h = mkHit('heavy', 'spike', 1, 1); h.src = b; b.hitSpikes.push(h); }
@@ -1146,6 +1256,7 @@
   }
   function kerUpdate(game, player) {
     const b = this, A = b.A, K = b.data.cols; b.t++;
+    b.focusX = b.x; b.focusY = b.phase >= 2 ? b.y - 35 : b.y - 120;   // the chest core / the flying core
     if (b.flash > 0) b.flash--; if (b.coreBright > 0) b.coreBright--; if (b.coreDark > 0) b.coreDark--;
     if (b.state === 'transition') {   // phase is already 2 here (set inside takeHit): 180 f split → the core rises to row 6
       b.vx = 0; b.transT++; b.coreY = U.lerp(b.y - 120, rowC(6), U.easeInOutQuad(Math.min(1, b.transT / 150)));
@@ -1300,16 +1411,26 @@
     ctx.save(); ctx.lineJoin = 'round'; ctx.lineCap = 'round';
     if (b.phase === 1) {
       // telegraphs in world space
+      // Rootwell is red on red (playtest B41): the spikes and their marks read by LUMINANCE and an ink outline, not hue —
+      // bleached-bone spikes with a white edge; each mark is a pale inked ellipse with a dashed riser above it, visible
+      // around a fighter standing on it
       if (st === 'tell' && b.atk === 2) {
-        ctx.fillStyle = K.core; ctx.globalAlpha = 0.4 + 0.3 * Math.cos(t * TAU / 8);
-        for (let i = 0; i < 5; i++) { ctx.beginPath(); ctx.ellipse(b.spots[i], A.floorY - 2, 14, 4, 0, 0, TAU); ctx.fill(); }
+        const pulse = 0.55 + 0.35 * Math.cos(t * TAU / 8);
+        for (let i = 0; i < 5; i++) {
+          const sx = b.spots[i];
+          ctx.globalAlpha = pulse; ctx.fillStyle = K.bone; ctx.strokeStyle = INK; ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.ellipse(sx, A.floorY - 2, 14, 4, 0, 0, TAU); ctx.fill(); ctx.stroke();
+          ctx.globalAlpha = pulse * 0.8; ctx.strokeStyle = K.hot; ctx.lineWidth = 2; setDash(ctx, true);
+          ctx.beginPath(); ctx.moveTo(sx, A.floorY - 8); ctx.lineTo(sx, A.floorY - 8 - 34 * (1 - b.timer / 40)); ctx.stroke(); setDash(ctx, false);
+        }
         ctx.globalAlpha = 1;
       } else if (st === 'spikes') {
-        ctx.strokeStyle = INK; ctx.lineWidth = 3; ctx.fillStyle = K.crown;
         const k = b.timer > 24 ? (30 - b.timer) / 6 : (b.timer < 6 ? b.timer / 6 : 1);
         for (let i = 0; i < 5; i++) {
           const sx = b.spots[i];
-          ctx.beginPath(); ctx.moveTo(sx - 14, A.floorY); ctx.lineTo(sx - 6, A.floorY - 30 * k); ctx.lineTo(sx, A.floorY - 12 * k); ctx.lineTo(sx + 6, A.floorY - 30 * k); ctx.lineTo(sx + 14, A.floorY); ctx.closePath(); ctx.fill(); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(sx - 14, A.floorY); ctx.lineTo(sx - 6, A.floorY - 30 * k); ctx.lineTo(sx, A.floorY - 12 * k); ctx.lineTo(sx + 6, A.floorY - 30 * k); ctx.lineTo(sx + 14, A.floorY); ctx.closePath();
+          ctx.fillStyle = K.bone; ctx.fill(); ctx.strokeStyle = INK; ctx.lineWidth = 4; ctx.stroke();
+          ctx.strokeStyle = WHITE; ctx.lineWidth = 1.5; ctx.stroke();
         }
       }
       const pulse = 1 + 0.1 * Math.sin(t * TAU / 60);
@@ -1336,6 +1457,12 @@
       else { b.core.on = true; b.star.on = true; }
       ctx.save(); ctx.translate(x, y); ctx.scale(sc, sc); ctx.translate(0, -90); ctx.globalAlpha = a;
       if (st === 'transition') { ctx.translate(Math.sin(t) * 2, 0); }
+      // a pale rim under each dark cable so the arms read on the dark-red floor by luminance (B41); the rig's ink + fill sit on it
+      ctx.strokeStyle = K.rim; ctx.lineCap = 'round';
+      for (let i = 0; i < 2; i++) {
+        const c = i ? b.cableR : b.cableL;
+        ctx.lineWidth = c.lw + 9; ctx.beginPath(); ctx.moveTo(c.x0, c.y0); ctx.quadraticCurveTo(c.cx, c.cy, c.x1, c.y1); ctx.stroke();
+      }
       drawRig(ctx, b.rig1, b.flash > 0, st === 'tell', b.accent, t);
       ctx.restore();
       if (st === 'cableOut' || st === 'cableHold') {   // the whip-tip (the only part of the cable that hurts) glows as it strikes

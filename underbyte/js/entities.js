@@ -309,6 +309,26 @@
   }
   const hitResult = { dmg: 0, killed: false, blocked: false };
   /**
+   * DESIGN §3.5 / §7.0 (playtest B29): a fighter's L1 / L2 is a shove, not a launch. The victim takes the sheet knockback
+   * velocity and slides as usual, but never further from the attacker than the reach of the attacker's NEXT light (its
+   * box front, Overclock reach included, plus the victim's half width, minus SHOVE_MARGIN) — so a grounded L1 → L2 → L3
+   * connects on a kbResist-1 target. A victim already beyond that distance is never pulled back. L3, heavies and specials
+   * keep the full slide and launch. Fills victim.shoveX / shoveDir / shoveMax (0 = no limit); enemies.js applies it.
+   */
+  const SHOVE_MARGIN = 8;
+  function chainShove(victim, hit) {
+    victim.shoveMax = 0;
+    const pl = hit.src, tag = hit.tag;
+    if (hit.owner !== 'player' || (tag !== 'light1' && tag !== 'light2') || !pl || !pl.data || !pl.data.moves) return;
+    const next = pl.data.moves[tag === 'light1' ? 'light2' : 'light3'];
+    if (!next || !next.box) return;
+    const R = UB.Characters && UB.Characters.RULES, oc = !!pl.ocActive && !!R;
+    const front = next.box[0] * (oc ? R.ocReachCx : 1) + next.box[2] * (oc ? R.ocReach : 1) / 2;
+    const dir = hit.facing || 1, d0 = (victim.x - pl.x) * dir;
+    victim.shoveX = pl.x; victim.shoveDir = dir;
+    victim.shoveMax = Math.max(d0, front + victim.w / 2 - SHOVE_MARGIN);
+  }
+  /**
    * Default damage application for enemies/bosses: hp, flash, hitstun and
    * knockback × kbResist (DESIGN §7.0). Returns a shared scratch result.
    */
@@ -321,6 +341,7 @@
       const k = victim.kbResist * (victim.units === 'pxs' ? 1 : 1 / 60);
       victim.vx = hit.kbx * hit.facing * k;
       victim.vy = hit.kby * k;
+      chainShove(victim, hit);
     }
     if (victim.hp <= 0) { victim.hp = 0; victim.dead = true; hitResult.killed = true; }
     return hitResult;
@@ -342,4 +363,5 @@
   UB.Entity.makeHit = makeHit;
   UB.Entity.hitBoxWorld = hitBoxWorld;
   UB.Entity.applyHit = applyHit;
+  UB.Entity.chainShove = chainShove;
 })(window.UB);

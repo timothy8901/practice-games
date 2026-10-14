@@ -53,10 +53,12 @@
     quit1: 'Unsaved progress since the', quit2: 'last node is lost. Quit?',
     yes: 'YES', no: 'NO',
     settings: 'SETTINGS',
-    settingRows: ['MASTER VOLUME', 'MUSIC VOLUME', 'SFX VOLUME', 'SCREEN SHAKE', 'SHOW HITBOXES', 'RESET SAVE', 'BACK'],
+    // REDUCED FLASHING (playtest B42, the comfort toggle beside SCREEN SHAKE): full-screen flashes become a thin edge pulse
+    settingRows: ['MASTER VOLUME', 'MUSIC VOLUME', 'SFX VOLUME', 'SCREEN SHAKE', 'REDUCED FLASHING', 'SHOW HITBOXES', 'RESET SAVE', 'BACK'],
     on: 'ON', off: 'OFF',
     reset1: 'Erase the saved run?', reset2: 'This cannot be undone.',
-    map: 'MAP', mapLegend: '◆ node  ● boss  ⬢ vendor  · you', mapClose: 'Esc / M close', mapRecentre: 'R recentre',
+    // map legend (§12.12): each word follows a swatch of the icon the map draws (playtest B24 added the core dot)
+    map: 'MAP', mapLegend: ['node', 'boss', 'vendor', 'core', 'you'], mapClose: 'Esc / M close', mapRecentre: 'R recentre',
     gameOver: 'SIGNAL LOST', gameOverSub: 'Rebooting at the last restore node…', gameOverPrompt: 'Press JUMP or CONFIRM to continue',
     victory: 'ROOT PROCESS PURGED', victoryPrompt: 'Press CONFIRM for the title',
     victoryRows: ['FIGHTER', 'TIME', 'DEATHS', 'BITS COLLECTED', 'CORES FOUND', 'ROOMS DISCOVERED', 'ENEMIES PURGED', 'BOSSES'],
@@ -80,7 +82,11 @@
     vendorFirstRw: "Don't ask how I got down here. I don't know either.",
     pressAnyKey: 'Press any key',
     ocLabel: 'OVERCLOCK', ocReady: 'OVERCLOCK — READY  [', ocOn: 'OVERCLOCKED', energy: 'ENERGY',
-    prompt: { REST: '▲ REST', TRADE: '▲ TRADE' },
+    // interaction prompt (§12.8): the label, with the bound up key under it — no '▲' glyph (playtest B12: it read as a
+    // console face button)
+    prompt: { REST: 'REST', TRADE: 'TRADE' },
+    // one-time drop-through hint (playtest B19), the §5.5 legend line; the bound keys are drawn under it
+    dropHint: 'Down + Jump drops through',
     moveLabels: ['LIGHT  ', 'HEAVY  ', '   SPECIAL  ', 'ULTIMATE  '],
     // §15.10: the owned abilities, listed in the pause menu and the map legend
     abilityDesc: { echoJump: 'ECHO JUMP — a second jump in the air', burstLine: 'BURST LINE — a 6-tile lunge, ground or air', gripProtocol: 'GRIP PROTOCOL — cling to walls and kick off them' },
@@ -93,10 +99,24 @@
     'CORE FOUND': ['Max hearts +1', 'Max hearts +1', 'A piece of the kingdom that never rotted.'],
     'RESTORED': ['Saved · hearts full · energy full', 'Saved · hearts full · energy full', ''],
   };
+  /**
+   * Gamepad variants of the keyboard footers/prompts (playtest B12): the same §15 strings with the key names swapped for the
+   * standard-pad buttons that do the same thing (confirm = A, back = B, map = BACK, the recentre key R = confirm), as
+   * §15.5 does for the banner hints. Built once; UI picks the variant of the last-used device (UB.Input.device).
+   */
+  const PAD_SWAP = [['Esc / M close', 'B / BACK close'], ['R recentre', 'A recentre'], ['JUMP or CONFIRM', 'A'], ['CONFIRM', 'A'], ['Enter', 'A'], ['Esc', 'B']];
+  function padText(str) { for (let i = 0; i < PAD_SWAP.length; i++) str = str.split(PAD_SWAP[i][0]).join(PAD_SWAP[i][1]); return str; }
+  const DEVICE_KEYS = ['footer', 'selectSub', 'mapClose', 'mapRecentre', 'shopFooter', 'gameOverPrompt', 'victoryPrompt'];
+  const PAD_TXT = Object.create(null);
+  for (let i = 0; i < DEVICE_KEYS.length; i++) PAD_TXT[DEVICE_KEYS[i]] = padText(TXT[DEVICE_KEYS[i]]);
+  /** The footer/prompt string `key` for the last-used device (keyboard/touch: the §15 text; gamepad: the pad variant). */
+  function devText(key) { return In.device === 'gamepad' && PAD_TXT[key] ? PAD_TXT[key] : TXT[key]; }
   const HINT_ORDER = [['move', 'MOVE', 'left'], ['jump', 'JUMP', 'jump'], ['light', 'LIGHT', 'light'], ['heavy', 'HEAVY', 'heavy'], ['special', 'SPECIAL', 'special'], ['dash', 'DASH', 'dash'], ['overclock', 'OVERCLOCK', 'overclock']];
   const CARD_X = [60, 240, 420, 600, 780];
-  const SETTING_KEYS = ['master', 'music', 'sfx', 'screenShake', 'showHitboxes', null, null];
+  const SETTING_KEYS = ['master', 'music', 'sfx', 'screenShake', 'reducedFlashing', 'showHitboxes', null, null];
+  const SET_RESET = 6, SET_BACK = 7;   // settingRows indices of RESET SAVE (title only) and BACK
   const MAP_S = 40;                    // map px per screen (DESIGN §12.12)
+  const STRIP_X = 240, STRIP_Y = 8, STRIP_W = 480;   // the banner's top strip (B04): between the hearts block and the bits
   const DIM = 'rgba(10,8,12,0.6)';
   const GAMEOVER_BG = '#07050A', TROUGH = '#2A2230', UNVISITED = '#1A1620', BOSS_TROUGH = '#2A1A24', BOSS_TROUGH2 = '#3A1020';
 
@@ -129,25 +149,31 @@
     t: 0,
     sel: 0, ynSel: 0,                        // menu index / yes-no cursor (0 = NO)
     confirmQuit: false, confirmReset: false, confirmNew: false,
-    fromTitle: false, pauseSel: -1,
+    fromTitle: false, pauseSel: -1, titleSel: -1,   // titleSel: the title row SETTINGS was opened from (restored on close, B03)
     mapPan: { x: 0, y: 0 }, mapMin: { x: 0, y: 0 }, mapMax: { x: 0, y: 0 }, recentreReq: false,
     mapRoomLine: '', mapBestiary: '', mapBestiary2: '', mapCur: null,   // the map cursor room (null = the current room) + its footer lines (a long bestiary wraps to a 2nd row)
     mapFootFree: -1,            // free footer width between the legend and the hints (measured once)
     hudAlpha: 1,                // the hearts/energy/meter block fades while the fighter stands behind it (§12.1)
     toastT: 0, toastDur: 0, toast1: '', toast2: '', toastBottom: false,
     bannerT: 0, bannerDur: 0, banner1: '', banner2: '', banner2b: '', banner3: '', banner2Font: F.mono16,
+    // B04: a banner is the centre panel only while the pickup sequence locks the player; with control it is the top strip
+    bannerStrip: false, bannerStripT: 0, bannerFromPanel: false, bannerLevel: null, stripL2: '', stripL2b: '', stripH: 0, stripAlpha: 1,
     cardT: 0, cardDur: 0, cardName: '', cardSub: '',
     // HUD animation state
     plRef: null, lastHp: 0, lastEnergy: 0, energyShown: 0, ghostFrom: 0, ghostTo: 0, ghostT: 0,
     heartT: new Uint8Array(9), heartKind: new Uint8Array(9),
     bitsPop: 0, lastBits: -1, bitsStr: '0',
     bossRef: null, bossLine: '', bossName: '', bossSub: '', bossGhost: 0, bossLastHp: 0, bossHold: 0, bossShake: 0, bossPhase: 1,
+    bossOut: 0,                 // frames since the boss died (the bar drains, then fades out — B11)
     hintStr: '', hintKey: -1, dbgStr: '',
+    // B19: the one-time "Down + Jump drops through" hint (dropT > 0 while shown; dropSeen = the save it was shown for)
+    dropT: 0, dropSeen: null, dropStand: 0, dropDown: 0, dropMust: false, dropCellX: -1, dropCellY: -1, dropLevel: null,
+    dropKeys: '', dropKeysDev: '',
     lowPulse: 0,
     // select screen
     selPrev: -1, selSlide: 0, statNow: new Float32Array(4), cardFlash: 0, moveLines: Object.create(null),
     // shop / lore / victory
-    shopLine: '', shopMsgT: 0, shopMsg: '', rwGreeted: false, loreT: 0,
+    shopLine: '', shopMsgT: 0, shopMsg: '', rwGreeted: false, loreT: 0, shopRoom: null,
     vicRows: [], epiOff: 0, epiScroll: 0, vicRowsAt: 0,
     saveSumRef: null, saveSum: '',
   };
@@ -286,20 +312,26 @@
   UI.init = function (game) { UI.sel = 0; UI.lastBits = -1; UI.game = game; };
   /** Engine calls this whenever game.screen / game.overlay changes (reset selection + per-screen state). */
   UI.enter = function (name, game) {
+    const prevSel = UI.sel;
     UI.sel = 0; UI.ynSel = 0; UI.confirmQuit = false; UI.confirmReset = false; UI.confirmNew = false;
-    if (name === 'title') { if (game && game.hasSave()) UI.sel = 1; UI.saveSumRef = null; }
+    if (name === 'title') {
+      // closing SETTINGS opened from the title puts the cursor back on SETTINGS (B03); otherwise CONTINUE when saved
+      if (UI.titleSel >= 0) { UI.sel = UI.titleSel; UI.titleSel = -1; } else if (game && game.hasSave()) UI.sel = 1;
+      UI.saveSumRef = null;
+    }
     else if (name === 'select' && game) {
       const ids = UB.Characters.list;
       for (let i = 0; i < ids.length; i++) if (ids[i].id === game.lastFighter) UI.sel = i;
       UI.selPrev = -1; UI.selSlide = 0; UI.cardFlash = 0;
       for (let i = 0; i < 4; i++) UI.statNow[i] = 0;
     } else if (name === 'play') { UI.hintKey = -1; syncHud(game); }
-    else if (name === 'settings') UI.fromTitle = !!(game && game.screen === 'title');
+    else if (name === 'settings') { UI.fromTitle = !!(game && game.screen === 'title'); if (UI.fromTitle) UI.titleSel = prevSel; }
     else if (name === 'pause') { if (UI.pauseSel >= 0) { UI.sel = UI.pauseSel; UI.pauseSel = -1; } }
     else if (name === 'map') { UI.mapPan.x = 0; UI.mapPan.y = 0; UI.recentreReq = false; if (game) mapSetup(game); }
     else if (name === 'shop' && game) {
       const sv = game.save.vendor;
       UI.shopMsgT = 0;
+      UI.shopRoom = game.level ? game.level.room.id : null;   // prices are per vendor room (UB.Util.vendorPrice, B25)
       if (sv.length >= VENDOR.length) UI.shopLine = TXT.vendorSoldOut;
       else if (game.level && game.level.room.zone === 'rootwell' && !UI.rwGreeted) { UI.shopLine = TXT.vendorFirstRw; UI.rwGreeted = true; }
       else UI.shopLine = TXT.vendorLines[Math.floor(game.rng() * TXT.vendorLines.length)];
@@ -316,28 +348,36 @@
     UI.toast1 = l1 || ''; UI.toast2 = l2 || ''; UI.toastDur = frames || 150; UI.toastT = UI.toastDur;
     UI.toastBottom = !UI.toast2;   // one-line system/boss toasts sit at the bottom (§15.8); zone toasts are the big centred kind
   };
+  /** Break `s` in two at ' — ' (else the space nearest the middle) when wider than maxW in `font`: [first, second|'']. Allocates (banner set-up only). */
+  function splitLine(s, font, maxW) {
+    measure.font = font;
+    if (measure.measureText(s).width <= maxW) return [s, ''];
+    let cut = s.indexOf(' — ');
+    if (cut < 0) { let best = -1; for (let i = 0; i < s.length; i++) if (s[i] === ' ' && (best < 0 || Math.abs(i - s.length / 2) < Math.abs(best - s.length / 2))) best = i; cut = best; }
+    return cut > 0 ? [s.slice(0, cut).trim(), s.slice(cut).replace(/^( — | )/, '').trim()] : [s, ''];
+  }
   UI.banner = function (l1, l2, l3, frames) {
     UI.banner1 = l1 || ''; UI.banner2 = l2 || ''; UI.banner3 = l3 || '';
     const own = BANNER_TEXT[UI.banner1];
     if (own) { UI.banner2 = In.device === 'gamepad' ? own[1] : own[0]; if (!l3 || own[2]) UI.banner3 = own[2]; }
+    const full2 = UI.banner2;
     measure.font = F.mono16;
-    UI.banner2Font = measure.measureText(UI.banner2).width > 440 ? F.mono12 : F.mono16;
+    UI.banner2Font = measure.measureText(full2).width > 440 ? F.mono12 : F.mono16;
     UI.banner2b = '';
-    if (UI.banner2Font === F.mono12) {   // still too wide for the 480 px panel: break it in two at the dash or the middle space
-      measure.font = F.mono12;
-      if (measure.measureText(UI.banner2).width > 440) {
-        const s = UI.banner2;
-        let cut = s.indexOf(' — ');
-        if (cut < 0) { let best = -1; for (let i = 0; i < s.length; i++) if (s[i] === ' ' && (best < 0 || Math.abs(i - s.length / 2) < Math.abs(best - s.length / 2))) best = i; cut = best; }
-        if (cut > 0) { UI.banner2b = s.slice(cut).replace(/^( — | )/, '').trim(); UI.banner2 = s.slice(0, cut).trim(); }
-      }
-    }
+    if (UI.banner2Font === F.mono12) { const two = splitLine(full2, F.mono12, 440); UI.banner2 = two[0]; UI.banner2b = two[1]; }   // still too wide for the 480 px panel
+    // the top-strip form (B04): line 2 in 12 px MONO inside the 480 px strip, the flavour line under it
+    const st = splitLine(full2, F.mono12, 456);
+    UI.stripL2 = st[0]; UI.stripL2b = st[1];
+    UI.stripH = 32 + (UI.stripL2 ? 15 : 0) + (UI.stripL2b ? 15 : 0) + (UI.banner3 ? 15 : 0);
     UI.bannerDur = frames || 182; UI.bannerT = UI.bannerDur;
     const g = UI.game;
+    // the centre panel is for the locked pickup sequence only (§12.7); with the player in control it is the strip
+    UI.bannerLevel = g ? g.level : null;
+    UI.bannerStrip = !(g && g.mode === 'pickupSeq'); UI.bannerFromPanel = !UI.bannerStrip; UI.bannerStripT = 0;
     if (g && g.level && g.cam) {   // 10 glitter from the panel corners (world space = screen + camera)
-      const cx = g.cam.x, cy = g.cam.y;
-      FX.burst('glitter', 240 + cx, 200 + cy, 3, { color: P.SELECT }); FX.burst('glitter', 720 + cx, 200 + cy, 3, { color: P.SELECT });
-      FX.burst('glitter', 240 + cx, 320 + cy, 2, { color: P.SELECT }); FX.burst('glitter', 720 + cx, 320 + cy, 2, { color: P.SELECT });
+      const cx = g.cam.x, cy = g.cam.y, top = UI.bannerStrip ? STRIP_Y : 200, bot = UI.bannerStrip ? STRIP_Y + UI.stripH : 320;
+      FX.burst('glitter', 240 + cx, top + cy, 3, { color: P.SELECT }); FX.burst('glitter', 720 + cx, top + cy, 3, { color: P.SELECT });
+      FX.burst('glitter', 240 + cx, bot + cy, 2, { color: P.SELECT }); FX.burst('glitter', 720 + cx, bot + cy, 2, { color: P.SELECT });
     }
   };
   UI.bossCard = function (name, sub, frames) { UI.cardName = name || ''; UI.cardSub = sub || ''; UI.cardDur = frames || 150; UI.cardT = UI.cardDur; };
@@ -362,6 +402,15 @@
       if (UI.toastT > 0) UI.toastT--;
       if (UI.bannerT > 0) UI.bannerT--;
       if (UI.cardT > 0) UI.cardT--;
+    }
+    // banners (B04): a room change ends them (they never follow the player into the next room); outside the locked
+    // pickup sequence they hold as the top strip, the centre panel easing out as the strip slides in
+    if (UI.bannerT > 0 && game.screen === 'play') {
+      if (game.mode === 'transition' || game.level !== UI.bannerLevel) UI.bannerT = 0;
+      else {
+        if (!UI.bannerStrip && game.mode !== 'pickupSeq') { UI.bannerStrip = true; UI.bannerStripT = 0; }
+        if (UI.bannerStrip && !frozen && UI.bannerStripT < 60) UI.bannerStripT++;
+      }
     }
     if (UI.bitsPop > 0) UI.bitsPop--;
     if (UI.cardFlash > 0) UI.cardFlash--;
@@ -403,6 +452,10 @@
         if ((b.phase || 1) !== UI.bossPhase) { UI.bossPhase = b.phase || 1; UI.bossShake = 20; }
         if (UI.bossHold > 0) UI.bossHold--; else UI.bossGhost += (b.hp - UI.bossGhost) * 0.15;
       }
+      // B11: once the boss is dying the bar drains (BOSS_DRAIN f) and fades out — nothing lingers under "{NAME} PURGED"
+      const bs = game.bossFight ? game.bossFight.state : 'none';
+      if (b && (bs === 'dying' || bs === 'reward')) { if (!frozen && UI.bossOut < 999) UI.bossOut++; } else UI.bossOut = 0;
+      if (game.screen === 'play' && game.level) updateDropHint(game, pl, frozen);
       // debug line (only built while hitboxes are shown; every 15 f)
       if (game.settings && game.settings.showHitboxes && game.level && (UI.t % 15) === 0) UI.dbgStr = 'fps ' + game.fps + '  ' + game.level.room.id + '  ' + pl.state + '  f' + game.frame;
     }
@@ -410,7 +463,10 @@
     if (game.screen === 'select') {
       const d = UB.Characters.list[UI.sel];
       if (d) {
-        const tgt0 = d.hp / 6, tgt1 = d.run / 300, tgt2 = (d.jumpVel * d.jumpVel / (2 * d.gravity)) / 113.8, tgt3 = d.weight / 1.3;
+        // WEIGHT shows real weight (B18): `weight` is the knockback multiplier taken (§4.1), so the heaviest fighter is the
+        // one with the lowest multiplier — bar = lightest multiplier in the roster / this fighter's (Brackmaw 1.0, Vellix 0.46)
+        if (!(WEIGHT_MIN > 0)) { WEIGHT_MIN = Infinity; const L = UB.Characters.list; for (let i = 0; i < L.length; i++) if (L[i].weight > 0 && L[i].weight < WEIGHT_MIN) WEIGHT_MIN = L[i].weight; }
+        const tgt0 = d.hp / 6, tgt1 = d.run / 300, tgt2 = (d.jumpVel * d.jumpVel / (2 * d.gravity)) / 113.8, tgt3 = d.weight > 0 ? WEIGHT_MIN / d.weight : 1;
         UI.statNow[0] += (tgt0 - UI.statNow[0]) * 0.2; UI.statNow[1] += (tgt1 - UI.statNow[1]) * 0.2;
         UI.statNow[2] += (tgt2 - UI.statNow[2]) * 0.2; UI.statNow[3] += (tgt3 - UI.statNow[3]) * 0.2;
       }
@@ -420,6 +476,60 @@
     // title: cache the CONTINUE sub-line (allocates only when the saved slot object changes)
     if (game.screen === 'title' && game.savedData !== UI.saveSumRef) { UI.saveSumRef = game.savedData; UI.saveSum = game.saveSummary() || ''; }
   };
+
+  let WEIGHT_MIN = 0;   // lowest knockback multiplier in the roster (the heaviest fighter), found on the first select tick
+
+  // ---------------------------------------------------------------------------------------------
+  // B19: the one-time "Down + Jump drops through" hint. It shows the first time the player stands on a grate they must drop
+  // through (walled in on both sides, no ledge to walk off — the dc_cross and bv_cistern chute boxes) for 30 f, or holds Down on any
+  // droppable grate for 20 f; it stays while they stand there and goes once they drop or step off. Seen once per run:
+  // save.hints.drop when the save carries that key, else remembered for the current save object.
+  // ---------------------------------------------------------------------------------------------
+  const DROP_STAND = 30, DROP_DOWN = 20, DROP_MAX = 600;
+  const E = UB.Entity;
+  function dropSeen(game) { const h = game.save && game.save.hints; return !!(h && h.drop === true) || UI.dropSeen === game.save; }
+  function markDropSeen(game) { const h = game.save && game.save.hints; if (h && Object.prototype.hasOwnProperty.call(h, 'drop')) h.drop = true; UI.dropSeen = game.save; }
+  /** Grounded on a one-way grate with air (not solid) under it, and no solid tile under the body (Down + Jump would drop). */
+  function onDroppableGrate(pl, lv) {
+    const ty = pl.groundTy; if (ty < 0 || pl.ground) return false;
+    let grate = false;
+    for (let tx = pl.groundTx0; tx <= pl.groundTx1; tx++) {
+      const ch = E.tileAt(lv, tx, ty);
+      if (ch === '#' || ch === 'c') return false;
+      if (ch === '-' && !E.solidAt(lv, tx, ty + 1)) grate = true;
+    }
+    return grate;
+  }
+  /** The floor the player stands on is walled in on both sides (body-height walls, no ledge, no room edge): only down goes on. */
+  function mustDrop(pl, lv) {
+    const fy = pl.groundTy, r0 = Math.floor((pl.y - pl.h) / 30), r1 = fy - 1;
+    for (let dir = -1; dir <= 1; dir += 2) {
+      let tx = dir < 0 ? pl.groundTx0 : pl.groundTx1, walled = false;
+      for (let k = 0; k < 24; k++) {
+        tx += dir;
+        if (tx < 0 || tx >= lv.w) return false;                      // the walk reaches the room edge (an exit)
+        for (let r = r0; r <= r1; r++) if (E.solidAt(lv, tx, r)) { walled = true; break; }
+        if (walled) break;
+        const fl = E.tileAt(lv, tx, fy);
+        if (fl !== '#' && fl !== 'c' && fl !== '-') return false;   // a ledge to walk off: another way on
+      }
+      if (!walled) return false;
+    }
+    return true;
+  }
+  function updateDropHint(game, pl, frozen) {
+    const lv = game.level;
+    if (UI.dropLevel !== lv) { UI.dropLevel = lv; UI.dropT = 0; UI.dropStand = 0; UI.dropDown = 0; UI.dropCellX = -1; UI.dropCellY = -1; }
+    if (frozen) return;
+    if (!(pl.onGround && !pl.dead && game.mode === 'normal' && onDroppableGrate(pl, lv))) { UI.dropT = 0; UI.dropStand = 0; UI.dropDown = 0; return; }
+    const cx = (pl.x / 30) | 0;
+    if (cx !== UI.dropCellX || pl.groundTy !== UI.dropCellY) { UI.dropCellX = cx; UI.dropCellY = pl.groundTy; UI.dropMust = mustDrop(pl, lv); }
+    UI.dropStand++;
+    UI.dropDown = In.state.down.down ? UI.dropDown + 1 : 0;
+    if (UI.dropT > 0) { if (++UI.dropT > DROP_MAX) UI.dropT = 0; return; }
+    if (dropSeen(game)) return;
+    if ((UI.dropMust && UI.dropStand >= DROP_STAND) || UI.dropDown >= DROP_DOWN) { UI.dropT = 1; markDropSeen(game); }
+  }
 
   // =============================================================================================
   // menu input (DESIGN §2.5): up/down wrap, left/right adjust, confirm activates, back closes
@@ -469,7 +579,7 @@
       if (st.confirm.pressed || UI.recentreReq) { UI.recentreReq = false; mapCursorTo(game, null); }
       UI.mapPan.x = U.clamp(UI.mapPan.x, UI.mapMin.x, UI.mapMax.x); UI.mapPan.y = U.clamp(UI.mapPan.y, UI.mapMin.y, UI.mapMax.y);
     } else if (s === 'settings') {
-      const rows = UI.fromTitle ? 7 : 6;   // RESET SAVE only from the title; the last row is BACK
+      const rows = UI.fromTitle ? SET_BACK + 1 : SET_BACK;   // RESET SAVE only from the title; the last row is BACK
       if (UI.confirmReset) { const r = navYesNo(); if (r === 'yes') { game.resetSave(); UI.confirmReset = false; } else if (r === 'no') UI.confirmReset = false; return; }
       nav(rows);
       if (st.back.pressed || st.pause.pressed) { Au.sfx('menuBack'); game.closeOverlay(); return; }
@@ -477,8 +587,8 @@
       const adj = (In.repeat('right') ? 1 : 0) - (In.repeat('left') ? 1 : 0);
       const key = SETTING_KEYS[UI.sel];
       if (UI.sel <= 2) { if (adj !== 0) { game.setSetting(key, U.clamp(sg[key] + adj, 0, 10)); Au.sfx('menuMove'); } }
-      else if (UI.sel <= 4) { if (adj !== 0 || st.confirm.pressed) { game.setSetting(key, !sg[key]); Au.sfx('menuMove'); } }
-      else if (UI.fromTitle && UI.sel === 5) {   // RESET SAVE: live only while a run is saved (nothing to erase otherwise → deny)
+      else if (UI.sel < SET_RESET) { if (adj !== 0 || st.confirm.pressed) { game.setSetting(key, !sg[key]); Au.sfx('menuMove'); } }
+      else if (UI.fromTitle && UI.sel === SET_RESET) {   // RESET SAVE: live only while a run is saved (nothing to erase otherwise → deny)
         if (st.confirm.pressed) { if (game.hasSave()) { Au.sfx('menuConfirm'); UI.confirmReset = true; UI.ynSel = 0; } else Au.sfx('deny'); }
       }
       else if (st.confirm.pressed) { Au.sfx('menuBack'); game.closeOverlay(); }
@@ -548,11 +658,15 @@
     ctx.strokeStyle = P.INK; ctx.lineWidth = 3; Rn.rrect(ctx, x, y, w, h, 6); ctx.stroke();
     UI.text(ctx, TXT.energy, 24, 80, F.ui10b, P.PAPER_DIM);
   }
+  const DENY_CUE = 12;   // player.denyT runs 18 → 0: the meter flashes while it is above 12 (the first 6 f)
   function drawMeter(ctx, pl) {
-    const x = 24, y = 88, w = 180, h = 8;
+    // a refused Overclock (B31, player.deny): for its first 6 f the bar shakes and the missing part of the trough and the
+    // rim flash DANGER, as the energy bar does for a refused special
+    const deny = pl.denyT > DENY_CUE && pl.denyKind === 'overclock';
+    const x = 24 + (deny ? U.jitter(UI.t, 1, 2) : 0), y = 88, w = 180, h = 8;
     const ready = pl.meter >= pl.meterMax && !pl.ocActive && !(pl.ocTransform > 0);
     const oc = pl.ocActive;
-    ctx.fillStyle = P.METER_DIM; Rn.rrect(ctx, x, y, w, h, 4); ctx.fill();
+    ctx.fillStyle = deny ? P.DANGER : P.METER_DIM; Rn.rrect(ctx, x, y, w, h, 4); ctx.fill();
     const frac = oc ? U.clamp(pl.overclock / 720, 0, 1) : U.clamp(pl.meter / pl.meterMax, 0, 1);
     const mw = w * frac;
     const blink = oc && pl.overclock < 180 && ((Math.floor(pl.overclock / 6)) & 1) === 1;
@@ -567,7 +681,7 @@
       ctx.globalAlpha = 0.5; ctx.fillStyle = P.METER_READY; ctx.fillRect(x - 24 + ((UI.t % 45) / 45) * (w + 24), y, 24, h);
       ctx.restore();
     }
-    ctx.strokeStyle = P.INK; ctx.lineWidth = 2; Rn.rrect(ctx, x, y, w, h, 4); ctx.stroke();
+    ctx.strokeStyle = deny ? P.DANGER : P.INK; ctx.lineWidth = 2; Rn.rrect(ctx, x, y, w, h, 4); ctx.stroke();
     if (oc) UI.text(ctx, TXT.ocOn, 24, 108, F.ui10b, pl.data.ocPalette.glow);
     else if (ready) {
       ctx.save(); ctx.globalAlpha = 0.8 + 0.2 * Math.sin(UI.t / 30 * TAU);
@@ -589,12 +703,20 @@
     UI.text(ctx, UI.bitsStr, 0, 0, F.mono20b, P.PAPER, 'right', 'middle', 3);
     ctx.restore();
   }
+  const BOSS_DRAIN = 40, BOSS_FADE = 20;   // B11: after the death the lost chunk drains for 40 f, then the bar fades over 20 f
   function drawBossBar(ctx, game) {
     const b = game.boss, bf = game.bossFight;
     if (!b || bf.state === 'none' || bf.state === 'done') return;
     let k = 1;
     if (bf.state === 'intro') k = U.clamp((30 - bf.timer) / 30, 0, 1);   // draws out from the centre over f120–150
     if (k <= 0) return;
+    const fade = UI.bossOut > BOSS_DRAIN ? 1 - (UI.bossOut - BOSS_DRAIN) / BOSS_FADE : 1;
+    if (fade <= 0) return;
+    ctx.save(); ctx.globalAlpha = fade;
+    drawBossBarBody(ctx, b, k, fade);
+    ctx.restore();
+  }
+  function drawBossBarBody(ctx, b, k, fade) {
     const sx = UI.bossShake > 0 ? U.jitter(UI.t, 3, 3) : 0;
     const bw = 600 * k, bx = 480 - bw / 2 + sx, by = 486;
     const phase2 = (b.phase || 1) >= 2;
@@ -609,10 +731,10 @@
       }
       ctx.save(); ctx.translate(bx, 0); ctx.fillStyle = phase2 ? gradBoss2 : gradBoss1; Rn.rrect(ctx, 2, by + 2, fillW, 26, 6); ctx.fill(); ctx.restore();
     }
-    ctx.save(); ctx.globalAlpha = 0.3; ctx.fillStyle = P.PAPER; for (let i = 1; i < 10; i++) ctx.fillRect(bx + i * bw / 10, by + 2, 1, 26); ctx.restore();
+    ctx.save(); ctx.globalAlpha = 0.3 * fade; ctx.fillStyle = P.PAPER; for (let i = 1; i < 10; i++) ctx.fillRect(bx + i * bw / 10, by + 2, 1, 26); ctx.restore();
     ctx.strokeStyle = P.INK; ctx.lineWidth = 3; Rn.rrect(ctx, bx, by, bw, 30, 8); ctx.stroke();
     // name · subtitle (§12.6)
-    ctx.save(); ctx.globalAlpha = k;
+    ctx.save(); ctx.globalAlpha = k * fade;
     if (UI.bossSub) {
       const nw = textW(ctx, UI.bossName, F.ui18b), sw = textW(ctx, UI.bossSub, F.mono12), dw = textW(ctx, ' · ', F.mono12);
       const x0 = 480 - (nw + dw + sw) / 2;
@@ -639,11 +761,43 @@
     }
     ctx.restore();
   }
-  function drawBanner(ctx) {
+  function drawBanner(ctx, game) {
     if (UI.bannerT <= 0) return;
     const e = UI.bannerDur - UI.bannerT;
     let a = 1, y = 200;
     if (e < 12) { const k = U.easeOutCubic(e / 12); a = k; y = 170 + 30 * k; } else if (UI.bannerT < 20) a = UI.bannerT / 20;
+    if (UI.bannerStrip) {   // B04: the player has control — the centre panel eases out (10 f), the strip slides in (12 f)
+      const st = UI.bannerStripT, out = UI.bannerFromPanel && st < 10 ? 1 - st / 10 : 0;
+      if (out > 0) drawBannerPanel(ctx, 200 - 30 * (1 - out), a * out);
+      drawBannerStrip(ctx, game, UI.bannerFromPanel ? U.easeOutCubic(Math.min(1, st / 12)) : (e < 12 ? U.easeOutCubic(e / 12) : 1), UI.bannerT < 20 ? UI.bannerT / 20 : 1);
+      return;
+    }
+    drawBannerPanel(ctx, y, a);
+  }
+  /**
+   * Boss side-edge marker (playtest B38, DESIGN §11.3.1): the boss camera keeps the fighter in view first, so a boss whose
+   * focus point (`focusX/focusY`) lies off the view to the LEFT or RIGHT — the two more than ~880 px apart in a 1440–1920 px
+   * arena — is marked by a pulsing inked chevron at that side edge, in the boss's accent colour, at the focus's height
+   * (clamped clear of the hearts block and the boss bar). Above the view a boss with its own beacon (`beaconTop`,
+   * Corrosant) marks itself. Intro and fight only; never under an overlay.
+   */
+  function drawBossEdge(ctx, game) {
+    const b = game.boss;
+    if (!b || b.dead || !game.bossCam || !game.bossCam() || !game.cam) return;
+    const fx = typeof b.focusX === 'number' && b.focusX === b.focusX ? b.focusX : b.x;
+    const fy = typeof b.focusY === 'number' && b.focusY === b.focusY ? b.focusY : b.cy();
+    const sx = fx - game.cam.x, sy = fy - game.cam.y;
+    if (sx >= 0 && sx <= W) return;                         // in view horizontally
+    if (b.beaconTop && sy < 0) return;                      // its own top-edge beacon marks it
+    const side = sx < 0 ? -1 : 1, x = side < 0 ? EDGE_IN : W - EDGE_IN, y = U.clamp(sy, EDGE_Y0, EDGE_Y1);
+    ctx.save(); ctx.globalAlpha = 0.7 + 0.3 * Math.cos(UI.t * TAU / 30); ctx.lineJoin = 'round';
+    ctx.fillStyle = b.accent || P.DANGER; ctx.strokeStyle = P.INK; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(x + side * 5, y); ctx.lineTo(x - side * 9, y - 14); ctx.lineTo(x - side * 9, y + 14); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.restore();
+  }
+  const EDGE_IN = 12, EDGE_Y0 = 140, EDGE_Y1 = 466;   // the marker's inset from the side edge; y range (under the hearts block, over the boss bar)
+  /** The §12.7 centre panel (240, y) 480×120 — the locked pickup sequence's banner. */
+  function drawBannerPanel(ctx, y, a) {
     ctx.save(); ctx.globalAlpha = a;
     UI.panel(ctx, 240, y, 480, 120);
     UI.text(ctx, UI.banner1, 480, y + 36, F.ui26b, P.SELECT, 'center', 'middle', 3);
@@ -655,6 +809,26 @@
       UI.text(ctx, UI.banner2, 480, y + 68, UI.banner2Font, P.PAPER, 'center', 'middle');
       UI.text(ctx, UI.banner3, 480, y + 96, F.mono13, P.PAPER_DIM, 'center', 'middle');
     }
+    ctx.restore();
+  }
+  /**
+   * The banner as a top strip (B04): (240, 8) 480 wide between the hearts block and the bits counter, line 1 in bold 16,
+   * the hint in 12 MONO (two rows when long), the flavour line in 11 MONO. It slides down from above by `k` (0→1), fades
+   * with the banner, and dims to α 0.35 while the fighter stands behind it (as the hearts block does, §12.1).
+   */
+  function drawBannerStrip(ctx, game, k, a) {
+    const h = UI.stripH, y = STRIP_Y - (h + 12) * (1 - k);
+    const pl = game.player, cam = game.cam;
+    let behind = false;
+    if (pl && cam) { const bx = pl.x - pl.w / 2 - cam.x, by = pl.y - pl.h - cam.y; behind = bx < STRIP_X + STRIP_W && bx + pl.w > STRIP_X && by < STRIP_Y + h && by + pl.h > STRIP_Y; }
+    UI.stripAlpha = U.approach(UI.stripAlpha, behind ? 0.35 : 1, 0.08);
+    ctx.save(); ctx.globalAlpha = a * UI.stripAlpha;
+    UI.panel(ctx, STRIP_X, y, STRIP_W, h);
+    UI.text(ctx, UI.banner1, 480, y + 17, F.ui16b, P.SELECT, 'center', 'middle', 3);
+    let ry = y + 35;
+    if (UI.stripL2) { UI.text(ctx, UI.stripL2, 480, ry, F.mono12, P.PAPER, 'center', 'middle'); ry += 15; }
+    if (UI.stripL2b) { UI.text(ctx, UI.stripL2b, 480, ry, F.mono12, P.PAPER, 'center', 'middle'); ry += 15; }
+    if (UI.banner3) UI.text(ctx, UI.banner3, 480, ry, F.mono11, P.PAPER_DIM, 'center', 'middle');
     ctx.restore();
   }
   /** Boss title card (§12.13): INK band y 190–270 slides in from the left over 12 f, exits upward over 10 f. */
@@ -693,8 +867,24 @@
   }
   /** A toast drawn by drawScreen (above everything) rather than the HUD: any toast outside play, bottom toasts over an overlay. */
   function toastOnTop(game) { return game.screen !== 'play' || (!!game.overlay && UI.toastBottom); }
+  /** B19: the drop-through hint over the player's head (below the feet when that would sit on the hearts block / bits). */
+  function drawDropHint(ctx, game, pl) {
+    if (UI.dropT <= 0) return;
+    if (UI.dropKeysDev !== In.device) { UI.dropKeysDev = In.device; UI.dropKeys = In.glyph('down') + ' + ' + In.glyph('jump'); }   // rebuilt on a device change only
+    const cam = game.cam, w = textW(ctx, TXT.dropHint, F.ui14b);
+    const x = U.clamp(pl.x - cam.x, 16 + w / 2, W - 16 - w / 2);
+    let y = pl.y - pl.h - cam.y - 34 + Math.sin(UI.t / 15) * 2;
+    if (y < 30 || (y < 125 && x - w / 2 < 220) || (y < 50 && x + w / 2 > 820)) y = pl.y - cam.y + 22;
+    ctx.save(); ctx.globalAlpha = Math.min(1, UI.dropT / 12);
+    UI.text(ctx, TXT.dropHint, x, y, F.ui14b, P.PAPER, 'center', 'middle', 3);
+    UI.text(ctx, UI.dropKeys, x, y + 17, F.mono12b, P.SELECT, 'center', 'middle', 3);
+    ctx.restore();
+  }
   UI.drawHUD = function (ctx, game) {
     const pl = game.player; if (!pl) return;
+    // B05: under an overlay (pause/map/settings/shop/lore) only the status HUD is drawn — no banner, boss card, zone toast,
+    // prompt or hints bleeding into the menu (their timers are frozen and they come back when the overlay closes)
+    const over = !!game.overlay;
     ctx.save();
     ctx.lineCap = 'round'; ctx.lineJoin = 'round';
     // the hearts/energy/meter block (24..210 × 22..115) dims while the fighter's body is behind it (top-left arrivals)
@@ -707,18 +897,22 @@
     drawMeter(ctx, pl);
     ctx.globalAlpha = 1;
     drawBits(ctx);
-    if (game.prompt) {   // ▲ REST / ▲ TRADE floating above the object, bobbing 2 px, with the bound key (§12.8)
+    if (game.prompt && !over) {   // REST / TRADE floating above the object, bobbing 2 px, with the bound up key under it (§12.8, B12)
       const bob = Math.sin(UI.t / 15) * 2, py = game.prompt.y - 24 + bob;
       UI.text(ctx, TXT.prompt[game.prompt.text] || game.prompt.text, game.prompt.x, py, F.ui14b, P.PAPER, 'center', 'middle', 3);
       UI.text(ctx, In.glyph('up'), game.prompt.x, py + 15, F.mono11, P.PAPER_DIM, 'center', 'middle', 2);
     }
     drawBossBar(ctx, game);
-    if (!toastOnTop(game)) drawToast(ctx, game);
-    drawBanner(ctx);
-    drawBossCard(ctx);
+    if (!over) drawBossEdge(ctx, game);
+    if (!over) {
+      if (!toastOnTop(game)) drawToast(ctx, game);
+      drawBanner(ctx, game);
+      drawBossCard(ctx);
+    }
     if (pl.hp <= (pl.maxHp >= 7 ? 2 : 1) && pl.hp > 0 && !pl.dead) FX.drawLowHp(ctx, UI.lowPulse);
-    const bossBar = game.boss && game.bossFight.state !== 'none' && game.bossFight.state !== 'done';
-    if (!bossBar) drawHints(ctx, game, pl);   // the strip shares the bottom edge with the boss bar
+    const bossBar = game.boss && game.bossFight.state !== 'none' && game.bossFight.state !== 'done' && UI.bossOut <= BOSS_DRAIN + BOSS_FADE;
+    if (!bossBar && !over) drawHints(ctx, game, pl);   // the strip shares the bottom edge with the boss bar
+    if (!over) drawDropHint(ctx, game, pl);
     if (game.settings.showHitboxes && UI.dbgStr) UI.text(ctx, UI.dbgStr, 8, 536, F.mono11, P.PAPER_DIM);
     ctx.restore();
   };
@@ -744,11 +938,12 @@
     ctx.restore();
     UI.text(ctx, TXT.tagline, 480, 232, F.mono18, P.PAPER_DIM, 'center', 'middle', 3);
     const disabled = TITLE_DISABLED; disabled[1] = !game.hasSave();
-    menuList(ctx, TXT.titleMenu, 480, 320, 44, F.ui24b, UI.confirmNew ? -1 : UI.sel, disabled);
+    // under SETTINGS the title keeps its own cursor (on SETTINGS) instead of following the settings rows (B03)
+    menuList(ctx, TXT.titleMenu, 480, 320, 44, F.ui24b, UI.confirmNew ? -1 : (game.overlay && UI.titleSel >= 0 ? UI.titleSel : UI.sel), disabled);
     if (game.hasSave()) UI.text(ctx, UI.saveSum, 480, 386, F.mono12, P.PAPER_DIM, 'center', 'middle', 2);
     else { ctx.save(); ctx.globalAlpha = 0.6; UI.text(ctx, TXT.noSave, 480, 386, F.mono12, P.PAPER_DIM, 'center', 'middle', 2); ctx.restore(); }
     if (!In.gestured && ((UI.t / 30) | 0) % 2 === 0) UI.text(ctx, TXT.pressAny, 480, 470, F.ui14b, P.SELECT, 'center', 'middle', 3);
-    UI.text(ctx, TXT.footer, 480, 516, F.mono11, P.PAPER_DIM, 'center', 'middle', 2);
+    UI.text(ctx, devText('footer'), 480, 516, F.mono11, P.PAPER_DIM, 'center', 'middle', 2);
     UI.text(ctx, TXT.version, 944, 528, F.mono11, P.PAPER_DIM, 'right', 'middle', 2);
     if (UI.confirmNew) drawYesNo(ctx, TXT.overwrite, '', UI.ynSel);
   }
@@ -771,8 +966,15 @@
     }
     return ml;
   }
+  /**
+   * The big select preview. B32: everything it draws is clipped to the portrait area (x 20..550, y 88..316) — under the
+   * header + sub line (y ≤ 81) and above the bio (y ≥ 316) — so a showcase pose that rises out of the halo (Tessik's
+   * jump) can never paint over "CHOOSE YOUR SPIRIT".
+   */
   function drawPreviewRig(ctx, d, x, alpha, t) {
-    ctx.save(); ctx.globalAlpha = alpha;
+    ctx.save();
+    ctx.beginPath(); ctx.rect(20, 88, 530, 228); ctx.clip();
+    ctx.globalAlpha = alpha;
     ctx.fillStyle = d.palette.glow; ctx.globalAlpha = 0.10 * alpha; ctx.beginPath(); ctx.arc(x, 202, 110, 0, TAU); ctx.fill();
     ctx.globalAlpha = 0.35 * alpha; ctx.fillStyle = P.INK; ctx.beginPath(); ctx.ellipse(x, 300, 60, 7, 0, 0, TAU); ctx.fill();
     ctx.globalAlpha = alpha;
@@ -783,7 +985,7 @@
     const list = UB.Characters.list;
     drawMenuBackground(ctx, bgZone(), 0.25);
     UI.text(ctx, TXT.selectHeader, 480, 48, F.ui30b, P.PAPER, 'center', 'middle', 3);
-    UI.text(ctx, TXT.selectSub, 480, 74, F.mono13, P.PAPER_DIM, 'center', 'middle', 2);
+    UI.text(ctx, devText('selectSub'), 480, 74, F.mono13, P.PAPER_DIM, 'center', 'middle', 2);
     const d = list[UI.sel]; if (!d) return;
     // big preview (§12.10): the old rig slides out 40 px and fades over 8 f while the new slides in
     if (UI.selSlide > 0 && UI.selPrev >= 0 && list[UI.selPrev]) {
@@ -823,7 +1025,7 @@
     ctx.save(); ctx.globalAlpha = U.clamp(e / 20, 0, 1);
     UI.text(ctx, TXT.gameOver, 480, 240, F.ui44b, P.DANGER, 'center', 'middle', 3);
     UI.text(ctx, TXT.gameOverSub, 480, 290, F.mono14, P.PAPER_DIM, 'center', 'middle');
-    if (e > 20 && ((e / 30) | 0) % 2 === 0) UI.text(ctx, TXT.gameOverPrompt, 480, 400, F.ui16b, P.SELECT, 'center', 'middle', 3);
+    if (e > 20 && ((e / 30) | 0) % 2 === 0) UI.text(ctx, devText('gameOverPrompt'), 480, 400, F.ui16b, P.SELECT, 'center', 'middle', 3);
     ctx.restore();
   }
   function drawVictory(ctx, game) {
@@ -857,7 +1059,7 @@
         UI.text(ctx, lines[i], 480, y, F.mono14, P.PAPER, 'center', 'middle', 2);
       }
       ctx.restore();
-      if (((game.screenT / 30) | 0) % 2 === 0) UI.text(ctx, TXT.victoryPrompt, 480, 522, F.ui14b, P.SELECT, 'center', 'middle', 3);
+      if (((game.screenT / 30) | 0) % 2 === 0) UI.text(ctx, devText('victoryPrompt'), 480, 522, F.ui14b, P.SELECT, 'center', 'middle', 3);
     }
   }
   UI.vicRowsAt = 8 * 12 + 12;
@@ -931,12 +1133,16 @@
       }
       line = bestiaryTmp.join(' · ');
     } else if (visited) line = 'no enemies';
-    // fit the line between the legend and the "R recentre · Esc / M close" hints: a long roster wraps at a ' · ' to a 2nd row
+    // fit the line between the legend and the "R recentre · Esc / M close" hints (either device's wording): the line is
+    // centred at 480, so its half-width must clear both; a long roster wraps at a ' · ' to a 2nd row
     measure.font = F.mono11;
     if (UI.mapFootFree < 0) {
-      const legendR = 60 + measure.measureText(TXT.mapLegend).width;
-      const rightL = 900 - measure.measureText(TXT.mapClose).width - 18 - measure.measureText(TXT.mapRecentre).width;
-      UI.mapFootFree = rightL - legendR - 24;
+      const legendR = 60 + legendWidth(measure);
+      measure.font = F.mono11;
+      const closeW = Math.max(measure.measureText(TXT.mapClose).width, measure.measureText(PAD_TXT.mapClose).width);
+      const recW = Math.max(measure.measureText(TXT.mapRecentre).width, measure.measureText(PAD_TXT.mapRecentre).width);
+      const rightL = 900 - closeW - 18 - recW;
+      UI.mapFootFree = 2 * Math.min(480 - legendR - 12, rightL - 12 - 480);
     }
     UI.mapBestiary2 = '';
     if (measure.measureText(line).width > UI.mapFootFree) {
@@ -1017,33 +1223,30 @@
           ctx.save(); ctx.setLineDash(DASH44); ctx.fillStyle = UNVISITED; ctx.strokeStyle = P.PAPER_DIM;
           Rn.rrect(ctx, x, y, w, h, 4); ctx.fill(); ctx.stroke(); ctx.restore();
         }
+        if (r === cur && game.player) {   // you: ENERGY dot r 5 + pulsing ring 5→12 every 40 f — drawn UNDER the room's icons (B23)
+          const pxr = x + U.clamp(game.player.x / (r.w * 30), 0, 1) * w, pyr = y + U.clamp(game.player.y / (r.h * 30), 0, 1) * h;
+          youMark(ctx, pxr, pyr, (UI.t % 40) / 40);
+        }
+        // icons (§12.12): a fixed row at the top of the cell — node top-left, boss top-right, the vendor top-right (top
+        // centre beside a boss) — and cores at their own tile; all over the "you" dot so it never hides one (B23, B24)
         if (vis || ping) {
-          if (r.nodes.length) { ctx.fillStyle = P.CORE_HEART; ctx.strokeStyle = P.INK; ctx.lineWidth = 1.5; diamond(ctx, x + 11, y + 11, 5); ctx.fill(); ctx.stroke(); }
-          if (r.vendor) { ctx.fillStyle = P.BITS; ctx.strokeStyle = P.INK; ctx.lineWidth = 1.5; hexagon(ctx, x + w / 2, y + h - 10, 5); ctx.fill(); ctx.stroke(); }
+          if (r.nodes.length) nodeIcon(ctx, x + 11, y + 11);
+          if (r.vendor) vendorIcon(ctx, r.boss ? x + w / 2 : x + w - 11, y + 11);
           for (let i = 0; i < r.cores.length; i++) {
-            const found = save.cores.indexOf(r.cores[i].id) >= 0;
-            if (found) { ctx.fillStyle = P.CORE_HEART; ctx.beginPath(); ctx.arc(x + w - 10 - i * 8, y + h - 10, 2.5, 0, TAU); ctx.fill(); }
-            else if (ping) UI.text(ctx, '?', x + w - 10 - i * 8, y + h - 10, F.mono12b, P.CORE_HEART, 'center', 'middle');
+            const c = r.cores[i], found = save.cores.indexOf(c.id) >= 0;
+            const cx = U.clamp(x + (c.x + 0.5) / r.w * w, x + 6, x + w - 6), cy = U.clamp(y + (c.y + 0.5) / r.h * h, y + 6, y + h - 6);
+            if (found) coreIcon(ctx, cx, cy);
+            else if (ping) UI.text(ctx, '?', cx, cy, F.mono12b, P.CORE_HEART, 'center', 'middle', 2);
           }
         }
-        if (r.boss && (vis || ping)) {
-          ctx.fillStyle = save.bossesDefeated.indexOf(r.boss.id) >= 0 ? P.PAPER_DIM : P.DANGER; ctx.strokeStyle = P.INK; ctx.lineWidth = 1.5;
-          ctx.beginPath(); ctx.arc(x + w - 11, y + 11, 5, 0, TAU); ctx.fill(); ctx.stroke();
-          ctx.fillStyle = P.INK; ctx.fillRect(x + w - 14, y + 9, 2, 2); ctx.fillRect(x + w - 10, y + 9, 2, 2);
-        }
+        if (r.boss && (vis || ping)) bossIcon(ctx, x + w - 11, y + 11, save.bossesDefeated.indexOf(r.boss.id) >= 0);
         if (UI.mapCur === r) { ctx.save(); ctx.strokeStyle = P.SELECT; ctx.lineWidth = 2; ctx.globalAlpha = 0.6 + 0.4 * Math.sin(UI.t / 10); Rn.rrect(ctx, x - 3, y - 3, w + 6, h + 6, 6); ctx.stroke(); ctx.restore(); }
-        if (r === cur && game.player) {   // you: ENERGY dot r 5 + pulsing ring 5→12 every 40 f
-          const pxr = x + U.clamp(game.player.x / (r.w * 30), 0, 1) * w, pyr = y + U.clamp(game.player.y / (r.h * 30), 0, 1) * h;
-          const k = (UI.t % 40) / 40;
-          ctx.fillStyle = P.ENERGY; ctx.strokeStyle = P.INK; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(pxr, pyr, 5, 0, TAU); ctx.fill(); ctx.stroke();
-          ctx.save(); ctx.strokeStyle = P.ENERGY; ctx.lineWidth = 2; ctx.globalAlpha = 1 - k; ctx.beginPath(); ctx.arc(pxr, pyr, 5 + k * 7, 0, TAU); ctx.stroke(); ctx.restore();
-        }
       }
     }
     ctx.restore();
     UI.text(ctx, TXT.map, 60, 56, F.ui22b, P.PAPER, 'left', 'middle', 3);
     UI.text(ctx, game.zone ? game.zone.name : '', 900, 56, F.mono14, P.PAPER_DIM, 'right', 'middle');
-    UI.text(ctx, TXT.mapLegend, 60, 500, F.mono11, P.PAPER_DIM, 'left', 'middle');
+    drawMapLegend(ctx);
     // §15.10: the owned abilities join the legend, stacked above it on an ink plate (bottom-left of the map area)
     const na = ownedAbilities(game);
     if (na) {
@@ -1056,8 +1259,47 @@
     UI.text(ctx, UI.mapRoomLine, 480, UI.mapBestiary ? (two ? 486 : 493) : 500, F.mono11, P.PAPER, 'center', 'middle');
     if (UI.mapBestiary) UI.text(ctx, UI.mapBestiary, 480, two ? 498 : 507, F.mono11, P.PAPER_DIM, 'center', 'middle');
     if (two) UI.text(ctx, UI.mapBestiary2, 480, 510, F.mono11, P.PAPER_DIM, 'center', 'middle');
-    UI.text(ctx, TXT.mapClose, 900, 500, F.mono11, P.PAPER_DIM, 'right', 'middle');
-    UI.text(ctx, TXT.mapRecentre, 900 - textW(ctx, TXT.mapClose, F.mono11) - 18, 500, F.mono11, P.PAPER_DIM, 'right', 'middle');
+    const close = devText('mapClose');
+    UI.text(ctx, close, 900, 500, F.mono11, P.PAPER_DIM, 'right', 'middle');
+    UI.text(ctx, devText('mapRecentre'), 900 - textW(ctx, close, F.mono11) - 18, 500, F.mono11, P.PAPER_DIM, 'right', 'middle');
+  }
+  // map icons (§12.12), shared by the rooms and the legend
+  function nodeIcon(ctx, x, y) { ctx.fillStyle = P.CORE_HEART; ctx.strokeStyle = P.INK; ctx.lineWidth = 1.5; diamond(ctx, x, y, 5); ctx.fill(); ctx.stroke(); }
+  function vendorIcon(ctx, x, y) { ctx.fillStyle = P.BITS; ctx.strokeStyle = P.INK; ctx.lineWidth = 1.5; hexagon(ctx, x, y, 5); ctx.fill(); ctx.stroke(); }
+  function coreIcon(ctx, x, y) { ctx.fillStyle = P.CORE_HEART; ctx.strokeStyle = P.INK; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(x, y, 3, 0, TAU); ctx.fill(); ctx.stroke(); }
+  function bossIcon(ctx, x, y, beaten) {
+    ctx.fillStyle = beaten ? P.PAPER_DIM : P.DANGER; ctx.strokeStyle = P.INK; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(x, y, 5, 0, TAU); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = P.INK; ctx.fillRect(x - 3, y - 2, 2, 2); ctx.fillRect(x + 1, y - 2, 2, 2);
+  }
+  function youMark(ctx, x, y, k) {
+    ctx.fillStyle = P.ENERGY; ctx.strokeStyle = P.INK; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(x, y, 5, 0, TAU); ctx.fill(); ctx.stroke();
+    if (k > 0) { ctx.save(); ctx.strokeStyle = P.ENERGY; ctx.lineWidth = 2; ctx.globalAlpha = 1 - k; ctx.beginPath(); ctx.arc(x, y, 5 + k * 7, 0, TAU); ctx.stroke(); ctx.restore(); }
+  }
+  /**
+   * Map legend (§12.12, B24): each icon as the map draws it, then its word — node · boss · vendor on the first row (y 493),
+   * core · you on the second (y 507), from x 60. LEGEND_ROWS lists [word index, row]; the width is measured once.
+   */
+  const LEGEND_ROWS = [0, 0, 0, 1, 1], LEGEND_ICON = 13, LEGEND_GAP = 14;
+  let legendW = -1;
+  function legendWidth(ctx) {
+    if (legendW < 0) {
+      const rowW = [0, 0];
+      for (let i = 0; i < TXT.mapLegend.length; i++) { const r = LEGEND_ROWS[i]; rowW[r] += (rowW[r] ? LEGEND_GAP : 0) + LEGEND_ICON + textW(ctx, TXT.mapLegend[i], F.mono11); }
+      legendW = Math.max(rowW[0], rowW[1]);
+    }
+    return legendW;
+  }
+  function drawMapLegend(ctx) {
+    let lx = 60, row = 0;
+    for (let i = 0; i < TXT.mapLegend.length; i++) {
+      if (LEGEND_ROWS[i] !== row) { row = LEGEND_ROWS[i]; lx = 60; }
+      const ly = row ? 507 : 493, ix = lx + 5;
+      if (i === 0) nodeIcon(ctx, ix, ly); else if (i === 1) bossIcon(ctx, ix, ly, false); else if (i === 2) vendorIcon(ctx, ix, ly);
+      else if (i === 3) coreIcon(ctx, ix, ly); else youMark(ctx, ix, ly, 0);
+      UI.text(ctx, TXT.mapLegend[i], lx + LEGEND_ICON, ly, F.mono11, P.PAPER_DIM, 'left', 'middle');
+      lx += LEGEND_ICON + textW(ctx, TXT.mapLegend[i], F.mono11) + LEGEND_GAP;
+    }
   }
   const DASH33 = [3, 3], DASH44 = [4, 4];
   let MAP_ROOMS = null;   // every RoomSpec, listed once on the first map open (no for-in inside a draw)
@@ -1065,11 +1307,12 @@
     dim(ctx);
     UI.panel(ctx, 230, 90, 500, 360);
     UI.text(ctx, TXT.settings, 480, 118, F.ui24b, P.PAPER, 'center', 'middle', 3);
-    const sg = game.settings, n = UI.fromTitle ? 7 : 6;
+    const sg = game.settings, n = UI.fromTitle ? SET_BACK + 1 : SET_BACK;
+    const pitch = n > 7 ? 40 : 44;   // eight rows (from the title) close up to 40 px so BACK stays inside the 360 px panel
     for (let i = 0; i < n; i++) {
-      const row = (i === 5 && !UI.fromTitle) ? 6 : i;      // without RESET SAVE the sixth row is BACK
-      const y = 150 + i * 44, on = i === UI.sel && !UI.confirmReset;
-      const off = row === 5 && !game.hasSave();   // RESET SAVE without a saved run is drawn disabled (like CONTINUE)
+      const row = (i === SET_RESET && !UI.fromTitle) ? SET_BACK : i;      // without RESET SAVE the last row is BACK
+      const y = 150 + i * pitch, on = i === UI.sel && !UI.confirmReset;
+      const off = row === SET_RESET && !game.hasSave();   // RESET SAVE without a saved run is drawn disabled (like CONTINUE)
       if (off) ctx.globalAlpha = 0.4;
       UI.text(ctx, TXT.settingRows[row], 260, y, F.ui16b, on ? P.SELECT : (off ? P.PAPER_DIM : P.PAPER), 'left', 'middle', 3);
       if (off) ctx.globalAlpha = 1;
@@ -1105,17 +1348,23 @@
     UI.text(ctx, UI.bitsStr, 700, 182, F.mono16b, P.BITS, 'right', 'middle', 2);
     for (let i = 0; i < VENDOR.length; i++) {
       const it = VENDOR[i], y = 220 + i * 56, on = i === UI.sel, sold = save.vendor.indexOf(it.id) >= 0;
+      const price = U.vendorPrice(it, UI.shopRoom), deep = price !== it.price;   // B25: cheaper at the deeper vendor
       ctx.save(); ctx.globalAlpha = sold ? 0.45 : 1;
       UI.text(ctx, it.name, 260, y, F.ui18b, on ? P.SELECT : P.PAPER, 'left', 'middle', 3);
       if (on) UI.text(ctx, '▶', 244 + Math.sin(UI.t / 20 * TAU) * 3, y, F.ui14b, P.SELECT, 'center', 'middle', 3);
-      UI.text(ctx, sold ? TXT.sold : PRICE_STR[i], 700, y, F.mono16b, sold ? P.PAPER_DIM : (save.bits < it.price ? P.DANGER : P.BITS), 'right', 'middle', 2);
+      UI.text(ctx, sold ? TXT.sold : (deep ? DEEP_STR[i] : PRICE_STR[i]), 700, y, F.mono16b, sold ? P.PAPER_DIM : (save.bits < price ? P.DANGER : P.BITS), 'right', 'middle', 2);
+      if (deep && !sold) {   // the shrine price, struck through, left of the discounted one
+        const pw = textW(ctx, DEEP_STR[i], F.mono16b), ox = 700 - pw - 10, ow = textW(ctx, PRICE_STR[i], F.mono12);
+        UI.text(ctx, PRICE_STR[i], ox, y + 1, F.mono12, P.PAPER_DIM, 'right', 'middle');
+        ctx.fillStyle = P.PAPER_DIM; ctx.fillRect(ox - ow - 1, y, ow + 2, 1.5);
+      }
       UI.text(ctx, it.effect, 260, y + 22, F.mono12, P.PAPER_DIM, 'left', 'middle');
       ctx.restore();
     }
-    UI.text(ctx, TXT.shopFooter, 480, 400, F.mono11, P.PAPER_DIM, 'center', 'middle');
+    UI.text(ctx, devText('shopFooter'), 480, 400, F.mono11, P.PAPER_DIM, 'center', 'middle');
   }
-  const PRICE_STR = [];
-  for (let i = 0; i < VENDOR.length; i++) PRICE_STR.push(String(VENDOR[i].price));
+  const PRICE_STR = [], DEEP_STR = [];
+  for (let i = 0; i < VENDOR.length; i++) { PRICE_STR.push(String(VENDOR[i].price)); DEEP_STR.push(String(VENDOR[i].deepPrice || VENDOR[i].price)); }
   /** Zone lore card (DESIGN §12.18); game.loreCard is the zone. */
   function drawLore(ctx, game) {
     const z = game.loreCard; if (!z) return;

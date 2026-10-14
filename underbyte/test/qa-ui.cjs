@@ -270,9 +270,10 @@ function QA_INSTALL() {
     check('B: Up wraps to SETTINGS (skipping CONTINUE)', (await ui(u => u.sel)) === 2, await ui(u => u.sel));
     await keyTap('Enter'); s = await state();
     check('B: Enter on SETTINGS opens the settings overlay over the title', s.screen === 'settings' && s.baseScreen === 'title', s);
-    check('B: settings from the title shows RESET SAVE (7 rows)', (await ui(u => u.fromTitle)) === true);
+    // playtest B42 added the REDUCED FLASHING row (after SCREEN SHAKE): the title's list has 8 rows, BACK is row 7
+    check('B: settings from the title shows RESET SAVE (8 rows)', (await ui(u => u.fromTitle)) === true);
     await keyTap('ArrowUp');
-    check('B: settings: Up from the first row wraps to BACK (row 6)', (await ui(u => u.sel)) === 6, await ui(u => u.sel));
+    check('B: settings: Up from the first row wraps to BACK (row 7)', (await ui(u => u.sel)) === 7, await ui(u => u.sel));
     await keyTap('Enter'); s = await state();
     check('B: settings: Enter on BACK returns to the title', s.screen === 'title', s.screen);
     const selAfter = await ui(u => u.sel);
@@ -295,7 +296,8 @@ function QA_INSTALL() {
     // r2: toasts set while NOT in play must still render (DESIGN §15.8: SAVE ERASED 90 f, Gamepad connected)
     await reload(true);
     await ev((UB, d, g, q) => { localStorage.setItem('underbyte.save', JSON.stringify(g.newSaveData('tessik'))); g.savedData = g.readSave(); UB.UI.enter('title', g); });
-    await ev((UB, d, g, q) => { while (UB.UI.sel !== 2) q.tap('ArrowDown'); q.tap('Enter'); while (UB.UI.sel !== 5) q.tap('ArrowDown'); q.tap('Enter'); q.tap('ArrowLeft'); q.tap('Enter'); q.tap('Escape'); });
+    // RESET SAVE is settings row 6 since playtest B42 added REDUCED FLASHING after SCREEN SHAKE (it was row 5)
+    await ev((UB, d, g, q) => { while (UB.UI.sel !== 2) q.tap('ArrowDown'); q.tap('Enter'); while (UB.UI.sel !== 6) q.tap('ArrowDown'); q.tap('Enter'); q.tap('ArrowLeft'); q.tap('Enter'); q.tap('Escape'); });
     const erased = await ev((UB, d, g, q) => { const UI = UB.UI; const t0 = UI.toastT, l = UI.toast1; d.step(25); const paper = q.scan(330, 426, 300, 28, (r, gg, b) => r > 215 && gg > 205 && b > 180); return { toastT: t0, toast1: l, screen: g.screen, overlay: g.overlay, hasSave: g.hasSave(), paperPx: paper }; });
     check('B: RESET SAVE from the title shows the 90 f "SAVE ERASED" toast ON THE TITLE SCREEN (DEFECT: drawToast only runs inside drawHUD, which the engine calls in play only — the toast is set but never drawn)', erased.toast1 === 'SAVE ERASED' && erased.toastT > 0 && erased.screen === 'title' && !erased.overlay && erased.paperPx > 30, erased);
     await shot('title-after-reset');
@@ -311,7 +313,8 @@ function QA_INSTALL() {
     check('B: a gamepad press on the title counts as the first gesture — PRESS ANY KEY stops blinking (DEFECT: only keyboard / pointer / touch call fireGesture, so a pad-only player sees PRESS ANY KEY blink forever)', padOnly.device === 'gamepad' && padOnly.screen === 'title' && padOnly.pressAnyPx === 0, padOnly);
     await shot('title-padonly');
     // r3: RESET SAVE while no save exists must not claim one was erased
-    const noSaveReset = await ev((UB, d, g, q) => { UB.UI.clearMessages(); while (UB.UI.sel !== 2) q.tap('ArrowDown'); q.tap('Enter'); while (UB.UI.sel !== 5) q.tap('ArrowDown'); q.tap('Enter'); const dlg = UB.UI.confirmReset; if (dlg) { q.tap('ArrowLeft'); q.tap('Enter'); } const o = { hasSave: g.hasSave(), dlg: dlg, toast: UB.UI.toastT > 0 ? UB.UI.toast1 : '' }; q.tap('Escape'); q.tap('Escape'); return o; });
+    // RESET SAVE is settings row 6 since playtest B42 (REDUCED FLASHING row) — row 5 is now SHOW HITBOXES
+    const noSaveReset = await ev((UB, d, g, q) => { UB.UI.clearMessages(); while (UB.UI.sel !== 2) q.tap('ArrowDown'); q.tap('Enter'); while (UB.UI.sel !== 6) q.tap('ArrowDown'); q.tap('Enter'); const dlg = UB.UI.confirmReset; if (dlg) { q.tap('ArrowLeft'); q.tap('Enter'); } const o = { hasSave: g.hasSave(), dlg: dlg, toast: UB.UI.toastT > 0 ? UB.UI.toast1 : '' }; q.tap('Escape'); q.tap('Escape'); return o; });
     check('B: RESET SAVE with no save present does not show the SAVE ERASED toast (DEFECT: the row is live without a slot and toasts SAVE ERASED although nothing was erased)', noSaveReset.hasSave === false && noSaveReset.toast !== 'SAVE ERASED', noSaveReset);
   });
 
@@ -335,7 +338,9 @@ function QA_INSTALL() {
     check('C: Right twice hovers Vellix', (await ui(u => u.sel)) === 2);
     await step(40);
     const stats = await ui(u => Array.from(u.statNow));
-    check('C: stat bars eased to Vellix (hearts 4/6, speed 1.0, weight 1.0)', Math.abs(stats[0] - 4 / 6) < 0.03 && Math.abs(stats[1] - 1) < 0.03 && Math.abs(stats[3] - 1) < 0.03, stats);
+    // playtest B18: WEIGHT shows real weight (lightest knockback multiplier 0.60 / the fighter's), so Vellix (×1.30) is the
+    // shortest bar at 0.60 / 1.30 ≈ 0.46 — it used to be the full bar (weight / 1.3 drew the knockback taken)
+    check('C: stat bars eased to Vellix (hearts 4/6, speed 1.0, weight 0.60/1.30 ≈ 0.46)', Math.abs(stats[0] - 4 / 6) < 0.03 && Math.abs(stats[1] - 1) < 0.03 && Math.abs(stats[3] - 0.6 / 1.3) < 0.03, stats);
     const fit = await page.evaluate(() => {
       const q = window.__QA, out = [];
       UB.Characters.list.forEach(f => {
@@ -566,11 +571,18 @@ function QA_INSTALL() {
       g.openOverlay('settings'); d.step(1); q.render(); o.settings = edges(230, 90, 500, 360); g.closeOverlay(); d.step(1);
       g.openOverlay('shop'); d.step(1); q.render(); o.shop = edges(230, 120, 500, 300); g.closeOverlay(); d.step(1);
       g.openOverlay('map'); d.step(1); q.render(); o.map = edges(20, 20, 920, 500); g.closeOverlay(); d.step(1);
-      UB.UI.banner('CORE FOUND', '', '', 100); d.step(14); q.render(); o.banner = edges(240, 200, 480, 120); UB.UI.clearMessages();
-      o.bad = ['pause', 'settings', 'shop', 'map', 'banner'].filter(k => !(o[k].top && o[k].bottom && o[k].left && o[k].right));
+      // playtest B04: the §12.7 centre panel (240,200) 480×120 is the banner of the locked pickup sequence; a banner shown
+      // while the player has control (CORE FOUND, RESTORED, PURCHASED) is the top strip (240,8) 480 wide instead
+      const pl = g.player, hadEJ = !!g.save.abilities.echoJump;
+      g.startPickupSeq({ ability: 'echoJump', bossId: null, x: pl.x, y: pl.y, cy: function () { return pl.y - 20; } });
+      d.step(14); q.render(); o.banner = edges(240, 200, 480, 120);
+      for (let i = 0; i < 200 && g.mode !== 'normal'; i++) d.step(1);
+      d.grant('echoJump', hadEJ); UB.UI.clearMessages();
+      UB.UI.banner('CORE FOUND', '', '', 100); d.step(14); q.render(); o.strip = edges(240, 8, 480, UB.UI.stripH); UB.UI.clearMessages();
+      o.bad = ['pause', 'settings', 'shop', 'map', 'banner', 'strip'].filter(k => !(o[k].top && o[k].bottom && o[k].left && o[k].right));
       return o;
     });
-    check('E: panel rects are pinned — pause (330,150) 300×240, settings (230,90) 500×360, shop (230,120) 500×300, map (20,20) 920×500, banner (240,200) 480×120', rects.bad.length === 0, rects);
+    check('E: panel rects are pinned — pause (330,150) 300×240, settings (230,90) 500×360, shop (230,120) 500×300, map (20,20) 920×500, banner (240,200) 480×120 in the pickup sequence, the top strip (240,8) 480 wide with control', rects.bad.length === 0, rects);
     // the r3 blocks above moved the run to debug_room: hand section F the dc_wake run it starts from
     await D(d => d.warp('dc_wake', null)); await step(3); await clearOverlay();
   });
@@ -755,7 +767,7 @@ function QA_INSTALL() {
     const dcAll = await G(g => { let n = 0; for (const id in UB.World.rooms) if (UB.World.rooms[id].zone === 'driftcache') n++; return { all: n, disc: g.save.discovered.filter(id => UB.World.rooms[id].zone === 'driftcache').length }; });
     check('G: Deep Ping reveals every room of every entered zone (all ' + dcAll.all + ' driftcache rooms)', bought === 'bought' && dcAll.disc === dcAll.all && beforePing < dcAll.all, { beforePing, dcAll });
     await keyTap('KeyM');
-    const ping = await page.evaluate(() => { const q = window.__QA; q.render(); const loft = q.mapRect('dc_loft'), shrine = q.mapRect('dc_shrine'); return { loft: q.px(loft.x + loft.w / 2, loft.y + loft.h / 2), shrineNode: q.px(shrine.x + 11, shrine.y + 11), shrineVendor: q.px(shrine.x + shrine.w / 2, shrine.y + shrine.h - 10), ping: UB.game.hasDeepPing(), loftQ: q.scan(loft.x + loft.w - 16, loft.y + loft.h - 17, 12, 14, (r, g, b) => r > 200 && g > 150 && b < 110) }; });
+    const ping = await page.evaluate(() => { const q = window.__QA; q.render(); const loft = q.mapRect('dc_loft'), shrine = q.mapRect('dc_shrine'); return { loft: q.px(loft.x + loft.w / 2, loft.y + loft.h / 2), shrineNode: q.px(shrine.x + 11, shrine.y + 11), shrineVendor: q.px(shrine.x + shrine.w - 11, shrine.y + 11) /* B23: the vendor hexagon sits in the top icon row, right */, ping: UB.game.hasDeepPing(), loftQ: q.scan(loft.x + loft.w - 16, loft.y + loft.h - 17, 12, 14, (r, g, b) => r > 200 && g > 150 && b < 110) }; });
     check('G: with Deep Ping unvisited dc_loft is drawn (dashed UNVISITED) with a "?" for its uncollected core; dc_shrine shows its node diamond + vendor hexagon', ping.ping && ping.loft[0] < 40 && ping.loftQ > 4 && ping.shrineNode[0] > 200 && ping.shrineNode[1] > 150 && ping.shrineVendor[1] > 180 && ping.shrineVendor[0] < 190, ping);
     await shot('map-deepping');
     await keyTap('Escape');
@@ -791,7 +803,9 @@ function QA_INSTALL() {
       const cross = UB.World.rooms.dc_cross, rc = q.mapRect('dc_cross');
       const er = cross.exits.filter(e => e.side === 'right')[0] || cross.exits[0];
       o.stub = q.px(stubX(er, cross, rc.x, rc.w), stubY(er, cross, rc.y, rc.h));
-      const loft = q.mapRect('dc_loft'); o.coreDot = q.px(loft.x + loft.w - 10, loft.y + loft.h - 10);
+      // playtest B24: a found core is drawn at its own tile (dc_loft core (27,12)), no longer in the room's corner
+      const loft = q.mapRect('dc_loft'), lr = UB.World.rooms.dc_loft, lc = lr.cores[0];
+      o.coreDot = q.px(loft.x + (lc.x + 0.5) / lr.w * loft.w, loft.y + (lc.y + 0.5) / lr.h * loft.h);
       o.zoneHeader = q.scan(790, 48, 110, 16, (r, gg, b) => r > 150 && gg > 140 && b > 120);
       o.mapTitle = q.scan(58, 46, 94, 20, (r, gg, b) => r > 215 && gg > 205 && b > 180);
       return o;
@@ -815,8 +829,9 @@ function QA_INSTALL() {
     await keyTap('Escape'); await keyTap('ArrowDown'); await keyTap('ArrowDown'); await keyTap('Enter');
     let s = await state();
     check('H: pause → SETTINGS opens the settings overlay (no RESET SAVE from play)', s.screen === 'settings' && (await ui(u => u.fromTitle)) === false, s.screen);
-    const rowsPlay = await page.evaluate(() => { const q = window.__QA; const o = []; for (let i = 0; i < 6; i++) { o.push(UB.UI.sel); q.tap('ArrowDown'); } return o; });
-    check('H: from play the settings list has 6 rows (RESET SAVE hidden) and wraps', rowsPlay.join(',') === '0,1,2,3,4,5' && (await ui(u => u.sel)) === 0, rowsPlay);
+    // playtest B42 added the REDUCED FLASHING row: from play the list has 7 rows (RESET SAVE still hidden)
+    const rowsPlay = await page.evaluate(() => { const q = window.__QA; const o = []; for (let i = 0; i < 7; i++) { o.push(UB.UI.sel); q.tap('ArrowDown'); } return o; });
+    check('H: from play the settings list has 7 rows (RESET SAVE hidden) and wraps', rowsPlay.join(',') === '0,1,2,3,4,5,6' && (await ui(u => u.sel)) === 0, rowsPlay);
     await keyTap('ArrowLeft');
     check('H: Left lowers MASTER VOLUME 8 → 7', (await G(g => g.settings.master)) === 7);
     await keyTap('ArrowDown'); await keyTap('ArrowRight');
@@ -840,6 +855,11 @@ function QA_INSTALL() {
     await keyTap('ArrowDown'); await keyTap('ArrowDown'); await keyTap('Enter');
     check('H: Enter toggles SCREEN SHAKE OFF', (await G(g => g.settings.screenShake)) === false);
     check('H: FX honours the shake setting (requests ignored while OFF)', (await page.evaluate(() => { UB.FX.shake(10, 10); return UB.FX._shakeLeft; })) === 0);
+    // REDUCED FLASHING (B42) sits between SCREEN SHAKE and SHOW HITBOXES: Right flips it ON, Enter back OFF
+    await keyTap('ArrowDown'); await keyTap('ArrowRight');
+    check('H: Right flips REDUCED FLASHING ON (the B42 comfort row after SCREEN SHAKE)', (await G(g => g.settings.reducedFlashing)) === true);
+    await keyTap('Enter');
+    check('H: Enter flips REDUCED FLASHING back OFF', (await G(g => g.settings.reducedFlashing)) === false);
     await keyTap('ArrowDown'); await keyTap('ArrowRight');
     check('H: Right flips SHOW HITBOXES ON', (await G(g => g.settings.showHitboxes)) === true);
     const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('underbyte.settings') || 'null'));
@@ -1276,7 +1296,7 @@ function QA_INSTALL() {
     await keyTap('Enter');
     check('N: SETTINGS from the title with a save shows RESET SAVE', (await state()).screen === 'settings' && (await ui(u => u.fromTitle)));
     await keyTap('ArrowLeft');
-    for (let i = 0; i < 5; i++) await keyTap('ArrowDown');
+    for (let i = 0; i < 6; i++) await keyTap('ArrowDown');   // RESET SAVE is row 6 since B42 added REDUCED FLASHING
     await keyTap('Enter');
     check('N: RESET SAVE asks "Erase the saved run? This cannot be undone." with NO default', (await ui(u => u.confirmReset && u.ynSel === 0)));
     await keyTap('ArrowLeft'); await keyTap('Enter');
@@ -1285,7 +1305,9 @@ function QA_INSTALL() {
     check('N: YES erases the slot (CONTINUE disabled afterwards) and leaves the settings file alone', !s.hasSave && (await page.evaluate(() => localStorage.getItem('underbyte.save') === null && localStorage.getItem('underbyte.settings') !== null)));
     check('N: the reset confirmation toast is the §15.8 string SAVE ERASED', resetToast === 'SAVE ERASED', resetToast);
     await keyTap('Escape');
-    check('N: title after the reset has a visible cursor on NEW GAME', (await ui(u => u.sel)) === 0, await ui(u => u.sel));
+    // playtest B03: closing SETTINGS returns the title cursor to the SETTINGS row it was opened from (always enabled), never
+    // to the now-disabled CONTINUE
+    check('N: title after the reset has a visible cursor back on SETTINGS', (await ui(u => u.sel)) === 2, await ui(u => u.sel));
     // r2: a boss death writes the save at once; after a reload + CONTINUE the arena is clear and its seals open
     await reload(true);
     s = await startGameClean('tessik');

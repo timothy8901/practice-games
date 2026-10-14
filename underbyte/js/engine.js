@@ -41,14 +41,17 @@
   const BIT_VALUE = { small: 1, medium: 5, large: 20 };
   const PICKUP_SIZE = { bit: 10, heart: 14, spark: 12, shard: 12, core: 18, ability: 24 };
   const VENDOR = IDS.vendorItems;
-  const HINT_KEYS = ['move', 'jump', 'light', 'heavy', 'special', 'dash', 'overclock'];
+  // save.hints (DESIGN §14.1): the control-hint strip's seven actions, plus `drop` — the one-time "Down + Jump drops
+  // through" hint (playtest B19), which the UI shows once per run and records here so it survives a reload / CONTINUE
+  const HINT_KEYS = ['move', 'jump', 'light', 'heavy', 'special', 'dash', 'overclock', 'drop'];
   // Ability banner lines (DESIGN §12.7 / §15.5). UI/WORLD implementers may replace via UB.Text later.
   const ABILITY_TEXT = {
     echoJump: ['ECHO JUMP ACQUIRED', 'Press JUMP again in the air', 'A second thought, taken mid-fall.'],
     burstLine: ['BURST LINE ACQUIRED', 'Press DASH (Shift / RB) to lunge 6 tiles — on the ground or once in the air', 'Skip the frames you do not need.'],
     gripProtocol: ['GRIP PROTOCOL ACQUIRED', 'Hold toward a wall in the air to cling · JUMP to kick off', 'The walls were never the problem.'],
   };
-  const DEFAULT_SETTINGS = { version: 1, master: 8, music: 7, sfx: 8, screenShake: true, showHitboxes: false, touchControls: 'auto' };
+  // reducedFlashing (playtest B42, DESIGN §14.2): full-screen flashes become a thin edge pulse (UB.FX reads it live)
+  const DEFAULT_SETTINGS = { version: 1, master: 8, music: 7, sfx: 8, screenShake: true, reducedFlashing: false, showHitboxes: false, touchControls: 'auto' };
 
   function warnOnce(key, msg) {
     warnOnce.seen = warnOnce.seen || Object.create(null);
@@ -151,6 +154,11 @@
     this.busy = false; this.mode = 'normal'; this.level = null; this.player = null; this.boss = null;
     this.enemies.length = 0; this.pickups.length = 0; this.dropProjectiles();
     this.loreTimer = 0; this.loreZone = null; this.shopBought = null; this.prompt = null; this.nearNode = null; this.nearVendor = false;
+    // no fight, sequence or freeze outlives the run (playtest B22: a quit mid-fight left bossFight 'fight' on the title)
+    this.bossFight.state = 'none'; this.bossFight.timer = 0; this.pickupSeq.timer = 0; this.pickupSeq.pickup = null;
+    this.nodeUse.timer = 0; this.nodeUse.node = null; this.transition.phase = ''; this.transition.timer = 0;
+    this.hazard.timer = 0; this.hazardTo.on = false; this.hazardRespawn.pending = false; this.zoom.t = 0; this.denyFlash = 0;
+    FX.hitstopFrames = 0;
     FX.clear(); UI.clearMessages();
     this.savedData = this.readSave();
     this.setScreen('title'); Au.music('title'); Au.stopAmbient(); Au.stopLoops(); Au.duck(1, 0.2);
@@ -284,7 +292,7 @@
       abilities: { echoJump: false, burstLine: false, gripProtocol: false },
       bits: 0, bitsLifetime: 0, discovered: [], visited: [], bossesDefeated: [], bitsCollected: [],
       vendor: [], nodesUsed: [], loreSeen: [],
-      hints: { move: false, jump: false, light: false, heavy: false, special: false, dash: false, overclock: false },
+      hints: { move: false, jump: false, light: false, heavy: false, special: false, dash: false, overclock: false, drop: false },
       enemiesPurged: 0, playTimeFrames: 0, deaths: 0, victory: false, savedAt: 0,
     };
   };
@@ -597,7 +605,8 @@
   };
   /**
    * Buy a vendor item (UI calls this from the shop overlay). Returns 'bought' | 'poor' |
-   * 'sold' | 'unknown'. On 'bought': bits deducted, save.vendor updated, the effect applied,
+   * 'sold' | 'unknown'. On 'bought': this vendor room's price deducted (UB.Util.vendorPrice — Scrivvet's
+   * Rootwell stand sells at `deepPrice`, playtest B25), save.vendor updated, the effect applied,
    * the save written, and the PURCHASED banner queued for when the panel closes.
    */
   Game.prototype.buy = function (itemId) {
@@ -606,8 +615,9 @@
     for (let i = 0; i < VENDOR.length; i++) if (VENDOR[i].id === itemId) item = VENDOR[i];
     if (!item) return 'unknown';
     if (this.save.vendor.indexOf(itemId) >= 0) return 'sold';
-    if (this.save.bits < item.price) return 'poor';
-    this.save.bits -= item.price;
+    const price = U.vendorPrice(item, this.level ? this.level.room.id : null);   // the price the shop panel shows
+    if (this.save.bits < price) return 'poor';
+    this.save.bits -= price;
     this.save.vendor.push(itemId);
     this.applyVendorEffects();
     if (itemId === 'deep_ping') this.applyDeepPing();
@@ -700,12 +710,24 @@
       } else if (pl && !pl.dead && this.mode === 'normal' && !this.god && (h.multi || h.hitList.indexOf(pl) < 0) && E.overlapBox(pl, h.x, h.y, h.w, h.h)) {
         // opts.hit = the descriptor (flags / src) so a counter such as Korvask's Bulwark Catch can read it exactly
         this.hurtOpts.hit = h;
-        const took = pl.hurt(h.dmg, h.x + h.w / 2, this.hurtOpts);
+        const took = pl.hurt(h.dmg, this.knockOrigin(h, pl), this.hurtOpts);
         this.hurtOpts.hit = null;
         if (took) { if (!h.multi) h.hitList.push(pl); if (h.onHit) h.onHit(pl, null, this); }
       }
     }
     this.hitCount = 0;
+  };
+  /**
+   * The x a registered enemy/boss hit knocks the fighter away from: the hit box centre, except for a melee box held out
+   * in front of the attacker's own body (it touches the body — Tallock's Slab Swing): a fighter standing between that
+   * body and the box centre is knocked away from the BODY, never into it (playtest B34's root). Projectiles (their
+   * src is the shot, not a listed body) and boxes away from the body (spikes, needles) keep the box centre.
+   */
+  Game.prototype.knockOrigin = function (h, pl) {
+    const bx = h.x + h.w / 2, s = h.src;
+    if (!s || s === pl || !(s.w > 0) || (s !== this.boss && this.enemies.indexOf(s) < 0)) return bx;
+    if (Math.abs(bx - s.x) - h.w / 2 > s.w / 2 + 8) return bx;   // the box does not reach the attacker's body
+    return (pl.x - s.x) * (bx - pl.x) > 0 ? s.x : bx;
   };
   Game.prototype.hitEnemy = function (e, h) {
     if (!h.multi) h.hitList.push(e);
@@ -951,6 +973,38 @@
       ps.pickup = null;
     }
   };
+  /**
+   * Beat boss `bossId` the way its killing hit does (UB.debug.defeatBoss — playtest B22: the old shortcut left the boss
+   * and its shots alive and skipped the reward and the finale). When it is live in this room: an intro in progress ends
+   * (the fight starts), a multi-phase boss spends its remaining phases (Kernauth's throne bursts as at its phase change),
+   * then startBossDeath runs — death FX, every boss shot popped, the defeat recorded and saved — and the dying → reward
+   * flow plays on exactly as after a real kill (bits, sparks, the ability module; the final boss's victory). The debug
+   * contract (DESIGN §16.9) adds: the ability is granted and this arena's seals and locked exits lift at once. A boss not
+   * live here is recorded, its ability granted and the save written. Returns false for an unknown id.
+   */
+  Game.prototype.defeatBoss = function (bossId) {
+    const s = this.save;
+    if (!s || typeof bossId !== 'string' || !UB.Bosses.DATA[bossId]) return false;
+    const b = this.boss, bf = this.bossFight;
+    if (b && b.id === bossId && !b.dead) {
+      let cleared = false;
+      if (bf.state === 'intro' || this.mode === 'bossIntro') {
+        bf.state = 'fight'; bf.timer = 0; b.active = true; cleared = true;
+        if (this.mode === 'bossIntro') { this.mode = 'normal'; if (this.player) this.player.locked = false; }
+      } else if (bf.state === 'none') bf.state = 'fight';
+      for (let i = 0; i < 4 && b.nextPhase && b.nextPhase(this); i++) cleared = true;   // spend every remaining phase
+      if (cleared) UI.clearMessages();   // no intro / phase card over the death
+      b.hp = 0;
+      this.startBossDeath();
+    }
+    if (s.bossesDefeated.indexOf(bossId) < 0) s.bossesDefeated.push(bossId);
+    const ability = UB.Bosses.rewardFor(bossId).ability;
+    if (ability) this.grantAbility(ability, true);
+    const spec = this.level ? this.level.boss : null;
+    if (spec && spec.id === bossId) { this.sealExits(spec.seal, false); this.sealExits(spec.locked, false); }
+    this.writeSave();
+    return true;
+  };
   /** Grant the reward, unseal (fight seals + locked exits), record, save, restore zone music. */
   Game.prototype.finishBoss = function (bossId, ability) {
     if (ability) this.grantAbility(ability, true);
@@ -1108,11 +1162,25 @@
   };
 
   // --- camera (DESIGN §11.3.1) ---------------------------------------------------------------------------
+  // Boss framing (playtest B38): the view frames the boss's focus point (`boss.focusX/focusY`, DESIGN §8.0 — the body,
+  // Corrosant's head, Kernauth's core; the body centre when a boss sets none) with the fighter. Horizontally it is the
+  // midpoint, never leaving the fighter closer than BOSS_CAM_SIDE to a side edge (only when the two are too far apart to
+  // share the view: in rw_throne's 1920 px the midpoint could otherwise put the fighter off-screen). Vertically the dead-band camera is kept
+  // while the focus sits inside [FOCUS_TOP, H − FOCUS_BOTTOM] of the view; otherwise the view eases toward it as far as
+  // the fighter allows: the feet stay above the boss bar (screen y ≤ H − FEET_BOTTOM) and the head FOCUS_TOP under the
+  // top edge. From the floor of bv_corrosant that limit keeps today's framing and Corrosant's edge beacon marks the head;
+  // from its grates the view rises to show the ceiling.
+  const BOSS_CAM_SIDE = 40, FOCUS_TOP = 70, FOCUS_BOTTOM = 110, FEET_BOTTOM = 96;
+  Game.prototype.bossCam = function () {
+    return !!this.boss && (this.bossFight.state === 'intro' || this.bossFight.state === 'fight');
+  };
   Game.prototype.cameraTarget = function (out) {
-    const pl = this.player, cam = this.cam;
-    const bossCam = this.boss && (this.bossFight.state === 'intro' || this.bossFight.state === 'fight');
-    if (bossCam) { cam.look = 0; out.x = (pl.x + this.boss.x) / 2 - W / 2; }
-    else {
+    const pl = this.player, cam = this.cam, b = this.boss;
+    if (this.bossCam()) {
+      cam.look = 0;
+      const fx = typeof b.focusX === 'number' && b.focusX === b.focusX ? b.focusX : b.x;
+      out.x = U.clamp((pl.x + fx) / 2 - W / 2, pl.x + BOSS_CAM_SIDE - W, pl.x - BOSS_CAM_SIDE);
+    } else {
       const running = Math.abs(pl.vx) > 60 && !pl.clinging;
       const want = running ? 90 * pl.facing : (pl.clinging ? -90 * pl.wallDir : 0);
       cam.look = U.approach(cam.look, want, running || pl.clinging ? 90 / 20 : 90 / 30);
@@ -1134,7 +1202,14 @@
     const cy = cam.y + H / 2;
     let dy = 0;
     if (pl.y < cy - 70) dy = pl.y - (cy - 70); else if (pl.y > cy + 110) dy = pl.y - (cy + 110);
-    cam.y += dy * (pl.vy > 700 ? 0.30 : 0.18);
+    const ny = cam.y + dy * (pl.vy > 700 ? 0.30 : 0.18);
+    const b = this.boss;
+    const fy = this.bossCam() ? (typeof b.focusY === 'number' && b.focusY === b.focusY ? b.focusY : b.cy()) : NaN;
+    if (fy === fy && (fy < ny + FOCUS_TOP || fy > ny + H - FOCUS_BOTTOM)) {   // the boss's focus would be out of frame
+      const lo = pl.y + FEET_BOTTOM - H, hi = pl.y - pl.h - FOCUS_TOP;   // the fighter's own bounds win over the focus
+      const want = U.clamp(fy < ny + FOCUS_TOP ? fy - FOCUS_TOP : fy - (H - FOCUS_BOTTOM), lo, hi);
+      cam.y = U.clamp(cam.y + (want - cam.y) * 0.12, lo, hi);   // eased, but a fast fall / jump never outruns the view
+    } else cam.y = ny;
     this.clampCamera();
   };
   Game.prototype.snapCamera = function () {
@@ -1440,17 +1515,17 @@
     d.setMeter = function (n) { if (game.player) game.player.meter = U.clamp(n, 0, game.player.meterMax); };
     d.addBits = function (n) { if (game.save) game.addBits(n | 0); };
     d.setBits = function (n) { if (game.save) game.save.bits = n | 0; };
+    /**
+     * defeatBoss(bossId?): the faithful defeat (Game.defeatBoss). With no id, the boss live in this room (else the room's
+     * boss record while it is still unbeaten); false when there is nothing to defeat or the id is unknown.
+     */
     d.defeatBoss = function (bossId) {
       if (!game.save) return false;
-      const rw = UB.Bosses.rewardFor(bossId);
-      if (game.save.bossesDefeated.indexOf(bossId) < 0) game.save.bossesDefeated.push(bossId);
-      if (rw.ability) game.grantAbility(rw.ability, true);
-      const spec = game.level ? game.level.boss : null;
-      if (spec && spec.id === bossId) {
-        game.sealExits(spec.seal, false); game.sealExits(spec.locked, false);
-        game.boss = null; game.bossFight.state = 'done'; if (game.mode === 'bossIntro') { game.mode = 'normal'; game.player.locked = false; }
+      if (bossId === undefined || bossId === null) {
+        const b = game.boss, spec = game.level ? game.level.boss : null;
+        bossId = b && !b.dead ? b.id : (spec && game.save.bossesDefeated.indexOf(spec.id) < 0 ? spec.id : null);
       }
-      return true;
+      return game.defeatBoss(bossId);
     };
     d.killEnemies = function () { for (let i = 0; i < game.enemies.length; i++) game.enemies[i].dead = true; game.enemies.length = 0; };
     /** Place an enemy in the current room: type id, feet tile (tx, ty), opts = extra spawn fields. Returns {type,x,y,hp,state} or null. */
