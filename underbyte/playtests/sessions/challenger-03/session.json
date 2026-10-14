@@ -1,0 +1,960 @@
+{
+ "session": "challenger-03",
+ "startedAt": "2026-10-14T13:15:57.836Z",
+ "size": [
+  960,
+  540
+ ],
+ "pad": false,
+ "turns": [
+  {
+   "turn": 1,
+   "video": 2.04,
+   "cmd": {
+    "act": [
+     {
+      "wait": 300
+     },
+     {
+      "tap": "confirm"
+     },
+     {
+      "wait": 1500
+     }
+    ]
+   },
+   "room": "lw_rest",
+   "hp": 5,
+   "events": [
+    {
+     "f": 58,
+     "type": "maxHp",
+     "maxHp": 5
+    },
+    {
+     "f": 58,
+     "type": "death",
+     "room": null
+    },
+    {
+     "f": 58,
+     "type": "bits",
+     "bits": 4,
+     "delta": 4
+    },
+    {
+     "f": 79,
+     "type": "screen",
+     "from": "title",
+     "to": "play"
+    },
+    {
+     "f": 79,
+     "type": "room",
+     "from": null,
+     "to": "lw_rest"
+    }
+   ]
+  },
+  {
+   "turn": 2,
+   "video": 2.04,
+   "cmd": {
+    "debug": "UB.debug.setMaxHp(7)"
+   },
+   "room": "lw_rest",
+   "hp": 5,
+   "events": [
+    {
+     "f": 159,
+     "type": "maxHp",
+     "maxHp": 7
+    }
+   ]
+  },
+  {
+   "turn": 3,
+   "video": 2.04,
+   "cmd": {
+    "debug": "UB.debug.warp(\"bv_rest\",\"L\")"
+   },
+   "room": "bv_rest",
+   "hp": 5,
+   "events": [
+    {
+     "f": 159,
+     "type": "room",
+     "from": "lw_rest",
+     "to": "bv_rest"
+    }
+   ]
+  },
+  {
+   "turn": 4,
+   "video": 3.93,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "wait": 1650
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 200
+     }
+    ]
+   },
+   "room": "bv_rest",
+   "hp": 5,
+   "events": [
+    {
+     "f": 249,
+     "type": "screen",
+     "from": "play",
+     "to": "lore"
+    }
+   ]
+  },
+  {
+   "turn": 5,
+   "video": 6.02,
+   "cmd": {
+    "act": [
+     {
+      "tap": "confirm"
+     },
+     {
+      "wait": 400
+     },
+     {
+      "down": "right"
+     },
+     {
+      "tap": "jump",
+      "ms": 200
+     },
+     {
+      "wait": 400
+     },
+     {
+      "up": "right"
+     },
+     {
+      "tap": "up"
+     },
+     {
+      "wait": 900
+     }
+    ]
+   },
+   "room": "bv_rest",
+   "hp": 7,
+   "events": [
+    {
+     "f": 273,
+     "type": "screen",
+     "from": "lore",
+     "to": "play"
+    },
+    {
+     "f": 367,
+     "type": "heal",
+     "hp": 7
+    }
+   ]
+  },
+  {
+   "turn": 6,
+   "video": 9.6,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "wait": 2300
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 1200
+     }
+    ]
+   },
+   "room": "bv_corrosant",
+   "hp": 7,
+   "events": [
+    {
+     "f": 530,
+     "type": "room",
+     "from": "bv_rest",
+     "to": "bv_corrosant"
+    },
+    {
+     "f": 553,
+     "type": "bossFight",
+     "state": "intro",
+     "boss": "corrosant"
+    }
+   ]
+  },
+  {
+   "turn": 7,
+   "video": 11.33,
+   "cmd": {
+    "act": [
+     {
+      "wait": 1700
+     }
+    ]
+   },
+   "room": "bv_corrosant",
+   "hp": 7,
+   "events": [
+    {
+     "f": 703,
+     "type": "bossFight",
+     "state": "fight",
+     "boss": "corrosant"
+    }
+   ]
+  },
+  {
+   "turn": 8,
+   "video": 12.35,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "wait": 700
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 100
+     }
+    ]
+   },
+   "room": "bv_corrosant",
+   "hp": 7,
+   "events": []
+  },
+  {
+   "turn": 9,
+   "video": 13.42,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "wait": 900
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 100
+     }
+    ]
+   },
+   "room": "bv_corrosant",
+   "hp": 7,
+   "events": []
+  },
+  {
+   "turn": 10,
+   "video": 14.58,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "tap": "jump",
+      "ms": 250
+     },
+     {
+      "wait": 100
+     },
+     {
+      "tap": "jump",
+      "ms": 250
+     },
+     {
+      "wait": 400
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 100
+     }
+    ]
+   },
+   "room": "bv_corrosant",
+   "hp": 7,
+   "events": []
+  },
+  {
+   "turn": 11,
+   "video": 15.81,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "tap": "jump",
+      "ms": 260
+     },
+     {
+      "wait": 120
+     },
+     {
+      "tap": "jump",
+      "ms": 260
+     },
+     {
+      "wait": 400
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 100
+     }
+    ]
+   },
+   "room": "bv_corrosant",
+   "hp": 7,
+   "events": []
+  },
+  {
+   "turn": 12,
+   "video": 17.01,
+   "cmd": {
+    "act": [
+     {
+      "down": "left"
+     },
+     {
+      "wait": 300
+     },
+     {
+      "tap": "jump",
+      "ms": 200
+     },
+     {
+      "wait": 100
+     },
+     {
+      "tap": "dash"
+     },
+     {
+      "wait": 250
+     },
+     {
+      "up": "left"
+     },
+     {
+      "wait": 150
+     }
+    ]
+   },
+   "room": "bv_corrosant",
+   "hp": 7,
+   "events": []
+  },
+  {
+   "turn": 13,
+   "video": 17.37,
+   "cmd": {
+    "act": [
+     {
+      "wait": 300
+     }
+    ]
+   },
+   "room": "bv_corrosant",
+   "hp": 7,
+   "events": []
+  },
+  {
+   "turn": 14,
+   "video": 19.38,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "wait": 150
+     },
+     {
+      "tap": "jump",
+      "ms": 250
+     },
+     {
+      "wait": 60
+     },
+     {
+      "tap": "dash"
+     },
+     {
+      "wait": 200
+     },
+     {
+      "tap": "jump",
+      "ms": 250
+     },
+     {
+      "wait": 60
+     },
+     {
+      "tap": "light"
+     },
+     {
+      "wait": 140
+     },
+     {
+      "tap": "light"
+     },
+     {
+      "wait": 140
+     },
+     {
+      "up": "right"
+     },
+     {
+      "tap": "light"
+     },
+     {
+      "wait": 200
+     }
+    ]
+   },
+   "room": "bv_corrosant",
+   "hp": 7,
+   "events": []
+  },
+  {
+   "turn": 15,
+   "video": 19.97,
+   "cmd": {
+    "act": [
+     {
+      "tap": [
+       "down",
+       "jump"
+      ],
+      "ms": 120
+     },
+     {
+      "wait": 350
+     }
+    ]
+   },
+   "room": "bv_corrosant",
+   "hp": 7,
+   "events": []
+  },
+  {
+   "turn": 16,
+   "video": 21.45,
+   "cmd": {
+    "act": [
+     {
+      "tap": "jump",
+      "ms": 260
+     },
+     {
+      "wait": 100
+     },
+     {
+      "down": "left"
+     },
+     {
+      "tap": "jump",
+      "ms": 200
+     },
+     {
+      "wait": 50
+     },
+     {
+      "up": "left"
+     },
+     {
+      "tap": "light"
+     },
+     {
+      "wait": 140
+     },
+     {
+      "tap": "light"
+     },
+     {
+      "wait": 140
+     },
+     {
+      "tap": "light"
+     },
+     {
+      "wait": 200
+     }
+    ]
+   },
+   "room": "bv_corrosant",
+   "hp": 6,
+   "events": [
+    {
+     "f": 1258,
+     "type": "hurt",
+     "hp": 6,
+     "maxHp": 7,
+     "room": "bv_corrosant",
+     "hazard": false
+    }
+   ]
+  },
+  {
+   "turn": 17,
+   "video": 22.66,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "wait": 50
+     },
+     {
+      "up": "right"
+     },
+     {
+      "tap": "jump",
+      "ms": 200
+     },
+     {
+      "wait": 80
+     },
+     {
+      "tap": "light"
+     },
+     {
+      "wait": 140
+     },
+     {
+      "tap": "light"
+     },
+     {
+      "wait": 140
+     },
+     {
+      "tap": "light"
+     },
+     {
+      "wait": 250
+     }
+    ]
+   },
+   "room": "bv_corrosant",
+   "hp": 6,
+   "events": []
+  },
+  {
+   "turn": 18,
+   "video": 24.16,
+   "cmd": {
+    "act": [
+     {
+      "down": "left"
+     },
+     {
+      "tap": "jump",
+      "ms": 260
+     },
+     {
+      "wait": 120
+     },
+     {
+      "tap": "jump",
+      "ms": 260
+     },
+     {
+      "wait": 100
+     },
+     {
+      "tap": "dash"
+     },
+     {
+      "wait": 300
+     },
+     {
+      "up": "left"
+     },
+     {
+      "wait": 200
+     }
+    ]
+   },
+   "room": "bv_corrosant",
+   "hp": 6,
+   "events": []
+  },
+  {
+   "turn": 19,
+   "video": 24.72,
+   "cmd": {
+    "act": [
+     {
+      "wait": 500
+     }
+    ]
+   },
+   "room": "bv_corrosant",
+   "hp": 6,
+   "events": []
+  },
+  {
+   "turn": 20,
+   "video": 26.13,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "tap": "jump",
+      "ms": 260
+     },
+     {
+      "wait": 150
+     },
+     {
+      "tap": "jump",
+      "ms": 260
+     },
+     {
+      "wait": 500
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 100
+     }
+    ]
+   },
+   "room": "bv_corrosant",
+   "hp": 6,
+   "events": []
+  },
+  {
+   "turn": 21,
+   "video": 27.85,
+   "cmd": {
+    "act": [
+     {
+      "down": "left"
+     },
+     {
+      "wait": 30
+     },
+     {
+      "up": "left"
+     },
+     {
+      "tap": "jump",
+      "ms": 280
+     },
+     {
+      "wait": 120
+     },
+     {
+      "tap": "jump",
+      "ms": 280
+     },
+     {
+      "wait": 120
+     },
+     {
+      "tap": "light"
+     },
+     {
+      "wait": 140
+     },
+     {
+      "tap": "light"
+     },
+     {
+      "wait": 140
+     },
+     {
+      "tap": "light"
+     },
+     {
+      "wait": 200
+     }
+    ]
+   },
+   "room": "bv_corrosant",
+   "hp": 6,
+   "events": []
+  },
+  {
+   "turn": 22,
+   "video": 29.72,
+   "cmd": {
+    "act": [
+     {
+      "down": "left"
+     },
+     {
+      "wait": 180
+     },
+     {
+      "up": "left"
+     },
+     {
+      "tap": "jump",
+      "ms": 300
+     },
+     {
+      "wait": 150
+     },
+     {
+      "tap": "jump",
+      "ms": 300
+     },
+     {
+      "wait": 60
+     },
+     {
+      "tap": "light"
+     },
+     {
+      "wait": 130
+     },
+     {
+      "tap": "light"
+     },
+     {
+      "wait": 130
+     },
+     {
+      "tap": "light"
+     },
+     {
+      "wait": 250
+     }
+    ]
+   },
+   "room": "bv_corrosant",
+   "hp": 5,
+   "events": [
+    {
+     "f": 1766,
+     "type": "hurt",
+     "hp": 5,
+     "maxHp": 7,
+     "room": "bv_corrosant",
+     "hazard": false
+    }
+   ]
+  },
+  {
+   "turn": 23,
+   "video": 30.26,
+   "cmd": {
+    "act": [
+     {
+      "wait": 400
+     }
+    ]
+   },
+   "room": "bv_corrosant",
+   "hp": 5,
+   "events": []
+  },
+  {
+   "turn": 24,
+   "video": 31.92,
+   "cmd": {
+    "act": [
+     {
+      "tap": "jump",
+      "ms": 300
+     },
+     {
+      "wait": 120
+     },
+     {
+      "tap": "jump",
+      "ms": 300
+     },
+     {
+      "wait": 40
+     },
+     {
+      "tap": "light"
+     },
+     {
+      "wait": 130
+     },
+     {
+      "tap": "light"
+     },
+     {
+      "wait": 130
+     },
+     {
+      "tap": "light"
+     },
+     {
+      "wait": 250
+     }
+    ]
+   },
+   "room": "bv_corrosant",
+   "hp": 4,
+   "events": [
+    {
+     "f": 1833,
+     "type": "hurt",
+     "hp": 4,
+     "maxHp": 7,
+     "room": "bv_corrosant",
+     "hazard": false
+    }
+   ]
+  }
+ ],
+ "marks": [
+  {
+   "turn": 11,
+   "video": 15.81,
+   "note": "Corrosant crawls on the ceiling: from the floor the camera never showed it (only a boss bar and tiny green drips). From the top platform its head shows up UNDER the hearts/energy HUD, which draws over it."
+  },
+  {
+   "turn": 22,
+   "video": 29.72,
+   "note": "Corrosant after ~20 s: 0 damage dealt, 2 hearts lost to body contact. It lives on the ceiling and walls; the only reachable moments are the lunge, and the retracting body hits you when you go for the head."
+  }
+ ],
+ "debugCalls": [
+  {
+   "turn": 2,
+   "video": 2.04,
+   "code": "UB.debug.setMaxHp(7)"
+  },
+  {
+   "turn": 3,
+   "video": 2.04,
+   "code": "UB.debug.warp(\"bv_rest\",\"L\")"
+  }
+ ],
+ "errors": [],
+ "segments": [
+  [
+   0.953,
+   2.996
+  ],
+  [
+   11.517,
+   13.404
+  ],
+  [
+   20.313,
+   22.404
+  ],
+  [
+   28.751,
+   32.327
+  ],
+  [
+   39.001,
+   40.738
+  ],
+  [
+   47.149,
+   48.165
+  ],
+  [
+   55.281,
+   56.352
+  ],
+  [
+   65.042,
+   66.198
+  ],
+  [
+   74.92,
+   76.15
+  ],
+  [
+   89.038,
+   90.245
+  ],
+  [
+   99.601,
+   99.956
+  ],
+  [
+   109.048,
+   111.061
+  ],
+  [
+   121.192,
+   121.783
+  ],
+  [
+   131.884,
+   133.356
+  ],
+  [
+   141.764,
+   142.98
+  ],
+  [
+   152.011,
+   153.513
+  ],
+  [
+   162.674,
+   163.229
+  ],
+  [
+   173.234,
+   174.645
+  ],
+  [
+   183.741,
+   185.464
+  ],
+  [
+   196.148,
+   198.019
+  ],
+  [
+   211.926,
+   212.461
+  ],
+  [
+   221.703,
+   223.369
+  ]
+ ],
+ "endedAt": "2026-10-14T13:19:56.365Z",
+ "liveSeconds": 31.92,
+ "video": "recordings/challenger-03-corrosant-ceiling.mp4",
+ "convertError": null
+}

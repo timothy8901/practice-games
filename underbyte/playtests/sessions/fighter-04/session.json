@@ -1,0 +1,1107 @@
+{
+ "session": "fighter-04",
+ "startedAt": "2026-10-14T13:21:09.173Z",
+ "size": [
+  960,
+  540
+ ],
+ "pad": false,
+ "turns": [
+  {
+   "turn": 1,
+   "video": 1.78,
+   "cmd": {
+    "act": [
+     {
+      "wait": 300
+     },
+     {
+      "tap": "confirm"
+     },
+     {
+      "wait": 1300
+     }
+    ]
+   },
+   "room": "dc_shrine",
+   "hp": 5,
+   "events": [
+    {
+     "f": 54,
+     "type": "maxHp",
+     "maxHp": 5
+    },
+    {
+     "f": 54,
+     "type": "death",
+     "room": null
+    },
+    {
+     "f": 54,
+     "type": "bits",
+     "bits": 18,
+     "delta": 18
+    },
+    {
+     "f": 75,
+     "type": "screen",
+     "from": "title",
+     "to": "play"
+    },
+    {
+     "f": 75,
+     "type": "room",
+     "from": null,
+     "to": "dc_shrine"
+    }
+   ]
+  },
+  {
+   "turn": 2,
+   "video": 8.73,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "wait": 3300
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 3000
+     },
+     {
+      "down": "right"
+     },
+     {
+      "wait": 500
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 50
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 5,
+   "events": [
+    {
+     "f": 320,
+     "type": "room",
+     "from": "dc_shrine",
+     "to": "dc_sentinel"
+    },
+    {
+     "f": 343,
+     "type": "bossFight",
+     "state": "intro",
+     "boss": "tallock"
+    },
+    {
+     "f": 493,
+     "type": "bossFight",
+     "state": "fight",
+     "boss": "tallock"
+    }
+   ]
+  },
+  {
+   "turn": 3,
+   "video": 9.34,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "tap": "dash",
+      "ms": 60
+     },
+     {
+      "wait": 350
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 100
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 5,
+   "events": []
+  },
+  {
+   "turn": 4,
+   "video": 10.04,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "tap": "dash",
+      "ms": 60
+     },
+     {
+      "wait": 450
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 50
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 5,
+   "events": []
+  },
+  {
+   "turn": 5,
+   "video": 10.69,
+   "cmd": {
+    "act": [
+     {
+      "tap": "left",
+      "ms": 30
+     },
+     {
+      "down": "left"
+     },
+     {
+      "wait": 200
+     },
+     {
+      "up": "left"
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 60
+     },
+     {
+      "tap": "special",
+      "ms": 40
+     },
+     {
+      "wait": 80
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 5,
+   "events": []
+  },
+  {
+   "turn": 6,
+   "video": 11.39,
+   "cmd": {
+    "act": [
+     {
+      "wait": 150
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 100
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 80
+     },
+     {
+      "tap": "heavy",
+      "ms": 40
+     },
+     {
+      "wait": 120
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 5,
+   "events": []
+  },
+  {
+   "turn": 7,
+   "video": 12.16,
+   "cmd": {
+    "act": [
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 70
+     },
+     {
+      "down": "right"
+     },
+     {
+      "tap": "dash",
+      "ms": 60
+     },
+     {
+      "wait": 200
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 100
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 5,
+   "events": []
+  },
+  {
+   "turn": 8,
+   "video": 12.74,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "tap": "dash",
+      "ms": 60
+     },
+     {
+      "wait": 250
+     },
+     {
+      "up": "right"
+     },
+     {
+      "tap": "left",
+      "ms": 30
+     },
+     {
+      "wait": 100
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 5,
+   "events": []
+  },
+  {
+   "turn": 9,
+   "video": 14.09,
+   "cmd": {
+    "act": [
+     {
+      "wait": 100
+     },
+     {
+      "tap": "jump",
+      "ms": 380
+     },
+     {
+      "down": "left"
+     },
+     {
+      "wait": 120
+     },
+     {
+      "up": "left"
+     },
+     {
+      "down": "down"
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 250
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 250
+     },
+     {
+      "up": "down"
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 5,
+   "events": []
+  },
+  {
+   "turn": 10,
+   "video": 15.08,
+   "cmd": {
+    "act": [
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 120
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 120
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 60
+     },
+     {
+      "tap": "special",
+      "ms": 40
+     },
+     {
+      "wait": 300
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 5,
+   "events": []
+  },
+  {
+   "turn": 11,
+   "video": 16.34,
+   "cmd": {
+    "act": [
+     {
+      "wait": 150
+     },
+     {
+      "tap": "jump",
+      "ms": 380
+     },
+     {
+      "wait": 250
+     },
+     {
+      "down": "down"
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 200
+     },
+     {
+      "up": "down"
+     },
+     {
+      "wait": 100
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 4,
+   "events": [
+    {
+     "f": 923,
+     "type": "hurt",
+     "hp": 4,
+     "maxHp": 5,
+     "room": "dc_sentinel",
+     "hazard": false
+    }
+   ]
+  },
+  {
+   "turn": 12,
+   "video": 17.7,
+   "cmd": {
+    "act": [
+     {
+      "tap": "left",
+      "ms": 30
+     },
+     {
+      "down": "left"
+     },
+     {
+      "wait": 120
+     },
+     {
+      "up": "left"
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 120
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 120
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 60
+     },
+     {
+      "tap": "special",
+      "ms": 40
+     },
+     {
+      "wait": 300
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 3,
+   "events": [
+    {
+     "f": 1066,
+     "type": "hurt",
+     "hp": 3,
+     "maxHp": 5,
+     "room": "dc_sentinel",
+     "hazard": false
+    }
+   ]
+  },
+  {
+   "turn": 13,
+   "video": 18.31,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "wait": 350
+     },
+     {
+      "up": "right"
+     },
+     {
+      "tap": "left",
+      "ms": 30
+     },
+     {
+      "wait": 100
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 3,
+   "events": []
+  },
+  {
+   "turn": 14,
+   "video": 18.31,
+   "cmd": {
+    "debug": "UB.debug.setMeter(100)"
+   },
+   "room": "dc_sentinel",
+   "hp": 3,
+   "events": []
+  },
+  {
+   "turn": 15,
+   "video": 19.06,
+   "cmd": {
+    "act": [
+     {
+      "tap": "overclock",
+      "ms": 60
+     },
+     {
+      "wait": 150
+     },
+     {
+      "down": "up"
+     },
+     {
+      "tap": "special",
+      "ms": 60
+     },
+     {
+      "wait": 150
+     },
+     {
+      "up": "up"
+     },
+     {
+      "wait": 100
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 3,
+   "events": [
+    {
+     "f": 1123,
+     "type": "overclock"
+    }
+   ]
+  },
+  {
+   "turn": 16,
+   "video": 20.45,
+   "cmd": {
+    "act": [
+     {
+      "wait": 100
+     },
+     {
+      "down": "left"
+     },
+     {
+      "wait": 150
+     },
+     {
+      "up": "left"
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 110
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 110
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 120
+     },
+     {
+      "tap": "heavy",
+      "ms": 40
+     },
+     {
+      "wait": 300
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 2,
+   "events": [
+    {
+     "f": 1215,
+     "type": "hurt",
+     "hp": 2,
+     "maxHp": 5,
+     "room": "dc_sentinel",
+     "hazard": false
+    }
+   ]
+  },
+  {
+   "turn": 17,
+   "video": 22.29,
+   "cmd": {
+    "act": [
+     {
+      "wait": 200
+     },
+     {
+      "down": "left"
+     },
+     {
+      "tap": "jump",
+      "ms": 380
+     },
+     {
+      "wait": 150
+     },
+     {
+      "up": "left"
+     },
+     {
+      "down": "down"
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 230
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 230
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 230
+     },
+     {
+      "up": "down"
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 2,
+   "events": []
+  },
+  {
+   "turn": 18,
+   "video": 23.28,
+   "cmd": {
+    "act": [
+     {
+      "wait": 120
+     },
+     {
+      "tap": "jump",
+      "ms": 380
+     },
+     {
+      "wait": 300
+     },
+     {
+      "tap": "right",
+      "ms": 30
+     },
+     {
+      "wait": 50
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 2,
+   "events": []
+  },
+  {
+   "turn": 19,
+   "video": 24.48,
+   "cmd": {
+    "act": [
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 110
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 110
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 60
+     },
+     {
+      "tap": "special",
+      "ms": 40
+     },
+     {
+      "wait": 250
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 2,
+   "events": []
+  },
+  {
+   "turn": 20,
+   "video": 25.49,
+   "cmd": {
+    "act": [
+     {
+      "wait": 100
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 110
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 110
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 120
+     },
+     {
+      "tap": "heavy",
+      "ms": 40
+     },
+     {
+      "wait": 300
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 1,
+   "events": [
+    {
+     "f": 1521,
+     "type": "hurt",
+     "hp": 1,
+     "maxHp": 5,
+     "room": "dc_sentinel",
+     "hazard": false
+    }
+   ]
+  },
+  {
+   "turn": 21,
+   "video": 26.49,
+   "cmd": {
+    "act": [
+     {
+      "wait": 150
+     },
+     {
+      "down": "right"
+     },
+     {
+      "wait": 500
+     },
+     {
+      "up": "right"
+     },
+     {
+      "tap": "left",
+      "ms": 30
+     },
+     {
+      "wait": 100
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 1,
+   "events": []
+  },
+  {
+   "turn": 22,
+   "video": 28.61,
+   "cmd": {
+    "act": [
+     {
+      "down": "left"
+     },
+     {
+      "tap": "jump",
+      "ms": 380
+     },
+     {
+      "wait": 80
+     },
+     {
+      "up": "left"
+     },
+     {
+      "wait": 120
+     },
+     {
+      "down": "down"
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 230
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 230
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 230
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 200
+     },
+     {
+      "up": "down"
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 0,
+   "events": [
+    {
+     "f": 1587,
+     "type": "hurt",
+     "hp": 0,
+     "maxHp": 5,
+     "room": "dc_sentinel",
+     "hazard": false
+    },
+    {
+     "f": 1587,
+     "type": "death",
+     "room": "dc_sentinel"
+    },
+    {
+     "f": 1693,
+     "type": "screen",
+     "from": "play",
+     "to": "gameover"
+    }
+   ]
+  },
+  {
+   "turn": 23,
+   "video": 31.76,
+   "cmd": {
+    "act": [
+     {
+      "wait": 800
+     },
+     {
+      "tap": "confirm"
+     },
+     {
+      "wait": 1300
+     },
+     {
+      "tap": "up"
+     },
+     {
+      "wait": 900
+     }
+    ]
+   },
+   "room": "dc_shrine",
+   "hp": 5,
+   "events": [
+    {
+     "f": 1780,
+     "type": "screen",
+     "from": "gameover",
+     "to": "play"
+    },
+    {
+     "f": 1780,
+     "type": "room",
+     "from": "dc_sentinel",
+     "to": "dc_shrine"
+    },
+    {
+     "f": 1780,
+     "type": "bossFight",
+     "state": "none",
+     "boss": null
+    }
+   ]
+  }
+ ],
+ "marks": [
+  {
+   "turn": 4,
+   "video": 10.04,
+   "note": "Clean dodge: dashing under Tallock stack slam twice feels great with Tessik"
+  },
+  {
+   "turn": 7,
+   "video": 12.16,
+   "note": "No dash cancel: pressed dash 70ms into a light, dash never came out (moved 30px instead of 180). Light->Special cancels, Light->Dash does not"
+  },
+  {
+   "turn": 10,
+   "video": 15.08,
+   "note": "Tessik light x3 into Pulse Line cancel: 14 dmg, the one real combo I found"
+  },
+  {
+   "turn": 11,
+   "video": 16.34,
+   "note": "Repro with Tessik: down+light pressed on the way up of a jump cancels the rise into the down-strike and drops me into the quake spikes"
+  },
+  {
+   "turn": 15,
+   "video": 19.06,
+   "note": "Tessik Sightline: screen-wide beam through Tallock, only 10 dmg (61/120) for a full meter, feels weak vs Brackmaw/Korvask ults"
+  },
+  {
+   "turn": 19,
+   "video": 24.48,
+   "note": "Readability: Overclocked Pulse Line looks almost identical to the Sightline ultimate beam"
+  },
+  {
+   "turn": 20,
+   "video": 25.49,
+   "note": "Tessik heavy (Prism Hammer) recovery is too long to escape Tallock enraged slab swing; traded down to 1 heart"
+  },
+  {
+   "turn": 22,
+   "video": 28.61,
+   "note": "Tessik died to Tallock at 21/120 HP: jumping from point-blank grazes its body (contact damage) before the pogo can come out. Tessik 0-2 on this boss"
+  }
+ ],
+ "debugCalls": [
+  {
+   "turn": 14,
+   "video": 18.31,
+   "code": "UB.debug.setMeter(100)"
+  }
+ ],
+ "errors": [],
+ "segments": [
+  [
+   1.014,
+   2.797
+  ],
+  [
+   11.271,
+   18.22
+  ],
+  [
+   25.778,
+   26.386
+  ],
+  [
+   32.944,
+   33.646
+  ],
+  [
+   42.141,
+   42.786
+  ],
+  [
+   51.029,
+   51.734
+  ],
+  [
+   59.763,
+   60.53
+  ],
+  [
+   70.036,
+   70.614
+  ],
+  [
+   78.603,
+   79.96
+  ],
+  [
+   89.559,
+   90.549
+  ],
+  [
+   98.258,
+   99.515
+  ],
+  [
+   109.446,
+   110.806
+  ],
+  [
+   119.565,
+   120.173
+  ],
+  [
+   127.879,
+   128.626
+  ],
+  [
+   138.23,
+   139.628
+  ],
+  [
+   147.896,
+   149.728
+  ],
+  [
+   157.818,
+   158.809
+  ],
+  [
+   165.917,
+   167.116
+  ],
+  [
+   175.769,
+   176.781
+  ],
+  [
+   185.137,
+   186.142
+  ],
+  [
+   194.93,
+   197.045
+  ],
+  [
+   207.011,
+   210.16
+  ]
+ ],
+ "endedAt": "2026-10-14T13:24:49.426Z",
+ "liveSeconds": 31.76,
+ "video": "recordings/fighter-04-tessik-cancels-sightline-tallock.mp4",
+ "convertError": null
+}

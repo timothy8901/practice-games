@@ -1,0 +1,3585 @@
+{
+ "session": "fighter-03",
+ "startedAt": "2026-10-14T13:09:10.260Z",
+ "size": [
+  960,
+  540
+ ],
+ "pad": false,
+ "turns": [
+  {
+   "turn": 1,
+   "video": 4.52,
+   "cmd": {
+    "act": [
+     {
+      "wait": 300
+     },
+     {
+      "tap": "confirm"
+     },
+     {
+      "wait": 400
+     },
+     {
+      "tap": "left"
+     },
+     {
+      "wait": 100
+     },
+     {
+      "tap": "confirm"
+     },
+     {
+      "wait": 800
+     },
+     {
+      "tap": "right"
+     },
+     {
+      "wait": 150
+     },
+     {
+      "tap": "right"
+     },
+     {
+      "wait": 150
+     },
+     {
+      "tap": "right"
+     },
+     {
+      "wait": 500
+     },
+     {
+      "tap": "confirm"
+     },
+     {
+      "wait": 1500
+     }
+    ]
+   },
+   "room": "dc_shrine",
+   "hp": 4,
+   "events": [
+    {
+     "f": 54,
+     "type": "maxHp",
+     "maxHp": 4
+    },
+    {
+     "f": 54,
+     "type": "death",
+     "room": null
+    },
+    {
+     "f": 54,
+     "type": "bits",
+     "bits": 2,
+     "delta": 2
+    },
+    {
+     "f": 74,
+     "type": "screen",
+     "from": "title",
+     "to": "play"
+    },
+    {
+     "f": 74,
+     "type": "room",
+     "from": null,
+     "to": "dc_shrine"
+    }
+   ]
+  },
+  {
+   "turn": 2,
+   "video": 6.56,
+   "cmd": {
+    "act": [
+     {
+      "tap": "pause"
+     },
+     {
+      "wait": 250
+     },
+     {
+      "tap": "down"
+     },
+     {
+      "wait": 100
+     },
+     {
+      "tap": "down"
+     },
+     {
+      "wait": 100
+     },
+     {
+      "tap": "down"
+     },
+     {
+      "wait": 100
+     },
+     {
+      "tap": "confirm"
+     },
+     {
+      "wait": 200
+     },
+     {
+      "tap": "left"
+     },
+     {
+      "wait": 100
+     },
+     {
+      "tap": "confirm"
+     },
+     {
+      "wait": 700
+     }
+    ]
+   },
+   "room": null,
+   "hp": 0,
+   "events": [
+    {
+     "f": 305,
+     "type": "screen",
+     "from": "play",
+     "to": "pause"
+    },
+    {
+     "f": 380,
+     "type": "screen",
+     "from": "pause",
+     "to": "title"
+    },
+    {
+     "f": 380,
+     "type": "hurt",
+     "hp": 0,
+     "maxHp": 0,
+     "room": null,
+     "hazard": false
+    }
+   ]
+  },
+  {
+   "turn": 3,
+   "video": 10.78,
+   "cmd": {
+    "act": [
+     {
+      "tap": "up"
+     },
+     {
+      "wait": 100
+     },
+     {
+      "tap": "confirm"
+     },
+     {
+      "wait": 300
+     },
+     {
+      "tap": "left"
+     },
+     {
+      "wait": 100
+     },
+     {
+      "tap": "confirm"
+     },
+     {
+      "wait": 800
+     },
+     {
+      "tap": "right"
+     },
+     {
+      "wait": 150
+     },
+     {
+      "tap": "right"
+     },
+     {
+      "wait": 150
+     },
+     {
+      "tap": "right"
+     },
+     {
+      "wait": 400
+     },
+     {
+      "tap": "confirm"
+     },
+     {
+      "wait": 1500
+     }
+    ]
+   },
+   "room": "dc_wake",
+   "hp": 5,
+   "events": [
+    {
+     "f": 469,
+     "type": "screen",
+     "from": "title",
+     "to": "select"
+    },
+    {
+     "f": 580,
+     "type": "maxHp",
+     "maxHp": 5
+    },
+    {
+     "f": 580,
+     "type": "bits",
+     "bits": 0,
+     "delta": -2
+    },
+    {
+     "f": 600,
+     "type": "screen",
+     "from": "select",
+     "to": "play"
+    },
+    {
+     "f": 600,
+     "type": "room",
+     "from": null,
+     "to": "dc_wake"
+    }
+   ]
+  },
+  {
+   "turn": 4,
+   "video": 14.41,
+   "cmd": {
+    "act": [
+     {
+      "tap": "pause"
+     },
+     {
+      "wait": 250
+     },
+     {
+      "tap": "down"
+     },
+     {
+      "wait": 100
+     },
+     {
+      "tap": "down"
+     },
+     {
+      "wait": 100
+     },
+     {
+      "tap": "down"
+     },
+     {
+      "wait": 100
+     },
+     {
+      "tap": "confirm"
+     },
+     {
+      "wait": 200
+     },
+     {
+      "tap": "left"
+     },
+     {
+      "wait": 100
+     },
+     {
+      "tap": "confirm"
+     },
+     {
+      "wait": 600
+     },
+     {
+      "tap": "up"
+     },
+     {
+      "wait": 100
+     },
+     {
+      "tap": "confirm"
+     },
+     {
+      "wait": 300
+     },
+     {
+      "tap": "left"
+     },
+     {
+      "wait": 100
+     },
+     {
+      "tap": "confirm"
+     },
+     {
+      "wait": 800
+     }
+    ]
+   },
+   "room": null,
+   "hp": 0,
+   "events": [
+    {
+     "f": 677,
+     "type": "screen",
+     "from": "play",
+     "to": "pause"
+    },
+    {
+     "f": 752,
+     "type": "screen",
+     "from": "pause",
+     "to": "title"
+    },
+    {
+     "f": 752,
+     "type": "hurt",
+     "hp": 0,
+     "maxHp": 0,
+     "room": null,
+     "hazard": false
+    },
+    {
+     "f": 802,
+     "type": "screen",
+     "from": "title",
+     "to": "settings"
+    }
+   ]
+  },
+  {
+   "turn": 5,
+   "video": 16.15,
+   "cmd": {
+    "act": [
+     {
+      "tap": "right"
+     },
+     {
+      "wait": 100
+     },
+     {
+      "tap": "back"
+     },
+     {
+      "wait": 300
+     },
+     {
+      "tap": "down"
+     },
+     {
+      "wait": 150
+     },
+     {
+      "tap": "confirm"
+     },
+     {
+      "wait": 800
+     }
+    ]
+   },
+   "room": null,
+   "hp": 0,
+   "events": [
+    {
+     "f": 905,
+     "type": "screen",
+     "from": "settings",
+     "to": "title"
+    },
+    {
+     "f": 943,
+     "type": "screen",
+     "from": "title",
+     "to": "settings"
+    }
+   ]
+  },
+  {
+   "turn": 6,
+   "video": 16.82,
+   "cmd": {
+    "act": [
+     {
+      "tap": "back"
+     },
+     {
+      "wait": 300
+     },
+     {
+      "tap": "up"
+     },
+     {
+      "wait": 200
+     }
+    ]
+   },
+   "room": null,
+   "hp": 0,
+   "events": [
+    {
+     "f": 994,
+     "type": "screen",
+     "from": "settings",
+     "to": "title"
+    }
+   ]
+  },
+  {
+   "turn": 7,
+   "video": 18.09,
+   "cmd": {
+    "act": [
+     {
+      "tap": "up"
+     },
+     {
+      "wait": 200
+     },
+     {
+      "tap": "confirm"
+     },
+     {
+      "wait": 900
+     }
+    ]
+   },
+   "room": null,
+   "hp": 0,
+   "events": [
+    {
+     "f": 1051,
+     "type": "screen",
+     "from": "title",
+     "to": "select"
+    }
+   ]
+  },
+  {
+   "turn": 8,
+   "video": 19.29,
+   "cmd": {
+    "act": [
+     {
+      "tap": "right"
+     },
+     {
+      "wait": 150
+     },
+     {
+      "tap": "right"
+     },
+     {
+      "wait": 150
+     },
+     {
+      "tap": "right"
+     },
+     {
+      "wait": 600
+     }
+    ]
+   },
+   "room": null,
+   "hp": 0,
+   "events": []
+  },
+  {
+   "turn": 9,
+   "video": 23.31,
+   "cmd": {
+    "act": [
+     {
+      "tap": "confirm"
+     },
+     {
+      "wait": 1500
+     },
+     {
+      "down": "right"
+     },
+     {
+      "wait": 900
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 200
+     },
+     {
+      "tap": "confirm"
+     },
+     {
+      "wait": 300
+     },
+     {
+      "down": "right"
+     },
+     {
+      "wait": 900
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 50
+     }
+    ]
+   },
+   "room": "dc_wake",
+   "hp": 5,
+   "events": [
+    {
+     "f": 1178,
+     "type": "maxHp",
+     "maxHp": 5
+    },
+    {
+     "f": 1198,
+     "type": "screen",
+     "from": "select",
+     "to": "play"
+    },
+    {
+     "f": 1198,
+     "type": "room",
+     "from": null,
+     "to": "dc_wake"
+    },
+    {
+     "f": 1307,
+     "type": "screen",
+     "from": "play",
+     "to": "lore"
+    },
+    {
+     "f": 1337,
+     "type": "screen",
+     "from": "lore",
+     "to": "play"
+    }
+   ]
+  },
+  {
+   "turn": 10,
+   "video": 23.51,
+   "cmd": {
+    "act": [
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 70
+     }
+    ]
+   },
+   "room": "dc_wake",
+   "hp": 5,
+   "events": []
+  },
+  {
+   "turn": 11,
+   "video": 24.07,
+   "cmd": {
+    "act": [
+     {
+      "wait": 200
+     },
+     {
+      "tap": "heavy",
+      "ms": 40
+     },
+     {
+      "wait": 250
+     }
+    ]
+   },
+   "room": "dc_wake",
+   "hp": 5,
+   "events": []
+  },
+  {
+   "turn": 12,
+   "video": 25.07,
+   "cmd": {
+    "act": [
+     {
+      "wait": 500
+     },
+     {
+      "tap": "special",
+      "ms": 40
+     },
+     {
+      "wait": 400
+     }
+    ]
+   },
+   "room": "dc_wake",
+   "hp": 5,
+   "events": []
+  },
+  {
+   "turn": 13,
+   "video": 25.07,
+   "cmd": {
+    "debug": "UB.debug.warp(\"dc_shrine\",\"L\")"
+   },
+   "room": "dc_shrine",
+   "hp": 5,
+   "events": [
+    {
+     "f": 1518,
+     "type": "room",
+     "from": "dc_wake",
+     "to": "dc_shrine"
+    }
+   ]
+  },
+  {
+   "turn": 14,
+   "video": 32.54,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "wait": 850
+     },
+     {
+      "up": "right"
+     },
+     {
+      "tap": "up"
+     },
+     {
+      "wait": 600
+     },
+     {
+      "down": "right"
+     },
+     {
+      "wait": 3200
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 2700
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 5,
+   "events": [
+    {
+     "f": 1805,
+     "type": "room",
+     "from": "dc_shrine",
+     "to": "dc_sentinel"
+    },
+    {
+     "f": 1828,
+     "type": "bossFight",
+     "state": "intro",
+     "boss": "tallock"
+    }
+   ]
+  },
+  {
+   "turn": 15,
+   "video": 34.89,
+   "cmd": {
+    "act": [
+     {
+      "wait": 1500
+     },
+     {
+      "tap": "special",
+      "ms": 40
+     },
+     {
+      "wait": 300
+     },
+     {
+      "tap": "heavy",
+      "ms": 40
+     },
+     {
+      "wait": 400
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 5,
+   "events": [
+    {
+     "f": 1978,
+     "type": "bossFight",
+     "state": "fight",
+     "boss": "tallock"
+    }
+   ]
+  },
+  {
+   "turn": 16,
+   "video": 36.27,
+   "cmd": {
+    "act": [
+     {
+      "wait": 150
+     },
+     {
+      "tap": "jump",
+      "ms": 350
+     },
+     {
+      "wait": 350
+     },
+     {
+      "tap": "heavy",
+      "ms": 40
+     },
+     {
+      "wait": 350
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 5,
+   "events": []
+  },
+  {
+   "turn": 17,
+   "video": 37.99,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "wait": 700
+     },
+     {
+      "up": "right"
+     },
+     {
+      "tap": "heavy",
+      "ms": 40
+     },
+     {
+      "wait": 300
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 130
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 130
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 200
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 5,
+   "events": []
+  },
+  {
+   "turn": 18,
+   "video": 38.91,
+   "cmd": {
+    "act": [
+     {
+      "down": "left"
+     },
+     {
+      "wait": 150
+     },
+     {
+      "up": "left"
+     },
+     {
+      "tap": "jump",
+      "ms": 380
+     },
+     {
+      "wait": 300
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 4,
+   "events": [
+    {
+     "f": 2303,
+     "type": "hurt",
+     "hp": 4,
+     "maxHp": 5,
+     "room": "dc_sentinel",
+     "hazard": false
+    }
+   ]
+  },
+  {
+   "turn": 19,
+   "video": 39.93,
+   "cmd": {
+    "act": [
+     {
+      "tap": "right",
+      "ms": 30
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 130
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 130
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 160
+     },
+     {
+      "tap": "heavy",
+      "ms": 40
+     },
+     {
+      "wait": 300
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 4,
+   "events": []
+  },
+  {
+   "turn": 20,
+   "video": 41.28,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "tap": "jump",
+      "ms": 380
+     },
+     {
+      "wait": 80
+     },
+     {
+      "up": "right"
+     },
+     {
+      "down": "down"
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 230
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 230
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 200
+     },
+     {
+      "up": "down"
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 3,
+   "events": [
+    {
+     "f": 2418,
+     "type": "hurt",
+     "hp": 3,
+     "maxHp": 5,
+     "room": "dc_sentinel",
+     "hazard": false
+    }
+   ]
+  },
+  {
+   "turn": 21,
+   "video": 42.2,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "wait": 200
+     },
+     {
+      "up": "right"
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 130
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 130
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 200
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 2,
+   "events": [
+    {
+     "f": 2494,
+     "type": "hurt",
+     "hp": 2,
+     "maxHp": 5,
+     "room": "dc_sentinel",
+     "hazard": false
+    }
+   ]
+  },
+  {
+   "turn": 22,
+   "video": 43.13,
+   "cmd": {
+    "act": [
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 130
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 130
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 160
+     },
+     {
+      "tap": "special",
+      "ms": 40
+     },
+     {
+      "wait": 250
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 2,
+   "events": []
+  },
+  {
+   "turn": 23,
+   "video": 44.23,
+   "cmd": {
+    "act": [
+     {
+      "wait": 200
+     },
+     {
+      "down": "right"
+     },
+     {
+      "wait": 800
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 50
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 1,
+   "events": [
+    {
+     "f": 2619,
+     "type": "hurt",
+     "hp": 1,
+     "maxHp": 5,
+     "room": "dc_sentinel",
+     "hazard": false
+    }
+   ]
+  },
+  {
+   "turn": 24,
+   "video": 45.66,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "wait": 700
+     },
+     {
+      "up": "right"
+     },
+     {
+      "tap": "jump",
+      "ms": 350
+     },
+     {
+      "wait": 300
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 0,
+   "events": [
+    {
+     "f": 2686,
+     "type": "hurt",
+     "hp": 0,
+     "maxHp": 5,
+     "room": "dc_sentinel",
+     "hazard": false
+    },
+    {
+     "f": 2686,
+     "type": "death",
+     "room": "dc_sentinel"
+    }
+   ]
+  },
+  {
+   "turn": 25,
+   "video": 51.45,
+   "cmd": {
+    "act": [
+     {
+      "wait": 2300
+     },
+     {
+      "tap": "confirm"
+     },
+     {
+      "wait": 1300
+     },
+     {
+      "tap": "pause"
+     },
+     {
+      "wait": 250
+     },
+     {
+      "tap": "down"
+     },
+     {
+      "wait": 100
+     },
+     {
+      "tap": "down"
+     },
+     {
+      "wait": 100
+     },
+     {
+      "tap": "down"
+     },
+     {
+      "wait": 100
+     },
+     {
+      "tap": "confirm"
+     },
+     {
+      "wait": 200
+     },
+     {
+      "tap": "left"
+     },
+     {
+      "wait": 100
+     },
+     {
+      "tap": "confirm"
+     },
+     {
+      "wait": 700
+     }
+    ]
+   },
+   "room": null,
+   "hp": 0,
+   "events": [
+    {
+     "f": 2792,
+     "type": "screen",
+     "from": "play",
+     "to": "gameover"
+    },
+    {
+     "f": 2902,
+     "type": "screen",
+     "from": "gameover",
+     "to": "play"
+    },
+    {
+     "f": 2902,
+     "type": "room",
+     "from": "dc_sentinel",
+     "to": "dc_wake"
+    },
+    {
+     "f": 2902,
+     "type": "bossFight",
+     "state": "none",
+     "boss": null
+    },
+    {
+     "f": 2964,
+     "type": "screen",
+     "from": "play",
+     "to": "pause"
+    },
+    {
+     "f": 3043,
+     "type": "screen",
+     "from": "pause",
+     "to": "title"
+    },
+    {
+     "f": 3043,
+     "type": "hurt",
+     "hp": 0,
+     "maxHp": 0,
+     "room": null,
+     "hazard": false
+    }
+   ]
+  },
+  {
+   "turn": 26,
+   "video": 53.03,
+   "cmd": {
+    "act": [
+     {
+      "tap": "confirm"
+     },
+     {
+      "wait": 800
+     },
+     {
+      "tap": "right"
+     },
+     {
+      "wait": 600
+     }
+    ]
+   },
+   "room": null,
+   "hp": 0,
+   "events": [
+    {
+     "f": 3090,
+     "type": "screen",
+     "from": "title",
+     "to": "select"
+    }
+   ]
+  },
+  {
+   "turn": 27,
+   "video": 57.44,
+   "cmd": {
+    "act": [
+     {
+      "tap": "confirm"
+     },
+     {
+      "wait": 1500
+     },
+     {
+      "down": "right"
+     },
+     {
+      "wait": 900
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 200
+     },
+     {
+      "tap": "confirm"
+     },
+     {
+      "wait": 300
+     },
+     {
+      "down": "right"
+     },
+     {
+      "wait": 1100
+     },
+     {
+      "up": "right"
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 60
+     }
+    ]
+   },
+   "room": "dc_wake",
+   "hp": 6,
+   "events": [
+    {
+     "f": 3182,
+     "type": "maxHp",
+     "maxHp": 6
+    },
+    {
+     "f": 3203,
+     "type": "screen",
+     "from": "select",
+     "to": "play"
+    },
+    {
+     "f": 3203,
+     "type": "room",
+     "from": null,
+     "to": "dc_wake"
+    },
+    {
+     "f": 3311,
+     "type": "screen",
+     "from": "play",
+     "to": "lore"
+    },
+    {
+     "f": 3347,
+     "type": "screen",
+     "from": "lore",
+     "to": "play"
+    }
+   ]
+  },
+  {
+   "turn": 28,
+   "video": 58.47,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "wait": 300
+     },
+     {
+      "up": "right"
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 150
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 150
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 80
+     }
+    ]
+   },
+   "room": "dc_wake",
+   "hp": 6,
+   "events": []
+  },
+  {
+   "turn": 29,
+   "video": 59.22,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "wait": 400
+     },
+     {
+      "up": "right"
+     },
+     {
+      "tap": "heavy",
+      "ms": 40
+     },
+     {
+      "wait": 200
+     }
+    ]
+   },
+   "room": "dc_wake",
+   "hp": 6,
+   "events": []
+  },
+  {
+   "turn": 30,
+   "video": 59.22,
+   "cmd": {
+    "debug": "UB.debug.warp(\"dc_shrine\",\"L\")"
+   },
+   "room": "dc_shrine",
+   "hp": 6,
+   "events": [
+    {
+     "f": 3551,
+     "type": "room",
+     "from": "dc_wake",
+     "to": "dc_shrine"
+    }
+   ]
+  },
+  {
+   "turn": 31,
+   "video": 61.18,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "wait": 1000
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 100
+     },
+     {
+      "tap": "up"
+     },
+     {
+      "wait": 700
+     }
+    ]
+   },
+   "room": "dc_shrine",
+   "hp": 6,
+   "events": []
+  },
+  {
+   "turn": 32,
+   "video": 68.29,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "wait": 3500
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 3000
+     },
+     {
+      "down": "right"
+     },
+     {
+      "wait": 500
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 50
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 6,
+   "events": [
+    {
+     "f": 3884,
+     "type": "room",
+     "from": "dc_shrine",
+     "to": "dc_sentinel"
+    },
+    {
+     "f": 3907,
+     "type": "bossFight",
+     "state": "intro",
+     "boss": "tallock"
+    },
+    {
+     "f": 4057,
+     "type": "bossFight",
+     "state": "fight",
+     "boss": "tallock"
+    }
+   ]
+  },
+  {
+   "turn": 33,
+   "video": 69.16,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "wait": 600
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 200
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 6,
+   "events": []
+  },
+  {
+   "turn": 34,
+   "video": 69.73,
+   "cmd": {
+    "act": [
+     {
+      "wait": 220
+     },
+     {
+      "tap": "special",
+      "ms": 40
+     },
+     {
+      "wait": 250
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 6,
+   "events": []
+  },
+  {
+   "turn": 35,
+   "video": 69.93,
+   "cmd": {
+    "act": [
+     {
+      "wait": 150
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 6,
+   "events": []
+  },
+  {
+   "turn": 36,
+   "video": 70.1,
+   "cmd": {
+    "act": [
+     {
+      "wait": 120
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 6,
+   "events": []
+  },
+  {
+   "turn": 37,
+   "video": 70.56,
+   "cmd": {
+    "act": [
+     {
+      "tap": "special",
+      "ms": 40
+     },
+     {
+      "wait": 300
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 6,
+   "events": []
+  },
+  {
+   "turn": 38,
+   "video": 72.2,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "wait": 550
+     },
+     {
+      "up": "right"
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 150
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 150
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 180
+     },
+     {
+      "tap": "heavy",
+      "ms": 40
+     },
+     {
+      "wait": 350
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 5,
+   "events": [
+    {
+     "f": 4280,
+     "type": "hurt",
+     "hp": 5,
+     "maxHp": 6,
+     "room": "dc_sentinel",
+     "hazard": false
+    }
+   ]
+  },
+  {
+   "turn": 39,
+   "video": 73.28,
+   "cmd": {
+    "act": [
+     {
+      "wait": 100
+     },
+     {
+      "tap": "jump",
+      "ms": 380
+     },
+     {
+      "wait": 150
+     },
+     {
+      "down": "down"
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 250
+     },
+     {
+      "up": "down"
+     },
+     {
+      "wait": 100
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 4,
+   "events": [
+    {
+     "f": 4361,
+     "type": "hurt",
+     "hp": 4,
+     "maxHp": 6,
+     "room": "dc_sentinel",
+     "hazard": false
+    }
+   ]
+  },
+  {
+   "turn": 40,
+   "video": 74.7,
+   "cmd": {
+    "act": [
+     {
+      "wait": 100
+     },
+     {
+      "down": "right"
+     },
+     {
+      "wait": 250
+     },
+     {
+      "up": "right"
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 150
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 150
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 180
+     },
+     {
+      "tap": "heavy",
+      "ms": 40
+     },
+     {
+      "wait": 350
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 4,
+   "events": []
+  },
+  {
+   "turn": 41,
+   "video": 75.14,
+   "cmd": {
+    "act": [
+     {
+      "wait": 120
+     },
+     {
+      "tap": "special",
+      "ms": 40
+     },
+     {
+      "wait": 200
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 4,
+   "events": []
+  },
+  {
+   "turn": 42,
+   "video": 75.42,
+   "cmd": {
+    "act": [
+     {
+      "wait": 250
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 4,
+   "events": []
+  },
+  {
+   "turn": 43,
+   "video": 76.63,
+   "cmd": {
+    "act": [
+     {
+      "wait": 100
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 150
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 150
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 180
+     },
+     {
+      "tap": "heavy",
+      "ms": 40
+     },
+     {
+      "wait": 350
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 4,
+   "events": []
+  },
+  {
+   "turn": 44,
+   "video": 77.37,
+   "cmd": {
+    "act": [
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 150
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 150
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 200
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 4,
+   "events": []
+  },
+  {
+   "turn": 45,
+   "video": 78.05,
+   "cmd": {
+    "act": [
+     {
+      "wait": 150
+     },
+     {
+      "tap": "special",
+      "ms": 40
+     },
+     {
+      "wait": 450
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 4,
+   "events": []
+  },
+  {
+   "turn": 46,
+   "video": 79.33,
+   "cmd": {
+    "act": [
+     {
+      "wait": 100
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 150
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 150
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 180
+     },
+     {
+      "tap": "heavy",
+      "ms": 40
+     },
+     {
+      "wait": 350
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 4,
+   "events": []
+  },
+  {
+   "turn": 47,
+   "video": 80.08,
+   "cmd": {
+    "act": [
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 150
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 150
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 250
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 4,
+   "events": []
+  },
+  {
+   "turn": 48,
+   "video": 80.77,
+   "cmd": {
+    "act": [
+     {
+      "wait": 200
+     },
+     {
+      "tap": "special",
+      "ms": 40
+     },
+     {
+      "wait": 400
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 3,
+   "events": [
+    {
+     "f": 4806,
+     "type": "hurt",
+     "hp": 3,
+     "maxHp": 6,
+     "room": "dc_sentinel",
+     "hazard": false
+    }
+   ]
+  },
+  {
+   "turn": 49,
+   "video": 82.04,
+   "cmd": {
+    "act": [
+     {
+      "wait": 150
+     },
+     {
+      "tap": "overclock",
+      "ms": 60
+     },
+     {
+      "wait": 150
+     },
+     {
+      "down": "right"
+     },
+     {
+      "wait": 150
+     },
+     {
+      "up": "right"
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 150
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 150
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 200
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 3,
+   "events": []
+  },
+  {
+   "turn": 50,
+   "video": 83.09,
+   "cmd": {
+    "act": [
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 150
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 150
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 180
+     },
+     {
+      "tap": "heavy",
+      "ms": 40
+     },
+     {
+      "wait": 300
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 3,
+   "events": []
+  },
+  {
+   "turn": 51,
+   "video": 84.04,
+   "cmd": {
+    "act": [
+     {
+      "wait": 60
+     },
+     {
+      "tap": "jump",
+      "ms": 380
+     },
+     {
+      "wait": 450
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 3,
+   "events": []
+  },
+  {
+   "turn": 52,
+   "video": 85.09,
+   "cmd": {
+    "act": [
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 150
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 150
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 180
+     },
+     {
+      "tap": "heavy",
+      "ms": 40
+     },
+     {
+      "wait": 300
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 3,
+   "events": []
+  },
+  {
+   "turn": 53,
+   "video": 85.76,
+   "cmd": {
+    "act": [
+     {
+      "wait": 100
+     },
+     {
+      "tap": "special",
+      "ms": 40
+     },
+     {
+      "wait": 450
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 3,
+   "events": [
+    {
+     "f": 5108,
+     "type": "bossFight",
+     "state": "dying",
+     "boss": "tallock"
+    }
+   ]
+  },
+  {
+   "turn": 54,
+   "video": 91.96,
+   "cmd": {
+    "act": [
+     {
+      "wait": 2500
+     },
+     {
+      "down": "right"
+     },
+     {
+      "wait": 1600
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 1500
+     },
+     {
+      "tap": "confirm"
+     },
+     {
+      "wait": 400
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 3,
+   "events": [
+    {
+     "f": 5208,
+     "type": "bossFight",
+     "state": "reward",
+     "boss": "tallock"
+    },
+    {
+     "f": 5242,
+     "type": "bits",
+     "bits": 20,
+     "delta": 20
+    },
+    {
+     "f": 5280,
+     "type": "bits",
+     "bits": 40,
+     "delta": 20
+    },
+    {
+     "f": 5310,
+     "type": "bits",
+     "bits": 60,
+     "delta": 20
+    },
+    {
+     "f": 5446,
+     "type": "bossFight",
+     "state": "done",
+     "boss": null
+    },
+    {
+     "f": 5446,
+     "type": "ability",
+     "ability": "echoJump"
+    }
+   ]
+  },
+  {
+   "turn": 55,
+   "video": 96.41,
+   "cmd": {
+    "act": [
+     {
+      "tap": "confirm"
+     },
+     {
+      "wait": 200
+     },
+     {
+      "down": "right"
+     },
+     {
+      "wait": 700
+     },
+     {
+      "tap": "jump",
+      "ms": 250
+     },
+     {
+      "wait": 200
+     },
+     {
+      "tap": "jump",
+      "ms": 300
+     },
+     {
+      "wait": 700
+     },
+     {
+      "wait": 1400
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 400
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 3,
+   "events": []
+  },
+  {
+   "turn": 56,
+   "video": 98.31,
+   "cmd": {
+    "act": [
+     {
+      "tap": "left",
+      "ms": 200
+     },
+     {
+      "down": "right"
+     },
+     {
+      "tap": "jump",
+      "ms": 300
+     },
+     {
+      "wait": 150
+     },
+     {
+      "tap": "jump",
+      "ms": 300
+     },
+     {
+      "wait": 600
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 100
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 3,
+   "events": []
+  },
+  {
+   "turn": 57,
+   "video": 102.19,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "wait": 800
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 300
+     },
+     {
+      "down": "right"
+     },
+     {
+      "wait": 900
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 200
+     },
+     {
+      "tap": "confirm"
+     },
+     {
+      "wait": 300
+     },
+     {
+      "down": "right"
+     },
+     {
+      "wait": 300
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 800
+     }
+    ]
+   },
+   "room": "lw_hoist",
+   "hp": 3,
+   "events": [
+    {
+     "f": 5904,
+     "type": "room",
+     "from": "dc_sentinel",
+     "to": "lw_hoist"
+    },
+    {
+     "f": 5904,
+     "type": "bossFight",
+     "state": "none",
+     "boss": null
+    },
+    {
+     "f": 6016,
+     "type": "screen",
+     "from": "play",
+     "to": "lore"
+    }
+   ]
+  },
+  {
+   "turn": 58,
+   "video": 103.63,
+   "cmd": {
+    "act": [
+     {
+      "tap": "confirm"
+     },
+     {
+      "wait": 300
+     },
+     {
+      "down": "right"
+     },
+     {
+      "wait": 250
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 700
+     }
+    ]
+   },
+   "room": "lw_hoist",
+   "hp": 3,
+   "events": [
+    {
+     "f": 6091,
+     "type": "screen",
+     "from": "lore",
+     "to": "play"
+    }
+   ]
+  },
+  {
+   "turn": 59,
+   "video": 104.33,
+   "cmd": {
+    "act": [
+     {
+      "tap": "left",
+      "ms": 30
+     },
+     {
+      "tap": "overclock",
+      "ms": 60
+     },
+     {
+      "wait": 150
+     },
+     {
+      "down": "up"
+     },
+     {
+      "tap": "special",
+      "ms": 60
+     },
+     {
+      "wait": 120
+     },
+     {
+      "up": "up"
+     },
+     {
+      "wait": 80
+     }
+    ]
+   },
+   "room": "lw_hoist",
+   "hp": 3,
+   "events": [
+    {
+     "f": 6195,
+     "type": "overclock"
+    }
+   ]
+  },
+  {
+   "turn": 60,
+   "video": 104.87,
+   "cmd": {
+    "act": [
+     {
+      "wait": 400
+     }
+    ]
+   },
+   "room": "lw_hoist",
+   "hp": 3,
+   "events": []
+  },
+  {
+   "turn": 61,
+   "video": 105.92,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "tap": "jump",
+      "ms": 300
+     },
+     {
+      "wait": 100
+     },
+     {
+      "up": "right"
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 120
+     },
+     {
+      "tap": "heavy",
+      "ms": 40
+     },
+     {
+      "wait": 200
+     }
+    ]
+   },
+   "room": "lw_hoist",
+   "hp": 3,
+   "events": []
+  },
+  {
+   "turn": 62,
+   "video": 111.83,
+   "cmd": {
+    "act": [
+     {
+      "tap": "pause"
+     },
+     {
+      "wait": 250
+     },
+     {
+      "tap": "down"
+     },
+     {
+      "wait": 100
+     },
+     {
+      "tap": "down"
+     },
+     {
+      "wait": 100
+     },
+     {
+      "tap": "down"
+     },
+     {
+      "wait": 100
+     },
+     {
+      "tap": "confirm"
+     },
+     {
+      "wait": 200
+     },
+     {
+      "tap": "left"
+     },
+     {
+      "wait": 100
+     },
+     {
+      "tap": "confirm"
+     },
+     {
+      "wait": 600
+     },
+     {
+      "tap": "up"
+     },
+     {
+      "wait": 100
+     },
+     {
+      "tap": "confirm"
+     },
+     {
+      "wait": 300
+     },
+     {
+      "tap": "left"
+     },
+     {
+      "wait": 100
+     },
+     {
+      "tap": "confirm"
+     },
+     {
+      "wait": 800
+     },
+     {
+      "tap": "left"
+     },
+     {
+      "wait": 500
+     },
+     {
+      "tap": "confirm"
+     },
+     {
+      "wait": 1500
+     }
+    ]
+   },
+   "room": "dc_wake",
+   "hp": 5,
+   "events": [
+    {
+     "f": 6300,
+     "type": "screen",
+     "from": "play",
+     "to": "pause"
+    },
+    {
+     "f": 6380,
+     "type": "screen",
+     "from": "pause",
+     "to": "title"
+    },
+    {
+     "f": 6380,
+     "type": "hurt",
+     "hp": 0,
+     "maxHp": 0,
+     "room": null,
+     "hazard": false
+    },
+    {
+     "f": 6464,
+     "type": "screen",
+     "from": "title",
+     "to": "select"
+    },
+    {
+     "f": 6554,
+     "type": "maxHp",
+     "maxHp": 5
+    },
+    {
+     "f": 6554,
+     "type": "bits",
+     "bits": 0,
+     "delta": -60
+    },
+    {
+     "f": 6572,
+     "type": "screen",
+     "from": "select",
+     "to": "play"
+    },
+    {
+     "f": 6572,
+     "type": "room",
+     "from": null,
+     "to": "dc_wake"
+    }
+   ]
+  },
+  {
+   "turn": 63,
+   "video": 111.83,
+   "cmd": {
+    "debug": "UB.debug.warp(\"dc_fall\",\"L\")"
+   },
+   "room": "dc_fall",
+   "hp": 5,
+   "events": [
+    {
+     "f": 6652,
+     "type": "room",
+     "from": "dc_wake",
+     "to": "dc_fall"
+    }
+   ]
+  },
+  {
+   "turn": 64,
+   "video": 111.83,
+   "cmd": {
+    "debug": "UB.debug.setMeter(100)"
+   },
+   "room": "dc_fall",
+   "hp": 5,
+   "events": []
+  },
+  {
+   "turn": 65,
+   "video": 114.66,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "wait": 1000
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 200
+     },
+     {
+      "tap": "confirm"
+     },
+     {
+      "wait": 200
+     },
+     {
+      "down": "right"
+     },
+     {
+      "wait": 900
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 400
+     }
+    ]
+   },
+   "room": "dc_fall",
+   "hp": 5,
+   "events": [
+    {
+     "f": 6681,
+     "type": "screen",
+     "from": "play",
+     "to": "lore"
+    },
+    {
+     "f": 6725,
+     "type": "screen",
+     "from": "lore",
+     "to": "play"
+    }
+   ]
+  },
+  {
+   "turn": 66,
+   "video": 116.44,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "wait": 700
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 900
+     }
+    ]
+   },
+   "room": "dc_fall",
+   "hp": 5,
+   "events": [
+    {
+     "f": 6829,
+     "type": "bits",
+     "bits": 1,
+     "delta": 1
+    },
+    {
+     "f": 6837,
+     "type": "bits",
+     "bits": 2,
+     "delta": 1
+    }
+   ]
+  },
+  {
+   "turn": 67,
+   "video": 117.65,
+   "cmd": {
+    "act": [
+     {
+      "down": "left"
+     },
+     {
+      "wait": 400
+     },
+     {
+      "up": "left"
+     },
+     {
+      "wait": 700
+     }
+    ]
+   },
+   "room": "dc_fall",
+   "hp": 5,
+   "events": []
+  },
+  {
+   "turn": 68,
+   "video": 118.32,
+   "cmd": {
+    "act": [
+     {
+      "tap": "overclock",
+      "ms": 60
+     },
+     {
+      "wait": 150
+     },
+     {
+      "down": "up"
+     },
+     {
+      "tap": "special",
+      "ms": 60
+     },
+     {
+      "wait": 150
+     },
+     {
+      "up": "up"
+     },
+     {
+      "wait": 100
+     }
+    ]
+   },
+   "room": "dc_fall",
+   "hp": 5,
+   "events": [
+    {
+     "f": 7003,
+     "type": "overclock"
+    }
+   ]
+  },
+  {
+   "turn": 69,
+   "video": 119.31,
+   "cmd": {
+    "act": [
+     {
+      "wait": 900
+     }
+    ]
+   },
+   "room": "dc_fall",
+   "hp": 5,
+   "events": []
+  },
+  {
+   "turn": 70,
+   "video": 120.15,
+   "cmd": {
+    "act": [
+     {
+      "wait": 800
+     }
+    ]
+   },
+   "room": "dc_fall",
+   "hp": 5,
+   "events": []
+  },
+  {
+   "turn": 71,
+   "video": 120.84,
+   "cmd": {
+    "act": [
+     {
+      "tap": "jump",
+      "ms": 350
+     },
+     {
+      "wait": 60
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 100
+     }
+    ]
+   },
+   "room": "dc_fall",
+   "hp": 5,
+   "events": [
+    {
+     "f": 7134,
+     "type": "bits",
+     "bits": 3,
+     "delta": 1
+    },
+    {
+     "f": 7137,
+     "type": "bits",
+     "bits": 4,
+     "delta": 1
+    }
+   ]
+  },
+  {
+   "turn": 72,
+   "video": 127.68,
+   "cmd": {
+    "act": [
+     {
+      "wait": 300
+     },
+     {
+      "tap": "pause"
+     },
+     {
+      "wait": 250
+     },
+     {
+      "tap": "down"
+     },
+     {
+      "wait": 100
+     },
+     {
+      "tap": "down"
+     },
+     {
+      "wait": 100
+     },
+     {
+      "tap": "down"
+     },
+     {
+      "wait": 100
+     },
+     {
+      "tap": "confirm"
+     },
+     {
+      "wait": 200
+     },
+     {
+      "tap": "left"
+     },
+     {
+      "wait": 100
+     },
+     {
+      "tap": "confirm"
+     },
+     {
+      "wait": 600
+     },
+     {
+      "tap": "up"
+     },
+     {
+      "wait": 100
+     },
+     {
+      "tap": "confirm"
+     },
+     {
+      "wait": 300
+     },
+     {
+      "tap": "left"
+     },
+     {
+      "wait": 100
+     },
+     {
+      "tap": "confirm"
+     },
+     {
+      "wait": 800
+     },
+     {
+      "tap": "left"
+     },
+     {
+      "wait": 150
+     },
+     {
+      "tap": "left"
+     },
+     {
+      "wait": 150
+     },
+     {
+      "tap": "left"
+     },
+     {
+      "wait": 400
+     },
+     {
+      "tap": "confirm"
+     },
+     {
+      "wait": 1500
+     }
+    ]
+   },
+   "room": null,
+   "hp": 0,
+   "events": [
+    {
+     "f": 7191,
+     "type": "screen",
+     "from": "play",
+     "to": "pause"
+    },
+    {
+     "f": 7270,
+     "type": "screen",
+     "from": "pause",
+     "to": "title"
+    },
+    {
+     "f": 7270,
+     "type": "hurt",
+     "hp": 0,
+     "maxHp": 0,
+     "room": null,
+     "hazard": false
+    },
+    {
+     "f": 7321,
+     "type": "screen",
+     "from": "title",
+     "to": "settings"
+    }
+   ]
+  },
+  {
+   "turn": 73,
+   "video": 129.6,
+   "cmd": {
+    "act": [
+     {
+      "tap": "right"
+     },
+     {
+      "wait": 80
+     },
+     {
+      "tap": "right"
+     },
+     {
+      "wait": 80
+     },
+     {
+      "tap": "right"
+     },
+     {
+      "wait": 80
+     },
+     {
+      "tap": "back"
+     },
+     {
+      "wait": 300
+     },
+     {
+      "tap": "down"
+     },
+     {
+      "wait": 150
+     },
+     {
+      "tap": "confirm"
+     },
+     {
+      "wait": 800
+     }
+    ]
+   },
+   "room": null,
+   "hp": 0,
+   "events": [
+    {
+     "f": 7601,
+     "type": "screen",
+     "from": "settings",
+     "to": "title"
+    },
+    {
+     "f": 7635,
+     "type": "screen",
+     "from": "title",
+     "to": "settings"
+    }
+   ]
+  },
+  {
+   "turn": 74,
+   "video": 130.33,
+   "cmd": {
+    "act": [
+     {
+      "tap": "back"
+     },
+     {
+      "wait": 300
+     },
+     {
+      "tap": "up"
+     },
+     {
+      "wait": 200
+     }
+    ]
+   },
+   "room": null,
+   "hp": 0,
+   "events": [
+    {
+     "f": 7690,
+     "type": "screen",
+     "from": "settings",
+     "to": "title"
+    }
+   ]
+  },
+  {
+   "turn": 75,
+   "video": 133.12,
+   "cmd": {
+    "act": [
+     {
+      "tap": "up"
+     },
+     {
+      "wait": 200
+     },
+     {
+      "tap": "confirm"
+     },
+     {
+      "wait": 800
+     },
+     {
+      "tap": "confirm"
+     },
+     {
+      "wait": 1500
+     }
+    ]
+   },
+   "room": "dc_wake",
+   "hp": 5,
+   "events": [
+    {
+     "f": 7748,
+     "type": "screen",
+     "from": "title",
+     "to": "select"
+    },
+    {
+     "f": 7800,
+     "type": "maxHp",
+     "maxHp": 5
+    },
+    {
+     "f": 7800,
+     "type": "bits",
+     "bits": 0,
+     "delta": -4
+    },
+    {
+     "f": 7821,
+     "type": "screen",
+     "from": "select",
+     "to": "play"
+    },
+    {
+     "f": 7821,
+     "type": "room",
+     "from": null,
+     "to": "dc_wake"
+    }
+   ]
+  },
+  {
+   "turn": 76,
+   "video": 134.28,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "wait": 700
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 300
+     }
+    ]
+   },
+   "room": "dc_wake",
+   "hp": 5,
+   "events": [
+    {
+     "f": 7930,
+     "type": "screen",
+     "from": "play",
+     "to": "lore"
+    }
+   ]
+  }
+ ],
+ "marks": [
+  {
+   "turn": 7,
+   "video": 18.09,
+   "note": "Select screen: Tessik showcase pose draws outside its portrait circle and covers the CHOOSE YOUR SPIRIT header"
+  },
+  {
+   "turn": 21,
+   "video": 42.2,
+   "note": "Orrubel cornered at the left wall by Tallock: quake shockwaves plus walk-in, the zoner has no escape option and loses 3 hearts here"
+  },
+  {
+   "turn": 24,
+   "video": 45.66,
+   "note": "Orrubel died to Tallock at 92/120. Ring Toss never reached the boss from safe range; sentry chip was the only reliable damage"
+  },
+  {
+   "turn": 37,
+   "video": 70.56,
+   "note": "Korvask Bulwark Catch finally caught a Tallock disc: +15 meter, but the disc just vanishes, no throw-back or damage. Whiffed first try with no window indicator"
+  },
+  {
+   "turn": 39,
+   "video": 73.28,
+   "note": "Pressing down+light right after jumping kills Korvask rise instantly, so I fell back into the quake spikes. Down-strike should not cancel upward momentum"
+  },
+  {
+   "turn": 42,
+   "video": 75.42,
+   "note": "DELIGHT: Korvask Bulwark Catch on Slab Swing countered for 16 dmg + meter. Best-feeling move in the game"
+  },
+  {
+   "turn": 48,
+   "video": 80.77,
+   "note": "Bulwark Catch does not catch the stomp-quake spikes (no feedback telling me what is catchable); took the hit"
+  },
+  {
+   "turn": 53,
+   "video": 85.76,
+   "note": "Korvask beat Tallock with a Bulwark Catch counter finisher, white-out death flash. 2nd fighter to clear a boss. Korvask lost only 3 hearts"
+  },
+  {
+   "turn": 60,
+   "video": 104.87,
+   "note": "Korvask Clamp Press (Up+Special in Overclock) grabbed and crushed the moth; readable and meaty"
+  },
+  {
+   "turn": 70,
+   "video": 120.15,
+   "note": "Orrubel Sentry Triad: 3 orbiting sentries auto-fire and killed the moth with no input. Strong, but I could not tell what they were targeting"
+  },
+  {
+   "turn": 74,
+   "video": 130.33,
+   "note": "Menu: the first Up press after backing out of Settings is ignored (cursor stays on SETTINGS), happened twice; made me re-enter settings by accident"
+  }
+ ],
+ "debugCalls": [
+  {
+   "turn": 13,
+   "video": 25.07,
+   "code": "UB.debug.warp(\"dc_shrine\",\"L\")"
+  },
+  {
+   "turn": 30,
+   "video": 59.22,
+   "code": "UB.debug.warp(\"dc_shrine\",\"L\")"
+  },
+  {
+   "turn": 63,
+   "video": 111.83,
+   "code": "UB.debug.warp(\"dc_fall\",\"L\")"
+  },
+  {
+   "turn": 64,
+   "video": 111.83,
+   "code": "UB.debug.setMeter(100)"
+  }
+ ],
+ "errors": [],
+ "segments": [
+  [
+   0.89,
+   5.409
+  ],
+  [
+   12.592,
+   14.629
+  ],
+  [
+   20.56,
+   24.781
+  ],
+  [
+   32.892,
+   36.53
+  ],
+  [
+   44.777,
+   46.515
+  ],
+  [
+   53.791,
+   54.46
+  ],
+  [
+   60.593,
+   61.859
+  ],
+  [
+   70.312,
+   71.514
+  ],
+  [
+   78.551,
+   82.571
+  ],
+  [
+   88.542,
+   88.741
+  ],
+  [
+   95.198,
+   95.757
+  ],
+  [
+   101.635,
+   102.639
+  ],
+  [
+   112.082,
+   119.554
+  ],
+  [
+   127.205,
+   129.553
+  ],
+  [
+   137.462,
+   138.838
+  ],
+  [
+   146.784,
+   148.505
+  ],
+  [
+   155.971,
+   156.889
+  ],
+  [
+   163.859,
+   164.884
+  ],
+  [
+   172.287,
+   173.637
+  ],
+  [
+   181.005,
+   181.922
+  ],
+  [
+   192.899,
+   193.828
+  ],
+  [
+   201.134,
+   202.234
+  ],
+  [
+   209.687,
+   211.118
+  ],
+  [
+   220.805,
+   226.594
+  ],
+  [
+   234.187,
+   235.768
+  ],
+  [
+   243.586,
+   248.001
+  ],
+  [
+   255.129,
+   256.151
+  ],
+  [
+   264.143,
+   264.899
+  ],
+  [
+   272.797,
+   274.751
+  ],
+  [
+   281.784,
+   288.901
+  ],
+  [
+   296.18,
+   297.052
+  ],
+  [
+   304.483,
+   305.047
+  ],
+  [
+   313.34,
+   313.538
+  ],
+  [
+   321.281,
+   321.452
+  ],
+  [
+   328.471,
+   328.932
+  ],
+  [
+   339.83,
+   341.466
+  ],
+  [
+   349.922,
+   351.011
+  ],
+  [
+   362.007,
+   363.423
+  ],
+  [
+   370.49,
+   370.928
+  ],
+  [
+   377.479,
+   377.763
+  ],
+  [
+   386.149,
+   387.357
+  ],
+  [
+   393.931,
+   394.673
+  ],
+  [
+   400.632,
+   401.312
+  ],
+  [
+   409.208,
+   410.481
+  ],
+  [
+   418.771,
+   419.527
+  ],
+  [
+   425.749,
+   426.44
+  ],
+  [
+   433.739,
+   435.011
+  ],
+  [
+   442.269,
+   443.312
+  ],
+  [
+   449.306,
+   450.255
+  ],
+  [
+   456.608,
+   457.659
+  ],
+  [
+   463.177,
+   463.845
+  ],
+  [
+   471.378,
+   477.586
+  ],
+  [
+   485.232,
+   489.683
+  ],
+  [
+   497.109,
+   499.004
+  ],
+  [
+   506.055,
+   509.932
+  ],
+  [
+   515.969,
+   517.414
+  ],
+  [
+   523.79,
+   524.489
+  ],
+  [
+   529.973,
+   530.516
+  ],
+  [
+   542.763,
+   543.805
+  ],
+  [
+   551.844,
+   557.754
+  ],
+  [
+   565.297,
+   568.134
+  ],
+  [
+   574.153,
+   575.933
+  ],
+  [
+   583.537,
+   584.747
+  ],
+  [
+   591.686,
+   592.355
+  ],
+  [
+   598.452,
+   599.439
+  ],
+  [
+   606.418,
+   607.265
+  ],
+  [
+   619.568,
+   620.251
+  ],
+  [
+   632.027,
+   638.874
+  ],
+  [
+   651.362,
+   653.281
+  ],
+  [
+   662.812,
+   663.536
+  ],
+  [
+   672.836,
+   675.633
+  ],
+  [
+   685.843,
+   687.002
+  ]
+ ],
+ "endedAt": "2026-10-14T13:21:00.643Z",
+ "liveSeconds": 134.28,
+ "video": "recordings/fighter-03-orrubel-korvask-tallock-ultimates.mp4",
+ "convertError": null
+}
