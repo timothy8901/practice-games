@@ -136,11 +136,16 @@
         c.save(); c.setLineDash([4, 3]); c.strokeStyle = pal.tileEdge; c.lineWidth = 2; c.strokeRect(x + 3, y + 3, TILE - 6, TILE - 6); c.restore();
       }
     } else if (ch === '-') {
+      // Adjacent '-' tiles merge into one bar: only the leftmost tile of a run draws it
+      // (partial redraws clip to their rect, so the bar stays consistent).
+      if (UB.Entity.tileAt(level, tx - 1, ty) === '-') return;
+      let n = 1; while (UB.Entity.tileAt(level, tx + n, ty) === '-') n++;
       c.fillStyle = pal.tileFill; c.strokeStyle = P.INK; c.lineWidth = 3; c.lineJoin = 'round';
-      const lf = UB.Entity.tileAt(level, tx - 1, ty) === '-', rt = UB.Entity.tileAt(level, tx + 1, ty) === '-';
-      const x0 = lf ? x - 4 : x, x1 = rt ? x + TILE + 4 : x + TILE;
-      rrect(c, x0, y, x1 - x0, 8, 4); c.fill(); c.stroke();
-      c.strokeStyle = pal.tileEdge; c.lineWidth = 2; c.beginPath(); c.moveTo(x + 2, y + 2.5); c.lineTo(x + TILE - 2, y + 2.5); c.stroke();
+      rrect(c, x, y, n * TILE, 8, 4); c.fill(); c.stroke();
+      c.strokeStyle = pal.tileEdge; c.lineWidth = 2; c.beginPath(); c.moveTo(x + 3, y + 2.5); c.lineTo(x + n * TILE - 3, y + 2.5); c.stroke();
+      c.strokeStyle = pal.tileShade; c.lineWidth = 1; c.globalAlpha = 0.6;
+      for (let i = 0; i < n * 2; i++) { c.beginPath(); c.moveTo(x + 8 + i * 15, y + 6); c.lineTo(x + 12 + i * 15, y + 2); c.stroke(); }
+      c.globalAlpha = 1;
     } else if (ch === '^' || ch === 'v') {
       c.fillStyle = P.SPIKE; c.strokeStyle = P.INK; c.lineWidth = 2; c.lineJoin = 'round';
       for (let i = 0; i < 2; i++) {

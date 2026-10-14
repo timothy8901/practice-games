@@ -167,6 +167,22 @@
     this.onGround = false; this.ground = null; this.dropThrough = 0;
     this.squashX = this.squashY = 1; this.squashT = 0;
   };
+  /**
+   * Move the body (bottom-centre) without resetting hp/energy/meter/Overclock —
+   * room arrivals, hazard respawn, debug teleport. opts: {vx, vy, iframes, airJumps}.
+   * Cancels any move/dash/cling and clears the hurt state.
+   */
+  Player.prototype.place = function (x, y, opts) {
+    opts = opts || {};
+    this.x = x; this.y = y; this.px = x; this.py = y;
+    this.vx = opts.vx || 0; this.vy = opts.vy || 0;
+    this.cancelMove(); this.dashing = false; this.dashT = 0; this.clinging = false; this.wallLock = 0;
+    this.hurtTimer = 0; this.landLag = 0; this.pogoActive = false;
+    this.onGround = false; this.wasOnGround = false; this.ground = null; this.dropThrough = 0; this.coyote = 0;
+    if (opts.iframes) this.iframes = Math.max(this.iframes, opts.iframes);
+    if (opts.airJumps !== undefined) { this.airJumps = opts.airJumps; this.airDash = opts.airJumps; }
+    if (!this.dead) this.state = 'fall';
+  };
   Player.prototype.heal = function (n) { this.hp = Math.min(this.maxHp, this.hp + n); };
 
   // --- update (one logic frame) --------------------------------------------------------------
@@ -363,10 +379,14 @@
     if (this.hitCeiling) this.jumpCutAvail = false;
 
     // ---- Gravity & move ----
-    this.gravity(d.gravity, d.maxFall);
+    // Half-step (leapfrog) gravity: vy += g/2·dt, move, vy += g/2·dt. This makes the
+    // discrete apex equal the analytic v²/2g that DESIGN §4.1 pins (113.8 px for
+    // this fighter) instead of ~5 px lower, so the 3-tile/6-tile guarantees hold.
+    this.vy = Math.min(d.maxFall, this.vy + d.gravity * DT * 0.5);
     if (this.clinging && this.vy > d.wallSlide) this.vy = d.wallSlide;
     this.lastVy = this.vy;
     this.moveAndCollide(game.level);
+    if (!this.onGround) this.vy = Math.min(d.maxFall, this.vy + d.gravity * DT * 0.5);
 
     // ---- Landing ----
     if (this.onGround && !wasGround) {
