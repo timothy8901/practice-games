@@ -101,6 +101,13 @@ function near(a, b, tol) { return Math.abs(a - b) <= tol; }
     await page.keyboard.down('ArrowRight'); await page.waitForTimeout(400); await page.keyboard.up('ArrowRight');
     s = await state();
     check('B4 holding ArrowRight (real key, live loop) moves the player right', s.x > b0.x + 40, { from: b0.x, to: s.x });
+    // first entry into Driftcache: the zone lore card opens 90 f after the toast; any key closes it (DESIGN §12.18)
+    s = await waitState(x => x.screen === 'lore', 4000);
+    check('B4b the zone lore card opens once on the first entry into the start zone', s.screen === 'lore' && s.loreSeen.indexOf(s.zoneId) >= 0, s);
+    await page.waitForTimeout(400);   // the card ignores keys for its first 10 frames
+    await page.keyboard.press('Enter');
+    s = await waitState(x => x.screen === 'play', 2000);
+    check('B4c any key closes the lore card', s.screen === 'play', s);
     await page.waitForTimeout(350);
     await t.shot(path.join(SHOTS, '2-play.png'));
     const heartPx = await pixel(39, 35), floorPx = await pixel(480, 520), skyPx = await pixel(480, 100);
@@ -108,6 +115,8 @@ function near(a, b, tol) { return Math.abs(a - b) <= tol; }
     check('B6 floor tile pixel is not black (tiles render)', floorPx[0] + floorPx[1] + floorPx[2] > 40, floorPx);
     check('B7 background pixel is not black (parallax renders)', skyPx[0] + skyPx[1] + skyPx[2] > 15, skyPx);
     await ev(() => window.UB.debug.pauseLogic(true));
+    // the physics / node / save checks below use the pinned geometry of the debug room (unreachable in play)
+    await ev(() => window.UB.debug.warp('debug_room', null));
     await step(10); s = await state();
     check('B8 player stands on the floor (grounded, y = 450)', s.grounded && s.y === 450, s);
 
@@ -430,7 +439,7 @@ function near(a, b, tol) { return Math.abs(a - b) <= tol; }
     await page.reload(); await page.waitForTimeout(300);
     await ev(() => { const d = window.UB.debug; d.pauseLogic(true); d.startGame('tessik'); });
     await stepUntil(x => x.screen === 'play' && !x.busy, 150, 5);
-    await ev(() => window.UB.debug.god(true));
+    await ev(() => { window.UB.debug.god(true); window.UB.debug.warp('debug_room', null); });
     const hs = await page.evaluate(() => {
       const d = window.UB.debug, g = window.UB.game, FX = window.UB.FX;
       const e = g.enemies[0]; d.teleport(e.x - 34, 450); d.step(2); d.pressed('right', 1); d.step(1); d.pressed('light', 2);

@@ -126,6 +126,11 @@
       if (!blocked) { ent.x = nx; continue; }
       // Ledge forgiveness (DESIGN §3.0): only the feet row blocks, its top is ≤ stepUp above the feet,
       // and the body column above the step is free → lift onto it.
+      // NOTE (CONTRACT §4.4): on tile-aligned geometry this can never fire — a grounded body's feet
+      // sit exactly on a tile top, so any blocking tile in the feet row has its top ≥ 30 px above
+      // the feet. It only helps when the feet are a few px above a tile edge, i.e. standing on a
+      // moving platform that is within `stepUp` px of a tile top. It is kept because it is cheap
+      // and harmless; level design must not rely on it.
       if (ent.stepUp > 0 && ent.wasOnGround && topRow === ty1) {
         const tileTop = topRow * TILE;
         if (ent.y - tileTop <= ent.stepUp + 0.001) {

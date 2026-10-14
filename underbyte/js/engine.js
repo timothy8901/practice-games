@@ -1,25 +1,32 @@
 /*
  * UNDERBYTE — js/engine.js
  * Owner: ENGINE ARCHITECT (do not edit from other modules).
- * Contract: CONTRACT.md §2 (tick/render order), §4.10 (UB.Engine / game API), §9 (UB.debug).
+ * Contract: CONTRACT.md §2 (tick/render order), §8 (UB.Engine / game API), §9 (UB.debug).
  * Design: DESIGN.md §3 (rules), §5.5 (exits, nodes, movers), §8.0 (boss sequence),
- *         §9 (pickups), §11.3 (camera, transitions), §14 (save), §16.9 (debug API).
+ *         §9 (pickups, vendor), §11.3 (camera, transitions), §12.18 (lore card trigger),
+ *         §14 (save), §16.9 (debug API).
  *
  * The Game object owns: the screen state machine, the fixed-60 Hz logic tick
  * (driven by main.js's accumulator — nothing here reads wall-clock time),
  * room loading + runtime level state (crumble, movers, seals), the entity
  * lists, hit resolution, contact + hazards, pickups and drops, restore nodes,
- * exits + room transitions, boss fight sequencing, death/respawn, save/load,
- * the camera, and rendering composition. It never draws a character itself:
- * characters/enemies/bosses/UI/FX draw through their hooks.
+ * the vendor (prompt, purchases, item effects), control hints and lore-card
+ * triggers, exits + room transitions, boss fight sequencing, death/respawn,
+ * save/load (with full validation), the camera, and rendering composition.
+ * It never draws a character itself: characters/enemies/bosses/UI/FX draw
+ * through their hooks.
  */
 'use strict';
 (function (UB) {
   const W = 960, H = 540, TILE = 30;
   const E = UB.Entity, FX = UB.FX, In = UB.Input, Au = UB.Audio, U = UB.Util, Wd = UB.World, R = UB.Render, UI = UB.UI, P = UB.Palette;
+  const IDS = UB.IDS;
   const SAVE_KEY = 'underbyte.save', SETTINGS_KEY = 'underbyte.settings';
   const SAVE_VERSION = 1;
   const MAX_HITS = 64;
+  const MAX_PROJECTILES = 64;   // oldest-first eviction (CONTRACT §7)
+  const OFFROOM = 64;           // projectiles further than this outside the room are culled (px)
+  const MAX_CORES = 4;          // HUD draws ≤ 9 hearts; base hp ≤ 6 (DESIGN §16.7) → at most 3 real cores (+1 debug)
 
   // Timings (frames) pinned by DESIGN.md.
   const T = {
@@ -28,15 +35,18 @@
     deathFrames: 60, gameOverFade: 40, respawnFade: 20,
     bossIntro: 150, bossSeal: 12, pickupSeq: 120, bossDeath: 90,
     nodePulse: 30, crumbleShake: 20, crumbleGone: 180, crumbleBack: 6,
-    zoneToast: 150, selectFade: 20, chuteLaunch: 1.2, chuteIFrames: 20, topArrivalVy: 120,
+    zoneToast: 150, loreDelay: 90, loreHold: 240, selectFade: 20, chuteLaunch: 1.2, chuteIFrames: 20, topArrivalVy: 120,
+    shopBanner: 150,
   };
   const BIT_VALUE = { small: 1, medium: 5, large: 20 };
   const PICKUP_SIZE = { bit: 10, heart: 14, spark: 12, shard: 12, core: 18, ability: 24 };
+  const VENDOR = IDS.vendorItems;
+  const HINT_KEYS = ['move', 'jump', 'light', 'heavy', 'special', 'dash', 'overclock'];
   // Ability banner lines (DESIGN §12.7 / §15.5). UI/WORLD implementers may replace via UB.Text later.
   const ABILITY_TEXT = {
     echoJump: ['ECHO JUMP ACQUIRED', 'Press JUMP again in the air', 'A second thought, taken mid-fall.'],
-    burstLine: ['BURST LINE ACQUIRED', 'Press DASH to burst forward', 'Prefetch the ground before it arrives.'],
-    gripProtocol: ['GRIP PROTOCOL ACQUIRED', 'Hold toward a wall to cling · JUMP to kick off', 'Nothing sheer is final.'],
+    burstLine: ['BURST LINE ACQUIRED', 'Press DASH (Shift / RB) to lunge 6 tiles — on the ground or once in the air', 'Skip the frames you do not need.'],
+    gripProtocol: ['GRIP PROTOCOL ACQUIRED', 'Hold toward a wall in the air to cling · JUMP to kick off', 'The walls were never the problem.'],
   };
   const DEFAULT_SETTINGS = { version: 1, master: 8, music: 7, sfx: 8, screenShake: true, showHitboxes: false, touchControls: 'auto' };
 
@@ -74,14 +84,20 @@
     this.nodeUse = { timer: 0, node: null };
     this.fadeLevel = 0; this.fadeTarget = 0; this.fadeStep = 0; this.fadeCb = null; this.fadeT = 0;
     this.god = false; this.logicPaused = false;
-    this.prompt = null; this.nearNode = null;
+    this.promptObj = { text: '', x: 0, y: 0 }; this.prompt = null;   // game.prompt = promptObj while a prompt shows, else null
+    this.nearNode = null; this.nearVendor = false;
     this.denyFlash = 0;
+    this.loreTimer = 0; this.loreZone = null;       // pending zone lore card (DESIGN §12.18)
+    this.loreCard = null;                            // the zone whose card the 'lore' overlay shows (UI reads it)
+    this.shopBought = null;                          // item bought while the shop is open → banner on close
     this.lastFighter = 'tessik';
     this.rng = U.rng(0x5EED);
     this.scratch = { x: 0, y: 0 };
     this.box = { x: 0, y: 0, w: 0, h: 0 };
+    this.hurtOpts = { hit: null };     // passed to player.hurt for registered hits (the descriptor; contact passes null)
   }
   Game.ABILITY_TEXT = ABILITY_TEXT;
+  Game.VENDOR = VENDOR;
 
   Game.prototype.init = function () {
     this.loadSettings();
@@ -108,21 +124,28 @@
     this.screen = name; this.overlay = null; this.overlayFrom = null; this.screenT = 0;
     UI.enter(name, this);
   };
+  /** Overlays: 'pause' | 'map' | 'settings' | 'shop' | 'lore'. The UI handles their input and drawing. */
   Game.prototype.openOverlay = function (name) {
     if (this.overlay === name) return;
     this.overlayFrom = this.overlay; this.overlay = name; UI.enter(name, this);
-    if (this.screen === 'play') Au.duck(0.4, 0.17);
+    if (this.screen === 'play') { Au.duck(0.4, 0.17); Au.stopLoops(); }
   };
   Game.prototype.closeOverlay = function () {
+    const was = this.overlay;
     this.overlay = this.overlayFrom; this.overlayFrom = null;
     if (this.overlay) UI.enter(this.overlay, this); else Au.duck(1, 0.17);
+    if (was === 'shop' && this.shopBought) {   // DESIGN §9.5: the PURCHASED banner shows after the panel closes
+      UI.banner(this.shopBought.name + ' PURCHASED', this.shopBought.effect, '', T.shopBanner);
+      this.shopBought = null;
+    }
   };
   Game.prototype.toTitle = function () {
     this.busy = false; this.mode = 'normal'; this.level = null; this.player = null; this.boss = null;
-    this.enemies.length = 0; this.pickups.length = 0; this.projectiles.length = 0;
+    this.enemies.length = 0; this.pickups.length = 0; this.dropProjectiles();
+    this.loreTimer = 0; this.loreZone = null; this.shopBought = null; this.prompt = null; this.nearNode = null; this.nearVendor = false;
     FX.clear(); UI.clearMessages();
     this.savedData = this.readSave();
-    this.setScreen('title'); Au.music('title'); Au.stopAmbient(); Au.duck(1, 0.2);
+    this.setScreen('title'); Au.music('title'); Au.stopAmbient(); Au.stopLoops(); Au.duck(1, 0.2);
     this.fadeLevel = 0; this.fadeTarget = 0; this.fadeCb = null;
   };
   Game.prototype.toSelect = function () { this.setScreen('select'); };
@@ -177,7 +200,14 @@
     this.player.maxHp = s.maxHearts = s.baseHearts + s.cores.length;
     this.player.hp = this.player.maxHp;
     this.player.abilities = s.abilities;
+    this.applyVendorEffects();
     this.cam.look = 0;
+  };
+  /** Persistent vendor effects on the player (DESIGN §9.5): Spare Cell → energyMax 125. Hot Clock lives in addMeter, Deep Ping in applyDeepPing. */
+  Game.prototype.applyVendorEffects = function () {
+    const pl = this.player; if (!pl) return;
+    pl.energyMax = this.save.vendor.indexOf('spare_cell') >= 0 ? 125 : 100;
+    if (pl.energy > pl.energyMax) pl.energy = pl.energyMax;
   };
   /** Game over → confirm: reload the last node with full HP, energy 50, meter 0. */
   Game.prototype.respawnAtNode = function () {
@@ -241,23 +271,83 @@
       enemiesPurged: 0, playTimeFrames: 0, deaths: 0, victory: false, savedAt: 0,
     };
   };
-  /** Read + validate localStorage; null = no usable save. */
+  /**
+   * Read + validate localStorage; null = no usable save (DESIGN §14 rules). Every field is
+   * checked for type AND contents against the world: a garbage value falls back to the fresh
+   * value, cores ⊆ world core ids, bossesDefeated ⊆ boss ids, bitsCollected ⊆ placed-bit keys,
+   * vendor ⊆ item ids, discovered/visited ⊆ room ids, nodesUsed ⊆ node ids, loreSeen ⊆ zone ids,
+   * fighter ∈ roster, room/node pair valid. Any exception anywhere = no save. CONTINUE can
+   * therefore never throw on a corrupt slot.
+   */
   Game.prototype.readSave = function () {
-    let raw = null;
-    try { raw = localStorage.getItem(SAVE_KEY); } catch (e) { return null; }
-    if (!raw) return null;
-    let d = null;
-    try { d = JSON.parse(raw); } catch (e) { return null; }
-    if (!d || d.version !== SAVE_VERSION) return null;
-    const fresh = this.newSaveData(d.fighter);
-    for (const k in fresh) if (d[k] === undefined) d[k] = fresh[k];
-    if (!UB.Characters.DATA[d.fighter]) d.fighter = UB.Characters.list[0].id;
-    if (!Wd.rooms[d.roomId] || !d.spawn || !Wd.findNode(d.spawn.nodeId)) { d.roomId = Wd.start.room; d.spawn = { nodeId: Wd.start.nodeId }; }
-    d.baseHearts = UB.Characters.DATA[d.fighter].hp;
-    d.maxHearts = d.baseHearts + d.cores.length;
-    d.hearts = d.maxHearts;
-    return d;
+    try {
+      const raw = localStorage.getItem(SAVE_KEY);
+      if (!raw) return null;
+      const d = JSON.parse(raw);
+      if (!d || typeof d !== 'object' || Array.isArray(d) || d.version !== SAVE_VERSION) return null;
+      return sanitizeSave(d, this.newSaveData(d.fighter));
+    } catch (e) { return null; }
   };
+  /** Pure validation of a parsed save object against `fresh` (a new save for the same fighter) and the world. */
+  function sanitizeSave(d, fresh) {
+    const out = fresh;
+    const isObj = function (v) { return !!v && typeof v === 'object' && !Array.isArray(v); };
+    const num = function (v, lo) { return typeof v === 'number' && isFinite(v) && v >= lo ? Math.floor(v) : null; };
+    // string lists filtered to a validator (dedupe, preserve order)
+    const strList = function (v, ok, cap) {
+      const res = [];
+      if (!Array.isArray(v)) return res;
+      for (let i = 0; i < v.length && res.length < cap; i++) {
+        const s = v[i];
+        if (typeof s === 'string' && ok(s) && res.indexOf(s) < 0) res.push(s);
+      }
+      return res;
+    };
+    // world id sets
+    const roomOk = function (id) { return !!Wd.rooms[id]; };
+    const zoneOk = function (id) { return !!Wd.zones[id]; };
+    const coreOk = function (id) { for (const rid in Wd.rooms) { const cs = Wd.rooms[rid].cores; for (let i = 0; i < cs.length; i++) if (cs[i].id === id) return true; } return false; };
+    const nodeOk = function (id) { return !!Wd.findNode(id); };
+    const bossOk = function (id) { if (IDS.bosses.indexOf(id) >= 0) return true; for (const rid in Wd.rooms) { const b = Wd.rooms[rid].boss; if (b && b.id === id) return true; } return false; };
+    const bitOk = function (key) {
+      const c = key.indexOf(':'); if (c < 0) return false;
+      const room = Wd.rooms[key.slice(0, c)]; if (!room) return false;
+      const xy = key.slice(c + 1);
+      for (let i = 0; i < room.bits.length; i++) if (room.bits[i].x + ',' + room.bits[i].y === xy) return true;
+      return false;
+    };
+    const vendorOk = function (id) { for (let i = 0; i < VENDOR.length; i++) if (VENDOR[i].id === id) return true; return false; };
+
+    // fighter (fresh was already built for it when valid)
+    if (typeof d.fighter === 'string' && UB.Characters.DATA[d.fighter]) out.fighter = d.fighter;
+    // room + node: both must exist and the node must live in that room, else the start
+    const nodeId = isObj(d.spawn) && typeof d.spawn.nodeId === 'string' ? d.spawn.nodeId : null;
+    const found = nodeId ? Wd.findNode(nodeId) : null;
+    if (typeof d.roomId === 'string' && Wd.rooms[d.roomId] && found && found.room === Wd.rooms[d.roomId]) { out.roomId = d.roomId; out.spawn.nodeId = nodeId; }
+    out.cores = strList(d.cores, coreOk, MAX_CORES);
+    if (isObj(d.abilities)) for (let i = 0; i < IDS.abilities.length; i++) out.abilities[IDS.abilities[i]] = d.abilities[IDS.abilities[i]] === true;
+    out.bits = num(d.bits, 0) !== null ? num(d.bits, 0) : 0;
+    out.bitsLifetime = Math.max(out.bits, num(d.bitsLifetime, 0) !== null ? num(d.bitsLifetime, 0) : 0);
+    out.discovered = strList(d.discovered, roomOk, 4096);
+    out.visited = strList(d.visited, roomOk, 4096);
+    for (let i = 0; i < out.visited.length; i++) if (out.discovered.indexOf(out.visited[i]) < 0) out.discovered.push(out.visited[i]);
+    out.bossesDefeated = strList(d.bossesDefeated, bossOk, 64);
+    out.bitsCollected = strList(d.bitsCollected, bitOk, 4096);
+    out.vendor = strList(d.vendor, vendorOk, VENDOR.length);
+    out.nodesUsed = strList(d.nodesUsed, nodeOk, 256);
+    out.loreSeen = strList(d.loreSeen, zoneOk, 64);
+    if (isObj(d.hints)) for (let i = 0; i < HINT_KEYS.length; i++) out.hints[HINT_KEYS[i]] = d.hints[HINT_KEYS[i]] === true;
+    out.enemiesPurged = num(d.enemiesPurged, 0) !== null ? num(d.enemiesPurged, 0) : 0;
+    out.playTimeFrames = num(d.playTimeFrames, 0) !== null ? num(d.playTimeFrames, 0) : 0;
+    out.deaths = num(d.deaths, 0) !== null ? num(d.deaths, 0) : 0;
+    out.victory = d.victory === true;
+    out.savedAt = num(d.savedAt, 0) !== null ? num(d.savedAt, 0) : 0;
+    // hearts are recomputed on load (DESIGN §14): you always load at a node, full.
+    out.baseHearts = UB.Characters.DATA[out.fighter].hp;
+    out.maxHearts = out.baseHearts + out.cores.length;
+    out.hearts = out.maxHearts;
+    return out;
+  }
   /** Write the in-memory save (node, boss pickup, vendor, victory). Returns true on success. */
   Game.prototype.writeSave = function () {
     const s = this.save; if (!s) return false;
@@ -296,6 +386,7 @@
       room: room, w: room.w, h: room.h, zone: Wd.zoneOf(room),
       gone: new Uint8Array(room.w * room.h), sealedMask: new Uint8Array(room.w * room.h),
       openings: [], platforms: [], crumble: [], tileCache: null, cacheScale: 1, sealedExits: [],
+      boss: room.boss,   // the active boss spec (room.boss, or one synthesized by UB.debug.spawnBoss)
     };
     for (let i = 0; i < room.exits.length; i++) {
       const e = room.exits[i];
@@ -337,14 +428,19 @@
     const prevZone = this.zone;
     this.level = makeLevel(room);
     this.zone = this.level.zone;
-    FX.clear();
-    this.enemies.length = 0; this.projectiles.length = 0; this.pickups.length = 0;
-    this.prompt = null; this.nearNode = null; this.hitCount = 0;
+    FX.clear(); Au.stopLoops();
+    this.dropProjectiles();
+    this.enemies.length = 0; this.pickups.length = 0;
+    this.prompt = null; this.nearNode = null; this.nearVendor = false; this.hitCount = 0;
+    // The static tile cache exists before anything (sealExits → redrawTiles) can touch it.
+    R.buildTileCache(this.level, this.dpr);
     this.spawnRoomEnemies();
     this.boss = null; this.bossFight.state = 'none'; this.bossFight.timer = 0;
     if (room.boss && this.save.bossesDefeated.indexOf(room.boss.id) < 0) {
-      this.boss = UB.Bosses.create(room.boss.id, room, this);
+      this.boss = UB.Bosses.create(room.boss.id, room, this, room.boss);
       if (!this.boss) warnOnce('boss:' + room.boss.id, 'no boss for id ' + room.boss.id);
+      // exits locked until the boss falls (e.g. the brine crust over bv_corrosant.B) are solid now
+      if (room.boss.locked.length) this.sealExits(room.boss.locked, true);
     }
     for (let i = 0; i < room.bits.length; i++) {
       const b = room.bits[i], key = room.id + ':' + b.x + ',' + b.y;
@@ -374,12 +470,21 @@
     if (s.visited.indexOf(room.id) < 0) s.visited.push(room.id);
     if (s.discovered.indexOf(room.id) < 0) s.discovered.push(room.id);
     for (let i = 0; i < room.exits.length; i++) if (s.discovered.indexOf(room.exits[i].to.room) < 0) s.discovered.push(room.exits[i].to.room);
+    if (this.hasDeepPing()) this.applyDeepPing();
     if (prevZone !== this.zone) {
       UI.toast(this.zone.name, this.zone.blurb, T.zoneToast);
       Au.music(this.zone.song); Au.ambient(this.zone.id);
+      // zone lore card (DESIGN §12.18): once per zone, after the toast settles; the UI draws overlay 'lore'.
+      // A card still pending from the previous zone is dropped (it belongs to a zone we just left).
+      this.loreZone = null; this.loreTimer = 0;
+      if (this.zone.lore && !this.zone.debug && s.loreSeen.indexOf(this.zone.id) < 0) { this.loreZone = this.zone; this.loreTimer = T.loreDelay; }
     }
-    R.buildTileCache(this.level, this.dpr);
     this.snapCamera();
+  };
+  /** Clear the projectile list, flagging every object dead so pooled projectiles (characters) know they were dropped. */
+  Game.prototype.dropProjectiles = function () {
+    for (let i = 0; i < this.projectiles.length; i++) this.projectiles[i].dead = true;
+    this.projectiles.length = 0;
   };
   Game.prototype.spawnRoomEnemies = function () {
     const room = this.level.room;
@@ -390,6 +495,54 @@
       if (e) { e.spawnIndex = i; this.enemies.push(e); }
       else warnOnce('enemy:' + sp.type, 'no enemy for type ' + sp.type);
     }
+  };
+  /**
+   * Add an enemy at runtime (broodcell motes, UB.debug.spawnEnemy). tx, ty = feet tile
+   * (flyers: centre tile); opts = extra spawn fields (patrol, variant, facing, …) merged into
+   * the spawn record passed to UB.Enemies.create. Returns the enemy or null (unknown type).
+   */
+  Game.prototype.spawnEnemy = function (type, tx, ty, opts) {
+    if (!this.level) return null;
+    const sp = Object.assign({ type: type, x: tx, y: ty }, opts || null);   // a fresh record: creators may keep a reference
+    const e = UB.Enemies.create(type, sp, this.level.room, this);
+    if (!e) { warnOnce('enemy:' + type, 'no enemy for type ' + type); return null; }
+    e.spawnIndex = -1; e.px = e.x; e.py = e.y;
+    this.enemies.push(e);
+    return e;
+  };
+  // --- vendor (DESIGN §9.5) ----------------------------------------------------------------------
+  Game.prototype.hasDeepPing = function () { return !!this.save && this.save.vendor.indexOf('deep_ping') >= 0; };
+  /** Deep Ping: every real room of a zone the player has set foot in counts as discovered (DESIGN §14). */
+  Game.prototype.applyDeepPing = function () {
+    const s = this.save; if (!s) return;
+    for (const id in Wd.rooms) {
+      const r = Wd.rooms[id];
+      if (r.debug || s.discovered.indexOf(id) >= 0) continue;
+      for (let i = 0; i < s.visited.length; i++) {
+        const v = Wd.rooms[s.visited[i]];
+        if (v && v.zone === r.zone) { s.discovered.push(id); break; }
+      }
+    }
+  };
+  /**
+   * Buy a vendor item (UI calls this from the shop overlay). Returns 'bought' | 'poor' |
+   * 'sold' | 'unknown'. On 'bought': bits deducted, save.vendor updated, the effect applied,
+   * the save written, and the PURCHASED banner queued for when the panel closes.
+   */
+  Game.prototype.buy = function (itemId) {
+    if (!this.save) return 'unknown';
+    let item = null;
+    for (let i = 0; i < VENDOR.length; i++) if (VENDOR[i].id === itemId) item = VENDOR[i];
+    if (!item) return 'unknown';
+    if (this.save.vendor.indexOf(itemId) >= 0) return 'sold';
+    if (this.save.bits < item.price) return 'poor';
+    this.save.bits -= item.price;
+    this.save.vendor.push(itemId);
+    this.applyVendorEffects();
+    if (itemId === 'deep_ping') this.applyDeepPing();
+    this.shopBought = item;
+    this.writeSave();
+    return 'bought';
   };
 
   // --- room transitions (DESIGN §11.3.2) -------------------------------------------------------------
@@ -442,6 +595,13 @@
     if (this.hitCount >= MAX_HITS) return;
     this.hits[this.hitCount++] = hit;
   };
+  /**
+   * CONTRACT §7. A victim already in hit.hitList is skipped unless hit.multi; multi hits
+   * never grow hitList (they rely on the victim's own i-frames / the attacker's cadence).
+   * Player hits test enemies, the boss and destructible ENEMY-owned projectiles (never the
+   * player's own). Enemy/boss hits test the player only in mode 'normal' (not at a node, in
+   * a boss intro, the pickup sequence, a hazard freeze or a transition).
+   */
   Game.prototype.resolveHits = function () {
     const pl = this.player;
     this.dbgHitCount = 0;
@@ -458,7 +618,7 @@
         if (b && b.active && !b.dead && (h.multi || h.hitList.indexOf(b) < 0) && E.overlapBox(b, h.x, h.y, h.w, h.h)) this.hitBoss(b, h);
         for (let j = 0; j < this.projectiles.length; j++) {
           const p = this.projectiles[j];
-          if (!p.destructible || p.dead || h.hitList.indexOf(p) >= 0) continue;
+          if (!p.destructible || p.dead || p.owner === 'player' || h.hitList.indexOf(p) >= 0) continue;
           if (E.overlapBox(p, h.x, h.y, h.w, h.h)) {
             h.hitList.push(p); p.dead = true;
             this.addMeter(2, false); FX.burst('spark', p.x, p.cy(), 4, { color: P.PAPER });
@@ -466,16 +626,18 @@
             if (h.onHit) h.onHit(p, null, this);
           }
         }
-      } else if (pl && !pl.dead && h.hitList.indexOf(pl) < 0 && E.overlapBox(pl, h.x, h.y, h.w, h.h)) {
-        if (!this.god && this.mode !== 'hazard') {
-          if (pl.hurt(h.dmg, h.x + h.w / 2, null)) { h.hitList.push(pl); if (h.onHit) h.onHit(pl, null, this); }
-        }
+      } else if (pl && !pl.dead && this.mode === 'normal' && !this.god && (h.multi || h.hitList.indexOf(pl) < 0) && E.overlapBox(pl, h.x, h.y, h.w, h.h)) {
+        // opts.hit = the descriptor (flags / src) so a counter such as Korvask's Bulwark Catch can read it exactly
+        this.hurtOpts.hit = h;
+        const took = pl.hurt(h.dmg, h.x + h.w / 2, this.hurtOpts);
+        this.hurtOpts.hit = null;
+        if (took) { if (!h.multi) h.hitList.push(pl); if (h.onHit) h.onHit(pl, null, this); }
       }
     }
     this.hitCount = 0;
   };
   Game.prototype.hitEnemy = function (e, h) {
-    h.hitList.push(e);
+    if (!h.multi) h.hitList.push(e);
     const res = e.takeHit ? e.takeHit(h, this) : E.applyHit(e, h);
     const cx = Math.max(e.left(), h.x), cy = Math.max(e.top(), h.y);
     const ix = (cx + Math.min(e.right(), h.x + h.w)) / 2, iy = (cy + Math.min(e.y, h.y + h.h)) / 2;
@@ -505,8 +667,13 @@
     this.rollDrops(e);
     if (e.onDeath) e.onDeath(this);
   };
+  /**
+   * Boss damage. A multi-phase boss (Kernauth) handles its phase change INSIDE takeHit:
+   * refill hp/maxHp, set this.phase, give the player i-frames, play its own card/sfx —
+   * the engine only starts the death sequence when takeHit returns with hp <= 0.
+   */
   Game.prototype.hitBoss = function (b, h) {
-    h.hitList.push(b);
+    if (!h.multi) h.hitList.push(b);
     const res = b.takeHit ? b.takeHit(h, this) : E.applyHit(b, h);
     if (res.blocked) { if (h.onHit) h.onHit(b, res, this); return; }
     FX.hitstop(h.hitstop); FX.shake(1, 3);
@@ -516,8 +683,19 @@
     if (h.onHit) h.onHit(b, res, this);
     if (b.hp <= 0 && this.bossFight.state === 'fight') this.startBossDeath();
   };
-  /** Add a projectile: an entity with update(game), draw(ctx, game, alpha), dead (+ destructible/onPopped). */
-  Game.prototype.spawnProjectile = function (obj) { obj.px = obj.x; obj.py = obj.y; this.projectiles.push(obj); return obj; };
+  /**
+   * Add a projectile (CONTRACT §7): a UB.Entity with owner 'player'|'enemy' (default 'enemy'),
+   * update(game), draw(ctx, game, alpha), dead, optional destructible/onPopped. Cap 64:
+   * the oldest is dropped. Projectiles further than 64 px outside the room are culled by the tick.
+   */
+  Game.prototype.spawnProjectile = function (obj) {
+    if (!(obj instanceof E)) { warnOnce('proj:' + (obj && obj.constructor ? obj.constructor.name : typeof obj), 'spawnProjectile: not a UB.Entity'); return null; }
+    if (obj.owner !== 'player' && obj.owner !== 'enemy') obj.owner = 'enemy';
+    obj.px = obj.x; obj.py = obj.y;
+    if (this.projectiles.length >= MAX_PROJECTILES) { this.projectiles[0].dead = true; this.projectiles.shift(); }
+    this.projectiles.push(obj);
+    return obj;
+  };
   Game.prototype.addEnergy = function (n) { const pl = this.player; pl.energy = U.clamp(pl.energy + n, 0, pl.energyMax); };
   Game.prototype.addMeter = function (n, fromHit) {
     const pl = this.player;
@@ -582,7 +760,7 @@
       if (p.id && this.save.cores.indexOf(p.id) < 0) this.save.cores.push(p.id);
       pl.maxHp++; pl.hp++; this.save.maxHearts = pl.maxHp; this.addMeter(25, false);
       FX.burst('glitter', p.x, p.cy(), 24, { color: P.CORE_HEART }); Au.sfx('core', p.x);
-      UI.banner('CORE FOUND', '+1 max heart', 'Something the kingdom kept for itself.', 182);
+      UI.banner('CORE FOUND', 'Max hearts +1', 'A piece of the kingdom that never rotted.', 182);
       this.writeSave();
     } else if (p.type === 'ability') {
       this.startPickupSeq(p);
@@ -594,6 +772,7 @@
     let n = e.bits || 0, k = 0;
     while (n >= 5) { this.spawnPickup('bit', e.x, e.cy(), { size: 'medium', vx: (rng() - 0.5) * 5, vy: -4 - rng() * 2 }); n -= 5; k++; }
     while (n > 0) { this.spawnPickup('bit', e.x, e.cy(), { size: 'small', vx: (rng() - 0.5) * 6, vy: -4 - rng() * 2 }); n--; k++; }
+    if (e.type === 'mote' || e.noDrops) return;   // DESIGN §9.2: motes drop their bit only, never hearts/orbs/shards
     const missing = pl.maxHp - pl.hp;
     if (missing > 0 && rng() < Math.min(0.4, 0.12 + 0.08 * missing)) this.spawnPickup('heart', e.x, e.cy(), { vx: (rng() - 0.5) * 3, vy: -5 });
     if (rng() < (pl.energy < pl.energyMax / 2 ? 0.25 : 0.05)) this.spawnPickup('spark', e.x, e.cy(), { vx: (rng() - 0.5) * 3, vy: -5 });
@@ -616,10 +795,10 @@
     }
   };
   Game.prototype.startBossFight = function () {
-    const b = this.boss, bf = this.bossFight;
+    const b = this.boss, bf = this.bossFight, spec = this.level.boss;
     bf.state = 'intro'; bf.timer = T.bossIntro; this.mode = 'bossIntro';
-    this.player.locked = true; this.player.vx = 0;
-    if (this.level.room.boss.seal) this.sealExits(this.level.room.boss.seal, true);
+    this.player.locked = true; this.player.vx = 0; this.player.cancelMove();
+    if (spec.seal.length) this.sealExits(spec.seal, true);
     UI.bossCard(b.name, b.subtitle, T.bossIntro);
     Au.music('boss');
     if (b.onIntro) b.onIntro(this);
@@ -673,12 +852,12 @@
       ps.pickup = null;
     }
   };
-  /** Grant the reward, unseal, record, save, restore zone music. */
+  /** Grant the reward, unseal (fight seals + locked exits), record, save, restore zone music. */
   Game.prototype.finishBoss = function (bossId, ability) {
     if (ability) this.grantAbility(ability, true);
     if (bossId && this.save.bossesDefeated.indexOf(bossId) < 0) this.save.bossesDefeated.push(bossId);
-    const rb = this.level.room.boss;
-    if (rb && rb.seal) this.sealExits(rb.seal, false);
+    const rb = this.level.boss;
+    if (rb) { this.sealExits(rb.seal, false); this.sealExits(rb.locked, false); }
     this.bossFight.state = 'done';
     this.boss = null;
     this.writeSave();
@@ -708,23 +887,47 @@
       this.snapCamera();
     }
   };
+  /** Restore node (▲ REST) and vendor (▲ TRADE) prompts + Up interaction (DESIGN §5.5, §9.5, §12.8). */
   Game.prototype.updateInteractions = function () {
     const pl = this.player, room = this.level.room;
-    this.nearNode = null; this.prompt = null;
+    this.nearNode = null; this.nearVendor = false; this.prompt = null;
     for (let i = 0; i < room.nodes.length; i++) {
       const n = room.nodes[i];
       const nx = n.x * TILE + 15, ny = (n.y + 1) * TILE;
       if (Math.abs(pl.x - nx) <= TILE && pl.y <= ny + 4 && pl.y >= ny - 60) {
-        this.nearNode = n; this.prompt = this.promptObj || (this.promptObj = { text: '', x: 0, y: 0 });
+        this.nearNode = n; this.prompt = this.promptObj;
         this.prompt.text = 'REST'; this.prompt.x = nx; this.prompt.y = ny - 48;
         break;
       }
     }
-    if (this.nearNode && pl.onGround && !pl.attacking() && In.state.up.pressed) {
-      In.consume('jump'); In.consume('up');
-      this.mode = 'nodeUse'; this.nodeUse.timer = T.nodePulse; this.nodeUse.node = this.nearNode;
-      pl.vx = 0; Au.sfx('restore', pl.x);
+    if (!this.nearNode && room.vendor) {
+      const vx = room.vendor.x * TILE + 15, vy = (room.vendor.y + 1) * TILE;
+      if (Math.abs(pl.x - vx) <= TILE && pl.y <= vy + 4 && pl.y >= vy - 60) {
+        this.nearVendor = true; this.prompt = this.promptObj;
+        this.prompt.text = 'TRADE'; this.prompt.x = vx; this.prompt.y = vy - 62;
+      }
     }
+    if ((this.nearNode || this.nearVendor) && pl.onGround && !pl.attacking() && In.state.up.pressed) {
+      In.consume('jump'); In.consume('up');
+      pl.vx = 0;
+      if (this.nearNode) {
+        this.mode = 'nodeUse'; this.nodeUse.timer = T.nodePulse; this.nodeUse.node = this.nearNode;
+        Au.sfx('restore', pl.x);
+      } else {
+        this.openOverlay('shop');   // the UI draws the panel, navigates and calls game.buy()
+      }
+    }
+  };
+  /** Control hints (DESIGN §12.8): record the first use of each action in save.hints; the UI shows the strip until set. */
+  Game.prototype.updateHints = function () {
+    const h = this.save.hints, st = In.state, pl = this.player;
+    if (!h.move && (st.left.down || st.right.down)) h.move = true;
+    if (!h.jump && st.jump.pressed) h.jump = true;
+    if (!h.light && st.light.pressed) h.light = true;
+    if (!h.heavy && st.heavy.pressed) h.heavy = true;
+    if (!h.special && st.special.pressed) h.special = true;
+    if (!h.dash && st.dash.pressed && pl.abilities.burstLine) h.dash = true;
+    if (!h.overclock && (pl.ocTransform > 0 || pl.ocActive)) h.overclock = true;
   };
   Game.prototype.updateNodeUse = function () {
     const nu = this.nodeUse, pl = this.player, n = nu.node;
@@ -738,7 +941,7 @@
       this.hazardRespawn.x = nx; this.hazardRespawn.y = ny;
       this.spawnRoomEnemies();
       this.writeSave();
-      UI.banner('RESTORED', 'Progress saved · hearts and energy refilled', 'The node remembers you.', 150);
+      UI.banner('RESTORED', 'Saved · hearts full · energy full', '', 150);
       FX.burst('heal', nx, ny - 20, 16, { color: P.CORE_HEART }); FX.burst('ring', nx, ny - 20, 1, { radius: 40 });
       Au.sfx('save', pl.x);
       this.mode = 'normal';
@@ -810,6 +1013,23 @@
   };
 
   // --- the logic tick (CONTRACT §2.1) ---------------------------------------------------------------------
+  /**
+   * Snapshot px/py = x/y for everything the renderer interpolates (player, enemies, boss,
+   * projectiles, pickups, movers, camera). Called on every early return of a play tick
+   * (overlay, transition, hitstop) so a frozen world renders at its final position whatever
+   * the accumulator alpha is, instead of sliding/jittering one frame of motion.
+   */
+  Game.prototype.snapInterp = function () {
+    const pl = this.player, lv = this.level;
+    if (!pl || !lv) return;
+    pl.px = pl.x; pl.py = pl.y;
+    for (let i = 0; i < this.enemies.length; i++) { const e = this.enemies[i]; e.px = e.x; e.py = e.y; }
+    if (this.boss) { this.boss.px = this.boss.x; this.boss.py = this.boss.y; }
+    for (let i = 0; i < this.projectiles.length; i++) { const p = this.projectiles[i]; p.px = p.x; p.py = p.y; }
+    for (let i = 0; i < this.pickups.length; i++) { const p = this.pickups[i]; p.px = p.x; p.py = p.y; }
+    for (let i = 0; i < lv.platforms.length; i++) { const p = lv.platforms[i]; p.px = p.x; p.py = p.y; }
+    this.cam.px = this.cam.x; this.cam.py = this.cam.y;
+  };
   Game.prototype.tick = function () {
     In.freezeBuffers = FX.hitstopFrames > 0 && this.screen === 'play' && !this.overlay;
     In.update();
@@ -820,16 +1040,22 @@
     if (this.screen !== 'play' || this.overlay) {
       if (!this.busy) UI.update(this);
       FX.update();
+      if (this.screen === 'play') this.snapInterp();
       return;
     }
     // --- play ---
     if (!this.busy && this.mode !== 'transition') {
-      if (In.state.pause.pressed) { this.openOverlay('pause'); return; }
-      if (In.state.map.pressed) { this.openOverlay('map'); return; }
+      if (In.state.pause.pressed) { this.openOverlay('pause'); this.snapInterp(); return; }
+      if (In.state.map.pressed) { this.openOverlay('map'); this.snapInterp(); return; }
+      // pending zone lore card (DESIGN §12.18): opens once the toast has settled, only in normal play
+      if (this.loreTimer > 0 && this.mode === 'normal' && !this.player.dead && --this.loreTimer === 0) {
+        const z = this.loreZone; this.loreZone = null;
+        if (z && this.save.loreSeen.indexOf(z.id) < 0) { this.save.loreSeen.push(z.id); this.loreCard = z; UI.clearMessages(); this.openOverlay('lore'); this.snapInterp(); return; }
+      }
     }
     this.save.playTimeFrames++;
-    if (this.mode === 'transition') { this.updateTransition(); FX.update(); this.cam.px = this.cam.x; this.cam.py = this.cam.y; return; }
-    if (FX.hitstopFrames > 0) { FX.hitstopFrames--; FX.update(); return; }
+    if (this.mode === 'transition') { this.updateTransition(); FX.update(); this.snapInterp(); return; }
+    if (FX.hitstopFrames > 0) { FX.hitstopFrames--; FX.update(); this.snapInterp(); return; }
 
     const pl = this.player, lv = this.level;
     // previous positions for render interpolation
@@ -847,7 +1073,8 @@
     else if (this.mode === 'pickupSeq') this.updatePickupSeq();
 
     // Node/vendor interaction runs BEFORE the player so an Up press at a node rests instead of jumping (DESIGN §2.2).
-    if (this.mode === 'normal' && !pl.dead) this.updateInteractions();
+    if (this.mode === 'normal' && !pl.dead) { this.updateInteractions(); if (!pl.locked) this.updateHints(); }
+    if (this.overlay) { this.snapInterp(); return; }   // the vendor just opened the shop
     const playerFrozen = this.mode === 'hazard';
     if (!playerFrozen) pl.update(this);
 
@@ -857,9 +1084,19 @@
       const bs = this.bossFight.state;
       if (bs === 'fight') this.boss.update(this, pl);
       else if (bs === 'dying') { this.boss.t++; this.updateBossDying(); }
-      else if (bs === 'none' || bs === 'intro') { this.boss.t++; this.boss.gravity(0.5, 12); this.boss.moveAndCollide(lv); if (this.boss.flash > 0) this.boss.flash--; }
+      else if (bs === 'none' || bs === 'intro') {   // idle: ground bosses settle under gravity; fliers/crawlers (boss.flying) hold their spot
+        this.boss.t++;
+        if (!this.boss.flying) { this.boss.gravity(0.5, 12); this.boss.moveAndCollide(lv); }
+        if (this.boss.flash > 0) this.boss.flash--;
+      }
     }
-    for (let i = 0; i < this.projectiles.length; i++) { const p = this.projectiles[i]; if (!p.dead) p.update(this); }
+    const rw = lv.w * TILE + OFFROOM, rh = lv.h * TILE + OFFROOM;
+    for (let i = 0; i < this.projectiles.length; i++) {
+      const p = this.projectiles[i];
+      if (p.dead) continue;
+      p.update(this);
+      if (p.x < -OFFROOM || p.x > rw || p.y < -OFFROOM || p.y > rh) p.dead = true;   // off-room cull
+    }
 
     // hits, contact, hazards
     this.resolveHits();
@@ -884,8 +1121,8 @@
     if (this.mode === 'normal' || this.mode === 'nodeUse') this.updatePickups();
     this.updateCrumble();
     if (this.mode === 'normal' && !pl.dead) {
-      if (this.checkExits()) { FX.update(); return; }
-      const rb = lv.room.boss;
+      if (this.checkExits()) { FX.update(); this.snapInterp(); return; }
+      const rb = lv.boss;
       if (this.boss && this.bossFight.state === 'none' && rb) {
         const tx = pl.x / TILE;
         if (tx >= rb.bounds[0] && tx <= rb.bounds[1]) this.startBossFight();
@@ -901,6 +1138,9 @@
     }
     FX.update();
     this.updateCamera();
+    // A hit this frame requested world hitstop: freeze at the impact position right away
+    // (otherwise the render between this tick and the first frozen one would still slide).
+    if (FX.hitstopFrames > 0) this.snapInterp();
   };
 
   // --- render (CONTRACT §2.2) ----------------------------------------------------------------------------
@@ -919,6 +1159,7 @@
       const pulse = this.mode === 'nodeUse' && this.nodeUse.node === n ? 1 - this.nodeUse.timer / T.nodePulse : 0;
       R.drawNode(ctx, n.x * TILE + 15, (n.y + 1) * TILE, zone, this.save.nodesUsed.indexOf(n.id) >= 0, this.frame, pulse);
     }
+    if (room.vendor) R.drawVendor(ctx, room.vendor.x * TILE + 15, (room.vendor.y + 1) * TILE, zone, this.frame, pl.x);
     for (let i = 0; i < this.pickups.length; i++) {
       const p = this.pickups[i];
       if (p.x > cx - 80 && p.x < cx + W + 80 && p.y > cy - 80 && p.y < cy + H + 80) R.drawPickup(ctx, p, p.t, alpha);
@@ -929,11 +1170,14 @@
     }
     if (this.boss) this.boss.draw(ctx, this, alpha);
     if (pl) pl.draw(ctx, this, alpha);
-    for (let i = 0; i < this.projectiles.length; i++) this.projectiles[i].draw(ctx, this, alpha);
+    for (let i = 0; i < this.projectiles.length; i++) {
+      const p = this.projectiles[i];
+      if (p.x + p.w > cx - 80 && p.x - p.w < cx + W + 80 && p.y + p.h > cy - 80 && p.y - p.h < cy + H + 80) p.draw(ctx, this, alpha);
+    }
     FX.draw(ctx);
     if (this.settings.showHitboxes) this.drawHitboxes(ctx);
     ctx.restore();
-    const isBoss = !!room.boss;
+    const isBoss = !!lv.boss;
     R.drawFog(ctx, zone, pl.x - cx, pl.cy() - cy, isBoss);
     R.drawVignette(ctx);
     if (this.mode === 'pickupSeq') { ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fillRect(0, 0, W, H); }
@@ -1001,16 +1245,26 @@
         boss: b ? { id: b.id, hp: b.hp, maxHp: b.maxHp, phase: b.phase, state: b.state, attack: b.attack, active: b.active } : null,
         bossFight: game.bossFight.state, hazardFreeze: game.mode === 'hazard', transition: game.mode === 'transition',
         fade: game.fadeLevel, hitstop: FX.hitstopFrames, god: game.god, logicPaused: game.logicPaused,
-        nearNode: game.nearNode ? game.nearNode.id : null, hasSave: game.hasSave(), savedRoom: game.savedData ? game.savedData.roomId : null,
+        nearNode: game.nearNode ? game.nearNode.id : null, nearVendor: game.nearVendor, prompt: game.prompt ? game.prompt.text : null,
+        projectiles: game.projectiles.length, vendor: s ? s.vendor.slice() : [], energyMax: pl ? pl.energyMax : 0,
+        loreSeen: s ? s.loreSeen.slice() : [], hints: s ? Object.assign({}, s.hints) : null,
+        hasSave: game.hasSave(), savedRoom: game.savedData ? game.savedData.roomId : null,
       };
     };
     d.warp = function (roomId, exitIdOrPos) {
       if (!game.player) return false;
       let arrival;
       if (exitIdOrPos && typeof exitIdOrPos === 'object') arrival = { x: exitIdOrPos.x, y: exitIdOrPos.y };
-      else if (typeof exitIdOrPos === 'string') arrival = { exitId: exitIdOrPos };
+      else if (typeof exitIdOrPos === 'string') {
+        // Arriving through exit X means we left the previous room through the opposite side, so a
+        // warp to a bottom exit gets the chute launch and a top exit the +120 px/s arrival, as in play.
+        const room = Wd.rooms[roomId], ex = room ? Wd.exit(room, exitIdOrPos) : null;
+        const OPP = { left: 'right', right: 'left', top: 'bottom', bottom: 'top' };
+        arrival = { exitId: exitIdOrPos, side: ex ? OPP[ex.side] : undefined };
+      }
       else arrival = {};
       game.mode = 'normal'; game.player.locked = false; FX.hitstopFrames = 0;
+      if (game.transition.phase) { game.transition.phase = ''; game.transition.timer = 0; }
       game.loadRoom(roomId, arrival);
       return true;
     };
@@ -1027,16 +1281,82 @@
       const rw = UB.Bosses.rewardFor(bossId);
       if (game.save.bossesDefeated.indexOf(bossId) < 0) game.save.bossesDefeated.push(bossId);
       if (rw.ability) game.grantAbility(rw.ability, true);
-      if (game.level && game.level.room.boss && game.level.room.boss.id === bossId) {
-        if (game.level.room.boss.seal) game.sealExits(game.level.room.boss.seal, false);
+      const spec = game.level ? game.level.boss : null;
+      if (spec && spec.id === bossId) {
+        game.sealExits(spec.seal, false); game.sealExits(spec.locked, false);
         game.boss = null; game.bossFight.state = 'done'; if (game.mode === 'bossIntro') { game.mode = 'normal'; game.player.locked = false; }
       }
       return true;
     };
     d.killEnemies = function () { for (let i = 0; i < game.enemies.length; i++) game.enemies[i].dead = true; game.enemies.length = 0; };
+    /** Place an enemy in the current room: type id, feet tile (tx, ty), opts = extra spawn fields. Returns {type,x,y,hp,state} or null. */
+    d.spawnEnemy = function (type, tx, ty, opts) {
+      if (!game.level) return null;
+      const e = game.spawnEnemy(type, tx, ty, opts || null);
+      return e ? { type: e.type, x: e.x, y: e.y, hp: e.hp, state: e.state } : null;
+    };
+    /**
+     * Create a boss in the current room. opts: {x, y} feet tile (default: the room's boss
+     * spawn, else 8 tiles right of the player), {fight:true} runs the full trigger flow
+     * (seal → intro card → fight); default places it live (bossFight 'fight', active).
+     * Rooms without a boss record get a synthesized spec (bounds = whole room, no seals,
+     * pickup under the player). Returns d.boss() or null for an unknown id.
+     */
+    d.spawnBoss = function (bossId, opts) {
+      if (!game.level || !game.player) return null;
+      opts = opts || {};
+      const room = game.level.room, pl = game.player;
+      let spec = room.boss && room.boss.id === bossId ? room.boss : null;
+      if (!spec) {
+        const ptx = Math.floor(pl.x / TILE), pty = Math.floor((pl.y - 1) / TILE);
+        spec = { id: bossId, bounds: [0, room.w - 1], seal: [], locked: [], final: !!UB.Bosses.rewardFor(bossId).final,
+          pickup: { x: ptx, y: pty }, spawn: { x: Math.min(room.w - 2, ptx + 8), y: pty } };
+      }
+      if (opts.x !== undefined && opts.y !== undefined) spec = Object.assign({}, spec, { spawn: { x: opts.x, y: opts.y } });
+      const b = UB.Bosses.create(bossId, room, game, spec);
+      if (!b) return null;
+      if (game.boss) game.boss.dead = true;
+      game.level.boss = spec;
+      game.boss = b; game.bossFight.state = 'none'; game.bossFight.timer = 0;
+      game.mode = 'normal'; pl.locked = false;
+      if (opts.fight) game.startBossFight();
+      else { game.bossFight.state = 'fight'; b.active = true; if (b.onFightStart) b.onFightStart(game); }
+      return d.boss();
+    };
+    /**
+     * Fire a presentation effect from tests. type: a UB.FX.burst preset ('spark' 'chip' 'dust'
+     * 'glitter' 'ring' 'pogo' 'heal' 'aura'; opts {n, color, dir, radius, life}), or 'shake'
+     * {mag, frames}, 'flash' {color, alpha, frames}, 'hitstop' {frames}, 'text' {str, color, frames}.
+     * x, y are world px. Returns the live particle count.
+     */
+    d.fx = function (type, x, y, opts) {
+      opts = opts || {};
+      if (type === 'shake') FX.shake(opts.mag || 5, opts.frames || 10);
+      else if (type === 'flash') FX.flash(opts.color || '#FFFFFF', opts.alpha !== undefined ? opts.alpha : 0.5, opts.frames || 8);
+      else if (type === 'hitstop') FX.hitstop(opts.frames || 4);
+      else if (type === 'text') FX.text(opts.str || '+1', x, y, opts.color || P.PAPER, opts.frames || 20);
+      else FX.burst(type, x, y, opts.n || 8, opts);
+      return FX.count();
+    };
     d.god = function (on) { game.god = on !== false; return game.god; };
     d.godmode = d.god;
     d.step = function (n) { n = n === undefined ? 1 : (n | 0); for (let i = 0; i < n; i++) game.tick(); return game.frame; };
+    /**
+     * Test-only timing probe: run n logic ticks each followed by a render, timed with
+     * performance.now (presentation only — the logic itself never reads the clock).
+     * Returns ms averages: {frames, avgTick, avgRender, avgTotal, maxTick, maxTotal}.
+     */
+    d.bench = function (n) {
+      n = n === undefined ? 60 : (n | 0);
+      let tick = 0, render = 0, maxTick = 0, maxTotal = 0;
+      for (let i = 0; i < n; i++) {
+        const t0 = performance.now(); game.tick(); const t1 = performance.now(); game.render(1); const t2 = performance.now();
+        tick += t1 - t0; render += t2 - t1;
+        if (t1 - t0 > maxTick) maxTick = t1 - t0;
+        if (t2 - t0 > maxTotal) maxTotal = t2 - t0;
+      }
+      return { frames: n, avgTick: tick / n, avgRender: render / n, avgTotal: (tick + render) / n, maxTick: maxTick, maxTotal: maxTotal };
+    };
     d.frame = function () { return d.step(1); };
     d.pauseLogic = function (on) { game.logicPaused = on !== false; return game.logicPaused; };
     d.pressed = function (action, frames) { In.press(action, frames || 1); };
@@ -1047,7 +1367,10 @@
     d.skipTo = function (screen) {
       if (screen === 'title') game.toTitle();
       else if (screen === 'select') { if (game.screen !== 'select') { game.toTitle(); game.setScreen('select'); } }
-      else if (screen === 'pause' || screen === 'map' || screen === 'settings') { if (game.screen === 'play') game.openOverlay(screen); else if (screen === 'settings') game.openOverlay('settings'); }
+      else if (screen === 'pause' || screen === 'map' || screen === 'settings' || screen === 'shop' || screen === 'lore') {
+        if (game.screen === 'play') { if (screen === 'lore') game.loreCard = game.zone; game.openOverlay(screen); }
+        else if (screen === 'settings') game.openOverlay('settings');
+      }
       else if (screen === 'play') { if (game.overlay) { game.overlay = null; game.overlayFrom = null; } if (game.screen !== 'play' && game.player && game.level) game.setScreen('play'); }
       else if (screen === 'gameover' && game.player) { game.player.die(); }
       else if (screen === 'victory' && game.save) { game.victory(); }
@@ -1068,6 +1391,7 @@
     d.boss = function () { const b = game.boss; return b ? { id: b.id, hp: b.hp, maxHp: b.maxHp, phase: b.phase, state: b.state, attack: b.attack, fight: game.bossFight.state } : null; };
     d.showHitboxes = function (on) { game.setSetting('showHitboxes', on !== false); };
     d.worldErrors = function () { return Wd.validate(); };
+    d.buy = function (itemId) { return game.buy(itemId); };
     d.game = game;
     return d;
   }

@@ -112,4 +112,49 @@ window.UB = window.UB || {};
   UB.font = function (px, family, bold) {
     return (bold ? 'bold ' : '') + px + 'px ' + (family === 'MONO' ? UB.Fonts.MONO : UB.Fonts.UI);
   };
+
+  // --- pinned identifiers (CONTRACT.md §1.1) ------------------------------------------
+  // Every string two modules must agree on lives here, first in the load order, so WORLD,
+  // ENEMIES, CHARACTERS, AUDIO and UI key on the same ids. World.validate() and the save
+  // loader check against these tables. Add, never rename.
+  UB.IDS = {
+    zones: ['driftcache', 'loomworks', 'brinevault', 'nullspire', 'rootwell'],
+    songs: ['title', 'driftcache', 'loomworks', 'brinevault', 'nullspire', 'rootwell', 'boss', 'victory'],
+    fighters: ['tessik', 'brackmaw', 'vellix', 'orrubel', 'korvask'],
+    abilities: ['echoJump', 'burstLine', 'gripProtocol'],
+    /** Boss ids = UB.Bosses.DATA keys = room.boss.id = save.bossesDefeated entries (DESIGN §16.9). */
+    bosses: ['tallock', 'weftyr', 'corrosant', 'kernauth'],
+    /** Arena room → boss id (DESIGN §6/§8). The debug arena uses the placeholder 'proto_warden'. */
+    bossRooms: { dc_sentinel: 'tallock', lw_weftyr: 'weftyr', bv_corrosant: 'corrosant', rw_throne: 'kernauth' },
+    /** Boss → ability it guards (null = final boss). */
+    bossAbility: { tallock: 'echoJump', weftyr: 'burstLine', corrosant: 'gripProtocol', kernauth: null },
+    pickups: ['bit', 'heart', 'spark', 'shard', 'core', 'ability'],
+    /** Enemy type ids as DESIGN §6 places them (`brinejelly` is placed by its own name);
+     *  `mote` is runtime-spawned by a broodcell; `walker` is the debug-room placeholder. */
+    enemies: ['scuttlebit', 'hopnode', 'driftmoth', 'brinejelly', 'glarewisp', 'spitvalve', 'rambyte',
+      'platewalker', 'broodcell', 'mote', 'droplatch', 'voltwheel', 'walker'],
+    /** Types whose spawn tile must have footing beneath it (World.validate). */
+    groundEnemies: ['scuttlebit', 'hopnode', 'rambyte', 'platewalker', 'broodcell', 'voltwheel', 'walker'],
+    /** `spawn.variant` values (DESIGN §7 zone variants). */
+    enemyVariants: ['brinecrab', 'staticshot', 'rootbound', 'dripnode', 'nullnode', 'rootwisp', 'acidvalve', 'twinvalve', 'rootram', 'rootplate'],
+    /** Vendor stock (DESIGN §9.5 / §15.5), in panel order; ids are what save.vendor stores. */
+    vendorItems: [
+      { id: 'spare_cell', name: 'SPARE CELL', price: 90, effect: 'Max energy 100 → 125' },
+      { id: 'hot_clock', name: 'HOT CLOCK', price: 160, effect: 'Overclock gains ×1.5 from hits and shards' },
+      { id: 'deep_ping', name: 'DEEP PING', price: 120, effect: 'Map shows every room, node and core of zones you have entered' },
+    ],
+    /** SFX recipe names (DESIGN §13.8) → the module that triggers them. UB.Audio.sfx is a
+     *  silent no-op for any other name, so modules may add private names without breaking. */
+    sfx: {
+      jump: 'characters', doubleJump: 'characters', land: 'characters', step: 'characters', dash: 'characters',
+      wallSlide: 'characters', special: 'characters', ultimate: 'characters', pogo: 'characters', hurt: 'characters',
+      death: 'characters', overclockOn: 'characters', overclockEnd: 'characters', overclockWarn: 'characters', deny: 'characters',
+      lightHit: 'engine', heavyHit: 'engine', whiff: 'engine', spike: 'engine', enemyHit: 'engine', enemyDeath: 'engine',
+      pickupBit: 'engine', energy: 'engine', heal: 'engine', core: 'engine', restore: 'engine', save: 'engine',
+      ability: 'engine', bossRoar: 'engine', bossHit: 'engine', bossDeath: 'engine', roomTransition: 'engine', crumble: 'engine',
+      platformMove: 'engine',
+      bolt: 'enemies', turretShot: 'enemies', bossPhase: 'enemies',
+      menuMove: 'ui', menuConfirm: 'ui', menuBack: 'ui', heartbeat: 'ui', vendorBuy: 'ui',
+    },
+  };
 })(window.UB);

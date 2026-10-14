@@ -1,13 +1,14 @@
 /*
  * UNDERBYTE — js/render.js
  * Owner: ENGINE ARCHITECT (do not edit from other modules).
- * Contract: CONTRACT.md §4.11 (UB.Render). Design: DESIGN.md §11.1.4–11.1.8, §11.3.7.
+ * Contract: CONTRACT.md §4.7 (UB.Render). Design: DESIGN.md §11.1.4–11.1.8, §11.3.7, §9.5 (vendor).
  *
  * Static world drawing: per-zone parallax background caches, the per-room
  * static tile cache (built once on room entry, patched when crumble tiles
  * vanish/return or boss seals drop), dynamic tile overlays (pool surfaces,
- * shaking crumble tiles), fog + vignette, and the shared drawing of movers,
- * restore nodes and pickups. All art is procedural canvas paths; colours come
+ * shaking crumble tiles), fog + vignette (gradients pre-rendered once per
+ * zone — nothing here allocates per frame), and the shared drawing of movers,
+ * restore nodes, the vendor figure and pickups. All art is procedural canvas paths; colours come
  * from UB.Palette and the zone palette. Presentation polish (hand-drawn
  * jitter, merged edge polylines, zone props) can be layered on later without
  * changing any call signature.
@@ -36,6 +37,9 @@
   // --- backgrounds (DESIGN §11.1.5, simplified) --------------------------------------
   Render.buildBackground = function (zone) {
     if (bgCache[zone.id]) return bgCache[zone.id];
+    // The WORLD module paints the per-zone parallax of DESIGN §11.1.5 (UB.World.background);
+    // the generic painter below is only the fallback when it is absent.
+    if (UB.World && typeof UB.World.background === 'function') { bgCache[zone.id] = UB.World.background(zone); return bgCache[zone.id]; }
     const pal = zone.palette;
     const rng = UB.Util.rng(zone.index * 1000 + 7);
     const bg0 = makeCanvas(BG_W, BG_H), bg1 = makeCanvas(BG_W, BG_H), bg2 = makeCanvas(BG_W, BG_H);
@@ -160,8 +164,8 @@
     } else if (ch === '~') {
       c.globalAlpha = 0.75; c.fillStyle = level.zone.poolKind === 'static' ? pal.glow : pal.hazard;
       c.fillRect(x, y + 8, TILE, TILE - 8); c.globalAlpha = 1;
-    } else if (ch === 'B') {
-      // small zone prop: a stub with a glow dot (full catalogue in DESIGN §5.4)
+    } else if (ch === 'B' && !(UB.World && typeof UB.World.drawProps === 'function')) {
+      // fallback stub for a zone prop when the WORLD painter (UB.World.drawProps, DESIGN §5.4) is absent
       c.fillStyle = pal.accent; c.strokeStyle = P.INK; c.lineWidth = 2;
       rrect(c, x + 8, y + 10, 14, 20, 3); c.fill(); c.stroke();
       c.fillStyle = pal.glow; c.beginPath(); c.arc(x + 15, y + 15, 2, 0, Math.PI * 2); c.fill();
@@ -186,6 +190,7 @@
   };
   /** Re-draw a tile rectangle of the cache (inclusive tile bounds). */
   Render.redrawTiles = function (level, tx0, ty0, tx1, ty1) {
+    if (!level || !level.tileCache) return;   // nothing to redraw before buildTileCache (the full build follows)
     const room = level.room, s = level.cacheScale;
     const c = level.tileCache.getContext('2d');
     c.setTransform(s, 0, 0, s, 0, 0);
@@ -198,7 +203,11 @@
       drawTile(c, level, tx, ty, UB.Util.rng(seedBase + tx * 131 + ty * 7), s);
     }
     c.restore();
+    // zone props (`B` tiles, DESIGN §5.4) are painted by the WORLD module into the same cache
+    if (UB.World && typeof UB.World.drawProps === 'function') UB.World.drawProps(level, tx0, ty0, tx1, ty1);
   };
+  Render.buildBackground.worldAware = true;   // world.js's hook installer sees these and leaves them alone
+  Render.redrawTiles.worldAware = true;
   /** Blit the visible part of the tile cache for camera (camX, camY). */
   Render.drawTileCache = function (ctx, level, camX, camY) {
     const s = level.cacheScale;
@@ -292,13 +301,70 @@
     ctx.restore();
   };
 
+  // --- vendor figure (DESIGN §9.5: Scrivvet) ---------------------------------------------------
+  /**
+   * Scrivvet at feet (x, y): a hunched cable-scrap cloak, a lantern-eye on a stalk that tracks
+   * `lookX` (the player's x), six small sorting hands on a 3-frame loop. Nothing humanoid.
+   */
+  Render.drawVendor = function (ctx, x, y, zone, t, lookX) {
+    const cloak = '#2a3a5c', hands = '#6c86b8', eye = '#ffcf5a';
+    const dir = lookX < x ? -1 : 1;
+    ctx.save(); ctx.translate(x, y);
+    ctx.lineJoin = 'round'; ctx.lineWidth = 3; ctx.strokeStyle = P.INK;
+    // cloak: a hunched mound of cable scraps
+    ctx.fillStyle = cloak;
+    ctx.beginPath(); ctx.moveTo(-18, 0); ctx.quadraticCurveTo(-22, -26, -8, -38); ctx.quadraticCurveTo(4, -46, 14, -34);
+    ctx.quadraticCurveTo(22, -22, 18, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = hands; ctx.lineWidth = 2; ctx.globalAlpha = 0.7;
+    for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.moveTo(-14 + i * 8, -6 - (i & 1) * 6); ctx.lineTo(-10 + i * 8, -22 - (i & 1) * 4); ctx.stroke(); }
+    ctx.globalAlpha = 1;
+    // six hands sorting (3-frame loop)
+    const ph = ((t / 3) | 0) % 3;
+    ctx.fillStyle = hands; ctx.strokeStyle = P.INK; ctx.lineWidth = 2;
+    for (let i = 0; i < 6; i++) {
+      const hx = -15 + i * 6, hy = -12 + ((i + ph) % 3) * 3;
+      ctx.beginPath(); ctx.arc(hx, hy, 3, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    }
+    // lantern-eye on a stalk, tracking the player
+    ctx.strokeStyle = hands; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(2, -36); ctx.quadraticCurveTo(2 + dir * 6, -48, 2 + dir * 10, -54); ctx.stroke();
+    ctx.fillStyle = eye; ctx.strokeStyle = P.INK; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(2 + dir * 10, -56, 6, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = P.INK; ctx.beginPath(); ctx.arc(2 + dir * 12, -56, 2, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  };
+
   // --- fog & vignette (DESIGN §11.1.7) -----------------------------------------------------
+  // The fog "hole" (radial gradient: clear at r 120 → zone fog at r 520) is pre-rendered once
+  // per zone at half resolution (520×520, drawn 2× = 1040 px square) so no gradient is
+  // created per frame; the area outside the square is plain fog colour.
+  const HOLE = 1040, HOLE_HALF = HOLE / 2;
+  const fogCache = Object.create(null);   // zoneId → canvas
+  function fogHole(zone) {
+    let c = fogCache[zone.id];
+    if (c) return c;
+    c = makeCanvas(HOLE / 2, HOLE / 2);
+    const g2 = c.getContext('2d');
+    const g = g2.createRadialGradient(HOLE / 4, HOLE / 4, 60, HOLE / 4, HOLE / 4, 260);
+    g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, zone.palette.fog);
+    g2.fillStyle = g; g2.fillRect(0, 0, HOLE / 2, HOLE / 2);
+    fogCache[zone.id] = c;
+    return c;
+  }
   Render.drawFog = function (ctx, zone, px, py, isBoss) {
     ctx.fillStyle = zone.palette.fog; ctx.fillRect(0, 0, 960, 540);
     if (isBoss) return;
-    const g = ctx.createRadialGradient(px, py, 120, px, py, 520);
-    g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, zone.palette.fog);
-    ctx.globalAlpha = 0.5; ctx.fillStyle = g; ctx.fillRect(0, 0, 960, 540); ctx.globalAlpha = 1;
+    const hole = fogHole(zone);
+    const hx = px - HOLE_HALF, hy = py - HOLE_HALF;
+    ctx.globalAlpha = 0.5;
+    ctx.drawImage(hole, hx, hy, HOLE, HOLE);
+    ctx.fillStyle = zone.palette.fog;
+    // the four bands around the square (only the parts inside the screen)
+    if (hy > 0) ctx.fillRect(0, 0, 960, hy);
+    if (hy + HOLE < 540) ctx.fillRect(0, hy + HOLE, 960, 540 - hy - HOLE);
+    if (hx > 0) ctx.fillRect(0, Math.max(0, hy), hx, Math.min(540, hy + HOLE) - Math.max(0, hy));
+    if (hx + HOLE < 960) ctx.fillRect(hx + HOLE, Math.max(0, hy), 960 - hx - HOLE, Math.min(540, hy + HOLE) - Math.max(0, hy));
+    ctx.globalAlpha = 1;
   };
   Render.drawVignette = function (ctx) {
     if (!vignette) {

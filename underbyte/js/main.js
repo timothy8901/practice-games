@@ -22,6 +22,10 @@
     UB.debug = UB.Engine.makeDebug(game);
     UB.Input.init(canvas);
     game.init();
+    // World data check (CONTRACT §4.3): every problem is a console.warn line — tests treat
+    // warnings as non-fatal, but the world test asserts UB.World.validate() returns [].
+    const worldErrors = UB.World.validate();
+    for (let i = 0; i < worldErrors.length; i++) console.warn('[UB world] ' + worldErrors[i]);
 
     function resize() {
       const ww = window.innerWidth, wh = window.innerHeight;
