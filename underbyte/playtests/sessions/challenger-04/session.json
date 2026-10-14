@@ -1,0 +1,1364 @@
+{
+ "session": "challenger-04",
+ "startedAt": "2026-10-14T13:20:07.160Z",
+ "size": [
+  960,
+  540
+ ],
+ "pad": false,
+ "turns": [
+  {
+   "turn": 1,
+   "video": 2.02,
+   "cmd": {
+    "act": [
+     {
+      "wait": 300
+     },
+     {
+      "tap": "confirm"
+     },
+     {
+      "wait": 1500
+     }
+    ]
+   },
+   "room": "bv_rest",
+   "hp": 5,
+   "events": [
+    {
+     "f": 58,
+     "type": "maxHp",
+     "maxHp": 5
+    },
+    {
+     "f": 58,
+     "type": "death",
+     "room": null
+    },
+    {
+     "f": 58,
+     "type": "bits",
+     "bits": 4,
+     "delta": 4
+    },
+    {
+     "f": 78,
+     "type": "screen",
+     "from": "title",
+     "to": "play"
+    },
+    {
+     "f": 78,
+     "type": "room",
+     "from": null,
+     "to": "bv_rest"
+    }
+   ]
+  },
+  {
+   "turn": 2,
+   "video": 2.02,
+   "cmd": {
+    "debug": "UB.debug.defeatBoss(\"corrosant\")"
+   },
+   "room": "bv_rest",
+   "hp": 5,
+   "events": []
+  },
+  {
+   "turn": 3,
+   "video": 2.02,
+   "cmd": {
+    "debug": "UB.debug.grant(\"gripProtocol\", true)"
+   },
+   "room": "bv_rest",
+   "hp": 5,
+   "events": [
+    {
+     "f": 152,
+     "type": "ability",
+     "ability": "gripProtocol"
+    }
+   ]
+  },
+  {
+   "turn": 4,
+   "video": 2.02,
+   "cmd": {
+    "debug": "UB.debug.setMaxHp(8)"
+   },
+   "room": "bv_rest",
+   "hp": 5,
+   "events": [
+    {
+     "f": 152,
+     "type": "maxHp",
+     "maxHp": 8
+    }
+   ]
+  },
+  {
+   "turn": 5,
+   "video": 2.02,
+   "cmd": {
+    "debug": "UB.debug.warp(\"rw_rest\",\"L\")"
+   },
+   "room": "rw_rest",
+   "hp": 5,
+   "events": [
+    {
+     "f": 152,
+     "type": "room",
+     "from": "bv_rest",
+     "to": "rw_rest"
+    }
+   ]
+  },
+  {
+   "turn": 6,
+   "video": 4.19,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "wait": 900
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 100
+     },
+     {
+      "tap": "up"
+     },
+     {
+      "wait": 1000
+     }
+    ]
+   },
+   "room": "rw_rest",
+   "hp": 8,
+   "events": [
+    {
+     "f": 247,
+     "type": "heal",
+     "hp": 8
+    },
+    {
+     "f": 272,
+     "type": "screen",
+     "from": "play",
+     "to": "lore"
+    }
+   ]
+  },
+  {
+   "turn": 7,
+   "video": 8.95,
+   "cmd": {
+    "act": [
+     {
+      "tap": "confirm"
+     },
+     {
+      "wait": 300
+     },
+     {
+      "down": "right"
+     },
+     {
+      "wait": 2800
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 1500
+     }
+    ]
+   },
+   "room": "rw_rest",
+   "hp": 8,
+   "events": [
+    {
+     "f": 283,
+     "type": "screen",
+     "from": "lore",
+     "to": "play"
+    }
+   ]
+  },
+  {
+   "turn": 8,
+   "video": 12.57,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "wait": 500
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 3000
+     }
+    ]
+   },
+   "room": "rw_throne",
+   "hp": 8,
+   "events": [
+    {
+     "f": 578,
+     "type": "room",
+     "from": "rw_rest",
+     "to": "rw_throne"
+    },
+    {
+     "f": 601,
+     "type": "bossFight",
+     "state": "intro",
+     "boss": "kernauth"
+    },
+    {
+     "f": 751,
+     "type": "bossFight",
+     "state": "fight",
+     "boss": "kernauth"
+    }
+   ]
+  },
+  {
+   "turn": 9,
+   "video": 13.47,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "wait": 600
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 200
+     }
+    ]
+   },
+   "room": "rw_throne",
+   "hp": 8,
+   "events": []
+  },
+  {
+   "turn": 10,
+   "video": 14.24,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "wait": 500
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 200
+     }
+    ]
+   },
+   "room": "rw_throne",
+   "hp": 8,
+   "events": []
+  },
+  {
+   "turn": 11,
+   "video": 14.64,
+   "cmd": {
+    "act": [
+     {
+      "wait": 300
+     }
+    ]
+   },
+   "room": "rw_throne",
+   "hp": 8,
+   "events": []
+  },
+  {
+   "turn": 12,
+   "video": 15.79,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "tap": "dash"
+     },
+     {
+      "wait": 250
+     },
+     {
+      "wait": 450
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 100
+     }
+    ]
+   },
+   "room": "rw_throne",
+   "hp": 8,
+   "events": []
+  },
+  {
+   "turn": 13,
+   "video": 16.99,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "tap": "jump",
+      "ms": 280
+     },
+     {
+      "wait": 100
+     },
+     {
+      "up": "right"
+     },
+     {
+      "tap": "light"
+     },
+     {
+      "wait": 140
+     },
+     {
+      "tap": "light"
+     },
+     {
+      "wait": 140
+     },
+     {
+      "tap": "light"
+     },
+     {
+      "wait": 200
+     }
+    ]
+   },
+   "room": "rw_throne",
+   "hp": 7,
+   "events": [
+    {
+     "f": 960,
+     "type": "hurt",
+     "hp": 7,
+     "maxHp": 8,
+     "room": "rw_throne",
+     "hazard": false
+    }
+   ]
+  },
+  {
+   "turn": 14,
+   "video": 18.87,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "wait": 300
+     },
+     {
+      "up": "right"
+     },
+     {
+      "tap": "jump",
+      "ms": 280
+     },
+     {
+      "wait": 150
+     },
+     {
+      "tap": "light"
+     },
+     {
+      "wait": 250
+     },
+     {
+      "tap": "jump",
+      "ms": 200
+     },
+     {
+      "wait": 120
+     },
+     {
+      "tap": "light"
+     },
+     {
+      "wait": 250
+     }
+    ]
+   },
+   "room": "rw_throne",
+   "hp": 7,
+   "events": []
+  },
+  {
+   "turn": 15,
+   "video": 19.94,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "wait": 250
+     },
+     {
+      "up": "right"
+     },
+     {
+      "tap": "light"
+     },
+     {
+      "wait": 140
+     },
+     {
+      "tap": "light"
+     },
+     {
+      "wait": 140
+     },
+     {
+      "tap": "light"
+     },
+     {
+      "wait": 200
+     }
+    ]
+   },
+   "room": "rw_throne",
+   "hp": 6,
+   "events": [
+    {
+     "f": 1186,
+     "type": "hurt",
+     "hp": 6,
+     "maxHp": 8,
+     "room": "rw_throne",
+     "hazard": false
+    }
+   ]
+  },
+  {
+   "turn": 16,
+   "video": 20.61,
+   "cmd": {
+    "act": [
+     {
+      "down": "left"
+     },
+     {
+      "wait": 220
+     },
+     {
+      "up": "left"
+     },
+     {
+      "wait": 350
+     }
+    ]
+   },
+   "room": "rw_throne",
+   "hp": 6,
+   "events": []
+  },
+  {
+   "turn": 17,
+   "video": 22.94,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "wait": 280
+     },
+     {
+      "up": "right"
+     },
+     {
+      "tap": "jump",
+      "ms": 300
+     },
+     {
+      "wait": 180
+     },
+     {
+      "tap": "light"
+     },
+     {
+      "wait": 300
+     },
+     {
+      "tap": "jump",
+      "ms": 300
+     },
+     {
+      "wait": 180
+     },
+     {
+      "tap": "light"
+     },
+     {
+      "wait": 300
+     }
+    ]
+   },
+   "room": "rw_throne",
+   "hp": 5,
+   "events": [
+    {
+     "f": 1287,
+     "type": "hurt",
+     "hp": 5,
+     "maxHp": 8,
+     "room": "rw_throne",
+     "hazard": false
+    }
+   ]
+  },
+  {
+   "turn": 18,
+   "video": 23.32,
+   "cmd": {
+    "act": [
+     {
+      "wait": 300
+     }
+    ]
+   },
+   "room": "rw_throne",
+   "hp": 5,
+   "events": []
+  },
+  {
+   "turn": 19,
+   "video": 24.29,
+   "cmd": {
+    "act": [
+     {
+      "wait": 200
+     },
+     {
+      "tap": "jump",
+      "ms": 250
+     },
+     {
+      "wait": 120
+     },
+     {
+      "tap": "light"
+     },
+     {
+      "wait": 200
+     }
+    ]
+   },
+   "room": "rw_throne",
+   "hp": 4,
+   "events": [
+    {
+     "f": 1446,
+     "type": "hurt",
+     "hp": 4,
+     "maxHp": 8,
+     "room": "rw_throne",
+     "hazard": false
+    }
+   ]
+  },
+  {
+   "turn": 20,
+   "video": 24.88,
+   "cmd": {
+    "act": [
+     {
+      "wait": 400
+     }
+    ]
+   },
+   "room": "rw_throne",
+   "hp": 4,
+   "events": []
+  },
+  {
+   "turn": 21,
+   "video": 25.63,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "wait": 550
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 100
+     }
+    ]
+   },
+   "room": "rw_throne",
+   "hp": 4,
+   "events": []
+  },
+  {
+   "turn": 22,
+   "video": 27.11,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "wait": 120
+     },
+     {
+      "up": "right"
+     },
+     {
+      "tap": "jump",
+      "ms": 300
+     },
+     {
+      "wait": 150
+     },
+     {
+      "tap": "light"
+     },
+     {
+      "wait": 150
+     },
+     {
+      "tap": "light"
+     },
+     {
+      "wait": 250
+     }
+    ]
+   },
+   "room": "rw_throne",
+   "hp": 3,
+   "events": [
+    {
+     "f": 1558,
+     "type": "hurt",
+     "hp": 3,
+     "maxHp": 8,
+     "room": "rw_throne",
+     "hazard": false
+    }
+   ]
+  },
+  {
+   "turn": 23,
+   "video": 28.39,
+   "cmd": {
+    "act": [
+     {
+      "down": "left"
+     },
+     {
+      "wait": 40
+     },
+     {
+      "up": "left"
+     },
+     {
+      "tap": "jump",
+      "ms": 200
+     },
+     {
+      "wait": 100
+     },
+     {
+      "tap": "light"
+     },
+     {
+      "wait": 150
+     },
+     {
+      "tap": "light"
+     },
+     {
+      "wait": 250
+     }
+    ]
+   },
+   "room": "rw_throne",
+   "hp": 2,
+   "events": [
+    {
+     "f": 1643,
+     "type": "hurt",
+     "hp": 2,
+     "maxHp": 8,
+     "room": "rw_throne",
+     "hazard": false
+    }
+   ]
+  },
+  {
+   "turn": 24,
+   "video": 29.62,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "wait": 40
+     },
+     {
+      "up": "right"
+     },
+     {
+      "tap": "jump",
+      "ms": 260
+     },
+     {
+      "wait": 110
+     },
+     {
+      "tap": "light"
+     },
+     {
+      "wait": 150
+     },
+     {
+      "tap": "light"
+     },
+     {
+      "wait": 250
+     }
+    ]
+   },
+   "room": "rw_throne",
+   "hp": 1,
+   "events": [
+    {
+     "f": 1713,
+     "type": "hurt",
+     "hp": 1,
+     "maxHp": 8,
+     "room": "rw_throne",
+     "hazard": false
+    }
+   ]
+  },
+  {
+   "turn": 25,
+   "video": 30.61,
+   "cmd": {
+    "act": [
+     {
+      "wait": 150
+     },
+     {
+      "tap": "jump",
+      "ms": 300
+     },
+     {
+      "wait": 450
+     }
+    ]
+   },
+   "room": "rw_throne",
+   "hp": 0,
+   "events": [
+    {
+     "f": 1784,
+     "type": "hurt",
+     "hp": 0,
+     "maxHp": 8,
+     "room": "rw_throne",
+     "hazard": false
+    },
+    {
+     "f": 1784,
+     "type": "death",
+     "room": "rw_throne"
+    }
+   ]
+  },
+  {
+   "turn": 26,
+   "video": 34.19,
+   "cmd": {
+    "act": [
+     {
+      "wait": 2200
+     },
+     {
+      "tap": "confirm"
+     },
+     {
+      "wait": 1200
+     }
+    ]
+   },
+   "room": "rw_rest",
+   "hp": 8,
+   "events": [
+    {
+     "f": 1891,
+     "type": "screen",
+     "from": "play",
+     "to": "gameover"
+    },
+    {
+     "f": 1967,
+     "type": "screen",
+     "from": "gameover",
+     "to": "play"
+    },
+    {
+     "f": 1967,
+     "type": "room",
+     "from": "rw_throne",
+     "to": "rw_rest"
+    },
+    {
+     "f": 1967,
+     "type": "bossFight",
+     "state": "none",
+     "boss": null
+    }
+   ]
+  },
+  {
+   "turn": 27,
+   "video": 40.52,
+   "cmd": {
+    "act": [
+     {
+      "tap": "up"
+     },
+     {
+      "wait": 600
+     },
+     {
+      "down": "right"
+     },
+     {
+      "wait": 2600
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 2900
+     }
+    ]
+   },
+   "room": "rw_rest",
+   "hp": 8,
+   "events": []
+  },
+  {
+   "turn": 28,
+   "video": 44.38,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "wait": 600
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 3000
+     }
+    ]
+   },
+   "room": "rw_throne",
+   "hp": 8,
+   "events": [
+    {
+     "f": 2425,
+     "type": "room",
+     "from": "rw_rest",
+     "to": "rw_throne"
+    },
+    {
+     "f": 2448,
+     "type": "bossFight",
+     "state": "intro",
+     "boss": "kernauth"
+    },
+    {
+     "f": 2598,
+     "type": "bossFight",
+     "state": "fight",
+     "boss": "kernauth"
+    }
+   ]
+  },
+  {
+   "turn": 29,
+   "video": 45.64,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "wait": 1100
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 50
+     }
+    ]
+   },
+   "room": "rw_throne",
+   "hp": 8,
+   "events": []
+  },
+  {
+   "turn": 30,
+   "video": 47.02,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "wait": 350
+     },
+     {
+      "tap": "jump",
+      "ms": 300
+     },
+     {
+      "wait": 500
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 50
+     }
+    ]
+   },
+   "room": "rw_throne",
+   "hp": 8,
+   "events": []
+  },
+  {
+   "turn": 31,
+   "video": 48.82,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "wait": 800
+     },
+     {
+      "up": "right"
+     },
+     {
+      "tap": "jump",
+      "ms": 300
+     },
+     {
+      "wait": 170
+     },
+     {
+      "tap": "light"
+     },
+     {
+      "wait": 250
+     }
+    ]
+   },
+   "room": "rw_throne",
+   "hp": 8,
+   "events": []
+  },
+  {
+   "turn": 32,
+   "video": 50.68,
+   "cmd": {
+    "act": [
+     {
+      "tap": "jump",
+      "ms": 300
+     },
+     {
+      "wait": 170
+     },
+     {
+      "tap": "light"
+     },
+     {
+      "wait": 330
+     },
+     {
+      "tap": "jump",
+      "ms": 300
+     },
+     {
+      "wait": 170
+     },
+     {
+      "tap": "heavy"
+     },
+     {
+      "wait": 350
+     }
+    ]
+   },
+   "room": "rw_throne",
+   "hp": 7,
+   "events": [
+    {
+     "f": 2942,
+     "type": "hurt",
+     "hp": 7,
+     "maxHp": 8,
+     "room": "rw_throne",
+     "hazard": false
+    }
+   ]
+  },
+  {
+   "turn": 33,
+   "video": 52.52,
+   "cmd": {
+    "act": [
+     {
+      "tap": "jump",
+      "ms": 300
+     },
+     {
+      "wait": 170
+     },
+     {
+      "tap": "light"
+     },
+     {
+      "wait": 330
+     },
+     {
+      "tap": "jump",
+      "ms": 300
+     },
+     {
+      "wait": 170
+     },
+     {
+      "tap": "light"
+     },
+     {
+      "wait": 330
+     }
+    ]
+   },
+   "room": "rw_throne",
+   "hp": 5,
+   "events": [
+    {
+     "f": 3008,
+     "type": "hurt",
+     "hp": 6,
+     "maxHp": 8,
+     "room": "rw_throne",
+     "hazard": false
+    },
+    {
+     "f": 3102,
+     "type": "hurt",
+     "hp": 5,
+     "maxHp": 8,
+     "room": "rw_throne",
+     "hazard": false
+    }
+   ]
+  },
+  {
+   "turn": 34,
+   "video": 52.52,
+   "cmd": {
+    "debug": "UB.debug.defeatBoss(\"kernauth\")"
+   },
+   "room": "rw_throne",
+   "hp": 5,
+   "events": []
+  },
+  {
+   "turn": 35,
+   "video": 55.55,
+   "cmd": {
+    "act": [
+     {
+      "wait": 3000
+     }
+    ]
+   },
+   "room": "rw_throne",
+   "hp": 5,
+   "events": [
+    {
+     "f": 3106,
+     "type": "bossFight",
+     "state": "done",
+     "boss": null
+    }
+   ]
+  },
+  {
+   "turn": 36,
+   "video": 57.97,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "wait": 800
+     },
+     {
+      "up": "right"
+     },
+     {
+      "tap": "up"
+     },
+     {
+      "wait": 1200
+     }
+    ]
+   },
+   "room": "rw_throne",
+   "hp": 5,
+   "events": []
+  }
+ ],
+ "marks": [
+  {
+   "turn": 17,
+   "video": 22.94,
+   "note": "Kernauth: took a hit while jumping at the core during Root Spikes recover - could not see what hit me (no visible spike, no projectile). 3 hearts gone for 2 damage dealt."
+  },
+  {
+   "turn": 24,
+   "video": 29.62,
+   "note": "Kernauth summons: two eye-wisps chase me, I swung at them 3 times and they are still alive (enemies:2), each contact = 1 heart. 7 hearts lost in 17 s for 2 damage dealt. The arena gets crowded fast: flares + summons + spikes + cable."
+  },
+  {
+   "turn": 25,
+   "video": 30.61,
+   "note": "Death to Kernauth phase 1 (198/200): jumped the cable whip-tip and landed in a chasing summon. Never saw phase 2 honestly."
+  },
+  {
+   "turn": 32,
+   "video": 50.68,
+   "note": "Drifted forward while jump-attacking and now stand INSIDE Kernauth seated body (x=961) - no push-out; unclear whether the mass hurts on contact (earlier it did)."
+  },
+  {
+   "turn": 33,
+   "video": 52.52,
+   "note": "Cable Sweep tip spawned at Kernauth base right where I stood after a core hit - hurt before I saw the cable. 9 damage in ~8 s of clean core hits (3 per hit) = phase 1 alone needs ~65 hits. Stopping honest attempt 2 at 191/200, 5/8 hearts. Next: debug defeatBoss to view the ending only."
+  },
+  {
+   "turn": 36,
+   "video": 57.97,
+   "note": "After debug defeatBoss(kernauth): the boss just vanishes, an empty throne arch stays, no victory/ending screen, no prompt at the throne after 5 s. Cannot judge the ending from here (debug path skips it)."
+  }
+ ],
+ "debugCalls": [
+  {
+   "turn": 2,
+   "video": 2.02,
+   "code": "UB.debug.defeatBoss(\"corrosant\")"
+  },
+  {
+   "turn": 3,
+   "video": 2.02,
+   "code": "UB.debug.grant(\"gripProtocol\", true)"
+  },
+  {
+   "turn": 4,
+   "video": 2.02,
+   "code": "UB.debug.setMaxHp(8)"
+  },
+  {
+   "turn": 5,
+   "video": 2.02,
+   "code": "UB.debug.warp(\"rw_rest\",\"L\")"
+  },
+  {
+   "turn": 34,
+   "video": 52.52,
+   "code": "UB.debug.defeatBoss(\"kernauth\")"
+  }
+ ],
+ "errors": [],
+ "segments": [
+  [
+   1.022,
+   3.042
+  ],
+  [
+   17.823,
+   19.997
+  ],
+  [
+   27.04,
+   31.798
+  ],
+  [
+   38.097,
+   41.714
+  ],
+  [
+   49.015,
+   49.915
+  ],
+  [
+   58.279,
+   59.047
+  ],
+  [
+   65.172,
+   65.573
+  ],
+  [
+   72.98,
+   74.137
+  ],
+  [
+   82.071,
+   83.268
+  ],
+  [
+   91.891,
+   93.767
+  ],
+  [
+   102.416,
+   103.489
+  ],
+  [
+   112.01,
+   112.678
+  ],
+  [
+   121.897,
+   124.224
+  ],
+  [
+   135.928,
+   136.317
+  ],
+  [
+   144.001,
+   144.962
+  ],
+  [
+   153.349,
+   153.943
+  ],
+  [
+   162.983,
+   163.729
+  ],
+  [
+   172.087,
+   173.572
+  ],
+  [
+   182.048,
+   183.324
+  ],
+  [
+   198.33,
+   199.566
+  ],
+  [
+   210.519,
+   211.507
+  ],
+  [
+   224.019,
+   227.595
+  ],
+  [
+   235.837,
+   242.169
+  ],
+  [
+   250.473,
+   254.333
+  ],
+  [
+   264.052,
+   265.312
+  ],
+  [
+   273.769,
+   275.146
+  ],
+  [
+   283.56,
+   285.36
+  ],
+  [
+   292.826,
+   294.695
+  ],
+  [
+   305.951,
+   307.785
+  ],
+  [
+   328.118,
+   331.15
+  ],
+  [
+   338.895,
+   341.311
+  ]
+ ],
+ "endedAt": "2026-10-14T13:27:46.828Z",
+ "liveSeconds": 57.97,
+ "video": "recordings/challenger-04-kernauth-attempts.mp4",
+ "convertError": null
+}
