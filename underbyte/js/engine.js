@@ -50,8 +50,19 @@
     burstLine: ['BURST LINE ACQUIRED', 'Press DASH (Shift / RB) to lunge 6 tiles — on the ground or once in the air', 'Skip the frames you do not need.'],
     gripProtocol: ['GRIP PROTOCOL ACQUIRED', 'Hold toward a wall in the air to cling · JUMP to kick off', 'The walls were never the problem.'],
   };
-  // reducedFlashing (playtest B42, DESIGN §14.2): full-screen flashes become a thin edge pulse (UB.FX reads it live)
-  const DEFAULT_SETTINGS = { version: 1, master: 8, music: 7, sfx: 8, screenShake: true, reducedFlashing: false, showHitboxes: false, touchControls: 'auto' };
+  // reducedFlashing (playtest B42, DESIGN §14.2): full-screen flashes become a thin edge pulse (UB.FX reads it live) at
+  // half intensity (FX.setFlashScale, F02), and the hero / boss / enemy strobes hold steady.
+  // steadySilhouette (F02): the i-frame blink never takes the hero away — the body stays drawn with a steady outline.
+  // hazardOutline (F05): every hazard tile and every hazardous enemy/boss attack box gets a high-contrast hatched rim.
+  // Old settings files simply lack the new keys: loadSettings fills every missing key with its default.
+  const DEFAULT_SETTINGS = { version: 1, master: 8, music: 7, sfx: 8, screenShake: true, reducedFlashing: false, steadySilhouette: false,
+    hazardOutline: false, showHitboxes: false, touchControls: 'auto' };
+  const REDUCED_FLASH_SCALE = 0.5;   // FX.flashScale while REDUCED FLASHING is on (the edge pulse is also capped at α 0.45)
+  // F06: a boss intro card the player has already sat through once can be skipped (confirm / jump / an attack press)
+  const INTRO_SKIP_FROM = 4;          // frames into the intro before a skip press counts (a press that opened it never does)
+  // F07 Restore Echo: a boss that has beaten the player this many times gets a recovered-memory tip at the next rest
+  const ECHO_DEATHS = 2;
+  const HAZARD_TINT = 3;   // F02: player.flash ≤ 4 draws the DANGER tint (no white); held through the hazard freeze when steady
 
   function warnOnce(key, msg) {
     warnOnce.seen = warnOnce.seen || Object.create(null);
@@ -68,6 +79,9 @@
     this.world = R.makeCanvas(W, H); this.wctx = this.world.getContext('2d');
     this.snap = R.makeCanvas(W, H);
     this.screen = 'title'; this.overlay = null; this.overlayFrom = null; this.screenT = 0;
+    // overlays stack (pause → settings → controls; lore → pause): closeOverlay() returns to the one below.
+    // `overlayFrom` mirrors the top of this stack (the overlay a close returns to).
+    this.overlayStack = [];
     this.busy = false;                 // a fade/transition owns the flow: menus ignore input
     this.frame = 0; this.fps = 0;
     this.save = null; this.savedData = null; this.settings = null;
@@ -96,6 +110,9 @@
     this.loreTimer = 0; this.loreZone = null;       // pending zone lore card (DESIGN §12.18)
     this.loreCard = null;                            // the zone whose card the 'lore' overlay shows (UI reads it)
     this.shopBought = null;                          // item bought while the shop is open → banner on close
+    this.ledgeOn = -1;                               // F04: index of the Signal Ledge that holds this visit's hazard respawn (−1 none)
+    this.ledgeT = 0;                                 // frames since that ledge was lit (its touch pulse)
+    this.introSkipped = false;                       // F06: this intro was skipped (the card exits early)
     this.lastFighter = 'tessik';
     this.rng = U.rng(0x5EED);
     this.scratch = { x: 0, y: 0 };
@@ -129,19 +146,25 @@
 
   // --- screens --------------------------------------------------------------------------------
   Game.prototype.setScreen = function (name) {
-    this.screen = name; this.overlay = null; this.overlayFrom = null; this.screenT = 0;
+    this.screen = name; this.overlay = null; this.overlayFrom = null; this.overlayStack.length = 0; this.screenT = 0;
     UI.enter(name, this);
   };
-  /** Overlays: 'pause' | 'map' | 'settings' | 'shop' | 'lore'. The UI handles their input and drawing. */
+  /**
+   * Overlays: 'pause' | 'map' | 'settings' | 'shop' | 'lore' | 'controls' (F01) | 'archive' (F06). The UI handles their
+   * input and drawing. Opening one over another stacks it (pause → settings → controls, lore → pause); closeOverlay()
+   * returns to the one below, the base screen after the last.
+   */
   Game.prototype.openOverlay = function (name) {
     if (this.overlay === name) return;
+    if (this.overlay) this.overlayStack.push(this.overlay);
     this.overlayFrom = this.overlay; this.overlay = name; UI.enter(name, this);
     In.clearBuffers();   // a buffered jump/attack must not fire when play resumes (DESIGN §2.5)
     if (this.screen === 'play') { Au.duck(0.4, 0.17); Au.stopLoops(); }
   };
   Game.prototype.closeOverlay = function () {
     const was = this.overlay;
-    this.overlay = this.overlayFrom; this.overlayFrom = null;
+    this.overlay = this.overlayStack.length ? this.overlayStack.pop() : null;
+    this.overlayFrom = this.overlayStack.length ? this.overlayStack[this.overlayStack.length - 1] : null;
     In.clearBuffers();   // the confirm key that closed the menu shares keys with jump/light: never carry it into play
     if (this.overlay) UI.enter(this.overlay, this);
     else { if (this.screen !== 'play') UI.enter(this.screen, this); Au.duck(1, 0.17); }
@@ -158,6 +181,7 @@
     this.bossFight.state = 'none'; this.bossFight.timer = 0; this.pickupSeq.timer = 0; this.pickupSeq.pickup = null;
     this.nodeUse.timer = 0; this.nodeUse.node = null; this.transition.phase = ''; this.transition.timer = 0;
     this.hazard.timer = 0; this.hazardTo.on = false; this.hazardRespawn.pending = false; this.zoom.t = 0; this.denyFlash = 0;
+    this.ledgeOn = -1; this.ledgeT = 0; this.dbgHitCount = 0; this.introSkipped = false;
     FX.hitstopFrames = 0;
     FX.clear(); UI.clearMessages();
     this.savedData = this.readSave();
@@ -241,6 +265,7 @@
       self.setScreen('play');
       // the game-over fade ducked the music to 0 and a boss death may have left 'boss' as the song: back to the zone
       self.playRoomMusic(); Au.duck(1, 0.5);
+      self.restoreEcho();   // F07: waking at the node after a boss beat you twice recovers a memory of it
       self.fadeTo(0, T.respawnFade, function () { self.busy = false; });
     });
   };
@@ -294,6 +319,10 @@
       vendor: [], nodesUsed: [], loreSeen: [],
       hints: { move: false, jump: false, light: false, heavy: false, special: false, dash: false, overclock: false, drop: false },
       enemiesPurged: 0, playTimeFrames: 0, deaths: 0, victory: false, savedAt: 0,
+      // F06: bosses whose intro card has played through once (later intros may be skipped)
+      introsSeen: [],
+      // F07 Restore Echo, per boss id: {deaths: times it beat the player, tips: memories shown, at: deaths when the last showed}
+      echo: {},
     };
   };
   /**
@@ -361,6 +390,16 @@
     out.vendor = strList(d.vendor, vendorOk, VENDOR.length);
     out.nodesUsed = strList(d.nodesUsed, nodeOk, 256);
     out.loreSeen = strList(d.loreSeen, zoneOk, 64);
+    out.introsSeen = strList(d.introsSeen, function (id) { return IDS.bosses.indexOf(id) >= 0; }, IDS.bosses.length);   // F06; absent in older saves → []
+    if (isObj(d.echo)) {   // F07: only pinned boss ids, each a {deaths, tips, at} of whole numbers (older saves: none)
+      for (let i = 0; i < IDS.bosses.length; i++) {
+        const e = d.echo[IDS.bosses[i]];
+        if (!isObj(e)) continue;
+        const de = num(e.deaths, 0), ti = num(e.tips, 0), at = num(e.at, 0);
+        if (de === null) continue;
+        out.echo[IDS.bosses[i]] = { deaths: Math.min(de, 99999), tips: Math.min(ti === null ? 0 : ti, 99999), at: Math.min(at === null ? 0 : at, de) };
+      }
+    }
     if (isObj(d.hints)) for (let i = 0; i < HINT_KEYS.length; i++) out.hints[HINT_KEYS[i]] = d.hints[HINT_KEYS[i]] === true;
     out.enemiesPurged = num(d.enemiesPurged, 0) !== null ? num(d.enemiesPurged, 0) : 0;
     out.playTimeFrames = num(d.playTimeFrames, 0) !== null ? num(d.playTimeFrames, 0) : 0;
@@ -417,9 +456,18 @@
     try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(this.settings)); } catch (e) { /* ignore */ }
   };
   Game.prototype.applySettings = function () {
-    FX.setShakeEnabled(this.settings.screenShake);
-    Au.setVolumes({ master: this.settings.master, music: this.settings.music, sfx: this.settings.sfx });
+    const st = this.settings;
+    FX.setShakeEnabled(st.screenShake);
+    Au.setVolumes({ master: st.master, music: st.music, sfx: st.sfx });
+    // F02: REDUCED FLASHING drives the FX flash intensity hook (B42's FX.flashScale): every full-screen flash is an edge
+    // pulse (FX.reducedFlashing) at half strength; the hero / boss / enemy strobes read the setting live
+    FX.setFlashScale(st.reducedFlashing === true ? REDUCED_FLASH_SCALE : 1);
+    // F05: the hatched hazard rims are painted into the static tile cache — repaint the room the setting changed in
+    const outline = st.hazardOutline === true;
+    if (R.setHazardOutline && R.setHazardOutline(outline) && this.level) R.buildTileCache(this.level, this.dpr);
   };
+  /** Is a boolean comfort / readability setting on? (missing keys — an older settings file — read as off) */
+  Game.prototype.setting = function (key) { return !!this.settings && this.settings[key] === true; };
 
   // --- rooms --------------------------------------------------------------------------------------
   function makeLevel(room) {
@@ -509,6 +557,8 @@
     this.hazardRespawn.x = pos.x; this.hazardRespawn.y = pos.y; this.hazardRespawn.vy = vy; this.hazardRespawn.iframes = iframes;
     this.hazardRespawn.pending = arrival.side === 'top';   // a chute launch: the first solid footing inside the room becomes the respawn point
     this.hazardTo.on = false;
+    this.ledgeOn = -1; this.ledgeT = 0;   // F04: Signal Ledges hold for one visit; every entry starts from the arrival again
+    this.dbgHitCount = 0;                 // no attack box of the previous room is outlined / drawn here (F05, showHitboxes)
     // a boss beaten whose module was never collected (died during the reward, quit): the module waits at its pickup tile
     if (room.boss && !this.boss && this.save.bossesDefeated.indexOf(room.boss.id) >= 0 && !room.boss.final) {
       const ab = IDS.bossAbility[room.boss.id];
@@ -913,17 +963,36 @@
     bf.state = 'intro'; bf.timer = T.bossIntro; this.mode = 'bossIntro';
     this.player.locked = true; this.player.vx = 0; this.player.cancelMove();
     if (spec.seal.length) this.sealExits(spec.seal, true);
+    this.introSkipped = false;
     UI.bossCard(b.name, b.subtitle, T.bossIntro);
     Au.music('boss');
     if (b.onIntro) b.onIntro(this);
   };
+  /**
+   * F06: may this intro be skipped? Only once the player has sat through this boss's card in full (save.introsSeen),
+   * and only after the first INTRO_SKIP_FROM frames (a press that walked the player into the bounds never skips).
+   */
+  Game.prototype.introSkippable = function () {
+    const b = this.boss, bf = this.bossFight;
+    return !!(b && bf.state === 'intro' && this.mode === 'bossIntro' && this.save && this.save.introsSeen &&
+      this.save.introsSeen.indexOf(b.id) >= 0 && bf.timer <= T.bossIntro - INTRO_SKIP_FROM);
+  };
   Game.prototype.updateBossIntro = function () {
-    const bf = this.bossFight;
+    const bf = this.bossFight, st = In.state;
+    // F06 retry flow: a confirm, jump or attack press ends a card already seen — straight into the fight
+    if (this.introSkippable() && (st.confirm.pressed || st.jump.pressed || st.light.pressed || st.heavy.pressed || st.special.pressed)) {
+      bf.timer = 1; this.introSkipped = true;
+      UI.skipBossCard();
+      In.clearBuffers();   // the skip press never becomes the fight's first jump / attack
+    }
     bf.timer--;
     if (bf.timer === T.bossIntro - 8) { Au.sfx('bossRoar', this.boss.x); FX.shake(7, 12); }
     if (bf.timer <= 0) {
       bf.state = 'fight'; this.mode = 'normal'; this.player.locked = false;
       this.boss.active = true;
+      // the card has now played once for this boss (in full, or skipped after a full viewing): later intros may be skipped
+      const seen = this.save && this.save.introsSeen;
+      if (seen && IDS.bosses.indexOf(this.boss.id) >= 0 && seen.indexOf(this.boss.id) < 0) seen.push(this.boss.id);
       if (this.boss.onFightStart) this.boss.onFightStart(this);
     }
   };
@@ -1025,12 +1094,14 @@
     Au.sfx('spike', pl.x);
     if (pl.dead) return;
     this.mode = 'hazard'; this.hazard.timer = 0; this.hazard.kind = kind;
-    pl.vx = 0; pl.vy = 0; pl.cancelMove(); pl.flash = T.hazardFreeze;
+    pl.vx = 0; pl.vy = 0; pl.cancelMove(); pl.flash = this.steadyHero() ? HAZARD_TINT : T.hazardFreeze;
   };
+  /** F02: no strobing hero — REDUCED FLASHING or STEADY SILHOUETTE hold the hazard-freeze tint steady instead of blinking it. */
+  Game.prototype.steadyHero = function () { return this.setting('reducedFlashing') || this.setting('steadySilhouette'); };
   Game.prototype.updateHazard = function () {
     const hz = this.hazard, pl = this.player;
     hz.timer++;
-    pl.flash = (hz.timer >> 2) & 1 ? 6 : 0;
+    pl.flash = this.steadyHero() ? HAZARD_TINT : ((hz.timer >> 2) & 1 ? 6 : 0);
     if (hz.timer === T.hazardFreeze) this.fadeTo(1, T.hazardFade, null);
     if (hz.timer >= T.hazardFreeze + T.hazardFade) {
       const hr = this.hazardRespawn, to = this.hazardTo;
@@ -1107,13 +1178,70 @@
       s.roomId = this.level.room.id; s.spawn.nodeId = n.id;
       if (s.nodesUsed.indexOf(n.id) < 0) s.nodesUsed.push(n.id);
       this.hazardRespawn.x = nx; this.hazardRespawn.y = ny; this.hazardRespawn.vy = 0; this.hazardRespawn.iframes = 0; this.hazardRespawn.pending = false;
+      this.ledgeOn = -1;   // the node now holds the hazard respawn (F04)
       this.spawnRoomEnemies();
       this.writeSave();
       UI.banner('RESTORED', 'Saved · hearts full · energy full', '', 150);
       FX.burst('heal', nx, ny - 20, 16, { color: P.CORE_HEART }); FX.burst('ring', nx, ny - 20, 1, { radius: 40 });
       Au.sfx('save', pl.x);
       this.mode = 'normal';
+      this.restoreEcho();
     }
+  };
+  /**
+   * F07 Restore Echo. After ECHO_DEATHS defeats by the same unbeaten boss, the next rest at a restore node — a REST, or
+   * waking there after SIGNAL LOST — recovers one short memory about that boss (UI.echo: a calm in-world panel that
+   * never takes control or pauses play). One memory per rest, and another only after another defeat by it; each boss's
+   * memories rotate. Returns the boss id whose memory showed, or null.
+   */
+  Game.prototype.restoreEcho = function () {
+    const s = this.save; if (!s || !s.echo) return null;
+    let best = null, bestD = 0;
+    for (let i = 0; i < IDS.bosses.length; i++) {
+      const id = IDS.bosses[i], e = s.echo[id];
+      if (!e || s.bossesDefeated.indexOf(id) >= 0) continue;
+      if (e.deaths >= ECHO_DEATHS && e.deaths > e.at && e.deaths > bestD) { best = id; bestD = e.deaths; }
+    }
+    if (!best) return null;
+    const e = s.echo[best];
+    UI.echo(best, e.tips);
+    e.tips++; e.at = e.deaths;
+    Au.sfx('memory');
+    return best;
+  };
+  /** F07: the player died while this boss's fight (or intro) was live — count it toward its Restore Echo. */
+  Game.prototype.noteBossDefeat = function () {
+    const b = this.boss, bf = this.bossFight, s = this.save;
+    if (!s || !b || b.dead || (bf.state !== 'fight' && bf.state !== 'intro') || IDS.bosses.indexOf(b.id) < 0) return;
+    const e = s.echo[b.id] || (s.echo[b.id] = { deaths: 0, tips: 0, at: 0 });
+    e.deaths++;
+  };
+  // --- Signal Ledges (F04) -----------------------------------------------------------------------------------------------
+  const LEDGE_REACH = 6;   // px each side of the pad's tile that still counts as touching it
+  /**
+   * A Signal Ledge (room.ledges, DESIGN §5.6) lights when the fighter's body touches its tile (± LEDGE_REACH px): for the
+   * rest of this visit a hazard respawns the fighter standing on it instead of at the room's entry. The most recent one
+   * touched wins; a room entry starts from the arrival again.
+   */
+  Game.prototype.updateLedges = function () {
+    const pl = this.player, ls = this.level.room.ledges;
+    if (this.ledgeT > 0 && this.ledgeT < 600) this.ledgeT++;
+    for (let i = 0; i < ls.length; i++) {
+      if (i === this.ledgeOn) continue;
+      const L = ls[i];
+      if (E.overlapBox(pl, L.x * TILE - LEDGE_REACH, L.y * TILE, TILE + 2 * LEDGE_REACH, TILE)) this.lightLedge(i);
+    }
+  };
+  Game.prototype.lightLedge = function (i) {
+    const L = this.level.room.ledges[i], hr = this.hazardRespawn;
+    if (!L) return false;
+    this.ledgeOn = i; this.ledgeT = 1;
+    hr.x = L.x * TILE + TILE / 2; hr.y = (L.y + 1) * TILE; hr.vy = 0; hr.iframes = 0; hr.pending = false;
+    const glow = this.zone ? this.zone.palette.glow : P.ENERGY;
+    FX.burst('ring', hr.x, hr.y - 6, 1, { radius: 28, color: glow });
+    FX.burst('glitter', hr.x, hr.y - 10, 8, { color: glow });
+    Au.sfx('signal', hr.x);
+    return true;
   };
   /**
    * Crush test (DESIGN §3.3): a mover has pushed the body so that it overlaps solid tiles by more than
@@ -1291,6 +1419,8 @@
       for (let tx = pl.groundTx0; tx <= pl.groundTx1; tx++) { const ch = E.tileAt(lv, tx, pl.groundTy); if (ch !== '#' && ch !== '-') solid = false; }
       if (solid && pl.y - pl.h > 0 && pl.y <= lv.h * TILE) { const hr = this.hazardRespawn; hr.x = pl.x; hr.y = pl.y; hr.vy = 0; hr.iframes = 0; hr.pending = false; }
     }
+    // F04: a Signal Ledge touched in normal play becomes this visit's hazard respawn
+    if (lv.room.ledges.length && this.mode === 'normal' && !pl.dead) this.updateLedges();
 
     // enemies / boss / projectiles
     for (let i = 0; i < this.enemies.length; i++) {
@@ -1357,7 +1487,7 @@
       }
     }
     // death
-    if (pl.dead && this.mode !== 'dying') { this.mode = 'dying'; this.save.deaths++; FX.shake(5, 20); }
+    if (pl.dead && this.mode !== 'dying') { this.noteBossDefeat(); this.mode = 'dying'; this.save.deaths++; FX.shake(5, 20); }
     if (this.mode === 'dying' && pl.deathTimer >= T.deathFrames && !this.busy) {
       const self = this;
       this.busy = true;
@@ -1388,6 +1518,8 @@
       const pulse = this.mode === 'nodeUse' && this.nodeUse.node === n ? 1 - this.nodeUse.timer / T.nodePulse : 0;
       R.drawNode(ctx, n.x * TILE + 15, (n.y + 1) * TILE, zone, this.save.nodesUsed.indexOf(n.id) >= 0, this.frame, pulse);
     }
+    const ls = room.ledges;   // F04 Signal Ledges: the lit one holds this visit's hazard respawn
+    for (let i = 0; i < ls.length; i++) R.drawLedge(ctx, ls[i].x * TILE + 15, (ls[i].y + 1) * TILE, zone, i === this.ledgeOn, this.frame, i === this.ledgeOn ? this.ledgeT : 0);
     if (room.vendor) R.drawVendor(ctx, room.vendor.x * TILE + 15, (room.vendor.y + 1) * TILE, zone, this.frame, pl.x);
     for (let i = 0; i < this.pickups.length; i++) {
       const p = this.pickups[i];
@@ -1403,6 +1535,7 @@
       const p = this.projectiles[i];
       if (p.x + p.w > cx - 80 && p.x - p.w < cx + W + 80 && p.y + p.h > cy - 80 && p.y - p.h < cy + H + 80) p.draw(ctx, this, alpha);
     }
+    if (this.setting('hazardOutline')) this.drawHazardHits(ctx);   // F05: every hazardous enemy/boss box gets the hatched rim
     FX.draw(ctx);
     if (this.settings.showHitboxes) this.drawHitboxes(ctx);
     ctx.restore();
@@ -1410,6 +1543,18 @@
     R.drawFog(ctx, zone, pl.x - cx, pl.cy() - cy, isBoss);
     R.drawVignette(ctx);
     if (this.mode === 'pickupSeq') { ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fillRect(0, 0, W, H); }
+  };
+  /**
+   * HAZARD OUTLINE (F05): the attack boxes enemies, bosses and their shots registered on the last resolved tick (the
+   * engine's copies in dbgHits — frozen with the world in hitstop and under an overlay) drawn with the shared
+   * high-contrast hatched rim (UB.Render.hazardBox), so what hurts reads by shape and luminance, not hue.
+   */
+  Game.prototype.drawHazardHits = function (ctx) {
+    for (let i = 0; i < this.dbgHitCount; i++) {
+      const h = this.dbgHits[i];
+      if (h.owner === 'player' || !(h.w > 0) || !(h.h > 0)) continue;
+      R.hazardBox(ctx, h.x, h.y, h.w, h.h, this.frame);
+    }
   };
   Game.prototype.drawHitboxes = function (ctx) {
     ctx.lineWidth = 1;
@@ -1487,6 +1632,7 @@
         nearNode: game.nearNode ? game.nearNode.id : null, nearVendor: game.nearVendor, prompt: game.prompt ? game.prompt.text : null,
         projectiles: game.projectiles.length, vendor: s ? s.vendor.slice() : [], energyMax: pl ? pl.energyMax : 0,
         loreSeen: s ? s.loreSeen.slice() : [], hints: s ? Object.assign({}, s.hints) : null,
+        ledge: game.ledgeOn, introsSeen: s && s.introsSeen ? s.introsSeen.slice() : [], echo: s && s.echo ? JSON.parse(JSON.stringify(s.echo)) : {},
         hasSave: game.hasSave(), savedRoom: game.savedData ? game.savedData.roomId : null,
       };
     };
@@ -1606,11 +1752,11 @@
     d.skipTo = function (screen) {
       if (screen === 'title') game.toTitle();
       else if (screen === 'select') { if (game.screen !== 'select') { game.toTitle(); game.setScreen('select'); } }
-      else if (screen === 'pause' || screen === 'map' || screen === 'settings' || screen === 'shop' || screen === 'lore') {
+      else if (screen === 'pause' || screen === 'map' || screen === 'settings' || screen === 'shop' || screen === 'lore' || screen === 'controls' || screen === 'archive') {
         if (game.screen === 'play') { if (screen === 'lore') game.loreCard = game.zone; game.openOverlay(screen); }
-        else if (screen === 'settings') game.openOverlay('settings');
+        else if (screen === 'settings' || screen === 'controls') game.openOverlay(screen);
       }
-      else if (screen === 'play') { if (game.overlay) { game.overlay = null; game.overlayFrom = null; } if (game.screen !== 'play' && game.player && game.level) game.setScreen('play'); }
+      else if (screen === 'play') { if (game.overlay) { game.overlay = null; game.overlayFrom = null; game.overlayStack.length = 0; } if (game.screen !== 'play' && game.player && game.level) game.setScreen('play'); }
       else if (screen === 'gameover' && game.player) { game.player.die(); }
       else if (screen === 'victory' && game.save) { game.victory(); }
       return game.overlay || game.screen;

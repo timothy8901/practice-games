@@ -41,7 +41,8 @@
     logo: 'UNDERBYTE',
     tagline: 'A kingdom buried in its own memory. Purge it from the inside.',
     titleMenu: ['NEW GAME', 'CONTINUE', 'SETTINGS'],
-    pressAny: 'PRESS ANY KEY',
+    // F03: before the first gesture nothing is known about the device — the prompt names both
+    pressAny: 'PRESS ANY KEY OR BUTTON',
     footer: 'an original game · keyboard or gamepad · press Enter',
     version: 'v1.0',
     noSave: 'No signal found. Start a new run.',
@@ -49,13 +50,51 @@
     selectHeader: 'CHOOSE YOUR SPIRIT',
     selectSub: '← → select · Enter confirm · Esc back',
     statLabels: ['HEARTS', 'SPEED', 'JUMP', 'WEIGHT'],
-    paused: 'PAUSED', pauseMenu: ['RESUME', 'MAP', 'SETTINGS', 'QUIT TO TITLE'],
+    // F01 CONTROLS and F06 LORE ARCHIVE join the pause menu before QUIT TO TITLE
+    paused: 'PAUSED', pauseMenu: ['RESUME', 'MAP', 'SETTINGS', 'CONTROLS', 'LORE ARCHIVE', 'QUIT TO TITLE'],
+    pauseFooter: '↑↓ select · Enter confirm · Esc resume',
     quit1: 'Unsaved progress since the', quit2: 'last node is lost. Quit?',
     yes: 'YES', no: 'NO',
     settings: 'SETTINGS',
-    // REDUCED FLASHING (playtest B42, the comfort toggle beside SCREEN SHAKE): full-screen flashes become a thin edge pulse
-    settingRows: ['MASTER VOLUME', 'MUSIC VOLUME', 'SFX VOLUME', 'SCREEN SHAKE', 'REDUCED FLASHING', 'SHOW HITBOXES', 'RESET SAVE', 'BACK'],
+    // REDUCED FLASHING (playtest B42, the comfort toggle beside SCREEN SHAKE): full-screen flashes become a thin edge pulse;
+    // STEADY SILHOUETTE (F02) and HAZARD OUTLINE (F05) follow it; CONTROLS (F01) opens the Controls & Moves page
+    settingRows: ['MASTER VOLUME', 'MUSIC VOLUME', 'SFX VOLUME', 'SCREEN SHAKE', 'REDUCED FLASHING', 'STEADY SILHOUETTE', 'HAZARD OUTLINE', 'SHOW HITBOXES', 'CONTROLS', 'RESET SAVE', 'BACK'],
+    settingsFooter: '↑↓ select · ←→ adjust · Enter toggle · Esc back',
     on: 'ON', off: 'OFF',
+    // F01 Controls & Moves page (DESIGN §12.19): every input of the device in use, the abilities (LOCKED until earned, with
+    // a vague in-world hint of where), the fighter's moves
+    controlsTitle: 'CONTROLS & MOVES', controlsDevices: ['KEYBOARD', 'GAMEPAD'], controlsFooter: 'Esc back',
+    controlsHead: ['INPUTS', 'MOVES'],
+    controlsRows: ['MOVE', 'JUMP', 'DROP THROUGH', 'LIGHT', 'HEAVY', 'SPECIAL', 'AIR ATTACK', 'DOWN-STRIKE', 'OVERCLOCK', 'ULTIMATE',
+      'INTERACT', 'PAUSE', 'MAP', 'ECHO JUMP', 'BURST LINE', 'GRIP PROTOCOL'],
+    controlsNotes: ['', 'hold for height', 'on a grate', '3-hit chain', '', 'costs energy', 'in the air', 'in the air · bounces off foes and spikes',
+      'when the meter is full', 'while overclocked', 'at a node or vendor', '', '', 'again in the air', 'a 6-tile lunge, ground or air',
+      'hold toward a wall in the air, then jump'],
+    controlsStick: 'stick', locked: 'LOCKED',
+    lockedWhere: { echoJump: 'held by a guardian below the shrine', burstLine: 'held by a guardian among the looms', gripProtocol: 'held by a guardian under the brine' },
+    movesRows: ['LIGHT CHAIN', 'HEAVY', 'SPECIAL', 'AIR ATTACK', 'DOWN-STRIKE', 'ULTIMATE'],
+    movesEnergy: ' energy',
+    movesOc: ['OVERCLOCK: landing hits fills the meter.', 'When it is full, transform for 12 seconds:', 'bigger, faster, stronger, and SPECIAL', 'becomes the ULTIMATE.'],
+    // F06 LORE ARCHIVE (DESIGN §12.20): the zone lore cards already seen, re-readable from the pause menu
+    archiveTitle: 'LORE ARCHIVE', archiveUnseen: 'unrecovered', archiveCount: ' of 5 recovered', archiveEmpty: 'Nothing recovered yet.',
+    archiveFooter: '↑↓ select · Esc back',
+    // F06 retry flow: a lore card closes on CONFIRM only (after a short ignore window); a seen boss intro can be skipped
+    loreContinue: 'Press Enter to continue',
+    introSkip: 'Enter skip',
+    // F07 Restore Echo (DESIGN §12.21): after two defeats by the same boss, the next rest recovers one of these
+    echoTitle: 'RECOVERED MEMORY',
+    echoTallock: ['The stack cannot turn mid-swing. Step behind it and strike its back.',
+      'When it crouches, its mark follows you. Once it leaps the mark holds still: walk out of it.',
+      'Its quake runs along the floor. Jump the wave, or wait it out on a shelf.'],
+    echoWeftyr: ['When the thread stops trembling, change your height. The shuttle keeps to the line it drew.',
+      'Come down on the snare and it breaks. Jump it as it is laid.',
+      'After the spin it lies dazed on the floor. That is the moment to hit hardest.'],
+    echoCorrosant: ['Its head is worth more than its coils. Strike the wedge.',
+      'When the floor stirs, climb. The brine only burns once it has risen.',
+      'On the floor it sweeps from end to end. Wait above it on a grate.'],
+    echoKernauth: ['The core sits one jump above the floor. Strike it from the air.',
+      'Only the glowing tip of the cable bites. Jump the tip and land on the slack.',
+      'Its dive strikes the point it aimed at. Move well away from the end of its line.'],
     reset1: 'Erase the saved run?', reset2: 'This cannot be undone.',
     // map legend (§12.12): each word follows a swatch of the icon the map draws (playtest B24 added the core dot)
     map: 'MAP', mapLegend: ['node', 'boss', 'vendor', 'core', 'you'], mapClose: 'Esc / M close', mapRecentre: 'R recentre',
@@ -106,15 +145,22 @@
    */
   const PAD_SWAP = [['Esc / M close', 'B / BACK close'], ['R recentre', 'A recentre'], ['JUMP or CONFIRM', 'A'], ['CONFIRM', 'A'], ['Enter', 'A'], ['Esc', 'B']];
   function padText(str) { for (let i = 0; i < PAD_SWAP.length; i++) str = str.split(PAD_SWAP[i][0]).join(PAD_SWAP[i][1]); return str; }
-  const DEVICE_KEYS = ['footer', 'selectSub', 'mapClose', 'mapRecentre', 'shopFooter', 'gameOverPrompt', 'victoryPrompt'];
+  // F03: every footer / prompt the menus draw has its pad wording (the new pages' footers, the lore and skip prompts too)
+  const DEVICE_KEYS = ['footer', 'selectSub', 'mapClose', 'mapRecentre', 'shopFooter', 'gameOverPrompt', 'victoryPrompt',
+    'pauseFooter', 'settingsFooter', 'controlsFooter', 'archiveFooter', 'loreContinue', 'introSkip'];
   const PAD_TXT = Object.create(null);
   for (let i = 0; i < DEVICE_KEYS.length; i++) PAD_TXT[DEVICE_KEYS[i]] = padText(TXT[DEVICE_KEYS[i]]);
   /** The footer/prompt string `key` for the last-used device (keyboard/touch: the §15 text; gamepad: the pad variant). */
   function devText(key) { return In.device === 'gamepad' && PAD_TXT[key] ? PAD_TXT[key] : TXT[key]; }
   const HINT_ORDER = [['move', 'MOVE', 'left'], ['jump', 'JUMP', 'jump'], ['light', 'LIGHT', 'light'], ['heavy', 'HEAVY', 'heavy'], ['special', 'SPECIAL', 'special'], ['dash', 'DASH', 'dash'], ['overclock', 'OVERCLOCK', 'overclock']];
   const CARD_X = [60, 240, 420, 600, 780];
-  const SETTING_KEYS = ['master', 'music', 'sfx', 'screenShake', 'reducedFlashing', 'showHitboxes', null, null];
-  const SET_RESET = 6, SET_BACK = 7;   // settingRows indices of RESET SAVE (title only) and BACK
+  const SETTING_KEYS = ['master', 'music', 'sfx', 'screenShake', 'reducedFlashing', 'steadySilhouette', 'hazardOutline', 'showHitboxes', null, null, null];
+  const SET_CONTROLS = 8, SET_RESET = 9, SET_BACK = 10;   // settingRows indices of CONTROLS, RESET SAVE (title only) and BACK
+  const SET_Y0 = 146, SET_YN = 416;                       // first / last settings row y: the pitch closes up to keep 10–11 rows in the panel
+  const PAUSE_QUIT = 5, PAUSE_N = 6, PAUSE_Y0 = 222, PAUSE_PITCH = 28;   // pause rows (§12.11): QUIT TO TITLE last
+  const LORE_IGNORE = 30;                                 // F06: a lore card ignores every press for its first 0.5 s
+  const ECHO_DUR = 480, ECHO_IN = 30, ECHO_OUT = 40;       // F07: the recovered-memory panel's 8 s life, fade in / out
+  const ECHO_TIPS = { tallock: TXT.echoTallock, weftyr: TXT.echoWeftyr, corrosant: TXT.echoCorrosant, kernauth: TXT.echoKernauth };
   const MAP_S = 40;                    // map px per screen (DESIGN §12.12)
   const STRIP_X = 240, STRIP_Y = 8, STRIP_W = 480;   // the banner's top strip (B04): between the hearts block and the bits
   const DIM = 'rgba(10,8,12,0.6)';
@@ -176,6 +222,15 @@
     shopLine: '', shopMsgT: 0, shopMsg: '', rwGreeted: false, loreT: 0, shopRoom: null,
     vicRows: [], epiOff: 0, epiScroll: 0, vicRowsAt: 0,
     saveSumRef: null, saveSum: '',
+    settingsSel: -1,            // the settings row CONTROLS was opened from (restored on the way back)
+    // F01 Controls & Moves page model (rebuilt on enter and when the device in use changes — never per frame)
+    ctrlDev: '', ctrlRows: [], ctrlFighter: null, ctrlTitle: '', ctrlMoves: [], ctrlAb: null,
+    // F06 Lore Archive (zone ids in order; null = not recovered yet), the selected entry
+    archive: [], archiveN: 0, archiveCountStr: '',
+    // F03: the device the banner's control-hint line was laid out for (it re-lays itself when the player switches)
+    bannerOwn: null, bannerDev: '', bannerRaw2: '',
+    // F07 Restore Echo: the recovered-memory panel
+    echoT: 0, echoHead: '', echoLines: null, echoLevel: null, echoAlpha: 1,
   };
 
   // =============================================================================================
@@ -325,7 +380,14 @@
       UI.selPrev = -1; UI.selSlide = 0; UI.cardFlash = 0;
       for (let i = 0; i < 4; i++) UI.statNow[i] = 0;
     } else if (name === 'play') { UI.hintKey = -1; syncHud(game); }
-    else if (name === 'settings') { UI.fromTitle = !!(game && game.screen === 'title'); if (UI.fromTitle) UI.titleSel = prevSel; }
+    else if (name === 'settings') {
+      UI.fromTitle = !!(game && game.screen === 'title');
+      // back from the Controls page: the cursor returns to the CONTROLS row (and the title's own cursor stays remembered)
+      if (UI.settingsSel >= 0) { UI.sel = UI.settingsSel; UI.settingsSel = -1; }
+      else if (UI.fromTitle) UI.titleSel = prevSel;
+    }
+    else if (name === 'controls' && game) buildControls(game);
+    else if (name === 'archive' && game) buildArchive(game);
     else if (name === 'pause') { if (UI.pauseSel >= 0) { UI.sel = UI.pauseSel; UI.pauseSel = -1; } }
     else if (name === 'map') { UI.mapPan.x = 0; UI.mapPan.y = 0; UI.recentreReq = false; if (game) mapSetup(game); }
     else if (name === 'shop' && game) {

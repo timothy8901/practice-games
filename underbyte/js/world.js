@@ -130,6 +130,7 @@
       r.w = r.w || r.tiles[0].length; r.h = r.h || r.tiles.length;
       r.exits = r.exits || []; r.spawns = r.spawns || []; r.platforms = r.platforms || [];
       r.nodes = r.nodes || []; r.cores = r.cores || []; r.bits = r.bits || [];
+      r.ledges = r.ledges || [];   // F04 Signal Ledges (DESIGN §5.6): [{x, y}] pad tiles, feet on (x, y+1)
       r.vendor = r.vendor || null; r.boss = r.boss || null;
       r.name = r.name || id; r.intro = r.intro || '';
       if (r.gx === undefined) r.gx = 0; if (r.gy === undefined) r.gy = 0;
@@ -287,6 +288,25 @@
         if (!inside(r, b.x, b.y)) errs.push(tag + ': outside the room'); else if (!air(r, b.x, b.y)) errs.push(tag + ': tile is solid');
         if (b.size !== 'small' && b.size !== 'medium' && b.size !== 'large') errs.push(tag + ': bad size ' + b.size);
         if (seenBit[key]) errs.push(tag + ': duplicate placed bit'); seenBit[key] = true;
+      }
+      // --- Signal Ledges (F04, DESIGN §5.6): a pad stands on real footing (a solid '#' or a '-' grate — never a crumble
+      // plank that vanishes), its tile and the one above are clear non-hazard air, it never sits in an exit opening or
+      // beside a hazard tile (the respawn it holds must be safe), at most three per room, no two on one tile
+      const ledges = listOf(r.ledges, 'ledges', id), seenLedge = Object.create(null);
+      if (ledges.length > 3) errs.push(id + ': ' + ledges.length + ' signal ledges (at most 3 per room)');
+      for (let i = 0; i < ledges.length; i++) {
+        const L = ledges[i], tag = id + ' ledge ' + i;
+        if (!L || typeof L.x !== 'number' || typeof L.y !== 'number' || L.x !== Math.floor(L.x) || L.y !== Math.floor(L.y)) { errs.push(tag + ': needs whole tile x, y'); continue; }
+        if (!inside(r, L.x, L.y) || !inside(r, L.x, L.y - 1)) { errs.push(tag + ': outside the room'); continue; }
+        const at = World.tileAt(r, L.x, L.y), above = World.tileAt(r, L.x, L.y - 1), under = World.tileAt(r, L.x, L.y + 1);
+        if ((at !== '.' && at !== 'B') || (above !== '.' && above !== 'B')) errs.push(tag + ': pad tile ' + L.x + ',' + L.y + ' (and the one above) must be clear air');
+        if (under !== '#' && under !== '-') errs.push(tag + ': no real footing under ' + L.x + ',' + L.y + ' (needs # or -)');
+        let hz = null;
+        for (let dx = -1; dx <= 1 && !hz; dx++) for (let dy = -1; dy <= 1 && !hz; dy++) if (World.isHazard(World.tileAt(r, L.x + dx, L.y + dy))) hz = (L.x + dx) + ',' + (L.y + dy);
+        if (hz) errs.push(tag + ': a hazard tile touches the pad at ' + hz);
+        for (let k = 0; k < exits.length; k++) { const e = exits[k]; if (L.x >= e.x && L.x < e.x + e.w && L.y >= e.y && L.y < e.y + e.h) errs.push(tag + ': inside the opening of exit ' + e.id); }
+        const key = L.x + ',' + L.y;
+        if (seenLedge[key]) errs.push(tag + ': duplicate pad at ' + key); seenLedge[key] = true;
       }
       if (r.vendor) {
         if (!inside(r, r.vendor.x, r.vendor.y)) errs.push(id + ' vendor: outside the room');
@@ -1016,6 +1036,8 @@
       { type: 'scuttlebit', x: 26, y: 42, patrol: [23, 29] },
     ],
     platforms: [],
+    // F04 Signal Ledges (DESIGN §5.6): ledge C beside the row-26 spikes, the row-40 grate under the crumble planks, ledge E
+    ledges: [{ x: 20, y: 26 }, { x: 16, y: 39 }, { x: 5, y: 35 }],
     nodes: [],
     cores: [
       { id: 'core_dc_fall', x: 24, y: 4, ability: 'gripProtocol' },
@@ -1070,6 +1092,8 @@
       { type: 'driftmoth', x: 37, y: 6 },
     ],
     platforms: [],
+    // F04 Signal Ledge (DESIGN §5.6): the floor between the two spike pits
+    ledges: [{ x: 22, y: 14 }],
     nodes: [],
     cores: [],
     bits: [
@@ -1265,6 +1289,8 @@
       { id: 'H1', w: 3, from: { x: 11, y: 9 }, to: { x: 11, y: 20 }, speed: 1, wait: 40 },
       { id: 'H2', w: 3, from: { x: 19, y: 16 }, to: { x: 19, y: 28 }, speed: 1, wait: 40 },
     ],
+    // F04 Signal Ledges (DESIGN §5.6): the right ledge beside hoist H2's track, the right grate shelf by the chute
+    ledges: [{ x: 23, y: 21 }, { x: 18, y: 29 }],
     nodes: [],
     cores: [],
     bits: [
@@ -1914,6 +1940,8 @@
     platforms: [
       { id: 'L1', w: 3, from: { x: 9, y: 56 }, to: { x: 9, y: 40 }, speed: 1.5, wait: 30 },
     ],
+    // F04 Signal Ledges (DESIGN §5.6): the right ledge (row 36), the shaft-3 floor, the left face's row-37 ledge
+    ledges: [{ x: 42, y: 36 }, { x: 45, y: 16 }, { x: 6, y: 37 }],
     nodes: [],
     cores: [],
     bits: [
@@ -2045,6 +2073,8 @@
       { type: 'hopnode', x: 28, y: 29, variant: 'nullnode', patrol: [19, 30] },
     ],
     platforms: [],
+    // F04 Signal Ledges (DESIGN §5.6): the pool shelf under the crumbles, the row-45 grate the shelf drop lands on
+    ledges: [{ x: 20, y: 14 }, { x: 17, y: 44 }],
     nodes: [],
     cores: [],
     bits: [

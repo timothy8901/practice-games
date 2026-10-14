@@ -1,0 +1,233 @@
+{
+ "fix:gameplay": {
+  "fixed": [
+   {
+    "id": "B15",
+    "change": "js/world.js + DESIGN.md \u00a76 (byte-identical): both Burst Line gaps used to open onto an acid pit 2 to 5 rows deep. Vellix could jump at the lip and then Echo Jump out of the pit to cross. The gap is now an acid channel level with the crawlspace floor, with solid tiles under it. In bv_sluice: row 8 x15-20 is '~', row 9 and rows 10-14 x9-20 are '#', and row 15 x9-24 is '#'. In bv_catwalk: row 5 x15-20 is '~' and rows 6-7 x15-20 are '#'. Dropping below the floor line now hits the hazard at once. The gap width is unchanged, so the dash still crosses. world.cjs reachability proof still valid (37/37 static, 123/123 browser). The new test swept 72 Jump+Echo Jump timings per fighter per room: 0 crossings (old code: Vellix 14/72 and 7/72). Dash windows are still at least 25 px for every fighter."
+   },
+   {
+    "id": "B16",
+    "change": "js/characters.js blinkPastBoss(): this is decided on the frame the slide would enter a boss body. If the remaining slide reaches the far side (with footing for half the body and no wall there), it passes through. Otherwise it stops flush at the near side, where the hitbox still reaches. It never ends inside the boss. Test: from 200, 160 and 100 px it deals 7, never overlaps the boss after the slide, and takes no contact hit."
+   },
+   {
+    "id": "B17",
+    "change": "js/world.js + DESIGN.md: the dc_fall row-40 grate is extended to x13-19 (row 40 x13-15 changed from '.' to '-'). A row-34 crumble plank that gives way now drops the fighter 6 rows onto that grate, on camera and on the descent route, instead of onto the off-screen spike bed. Test: 9 drops (3 fighters \u00d7 3 x positions) all land at y 1200 with no hazard."
+   },
+   {
+    "id": "B19",
+    "change": "World part only: bv_sluice row 2 x5-8 changed from '#' to '.', so the arrival chamber is open at rows 2-7 over x1-8. After the T arrival, holding RIGHT walks off the grate's end and drops into the crawlspace. Down+Jump still works. Test: Tessik, Brackmaw and Korvask land at y 120, then holding RIGHT alone reaches x \u2265 300 on the floor at y 240 with no hazard. The existing qa-progression D5/H7/R2/S1 and the playthrough still pass."
+   },
+   {
+    "id": "B26",
+    "change": "js/bosses.js tallockPick: a fighter standing on a grate at least 60 px above Tallock's feet is never given the floor-only Slab Swing or Stomp Quake. Within 95 px he picks Stack Shrug (60%) or Stack Slam (40%); farther away, Slam or Disc. Test: over 15 s of shelf camping he made no floor-only picks, the camper took at least 3 hits, and Tallock was not beaten in 10.4 s."
+   },
+   {
+    "id": "B27",
+    "change": "js/bosses.js: new Stack Shrug attack. A takeHit wrapper counts down-strikes that land on Tallock. The count resets when the fighter touches ground. On the 3rd head pogo in a row, the Shrug tell starts at once if he is walking or recovering, or as his next pick otherwise. Tell: 24 f (20 f when enraged, never below the floor), the stack squats, the top discs and visor glow, and inked chevrons rise over his head. Active 8 f: a box 170 wide from 90 px above his top to 40 px below it, so it never reaches the floor. 1 damage, 40 f recovery. Test: a Brackmaw pogo bot triggers it and takes the 'shrug' hit; every tell is at least 20 f and fires only after 3 or more pogos."
+   },
+   {
+    "id": "B29",
+    "change": "js/entities.js chainShove() + js/enemies.js hurtTick (+ E.applyHit / applyDamage): L1 and L2 hits are now shoves. The victim keeps the sheet knockback velocity and slide, so the qa-combat sheet checks and the qa-enemies 'knockback 2.1 px/f' check are unchanged. But the slide stops at the reach of the attacker's next light: that box's front edge (Overclock reach included) plus the victim's half width, minus 8 px. A victim already beyond that is never pulled back. L3, heavies and specials are untouched. Test: L1, L2 and L3 all land for all five fighters on a stationary scuttlebit 40 px ahead (old code: Tessik and Brackmaw L3 whiffed), and L3's kb on the hit frame equals the sheet value."
+   },
+   {
+    "id": "B33",
+    "change": "js/bosses.js: during the tell the marker follows the fighter (clamped so the stack fits the arena). At tell end it freezes at slamX, the landing x, and stays drawn through the whole slam arc, brighter and with an ink rim. Test (spy on the draw context): 49 of 49 arc frames show the marker at slamX, and Tallock lands there."
+   },
+   {
+    "id": "B34",
+    "change": "js/bosses.js tallockUnpin(): set when a Stack Slam lands and whenever one of Tallock's own hits connects (the Slab Swing knocked fighters back toward its box centre, i.e. into his body). On the next frame an overlapping fighter is pushed clear: to the side of their centre, or the other side when that side is a wall. Any into-the-boss vx is zeroed. The landing touch itself is still the slam's hit. Test: a fighter idling at the left wall for 30 s overlaps the grounded stack for at most 1 frame (old: 673 frames), with 1 body-contact hit (old: 10)."
+   },
+   {
+    "id": "B36",
+    "change": "js/bosses.js SHOTS.snare.step: a fighter coming down onto the thread from above (previous-frame feet at or above its top) treads it flat. It snaps with spark and dust and does no damage. A fighter standing in it when it is laid is still caught for 1. Test: jumping it 6 f before the tell ends lands unhurt (the thread snaps at f51, landing at f53); standing still is still hit for 1 (tag 'snare')."
+   },
+   {
+    "id": "B38",
+    "change": "Bosses part (js/bosses.js). Every boss now updates focusX/focusY each tick: Tallock and Weftyr the body, Corrosant the head, Kernauth the chest core or flying core. Corrosant also draws an edge beacon while its head is above the view: an inked fin-coloured chevron over a small head wedge, pulsing, placed at the head's x and dropped below the HUD block when the head is over it. Test: the head sits at y 112 while the floor camera's view starts at y 180; rendering with and without the beacon changes the view's top band, and focusY equals the head y. Camera framing is in engine_requests."
+   },
+   {
+    "id": "B41",
+    "change": "js/bosses.js (Kernauth). Root Spikes are now bleached bone #f2e4c2 with a 4 px ink outline and a 1.5 px white edge. Their tell marks are bone ellipses with an ink outline plus a dashed 'hot' riser above each one, so a mark stays visible around a fighter standing on it. Both cable-arms now sit on a pale #e8c79a rim under their ink and fill. This also fixed a latent bug: cableTip used to start at 0, which drew the right cable across the whole arena until the first sweep; it now starts at home. Test (rendered pixels): spikes 11.7:1 against the background and 4.1:1 against the red floor edge (old 1.66 and 1.58); every strip of the cable has a pixel at least 3:1 against the background."
+   },
+   {
+    "id": "B10",
+    "change": "js/characters.js: the Overclock countdown, warning and end are skipped while player.locked is true (the boss intro card and the 120 f ability pickup). The aura FX still runs. Test: across the pickup the timer goes 719 \u2192 718 (old: 719 \u2192 599)."
+   },
+   {
+    "id": "B31",
+    "change": "js/characters.js. Player.update now wraps updateBody, then runs a refused-press check. A Special, Overclock or Dash press whose 6 f buffer reaches its last frame unconsumed, while the fighter canAct(), now:\n- plays the deny sfx\n- sets denyT/denyKind and draws an 18 f cue over the fighter's head (an inked DANGER ring with a slash)\n- for a special, also flashes the energy bar (game.denyFlash)\n\nPresses lost to hurt, a lock, death or the Overclock transform stay silent. The existing immediate denies (energy short, second Pulse Line, light-cancel refusal) now go through the same deny() helper, keeping their 10 f lockout. A Pulse Line with less than 30 px of floor ahead (same footing rule as the wave) is refused with deny and no energy spent. Tests cover: mid-air special, special during its own Pulse Line, Vellix special in the L3 chain end, Overclock at meter 60, Dash without Burst Line, and a Pulse Line off a grate end (no energy spent). A control check confirms a Pulse Line with a runway still fires with no deny."
+   },
+   {
+    "id": "B32",
+    "change": "js/characters.js drawPreview: the jump showcase lift is now pose-aware. A new rigTop() measures the posed rig, compared against the cached idle top. The rig's highest point rises at most jumpHeight \u00d7 0.25 \u00d7 scale/3 (about 28 px for Tessik at \u00d73), and the airborne pose's own reach counts toward that. Test (offscreen pixels over all jump frames, all five fighters): the top stays at y \u2265 92, inside the halo (old: y 0-4, over the header), and the lift is still 24-40 px."
+   },
+   {
+    "id": "B43",
+    "change": "js/characters.js Player.draw: on the i-frame blink-off beats the fighter is no longer skipped. It is drawn at \u03b1 0.4, plus a new drawRig outline pass that strokes every body shape in the palette's glow colour. Test: 0 blank frames across the 60 i-frames (old: 29), with the minimum pixel count at 97% of a solid frame."
+   }
+  ],
+  "not_fixed": [],
+  "engine_requests": [
+   "test/run-all.cjs and test/README.md (needed for qa-ip-code checks B14/B16). Add 'pt-fixes-gameplay' to the SUITES array in run-all.cjs, and add the matching row in the same position in README's suite table. Suggested row: | `pt-fixes-gameplay.cjs` | Playtest gameplay-lane fixes: Burst Line gaps not crossable with Jump + Echo Jump (dash still crosses), dc_fall crumble lands on the row-40 grate, bv_sluice arrival walkable without Down+Jump, light chain L1\u2192L2\u2192L3 for every fighter, Overclock frozen during the pickup lock, Blink Strike never ends inside Tallock, refused Special/Overclock/Dash presses deny with a cue, select jump inside the halo, i-frame silhouette, Tallock shelf answers / Stack Shrug / slam marker / push-out, Weftyr Snare stomp-snap, Corrosant edge beacon + focus, Rootwell spike/cable contrast | 34 |. qa-ip-code B16 fails on any test/*.cjs file not in SUITES. The presentation lane's pt-fixes-presentation.cjs needs the same treatment.",
+   "js/engine.js, camera framing for B38 (optional; the bosses-side beacon already guarantees Corrosant is never fully invisible). In Game.prototype.cameraTarget's bossCam branch: let fx = boss.focusX ?? boss.x and fy = boss.focusY ?? boss.cy(). Set out.x = (pl.x + fx) / 2 - W/2. Set out.y = U.clamp(fy - 70, pl.y + 96 - H, pl.y - pl.h - 70). This raises the view to show the focus 70 px below the top edge, but never lets the player's feet drop under the boss bar (screen y 486-516) and keeps the head 70 px below the top. In Game.prototype.updateCamera, when bossCam is true, ease cam.y toward tg.y (cam.y += (tg.y - cam.y) * 0.12) instead of using the player dead-band, then clampCamera(). Effect in bv_corrosant: with the player on a row-16 or row-11 grate the camera rises to show the ceiling head. With the player on the floor the clamp keeps today's framing, so the beacon covers that case.",
+   "js/ui.js drawMeter / drawEnergy, B31 HUD cue (optional; the over-the-fighter cue and sfx already ship). Player.deny() sets player.denyT (18\u21920), player.denyKind ('special' | 'overclock' | 'dash') and game.denyKind. game.denyFlash (the energy-bar flash) is now set only for 'special'. To flash and shake the Overclock meter bar on a refused Overclock, read pl.denyT > 0 && pl.denyKind === 'overclock' in drawMeter.",
+   "js/engine.js Game.prototype.resolveHits (optional root improvement behind B34). A registered enemy or boss hit passes the hit box centre (h.x + h.w/2) to player.hurt as the knockback origin. For melee boxes that sit in front of the attacker (Tallock's Slab Swing), a fighter standing between the attacker and the box centre is knocked into the attacker. Suggested change: when h.src is a body (not a projectile, e.g. h.src === this.boss or an enemy) and the player's centre lies between h.src.x and the box centre, pass h.src.x instead. Tallock is already handled locally (pinCheck after any of his hits), so this is not required for the tests."
+  ],
+  "tests": [
+   "node test/pt-fixes-gameplay.cjs: 32/32 PASS (34 check() calls; also run against a clean HEAD export of the game: every bug has at least one FAIL there, and the remaining PASS lines on old code are controls)",
+   "node test/smoke.cjs: 90/90",
+   "node test/world.cjs: 123/123 (static: 37/37, tilemaps byte-identical to DESIGN \u00a76, BFS tiers unchanged)",
+   "node test/characters.cjs: 113/113",
+   "node test/enemies.cjs: 220/220",
+   "node test/verify-core.cjs: 75/75",
+   "node test/qa-combat.cjs: 931/931",
+   "node test/qa-enemies.cjs: 566/566",
+   "node test/qa-progression.cjs: 119/119",
+   "node test/playthrough.cjs: 63/63",
+   "node test/critic-complete.cjs: 21/21"
+  ],
+  "tests_passed": true,
+  "files_to_write": [],
+  "notes": "All 16 assigned bugs are fixed. Nothing is committed.\n\nFiles I edited:\n- /home/user/practice-games/underbyte/js/bosses.js\n- /home/user/practice-games/underbyte/js/characters.js\n- /home/user/practice-games/underbyte/js/enemies.js\n- /home/user/practice-games/underbyte/js/entities.js\n- /home/user/practice-games/underbyte/js/world.js\n- /home/user/practice-games/underbyte/DESIGN.md\n- /home/user/practice-games/underbyte/DESIGN-SUMMARY.md\n- /home/user/practice-games/underbyte/test/pt-fixes-gameplay.cjs (new)\n\nDESIGN.md updates:\n- \u00a73.2 (i-frame silhouette)\n- \u00a73.5 (chain shove)\n- \u00a73.7 (no silent refusals; Pulse Line runway)\n- \u00a73.9 (Overclock frozen while locked)\n- \u00a74.2.3 (Blink Strike vs a boss)\n- \u00a76.2, \u00a76.12 and \u00a76.14 tilemaps, kept byte-identical with world.js\n- bv_sluice hazards (16 \u2192 6 pool tiles) and its \"on entering\" text\n- \u00a77.0\n- \u00a78.1 Tallock: shelf rule, three-pogo rule, never pinned, slam marker, new Stack Shrug table row\n- \u00a78.2 Snare stomp-snap\n- \u00a78.3 edge beacon and focusX/focusY\n- \u00a78.4 contrast\n- \u00a710.3 #2/#11, \u00a710.4 loop B, \u00a710.5 core-3 route\n- \u00a710.6 new rows F15\u2013F17\n- \u00a712.10 showcase hop\n- \u00a716.3 ruling\n\nDESIGN-SUMMARY.md: playtest geometry, key numbers and rulings (17 world-data fixes).\n\nThings to know:\n\n1. B29 first used a brake on the knockback. That broke qa-enemies \"a light on a scuttlebit ... knockback 2.1 px/f\", a file outside my lane. I replaced it with a stop-at-next-light-reach shove, which keeps the sheet knockback and slide. No existing test was modified or weakened.\n\n2. B19: I fixed the geometry only. The presentation lane's Down+Jump hint (their pt-pres-b19 shot) is still valid. Down+Jump also still works at bv_sluice, and it is still needed at the optional lw_rest and ns_rest hatches.\n\n3. B38: the beacon and the focus point are mine. The camera framing is in engine_requests. With the player on the floor, the boss bar limits how far the camera can rise, so the beacon is what covers the floor case.\n\n4. The new test file must be added to run-all.cjs SUITES and the README table, or qa-ip-code B16 fails. This is listed in engine_requests.\n\n5. I did not run run-all.cjs, ui.cjs, qa-ui.cjs or qa-perf.cjs. Those touch the other lane or are timing-only. qa-ip-code.cjs was also not run, and it will fail B14/B16 until the run-all/README request is applied.\n\n6. Probe scripts and the clean HEAD copy used for the old-code check are in the scratchpad only, not in the repo."
+ },
+ "fix:presentation": {
+  "fixed": [
+   {
+    "id": "B03",
+    "change": "js/ui.js: UI.enter('settings') from the title stores the title row it was opened from in UI.titleSel; enter('title') restores it, so closing SETTINGS puts the cursor back on SETTINGS (Up then goes to NEW GAME without a save, CONTINUE with one). drawTitle draws the hidden title menu with UI.titleSel while an overlay is open, so it no longer follows the Settings cursor."
+   },
+   {
+    "id": "B04",
+    "change": "js/ui.js: the \u00a712.7 centre panel is now used only while the pickup sequence locks the player. Whenever the player has control (RESTORED, CORE FOUND, PURCHASED, and the ability banner's 150 f after the sequence), the banner is a top strip at (240,8), 480 wide, between the hearts block and the bits counter. When the sequence ends, the panel eases out and the strip slides in. The strip dims to \u03b1 0.35 while the fighter stands behind it. UI.tick clears any banner on a room change (a transition, or game.level changing), so nothing carries into the next room."
+   },
+   {
+    "id": "B05",
+    "change": "js/util.js: Palette.PANEL is opaque (#17131C, the old 82 % ink panel as it read over the dimmed game), so every panel, YES/NO dialog included, hides what is under it. js/ui.js drawHUD: while an overlay is open, only the status HUD is drawn (hearts, energy, meter, bits, boss bar). Banners, the boss card, the zone toast, the REST/TRADE prompt, the hint strip and the drop hint are not drawn under pause, map, settings, shop or lore. Their timers stay frozen, so they come back when the overlay closes."
+   },
+   {
+    "id": "B06",
+    "change": "js/ui.js: the zone toast is no longer drawn under an overlay (B05), so the pause menu's ability lines are never printed across LOOMWORKS. The toast resumes after the pause."
+   },
+   {
+    "id": "B11",
+    "change": "js/ui.js: a UI.bossOut counter runs while bossFight is 'dying' or 'reward'. drawBossBar lets the lost chunk drain for 40 f, then fades the bar out over 20 f. No bar or empty trough is drawn under '{NAME} PURGED'. The hint strip returns once the bar is gone."
+   },
+   {
+    "id": "B12",
+    "change": "js/ui.js: the footers and prompts follow UB.Input.device. Gamepad variants are built once from the \u00a715 strings by swapping key names for pad buttons (Enter\u2192A, Esc\u2192B, 'Esc / M close'\u2192'B / BACK close', 'R recentre'\u2192'A recentre', 'JUMP or CONFIRM'/'CONFIRM'\u2192A). This covers the title footer, select sub-line, map footer, shop footer, game-over and victory prompts. The REST/TRADE prompt has no '\u25b2' glyph: the label 'REST'/'TRADE' with the bound up key (\u2191) under it. The map footer width fit uses the wider of the two device wordings."
+   },
+   {
+    "id": "B18",
+    "change": "js/ui.js UI.tick: WEIGHT bar = (lowest knockback multiplier in the roster) / (this fighter's), i.e. real weight. Brackmaw 1.0, Korvask 0.8, Tessik 0.6, Orrubel 0.55, Vellix 0.46."
+   },
+   {
+    "id": "B19",
+    "change": "Presentation part, js/ui.js: a one-time 'Down + Jump drops through' hint (this is the \u00a75.5 legend text, so it passes the DESIGN text audit). It shows the bound keys under it ('\u2193 + SPACE' / '\u2193 + A') and floats over the fighter, moving below the feet when it would sit on the hearts or bits. It appears when the player stands 30 f on a droppable grate that is walled in on both sides with no ledge or room edge \u2014 in the current world that is the dc_cross chute box x56\u201358 and the bv_cistern boxed grate x50\u201352. It also appears when the player holds Down 20 f on any droppable grate (the bv_sluice arrival, which the other lane has opened up). It stays until they drop or step off (600 f max) and is not drawn under overlays. It is shown once per run: save.hints.drop when that key exists (engine request), otherwise remembered for the current save object."
+   },
+   {
+    "id": "B23",
+    "change": "js/ui.js drawMap: the 'you' dot is drawn under the room icons. Icons sit in a fixed top row: node top-left, boss top-right, vendor top-right (top-centre beside a boss). The vendor hexagon now stays visible wherever the player stands in dc_shrine."
+   },
+   {
+    "id": "B24",
+    "change": "js/ui.js drawMap: found cores are a CORE_HEART dot r 3 (ink 1) at the core's own tile, clamped inside the cell; the Deep Ping '?' for an uncollected core uses the same spot. The legend now draws the real icon swatches plus words in two rows (node \u00b7 boss \u00b7 vendor / core \u00b7 you). TXT.mapLegend is now the word list, and the bestiary wrap width is computed from the real legend width."
+   },
+   {
+    "id": "B25",
+    "change": "js/util.js: vendorItems rows carry deepPrice (70 / 120 / 90, about 25 % off). UB.IDS.vendorDeepRooms = ['rw_rest']. New pure UB.Util.vendorPrice(item, roomId). The base prices stay 90/160/120, and save.vendor still stores ids only, so saves are compatible. js/ui.js shop: per-room prices; at rw_rest the shrine price is shown struck through left of the discount, and the poor/DANGER colouring uses the room price. Not done in this lane: game.buy() in engine.js still charges item.price until engine request E1 is applied. I checked E1 at runtime: rw_rest then charges 70 and dc_shrine 90."
+   },
+   {
+    "id": "B32",
+    "change": "UI part, js/ui.js drawPreviewRig: the big select preview (halo, shadow, rig) is clipped to the portrait area x 20..550, y 88..316, so a showcase pose can never paint over 'CHOOSE YOUR SPIRIT' or the sub-line. The other lane is capping the showcase hop height in characters.js drawPreview."
+   },
+   {
+    "id": "B42",
+    "change": "js/fx.js: new intensity hook FX.flashScale (0..1) with FX.setFlashScale(k), which multiplies every full-screen flash (0 = none). FX.reducedFlashing() reads game.settings.reducedFlashing live. When it is true, the hurt, hazard, boss-death and Overclock washes become a 10 px edge pulse (\u03b1 \u2264 0.45) instead of a full-screen fill, so the later REDUCED FLASHING row only has to setSetting('reducedFlashing', bool)."
+   }
+  ],
+  "not_fixed": [],
+  "engine_requests": [
+   "E1 (B25, required: one pt-fixes-presentation check fails without it) js/engine.js Game.prototype.buy: after finding `item`, compute `const price = UB.Util.vendorPrice(item, this.level ? this.level.room.id : null);` and use `price` for both the 'poor' test (`if (this.save.bits < price) return 'poor';`) and the deduction (`this.save.bits -= price;`) instead of item.price. Nothing else changes; save.vendor still stores ids. Verified by applying it at runtime: rw_rest 500\u2192430 bits for SPARE CELL, HOT CLOCK affordable at 120, dc_shrine still 90.",
+   "E2 (B19 persistence) js/engine.js: add 'drop' to HINT_KEYS (line ~44) and `drop: false` to newSaveData().hints. Then sanitizeSave keeps it and the one-time drop-through hint survives a reload or CONTINUE. ui.js already writes save.hints.drop = true when the key exists. Old saves load drop=false and see the hint once more. HINT_ORDER (the hint strip) does not include it, so the strip is unchanged.",
+   "E3 (B42, for the later REDUCED FLASHING settings row) js/engine.js DEFAULT_SETTINGS: add `reducedFlashing: false`. The existing boolean validation in loadSettings covers it, and fx.js reads game.settings.reducedFlashing live, so applySettings needs no change. The row just calls game.setSetting('reducedFlashing', !v).",
+   "E4 test/run-all.cjs: add 'pt-fixes-presentation' (and the other lane's 'pt-fixes-gameplay') to SUITES. qa-ip-code check B16 fails until both new suites are listed in run-all.cjs and test/README.md. README table row: | `pt-fixes-presentation.cjs` | Playtest fixes, presentation lane (playtests/REPORT.md): title cursor back on SETTINGS (B03), banners as a top strip once the player has control and cleared on a room change (B04), opaque panels with nothing drawn under an overlay (B05, B06), no boss bar after the death (B11), device-aware footers and a \u25b2-free REST/TRADE prompt (B12), real-weight WEIGHT bar (B18), the one-time Down + Jump drop hint (B19), map icons over the you dot, cores at their tile and in the legend (B23, B24), Scrivvet's rw_rest discount (B25), select preview clipped under the header (B32), reducedFlashing + FX.setFlashScale (B42) | 53 |",
+   "E5 DESIGN.md (canonical spec, being edited by the other lane) \u2014 text to update: \u00a711.1.2 PANEL is opaque #17131C (B05). \u00a712.5 last sentence \u2192 'the zone toast, banners, the boss card, the interaction prompt and the hint lines belong to play and are not drawn while an overlay is open (timers frozen; they return when it closes)' (B05/B06). \u00a712.6 add 'after the death the lost chunk drains 40 f, then the bar fades out over 20 f; nothing is drawn in the reward state' (B11). \u00a712.7 \u2192 the panel (240,200) 480\u00d7120 is used only inside the 120 f pickup sequence; any banner shown while the player has control (cores, purchases, RESTORED, the ability banner after the sequence) is a top strip (240,8), 480 wide (bold 16 UI SELECT line 1; 12 MONO PAPER line 2, two rows when wider than 456 px; 11 MONO PAPER_DIM line 3), sliding down over 12 f, dimming to \u03b1 0.35 while the fighter is behind it; any banner ends on a room change (B04). \u00a712.8 and \u00a715.8 prompts \u2192 `REST` / `TRADE` (no \u25b2) with the bound up key under it. Footers follow the last-used device; pad variants swap Enter\u2192A, Esc\u2192B, 'Esc / M'\u2192'B / BACK', 'R recentre'\u2192'A recentre', 'JUMP or CONFIRM'/'CONFIRM'\u2192A (B12). Add the drop hint: 'Down + Jump drops through' (bold 14 UI PAPER) with the keys under it ('\u2193 + SPACE' / '\u2193 + A', bold 12 MONO SELECT), shown once per run when standing 30 f on a walled-in droppable grate or holding Down 20 f on any droppable grate (B19). \u00a712.10 weight \u2192 `0.60 / weight` (real weight: Brackmaw 1.0 \u2026 Vellix 0.46) (B18); the big preview is clipped to x 20..550, y 88..316 (B32). \u00a712.12 icons \u2192 node top-left, boss top-right, vendor top-right (top-centre beside a boss), found core = CORE_HEART dot r 3 at its own tile, Deep Ping '?' at the core's tile, icons drawn over the player dot (B23/B24); legend = icon swatches + `node \u00b7 boss \u00b7 vendor` (y 493) / `core \u00b7 you` (y 507) (B24). \u00a79.5/\u00a715.5 \u2192 rw_rest sells at 70 / 120 / 90 (deepPrice), dc_shrine 90 / 160 / 120; the panel shows the shrine price struck through (B25). \u00a711.3.5/\u00a714.2 \u2192 settings.reducedFlashing (boolean, default false) turns full-screen flashes into a 10 px edge pulse (\u03b1 \u2264 0.45); UB.FX.setFlashScale(k) scales all flashes (B42). \u00a714.1 hints gains `drop` (with E2).",
+   "E6 CONTRACT.md: \u00a74.0 PANEL is opaque. \u00a74.1 UB.Util gains vendorPrice(item, roomId). \u00a71.1 UB.IDS.vendorItems rows gain `deepPrice`, plus a new `vendorDeepRooms: ['rw_rest']`. \u00a74.5 UB.FX gains `flashScale`, `setFlashScale(k)`, `reducedFlashing()` (reads game.settings.reducedFlashing). \u00a78 vendor flow: buy() deducts UB.Util.vendorPrice(item, roomId)."
+  ],
+  "tests": [
+   "node underbyte/test/pt-fixes-presentation.cjs \u2014 new suite, 53 checks. Against the pre-fix code: 13/53 passed, 40 failed (each bug reproduced). Now: 52/53. The one failure is 'B25 buying SPARE CELL at rw_rest charges the shown 70 bits', which needs engine request E1; it passes with E1 applied at runtime (scratch script).",
+   "node underbyte/test/smoke.cjs \u2014 90/90",
+   "node underbyte/test/ui.cjs \u2014 70/70",
+   "node underbyte/test/critic-complete.cjs \u2014 21/21",
+   "node underbyte/test/verify-core.cjs \u2014 75/75",
+   "node underbyte/test/playthrough.cjs \u2014 63/63",
+   "node underbyte/test/qa-ui.cjs \u2014 292/292 after updating 5 checks that encoded the old behaviour (listed in notes)",
+   "node underbyte/test/qa-perf.cjs \u2014 84/85 (run alone twice). Only failure: 11e DPR-2 frame time, median 25.5\u201325.9 ms vs < 25. The untouched HEAD copy (git archive into the scratchpad) fails the same check at 25.0 ms on this box, so it is environmental.",
+   "node underbyte/test/qa-ip-code.cjs \u2014 62/63. Only failure: B16 'suite present in test/ but missing from run-all.cjs / README' for pt-fixes-gameplay.cjs and pt-fixes-presentation.cjs (engine request E4)."
+  ],
+  "tests_passed": false,
+  "files_to_write": [],
+  "notes": "Files edited in this lane: underbyte/js/ui.js, underbyte/js/fx.js, underbyte/js/util.js, the new underbyte/test/pt-fixes-presentation.cjs (screenshots go to test/shots/pt-pres-*.png), and underbyte/test/qa-ui.cjs. js/input.js and js/render.js needed no changes. engine.js, main.js and index.html are untouched.\n\ntests_passed is false for three reasons, none a regression in this lane: (1) one pt-fixes-presentation check waits on E1 (buy() charging the rw_rest price); (2) qa-ip-code B16 waits on E4 (listing the two new suites in run-all.cjs and README); (3) qa-perf 11e is environmental, since pristine HEAD fails it identically here. Everything else run is green.\n\nqa-ui.cjs: 5 checks updated, minimal edits, each with a comment.\n- C: Vellix's WEIGHT bar expectation changes from 1.0 to 0.6/1.3, because B18 makes the bar show real weight.\n- E: the pinned banner rect (240,200,480,120) is now asserted during the pickup sequence, and a new assertion covers the top strip for a banner shown in normal play (B04).\n- G Deep Ping: the vendor-hexagon sample point moves to the top icon row (B23).\n- G found-core dot: sampled at the core's tile, not the room corner (B24).\n- N: after RESET SAVE, closing SETTINGS returns the cursor to SETTINGS (2) instead of NEW GAME (B03). The check's intent, a visible enabled row, still holds.\nNone of these were loosened.\n\nText audit: every new visible string is in DESIGN.md already ('REST'/'TRADE', 'Down + Jump drops through' from the \u00a75.5 legend, the legend words), and qa-ui A passes. The gamepad footers are derived by swapping key names, the same way the \u00a715.5 banner pad lines work.\n\nThe other lane changed bv_sluice so its arrival is no longer a closed box. For that reason the B19 check uses the hold-Down trigger there, and tests the walled-in trigger on a temporary debug_room fixture that is restored afterwards.\n\nThe other lane is also editing characters.js drawPreview (B32 hop cap) and DESIGN.md. E5 lists the DESIGN.md text that documents this lane's changes."
+ },
+ "integrate": {
+  "fixed": [
+   {
+    "id": "B22",
+    "change": "js/engine.js: new Game.prototype.defeatBoss(bossId) runs the real defeat path. If the boss is live in the room, it ends an intro in progress (mode normal, player unlocked, card cleared), spends any remaining phases through boss.nextPhase (Kernauth's throne bursts, phase 2), sets hp 0 and calls startBossDeath. That plays the death FX, pops every boss shot and records + saves the defeat, and the dying \u2192 reward flow then runs as after a real kill: bits, sparks, the ability module, and for Kernauth the victory screen 190 f later. It always records the defeat, grants the ability, lifts the arena's seal + locked exits and writes the save (the DESIGN \u00a716.9 contract existing tests rely on). UB.debug.defeatBoss() with no id now targets the boss live in the room (else the room's unbeaten boss record). An unknown id or nothing to defeat returns false, so null never enters bossesDefeated. Game.toTitle now resets bossFight, pickupSeq, nodeUse, transition, hazard/hazardTo, zoom, denyFlash and hitstop, so a quit mid-fight leaves bossFight 'none'. 7 checks in the new test/pt-fixes-engine.cjs; all 7 fail with HEAD's engine.js."
+   },
+   {
+    "id": "B38",
+    "change": "js/engine.js camera. cameraTarget x is the midpoint of the fighter and boss.focusX, but never closer than 40 px to a side edge; without this, a boss across rw_throne's 1920 px could leave the fighter about 420 px off-screen. updateCamera y keeps the dead band while focusY lies within [70, 430] of the view. Otherwise it eases (0.12) toward putting the focus 70 px under the top edge (or 110 px over the bottom), then hard-clamps to the fighter's bounds: feet at screen y \u2264 444 (above the boss bar), head \u2265 70 px under the top, so a fall never outruns the view. Result in bv_corrosant: from the row-16 and row-11 grates the head sits at screen y 70; from the floor the room limit keeps today's framing and the gameplay lane's beacon marks the head. Added js/ui.js drawBossEdge: when a boss's focus is off the view to the left or right, a pulsing inked chevron in the boss's accent colour sits at that edge (y 140\u2013466). It is not drawn under overlays, and it skips the above-the-view case for a boss with its own beacon (new flag beaconTop, set in bosses.js createCorrosant). Only rendering reads the camera. 9 checks; HEAD's engine fails the grate and rw_throne ones."
+   },
+   {
+    "id": "B34",
+    "change": "Root fix, optional request. js/engine.js adds Game.prototype.knockOrigin(hit, player), which resolveHits passes to player.hurt. The origin is the hit box centre, except for a melee box touching the attacker's own body (hit.src is game.boss or a listed enemy, and the box reaches within src.w/2 + 8 px of it) with the fighter standing between that body and the box centre: then the origin is src.x, so the fighter is knocked away from the body. Projectiles and boxes away from the body keep the box centre. Tallock's Slab Swing no longer knocks a fighter at his front edge into him; the gameplay lane's tallockUnpin stays as a backstop. 2 checks (old code knocked the fighter into the body)."
+   },
+   {
+    "id": "B25",
+    "change": "Engine request E1. game.buy() now uses UB.Util.vendorPrice(item, roomId) for both the 'poor' test and the deduction. SPARE CELL takes 500 \u2192 430 bits at rw_rest and 500 \u2192 410 at dc_shrine. HOT CLOCK at rw_rest is 'poor' at 119 bits and bought at 120. The presentation suite's last failing check now passes (53/53)."
+   },
+   {
+    "id": "B19",
+    "change": "Engine request E2. 'drop' is added to HINT_KEYS and newSaveData().hints (drop: false). sanitizeSave keeps it, so the one-time Down + Jump hint stays seen after a reload or CONTINUE. Older saves load it as false. The hint strip (HINT_ORDER) is unchanged. 2 checks."
+   },
+   {
+    "id": "B42",
+    "change": "Engine request E3: DEFAULT_SETTINGS.reducedFlashing = false, validated as a boolean like the other toggles. I also added the player-facing control, which the bug needs: js/ui.js gains a REDUCED FLASHING settings row after SCREEN SHAKE (SETTING_KEYS plus SET_RESET/SET_BACK indices). The list has 7 rows from play and 8 from the title, at pitch 40 so BACK stays inside the 360 px panel. The value is persisted on change, and with it on a full-screen flash is only the 10 px edge pulse. 6 checks."
+   },
+   {
+    "id": "B31",
+    "change": "Optional HUD cue request. js/ui.js drawMeter: while player.denyT > 12 and denyKind is 'overclock' (the first 6 f of a refused Overclock), the meter shakes \u00b12 px and its trough and rim turn DANGER, matching the energy bar's refused-special flash. 1 check."
+   },
+   {
+    "id": "B04",
+    "change": "No engine change needed. UI.tick ends any banner when game.mode is 'transition' or game.level changes, and loadRoom builds a new level on every transition, warp, respawn and CONTINUE. Verified: the pt-fixes-presentation B04 checks pass with the integrated engine."
+   },
+   {
+    "id": "B10",
+    "change": "Engine side verified, no new code. The engine already sets player.locked for the boss intro (startBossFight) and the pickup sequence (startPickupSeq), which the characters.js fix keys on. Transitions, hazard freezes and overlays never call player.update, so the clock never ran there. The pt-fixes-gameplay B10 check (719 \u2192 718 across the pickup) passes with the integrated engine."
+   },
+   {
+    "id": "SUITES",
+    "change": "Engine request E4 and the gameplay lane's request 1. run-all.cjs SUITES gains pt-fixes-gameplay, pt-fixes-presentation and pt-fixes-engine, after critic-complete and before the QA lenses. test/README.md gets matching rows (32 / 53 / 30), the qa-ui count goes 292 \u2192 294, and the screenshot prefixes and a pt-fixes paragraph are added. test/pt-fixes-gameplay.cjs: only its summary line changed, from 'N/M passed' to the standard 'N/M checks passed', so run-all's table and qa-ip-code G2 can read it. qa-ip-code B14/B16 pass."
+   },
+   {
+    "id": "DOCS",
+    "change": "Engine request E5 and the gameplay lane's DESIGN notes, applied to DESIGN.md: \u00a711.1.2 opaque PANEL; \u00a711.3.1 boss framing and the side marker; \u00a711.3.5 reduced flashing; \u00a712.3 Overclock meter refusal; \u00a712.5 nothing drawn under overlays; \u00a712.6 boss bar drains and fades; \u00a712.7 top strip; \u00a712.8 REST/TRADE without \u25b2, device-aware footers, drop hint; \u00a712.10 preview clip and real weight; \u00a712.12 map icons and legend; \u00a712.14 REDUCED FLASHING row; \u00a712.17 and \u00a79.5/\u00a715.5 rw_rest deep prices (the '160 bits' literal is kept for the qa-ui text audit); \u00a714.1 hints.drop; \u00a714.2 reducedFlashing; \u00a715.8 strings; \u00a78.0 knockback origin, camera focus and debug defeat; \u00a73.7 meter cue; \u00a716.9 defeatBoss. Engine request E6: CONTRACT.md gets a new 'Changes since v6 (v7)' list plus \u00a71.1 deepPrice/vendorDeepRooms, \u00a74.0 PANEL, \u00a74.1 vendorPrice, \u00a74.5 FX flash hooks, \u00a76.2 focusX/focusY and beaconTop, \u00a78 knockOrigin/defeatBoss/bossCam/denyKind, the vendor flow price, hints.drop, prompts and \u00a79 defeatBoss. DESIGN-SUMMARY.md is synced."
+   }
+  ],
+  "not_fixed": [],
+  "engine_requests": [],
+  "tests": [
+   "node underbyte/test/run-all.cjs on the final code tree: 17/18 suites PASS. smoke 90/90, verify-core 75/75, world 123/123, characters 113/113, enemies 220/220, audio 58/58, ui 70/70, playthrough 63/63, critic-complete 21/21, pt-fixes-gameplay 32/32, pt-fixes-presentation 53/53, pt-fixes-engine 30/30, qa-progression 119/119, qa-combat 931/931, qa-enemies 566/566, qa-ui 294/294, qa-ip-code 63/63. qa-perf 84/85: only 11e failed (DPR-2 rw_gate median exactly 25.0 ms, limit < 25).",
+   "node underbyte/test/qa-perf.cjs alone on the final tree: 85/85 (rw_gate DPR-2 median 24.8 ms). An earlier solo run failed only 11e at 25.6 ms. A pristine HEAD export (git archive) passed 85/85 alone at 23.5 ms; the presentation lane saw HEAD fail it at 25.0 ms.",
+   "Interleaved A/B render benchmark, current tree vs HEAD export, DPR 2, 6\u00d7120-frame blocks in one browser: dc_cross 20.2 vs 19.7 ms, rw_gate 28.7 vs 28.5 ms. The world and HUD splits are identical within 0.1 ms, so there is no render regression; the qa-perf 11e misses are machine noise around 25 ms.",
+   "After two last edits (a DESIGN \u00a711.3.1 wording note, and an unused variable removed from the new test): run-all pt-fixes-engine qa-ui qa-ip-code gives 30/30, 294/294 and 63/63.",
+   "node underbyte/test/pt-fixes-engine.cjs with HEAD's engine.js swapped in: 8/27, 19 FAIL. Every engine fix fails there; the remaining PASS lines are controls or ui.js-only checks.",
+   "The first full run-all, before the side marker, was 16/18. qa-ui was 292/294: two checks still assumed the old settings row index or the '160 bits' DESIGN literal, both fixed since. qa-perf was 83/85 (11d/11e timing only)."
+  ],
+  "tests_passed": true,
+  "files_to_write": [],
+  "notes": "Every engine request from both lanes is implemented. Both lanes reported nothing in not_fixed, and nothing is left over. Nothing is committed or pushed.\n\nFiles the integrator edited:\n- /home/user/practice-games/underbyte/js/engine.js\n- /home/user/practice-games/underbyte/js/ui.js: REDUCED FLASHING row, Overclock meter refusal cue, boss side-edge marker\n- /home/user/practice-games/underbyte/js/bosses.js: only the Corrosant beaconTop flag\n- /home/user/practice-games/underbyte/test/run-all.cjs\n- /home/user/practice-games/underbyte/test/README.md\n- /home/user/practice-games/underbyte/test/qa-ui.cjs\n- /home/user/practice-games/underbyte/test/pt-fixes-gameplay.cjs: summary line format only\n- /home/user/practice-games/underbyte/test/pt-fixes-engine.cjs: new, 30 checks\n- /home/user/practice-games/underbyte/DESIGN.md\n- /home/user/practice-games/underbyte/CONTRACT.md\n- /home/user/practice-games/underbyte/DESIGN-SUMMARY.md\n\nqa-ui.cjs check updates. Each one encodes the settings row layout that the new REDUCED FLASHING row (B42) changes; none were loosened:\n1. B 'settings from the title shows RESET SAVE': the label now says 8 rows instead of 7 (the assertion is unchanged).\n2. B 'Up wraps to BACK': row 6 \u2192 row 7.\n3. B, the SAVE ERASED toast check and the no-save RESET SAVE check: both reach RESET SAVE by index, 5 \u2192 6. On the old index the no-save check passed vacuously, because Enter toggled SHOW HITBOXES instead.\n4. H 'from play the settings list has 6 rows' \u2192 7 rows (indices 0..6).\n5. H: one extra Down before 'Right flips SHOW HITBOXES ON', plus two new checks: Right turns REDUCED FLASHING on, Enter turns it off.\n6. N: RESET SAVE is reached with 6 Downs instead of 5.\n\nDesign choices:\n- B38 framing departs from the lane's suggested formula, which always pulled the view toward the focus. That would also have re-framed Tallock, Weftyr and Kernauth. Mine keeps the dead band whenever the focus is already in frame, overrides only when it is not, and clamps hard to the fighter's bounds after easing.\n- On bv_corrosant's floor the room clamp leaves the feet at screen y 450, still above the boss bar at 486. DESIGN says so.\n- I added the generic side-edge marker because the 40 px side clamp can push a boss more than about 880 px away off-screen sideways in the 1440\u20131920 px arenas.\n- knockOrigin only applies to boxes that touch the attacker's body, so spikes, needles and the cable tip keep their box-centre knockback.\n- A debug defeat during an intro calls UI.clearMessages(), so it also clears any toast. This is debug-only.\n\nThe new test is pt-fixes-engine.cjs (30 checks). Its screenshots are test/shots/pt-eng-b38-corrosant-grate.png and pt-eng-b38-side-marker.png.\n\nScratch artifacts are outside the repo, in /tmp/claude-0/-home-user-practice-games/ab89bef3-bdd4-5e51-8dea-7555674cc336/scratchpad/integ/: probes, the A/B benchmark, the HEAD export, and the run logs runall1.log, runall2.log, runall3.log, perf-alone1.log, perf-alone2.log and perf-head.log."
+ }
+}

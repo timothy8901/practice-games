@@ -1,0 +1,935 @@
+{
+ "report_path": "(not written) /home/user/practice-games/underbyte/playtests/REPORT.md. The Write tool refused report files from this subagent. The full REPORT.md markdown is in `summary`, after the line '=== REPORT.md ==='.",
+ "bugs": [
+  {
+   "id": "B15",
+   "severity": "major",
+   "status": "confirmed",
+   "title": "Burst Line crawlspace gaps can be crossed with Jump + Echo Jump (Weftyr skip via lw_rest \u2192 bv_catwalk)",
+   "repro": "Vellix with echoJump on and burstLine off. Run right through the 2-tall crawlspace: bv_sluice from (315,240), bv_catwalk from (315,150). At the gap lip press Jump (hold 12 f), then Jump again 19\u201321 f later. Keep holding Right.",
+   "evidence": "Lands on the far block in bv_sluice at (640,240) for 13 of 72 timings and in bv_catwalk at (645,150) for 16 of 72. Tessik also crosses bv_catwalk (4 of 72). The lw_rest.B \u2192 bv_catwalk.T link has no gate, so Brinevault is reachable before Weftyr.",
+   "reporters": [
+    "speedrunner (Vee)"
+   ],
+   "likely_file": "js/world.js (bv_sluice / bv_catwalk gap geometry) or the Echo Jump ceiling-bonk handling in js/characters.js"
+  },
+  {
+   "id": "B16",
+   "severity": "major",
+   "status": "confirmed",
+   "title": "Vellix Blink Strike ends inside Tallock's body and takes contact damage",
+   "repro": "In the Tallock fight, hold Tallock in recover. Put Vellix 200 px to his right facing him, energy 100, god off, and press Special.",
+   "evidence": "The slide ends at x 764, which is Tallock's centre (overlap true). Hurt on frame 12, hp 4\u21923, after dealing 7 damage. From 100 px the slide passes through and is safe.",
+   "reporters": [
+    "speedrunner (Vee)",
+    "fighter (Jules)"
+   ],
+   "likely_file": "js/characters.js SPECIALS.vellix.tick (stop at or pass the boss body)"
+  },
+  {
+   "id": "B19",
+   "severity": "major",
+   "status": "confirmed",
+   "title": "bv_sluice arrival grate is a closed box and Down+Jump drop-through is never taught (critical path after Weftyr)",
+   "repro": "Arrive in bv_sluice from the top (lw_weftyr.B, or warp('bv_sluice','T')) and hold Right or Left.",
+   "evidence": "The player arrives at (105,120) and stops at x 141 after 1 s of Right: the 3-wide shaft (row 2) walls in the head. Only Down+Jump continues. No string in js/ui.js or js/engine.js mentions drop-through, and the hint strip has no Down+Jump item.",
+   "reporters": [
+    "speedrunner (Vee)",
+    "newcomer (Rin)",
+    "access (Ana)"
+   ],
+   "likely_file": "js/world.js bv_sluice rows 2\u20134, plus a drop-through prompt in js/ui.js"
+  },
+  {
+   "id": "B27",
+   "severity": "major",
+   "status": "confirmed",
+   "title": "Pogo-lock: Tallock can't punish repeated down-strikes on his head",
+   "repro": "Brackmaw in the Tallock fight. Stay on top of Tallock and press Down+Light on every fall.",
+   "evidence": "Tallock 120\u21920 HP in 10.6 s with 19 pogos and 0 hits taken.",
+   "reporters": [
+    "fighter (Jules)"
+   ],
+   "likely_file": "js/bosses.js Tallock (no anti-air or shake-off)"
+  },
+  {
+   "id": "B29",
+   "severity": "major",
+   "status": "confirmed",
+   "title": "Light chain knocks small enemies out of range so later hits whiff",
+   "repro": "Tessik or Brackmaw with a stationary scuttlebit (hp 999) 40 px ahead, Light buffered every 4 f.",
+   "evidence": "Tessik: light1 and light2 hit, light3 whiffs (target 65 px away). Brackmaw: light3 whiffs at 77 px. Korvask, Vellix and Orrubel land all three hits.",
+   "reporters": [
+    "fighter (Jules)",
+    "newcomer (Rin)"
+   ],
+   "likely_file": "js/characters.js light1/light2 kb values"
+  },
+  {
+   "id": "B33",
+   "severity": "major",
+   "status": "confirmed",
+   "title": "Stack Slam marker tracks the player through the tell, then disappears during the arc",
+   "repro": "In the Tallock fight, force a Stack Slam tell (state 'tell', atk 4, timer 40) and walk 100 px during it.",
+   "evidence": "The marker x moved from 544 to 447 with the player. slamX and the landing x are both 447 (the x at tell end). tallockDraw draws the ellipse only while state==='tell', so the recorded landing x is never shown during the arc.",
+   "reporters": [
+    "challenger (Kai)",
+    "newcomer (Rin)"
+   ],
+   "likely_file": "js/bosses.js tallockDraw (freeze the marker at tell end and keep it through 'slam')"
+  },
+  {
+   "id": "B34",
+   "severity": "major",
+   "status": "confirmed",
+   "title": "Tallock pins a cornered fighter: a slam landing on them leaves the body overlapping with repeated contact hits",
+   "repro": "Tessik idle at the left wall (x 45), god off, Tallock fight running for 30 s.",
+   "evidence": "18 hurts. The first is the Stack Slam at f225, then a contact hit every 66 f in recover, tell and walk. Minimum body gap \u221255 px; there is no push-out, and a 120 px stack can't be jumped without Echo Jump.",
+   "reporters": [
+    "challenger (Kai)",
+    "newcomer (Rin)",
+    "fighter (Jules)"
+   ],
+   "likely_file": "js/bosses.js Tallock walk/slam; contact pass in js/engine.js"
+  },
+  {
+   "id": "B36",
+   "severity": "major",
+   "status": "confirmed",
+   "title": "Jumping Weftyr's Snare still gets you caught on the way down",
+   "repro": "In the Weftyr fight, Tessik on the floor at x 360. Force a Snare tell (24 f) and press Jump 6 f before it ends.",
+   "evidence": "The thread appears on f23 while the player is airborne. The player is caught on f52, still falling (hurtOnGround false). The thread lives 240 f, so a jump only delays the hit unless you land on a grate. Standing still is hit on f23.",
+   "reporters": [
+    "challenger (Kai)"
+   ],
+   "likely_file": "js/bosses.js SHOTS.snare / weftyrActive"
+  },
+  {
+   "id": "B38",
+   "severity": "major",
+   "status": "confirmed",
+   "title": "Corrosant is off-camera from the floor",
+   "repro": "Start the bv_corrosant fight and stand on the floor.",
+   "evidence": "Camera y 180 and Corrosant at y 132, so its screen y is \u221248. The screenshot shows only the boss bar.",
+   "reporters": [
+    "challenger (Kai)"
+   ],
+   "likely_file": "js/engine.js updateCamera (boss framing) / js/bosses.js Corrosant"
+  },
+  {
+   "id": "B41",
+   "severity": "major",
+   "status": "confirmed",
+   "title": "Rootwell hazards are red on red (Root Spikes, Cable Sweep), causing unseen hits",
+   "repro": "rw_throne, Kernauth phase 1. Wait for Root Spikes, then Cable Sweep.",
+   "evidence": "Screenshots: the root spikes are small red triangles on the red floor, and the one under the player is invisible. The cable is a dark line on a dark-red floor.",
+   "reporters": [
+    "access (Ana)",
+    "challenger (Kai)"
+   ],
+   "likely_file": "js/bosses.js Kernauth draw; Rootwell palette in js/world.js"
+  },
+  {
+   "id": "B42",
+   "severity": "major",
+   "status": "confirmed",
+   "title": "Full-screen hurt/hazard/boss-death flashes cannot be disabled; Screen Shake OFF doesn't reduce them",
+   "repro": "Settings \u2192 Screen Shake OFF, then take a hit (or a spike, or a boss death).",
+   "evidence": "The settings keys have no flash option. With shake off, a screen pixel goes from [24,35,62] to [72,40,62] (red wash) on a hurt. Hazard and boss-death washes also use FX.flash.",
+   "reporters": [
+    "access (Ana)"
+   ],
+   "likely_file": "js/fx.js FX.flash; settings in js/engine.js / js/ui.js"
+  },
+  {
+   "id": "B03",
+   "severity": "minor",
+   "status": "confirmed",
+   "title": "Title cursor doesn't return to SETTINGS after closing it; the hidden title menu follows Settings input",
+   "repro": "Title: Down to SETTINGS, Confirm, Down, Esc, Up.",
+   "evidence": "With no save the cursor comes back on NEW GAME and Up goes to SETTINGS. With a save it comes back on CONTINUE and Up goes to NEW GAME. The shared UI.sel changed to 1 while Settings was open.",
+   "reporters": [
+    "newcomer (Rin)",
+    "fighter (Jules)",
+    "access (Ana)"
+   ],
+   "likely_file": "js/ui.js UI.enter / shared UI.sel"
+  },
+  {
+   "id": "B04",
+   "severity": "minor",
+   "status": "confirmed",
+   "title": "Centre banners (RESTORED, ability) persist into the next room and cover play",
+   "repro": "Rest at the dc_shrine node and walk straight out left into dc_cross.",
+   "evidence": "After the 24 f room change, RESTORED is still up with 102 of 150 f left, over dc_cross and its 5 enemies. ECHO JUMP ACQUIRED also carried into dc_wake.",
+   "reporters": [
+    "newcomer (Rin)",
+    "access (Ana)"
+   ],
+   "likely_file": "js/ui.js drawBanner / banner timers; js/engine.js room load"
+  },
+  {
+   "id": "B05",
+   "severity": "minor",
+   "status": "confirmed",
+   "title": "Overlays are translucent: banners, boss card and HUD bleed through pause, map, shop and dialogs",
+   "repro": "Rest at a node, then press Pause or M at once. The same happens with the shop, the quit dialog and the boss intro card.",
+   "evidence": "PANEL is rgba(20,16,24,0.82) over DIM 0.6. The screenshots show 'RESTORED / Saved \u00b7 hearts full \u00b7 energy full' readable behind RESUME/MAP and in the middle of the map.",
+   "reporters": [
+    "masher (Dex)",
+    "speedrunner (Vee)",
+    "explorer (Mo)",
+    "access (Ana)"
+   ],
+   "likely_file": "js/ui.js dim()/UI.panel; js/util.js Palette.PANEL"
+  },
+  {
+   "id": "B06",
+   "severity": "minor",
+   "status": "confirmed",
+   "title": "Pause ability line is printed across the zone-title toast",
+   "repro": "With Echo Jump, enter Loomworks and pause while the LOOMWORKS toast is up.",
+   "evidence": "The screenshot shows 'ECHO JUMP \u2014 a second jump in the air' (y 136) drawn across 'LOOMWORKS' (y 150).",
+   "reporters": [
+    "masher (Dex)"
+   ],
+   "likely_file": "js/ui.js drawPause"
+  },
+  {
+   "id": "B10",
+   "severity": "minor",
+   "status": "confirmed",
+   "title": "Overclock keeps draining during the ability pickup lock",
+   "repro": "Kill Tallock, set meter 100, press Overclock, then touch the ability crystal.",
+   "evidence": "The overclock timer goes 719\u2192599 across the 120 f pickupSeq, so all 120 locked frames are lost.",
+   "reporters": [
+    "masher (Dex)"
+   ],
+   "likely_file": "js/characters.js Overclock tick / js/engine.js startPickupSeq"
+  },
+  {
+   "id": "B11",
+   "severity": "minor",
+   "status": "confirmed",
+   "title": "Empty boss bar lingers under 'TALLOCK PURGED'",
+   "repro": "Kill Tallock and don't touch the crystal.",
+   "evidence": "The bar is drawn through 'dying' (94 f) and all of 'reward', and is still drawn after 400 f, with the PURGED toast on top.",
+   "reporters": [
+    "masher (Dex)"
+   ],
+   "likely_file": "js/ui.js drawBossBar"
+  },
+  {
+   "id": "B12",
+   "severity": "minor",
+   "status": "confirmed",
+   "title": "Keyboard prompts while playing on a gamepad; '\u25b2 REST' reads as PlayStation Triangle",
+   "repro": "Play pad-only and open the map, shop, select and game-over screens. Stand at a node.",
+   "evidence": "Input.device is 'gamepad' and glyph('jump') is 'A', but the footers are constant TXT strings ('R recentre \u00b7 Esc / M close', 'Enter buy \u00b7 Esc close', 'Enter confirm \u00b7 Esc back', 'Press JUMP or CONFIRM'). The prompt is '\u25b2 REST' with '\u2191'.",
+   "reporters": [
+    "masher (Dex)",
+    "access (Ana)"
+   ],
+   "likely_file": "js/ui.js TXT footers / TXT.prompt"
+  },
+  {
+   "id": "B17",
+   "severity": "minor",
+   "status": "confirmed",
+   "title": "dc_fall crumble blocks drop you blind onto an off-screen spike bed",
+   "repro": "In dc_fall, stand on the crumble tiles (14\u201316, 34).",
+   "evidence": "Camera y 770 shows the view down to y 1310. The spikes directly below are at row 49 (y 1470), off-screen. The reset to the room entry is by design.",
+   "reporters": [
+    "speedrunner (Vee)",
+    "newcomer (Rin)",
+    "masher (Dex)"
+   ],
+   "likely_file": "js/world.js dc_fall layout, or camera look-down in js/engine.js"
+  },
+  {
+   "id": "B18",
+   "severity": "minor",
+   "status": "confirmed",
+   "title": "Select-screen WEIGHT bar is inverted (shows knockback taken)",
+   "repro": "Compare the WEIGHT bars on the select screen.",
+   "evidence": "Bar = weight/1.3, where weight is the knockback multiplier: Vellix 100 %, Orrubel 85 %, Tessik 77 %, Korvask 58 %, Brackmaw 46 %. This follows the DESIGN \u00a712.10 formula, but \u00a74.1 weight means knockback taken.",
+   "reporters": [
+    "newcomer (Rin)",
+    "speedrunner (Vee)",
+    "fighter (Jules)"
+   ],
+   "likely_file": "js/ui.js UI.tick statNow[3]"
+  },
+  {
+   "id": "B22",
+   "severity": "minor",
+   "status": "confirmed",
+   "title": "Debug defeatBoss is not a faithful defeat (debug-only)",
+   "repro": "UB.debug.defeatBoss() with no argument in the arena; defeatBoss('weftyr'/'kernauth') mid-fight; toTitle() mid-fight.",
+   "evidence": "With no argument it returns true, bossesDefeated becomes [null] and the boss stays. Boss shots (needles, orbs) survive, the Kernauth finale and victory are skipped, and state().bossFight stays 'fight' on the title. Real kills are fine: needles 6\u21920, and Kernauth reaches victory in 190 f.",
+   "reporters": [
+    "speedrunner (Vee)",
+    "access (Ana)",
+    "challenger (Kai)",
+    "masher (Dex)"
+   ],
+   "likely_file": "js/engine.js makeDebug.defeatBoss / Game.toTitle"
+  },
+  {
+   "id": "B23",
+   "severity": "minor",
+   "status": "confirmed",
+   "title": "Map 'you' dot covers the vendor hex in the current room",
+   "repro": "Stand in dc_shrine and press M.",
+   "evidence": "The hex is drawn at the room's centre-bottom (x+18, y+26 of a 36 px cell). The dot (r 5, ring to r 12) overlaps it for player x of about 213\u2013747 px, which includes the node and the vendor spot.",
+   "reporters": [
+    "explorer (Mo)"
+   ],
+   "likely_file": "js/ui.js drawMap"
+  },
+  {
+   "id": "B24",
+   "severity": "minor",
+   "status": "confirmed",
+   "title": "Collected-core map dots are drawn in the room's corner and missing from the legend",
+   "repro": "Collect the Long Drop and Loft cores, then open the map.",
+   "evidence": "Found cores are drawn at (x+w\u221210\u2212i\u00b78, y+h\u221210) whatever the core's position (the Long Drop core is at the top right). TXT.mapLegend has no core entry.",
+   "reporters": [
+    "explorer (Mo)"
+   ],
+   "likely_file": "js/ui.js drawMap / TXT.mapLegend"
+  },
+  {
+   "id": "B25",
+   "severity": "minor",
+   "status": "confirmed",
+   "title": "Scrivvet says 'the deeper you go, the cheaper I get' but prices are identical",
+   "repro": "Open the shop in dc_shrine and in rw_rest.",
+   "evidence": "Both vendor rooms use one price table (spare_cell 90, hot_clock 160, deep_ping 120). The line is in TXT.vendorLines.",
+   "reporters": [
+    "explorer (Mo)"
+   ],
+   "likely_file": "js/ui.js TXT.vendorLines / js/util.js vendorItems"
+  },
+  {
+   "id": "B26",
+   "severity": "minor",
+   "status": "confirmed",
+   "title": "Tallock can be cheesed from the left row-12 shelf",
+   "repro": "Tessik on the shelf (tile x 10, feet y 360), Light spam whenever Tallock is in reach, no dodging.",
+   "evidence": "Boss 120\u21920 in 10.4 s with 1 hit taken (a Stack Slam). Slab Swing and Stomp Quake never reach the shelf.",
+   "reporters": [
+    "explorer (Mo)"
+   ],
+   "likely_file": "js/bosses.js Tallock attack selection"
+  },
+  {
+   "id": "B31",
+   "severity": "minor",
+   "status": "confirmed",
+   "title": "Refused inputs give no feedback (special mid-air or during its own move, Vellix chain-end special, Overclock below full, dash without Burst Line, Pulse Line off a ledge)",
+   "repro": "Tessik: Special in mid-air, and Special again within 20 f of a Pulse Line. Vellix: L\u00d73 five frames apart, then Special. Overclock at meter 60. Dash with no Burst Line. Pulse Line from the Tallock shelf.",
+   "evidence": "All silent: energy unchanged and denyFlash 0. A second Pulse Line is silent until f26 and only then flashes. The Pulse Line from the shelf spends 26 energy, lives 10 f, dies at the ledge (x 371) and deals 0 damage.",
+   "reporters": [
+    "newcomer (Rin)",
+    "fighter (Jules)",
+    "access (Ana)",
+    "masher (Dex)",
+    "speedrunner (Vee)"
+   ],
+   "likely_file": "js/characters.js special/overclock/dash press paths"
+  },
+  {
+   "id": "B32",
+   "severity": "minor",
+   "status": "confirmed",
+   "title": "Tessik's select-screen showcase pose leaves the portrait and covers the header",
+   "repro": "Select screen, Tessik highlighted, wait for the jump pose.",
+   "evidence": "Screenshot: the jumping rig rises out of the halo and over 'CHOOSE YOUR SPIRIT'.",
+   "reporters": [
+    "fighter (Jules)"
+   ],
+   "likely_file": "js/characters.js drawPreview (showcase jump dy) / js/ui.js drawPreviewRig"
+  },
+  {
+   "id": "B43",
+   "severity": "minor",
+   "status": "confirmed",
+   "title": "Hero blinks fully invisible during post-hit i-frames",
+   "repro": "Take any hit.",
+   "evidence": "The hero is not drawn on 32 of the 60 i-frames (Player.draw returns when (iframes>>2)&1).",
+   "reporters": [
+    "access (Ana)",
+    "newcomer (Rin)",
+    "challenger (Kai)"
+   ],
+   "likely_file": "js/characters.js Player.draw"
+  },
+  {
+   "id": "B01",
+   "severity": "major",
+   "status": "already_fixed",
+   "title": "Gamepad-only play never started audio; PRESS ANY KEY stayed",
+   "repro": "Fresh boot with only a pad, then press A on the title.",
+   "evidence": "After the A press, gestured is true, device is 'gamepad', ctxState is 'running' and the title song plays.",
+   "reporters": [
+    "masher (Dex)"
+   ],
+   "likely_file": "js/input.js"
+  },
+  {
+   "id": "B13",
+   "severity": "minor",
+   "status": "already_fixed",
+   "title": "RESET SAVE looked active without a save",
+   "repro": "Fresh boot \u2192 SETTINGS \u2192 RESET SAVE \u2192 Enter.",
+   "evidence": "hasSave is false. Enter opens no dialog and shows no toast, and the row is drawn at \u03b1 0.4 (disabled).",
+   "reporters": [
+    "masher (Dex)"
+   ],
+   "likely_file": "js/ui.js"
+  },
+  {
+   "id": "B20",
+   "severity": "minor",
+   "status": "not_reproduced",
+   "title": "ns_base static-pool reset respawns you mid-air",
+   "repro": "warp('ns_base','T') (the natural top entry) and warp('ns_base','L'), then touch the static pool at tile (14,32) three times each.",
+   "evidence": "All six resets respawn at (105,60) and land on the entry ledge at y 120.",
+   "reporters": [
+    "speedrunner (Vee)"
+   ],
+   "likely_file": "js/engine.js hazardRespawn"
+  },
+  {
+   "id": "B21",
+   "severity": "minor",
+   "status": "not_reproduced",
+   "title": "Down+Light onto a hopnode gives contact damage; no spike pogo",
+   "repro": "Fall onto a hopnode and press Down+Light 1\u201314 f before contact; also onto dc_cross spikes.",
+   "evidence": "Pressed at least 4 f early, it pogos. Pressed 1\u20133 f early, it lands in the 4 f startup and takes contact damage, which is by design. Spikes pogo correctly.",
+   "reporters": [
+    "speedrunner (Vee)"
+   ],
+   "likely_file": "js/characters.js down-strike"
+  },
+  {
+   "id": "B28",
+   "severity": "minor",
+   "status": "not_reproduced",
+   "title": "Loomworks lore card text is low contrast",
+   "repro": "First entry to Loomworks (lw_hoist); compare with the Brinevault card.",
+   "evidence": "Measured text contrast 12.6:1 on Loomworks against 11.8:1 on Brinevault.",
+   "reporters": [
+    "explorer (Mo)"
+   ],
+   "likely_file": "js/ui.js drawLore"
+  },
+  {
+   "id": "B35",
+   "severity": "minor",
+   "status": "not_reproduced",
+   "title": "Stomp Quake wave hits higher than it looks",
+   "repro": "Spawn a wave 45 px away (edge to edge) and jump (hold 14 f, and a 4 f tap).",
+   "evidence": "The wave box is 30\u00d720. Neither jump is hit (rises 103 px and 54 px).",
+   "reporters": [
+    "challenger (Kai)",
+    "newcomer (Rin)"
+   ],
+   "likely_file": "js/bosses.js SHOTS.wave"
+  },
+  {
+   "id": "B39",
+   "severity": "major",
+   "status": "not_reproduced",
+   "title": "Kernauth's summoned motes take no hits",
+   "repro": "Force Summon, then air-attack a mote.",
+   "evidence": "The mote goes from hp 3 to 0 and dies.",
+   "reporters": [
+    "challenger (Kai)"
+   ],
+   "likely_file": "js/enemies.js mote"
+  },
+  {
+   "id": "B02",
+   "severity": "major",
+   "status": "by_design",
+   "title": "Dash does nothing and is never taught before Tallock",
+   "repro": "Press Shift, ; or RB/LB before beating Weftyr.",
+   "evidence": "Dash is the Burst Line ability (Weftyr's reward, taught by its banner); the player stays idle with burstLine false. The DASH hint-strip item can never show, because hints stop after 3 visited rooms. The confusion is covered by B31 and feature F01.",
+   "reporters": [
+    "newcomer (Rin)",
+    "masher (Dex)",
+    "speedrunner (Vee)"
+   ],
+   "likely_file": "js/characters.js (dash gate) / js/ui.js drawHints"
+  },
+  {
+   "id": "B07",
+   "severity": "minor",
+   "status": "by_design",
+   "title": "Any key (even Pause) closes the one-time lore card and eats the input",
+   "repro": "Enter a new zone and press Pause after 10 f.",
+   "evidence": "The card closes on any key after 10 f and is shown once per zone. Buffers are cleared on overlay close (DESIGN \u00a72.5, \u00a712.18). Covered by feature F06.",
+   "reporters": [
+    "masher (Dex)",
+    "fighter (Jules)",
+    "speedrunner (Vee)"
+   ],
+   "likely_file": "js/ui.js lore"
+  },
+  {
+   "id": "B08",
+   "severity": "minor",
+   "status": "by_design",
+   "title": "Can pause while dying; quitting erases the death",
+   "repro": "setHp(0), pause during the dying animation, quit.",
+   "evidence": "The pause menu opens during 'dying'. Deaths stay in memory and are written at the next node, like bits (DESIGN \u00a73.x; the quit dialog warns of this). The saved deaths count stays 0 even after a full game-over respawn.",
+   "reporters": [
+    "masher (Dex)"
+   ],
+   "likely_file": "js/engine.js"
+  },
+  {
+   "id": "B09",
+   "severity": "minor",
+   "status": "by_design",
+   "title": "Two heroes visible during the room slide",
+   "repro": "Run through any door.",
+   "evidence": "DESIGN \u00a711.3.2 slides the old room's last frame (with the hero) out while the new room slides in.",
+   "reporters": [
+    "masher (Dex)"
+   ],
+   "likely_file": "js/engine.js render (slide)"
+  },
+  {
+   "id": "B14",
+   "severity": "minor",
+   "status": "by_design",
+   "title": "Rest says 'energy full' but Continue loads half energy",
+   "repro": "Rest, quit to title, Continue.",
+   "evidence": "Energy is 100 at rest and about 51 after Continue. A load or respawn starts at energy 50 by design.",
+   "reporters": [
+    "masher (Dex)",
+    "newcomer (Rin)"
+   ],
+   "likely_file": "js/engine.js continueGame/respawn"
+  },
+  {
+   "id": "B30",
+   "severity": "minor",
+   "status": "by_design",
+   "title": "Down+Light while rising stops the jump",
+   "repro": "Jump, then Down+Light 150 ms later.",
+   "evidence": "DESIGN \u00a73.6: during the down-strike's active frames vy = max(vy, 500).",
+   "reporters": [
+    "fighter (Jules)"
+   ],
+   "likely_file": "js/characters.js down move"
+  },
+  {
+   "id": "B37",
+   "severity": "major",
+   "status": "by_design",
+   "title": "Weftyr stays harmful while drilled in after Spin",
+   "repro": "After Spool Spin, punish from 6 px away, then stand inside the body.",
+   "evidence": "From 6 px away the punish dealt 17 damage with 0 hits taken. Standing inside the body takes 1 contact hit in 60 f (DESIGN \u00a78.0: body contact is 1).",
+   "reporters": [
+    "challenger (Kai)"
+   ],
+   "likely_file": "js/bosses.js weftyr"
+  },
+  {
+   "id": "B40",
+   "severity": "minor",
+   "status": "by_design",
+   "title": "Can stand inside Kernauth; Cable Sweep starts on top of you",
+   "repro": "Stand at Kernauth's centre in idle.",
+   "evidence": "1 contact hit with knockback (x 975\u2192838). Cable Sweep has a 30 f tell and its tip starts at the body edge (DESIGN \u00a78.4).",
+   "reporters": [
+    "challenger (Kai)"
+   ],
+   "likely_file": "js/bosses.js kernauth"
+  },
+  {
+   "id": "B44",
+   "severity": "minor",
+   "status": "by_design",
+   "title": "In small windows secondary text is about 6 px, with letterboxing and no UI scale",
+   "repro": "Run at 844\u00d7390.",
+   "evidence": "The canvas is a fixed 960\u00d7540, letterboxed (BRIEF rule 7). Covered by feature F21.",
+   "reporters": [
+    "access (Ana)"
+   ],
+   "likely_file": "js/engine.js resize"
+  },
+  {
+   "id": "B45",
+   "severity": "minor",
+   "status": "by_design",
+   "title": "Unaffordable shop items are marked only by red price text",
+   "repro": "Open the shop with 24 bits.",
+   "evidence": "The screenshot shows prices in DANGER red. DESIGN \u00a712.17 specifies this, but it is a colour-only cue.",
+   "reporters": [
+    "access (Ana)"
+   ],
+   "likely_file": "js/ui.js drawShop"
+  }
+ ],
+ "features": [
+  {
+   "id": "F01",
+   "title": "Controls & Moves page in Pause and Settings",
+   "pitch": "A device-aware page listing every action and its key or button, including dash/Burst Line, Down+Jump drop-through, Overclock, 'Special = ultimate while Overclocked', interact and map, plus a move list for the current fighter.",
+   "requested_by": [
+    "newcomer (Rin)",
+    "fighter (Jules)",
+    "access (Ana)",
+    "masher (Dex)"
+   ],
+   "value": "high",
+   "effort": "S",
+   "risk": "low",
+   "recommend_now": true
+  },
+  {
+   "id": "F02",
+   "title": "Comfort pack: Reduced Flashing + Steady Silhouette",
+   "pitch": "A Settings toggle that replaces full-screen hurt, hazard and boss-death washes with a thin edge pulse and a shake on the lost heart, and draws the invulnerable hero as an outlined, pulsing silhouette instead of blinking out.",
+   "requested_by": [
+    "access (Ana)",
+    "newcomer (Rin)",
+    "challenger (Kai)"
+   ],
+   "value": "high",
+   "effort": "S",
+   "risk": "low",
+   "recommend_now": true
+  },
+  {
+   "id": "F03",
+   "title": "Device-aware prompts everywhere",
+   "pitch": "Every footer and prompt follows the last device used (A/B/Start/Back), a d-pad icon replaces '\u25b2', a 'press a key or button for sound' note replaces PRESS ANY KEY, and there is an optional glyph style.",
+   "requested_by": [
+    "masher (Dex)",
+    "access (Ana)"
+   ],
+   "value": "high",
+   "effort": "S",
+   "risk": "low",
+   "recommend_now": true
+  },
+  {
+   "id": "F04",
+   "title": "Signal Ledges (mid-room hazard-respawn anchors)",
+   "pitch": "Glowing pads on safe ledges in tall rooms (The Long Drop, Crossrack). Touching one makes it the hazard-respawn point, so a spike still costs a heart but not the whole climb.",
+   "requested_by": [
+    "newcomer (Rin)",
+    "masher (Dex)",
+    "speedrunner (Vee)"
+   ],
+   "value": "high",
+   "effort": "M",
+   "risk": "low",
+   "recommend_now": true
+  },
+  {
+   "id": "F05",
+   "title": "Hazard Outline mode",
+   "pitch": "One consistent shape language for everything that hurts (a hatched zig-zag rim, outlined projectiles and floor tells), so danger reads by shape in every zone palette, including Rootwell's red on red.",
+   "requested_by": [
+    "access (Ana)",
+    "masher (Dex)",
+    "fighter (Jules)",
+    "challenger (Kai)"
+   ],
+   "value": "high",
+   "effort": "M",
+   "risk": "low",
+   "recommend_now": true
+  },
+  {
+   "id": "F06",
+   "title": "Retry flow: skippable boss intros, safe lore cards, Lore archive",
+   "pitch": "Confirm skips a boss intro you have already seen, lore cards ignore input for their first 0.5 s, and every card you have seen goes into a Lore page in Pause.",
+   "requested_by": [
+    "masher (Dex)",
+    "speedrunner (Vee)"
+   ],
+   "value": "medium",
+   "effort": "S",
+   "risk": "low",
+   "recommend_now": true
+  },
+  {
+   "id": "F07",
+   "title": "Restore Echo boss tips",
+   "pitch": "After two deaths to the same boss, resting at the nearest node shows one in-world memory fragment, for example 'It cannot turn mid-leap. Pass beneath.'",
+   "requested_by": [
+    "newcomer (Rin)"
+   ],
+   "value": "medium",
+   "effort": "S",
+   "risk": "low",
+   "recommend_now": true
+  },
+  {
+   "id": "F08",
+   "title": "Remappable controls",
+   "pitch": "A Controls page where every action can be reassigned for keyboard and pad, with a reset-to-default item.",
+   "requested_by": [
+    "access (Ana)",
+    "newcomer (Rin)"
+   ],
+   "value": "high",
+   "effort": "M",
+   "risk": "medium",
+   "recommend_now": false
+  },
+  {
+   "id": "F09",
+   "title": "Gentle Signal assist mode",
+   "pitch": "Optional +1 heart, telegraphs 25\u201330 % longer, game speed 80/90/100 %, shown as a badge on the save.",
+   "requested_by": [
+    "newcomer (Rin)",
+    "access (Ana)"
+   ],
+   "value": "high",
+   "effort": "M",
+   "risk": "medium",
+   "recommend_now": false
+  },
+  {
+   "id": "F10",
+   "title": "Boss rehearsal & trials",
+   "pitch": "Rehearse a met boss from the nearest node with no progress lost, a per-fighter rematch board, and Fault Log boss trials after the ending.",
+   "requested_by": [
+    "challenger (Kai)",
+    "speedrunner (Vee)",
+    "fighter (Jules)"
+   ],
+   "value": "high",
+   "effort": "L",
+   "risk": "medium",
+   "recommend_now": false
+  },
+  {
+   "id": "F11",
+   "title": "Combo counter with COUNTER / PUNISH callouts",
+   "pitch": "A hit counter beside the hero that shows total damage when a string ends, with tags for a Bulwark Catch counter and a hit on a boss in recover.",
+   "requested_by": [
+    "masher (Dex)",
+    "fighter (Jules)"
+   ],
+   "value": "medium",
+   "effort": "S",
+   "risk": "low",
+   "recommend_now": false
+  },
+  {
+   "id": "F12",
+   "title": "Training room (Diagnostic Bay)",
+   "pitch": "A dummy you can set to stand, walk, hover or block, with damage numbers and frame data, plus infinite meter and energy toggles.",
+   "requested_by": [
+    "fighter (Jules)"
+   ],
+   "value": "medium",
+   "effort": "M",
+   "risk": "low",
+   "recommend_now": false
+  },
+  {
+   "id": "F13",
+   "title": "Map pins and room sweep marks",
+   "pitch": "Four pin glyphs saved per room, a tick when a room is fully looted, and a zone % in the map header.",
+   "requested_by": [
+    "explorer (Mo)"
+   ],
+   "value": "medium",
+   "effort": "S",
+   "risk": "low",
+   "recommend_now": false
+  },
+  {
+   "id": "F14",
+   "title": "Out-of-reach echoes",
+   "pitch": "Standing under an ability gate writes 'a signal above, too faint to follow' into the room's map line, and it changes once the ability is earned.",
+   "requested_by": [
+    "explorer (Mo)"
+   ],
+   "value": "medium",
+   "effort": "M",
+   "risk": "low",
+   "recommend_now": false
+  },
+  {
+   "id": "F15",
+   "title": "Node relay fast travel",
+   "pitch": "After Tallock, resting can relay you to any node you have already rested at.",
+   "requested_by": [
+    "explorer (Mo)"
+   ],
+   "value": "medium",
+   "effort": "M",
+   "risk": "medium",
+   "recommend_now": false
+  },
+  {
+   "id": "F16",
+   "title": "Edge beacon for off-screen bosses + HUD fade",
+   "pitch": "An arrow at the screen edge when the boss or its weak spot is off-camera, and the HUD fades when the boss is underneath it (the fix path for B38).",
+   "requested_by": [
+    "challenger (Kai)"
+   ],
+   "value": "medium",
+   "effort": "S",
+   "risk": "low",
+   "recommend_now": false
+  },
+  {
+   "id": "F17",
+   "title": "Dismissable edge banners",
+   "pitch": "RESTORED, ability and zone banners move to a top strip and B dismisses them early (the fix path for B04).",
+   "requested_by": [
+    "access (Ana)"
+   ],
+   "value": "medium",
+   "effort": "S",
+   "risk": "low",
+   "recommend_now": false
+  },
+  {
+   "id": "F18",
+   "title": "Run timer with auto-splits",
+   "pitch": "An optional in-game timer that splits on room transitions and boss kills, with a best-split table.",
+   "requested_by": [
+    "speedrunner (Vee)"
+   ],
+   "value": "medium",
+   "effort": "M",
+   "risk": "low",
+   "recommend_now": false
+  },
+  {
+   "id": "F19",
+   "title": "Pogo cues",
+   "pitch": "A flash and sound when a pogo connects, and a slightly earlier, taller down-air box.",
+   "requested_by": [
+    "speedrunner (Vee)"
+   ],
+   "value": "medium",
+   "effort": "S",
+   "risk": "medium",
+   "recommend_now": false
+  },
+  {
+   "id": "F20",
+   "title": "Fault Trace on death",
+   "pitch": "A 2-second ghost replay of the killing hit with the attack's name and hitbox on the game-over screen.",
+   "requested_by": [
+    "challenger (Kai)"
+   ],
+   "value": "medium",
+   "effort": "M",
+   "risk": "medium",
+   "recommend_now": false
+  },
+  {
+   "id": "F21",
+   "title": "UI scale and fit-to-window",
+   "pitch": "HUD and text size at 100/125/150 % and an option to use the whole window instead of the letterbox.",
+   "requested_by": [
+    "access (Ana)"
+   ],
+   "value": "medium",
+   "effort": "M",
+   "risk": "medium",
+   "recommend_now": false
+  },
+  {
+   "id": "F22",
+   "title": "Weak-spot feedback",
+   "pitch": "A small '\u00bd' chip on a non-core boss hit, with a flash of the real weak spot.",
+   "requested_by": [
+    "access (Ana)"
+   ],
+   "value": "medium",
+   "effort": "S",
+   "risk": "low",
+   "recommend_now": false
+  },
+  {
+   "id": "F23",
+   "title": "Readable Bulwark Catch windows",
+   "pitch": "A glint on catchable tells, a flash during the active window, and caught projectiles thrown back.",
+   "requested_by": [
+    "fighter (Jules)"
+   ],
+   "value": "medium",
+   "effort": "M",
+   "risk": "low",
+   "recommend_now": false
+  },
+  {
+   "id": "F24",
+   "title": "Boss anti-pogo shrug",
+   "pitch": "After two consecutive pogos the boss spins its top and throws the player off, with a tell (the fix path for B27).",
+   "requested_by": [
+    "fighter (Jules)"
+   ],
+   "value": "medium",
+   "effort": "S",
+   "risk": "low",
+   "recommend_now": false
+  },
+  {
+   "id": "F25",
+   "title": "Light-chain knockback tuning + dash buffer",
+   "pitch": "Low knockback on L1 and L2, the big knockback on L3, and a dash press that buffers out of a light (the fix path for B29).",
+   "requested_by": [
+    "fighter (Jules)"
+   ],
+   "value": "medium",
+   "effort": "S",
+   "risk": "low",
+   "recommend_now": false
+  },
+  {
+   "id": "F26",
+   "title": "Phase Step dash module",
+   "pitch": "A Scrivvet upgrade that gives the dash about 6 i-frames.",
+   "requested_by": [
+    "challenger (Kai)"
+   ],
+   "value": "low",
+   "effort": "S",
+   "risk": "medium",
+   "recommend_now": false
+  },
+  {
+   "id": "F27",
+   "title": "Scrivvet's depth discount",
+   "pitch": "Rootwell prices about 25 % lower, with earlier purchases refunded as bits, which makes his line true (the fix path for B25).",
+   "requested_by": [
+    "explorer (Mo)"
+   ],
+   "value": "low",
+   "effort": "S",
+   "risk": "low",
+   "recommend_now": false
+  },
+  {
+   "id": "F28",
+   "title": "Input display overlay",
+   "pitch": "A settings toggle that draws held directions and buttons in a corner.",
+   "requested_by": [
+    "speedrunner (Vee)"
+   ],
+   "value": "low",
+   "effort": "S",
+   "risk": "low",
+   "recommend_now": false
+  }
+ ],
+ "summary": "7 testers, 22 clips, 34:04 of recorded live play. Average ratings: fun 6.4, controls 6.0, clarity 5.1, fairness 4.9. No console errors and no soft-locks. Every merged bug (45) was re-checked with headless Playwright against the current js (commit b0e3806, which includes the round-3 fixes): 28 confirmed (11 major, 17 minor), 2 already fixed (pad audio, RESET SAVE), 5 not reproduced, 10 by design.\n\nThe major confirmed bugs:\n- A Burst Line gate skip with Jump + Echo Jump. bv_catwalk is reachable from lw_rest before Weftyr, so this skips a boss and an ability.\n- Vellix's Blink Strike ending inside Tallock.\n- The bv_sluice arrival box, with Down+Jump never taught.\n- Tallock's pogo-lock, the slam marker that never shows the landing x, and wall pinning after a slam.\n- Weftyr's Snare catching a fighter who jumps it.\n- Corrosant off-camera from the floor.\n- Rootwell's red-on-red hazards.\n- Flashes that can't be turned off.\n\nSeven features are recommended now: a Controls & Moves page, a comfort pack (reduced flashing and a steady silhouette), device-aware prompts, Signal Ledges, a Hazard Outline mode, a retry flow, and Restore Echo tips. Remapping is next.\n\nREPORT.md was NOT written: the Write tool refuses report files from this subagent. The full markdown follows for the caller to save at /home/user/practice-games/underbyte/playtests/REPORT.md. The scratch folder playtests/sessions/_triage/ was deleted. No game files were edited and nothing was committed.\n\n=== REPORT.md ===\n# UNDERBYTE playtest report (merged)\n\nSeven playtesters, each playing like a different kind of player, recorded 22 clips. Every bug they reported was merged with its duplicates and re-checked against the current code (js at commit `b0e3806`, which includes the round-3 fixes) using short headless Playwright scripts and the `UB.debug` API.\n\n## Overview\n\n| | |\n|---|---|\n| Testers | 7: Rin (newcomer), Dex (button-masher, keyboard + pad), Vee (speedrunner), Mo (explorer), Jules (fighting-game player), Kai (boss challenger), Ana (pad + accessibility) |\n| Recorded live play | **34 min 04 s** in 22 clips (the thinking time between turns is cut, so the clips play at game speed, without sound) |\n| Furthest point reached | All four bosses were fought. Tallock was beaten by honest play (Brackmaw, Korvask, Ana's Tessik, Dex on the pad). Weftyr, Corrosant and Kernauth were only fought from debug-assisted loadouts. |\n| Console errors | None in any clip and none in the triage runs |\n| Soft-locks | None found |\n| Average ratings (1\u201310) | Fun **6.4** \u00b7 Controls **6.0** \u00b7 Clarity **5.1** \u00b7 Fairness **4.9** |\n\n| Tester | Fun | Controls | Clarity | Fairness |\n|---|---|---|---|---|\n| Rin, newcomer | 6 | 6 | 6 | 4 |\n| Dex, masher | 7 | 5 | 6 | 5 |\n| Vee, speedrunner | 7 | 7 | 5 | 5 |\n| Mo, explorer | 7 | 6 | 6 | 6 |\n| Jules, fighter | 7 | 6 | 5 | 6 |\n| Kai, challenger | 5 | 6 | 4 | 3 |\n| Ana, accessibility | 6 | 6 | 4 | 5 |\n\n**Bug triage at a glance:** 45 merged bugs.\n\n| Status | Count |\n|---|---|\n| Confirmed | 28 (11 major, 17 minor) |\n| Already fixed | 2 |\n| Not reproduced | 5 |\n| By design | 10 |\n\n**Biggest themes:**\n\n1. **Bosses are not fair yet.** These are mostly readability and body-contact problems, not difficult patterns:\n   - Tallock's slam marker, wall pinning, pogo-lock and shelf cheese.\n   - Weftyr's Snare catches a fighter who jumps it.\n   - Corrosant stays off-camera.\n   - Rootwell's hazards are red on red.\n2. **The game teaches too little.** There is no controls page, Down+Jump is never shown (and the critical path needs it), refused inputs are silent, and prompts name keyboard keys while you play on a pad.\n3. **Overlays and banners leak through each other** and sit over the play area.\n4. **Comfort options are thin.** Full-screen flashes can't be turned off, and the hero blinks fully invisible after a hit.\n\n## Recordings\n\nAll clips are in `recordings/`.\n\n| File | Tester | Length | What it shows |\n|---|---|---|---|\n| `newcomer-01-first-steps-and-tallock.mp4` | Rin | 2:08 | Title, Settings and select (Tessik), first rooms, a spike reset to the top of The Long Drop, Rackside Shrine, finding Overclock, and a death to Tallock at 68/120 |\n| `newcomer-02-tallock-attempts.mp4` | Rin | 2:21 | Continue, then four more Tallock attempts (best 45/120). Shows the title-cursor jump and the RESTORED banner following into the next room. |\n| `masher-01-title-mash-and-spike-deaths.mp4` | Dex | 1:47 | Menu mashing, pauses mid-jump/transition/death, repeated spike deaths, 2 game overs, quit to title |\n| `masher-02-gamepad-boss-mash.mp4` | Dex | 1:38 | Pad only: overwrite dialog, dash attempts, pause and map during Tallock's intro, a loss and a win, Overclock draining during the pickup. The game was silent on the pad (since fixed). |\n| `masher-03-dash-lore-quit-tests.mp4` | Dex | 0:40 | Dash key tests, the pause ability line over the LOOMWORKS toast, the lore card closed by Pause, two heroes in the room slide |\n| `speedrunner-01-vellix-driftcache-tallock-attempts.mp4` | Vee | 2:07 | Blind Vellix run, a crumble-into-spikes death, the shop under the RESTORED banner, a Blink Strike that ends inside Tallock |\n| `speedrunner-02-gate-breaks-burstline-skip.mp4` | Vee | 1:07 | Debug-assisted gate tests: the Echo Jump gate holds, both Burst Line gaps are crossed with Jump + Echo Jump, and the bv_sluice arrival box |\n| `speedrunner-03-driftcache-timed-route.mp4` | Vee | 1:11 | Timed Driftcache route (about 62.9 s in-game to Tallock's door), a damage boost and a missed pogo |\n| `explorer-01-driftcache-first-sweep.mp4` | Mo | 3:03 | Full Driftcache sweep, spotting the Long Drop core alcove, the vendor, two Tallock losses at 15\u201316 HP |\n| `explorer-02-tallock-echo-jump-backtrack.mp4` | Mo | 1:38 | Beats Tallock from the left shelf without taking a hit, then the Echo Jump backtrack to the Crossrack ledge and The Loft |\n| `explorer-03-zone-tour-and-cores.mp4` | Mo | 1:20 | Debug-assisted tour of all five zones, the Grip Protocol climb to the Long Drop core, all three cores |\n| `fighter-01-tessik-driftcache-and-tallock.mp4` | Jules | 1:38 | Tessik lab where light-chain hits 2\u20133 whiff on crawlers, Driftcache, a loss to Tallock at 65/120 |\n| `fighter-02-brackmaw-vellix-tallock-ultimates.mp4` | Jules | 2:15 | Brackmaw pogo-locks Tallock, the ultimates, the Vellix lab, Blink Strike contact damage, the WEIGHT bar |\n| `fighter-03-orrubel-korvask-tallock-ultimates.mp4` | Jules | 2:14 | Orrubel cornered, Korvask wins with Bulwark Catch, Clamp Press and Sentry Triad, Tessik's pose over the header |\n| `fighter-04-tessik-cancels-sightline-tallock.mp4` | Jules | 0:32 | Tessik cancels, Sightline, a down-strike that stops the jump |\n| `challenger-01-tallock-three-losses.mp4` | Kai | 1:41 | Three Tallock losses (best 59/120): the Stack Slam marker and being pinned at the walls |\n| `challenger-02-weftyr-attempts.mp4` | Kai | 1:13 | Weftyr: the Snare catches him on landing, contact after the Spin, needles left behind by a debug defeat |\n| `challenger-03-corrosant-ceiling.mp4` | Kai | 0:32 | Corrosant off-camera or under the HUD, 0 damage dealt |\n| `challenger-04-kernauth-attempts.mp4` | Kai | 0:58 | Kernauth phase 1 (flares, motes, root spikes, cable). A debug defeat shows no ending. |\n| `access-01-pad-menus-driftcache-960.mp4` | Ana | 2:01 | Pad-only menus and Driftcache at 960\u00d7540, keyboard prompts on the pad, translucent panels |\n| `access-02-small-window-tallock-844x390.mp4` | Ana | 1:27 | 844\u00d7390 window. With Screen Shake off the flashes stay. Beats Tallock at 1 heart. |\n| `access-03-rootwell-1280x720-kernauth.mp4` | Ana | 0:33 | 1280\u00d7720, debug warp to Rootwell, Kernauth's red-on-red hazards |\n\n## Confirmed bugs\n\nVideo references are `clip m:ss`; the clip names drop the `.mp4`. Precise repro steps and the check output for each bug are in the structured return.\n\n### Major\n\n| ID | Bug | What the check showed | Video |\n|---|---|---|---|\n| B15 | Burst Line gaps crossed with Jump + Echo Jump; bv_catwalk is reachable from lw_rest before Weftyr | Vellix crosses bv_sluice in 13/72 timings and bv_catwalk in 16/72; Tessik crosses bv_catwalk in 4/72 | speedrunner-02 0:41, 0:46, 0:51 |\n| B16 | Vellix's Blink Strike ends inside Tallock, then contact damage | The slide ends at the boss centre; hurt on frame 12 | speedrunner-01 1:16 \u00b7 fighter-02 2:06 |\n| B19 | The bv_sluice arrival grate is a closed box, and Down+Jump is never taught | Holding Right stops at x 141; only Down+Jump continues | speedrunner-02 0:36 |\n| B27 | Pogo-lock on Tallock | 120\u21920 in 10.6 s, 0 hits taken | fighter-02 0:44 |\n| B29 | The light chain knocks crawlers out of range | Tessik and Brackmaw L3 whiff at 65 and 77 px | fighter-01 0:47 \u00b7 fighter-02 0:16 |\n| B33 | The Stack Slam marker follows the player, then vanishes during the arc | The marker moved from x 544 to 447; the slam lands at 447 | challenger-01 0:34, 1:18 |\n| B34 | Tallock pins you at the wall after a slam lands on you | 18 hurts in 30 s, a contact hit every 66 f, body gap \u221255 px | challenger-01 0:38, 1:36 \u00b7 newcomer-02 0:15 |\n| B36 | Jumping the Snare still gets you caught on the way down | Caught on f52 while still falling; the thread lives 240 f | challenger-02 0:47, 1:01 |\n| B38 | Corrosant is off-camera from the floor | Boss screen y \u221248 | challenger-03 0:16 |\n| B41 | Rootwell hazards are red on red | Screenshots of the root spikes and the cable | access-03 0:21 \u00b7 challenger-04 0:23 |\n| B42 | Flashes can't be disabled; Screen Shake OFF doesn't help | No flash setting; red wash on a hurt with shake off | access-02 0:43, 0:59 |\n\n### Minor\n\n| ID | Bug | Video |\n|---|---|---|\n| B03 | The title cursor doesn't return to SETTINGS, and the title menu follows Settings input | newcomer-02 0:04 \u00b7 fighter-03 2:10 \u00b7 access-02 0:05 |\n| B04 | Centre banners follow you into the next room | newcomer-02 1:04 \u00b7 access-02 1:09 |\n| B05 | Translucent overlays let text bleed through | masher-02 0:39 \u00b7 speedrunner-01 1:04 \u00b7 explorer-03 0:56 \u00b7 access-01 1:08 |\n| B06 | The pause ability line is drawn over the zone toast | masher-03 0:16 |\n| B10 | Overclock drains during the pickup lock (120 f lost) | masher-02 1:25 |\n| B11 | The empty boss bar lingers under \"TALLOCK PURGED\" | masher-02 1:22 |\n| B12 | Keyboard prompts on the pad, and a \u25b2 glyph that reads as Triangle | masher-02 0:09 \u00b7 access-01 1:20 |\n| B17 | The dc_fall crumble blocks drop you blind onto off-screen spikes | speedrunner-01 0:27 |\n| B18 | The WEIGHT bar is inverted | newcomer-01 0:07 \u00b7 fighter-02 1:25 |\n| B22 | The debug `defeatBoss` is unfaithful (debug only) | speedrunner-02 0:19 \u00b7 challenger-04 0:58 |\n| B23 | The map \"you\" dot covers the vendor hex | explorer-01 1:57 |\n| B24 | Core map dots sit in the room corner and aren't in the legend | explorer-03 0:56 |\n| B25 | The vendor's discount line is false | explorer-03 0:34 |\n| B26 | Tallock can be cheesed from the shelf (10.4 s, 1 hit) | explorer-02 0:22 |\n| B31 | Refused inputs are silent | newcomer-02 0:40 \u00b7 fighter-02 2:01 \u00b7 access-03 0:14 |\n| B32 | Tessik's pose covers the select header | fighter-03 0:18 |\n| B43 | The hero blinks fully invisible during i-frames | access-01 0:33 |\n\n## Already fixed, not reproduced, by design\n\n**Already fixed:**\n\n- **B01** pad-only audio.\n- **B13** RESET SAVE without a save.\n\n**Not reproduced:**\n\n- **B20** ns_base mid-air respawn.\n- **B21** pogo on hopnodes and spikes. It works with at least a 4 f lead.\n- **B28** Loomworks lore-card contrast (12.6:1).\n- **B35** Stomp Quake wave height.\n- **B39** Kernauth's motes: an air attack kills them.\n\n**By design:**\n\n- **B02** Dash is Burst Line, earned from Weftyr.\n- **B07** Any key closes the lore card.\n- **B08** Deaths are saved at the next node.\n- **B09** Two heroes in the room slide (\u00a711.3.2).\n- **B14** Continue loads 50 energy.\n- **B30** A down-strike while rising stops the jump (\u00a73.6).\n- **B37** Weftyr's body contact during recover.\n- **B40** Kernauth's body and cable.\n- **B44** Fixed 960\u00d7540 letterbox.\n- **B45** Red unaffordable prices (\u00a712.17).\n\n## Feature backlog (ranked)\n\n\u2605 marks a recommendation to build now.\n\n1. \u2605 **F01 Controls & Moves page** in Pause and Settings, device-aware (Rin, Jules, Ana, Dex). High value, S, low risk.\n2. \u2605 **F02 Comfort pack:** Reduced Flashing plus a Steady Silhouette (Ana, Rin, Kai). High, S, low.\n3. \u2605 **F03 Device-aware prompts everywhere** (Dex, Ana). High, S, low.\n4. \u2605 **F04 Signal Ledges:** mid-room hazard-respawn anchors in tall rooms (Rin, Dex, Vee). High, M, low.\n5. \u2605 **F05 Hazard Outline mode** (Ana, Dex, Jules, Kai). High, M, low.\n6. \u2605 **F06 Retry flow:** skippable boss intros, safe lore cards, a Lore archive (Dex, Vee). Medium, S, low.\n7. \u2605 **F07 Restore Echo boss tips** (Rin). Medium, S, low.\n8. **F08** Remappable controls (Ana, Rin). High, M, medium risk. Next up.\n9. **F09** Gentle Signal assist mode (Rin, Ana). High, M, medium.\n10. **F10** Boss rehearsal & trials (Kai, Vee, Jules). High, L, medium.\n\nThen:\n\n- **F11** Combo counter.\n- **F12** Training room.\n- **F13** Map pins and sweep marks.\n- **F14** Out-of-reach echoes.\n- **F15** Node relay.\n- **F16** Edge beacon (fix path for B38).\n- **F17** Dismissable banners (fix path for B04).\n- **F18** Run timer.\n- **F19** Pogo cues.\n- **F20** Fault Trace.\n- **F21** UI scale.\n- **F22** Weak-spot chip.\n- **F23** Catch windows.\n- **F24** Anti-pogo shrug (fix path for B27).\n- **F25** Chain knockback tuning (fix path for B29).\n- **F26** Phase Step.\n- **F27** Depth discount (fix path for B25).\n- **F28** Input display.\n\n## Notable quotes\n\n> \"For the first four rooms I felt welcome. Then Tallock showed up two rooms later and asked for a skill set the game never taught me.\" (Rin)\n\n> \"I tried really hard to break UNDERBYTE and mostly couldn't.\" (Dex)\n\n> \"What holds the game back for me is friction, not difficulty.\" (Vee)\n\n> \"The moment where I wall-jumped up to the alcove I'd seen in the first half-minute felt like a real explorer's payoff.\" (Mo)\n\n> \"Read the tell, press Special, Tallock flashes white, 16 damage and a chunk of meter. \u2026 That's a real fighting-game moment.\" (Jules)\n\n> \"The boss designs are good, but the fights aren't fair yet.\" / \"Corrosant was invisible for half my fight.\" (Kai)\n\n> \"As a pad player I'm relieved: I played the whole thing, menus included, without touching the keyboard.\" (Ana)"
+}

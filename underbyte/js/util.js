@@ -172,6 +172,7 @@ window.UB = window.UB || {};
       platformMove: 'engine',
       bolt: 'enemies', turretShot: 'enemies', bossPhase: 'enemies',
       menuMove: 'ui', menuConfirm: 'ui', menuBack: 'ui', heartbeat: 'ui', vendorBuy: 'ui',
+      signal: 'engine', memory: 'engine',   // F04 a Signal Ledge lights · F07 a recovered memory (Restore Echo)
     },
   };
 })(window.UB);

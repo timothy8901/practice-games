@@ -1021,6 +1021,8 @@
       if (!rising) {
         ctx.strokeStyle = K.fins; ctx.lineWidth = 2; ctx.globalAlpha = 0.6 + 0.3 * Math.cos(t * TAU / 8);
         ctx.beginPath(); for (let px = A.x0; px <= A.x1; px += 20) { const yy = A.floorY - 30 * k + Math.sin(px / 25 + t / 6) * 3; if (px === A.x0) ctx.moveTo(px, yy); else ctx.lineTo(px, yy); } ctx.stroke();
+        // HAZARD OUTLINE (F05): the burning brine is a module hazard (game.triggerHazard), not a registered hit — mark its box
+        if (game && game.setting && game.setting('hazardOutline')) { const fh = b.hitFlood; ctx.globalAlpha = 1; UB.Render.hazardBox(ctx, fh.x, fh.y, fh.w, fh.h, t); }
       }
       ctx.globalAlpha = 1;
     } else if (b.enraged && b.floodT >= FLOOD_EVERY - FLOOD_WARN) {

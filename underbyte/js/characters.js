@@ -1904,10 +1904,15 @@
   // Draw (DESIGN §11.2.3): squash/stretch, Overclock scale + palette crossfade, death, afterimages
   // =====================================================================================
   const WHITE = '#FFFFFF', GHOST_ALPHA = 0.4;
+  /** A boolean comfort setting (F02) — read live; a missing key (older settings file) is off. */
+  function comfort(game, key) { const s = game && game.settings; return !!(s && s[key] === true); }
   Player.prototype.draw = function (ctx, game, alpha) {
     // i-frame blink (playtest B43): the "off" beats draw a dimmed silhouette with a bright outline instead of nothing,
-    // so the fighter is never lost on screen
-    const ghost = this.iframes > 0 && ((this.iframes >> 2) & 1) === 1 && !this.dead;
+    // so the fighter is never lost on screen. STEADY SILHOUETTE (F02): no blink at all — the body stays fully drawn
+    // and a steady outline in the fighter's glow marks the invulnerable frames.
+    const steady = comfort(game, 'steadySilhouette');
+    const inv = this.iframes > 0 && !this.dead;
+    const ghost = inv && !steady && ((this.iframes >> 2) & 1) === 1;
     const d = this.data, x = U.lerp(this.px, this.x, alpha), y = U.lerp(this.py, this.y, alpha);
     // palette: Overclock ramp (transform / active / revert) or the death desaturation
     let pal = d.pal;
@@ -1938,7 +1943,8 @@
     const rigDef = this.rig, shapes = rigDef.rig.shapes;
     const lean = rigDef.pose(rigDef.rig, this);
     if (lean) ctx.rotate(lean * DEG);
-    const tint = this.flash > 0 ? (this.flash > 4 ? WHITE : P.DANGER) : null;
+    // the hurt tint: 2 f white then DANGER — REDUCED FLASHING (F02) skips the white beat (a red tint only, no body flash)
+    const tint = this.flash > 0 ? (this.flash > 4 && !comfort(game, 'reducedFlashing') ? WHITE : P.DANGER) : null;
     if (this.id === 'vellix' && (Math.abs(this.vx) > 240 || this.ocActive) && !this.dead) { // afterimage ghosts
       const n = this.ocActive ? 3 : 2;
       for (let i = n; i >= 1; i--) {
@@ -1946,7 +1952,7 @@
         drawRig(ctx, shapes, pal, null, 0); ctx.restore();
       }
     }
-    drawRig(ctx, shapes, pal, tint, 0.6, ghost ? pal.glow : null);
+    drawRig(ctx, shapes, pal, tint, 0.6, ghost || (steady && inv) ? pal.glow : null);
     rigDef.extras(ctx, this, pal);
     ctx.restore();
     if (this.denyT > 0 && !this.dead) drawDenyCue(ctx, x, y - this.h * sy - 16, this.denyT);

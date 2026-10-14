@@ -36,7 +36,7 @@
     ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y); ctx.closePath();
   }
 
-  const Render = { rrect: rrect, makeCanvas: makeCanvas, scale: 1 };
+  const Render = { rrect: rrect, makeCanvas: makeCanvas, scale: 1, hazardOutline: false };
   /** main.js/engine: the backing scale changed → every scale-bound cache is rebuilt on first use. */
   Render.setScale = function (s) {
     s = s > 0 ? s : 1;
@@ -174,6 +174,80 @@
     ctx.restore();
   };
 
+  // --- HAZARD OUTLINE mode (F05, DESIGN §11.1.4) ------------------------------------------------------------------------
+  // One shape language for everything that hurts, readable without colour: a hatch of INK / PAPER diagonal stripes ("tape")
+  // over the hazard, and a zig-zag rim drawn as an INK stroke under a PAPER stroke — maximum luminance contrast in every
+  // zone palette (Rootwell's red on red included). Tiles get it in the static tile cache; attack boxes per frame (hazardBox).
+  const HATCH = 10;                 // stripe period (px)
+  let hatch = null;                 // CanvasPattern (built once, on first use)
+  function hatchOf(ctx) {
+    if (!hatch) {
+      const c = makeCanvas(HATCH, HATCH), g = c.getContext('2d');
+      g.fillStyle = P.INK; g.fillRect(0, 0, HATCH, HATCH);
+      g.strokeStyle = P.PAPER; g.lineWidth = 3; g.lineCap = 'square';
+      g.beginPath(); g.moveTo(-2, HATCH + 2); g.lineTo(HATCH + 2, -2); g.moveTo(-2, 2); g.lineTo(2, -2); g.moveTo(HATCH - 2, HATCH + 2); g.lineTo(HATCH + 2, HATCH - 2); g.stroke();
+      hatch = ctx.createPattern(c, 'repeat');
+    }
+    return hatch;
+  }
+  const RIM_DASH = [6, 4], NO_DASH = [];
+  /** Zig-zag polyline from (x0, y) to (x1, y) with teeth of height `amp` every 6 px (path only). */
+  function zigzag(ctx, x0, x1, y, amp) {
+    ctx.moveTo(x0, y);
+    let up = true;
+    for (let x = x0 + 3; x < x1; x += 3) { ctx.lineTo(x, up ? y - amp : y); up = !up; }
+    ctx.lineTo(x1, y);
+  }
+  function rimStroke(ctx) {
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    ctx.strokeStyle = P.INK; ctx.lineWidth = 5; ctx.stroke();
+    ctx.strokeStyle = P.PAPER; ctx.lineWidth = 2; ctx.stroke();
+  }
+  /** F05: switch the hazard rims on/off; true when the value changed (the engine then repaints the room's tile cache). */
+  Render.setHazardOutline = function (on) {
+    on = !!on;
+    if (on === Render.hazardOutline) return false;
+    Render.hazardOutline = on;
+    return true;
+  };
+  /** Hazard rims of one tile into the static cache (spikes, pools, crumble warning). */
+  function drawHazardRim(c, level, tx, ty, ch) {
+    const x = tx * TILE, y = ty * TILE;
+    c.save();
+    if (ch === '^' || ch === 'v') {   // the teeth themselves: ink + paper zig-zag along their edges, a hatched band at the base
+      const base = ch === '^' ? y + TILE - 5 : y, tip = ch === '^' ? y + TILE - 22 : y + 22;
+      c.globalAlpha = 0.9; c.fillStyle = hatchOf(c); c.fillRect(x, base, TILE, 5);
+      c.globalAlpha = 1; c.beginPath();
+      c.moveTo(x, ch === '^' ? y + TILE : y);
+      c.lineTo(x + 7.5, tip); c.lineTo(x + 15, ch === '^' ? y + TILE : y); c.lineTo(x + 22.5, tip); c.lineTo(x + 30, ch === '^' ? y + TILE : y);
+      rimStroke(c);
+    } else if (ch === '~') {          // the pool body hatched, a zig-zag rim on its surface (the wave stays dynamic)
+      c.globalAlpha = 0.55; c.fillStyle = hatchOf(c); c.fillRect(x, y + 10, TILE, TILE - 10);
+      c.globalAlpha = 1; c.beginPath(); zigzag(c, x, x + TILE, y + 10, 4); rimStroke(c);
+    } else if (ch === 'c') {          // crumble warning: a dashed ink / paper frame and a zig-zag crack band across the top
+      c.beginPath(); c.rect(x + 4, y + 4, TILE - 8, TILE - 8);
+      c.strokeStyle = P.INK; c.lineWidth = 4; c.stroke();
+      c.setLineDash(RIM_DASH); c.strokeStyle = P.PAPER; c.lineWidth = 2; c.stroke(); c.setLineDash(NO_DASH);
+      c.beginPath(); zigzag(c, x + 4, x + TILE - 4, y + 12, 4); rimStroke(c);
+    }
+    c.restore();
+  }
+  /**
+   * The shared hazard mark for a world-space box that hurts (F05): the INK / PAPER stripe hatch at α 0.4 and a dashed
+   * PAPER rim over an INK rim. Used for every enemy / boss / shot attack box the engine resolved this tick and by bosses
+   * for their own module hazards (Corrosant's Flood). Allocation-free.
+   */
+  Render.hazardBox = function (ctx, x, y, w, h, frame) {
+    ctx.save();
+    ctx.globalAlpha = 0.4; ctx.fillStyle = hatchOf(ctx); ctx.fillRect(x, y, w, h);
+    ctx.globalAlpha = 1; ctx.lineJoin = 'round';
+    ctx.strokeStyle = P.INK; ctx.lineWidth = 4; ctx.strokeRect(x, y, w, h);
+    ctx.setLineDash(RIM_DASH); ctx.lineDashOffset = -((frame | 0) % 10) * 0.5;
+    ctx.strokeStyle = P.PAPER; ctx.lineWidth = 2; ctx.strokeRect(x, y, w, h);
+    ctx.setLineDash(NO_DASH); ctx.lineDashOffset = 0;
+    ctx.restore();
+  };
+
   // --- static tile cache (DESIGN §11.1.4, §11.1.8) ------------------------------------
   function drawTile(c, level, tx, ty, rng, s) {
     const pal = level.zone.palette;
@@ -242,6 +316,7 @@
       rrect(c, x + 8, y + 10, 14, 20, 3); c.fill(); c.stroke();
       c.fillStyle = pal.glow; c.beginPath(); c.arc(x + 15, y + 15, 2, 0, Math.PI * 2); c.fill();
     }
+    if (Render.hazardOutline && (ch === '^' || ch === 'v' || ch === '~' || ch === 'c')) drawHazardRim(c, level, tx, ty, ch);
   }
 
   /** Build (or rebuild) the room's static tile cache. */
@@ -308,7 +383,50 @@
       const jx = UB.Util.jitter(frame, t.tx, 2), jy = UB.Util.jitter(frame, t.ty + 99, 2);
       const s = level.cacheScale;
       ctx.drawImage(level.tileCache, t.tx * TILE * s, t.ty * TILE * s, TILE * s, TILE * s, t.tx * TILE + jx, t.ty * TILE + jy, TILE, TILE);
+      if (Render.hazardOutline) {   // F05: a giving-way plank gets a heavy steady ink + paper frame (no blink)
+        ctx.save(); ctx.lineJoin = 'round';
+        ctx.strokeStyle = P.INK; ctx.lineWidth = 6; ctx.strokeRect(t.tx * TILE + 2 + jx, t.ty * TILE + 2 + jy, TILE - 4, TILE - 4);
+        ctx.strokeStyle = P.PAPER; ctx.lineWidth = 3; ctx.strokeRect(t.tx * TILE + 2 + jx, t.ty * TILE + 2 + jy, TILE - 4, TILE - 4);
+        ctx.restore();
+      }
     }
+  };
+
+  // --- Signal Ledges (F04, DESIGN §5.6) ------------------------------------------------------------------------------------
+  /**
+   * A Signal Ledge pad at feet (x, y): a low inked plate in the zone's tile colours with a slit and two signal arcs in
+   * the zone `glow`. Dim while idle; once lit (`on`, it holds this visit's hazard respawn) the slit and arcs burn steady
+   * with a soft column of light, and for its first 36 frames (`t` since lit) two rings rise from it.
+   */
+  Render.drawLedge = function (ctx, x, y, zone, on, frame, t) {
+    const pal = zone.palette;
+    ctx.save(); ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    if (on) {   // light column (three stacked bands, no gradient object)
+      ctx.fillStyle = pal.glow;
+      for (let i = 0; i < 3; i++) { ctx.globalAlpha = 0.07 + 0.03 * (2 - i); ctx.fillRect(x - 9 + i * 3, y - 64 + i * 8, 18 - i * 6, 58 - i * 8); }
+      ctx.globalAlpha = 1;
+    }
+    // plate
+    ctx.fillStyle = pal.tileFill; ctx.strokeStyle = P.INK; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(x - 14, y); ctx.lineTo(x - 10, y - 7); ctx.lineTo(x + 10, y - 7); ctx.lineTo(x + 14, y); ctx.closePath(); ctx.fill(); ctx.stroke();
+    // slit
+    ctx.fillStyle = pal.glow; ctx.globalAlpha = on ? 1 : 0.45;
+    rrect(ctx, x - 7, y - 5, 14, 2.5, 1); ctx.fill();
+    // signal arcs
+    const k = on ? 0.85 + 0.15 * Math.sin(frame / 20) : 0.35;
+    ctx.strokeStyle = pal.glow; ctx.lineWidth = 2;
+    for (let i = 0; i < 2; i++) {
+      ctx.globalAlpha = k * (i ? 0.6 : 1);
+      ctx.beginPath(); ctx.arc(x, y - 8, 6 + i * 5, Math.PI * 1.2, Math.PI * 1.8); ctx.stroke();
+    }
+    if (on && t > 0 && t < 36) {   // the touch: two rings rising off the pad
+      for (let i = 0; i < 2; i++) {
+        const e = (t - i * 8) / 28; if (e <= 0 || e >= 1) continue;
+        ctx.globalAlpha = 1 - e; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.ellipse(x, y - 6 - e * 30, 10 + e * 10, 3 + e * 2, 0, 0, Math.PI * 2); ctx.stroke();
+      }
+    }
+    ctx.restore();
   };
 
   // --- movers, nodes, pickups ---------------------------------------------------------

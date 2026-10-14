@@ -335,16 +335,49 @@
     virt[action] = Math.max(virt[action], frames | 0 || 1);
     Input._anyEdge = true;
   };
-  /** Human-readable glyph for the first binding of an action (HUD hints). */
-  Input.glyph = function (action) {
-    if (Input.device === 'gamepad') { const b = PAD_BUTTONS[action]; return b ? (PAD_GLYPHS[b[0]] || ('B' + b[0])) : '?'; }
-    const codes = Input.bindings[action];
-    if (!codes || !codes.length) return '?';
-    const c = codes[0];
+  /** Label of one keyboard code ('Space' → 'SPACE', 'KeyZ' → 'Z', 'ArrowUp' → '↑'). */
+  function keyLabel(c) {
     if (GLYPHS[c]) return GLYPHS[c];
     if (c.indexOf('Key') === 0) return c.slice(3);
     if (c.indexOf('Digit') === 0) return c.slice(5);
     return c.toUpperCase();
+  }
+  /** Is `device` (or the last-used device) a gamepad? Touch reads as the keyboard wording. */
+  function padDevice(device) { return (device || Input.device) === 'gamepad'; }
+  /**
+   * Human-readable glyph for the first binding of an action (HUD hints). `device` ('keyboard' | 'gamepad', optional)
+   * asks for that device's label instead of the last-used one's (the Controls page, F01).
+   */
+  Input.glyph = function (action, device) {
+    if (padDevice(device)) { const b = PAD_BUTTONS[action]; return b ? (PAD_GLYPHS[b[0]] || ('B' + b[0])) : '?'; }
+    const codes = Input.bindings[action];
+    if (!codes || !codes.length) return '?';
+    return keyLabel(codes[0]);
+  };
+  /**
+   * Every label bound to `action` on `device` (default: the last-used device) — keyboard: each bound key once, in
+   * binding order (jump → SPACE, W, ↑); gamepad: each standard-mapping button (dash → RB, LB). Feeds the Controls &
+   * Moves page (F01). Allocates a fresh array: callers cache it per device.
+   */
+  Input.labels = function (action, device) {
+    const out = [];
+    if (padDevice(device)) {
+      const b = PAD_BUTTONS[action] || [];
+      for (let i = 0; i < b.length; i++) out.push(PAD_GLYPHS[b[i]] || ('B' + b[i]));
+      return out;
+    }
+    const codes = Input.bindings[action] || [];
+    for (let i = 0; i < codes.length; i++) { const l = keyLabel(codes[i]); if (out.indexOf(l) < 0) out.push(l); }
+    return out;
+  };
+  /**
+   * The standard-mapping button index behind a gamepad label ('A' → 0, 'RB' → 5, '↑' → 12), or -1. The UI's neutral
+   * glyph caps (F03) draw a face button by its POSITION in the diamond (bottom / right / left / top), so the prompt
+   * reads the same on any pad layout.
+   */
+  Input.padButtonOf = function (label) {
+    for (const k in PAD_GLYPHS) if (PAD_GLYPHS[k] === label) return +k;
+    return -1;
   };
 
   UB.Input = Input;

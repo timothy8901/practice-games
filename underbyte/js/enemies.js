@@ -155,6 +155,10 @@
    */
   function drawRig(ctx, rig, flash, tellOn, accent, t) {
     const n = rig.length;
+    // REDUCED FLASHING (F02): a hit no longer fills the whole body white (a boss body is a large area) — the shapes keep
+    // their colours and only their edges light up in PAPER for the flash frames
+    const soft = flash && FX.reducedFlashing();
+    if (soft) flash = false;
     ctx.lineJoin = 'round'; ctx.lineCap = 'round';
     ctx.strokeStyle = INK;
     for (let i = 0; i < n; i++) {
@@ -182,6 +186,11 @@
         if (s.k === 'dot') { ctx.beginPath(); ctx.arc(s.x, s.y, s.r > 12 ? s.r + 14 : s.r * 2.5, 0, TAU); ctx.fill(); }
         else { pathOf(ctx, s); ctx.fill(); }
       }
+      ctx.restore();
+    }
+    if (soft) {
+      ctx.save(); ctx.strokeStyle = WHITE; ctx.globalAlpha = 0.85;
+      for (let i = 0; i < n; i++) { const s = rig[i]; if (!s.on || !s.ink) continue; pathOf(ctx, s); ctx.lineWidth = OPEN[s.k] ? s.lw : 2; ctx.stroke(); }
       ctx.restore();
     }
     if (tellOn) {
@@ -639,7 +648,8 @@
     e.core.alpha = dim; e.halo.alpha = 0.55 * dim; e.pupil.alpha = dim;
     e.core.r = bright ? 9 + Math.sin(t) : 8;
     beginDraw(ctx, e, alpha, 1, 1, 0);
-    drawRig(ctx, e.rig, e.flash > 0 || (bright && (t & 2) === 0), bright, e.accent, t);
+    // the lock tell strobes white every 2 f — held steady (no strobe) under REDUCED FLASHING (F02)
+    drawRig(ctx, e.rig, e.flash > 0 || (bright && (t & 2) === 0 && !FX.reducedFlashing()), bright, e.accent, t);
     ctx.restore();
   }
 
@@ -1161,7 +1171,7 @@
     p[2] = (p[0] * 2 + p[6]) / 3 + U.jitter(t, 3, 3); p[3] = (p[1] * 2 + p[7]) / 3 + U.jitter(t, 4, 3);
     p[4] = (p[0] + p[6] * 2) / 3 + U.jitter(t, 5, 3); p[5] = (p[1] + p[7] * 2) / 3 + U.jitter(t, 6, 3);
     e.stat.on = (t & 2) === 0;
-    const bright = e.state === 'tell' && (t & 2) === 0;
+    const bright = e.state === 'tell' && (t & 2) === 0 && !FX.reducedFlashing();   // F02: no white strobe under REDUCED FLASHING
     const sq = e.state === 'hop' ? 1.08 : (e.state === 'tell' ? 0.92 : 1);
     beginDraw(ctx, e, alpha, 1 / sq, sq, 0);
     drawRig(ctx, e.rig, e.flash > 0 || bright, e.state === 'tell', e.accent, t);

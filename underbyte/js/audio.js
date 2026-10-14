@@ -357,6 +357,9 @@
     heart1:     { type: 'sine', f: 50, a: 0.003, d: 0.12, s: 0, r: 0.03, dur: 0, vol: 0.35 },
     heart2:     { type: 'sine', f: 45, a: 0.003, d: 0.1, s: 0, r: 0.03, dur: 0, vol: 0.25 },
     saveTri:    { type: 'triangle', f: 1320, a: 0.002, d: 0.2, s: 0, r: 0.05, dur: 0, vol: 0.1 },
+    // F04 Signal Ledge lit: a soft rising two-tone ping (sine, short); F07 recovered memory: two distant bell tones
+    signalPing: { type: 'sine', f: 988, slide: { to: 1319, t: 0.05 }, a: 0.004, d: 0.18, s: 0, r: 0.08, dur: 0, vol: 0.12, send: 0.35 },
+    memoryBell: { type: 'sine', type2: 'sine', f2mul: 2.76, g2: 0.25, f: 392, a: 0.01, d: 0.9, s: 0, r: 0.3, dur: 0, vol: 0.1, send: 0.5 },
   };
 
   function game() { return UB.game || null; }
@@ -526,6 +529,8 @@
       recMenuConfirm(b + 0.22);
     },
     save: function (b) { recMenuConfirm(b); at(b, 0.1); voice(SP.saveTri); },
+    signal: function (b, pan) { O.pan = pan; at(b, 0); voice(SP.signalPing); at(b, 0.09); O.fMul = 1.5; voice(SP.signalPing); O.fMul = 1; },
+    memory: function (b) { at(b, 0); voice(SP.memoryBell); at(b, 0.28); O.fMul = 4 / 3; voice(SP.memoryBell); O.fMul = 1; },
   };
 
   /** Core sfx entry: rate limit, resolve pan, run the recipe inside the live graph. */
