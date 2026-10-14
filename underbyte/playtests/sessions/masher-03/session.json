@@ -1,0 +1,1244 @@
+{
+ "session": "masher-03",
+ "startedAt": "2026-10-14T11:53:38.614Z",
+ "size": [
+  960,
+  540
+ ],
+ "pad": false,
+ "turns": [
+  {
+   "turn": 1,
+   "video": 0.88,
+   "cmd": {
+    "act": [
+     {
+      "tap": "confirm",
+      "ms": 50
+     },
+     {
+      "wait": 50
+     },
+     {
+      "tap": "confirm",
+      "ms": 50
+     },
+     {
+      "wait": 600
+     }
+    ]
+   },
+   "room": "dc_shrine",
+   "hp": 5,
+   "events": [
+    {
+     "f": 32,
+     "type": "maxHp",
+     "maxHp": 5
+    },
+    {
+     "f": 32,
+     "type": "death",
+     "room": null
+    },
+    {
+     "f": 32,
+     "type": "bits",
+     "bits": 83,
+     "delta": 83
+    },
+    {
+     "f": 52,
+     "type": "screen",
+     "from": "title",
+     "to": "play"
+    },
+    {
+     "f": 52,
+     "type": "room",
+     "from": null,
+     "to": "dc_shrine"
+    }
+   ]
+  },
+  {
+   "turn": 2,
+   "video": 0.88,
+   "cmd": {
+    "debug": "JSON.stringify(UB.debug.audio())"
+   },
+   "room": "dc_shrine",
+   "hp": 5,
+   "events": []
+  },
+  {
+   "turn": 3,
+   "video": 2.01,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "wait": 300
+     },
+     {
+      "tap": "ShiftLeft",
+      "ms": 80
+     },
+     {
+      "wait": 300
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 200
+     }
+    ]
+   },
+   "room": "dc_shrine",
+   "hp": 5,
+   "events": []
+  },
+  {
+   "turn": 4,
+   "video": 2.58,
+   "cmd": {
+    "act": [
+     {
+      "tap": "ShiftLeft",
+      "ms": 100
+     },
+     {
+      "wait": 400
+     }
+    ]
+   },
+   "room": "dc_shrine",
+   "hp": 5,
+   "events": []
+  },
+  {
+   "turn": 5,
+   "video": 4.31,
+   "cmd": {
+    "act": [
+     {
+      "down": "left"
+     },
+     {
+      "wait": 150
+     },
+     {
+      "tap": "Semicolon",
+      "ms": 80
+     },
+     {
+      "wait": 150
+     },
+     {
+      "tap": "jump",
+      "ms": 150
+     },
+     {
+      "wait": 100
+     },
+     {
+      "tap": "ShiftLeft",
+      "ms": 80
+     },
+     {
+      "wait": 400
+     },
+     {
+      "up": "left"
+     },
+     {
+      "wait": 200
+     }
+    ]
+   },
+   "room": "dc_shrine",
+   "hp": 5,
+   "events": []
+  },
+  {
+   "turn": 6,
+   "video": 5.56,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "wait": 300
+     },
+     {
+      "tap": "jump",
+      "ms": 150
+     },
+     {
+      "wait": 480
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 200
+     }
+    ]
+   },
+   "room": "dc_shrine",
+   "hp": 5,
+   "events": []
+  },
+  {
+   "turn": 7,
+   "video": 5.93,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "wait": 200
+     },
+     {
+      "tap": "ShiftLeft",
+      "ms": 60
+     },
+     {
+      "wait": 60
+     }
+    ]
+   },
+   "room": "dc_shrine",
+   "hp": 5,
+   "events": []
+  },
+  {
+   "turn": 8,
+   "video": 6.05,
+   "cmd": {
+    "act": [
+     {
+      "down": "ShiftLeft"
+     },
+     {
+      "wait": 50
+     }
+    ]
+   },
+   "room": "dc_shrine",
+   "hp": 5,
+   "events": []
+  },
+  {
+   "turn": 9,
+   "video": 6.05,
+   "cmd": {
+    "debug": "JSON.stringify(UB.debug.pressed && UB.debug.pressed())"
+   },
+   "room": "dc_shrine",
+   "hp": 5,
+   "events": []
+  },
+  {
+   "turn": 10,
+   "video": 6.79,
+   "cmd": {
+    "act": [
+     {
+      "up": "ShiftLeft"
+     },
+     {
+      "down": "right"
+     },
+     {
+      "wait": 150
+     },
+     {
+      "tap": "jump",
+      "ms": 200
+     },
+     {
+      "wait": 120
+     },
+     {
+      "tap": "ShiftLeft",
+      "ms": 60
+     },
+     {
+      "wait": 80
+     }
+    ]
+   },
+   "room": "dc_shrine",
+   "hp": 5,
+   "events": []
+  },
+  {
+   "turn": 11,
+   "video": 8.93,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "wait": 1800
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 300
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 5,
+   "events": [
+    {
+     "f": 520,
+     "type": "room",
+     "from": "dc_shrine",
+     "to": "dc_sentinel"
+    }
+   ]
+  },
+  {
+   "turn": 12,
+   "video": 12.17,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "wait": 3000
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 200
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 5,
+   "events": []
+  },
+  {
+   "turn": 13,
+   "video": 15.26,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "wait": 900
+     },
+     {
+      "tap": "jump",
+      "ms": 250
+     },
+     {
+      "wait": 100
+     },
+     {
+      "tap": "jump",
+      "ms": 250
+     },
+     {
+      "wait": 600
+     },
+     {
+      "wait": 800
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 100
+     }
+    ]
+   },
+   "room": "lw_hoist",
+   "hp": 5,
+   "events": [
+    {
+     "f": 907,
+     "type": "room",
+     "from": "dc_sentinel",
+     "to": "lw_hoist"
+    }
+   ]
+  },
+  {
+   "turn": 14,
+   "video": 16.02,
+   "cmd": {
+    "act": [
+     {
+      "wait": 400
+     },
+     {
+      "tap": "pause",
+      "ms": 50
+     },
+     {
+      "wait": 250
+     }
+    ]
+   },
+   "room": "lw_hoist",
+   "hp": 5,
+   "events": [
+    {
+     "f": 948,
+     "type": "screen",
+     "from": "play",
+     "to": "pause"
+    }
+   ]
+  },
+  {
+   "turn": 15,
+   "video": 17.61,
+   "cmd": {
+    "act": [
+     {
+      "tap": "pause",
+      "ms": 50
+     },
+     {
+      "wait": 1500
+     }
+    ]
+   },
+   "room": "lw_hoist",
+   "hp": 5,
+   "events": [
+    {
+     "f": 970,
+     "type": "screen",
+     "from": "pause",
+     "to": "play"
+    },
+    {
+     "f": 1041,
+     "type": "screen",
+     "from": "play",
+     "to": "lore"
+    }
+   ]
+  },
+  {
+   "turn": 16,
+   "video": 17.95,
+   "cmd": {
+    "act": [
+     {
+      "tap": "pause",
+      "ms": 50
+     },
+     {
+      "wait": 250
+     }
+    ]
+   },
+   "room": "lw_hoist",
+   "hp": 5,
+   "events": [
+    {
+     "f": 1063,
+     "type": "screen",
+     "from": "lore",
+     "to": "play"
+    }
+   ]
+  },
+  {
+   "turn": 17,
+   "video": 20.09,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "wait": 700
+     },
+     {
+      "tap": "jump",
+      "ms": 250
+     },
+     {
+      "wait": 120
+     },
+     {
+      "tap": "jump",
+      "ms": 250
+     },
+     {
+      "wait": 500
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 200
+     }
+    ]
+   },
+   "room": "lw_hoist",
+   "hp": 5,
+   "events": []
+  },
+  {
+   "turn": 18,
+   "video": 21.28,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "wait": 500
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 600
+     }
+    ]
+   },
+   "room": "lw_hoist",
+   "hp": 4,
+   "events": [
+    {
+     "f": 1264,
+     "type": "hurt",
+     "hp": 4,
+     "maxHp": 5,
+     "room": "lw_hoist",
+     "hazard": true
+    }
+   ]
+  },
+  {
+   "turn": 19,
+   "video": 22.12,
+   "cmd": {
+    "act": [
+     {
+      "wait": 800
+     }
+    ]
+   },
+   "room": "lw_hoist",
+   "hp": 4,
+   "events": []
+  },
+  {
+   "turn": 20,
+   "video": 22.44,
+   "cmd": {
+    "act": [
+     {
+      "tap": [
+       "pause",
+       "map"
+      ],
+      "ms": 60
+     },
+     {
+      "wait": 200
+     }
+    ]
+   },
+   "room": "lw_hoist",
+   "hp": 4,
+   "events": [
+    {
+     "f": 1328,
+     "type": "screen",
+     "from": "play",
+     "to": "pause"
+    }
+   ]
+  },
+  {
+   "turn": 21,
+   "video": 24.84,
+   "cmd": {
+    "act": [
+     {
+      "tap": "map",
+      "ms": 50
+     },
+     {
+      "wait": 100
+     },
+     {
+      "down": "left"
+     },
+     {
+      "wait": 900
+     },
+     {
+      "up": "left"
+     },
+     {
+      "down": "up"
+     },
+     {
+      "wait": 900
+     },
+     {
+      "up": "up"
+     },
+     {
+      "wait": 200
+     }
+    ]
+   },
+   "room": "lw_hoist",
+   "hp": 4,
+   "events": [
+    {
+     "f": 1349,
+     "type": "screen",
+     "from": "pause",
+     "to": "map"
+    }
+   ]
+  },
+  {
+   "turn": 22,
+   "video": 26.06,
+   "cmd": {
+    "act": [
+     {
+      "down": "down"
+     },
+     {
+      "wait": 900
+     },
+     {
+      "up": "down"
+     },
+     {
+      "wait": 200
+     }
+    ]
+   },
+   "room": "lw_hoist",
+   "hp": 4,
+   "events": []
+  },
+  {
+   "turn": 23,
+   "video": 26.8,
+   "cmd": {
+    "act": [
+     {
+      "tap": "back",
+      "ms": 50
+     },
+     {
+      "wait": 80
+     },
+     {
+      "tap": "back",
+      "ms": 50
+     },
+     {
+      "wait": 80
+     },
+     {
+      "tap": "back",
+      "ms": 50
+     },
+     {
+      "wait": 300
+     }
+    ]
+   },
+   "room": "lw_hoist",
+   "hp": 4,
+   "events": [
+    {
+     "f": 1558,
+     "type": "screen",
+     "from": "map",
+     "to": "pause"
+    },
+    {
+     "f": 1566,
+     "type": "screen",
+     "from": "pause",
+     "to": "play"
+    },
+    {
+     "f": 1575,
+     "type": "screen",
+     "from": "play",
+     "to": "pause"
+    }
+   ]
+  },
+  {
+   "turn": 24,
+   "video": 29.16,
+   "cmd": {
+    "act": [
+     {
+      "tap": "pause",
+      "ms": 50
+     },
+     {
+      "wait": 100
+     },
+     {
+      "down": "right"
+     },
+     {
+      "wait": 550
+     },
+     {
+      "tap": "jump",
+      "ms": 250
+     },
+     {
+      "wait": 250
+     },
+     {
+      "tap": "jump",
+      "ms": 250
+     },
+     {
+      "wait": 300
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 500
+     }
+    ]
+   },
+   "room": "lw_hoist",
+   "hp": 4,
+   "events": [
+    {
+     "f": 1598,
+     "type": "screen",
+     "from": "pause",
+     "to": "play"
+    }
+   ]
+  },
+  {
+   "turn": 25,
+   "video": 30.31,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "tap": "jump",
+      "ms": 250
+     },
+     {
+      "wait": 500
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 300
+     }
+    ]
+   },
+   "room": "lw_hoist",
+   "hp": 4,
+   "events": []
+  },
+  {
+   "turn": 26,
+   "video": 31.86,
+   "cmd": {
+    "act": [
+     {
+      "tap": "left",
+      "ms": 60
+     },
+     {
+      "tap": "special",
+      "ms": 50
+     },
+     {
+      "wait": 200
+     },
+     {
+      "tap": "special",
+      "ms": 50
+     },
+     {
+      "wait": 200
+     },
+     {
+      "tap": "special",
+      "ms": 50
+     },
+     {
+      "wait": 200
+     },
+     {
+      "tap": "light",
+      "ms": 50
+     },
+     {
+      "wait": 100
+     },
+     {
+      "tap": "light",
+      "ms": 50
+     },
+     {
+      "wait": 300
+     }
+    ]
+   },
+   "room": "lw_hoist",
+   "hp": 4,
+   "events": []
+  },
+  {
+   "turn": 27,
+   "video": 33.34,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "wait": 250
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 250
+     },
+     {
+      "tap": "pause",
+      "ms": 40
+     },
+     {
+      "wait": 80
+     },
+     {
+      "tap": "down",
+      "ms": 40
+     },
+     {
+      "wait": 50
+     },
+     {
+      "tap": "down",
+      "ms": 40
+     },
+     {
+      "wait": 50
+     },
+     {
+      "tap": "down",
+      "ms": 40
+     },
+     {
+      "wait": 50
+     },
+     {
+      "tap": "confirm",
+      "ms": 40
+     },
+     {
+      "wait": 200
+     }
+    ]
+   },
+   "room": "lw_hoist",
+   "hp": 3,
+   "events": [
+    {
+     "f": 1925,
+     "type": "hurt",
+     "hp": 3,
+     "maxHp": 5,
+     "room": "lw_hoist",
+     "hazard": true
+    },
+    {
+     "f": 1930,
+     "type": "screen",
+     "from": "play",
+     "to": "pause"
+    }
+   ]
+  },
+  {
+   "turn": 28,
+   "video": 34.73,
+   "cmd": {
+    "act": [
+     {
+      "tap": [
+       "left",
+       "right"
+      ],
+      "ms": 80
+     },
+     {
+      "wait": 100
+     },
+     {
+      "tap": "left",
+      "ms": 40
+     },
+     {
+      "wait": 60
+     },
+     {
+      "tap": "confirm",
+      "ms": 40
+     },
+     {
+      "wait": 80
+     },
+     {
+      "tap": "confirm",
+      "ms": 40
+     },
+     {
+      "wait": 80
+     },
+     {
+      "tap": "down",
+      "ms": 40
+     },
+     {
+      "wait": 60
+     },
+     {
+      "tap": "confirm",
+      "ms": 40
+     },
+     {
+      "wait": 500
+     }
+    ]
+   },
+   "room": "dc_shrine",
+   "hp": 5,
+   "events": [
+    {
+     "f": 2004,
+     "type": "screen",
+     "from": "pause",
+     "to": "title"
+    },
+    {
+     "f": 2004,
+     "type": "hurt",
+     "hp": 0,
+     "maxHp": 0,
+     "room": null,
+     "hazard": false
+    },
+    {
+     "f": 2011,
+     "type": "maxHp",
+     "maxHp": 5
+    },
+    {
+     "f": 2031,
+     "type": "screen",
+     "from": "title",
+     "to": "play"
+    },
+    {
+     "f": 2031,
+     "type": "room",
+     "from": null,
+     "to": "dc_shrine"
+    }
+   ]
+  },
+  {
+   "turn": 29,
+   "video": 34.73,
+   "cmd": {
+    "debug": "JSON.stringify(UB.debug.audio())"
+   },
+   "room": "dc_shrine",
+   "hp": 5,
+   "events": []
+  },
+  {
+   "turn": 30,
+   "video": 35.45,
+   "cmd": {
+    "act": [
+     {
+      "tap": "overclock",
+      "ms": 50
+     },
+     {
+      "wait": 80
+     },
+     {
+      "tap": "overclock",
+      "ms": 50
+     },
+     {
+      "wait": 80
+     },
+     {
+      "tap": "KeyI",
+      "ms": 50
+     },
+     {
+      "wait": 250
+     }
+    ]
+   },
+   "room": "dc_shrine",
+   "hp": 5,
+   "events": []
+  },
+  {
+   "turn": 31,
+   "video": 39.59,
+   "cmd": {
+    "act": [
+     {
+      "down": "right"
+     },
+     {
+      "wait": 2750
+     },
+     {
+      "tap": "special",
+      "ms": 40
+     },
+     {
+      "wait": 60
+     },
+     {
+      "tap": "light",
+      "ms": 40
+     },
+     {
+      "wait": 60
+     },
+     {
+      "tap": "jump",
+      "ms": 40
+     },
+     {
+      "wait": 60
+     },
+     {
+      "tap": "special",
+      "ms": 40
+     },
+     {
+      "wait": 600
+     },
+     {
+      "up": "right"
+     },
+     {
+      "wait": 200
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 5,
+   "events": [
+    {
+     "f": 2344,
+     "type": "room",
+     "from": "dc_shrine",
+     "to": "dc_sentinel"
+    }
+   ]
+  }
+ ],
+ "marks": [
+  {
+   "turn": 10,
+   "video": 6.79,
+   "note": "BUG?: Shift / Semicolon dash does nothing - on ground, standing, or in air (playerState never dash). Same with RB/LB in clip 02"
+  },
+  {
+   "turn": 14,
+   "video": 16.02,
+   "note": "VISUAL: pause menu ability line (ECHO JUMP - a second jump in the air) is printed right on top of the LOOMWORKS zone title toast"
+  },
+  {
+   "turn": 16,
+   "video": 17.95,
+   "note": "CONFUSING: pressing PAUSE on the Loomworks lore card just closes the lore (no pause) after a third of a second, and the lore never comes back"
+  },
+  {
+   "turn": 31,
+   "video": 39.59,
+   "note": "VISUAL: during the room slide there are TWO of me on screen - one in the old room by the door and one in the new room"
+  }
+ ],
+ "debugCalls": [
+  {
+   "turn": 2,
+   "video": 0.88,
+   "code": "JSON.stringify(UB.debug.audio())"
+  },
+  {
+   "turn": 9,
+   "video": 6.05,
+   "code": "JSON.stringify(UB.debug.pressed && UB.debug.pressed())"
+  },
+  {
+   "turn": 29,
+   "video": 34.73,
+   "code": "JSON.stringify(UB.debug.audio())"
+  }
+ ],
+ "errors": [],
+ "segments": [
+  [
+   0.806,
+   1.682
+  ],
+  [
+   12.037,
+   13.174
+  ],
+  [
+   19.728,
+   20.3
+  ],
+  [
+   27.047,
+   28.77
+  ],
+  [
+   36.552,
+   37.804
+  ],
+  [
+   44.826,
+   45.192
+  ],
+  [
+   59.878,
+   59.998
+  ],
+  [
+   68.688,
+   69.434
+  ],
+  [
+   88.997,
+   91.134
+  ],
+  [
+   95.64,
+   98.886
+  ],
+  [
+   108.433,
+   111.518
+  ],
+  [
+   117.42,
+   118.181
+  ],
+  [
+   133.972,
+   135.562
+  ],
+  [
+   140.208,
+   140.546
+  ],
+  [
+   157.774,
+   159.914
+  ],
+  [
+   170.386,
+   171.578
+  ],
+  [
+   179.436,
+   180.278
+  ],
+  [
+   191.078,
+   191.397
+  ],
+  [
+   196.981,
+   199.376
+  ],
+  [
+   211.427,
+   212.647
+  ],
+  [
+   223.439,
+   224.185
+  ],
+  [
+   231.871,
+   234.224
+  ],
+  [
+   244.075,
+   245.225
+  ],
+  [
+   253.936,
+   255.486
+  ],
+  [
+   266.666,
+   268.147
+  ],
+  [
+   278.789,
+   280.181
+  ],
+  [
+   298.639,
+   299.358
+  ],
+  [
+   309.518,
+   313.659
+  ]
+ ],
+ "endedAt": "2026-10-14T11:59:18.145Z",
+ "liveSeconds": 39.59,
+ "video": "recordings/masher-03-dash-lore-quit-tests.mp4",
+ "convertError": null
+}
