@@ -1183,7 +1183,8 @@ function QA_INSTALL() {
   await section('H', async () => {
     await ensurePlay(true);
     // H1 hazard respawn after a chute (bottom-exit) arrival must keep the player in the room (DESIGN §3.3: "respawn at the last entry spawn")
-    for (const [room, exit, dirKey, hz, prev] of [['dc_loft', 'B', 'left', [20, 14], 'dc_cross'], ['ns_plunge', 'B', 'left', [21, 48], 'rw_gate'], ['bv_catwalk', 'B', 'right', [10, 32], 'bv_cistern']]) {
+    // (ns_plunge's floor pool is x24–28 since DESIGN §10.6 F12: the probe stands in it at x25)
+    for (const [room, exit, dirKey, hz, prev] of [['dc_loft', 'B', 'left', [20, 14], 'dc_cross'], ['ns_plunge', 'B', 'left', [25, 48], 'rw_gate'], ['bv_catwalk', 'B', 'right', [10, 32], 'bv_cistern']]) {
       const r = await ev((d, g, Q, room, exit, dirKey, hz) => {
         Q.setAbilities(true, true, true); Q.waitNormal(200);
         d.warp(room, exit); Q.settle(3); d.killEnemies(); Q.bigHp();

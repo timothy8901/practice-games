@@ -511,7 +511,9 @@ const ARENAS = [
       let turned = -1; for (let f = 0; f < 120; f++) { Q.step(1); if (e.facing !== f0) { turned = f; break; } } res.turn = { turned, f0, facing: e.facing };
       Q.enter('lw_belts'); e = Q.find('platewalker'); const pl = g.player; d.setMeter(0); const front = -e.facing;
       Q.pinAt(e.x - front * (e.w / 2 + 26), e.y); pl.facing = front; d.pressed(front > 0 ? 'right' : 'left', 1); Q.step(1); Q.pin = null; d.pressed('light', 2);
-      let pushVx = 0, blockedF = -1; for (let f = 0; f < 10; f++) { Q.step(1); if (e.blockFlash > 0 && blockedF < 0) { blockedF = f; pushVx = pl.vx * -e.facing; } }   // positive = pushed away from the plate
+      // positive = pushed away from the plate: the player stands on the shield side (e.facing points at it), so "away" is +e.facing
+      // (round 2 measured pl.vx · −e.facing, i.e. TOWARD the plate — it encoded the inverted push the round-3 audit fixed)
+      let pushVx = 0, blockedF = -1; for (let f = 0; f < 10; f++) { Q.step(1); if (e.blockFlash > 0 && blockedF < 0) { blockedF = f; pushVx = pl.vx * e.facing; } }
       res.block = { blockedF, pushVx, hp: e.hp, kbGuard: e.kbResist };
       e.state = 'open'; e.timer = 0; Q.step(1); res.kbOpen = e.kbResist;
       Q.enter('lw_belts'); e = Q.find('platewalker'); Q.pinAt(e.x + e.facing * 70, e.y); Q.until(e, 'bash', 60); const x0 = e.x; while (e.state === 'bash') Q.step(1); res.bashDist = Math.abs(e.x - x0); res.bashHit = { dmg: e.hit.dmg, kind: e.hit.kind };
@@ -1024,7 +1026,9 @@ const ARENAS = [
       f = Q.waitState('hover', 600, function () { Q.pinAt(cx, A.floorY); });
       if (f >= 0) { pl.iframes = 0; Q.takeDrops(); for (let i = 0; i < 20 && b.state === 'hover'; i++) { Q.pinAt(b.tailX[2], b.tailY[2] + 24); Q.step(1); } res.tail = Q.takeDrops(); }
       f = Q.waitState('dive', 2500, function () { Q.pinAt(cx, A.floorY); });
-      if (f >= 0) { const lx = b.lockX; pl.iframes = 0; Q.takeDrops(); let sp = 0; while (b.state === 'dive') { const xb = b.x, yb = b.y; Q.pinAt(lx + 42, A.floorY); Q.step(1); sp = Math.max(sp, Math.hypot(b.x - xb, b.y - yb)); } for (let i = 0; i < 12; i++) { Q.pinAt(lx + 42, A.floorY); Q.step(1); } res.dive = { hits: Q.takeDrops(), speed: Math.round(sp * 10) / 10, shockW: b.lockX, bodyW: b.w, playerW: pl.w, recover: b.state === 'recover2' ? b.timer : b.state }; }
+      // after the dive: step until the 10 f shock ends (the shock's own 6 f hurt hitstop on the player beside the impact freezes the
+      // boss too, so a fixed 12-step wait can still be inside the shock) and read the recovery timer on its first frame
+      if (f >= 0) { const lx = b.lockX; pl.iframes = 0; Q.takeDrops(); let sp = 0; while (b.state === 'dive') { const xb = b.x, yb = b.y; Q.pinAt(lx + 42, A.floorY); Q.step(1); sp = Math.max(sp, Math.hypot(b.x - xb, b.y - yb)); } for (let i = 0; i < 40 && b.state !== 'recover2'; i++) { Q.pinAt(lx + 42, A.floorY); Q.step(1); } res.dive = { hits: Q.takeDrops(), speed: Math.round(sp * 10) / 10, shockW: b.lockX, bodyW: b.w, playerW: pl.w, recover: b.state === 'recover2' ? b.timer : b.state }; }
       f = Q.waitState('beam', 2500, function () { Q.pinAt(cx, A.floorY); });
       if (f >= 0) { pl.iframes = 0; Q.takeDrops(); const by = b.beamY; for (let i = 0; i < 100 && b.state === 'beam'; i++) { Q.pinAt(cx, by + 24); Q.step(1); } res.beam = { hits: Q.takeDrops(), h: b.hitBeam.h, w: b.hitBeam.w, recover: b.state === 'recover2' ? b.timer : b.state }; }
       f = Q.waitTell('frag', 2500, function () { Q.pinAt(cx, A.floorY); });
@@ -1296,7 +1300,7 @@ const ARENAS = [
       for (let i = 0; i < 1500; i++) {
         Q.pinAt(gx, A.floorY); Q.step(1);
         if (b.y < A.floorY - 1) out.grateFrames++;
-        if (b.state === 'tell' && last !== 'tell') out.attacksFromShelf.push(b.attack + '@' + Math.round(A.floorY - b.y));
+        if (b.state === 'tell' && last !== 'tell' && b.y < A.floorY - 1) out.attacksFromShelf.push(b.attack + '@' + Math.round(A.floorY - b.y));   // only tells started above the floor (on a shelf)
         if (b.state === 'swing' && out.swingY === null) out.swingY = Math.round(A.floorY - b.y);
         const w = g.projectiles.find(p => p.kind === 'wave'); if (w && out.waveY === null) out.waveY = Math.round(A.floorY - w.y);
         last = b.state;
@@ -1323,7 +1327,9 @@ const ARENAS = [
       }
       // at 1 heart the flood kills: game over, no softlock
       let death = null;
-      Q.pinAt(px, A.floorY); let start2 = -1; for (let f = 0; f < 1200; f++) { Q.step(1); if (b.floodOn > 0 && b.floodOn < 118) { start2 = f; break; } }
+      // wait for a FRESH flood with the player back in normal play: right after the first half the same flood is still
+      // running while the player is mid-respawn onto a grate (where the acid cannot reach), so its tail is no test of death
+      Q.pinAt(px, A.floorY); let start2 = -1, fresh = false; for (let f = 0; f < 1200; f++) { Q.step(1); if (b.floodOn === 0 && g.mode === 'normal') fresh = true; if (fresh && b.floodOn > 0 && b.floodOn < 118) { start2 = f; break; } }
       if (start2 >= 0) {
         Q.pin = null; d.teleport(px, A.floorY); pl.hp = 1; pl.iframes = 0; d.god(false);
         let died = false, s = d.state(), f2;
@@ -1396,6 +1402,9 @@ const ARENAS = [
           if (f < 0) { out.push({ dist, lead, noTell: true }); continue; }
           b.cableSide = 1; b.cableTip = b.x + 75;
           while (b.state === 'tell') { Q.pinAt(px, A.floorY); Q.step(1); }
+          // the probe measures the cable alone: orbs still homing from an earlier Orbital Flare (and summoned motes) would hit the
+          // god-off player on the first frame and mask the jump (round 3 counted those 'orb1' hits against the cable)
+          for (const p of g.projectiles) p.dead = true; for (const m of g.enemies) if (m.type === 'mote') m.dead = true;
           Q.pin = null; d.teleport(px, A.floorY); d.step(1); pl.iframes = 0; d.god(false); Q.takeDrops();
           let jumped = false, dj = false, n = 0, jumpF = -1, landedF = -1, maxRise = 0;
           while (b.state !== 'recover' && b.state !== 'idle' && n < 400) {
@@ -1506,7 +1515,8 @@ const ARENAS = [
       return { frames: fr, heartsLeft: pl.hp, maxHp: pl.maxHp, dead: pl.dead, heartsLost: hurts.reduce((s, h) => s + h.dmg, 0), hurts, dealt, bossHp: b.hp, lights, jumps, tells: tl, enraged: !!b.enraged };
     });
     info('fairness ROUND-3 bot (keep 4–6 tiles, jump at the Slab Swing wind-up / approaching waves and discs, run from the Stack Slam mark (under it when cornered), light the recoveries), Tessik vs Tallock, god off, 60 s: hearts lost ' + r.heartsLost + '/' + r.maxHp + (r.dead ? ' (DIED at ' + Math.round(r.frames / 60) + ' s)' : '') + ', damage dealt ' + r.dealt + '/120' + (r.enraged ? ' (enraged)' : '') + ', lights ' + r.lights + ', jumps ' + r.jumps + ', hits taken ' + JSON.stringify(r.hurts) + ', tells ' + JSON.stringify(r.tells));
-    check('L13: the round-3 scripted Tessik survives 60 s against Tallock with god off, losing ≤ 3 of ' + r.maxHp + ' hearts (lost ' + r.heartsLost + ')', !r.dead && r.frames >= 3600 && r.heartsLost <= 3, r);
+    // the loop ends early when the fight does: purging Tallock inside the 60 s is surviving it
+    check('L13: the round-3 scripted Tessik survives 60 s against Tallock with god off (or purges it sooner), losing ≤ 3 of ' + r.maxHp + ' hearts (lost ' + r.heartsLost + ')', !r.dead && (r.frames >= 3600 || r.bossHp <= 0) && r.heartsLost <= 3, r);
     check('L13: the scripted player lands ≥ 30 damage in the recoveries (got ' + r.dealt + ')', r.dealt >= 30, r.dealt);
     check('L13: every Tallock tell the bot saw is ≥ 20 f', Object.keys(r.tells).length >= 2 && Object.keys(r.tells).every(k => r.tells[k].minTell >= 20), r.tells);
 

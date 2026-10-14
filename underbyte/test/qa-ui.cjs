@@ -557,7 +557,7 @@ function QA_INSTALL() {
     });
     check('E: the hint strip draws at (24,520) without a boss, hides while the boss bar is up and returns afterwards', hintBoss[0] > 30 && hintBoss[1] === 0 && hintBoss[2] > 30, hintBoss);
     // r3: the pinned panel rects (§12.7, §12.11, §12.12, §12.14, §12.17): the PANEL_EDGE stroke lies on every edge (±2 px band)
-    const geo = await ev((UB, d, g, q) => {
+    const rects = await ev((UB, d, g, q) => {
       const paper = (r, gg, b) => r > 215 && gg > 205 && b > 180;
       const band = (x, y, w, h) => q.scan(x, y, w, h, paper) > 0;
       const edges = (x, y, w, h) => ({ top: band(x + w / 2, y - 2, 1, 5), bottom: band(x + w / 2, y + h - 2, 1, 5), left: band(x - 2, y + h / 2, 5, 1), right: band(x + w - 2, y + h / 2, 5, 1) });
@@ -570,7 +570,9 @@ function QA_INSTALL() {
       o.bad = ['pause', 'settings', 'shop', 'map', 'banner'].filter(k => !(o[k].top && o[k].bottom && o[k].left && o[k].right));
       return o;
     });
-    check('E: panel rects are pinned — pause (330,150) 300×240, settings (230,90) 500×360, shop (230,120) 500×300, map (20,20) 920×500, banner (240,200) 480×120', geo.bad.length === 0, geo);
+    check('E: panel rects are pinned — pause (330,150) 300×240, settings (230,90) 500×360, shop (230,120) 500×300, map (20,20) 920×500, banner (240,200) 480×120', rects.bad.length === 0, rects);
+    // the r3 blocks above moved the run to debug_room: hand section F the dc_wake run it starts from
+    await D(d => d.warp('dc_wake', null)); await step(3); await clearOverlay();
   });
 
   // =================================================================================================
@@ -1225,7 +1227,8 @@ function QA_INSTALL() {
     check('N: a saved slot survives a reload (CONTINUE default)', s.hasSave && (await ui(u => u.sel)) === 1, { hasSave: s.hasSave });
     await keyTap('Enter');
     s = await stepUntil(x => x.screen === 'play' && !x.busy, 300);
-    check('N: CONTINUE loads the saved fighter at the saved node, full hearts incl. the core, abilities + bosses kept', s.screen === 'play' && s.fighter === 'vellix' && s.roomId === 'dc_wake' && s.maxHp === 5 && s.hp === 5 && s.bossesDefeated.length === 4 && s.abilities.gripProtocol === true, { fighter: s.fighter, room: s.roomId, maxHp: s.maxHp, bosses: s.bossesDefeated.length, ab: s.abilities });
+    // the slot is section M's cleared Vellix run: DESIGN §12.16 resumes a victory save at rw_rest (Last Light), whichever node was last used
+    check('N: CONTINUE loads the saved fighter at the saved node (the cleared run → rw_rest, §12.16), full hearts incl. the core, abilities + bosses kept', s.screen === 'play' && s.fighter === 'vellix' && s.roomId === 'rw_rest' && s.maxHp === 5 && s.hp === 5 && s.bossesDefeated.length === 4 && s.abilities.gripProtocol === true, { fighter: s.fighter, room: s.roomId, maxHp: s.maxHp, bosses: s.bossesDefeated.length, ab: s.abilities });
     await clearOverlay();
     const blocked = await page.evaluate(() => {
       const orig = Storage.prototype.setItem;

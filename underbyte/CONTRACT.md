@@ -162,6 +162,34 @@ Every item names the section it changes. Nothing was removed; signatures were on
    + exit hole (x4–6, rows 16–17), shaft-3 floor hole (x42–43, rows 17–18); `dc_loft.B` chute at cols 5–7 (spawn (6,17));
    `bv_cistern` row-8 grate x46–51.
 
+## Changes since v5 (v6 — QA round 3; everything additive)
+
+1. **§5 player**: the Overclock activation is checked after the move in progress has ticked (and possibly ended), like
+   jump/light/dash, so a press buffered through the end of an attack fires on the first free frame; nothing else starts on
+   the activation frame. `guard` (Vellix's blink i-frames) is set to **1** on each covered frame — it is read by that
+   tick's hit resolution and cleared at the top of the next update (Blink Strike f5–12, Afterimage Storm f1–38 exactly).
+   Blink Strike's ledge stop and the Pulse Line's floor snap treat a mover under the feet as footing (DESIGN §3.0).
+2. **§7 hits — the pull**: a player hit with `kbx < 0` (Korvask's Chain Haul) that leaves its victim in hitstun sets
+   `e.pullBy = player` and `e.pullSide`; after each enemy's `update` the engine calls `game.holdPulled(e)`, which keeps the
+   victim 1 px clear of the puller's body (never into a wall) until its hitstun ends — the pull never hands it a contact hit.
+3. **§6.1 platewalker**: a blocked hit pushes the attacking player back AWAY from the shield (`vx = e.facing · 180`), only
+   for the player's own melee (`hit.src === game.player`); the BASH lunge and the guard-break shove stop at a ledge edge or
+   the patrol bound, like the walk.
+4. **§6.2 bosses** (DESIGN §8 fairness): Tallock is `ignoreOneWay` (a Stack Slam passes through the grates to the floor) and
+   its WALK halts 16 px short of the player's body; Corrosant's Wall Lunge head reaches the lunge height 10 f before the lunge;
+   the Flood stirs for 30 f (`floodT` 390–419: bubbles, shake, sfx), then `floodOn` 120 → its first 20 f rise harmlessly and
+   only the last 100 f are a hazard; Kernauth's Dive Bomb impacts where it arrives (no snap to the floor; shock box at its
+   base) with `contact = 0` within 80 px of the lock point; the Cable Sweep hit-box is the whip-tip (leading 40 px) only.
+5. **§8 engine**: `game.newGame(fighterId, fromMenu)` — the select screen passes `true` and an overwritten slot is erased
+   when the new run boots (`game.eraseSlot()`); `game.resetSave()` returns false and toasts nothing without a saved run
+   (`UB.debug.reset()` always clears the slot); `victory()` moves the cleared save to `rw_rest` / its node (DESIGN §12.16).
+6. **§4.2 input**: a gamepad button press edge fires the gesture listeners (sets `gestured`, PRESS ANY KEY stops).
+7. **§8.1 UI**: the pause menu (above the panel) and the map legend (bottom-left, over an ink plate) list the owned abilities'
+   DESIGN §15.10 lines (`TXT.abilityDesc`); the RESET SAVE row is drawn disabled and only denies without a save; the slider
+   value is right-aligned at x 724 inside the settings panel.
+8. **World data (DESIGN §10.6 F11–F14)**: `bv_catwalk` row 33 x19–22 dry; `ns_plunge` row 49 x20–23 dry; `lw_hoist` grates
+   row 30 x7–12 / x18–23; `ns_climb` doorways x32–33 rows 67–69 and x34–35 rows 49–50.
+
 ## 0. Ground rules (from `BRIEF.md`, non-negotiable)
 
 * 100 % original content. No franchise names, designs, terms or lookalikes anywhere (code,
@@ -614,11 +642,11 @@ are drawn. Popping an enemy projectile gives +2 meter and 4 sparks.
 |---|---|
 | `game.screen` `'title'|'select'|'play'|'gameover'|'victory'`; `game.overlay` `null|'pause'|'map'|'settings'|'shop'|'lore'`; `game.mode` `'normal'|'transition'|'hazard'|'nodeUse'|'bossIntro'|'pickupSeq'|'dying'`; `game.busy` | state (read) |
 | `game.frame`, `game.screenT`, `game.fps` | counters |
-| `game.save` (DESIGN §14 object), `game.settings` (§14.2), `game.hasSave()`, `game.saveSummary()`, `game.writeSave()`, `game.resetSave()`, `game.setSetting(key, value)` | save/settings |
+| `game.save` (DESIGN §14 object), `game.settings` (§14.2), `game.hasSave()`, `game.saveSummary()`, `game.writeSave()`, `game.resetSave()` (→ false, no toast, when there is no saved run), `game.eraseSlot()`, `game.setSetting(key, value)` | save/settings |
 | `game.level`, `game.zone`, `game.player`, `game.enemies[]`, `game.boss`, `game.projectiles[]`, `game.pickups[]`, `game.cam {x,y,px,py}`, `game.hazardRespawn`, `game.bossFight {state,timer}`, `game.nearNode`, `game.nearVendor`, `game.prompt` (`null` or `{text:'REST'|'TRADE', x, y}`), `game.denyFlash`, `game.loreCard` (zone shown by the `lore` overlay) | world (read) |
 | `game.registerHit(hit)` · `game.spawnProjectile(obj)` · `game.spawnEnemy(type, tx, ty, opts)` · `game.spawnPickup(type, x, y, opts)` (`bit heart spark shard core ability`; opts `{size, placed, key, id, ability, bossId, glow, permanent, vx, vy}`) · `game.addBits(n)` `addEnergy(n)` `addMeter(n, fromHit)` · `game.grantAbility(id, on)` · `game.rng()` · `game.triggerHazard(kind, rx, ry)` (module-owned hazard → the §3.3 freeze + respawn at (rx, ry); false unless alive, mode normal, god off) · `game.hideProp(tag, quiet)` (hide a tagged composite prop for the visit) · `game.impactZoom(x, y)` | gameplay |
 | `game.buy(itemId) → 'bought'|'poor'|'sold'|'unknown'` · `game.hasDeepPing()` · `game.applyDeepPing()` · `UB.Engine.Game.VENDOR` (= `UB.IDS.vendorItems`) | vendor (UI) |
-| `game.toSelect()` `toTitle()` `newGame(fighterId)` `continueGame()` `openOverlay(name)` `closeOverlay()` `respawnAtNode()` `victory()` `victoryStats()` | flow (UI) |
+| `game.toSelect()` `toTitle()` `newGame(fighterId, fromMenu)` `continueGame()` `openOverlay(name)` `closeOverlay()` `respawnAtNode()` `victory()` `victoryStats()` | flow (UI) |
 | `game.loadRoom(roomId, arrival)` `startTransition(exit)` `defeat flow…` `snapInterp()` | engine-internal; use `UB.debug` in tests |
 | `UB.Engine.T` | pinned timings (transition 6/18/4, hazard 30+10/45, boss intro 150, pickup 120, crumble 20/180/6, loreDelay 90, shopBanner 150, …) |
 
@@ -657,7 +685,7 @@ UB.UI.toast(line1, line2, frames)  UB.UI.banner(l1, l2, l3, frames)  UB.UI.bossC
 UB.UI.text(ctx, str, x, y, font, color, align, baseline, inkWidth)   UB.UI.panel(ctx, x, y, w, h)
 ```
 Screens the UI must handle in `update`/`drawScreen`: `title` (NEW GAME / CONTINUE / SETTINGS →
-`game.toSelect() / continueGame() / openOverlay('settings')`), `select` (→ `game.newGame(id)`,
+`game.toSelect() / continueGame() / openOverlay('settings')`), `select` (→ `game.newGame(id, true)`,
 back → `toTitle()`), overlays `pause` (RESUME `closeOverlay()`, MAP `openOverlay('map')`, SETTINGS,
 QUIT `toTitle()`), `map` (Deep Ping: `game.hasDeepPing()` → draw every discovered room's node and a `?`
 on rooms with an uncollected core), `settings` (`setSetting`), **`shop`** (DESIGN §12.17: Scrivvet's

@@ -306,10 +306,12 @@
   const TAL_NAME = ['', 'slabSwing', 'stompQuake', 'discToss', 'stackSlam'];
   const TAL_TELL = [0, 30, 36, 24, 40];
   const TAL_W = [90, 84, 78, 72, 66, 60];
+  const TAL_GAP = 16;   // the walk halts this many px short of the player's body
   function createTallock(id, d, room, game, spec) {
     const b = bossBase(id, d, spec, 90, 120);
     const K = d.cols;
     b.A = arenaOf(spec, room);
+    b.ignoreOneWay = true;   // a ground boss: the row-12 grates are the player's refuge — a Stack Slam passes through them to the floor
     b.walkSpeed = 1.5; b.gap = 45; b.waveSpeed = 5; b.last1 = 0; b.last2 = 0; b.atk = 0; b.slamX = 0; b.thud = 0;
     b.hitA = mkHit('heavy', 'swing', 1, 0); b.hitA.src = b;
     b.hitL = mkHit('heavy', 'shock', 2, 1); b.hitL.src = b;
@@ -367,7 +369,10 @@
     const dx = player.x - b.x, adx = Math.abs(dx);
     switch (b.state) {
       case 'walk':
-        b.facing = dx < 0 ? -1 : 1; b.vx = b.facing * b.walkSpeed;
+        // DESIGN §8.1: it walks toward the player but halts a short step (16 px) from the body — the walk is never an
+        // attack, so a cornered fighter is not shoved into 1-heart contact (it can't be jumped: 120 px > a plain jump)
+        b.facing = dx < 0 ? -1 : 1;
+        b.vx = adx > b.w / 2 + player.w / 2 + TAL_GAP ? b.facing * b.walkSpeed : 0;
         if (--b.timer <= 0) tallockPick(b, game, adx);
         break;
       case 'tell':
@@ -642,6 +647,8 @@
   // 8.3 CORROSANT — Keeper of the Brine (surface crawler: head 50×40 + 7 segments)
   // ==========================================================================================
   const INS = 22, PATH_N = 1024, SEGS = 7;
+  const FLOOD_EVERY = 420, FLOOD_ON = 120, FLOOD_WARN = 30, FLOOD_RISE = 20;   // DESIGN §8.3 Flood timings
+  const LUNGE_SET = 10;   // the Wall Lunge head holds the strike height for the last 10 f of its tell
   const perOut = { x: 0, y: 0, surf: 0, nx: 0, ny: 0 };
   const pathOut = { x: 0, y: 0 };
   function createCorrosant(id, d, room, game, spec) {
@@ -809,14 +816,21 @@
     if (b.flash > 0) b.flash--; if (b.coreBright > 0) b.coreBright--;
     if ((b.t & 31) === 0) corroEnsureSegs(b, game);
     if (b.roar > 0) { b.jaw = 0.6; if (--b.roar === 0) corroChoose(b, game); corroPlaceHead(b); return; }
-    // Flood (enraged): every 420 f the floor row is acid for 120 f
+    // Flood (enraged, DESIGN §8.3): every 420 f the floor row is acid for 120 f. Fairness floor (§8.0): the brine
+    // stirs for FLOOD_WARN f first (bubbles along the floor, rumble, shake), then the acid rises over FLOOD_RISE f
+    // harmlessly (drawn pale) and only burns once it has risen — 50 f of visible warning before it can hurt.
     if (b.enraged) {
       if (b.floodOn > 0) {
         b.floodOn--;
-        const k = Math.min(1, (120 - b.floodOn) / 20), fh = b.hitFlood;
+        const e = FLOOD_ON - b.floodOn, k = Math.min(1, e / FLOOD_RISE), fh = b.hitFlood;
         fh.x = A.x0; fh.y = A.floorY - 30 * k; fh.w = A.x1 - A.x0; fh.h = 30 * k;
-        if (k > 0 && player && E.overlapBox(player, fh.x, fh.y, fh.w, fh.h)) corroFloodHit(b, game, player);
-      } else if (++b.floodT >= 420) { b.floodT = 0; b.floodOn = 120; FX.shake(5, 20); Au.sfx('bossPhase', b.x); }
+        if (e === FLOOD_RISE + 1) { FX.shake(3, 8); Au.sfx('spike', b.x); }
+        if (e > FLOOD_RISE && player && E.overlapBox(player, fh.x, fh.y, fh.w, fh.h)) corroFloodHit(b, game, player);
+      } else {
+        ++b.floodT;
+        if (b.floodT === FLOOD_EVERY - FLOOD_WARN) { FX.shake(5, 20); Au.sfx('bossPhase', b.x); }
+        if (b.floodT >= FLOOD_EVERY) { b.floodT = 0; b.floodOn = FLOOD_ON; }
+      }
     }
     b.jaw = U.approach(b.jaw, 0, 0.05); b.rear = U.approach(b.rear, 0, 2);
     switch (b.state) {
@@ -830,9 +844,10 @@
       }
       case 'tell':
         if (b.plan === 'lunge') {
-          // slide along the wall to the lunge height, rear back
+          // slide along the wall to the lunge height (arriving LUNGE_SET f before the lunge, so the head visibly rears
+          // at the height it will strike — DESIGN §8.3), then rear back
           const wallS = surfOf(b, b.s) === 1 ? b.W + (b.lungeY - A.ceilY - INS) : 2 * b.W + 2 * b.H - (b.lungeY - A.ceilY - INS);
-          b.s = U.approach(b.s, wallS, 6); perPos(b, b.s, perOut); b.hx = perOut.x; b.hy = perOut.y;
+          b.s = U.approach(b.s, wallS, Math.max(6, Math.abs(wallS - b.s) / Math.max(1, b.timer - LUNGE_SET))); perPos(b, b.s, perOut); b.hx = perOut.x; b.hy = perOut.y;
           b.rear = 20 * (1 - b.timer / 30); b.jaw = 0.6;
           if ((b.timer % 10) === 0) { const s = makeShot(game, 'drip', b.hx + perOut.nx * 10, b.hy + 20, 0, 5, K.acid); if (s) { s.src = b; s.life = 40; s.noHit = true; } }
         } else if (b.plan === 'drip') {
@@ -907,11 +922,28 @@
     ctx.save(); ctx.lineJoin = 'round'; ctx.lineCap = 'round';
     // flood / telegraphs in world space
     if (b.enraged && b.floodOn > 0) {
-      const k = Math.min(1, (120 - b.floodOn) / 20) * (b.floodOn < 15 ? b.floodOn / 15 : 1);
-      ctx.fillStyle = K.acid; ctx.globalAlpha = 0.75;
+      const e = FLOOD_ON - b.floodOn, rising = e <= FLOOD_RISE;
+      const k = Math.min(1, e / FLOOD_RISE) * (b.floodOn < 15 ? b.floodOn / 15 : 1);
+      ctx.fillStyle = K.acid; ctx.globalAlpha = rising ? 0.3 + 0.2 * (e / FLOOD_RISE) : 0.75;   // pale while it rises (harmless), full once it burns
       ctx.beginPath(); ctx.moveTo(A.x0, A.floorY);
       for (let px = A.x0; px <= A.x1; px += 20) ctx.lineTo(px, A.floorY - 30 * k + Math.sin(px / 25 + t / 6) * 3);
-      ctx.lineTo(A.x1, A.floorY); ctx.closePath(); ctx.fill(); ctx.globalAlpha = 1;
+      ctx.lineTo(A.x1, A.floorY); ctx.closePath(); ctx.fill();
+      if (!rising) {
+        ctx.strokeStyle = K.fins; ctx.lineWidth = 2; ctx.globalAlpha = 0.6 + 0.3 * Math.cos(t * TAU / 8);
+        ctx.beginPath(); for (let px = A.x0; px <= A.x1; px += 20) { const yy = A.floorY - 30 * k + Math.sin(px / 25 + t / 6) * 3; if (px === A.x0) ctx.moveTo(px, yy); else ctx.lineTo(px, yy); } ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+    } else if (b.enraged && b.floodT >= FLOOD_EVERY - FLOOD_WARN) {
+      // the warning: the brine stirs — bubbles swell and pop along the whole floor row
+      const w = (b.floodT - (FLOOD_EVERY - FLOOD_WARN)) / FLOOD_WARN;
+      ctx.fillStyle = K.acid; ctx.strokeStyle = K.fins; ctx.lineWidth = 1.5;
+      for (let px = A.x0 + 10; px < A.x1; px += 36) {
+        const ph = ((px * 7 + t * 3) % 24) / 24, r = (2 + 5 * w) * Math.sin(ph * PI);
+        ctx.globalAlpha = 0.35 + 0.45 * w;
+        ctx.beginPath(); ctx.arc(px + Math.sin(px + t / 5) * 4, A.floorY - 3 - ph * 10 * w, Math.max(0.5, r), 0, TAU); ctx.fill(); ctx.stroke();
+      }
+      ctx.globalAlpha = 0.25 + 0.35 * w; ctx.fillRect(A.x0, A.floorY - 3, A.x1 - A.x0, 3);
+      ctx.globalAlpha = 1;
     }
     if (st === 'tell' && b.plan === 'drip') {
       ctx.fillStyle = K.acid; ctx.globalAlpha = 0.5 + 0.3 * Math.cos(t * TAU / 8);
@@ -963,6 +995,8 @@
   // ==========================================================================================
   const KER_NAME = ['', 'cableSweep', 'rootSpikes', 'orbitalFlare', 'summon'];
   const KER_CYCLE = ['dive', 'beam', 'frag', 'blink', 'beam'];
+  const DIVE_NEAR = 80;   // Dive Bomb: no body contact within this many px of the lock point (the shock decides)
+  const CABLE_TIP = 40;   // Cable Sweep: only the leading 40 px of the cable (its whip-tip) hurts
   function createKernauth(id, d, room, game, spec) {
     const b = bossBase(id, d, spec, 150, 180);
     const K = d.cols;
@@ -1099,7 +1133,9 @@
   }
   function kerActive2(b, game, player) {
     const A = b.A, K = b.data.cols;
-    if (b.atk2 === 'dive') { b.lockX = player.x; b.lockY = Math.min(player.cy(), A.floorY - 35); b.state = 'dive'; b.contact = 1; Au.sfx('whiff', b.x); }
+    if (b.atk2 === 'dive') {   // the lock: the body comes down with its base on the fighter's feet line (the floor, or a grate)
+      b.lockX = player.x; b.lockY = Math.min(player.y, A.floorY) - b.h / 2; b.state = 'dive'; b.contact = 1; Au.sfx('whiff', b.x);
+    }
     else if (b.atk2 === 'beam') { b.state = 'beam'; b.timer = 40; b.hitBeam.hitList.length = 0; Au.sfx('bolt', b.x); FX.shake(3, 8); }
     else if (b.atk2 === 'frag') {
       const off = game.rng() * TAU;
@@ -1170,19 +1206,25 @@
         break;
       case 'dive': {
         const arrived = seek(b, b.lockX, b.lockY, 13); b.moveAndCollide(game.level);
+        // DESIGN §8.4: a fighter at the lock point takes the shock, never the body — on the final approach (within
+        // DIVE_NEAR px of the point) the body deals no contact; the impact lands on arrival
+        const ddx = b.lockX - b.x, ddy = b.lockY - (b.y - b.h / 2);
+        b.contact = ddx * ddx + ddy * ddy <= DIVE_NEAR * DIVE_NEAR ? 0 : 1;
         if (arrived || b.y >= A.floorY - 0.5) {
+          // the impact happens where the dive arrives (the floor, or the grate it aimed at) — no snap to the floor
           b.state = 'shock'; b.timer = 10; b.hitShock.hitList.length = 0; b.vx = 0; b.vy = 0;
-          b.y = A.floorY; FX.shake(8, 14); FX.burst('dust', b.x, b.y, 10, DUST_N); Au.sfx('heavyHit', b.x);
+          FX.shake(8, 14); FX.burst('dust', b.x, b.y, 10, DUST_N); Au.sfx('heavyHit', b.x);
           b.lockX = 120;   // shock width (DESIGN §8.4: 120×30, a player width wider than the 70 px body on each side)
           // the shock is registered on the landing frame itself: hits resolve before body contact, so the player at the
           // impact takes the 2-damage shock, never the 1-damage body touch
-          regBox(game, b.hitShock, b.x - b.lockX / 2, A.floorY - 30, b.lockX, 30, b.facing);
+          regBox(game, b.hitShock, b.x - b.lockX / 2, b.y - 30, b.lockX, 30, b.facing);
+          b.contact = 1;
         }
         break;
       }
       case 'shock':
         b.vx = 0; b.vy = 0;
-        regBox(game, b.hitShock, b.x - b.lockX / 2, A.floorY - 30, b.lockX, 30, b.facing);
+        regBox(game, b.hitShock, b.x - b.lockX / 2, b.y - 30, b.lockX, 30, b.facing);
         if (--b.timer <= 0) { b.state = 'recover2'; b.timer = b.atk2 === 'blink' ? 45 : 50; }
         break;
       case 'beam':
@@ -1230,8 +1272,15 @@
     }
     kerTailHits(b, game);
   }
+  /**
+   * Cable Sweep hit-box (DESIGN §8.4): the whip-tip — the leading CABLE_TIP px of the cable, 1 tile tall — as it
+   * strikes out along the floor and holds at the wall. The slack cable behind the tip lies harmless on the floor, so a
+   * fighter who jumps the tip as it passes lands safely on it ("jump over the cable tip as it passes").
+   */
   function kerCableHit(b, game) {
-    const A = b.A, x0 = Math.min(b.x + b.cableSide * 75, b.cableTip), x1 = Math.max(b.x + b.cableSide * 75, b.cableTip);
+    const A = b.A, root = b.x + b.cableSide * 75, tip = b.cableTip;
+    // the tip segment, never reaching back past the cable's root at the body
+    const x0 = b.cableSide > 0 ? Math.max(root, tip - CABLE_TIP) : tip, x1 = b.cableSide > 0 ? tip : Math.min(root, tip + CABLE_TIP);
     regBox(game, b.hitCable, x0, A.floorY - 30, Math.max(10, x1 - x0), 30, b.cableSide);
   }
   /** Tail: six circles along the recent path (contact 1, paced by the player's i-frames). */
@@ -1289,6 +1338,14 @@
       if (st === 'transition') { ctx.translate(Math.sin(t) * 2, 0); }
       drawRig(ctx, b.rig1, b.flash > 0, st === 'tell', b.accent, t);
       ctx.restore();
+      if (st === 'cableOut' || st === 'cableHold') {   // the whip-tip (the only part of the cable that hurts) glows as it strikes
+        const tx = b.cableTip - b.cableSide * CABLE_TIP / 2;
+        ctx.fillStyle = K.core; ctx.strokeStyle = INK; ctx.lineWidth = 3; ctx.globalAlpha = 0.9;
+        ctx.beginPath(); ctx.ellipse(tx, A.floorY - 12, CABLE_TIP / 2, 11, 0, 0, TAU); ctx.fill(); ctx.stroke();
+        ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.5 + 0.3 * Math.cos(t * TAU / 8); ctx.fillStyle = K.hot;
+        ctx.beginPath(); ctx.ellipse(tx, A.floorY - 12, CABLE_TIP / 4, 5, 0, 0, TAU); ctx.fill();
+        ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+      }
       if (st === 'tell' && b.atk === 3) {
         ctx.fillStyle = K.core; ctx.globalAlpha = 0.6 + 0.3 * Math.sin(t / 2);
         for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc(x + (i - 1) * 26, y - 185, 4 + 4 * (30 - b.timer) / 30, 0, TAU); ctx.fill(); }
@@ -1316,7 +1373,7 @@
       ctx.fillStyle = K.hot; ctx.globalAlpha = 0.8; ctx.fillRect(A.x0, b.beamY - 3 + Math.sin(t) * 2, A.x1 - A.x0, 6);
       ctx.restore();
     } else if (st === 'shock') {
-      ctx.fillStyle = K.crown; ctx.globalAlpha = 0.7 * (b.timer / 10); ctx.fillRect(x - b.lockX / 2, A.floorY - 30, b.lockX, 30); ctx.globalAlpha = 1;
+      ctx.fillStyle = K.crown; ctx.globalAlpha = 0.7 * (b.timer / 10); ctx.fillRect(x - b.lockX / 2, y - 30, b.lockX, 30); ctx.globalAlpha = 1;
     }
     let a = 1, sc = 1;
     if (st === 'blinkOut') a = b.timer / 12;

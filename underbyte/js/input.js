@@ -190,6 +190,8 @@
     if (axisState.x < 0) padDown.left = true; if (axisState.x > 0) padDown.right = true;
     if (axisState.y < 0) padDown.up = true; if (axisState.y > 0) padDown.down = true;
     if (any || axisState.x || axisState.y) { Input.device = 'gamepad'; if (any) { Input._anyEdge = Input._anyEdge || !Input._padAnyPrev; } }
+    // a pad button press is the first gesture for a pad-only player too (PRESS ANY KEY stops, audio may init — DESIGN §12.9)
+    if (any && !Input._padAnyPrev) fireGesture();
     Input._padAnyPrev = any;
   }
 

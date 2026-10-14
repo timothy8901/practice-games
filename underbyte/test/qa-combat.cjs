@@ -1044,17 +1044,24 @@ const DESIGN = {
       await ev((d) => d.god(false));
       const belt = await page.evaluate(() => { const p = window.UB.game.level.platforms[0]; return { x: p.x, y: p.y, w: p.w, h: p.h }; });
       await evs(CLEAR + 'd.setEnergy(100); d.setHp(5); d.teleport(' + (belt.x + belt.w / 2) + ', ' + (belt.y - 2) + '); g.player.facing = 1;'); await step(20);
-      const before = await page.evaluate(() => { const p = window.UB.game.level.platforms[0], pl = window.UB.game.player; return { beltX: p.x, beltDx: p.dx, x: pl.x, y: pl.y, onBelt: !!pl.ground }; });
+      const before = await page.evaluate(() => { const p = window.UB.game.level.platforms[0], pl = window.UB.game.player; return { beltX: p.x, beltDx: p.dx, x: pl.x, y: pl.y, onBelt: !!pl.ground, hp: pl.hp }; });
       const L = await log(120, 'if (i === 0) { g.player.facing = 1; d.pressed("special", 1); }');
       const beltRight = () => page.evaluate(() => { const p = window.UB.game.level.platforms[0]; return p.x + p.w; });
       if (id === 'vellix') {
+        // hp is compared with the hp before the move: setHp(5) clamps to Vellix's 4 hearts (DESIGN §4.1)
         const sl = L.filter(r => r.ph === 'slide');
         const maxX = Math.max(...sl.map(r => r.x)), right = await beltRight();
-        check('[vellix] lw_belts: Blink Strike on the belt stops at the belt\'s edge (a mover is footing, §4.2.3) — never hangs in the air nor drops into the pool', before.onBelt && sl.length === 8 && sl.every(r => r.gnd) && !L.some(r => r.mode === 'hazard') && L[119].hp === 5, { before, slide: sl.map(r => [r.x, Math.round(r.y), r.gnd]), hazard: L.some(r => r.mode === 'hazard'), hp: L[119].hp, beltRightNow: right });
+        check('[vellix] lw_belts: Blink Strike on the belt stops at the belt\'s edge (a mover is footing, §4.2.3) — never hangs in the air nor drops into the pool', before.onBelt && sl.length === 8 && sl.every(r => r.gnd) && !L.some(r => r.mode === 'hazard') && L[119].hp === before.hp, { before, slide: sl.map(r => [r.x, Math.round(r.y), r.gnd]), hazard: L.some(r => r.mode === 'hazard'), hp: L[119].hp, beltRightNow: right });
         await evs('d.showHitboxes(true);'); await shot('qa-combat-r3-vellix-belt.png', { x: 0, y: 0, width: 1280, height: 720 }); await evs('d.showHitboxes(false);');
       } else if (id === 'tessik') {
-        const alive = L.filter(r => r.pr > 0).length;
-        check('[tessik] lw_belts: a Pulse Line fired from the belt rides the belt surface (a mover is a floor, §3.0) instead of dying on its spawn frame', before.onBelt && L.some(r => r.mv === 'special') && alive >= 10, { before, alive, energyAfter: L[30].en });
+        // DESIGN §4.2.1: the wave snaps to the floor each frame and dies at a wall or a drop > 30 px — from the middle of the
+        // 3-tile belt (over the static pool) it must ride the belt to its edge (≈ 60 px, 8 f at 7 px/f), not die on its spawn
+        // frame. (The round-3 '≥ 10 f alive' threshold is impossible here: the belt's edge is a 90 px drop ~50 px ahead.)
+        const pulse = L.map(r => r.prs.find(p => p.k === 'pulse' && !p.dead) || null);
+        const alive = pulse.filter(Boolean).length, lastI = pulse.reduce((a, p, i) => p ? i : a, -1);
+        const beltRightAt = (i) => before.beltX + 90 + before.beltDx * (i + 1);   // M1 is 3 tiles wide and moves 1.5 px/f right for ~115 f here
+        const rode = lastI >= 0 && pulse[lastI].x + 13 > beltRightAt(lastI);
+        check('[tessik] lw_belts: a Pulse Line fired from the belt rides the belt surface to its edge (a mover is a floor, §3.0) instead of dying on its spawn frame', before.onBelt && L.some(r => r.mv === 'special') && alive >= 5 && rode, { before, alive, last: lastI >= 0 ? { i: lastI, x: pulse[lastI].x, beltRight: beltRightAt(lastI) } : null, energyAfter: L[30].en });
       } else if (id === 'brackmaw') {
         check('[brackmaw] lw_belts: Vault Stomp on the belt bursts normally and Brackmaw stays on the belt', before.onBelt && L.some(r => r.ph === 'burst') && !L.some(r => r.mode === 'hazard') && L[119].hp === 5, { phases: uniq(L.map(r => r.ph)), hp: L[119].hp });
       } else if (id === 'orrubel') {

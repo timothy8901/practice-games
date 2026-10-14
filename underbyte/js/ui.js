@@ -82,6 +82,8 @@
     ocLabel: 'OVERCLOCK', ocReady: 'OVERCLOCK — READY  [', ocOn: 'OVERCLOCKED', energy: 'ENERGY',
     prompt: { REST: '▲ REST', TRADE: '▲ TRADE' },
     moveLabels: ['LIGHT  ', 'HEAVY  ', '   SPECIAL  ', 'ULTIMATE  '],
+    // §15.10: the owned abilities, listed in the pause menu and the map legend
+    abilityDesc: { echoJump: 'ECHO JUMP — a second jump in the air', burstLine: 'BURST LINE — a 6-tile lunge, ground or air', gripProtocol: 'GRIP PROTOCOL — cling to walls and kick off them' },
   };
   /** Banner line 2/3 by line 1 (DESIGN §15.5); the engine passes its own lines, the UI owns the text. */
   const BANNER_TEXT = {
@@ -440,7 +442,7 @@
       let moved = 0;
       if (In.repeat('right')) moved = 1; else if (In.repeat('left')) moved = -1;
       if (moved) { UI.selPrev = UI.sel; UI.selSlide = 8; UI.sel = (UI.sel + n + moved) % n; Au.sfx('menuMove'); }
-      if (st.confirm.pressed) { Au.sfx('menuConfirm'); UI.cardFlash = 4; game.newGame(UB.Characters.list[UI.sel].id); }
+      if (st.confirm.pressed) { Au.sfx('menuConfirm'); UI.cardFlash = 4; game.newGame(UB.Characters.list[UI.sel].id, true); }
       else if (st.back.pressed) { Au.sfx('menuBack'); game.toTitle(); }
     } else if (s === 'pause') {
       if (UI.confirmQuit) { const r = navYesNo(); if (r === 'yes') game.toTitle(); else if (r === 'no') { UI.confirmQuit = false; UI.sel = 3; } return; }
@@ -476,7 +478,9 @@
       const key = SETTING_KEYS[UI.sel];
       if (UI.sel <= 2) { if (adj !== 0) { game.setSetting(key, U.clamp(sg[key] + adj, 0, 10)); Au.sfx('menuMove'); } }
       else if (UI.sel <= 4) { if (adj !== 0 || st.confirm.pressed) { game.setSetting(key, !sg[key]); Au.sfx('menuMove'); } }
-      else if (UI.fromTitle && UI.sel === 5) { if (st.confirm.pressed) { Au.sfx('menuConfirm'); UI.confirmReset = true; UI.ynSel = 0; } }
+      else if (UI.fromTitle && UI.sel === 5) {   // RESET SAVE: live only while a run is saved (nothing to erase otherwise → deny)
+        if (st.confirm.pressed) { if (game.hasSave()) { Au.sfx('menuConfirm'); UI.confirmReset = true; UI.ynSel = 0; } else Au.sfx('deny'); }
+      }
       else if (st.confirm.pressed) { Au.sfx('menuBack'); game.closeOverlay(); }
     } else if (s === 'shop') {
       if (UI.shopMsgT > 0) UI.shopMsgT--;
@@ -862,12 +866,23 @@
   // overlays: pause, map, settings, shop, lore (DESIGN §12.11, §12.12, §12.14, §12.17, §12.18)
   // =============================================================================================
   function dim(ctx) { ctx.fillStyle = DIM; ctx.fillRect(0, 0, W, H); }
-  function drawPause(ctx) {
+  function drawPause(ctx, game) {
     dim(ctx);
     UI.panel(ctx, 330, 150, 300, 240);
     UI.text(ctx, TXT.paused, 480, 186, F.ui24b, P.PAPER, 'center', 'middle', 3);
     menuList(ctx, TXT.pauseMenu, 480, 226, 40, F.ui18b, UI.confirmQuit ? -1 : UI.sel);
+    // §15.10: the abilities owned so far, one line each, above the panel
+    const n = ownedAbilities(game);
+    for (let i = 0; i < n; i++) UI.text(ctx, ABIL_LINES[i], 480, 136 - (n - 1 - i) * 18, F.mono12, P.PAPER, 'center', 'middle', 3);
     if (UI.confirmQuit) drawYesNo(ctx, TXT.quit1, TXT.quit2, UI.ynSel);
+  }
+  /** Fill ABIL_LINES with the §15.10 lines of the abilities the run owns (fixed order); returns the count. */
+  const ABIL_LINES = ['', '', ''];
+  function ownedAbilities(game) {
+    const ab = game && game.save ? game.save.abilities : null, ids = UB.IDS.abilities;
+    let n = 0;
+    if (ab) for (let i = 0; i < ids.length; i++) if (ab[ids[i]]) ABIL_LINES[n++] = TXT.abilityDesc[ids[i]];
+    return n;
   }
   /** Map setup on open: pan limits so the whole discovered graph can be reached, the footer room line. */
   function mapSetup(game) {
@@ -1029,6 +1044,14 @@
     UI.text(ctx, TXT.map, 60, 56, F.ui22b, P.PAPER, 'left', 'middle', 3);
     UI.text(ctx, game.zone ? game.zone.name : '', 900, 56, F.mono14, P.PAPER_DIM, 'right', 'middle');
     UI.text(ctx, TXT.mapLegend, 60, 500, F.mono11, P.PAPER_DIM, 'left', 'middle');
+    // §15.10: the owned abilities join the legend, stacked above it on an ink plate (bottom-left of the map area)
+    const na = ownedAbilities(game);
+    if (na) {
+      let wmax = 0; for (let i = 0; i < na; i++) wmax = Math.max(wmax, textW(ctx, ABIL_LINES[i], F.mono11));
+      const top = 470 - (na - 1) * 14 - 9;   // lines at pitch 14, the last centred at y 470 (clear of the footer's room line)
+      ctx.globalAlpha = 0.8; ctx.fillStyle = P.INK; Rn.rrect(ctx, 52, top, wmax + 16, 478 - top, 4); ctx.fill(); ctx.globalAlpha = 1;
+      for (let i = 0; i < na; i++) UI.text(ctx, ABIL_LINES[i], 60, 470 - (na - 1 - i) * 14, F.mono11, P.PAPER_DIM, 'left', 'middle');
+    }
     const two = !!UI.mapBestiary2;
     UI.text(ctx, UI.mapRoomLine, 480, UI.mapBestiary ? (two ? 486 : 493) : 500, F.mono11, P.PAPER, 'center', 'middle');
     if (UI.mapBestiary) UI.text(ctx, UI.mapBestiary, 480, two ? 498 : 507, F.mono11, P.PAPER_DIM, 'center', 'middle');
@@ -1046,7 +1069,10 @@
     for (let i = 0; i < n; i++) {
       const row = (i === 5 && !UI.fromTitle) ? 6 : i;      // without RESET SAVE the sixth row is BACK
       const y = 150 + i * 44, on = i === UI.sel && !UI.confirmReset;
-      UI.text(ctx, TXT.settingRows[row], 260, y, F.ui16b, on ? P.SELECT : P.PAPER, 'left', 'middle', 3);
+      const off = row === 5 && !game.hasSave();   // RESET SAVE without a saved run is drawn disabled (like CONTINUE)
+      if (off) ctx.globalAlpha = 0.4;
+      UI.text(ctx, TXT.settingRows[row], 260, y, F.ui16b, on ? P.SELECT : (off ? P.PAPER_DIM : P.PAPER), 'left', 'middle', 3);
+      if (off) ctx.globalAlpha = 1;
       if (on) UI.text(ctx, '▶', 244 + Math.sin(UI.t / 20 * TAU) * 3, y, F.ui14b, P.SELECT, 'center', 'middle', 3);
       const k = SETTING_KEYS[row];
       if (row <= 2) {   // slider 0–10: bar 160×10 (x 540..700), knob r 8 SELECT
@@ -1054,7 +1080,7 @@
         ctx.fillStyle = on ? P.SELECT : P.PAPER_DIM; Rn.rrect(ctx, 540, y - 5, 160 * sg[k] / 10, 10, 5); ctx.fill();
         ctx.strokeStyle = P.INK; ctx.lineWidth = 2; Rn.rrect(ctx, 540, y - 5, 160, 10, 5); ctx.stroke();
         ctx.fillStyle = P.SELECT; ctx.beginPath(); ctx.arc(540 + sg[k] / 10 * 160, y, 8, 0, TAU); ctx.fill(); ctx.stroke();
-        UI.text(ctx, SLIDER_NUM[sg[k]], 716, y, F.mono12, P.PAPER_DIM, 'left', 'middle');
+        UI.text(ctx, SLIDER_NUM[sg[k]], 724, y, F.mono12, P.PAPER_DIM, 'right', 'middle');   // right-aligned inside the panel edge (728): "10" never touches the stroke
       } else if (k) {   // toggle pill 56×22 right-aligned to x 700
         const v = !!sg[k];
         ctx.fillStyle = v ? P.SELECT : TROUGH; Rn.rrect(ctx, 644, y - 11, 56, 22, 11); ctx.fill();
@@ -1112,7 +1138,7 @@
     else if (game.screen === 'select') drawSelect(ctx, game);
     else if (game.screen === 'gameover') drawGameOver(ctx, game);
     else if (game.screen === 'victory') drawVictory(ctx, game);
-    if (game.overlay === 'pause') drawPause(ctx);
+    if (game.overlay === 'pause') drawPause(ctx, game);
     else if (game.overlay === 'map') drawMap(ctx, game);
     else if (game.overlay === 'settings') drawSettings(ctx, game);
     else if (game.overlay === 'shop') drawShop(ctx, game);

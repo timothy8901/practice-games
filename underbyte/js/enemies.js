@@ -841,13 +841,15 @@
         e.kbResist = 0; e.timer++;
         if (e.timer <= 18) e.vx = 0;
         else if (e.timer <= 32) {
-          e.vx = e.facing * 4;
+          // the lunge stops at a ledge edge or the patrol bound like the walk does (DESIGN §7.0): a bash lured at the end
+          // of the stretch never carries the walker off its floor
+          e.vx = ledge(e, game.level, e.facing) || bound(e, e.facing) ? 0 : e.facing * 4;
           E.hitBoxWorld(e, 19, 0, 8, 36, e.hit); e.hit.facing = e.facing; game.registerHit(e.hit);
         } else { e.vx = 0; if (e.timer >= 56) { e.state = 'walk'; e.dir = e.facing; } }
         break;
       case 'stagger':
         e.kbResist = 0.5; e.timer++;
-        e.vx = e.timer <= 6 ? -e.facing * 4 : 0;
+        e.vx = e.timer <= 6 && !ledge(e, game.level, -e.facing) ? -e.facing * 4 : 0;   // the guard-break shove never tips it off a ledge
         if (e.timer >= 30) { e.state = 'open'; e.timer = 0; }
         break;
       case 'open':

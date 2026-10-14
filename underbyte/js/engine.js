@@ -164,10 +164,14 @@
     const f = UB.Characters.DATA[s.fighter];
     return (f ? f.name.toUpperCase() : s.fighter) + ' · ' + (zone ? zone.name : '?') + ' · ' + s.maxHearts + ' hearts · ' + U.fmtTime(s.playTimeFrames || 0);
   };
-  /** Start a new run with a fighter (from the select screen or UB.debug). */
-  Game.prototype.newGame = function (fighterId) {
+  /**
+   * Start a new run with a fighter (from the select screen or UB.debug). fromMenu: the title's NEW GAME path — a
+   * saved run was overwritten ("Overwrite the saved run?" → YES), so its slot is erased now, never outliving the answer.
+   */
+  Game.prototype.newGame = function (fighterId, fromMenu) {
     if (this.busy) return;
     const self = this;
+    if (fromMenu && this.savedData) this.eraseSlot();
     this.busy = true;
     this.save = this.newSaveData(fighterId);
     this.lastFighter = this.save.fighter;
@@ -236,6 +240,9 @@
   Game.prototype.victory = function () {
     const self = this;
     this.save.victory = true;
+    // DESIGN §12.16: the cleared run resumes at Last Light (rw_rest) for free play, whichever node was used last
+    const rest = Wd.rooms.rw_rest, node = rest && rest.nodes && rest.nodes[0];
+    if (node) { this.save.roomId = rest.id; this.save.spawn.nodeId = node.id; }
     this.writeSave();
     this.busy = true;
     this.fadeTo(1, 60, function () {
@@ -368,10 +375,17 @@
     this.savedData = this.readSave();
     return true;
   };
-  Game.prototype.resetSave = function () {
+  /** Remove the save slot (no toast). */
+  Game.prototype.eraseSlot = function () {
     try { localStorage.removeItem(SAVE_KEY); } catch (e) { /* ignore */ }
     this.savedData = null;
+  };
+  /** Settings → RESET SAVE → YES. Returns false (no toast, nothing erased) when there is no saved run. */
+  Game.prototype.resetSave = function () {
+    if (!this.hasSave()) return false;
+    this.eraseSlot();
     UI.toast('SAVE ERASED', '', 90);
+    return true;
   };
   Game.prototype.loadSettings = function () {
     let d = null;
@@ -725,7 +739,11 @@
     const a = e.pullBy;
     if (e.hitstun <= 0 || a.dead || a !== this.player) { e.pullBy = null; return; }
     const min = a.w / 2 + e.w / 2 + 1;
-    if ((e.x - a.x) * e.pullSide < min) { e.x = a.x + e.pullSide * min; if (e.vx * e.pullSide < 0) e.vx = 0; }
+    if ((e.x - a.x) * e.pullSide < min) {
+      const nx = a.x + e.pullSide * min;
+      if (e.collideTiles && E.overlapsSolid(this.level, nx - e.w / 2, e.y - e.h, e.w, e.h)) return;   // never into a wall
+      e.x = nx; if (e.vx * e.pullSide < 0) e.vx = 0;
+    }
   };
   Game.prototype.killEnemy = function (e, h) {
     e.dead = true;
@@ -1524,7 +1542,7 @@
     };
     d.save = function () { return game.writeSave(); };
     d.load = function () { return d.continueGame(); };
-    d.reset = function () { game.resetSave(); };
+    d.reset = function () { if (!game.resetSave()) game.eraseSlot(); };   // always clears the slot (a stale one the title never read too)
     d.audio = function () { return Au.state(); };
     d.mute = function () { Au.mute(); };
     d.rooms = function () {
