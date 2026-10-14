@@ -295,7 +295,7 @@
         ctx.fillStyle = WHITE; ctx.globalAlpha = 0.6; ctx.beginPath(); ctx.arc(-2, -2, 1.5, 0, TAU); ctx.fill();
       } },
     /** Acid puddle hazard: stationary, multi-tick (the player's i-frames pace it), unblockable. */
-    puddle: { w: 30, h: 6, grav: 0, life: 90, tiles: 'none', destructible: false, multi: true, dmg: 1, flags: 1,
+    puddle: { w: 30, h: 6, grav: 0, life: 90, tiles: 'none', destructible: false, multi: true, dmg: 1, flags: 1, noKbx: true,
       draw: function (ctx, s, x, y) {
         const k = s.life < 20 ? s.life / 20 : 1;
         ctx.globalAlpha = 0.9 * k; ctx.strokeStyle = INK; ctx.lineWidth = 2; ctx.fillStyle = s.col;
@@ -327,7 +327,7 @@
     s.col = color || WHITE; s.col2 = WHITE; s.src = null; s.acid = false; s.puddleW = 30; s.puddleLife = 90;
     s.destructible = !!k.destructible; s.collideTiles = k.tiles !== 'none'; s.ignoreOneWay = !!k.ignoreOneWay;
     s.bounces = 0; s.stuck = false; s.ang = 0; s.n = 0; s.tx = 0; s.ty = 0; s.flash = 0; s.grav = -1; s.noHit = false;
-    const h2 = E.makeHit('enemy'); h2.dmg = k.dmg; h2.multi = !!k.multi; h2.flags = k.flags; h2.kind = 'projectile';
+    const h2 = E.makeHit('enemy'); h2.dmg = k.dmg; h2.multi = !!k.multi; h2.flags = k.flags; h2.kind = 'projectile'; h2.noKbx = !!k.noKbx;
     h2.src = s; h2.onHit = k.onHit || null; h2.hitstop = 0; h2.kbx = 240; h2.kby = -300; h2.tag = kind;
     s.hit = h2;
     s.update = shotUpdate; s.draw = shotDraw;
@@ -435,6 +435,19 @@
     e.update = hopUpdate; e.draw = hopDraw;
     return e;
   }
+  /** Footing under a hop's landing spot along `dir` at the hopper's floor row (or a lower floor within 4 rows). */
+  function hopFooting(e, level, dir) {
+    if (!e.onGround) return true;
+    const air = 2 * Math.abs(e.hopVy) / Math.max(0.01, e.g), reach = air * e.hopVx;
+    const row = Math.floor((e.y + 1) / TILE);
+    if (e.ground) return true;   // riding a mover: the mover decides
+    const lx = e.x + dir * (reach + e.w / 2);
+    const col = Math.floor(lx / TILE);
+    if (footingAt(level, col, row)) return true;
+    // a lower floor further along is fine too (it lands somewhere): scan down 4 rows at the landing column
+    for (let r = row + 1; r <= row + 4; r++) if (footingAt(level, col, r)) return true;
+    return false;
+  }
   function hopUpdate(game, player) {
     const e = this; e.t++;
     if (hurtTick(e, game, true, e.g, 12)) { if (e.state === 'hop' || e.state === 'crouch') { e.state = 'idle'; e.timer = 0; } return; }
@@ -449,6 +462,9 @@
         if (++e.timer >= 12) {
           let dir = near ? (dx < 0 ? -1 : 1) : -e.dir;
           if (e.hasPatrol) { if (dir < 0 && e.x - 36 < e.p0) dir = 1; else if (dir > 0 && e.x + 36 > e.p1) dir = -1; }
+          // never hop onto nothing: the landing column (a full hop ≈ 2·|vy|/g frames × vx) needs footing at
+          // this floor row or the hopper turns round; an exit opening in the floor counts as a ledge
+          if (!hopFooting(e, game.level, dir)) { dir = -dir; if (!hopFooting(e, game.level, dir)) { e.state = 'idle'; e.timer = 0; break; } }
           e.dir = dir; e.facing = dir; e.vx = dir * e.hopVx; e.vy = e.hopVy; e.state = 'hop'; e.timer = 0;
         }
         break;
@@ -798,7 +814,8 @@
         return r;
       }
       e.blockFlash = 6;
-      if (game.player) game.player.vx = -e.facing * 180;   // pushed back ~3 px/f, friction decays it
+      // pushed back AWAY from the shield (e.facing points at the attacker) ~3 px/f, friction decays it (DESIGN §7.7)
+      if (game.player && hit.src === game.player) game.player.vx = e.facing * 180;
       Au.sfx('whiff', e.x);
       return blocked();
     }
@@ -990,7 +1007,8 @@
     const z = e.zone;
     e.cBody = z.tileEdge || DEBUG_PAL.tileEdge; e.cEyes = z.accent || DEBUG_PAL.accent; e.cClaws = z.tileFill || DEBUG_PAL.tileFill; e.accent = e.cEyes;
     e.dropG = d.dropG; e.scuttle = d.scuttle; e.climb = d.climb;
-    e.state = 'cling'; e.ignoreOneWay = true; e.climbed = 0; e.side = false; e.clingY = e.y; e.prev = 'cling';
+    // one-way grates are footing for the drop (DESIGN §7.9 "until it lands on footing", §7.0); only the CLIMB rises through them
+    e.state = 'cling'; e.ignoreOneWay = false; e.climbed = 0; e.side = false; e.clingY = e.y; e.prev = 'cling';
     const r = e.rig = [];
     e.thread = shape('line', e.cClaws); e.thread.lw = 1.5; e.thread.on = false; r.push(e.thread);
     const tip = shape('poly', e.cBody); tip.pts = [-9, -3, 0, -13, 9, -3]; r.push(tip);
@@ -1005,7 +1023,7 @@
     e.update = latchUpdate; e.draw = latchDraw; e.takeHit = latchTakeHit;
     return e;
   }
-  function latchDrop(e) { e.state = 'drop'; e.timer = 0; e.contact = 2; e.vx = 0; e.vy = 0; e.clingY = e.y; }
+  function latchDrop(e) { e.state = 'drop'; e.timer = 0; e.contact = 2; e.vx = 0; e.vy = 0; e.clingY = e.y; e.ignoreOneWay = false; }
   function latchTakeHit(hit, game) {
     const r = applyDamage(this, hit, hit.dmg);
     if (this.state === 'cling' || this.state === 'alert') latchDrop(this);
@@ -1046,14 +1064,20 @@
         if (ledge(e, game.level, e.dir)) { e.dir = -e.dir; e.facing = e.dir; e.vx = e.dir * e.scuttle; }
         e.gravity(e.dropG, 12); e.moveAndCollide(game.level);
         if (e.hitWall === e.dir) { e.dir = -e.dir; e.facing = e.dir; }
-        if (++e.timer >= 120) { e.state = 'climb'; e.timer = 0; e.climbed = 0; e.side = false; }
+        if (++e.timer >= 120) { e.state = 'climb'; e.timer = 0; e.climbed = 0; e.side = false; e.ignoreOneWay = true; }
         break;
-      case 'climb':
+      case 'climb': {
         if (!e.side) { e.vx = 0; e.vy = -e.climb; e.climbed += e.climb; if (e.climbed > 600) e.side = true; }
         else { e.vx = e.facing * e.climb; e.vy = 0; }
         e.moveAndCollide(game.level);
-        if (e.hitCeiling || (e.side && e.hitWall)) { e.state = 'cling'; e.vx = 0; e.vy = 0; e.contact = 1; }
+        // the room's edges count as walls/ceiling: the side-walk must never leave through an exit opening
+        const lv = game.level, hw = e.w / 2;
+        let edge = false;
+        if (e.x - hw <= 0) { e.x = hw; edge = true; } else if (e.x + hw >= lv.w * TILE) { e.x = lv.w * TILE - hw; edge = true; }
+        if (e.y - e.h <= 0) { e.y = e.h; edge = true; }
+        if (e.hitCeiling || (e.side && e.hitWall) || edge) { e.state = 'cling'; e.vx = 0; e.vy = 0; e.contact = 1; e.ignoreOneWay = false; }
         break;
+      }
     }
   }
   function latchDraw(ctx, game, alpha) {
@@ -1156,7 +1180,10 @@
       const b = this.parent;
       if (!b || !b.active || b.dead || !b.hurtBy) return blocked();
       if (!hit.multi) { if (hit.hitList.indexOf(b) >= 0) return blocked(); hit.hitList.push(b); }
-      const r = b.hurtBy(hit, game, 1);
+      // DESIGN §8.3: a hit box that reaches the head is a head hit (×1.5) even when it also covers a trailing segment —
+      // the engine resolves enemies (these proxies) before the boss, so the segment must forward the head's multiplier
+      const onHead = b.dmgMult && U.aabb(hit.x, hit.y, hit.w, hit.h, b.x - b.w / 2, b.y - b.h, b.w, b.h);
+      const r = b.hurtBy(hit, game, onHead ? b.dmgMult(hit) : 1);
       res.dmg = r.dmg; res.blocked = r.blocked; res.killed = false;
       if (!r.blocked) this.flash = 4;
       if (b.hp <= 0 && game.bossFight && game.bossFight.state === 'fight' && typeof game.startBossDeath === 'function') game.startBossDeath();

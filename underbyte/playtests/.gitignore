@@ -1,0 +1,9 @@
+# Transient files a play session writes while it runs; only session.json, save.json,
+# the reports and the converted recordings are kept.
+sessions/*/shots/
+sessions/*/raw/
+sessions/*/server.json
+sessions/*/server.log
+sessions/*/server-error.txt
+sessions/*/select.txt
+sessions/_triage/

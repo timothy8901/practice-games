@@ -290,6 +290,7 @@
       hitstop: 0,                 // world hitstop frames on connect
       hitList: [],                // victims already hit by this move instance
       multi: false,               // true = may hit the same victim every frame (multi-tick)
+      noKbx: false,               // true = the victim's knockback is straight up, (0, kby) — DESIGN §3.3 acid puddles / stuck needles
       src: null,                  // the attacking entity (for pan/particles), may be null
       tag: '',                    // free label ('light1', 'slam', ...) for SFX/FX choice
       kind: 'light',              // 'light'|'heavy'|'special'|'ultimate'|'air'|'down'|'projectile'|'contact'

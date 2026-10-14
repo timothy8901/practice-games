@@ -90,6 +90,78 @@ Every item names the section it changes. Nothing was removed; signatures were on
 8. **Tests**: `test/playthrough.cjs` is the end-to-end proof (title → victory); `test/run-all.cjs` runs every
    suite sequentially (the timing checks need an idle machine).
 
+## Changes since v3 (v4 — QA round 1; everything additive)
+
+1. **§4.2 `UB.Input.clearBuffers()`** — drops every pending gameplay buffer + press edge; the engine calls it when an
+   overlay opens or closes so a menu confirm (Z/J, Space, pad A, Up/W) never fires jump/light when play resumes.
+2. **§4.3 `UB.World.background(zone, scale)`** paints the three layers at the canvas backing scale (only the two most
+   recent zone/scale sets stay cached); **`UB.World.hideProp(level, tag)`** marks a tagged composite prop
+   (`rw_throne` `'throne'` / `'canopy'`) hidden for the visit (`level.hiddenProps`) and returns its tile rect.
+3. **§4.7 Render**: `UB.Render.setScale(s)` (the engine's `setDpr` calls it; every full-screen cache — parallax layers,
+   fog hole, vignette — is rebuilt at that scale and blitted 1:1, so a DPR-2 frame costs the pixel count);
+   `UB.Render.drawAmbient(ctx, zone, level, frame, camX, camY)` is the DESIGN §11.1.6 ambient layer, drawn between the
+   background and the tiles. `setDpr` accepts fractional backing scales (main.js: `dpr × CSS upscale`, quantised to
+   1 / 1.5 / 2, so a 1920×1080 window on a dpr-1 display renders at 1920×1080).
+4. **§5 player**: `contactImmune` (set per frame by a special whose body is meant to collide with its victim —
+   Brackmaw's dive + burst, Korvask's press + slam; cleared by `endMove/place/respawn`); `place()`/`respawn()` clear
+   `jumpCutAvail` (a chute launch is not a jump); `pogo(game, victim)` lifts the body onto the victim's top; coyote /
+   wall-coyote counters tick after the jump check (6 f / 5 f after the let-go frame); a special's press frame is its f1
+   (the program's `tick` runs on the press frame).
+5. **§7 contact**: the engine applies enemy/boss body contact only when `!pl.pogoActive && !pl.contactImmune`.
+   `game.spawnProjectile` never lists the same object twice (a pooled projectile re-spawned before the end-of-tick
+   sweep). Hitstop > 5 f on a landed hit or a hurt sets a 1-frame 2 % impact zoom (`game.impactZoom(x, y)`).
+6. **§8 engine API**: `game.triggerHazard(kind, rx, ry)` (a module-owned hazard: the §3.3 freeze/respawn with
+   (rx, ry) as the respawn — Corrosant's Flood), `game.hideProp(tag, quiet)` (hides the prop, repaints the cache, chips unless `quiet`; `loadRoom` hides the throne quietly in the cleared final arena),
+   `game.roomSong()` / `game.playRoomMusic()` (the zone song, or none in a cleared final arena), `game.crushed(pl)`
+   (a mover pressed the body into solid tiles → hazard `'crush'`). `game.hazardRespawn` is `{x, y, vy, iframes,
+   pending}`: the arrival placement including a chute launch; after a chute arrival the first solid footing inside
+   the room replaces it. `game.zoom {x, y, t}`.
+7. **§8 boss flow**: `startBossDeath` pops every enemy-owned projectile, records the boss in `bossesDefeated` and
+   writes the save; `loadRoom` re-spawns the ability module at `boss.pickup` when a recorded boss's ability is still
+   missing (died during the reward, quit). `respawnAtNode` restarts the room music and the duck.
+8. **§8 overlays**: `closeOverlay()` re-enters the base screen (`UI.enter(screen)`) when the last overlay closes
+   (the title cursor is valid again after SETTINGS). `loadSettings` validates every key (type + range) like the save.
+9. **§6.2 bosses**: `arenaOf` scans the six air rows above the spawn column's floor (fliers/crawlers get the full
+   arena); enrage tell cuts floor at 20 f (`tellOf(b, n)`); Corrosant's Flood goes through `game.triggerHazard`
+   (respawn on the nearest grate of the lowest grate row); Kernauth's phase change calls `game.hideProp('throne')`.
+10. **§6.1 enemies**: a hopper only hops where its landing column has footing (an exit opening in the floor is a
+    ledge); the engine drops an enemy that falls more than 128 px below the room (no drops, no purge count).
+11. **§8.1 UI**: banner line 2 wraps to a second line when it is wider than 440 px at 12 px MONO; the map has a room
+    cursor (arrows/d-pad, key-repeat; the view follows; Confirm/`R` recentre) with the §15.11 bestiary line in the
+    footer; a SOLD shop row only denies; the select screen runs the §12.10 pose showcase
+    (`UB.Characters.drawPreview(ctx, id, x, y, scale, t, showcase)`).
+12. **World data**: `dc_sentinel` grates at row 12; `lw_rest`/`ns_rest` hatch grates in the floor line (row 15);
+    `rw_gate` arrival grate at row 4; `lw_hoist` bottom-left bank is pool; `bv_catwalk` trough grate (row 31, x16–18);
+    Rootwell variants placed in `rw_gate` (rootbound scuttlebit, rootwisp). DESIGN §6 blocks updated in step.
+
+## Changes since v4 (v5 — QA round 2; everything additive)
+
+1. **§7 hit descriptor `noKbx`** (default false): the victim's knockback is `(0, kby)` — set by the acid puddle shot
+   (enemies.js) and Weftyr's stuck needle (bosses.js); `player.hurt` reads it from `opts.hit` (DESIGN §3.3).
+2. **§5 player**: `canStartSpecial()` (energy for the special/ultimate cost + the program's `refuses(pl)` hook — Tessik's
+   second Pulse Line); a light's hit-cancel into Special only fires when it would start, otherwise the press is the
+   deny (sfx, bar flash, 10 f lockout) and the light runs on (DESIGN §3.7). A light/heavy pressed while clinging starts
+   nothing and stays buffered (DESIGN §3.5). Orrubel's `sp.ringOut` follows `ring.dead` every frame, so an engine cull /
+   eviction of the ring never locks the heavy.
+3. **§6.1 droplatch**: `ignoreOneWay` only during CLIMB — the DROP lands on the first `#`/`-`/`c` below; the side-walk
+   treats the room's edges as walls. **Corrosant segment proxies** forward the head multiplier when the hit box also
+   reaches the head's box (DESIGN §8.3). **`bossHurtBy`** returns dmg 0 for a 0-damage hit (the Overclock shove).
+4. **§6.2 bosses**: Kernauth's phase-1 ×1 zone is the 150×60 core band (DESIGN §8.4); Dive Bomb's shock is 120×30 and
+   both shocks are registered on the landing frame; Weftyr's Snare Line lies at knee height (`A.floorY − 14`) and snaps on
+   its first catch (`onHit: popSelf`), its Thread Dash snaps onto the telegraphed `lineY` as the pass begins; Tallock's
+   Slab Swing is 70×40 sweeping its top edge from 90 to 40 px above the floor.
+5. **§8 engine**: `game.tileOccupied(tx, ty)` — a vanished crumble tile returns only when no enemy/boss overlaps it
+   (retried every 6 f); `render` paints a fade in flight UNDER an open overlay (pause/map during the hazard fade stays
+   readable) and over everything otherwise.
+6. **§8.1 UI**: `UI.tick` freezes the toast/banner/card timers while `game.screen === 'play' && game.overlay`;
+   `drawScreen` draws the toast on every non-play screen and bottom toasts above an overlay (`drawHUD` draws the rest);
+   `UI.hudAlpha` dims the hearts/energy/meter block to 0.35 while the fighter's body is behind it (DESIGN §12.1); the map
+   footer's bestiary line wraps at a ` · ` into `UI.mapBestiary2` when wider than the free span; the title tagline is
+   18 px MONO.
+7. **World data (DESIGN §10.6 F8–F10)**: `ns_climb` shaft-1 doorway (x26–27, rows 67–69), slot doorway (x7–8, rows 24–26)
+   + exit hole (x4–6, rows 16–17), shaft-3 floor hole (x42–43, rows 17–18); `dc_loft.B` chute at cols 5–7 (spawn (6,17));
+   `bv_cistern` row-8 grate x46–51.
+
 ## 0. Ground rules (from `BRIEF.md`, non-negotiable)
 
 * 100 % original content. No franchise names, designs, terms or lookalikes anywhere (code,
@@ -238,7 +310,8 @@ easeInQuad easeOutQuad easeInOutQuad easeOutBack` · `rng(seed) → fn()` (mulbe
   logic frame; `buffer` counts down from 6 for `jump, light, heavy, special, dash, overclock`
   and does not tick while `freezeBuffers` (hitstop). Gameplay code uses `state[a].buffer > 0`
   for buffered actions and must call `consume(action)` when it acts on one.
-* `update()` — engine only, once per tick. `consume(action)`, `buffered(action)`,
+* `update()` — engine only, once per tick. `consume(action)`, `buffered(action)`, `clearBuffers()` (every gameplay
+  buffer + press edge dropped; the engine calls it when an overlay opens/closes),
   `repeat(action)` (menu key-repeat 18 f then every 8 f), `press(action, frames)` (virtual hold —
   tests), `releaseAll()`, `bind(action, codes[])`, `resetBindings()`, `bindings`, `glyph(action)` (HUD
   key label), `device` (`'keyboard'|'gamepad'|'touch'`), `anyPressed` (any key/button edge this
@@ -386,8 +459,9 @@ Every method must be safe with no AudioContext (headless tests never gesture). N
 `loop('wallSlide', false)` when it stops (calling `false` every non-sliding frame is fine).
 
 ### 4.7 `UB.Render` (render.js) — ENGINE
-`rrect(ctx,x,y,w,h,r)` `makeCanvas(w,h)` · `buildBackground(zone)` / `drawBackground(ctx, zone,
-camX, camY)` · `buildTileCache(level, dpr)` / `redrawTiles(level, tx0,ty0,tx1,ty1)` /
+`rrect(ctx,x,y,w,h,r)` `makeCanvas(w,h)` · `setScale(s)` (backing scale; rebuilds the scale-bound caches) ·
+`buildBackground(zone)` / `drawBackground(ctx, zone, camX, camY)` · `drawAmbient(ctx, zone, level, frame, camX, camY)`
+(DESIGN §11.1.6, ≤ 60 primitives, stateless) · `buildTileCache(level, dpr)` / `redrawTiles(level, tx0,ty0,tx1,ty1)` /
 `drawTileCache(ctx, level, camX, camY)` / `drawDynamicTiles(ctx, level, frame, camX, camY)` ·
 `drawPlatform(ctx, p, zone, alpha)` `drawNode(ctx, x, y, zone, used, t, pulse)`
 `drawVendor(ctx, x, y, zone, t, lookX)` (Scrivvet at feet x,y; eye tracks `lookX`) ·
@@ -415,7 +489,8 @@ UB.Characters.RULES                             // DESIGN §3.12 numbers (option
 | `locked` | engine sets true = ignore all input (boss intro, pickup sequence, transition settle); physics still runs |
 | `dead, deathTimer` | set by `die()`; `deathTimer` counts up in `update`; engine shows game over at 60 |
 | `iframes, hurtTimer, flash` | i-frames (60 after a hit; engine sets 45 after a hazard respawn, 20 chute; a boss phase change sets 180) |
-| `pogoActive` | true on active down-strike frames (engine then ignores floor-spike contact) |
+| `pogoActive` | true on active down-strike frames and the pogo tick (engine then ignores floor-spike contact and enemy/boss body contact) |
+| `contactImmune` | set per frame by a special whose body is meant to collide with its victim (Brackmaw's dive + burst, Korvask's press + slam): the engine skips enemy/boss body contact; cleared by `endMove`/`place`/`respawn` |
 | `facing, onGround, clinging, wallDir` | camera uses `facing`/`clinging`/`wallDir` |
 
 **Hooks the engine calls:**
@@ -508,9 +583,11 @@ boss's own: return `blocked:true` while invulnerable.
 
 ```
 hit = { owner:'player'|'enemy'|'boss', x, y, w, h /*world top-left box*/, dmg, kbx, kby /*px/s*/, facing,
-        hitstop, hitList:[], multi:false, src, tag, kind:'light'|'heavy'|'special'|'ultimate'|'air'|'down'|'projectile'|'contact',
+        hitstop, hitList:[], multi:false, noKbx:false /*victim knockback straight up — puddles, stuck needles (DESIGN §3.3)*/,
+        src, tag, kind:'light'|'heavy'|'special'|'ultimate'|'air'|'down'|'projectile'|'contact',
         energy, meter /*player gains on connect*/, flags /*1 unblockable, 2 projectile*/, shake, shakeFrames, onHit(victim, result, game) }
 ```
+Body contact (enemy `contact` / boss `contact`) is skipped while `player.pogoActive` or `player.contactImmune`.
 Rules: register on every active frame; the engine resolves after all updates. A victim already
 in `hitList` is skipped unless `multi` (multi-tick moves such as beams and floor hazards). **`multi`
 hits never grow `hitList`** — they may connect every frame, so their victims' own i-frames (player:
@@ -539,7 +616,7 @@ are drawn. Popping an enemy projectile gives +2 meter and 4 sparks.
 | `game.frame`, `game.screenT`, `game.fps` | counters |
 | `game.save` (DESIGN §14 object), `game.settings` (§14.2), `game.hasSave()`, `game.saveSummary()`, `game.writeSave()`, `game.resetSave()`, `game.setSetting(key, value)` | save/settings |
 | `game.level`, `game.zone`, `game.player`, `game.enemies[]`, `game.boss`, `game.projectiles[]`, `game.pickups[]`, `game.cam {x,y,px,py}`, `game.hazardRespawn`, `game.bossFight {state,timer}`, `game.nearNode`, `game.nearVendor`, `game.prompt` (`null` or `{text:'REST'|'TRADE', x, y}`), `game.denyFlash`, `game.loreCard` (zone shown by the `lore` overlay) | world (read) |
-| `game.registerHit(hit)` · `game.spawnProjectile(obj)` · `game.spawnEnemy(type, tx, ty, opts)` · `game.spawnPickup(type, x, y, opts)` (`bit heart spark shard core ability`; opts `{size, placed, key, id, ability, bossId, glow, permanent, vx, vy}`) · `game.addBits(n)` `addEnergy(n)` `addMeter(n, fromHit)` · `game.grantAbility(id, on)` · `game.rng()` | gameplay |
+| `game.registerHit(hit)` · `game.spawnProjectile(obj)` · `game.spawnEnemy(type, tx, ty, opts)` · `game.spawnPickup(type, x, y, opts)` (`bit heart spark shard core ability`; opts `{size, placed, key, id, ability, bossId, glow, permanent, vx, vy}`) · `game.addBits(n)` `addEnergy(n)` `addMeter(n, fromHit)` · `game.grantAbility(id, on)` · `game.rng()` · `game.triggerHazard(kind, rx, ry)` (module-owned hazard → the §3.3 freeze + respawn at (rx, ry); false unless alive, mode normal, god off) · `game.hideProp(tag, quiet)` (hide a tagged composite prop for the visit) · `game.impactZoom(x, y)` | gameplay |
 | `game.buy(itemId) → 'bought'|'poor'|'sold'|'unknown'` · `game.hasDeepPing()` · `game.applyDeepPing()` · `UB.Engine.Game.VENDOR` (= `UB.IDS.vendorItems`) | vendor (UI) |
 | `game.toSelect()` `toTitle()` `newGame(fighterId)` `continueGame()` `openOverlay(name)` `closeOverlay()` `respawnAtNode()` `victory()` `victoryStats()` | flow (UI) |
 | `game.loadRoom(roomId, arrival)` `startTransition(exit)` `defeat flow…` `snapInterp()` | engine-internal; use `UB.debug` in tests |

@@ -184,7 +184,7 @@ Wall-jump numbers per fighter `(vx, vy)`: Tessik (275, −608), Brackmaw (220, �
 | Hazard | Effect |
 |---|---|
 | Floor spikes `^`, ceiling spikes `v`, pools `~` (acid in Brinevault, static elsewhere), crush by moving/crumbling geometry | **1 heart, ignores i-frames.** 6 f world hitstop, white flash; the fighter freezes in place flashing for **30 f** (the world keeps running, enemies cannot hurt the frozen fighter), then a 10 f fade and the player is placed at the **hazard respawn point** with **45 f** of i-frames, energy and meter unchanged. If HP reaches 0 it is a death instead (§3.2). |
-| Hazard respawn point | the **arrival spawn tile of the exit the player most recently entered this room through**; in the room where the run started or the last restore node was used, that start/node tile; Corrosant's Flood uses the nearest row-16 grate instead (§8.3). |
+| Hazard respawn point | the **arrival spawn tile of the exit the player most recently entered this room through**, placed exactly as that arrival was (a bottom-exit entry respawns with its chute auto-launch, so the respawn never drops straight back out of the room); in the room where the run started or the last restore node was used, that start/node tile; Corrosant's Flood uses the nearest row-16 grate instead (§8.3). Body contact is not applied on a pogo tick / active down-strike frame, nor while a special holds its victim against the body (Brackmaw's dive, Korvask's press). |
 | Pogo on floor spikes | allowed, no damage (§3.6). Ceiling spikes are not pogo-able. |
 | Acid puddles (Acid-valve globs, Corrosant's Acid Spit) and Weftyr's stuck needles | **1 heart**, normal knockback `(0, −300) * weight`, normal 60 i-frames, **no respawn-teleport** (i-frames protect against them). |
 | Static spark (Static-shot scuttlebit) | treated as enemy contact (1 heart, i-frames apply). |
@@ -247,7 +247,7 @@ Enemies flash white 4 f on hit. Non-boss enemies enter hitstun for `10 + hitstop
 | Gain per pickup | bit coin +1 (any size) · spark +10 · shard +15 · hidden core +25 |
 | During Overclock | no meter gain; meter drains linearly 100→0 over the duration (it is the timer) |
 | Activate | `Overclock` with meter = 100, while idle/run/jump/fall/cling only (not during attacks, dash, hurt, hazard freeze, transitions or boss intro) |
-| Transform | 20 f: f1–8 world hitstop + white flash alpha 0.6→0 + ring r0→120; f9–20 scale 1.0→1.25 and palette crossfade; invulnerable f1–20; enemies within 60 px pushed `(300 away, −200)` with 0 dmg |
+| Transform | 20 f: f1–8 world hitstop + white flash alpha 0.6→0 + ring r0→120; f9–20 scale 1.0→1.25 and palette crossfade; invulnerable f1–20; enemies within 60 px pushed `(300 away, −200)` with 0 dmg (a 0-damage hit is never rounded up by a boss's ×1.5 / ×0.5 multiplier) |
 | Duration | **12 s = 720 f** after the transform |
 | Damage | `floor(d * 1.5)`: 2→3, 3→4, 4→6, 5→7, 6→9, 7→10, 8→12, 9→13, 11→16, 12→18, 14→21, 16→24, 26→39, 32→48 |
 | Speed | run ×1.15 (Tessik 270, Brackmaw 207, Vellix 345, Orrubel 247, Korvask 230); dash distance ×1.15 (same frames: Tessik 207, Brackmaw 207, Vellix 242, Orrubel 207, Korvask 207); jump unchanged |
@@ -651,7 +651,7 @@ single-jump horizontal reach 150 px.
 
 | Move | S | A | R | Total | Hitbox | Dmg | KB | Hitstop | Lunge | Hit-cancel→next | Whiff-cancel→next | Jump-cancel (hit) | Energy | Meter |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| L1 Whip Flick | 5 | 3 | 9 | 17 | (44,−6,64,18) | 2 | (120,−30) | 3 world | 0 | f9 | f13 | f9 | +4 | +2 |
+| L1 Whip Flick | 5 | 3 | 9 | 17 | (44,−2,64,22) | 2 | (120,−30) | 3 world | 0 | f9 | f13 | f9 | +4 | +2 |
 | L2 Whip Cross | 5 | 3 | 9 | 17 | (46,0,68,22) | 3 | (140,−40) | 3 world | 0 | f9 | f13 | f9 | +4 | +2 |
 | L3 Double Lash | 7 | 4 | 13 | 24 | (50,−4,76,26) | 4 | (320,−120) | 4 world | 0 | f12 (jump/dash/special) · f18 (L1 re-chain) | none | f12 | +6 | +4 |
 | Heavy Ring Toss | 10 | proj | 14 | 24 | ring 20x20 | 7 out / 4 back | (260,−120) | 4 local | 0 | none | none | no | +5 per leg hit | +1 per hit |
@@ -663,7 +663,7 @@ Visuals: L1 = one antenna lash, L2 = the other antenna lash crossing the first, 
 antennae lash together with a double flash; Air = both antennae circle around the body
 front; Down-Strike = peg legs pointed down, rings compressed.
 
-**Heavy — Ring Toss (returning projectile).** On f11 the top ring launches from (14,−10):
+**Heavy — Ring Toss (returning projectile).** On f11 the top ring launches from (14,−2):
 box 20x20, speed 560 px/s along facing for 220 px (or until a wall), then flies straight back
 toward Orrubel's current body center at 560 px/s (re-aimed every frame) and despawns on
 contact with the body box (or after 50 f total). Each leg has its own hit-list: outbound 7
@@ -875,7 +875,7 @@ In `rw_throne` the `BBBB` blocks at rows 8–9 (x30–33) draw the hanging crown
 |---|---|---|
 | `#` | solid | Solid on all four sides. Wall-clingable once Grip Protocol is owned. |
 | `-` | one-way platform | Solid only from above (§3.0). Down + Jump drops through. Enemies treat it as solid from above. |
-| `c` | crumbling platform | Behaves like `#` until a player stands on it; then **shakes 20 f** (±2 px jitter), then **vanishes** (no collision, falling-fragment particles) for **180 f**, then returns with a 6 f fade-in. Each `c` tile has its own timer, but all `c` tiles touched on the same frame start together. Clingable while present. |
+| `c` | crumbling platform | Behaves like `#` until a player stands on it; then **shakes 20 f** (±2 px jitter), then **vanishes** (no collision, falling-fragment particles) for **180 f**, then returns with a 6 f fade-in (the return waits, 6 f at a time, while an enemy or the boss occupies the tile — a plank never closes onto one; a player in the gap is the §3.3 crush hazard). Each `c` tile has its own timer, but all `c` tiles touched on the same frame start together. Clingable while present. |
 | `^` | floor spike | Hazard (§3.3). Pogo-able. |
 | `v` | ceiling spike | Hazard (§3.3). Not pogo-able. |
 | `~` | hazard pool | Hazard (§3.3): acid in Brinevault, static elsewhere. Enemies, projectiles and moving platforms ignore pools. |
@@ -1052,7 +1052,7 @@ Tilemap fixes relative to `design/world.md` are listed in §10.6; everything els
 * **Zone:** Driftcache (`driftcache`) · **Size:** 32×18 tiles (960×540 px) · **Map grid:** gx 3.75, gy 1, 1×1 screens
 * **On entering:** A cramped attic of racks, warm and silent. A pedestal on the right holds a pulsing core; between you and it a bed of spikes under two crumbling planks and a dropper clinging to the ceiling.
 * **Exits** (id · edge · opening · → target.exit · ability expected · arrival spawn tile):
-  * `B` · bottom · cols 14–16 (y=17) · → `dc_cross.T` · **none** · spawn (15, 17)
+  * `B` · bottom · cols 5–7 (y=17) · → `dc_cross.T` · **none** · spawn (6, 17)
 * **Enemies** (type · tile x,y · behaviour note):
   * `droplatch` · (21,4) · stationary / own logic — drops when player is within 2 tiles horizontally
   * `spitvalve` · (29,8) · stationary / own logic — faces left
@@ -1077,9 +1077,9 @@ Tilemap fixes relative to `design/world.md` are listed in §10.6; everything els
 #...B....B.....................#
 #...B....B................###..#
 #...B....B........^^^^^^^.###..#
-##############...###############
-##############...###############
-##############...###############
+#####...########################
+#####...########################
+#####...########################
 ```
 
 ### 6.5 `dc_shrine` — Rackside Shrine
@@ -1141,8 +1141,8 @@ Tilemap fixes relative to `design/world.md` are listed in §10.6; everything els
 #...............................................
 #...............................................
 #.......................................########
-#.......----................----........########
-........................................########
+#.......................................########
+........----................----........########
 ......B...........................B.....########
 ......B...........................B.....########
 ################################################
@@ -1161,7 +1161,7 @@ Tilemap fixes relative to `design/world.md` are listed in §10.6; everything els
   * `driftmoth` · (16,13) · stationary / own logic
   * `driftmoth` · (9,27) · stationary / own logic
   * `droplatch` · (27,4) · stationary / own logic — hangs from the right ceiling block
-* **Hazards:** 7 ceiling-spike tiles, 18 hazard-pool tiles (static).
+* **Hazards:** 7 ceiling-spike tiles, 21 hazard-pool tiles (static). The bottom-left bank is pool too: the chute pillar is the only dry footing at the bottom besides the right bank (x27–30, which hoist H2 reaches at its lowest point).
 * **Moving platforms** (id · width · from (x,y) → to (x,y) · speed px/frame · end-wait frames; (x,y) = platform top-left tile; ping-pong; phase offset = index × 45 f):
   * `H1` · 3×1 · (11, 9) → (11, 20) · 1.0 · 40
   * `H2` · 3×1 · (19, 16) → (19, 28) · 1.0 · 40
@@ -1202,7 +1202,7 @@ Tilemap fixes relative to `design/world.md` are listed in §10.6; everything els
 #............#...#.............#
 #............#...#.............#
 #............#...#.............#
-####~~~~~~~~~#...#~~~~~~~~~#####
+#~~~~~~~~~~~~#...#~~~~~~~~~#####
 ##############...###############
 ##############...###############
 ```
@@ -1336,8 +1336,8 @@ Tilemap fixes relative to `design/world.md` are listed in §10.6; everything els
 #.........B....................#
 ..........B...........B.........
 ..........B...........B.........
-....---...B...........B.........
-####...#########################
+..........B...........B.........
+####---#########################
 ####...#########################
 ####...#########################
 ```
@@ -1442,7 +1442,7 @@ Tilemap fixes relative to `design/world.md` are listed in §10.6; everything els
 #..............................................................#
 #..............................................................#
 #...............B..............................................#
-#...............B.............................---..............#
+#...............B.............................------...........#
 #...............B..............................................#
 #.........................----.........B................########
 #......................................B................########
@@ -1483,8 +1483,8 @@ Tilemap fixes relative to `design/world.md` are listed in §10.6; everything els
   * `brinejelly` · (10,20) · stationary / own logic
   * `brinejelly` · (20,27) · stationary / own logic
   * `droplatch` · (18,13) · stationary / own logic
-  * `hopnode` (dripnode variant) · (25,32) · patrol x 23–30
-* **Hazards:** 11 ceiling-spike tiles, 21 hazard-pool tiles (acid).
+  * `hopnode` (dripnode variant) · (25,32) · patrol x 23–30 (hoppers never hop onto the `B` opening: a hop needs footing at its landing column)
+* **Hazards:** 11 ceiling-spike tiles, 21 hazard-pool tiles (acid). A one-way grate at row 31 (x16–18) stands in the acid trough so the large-bit pocket (x1–7) is left with an ordinary jump + Echo Jump.
 * **Bits placed (one-time, saved per tile):** (11,4) small (1), (13,4) small (1), (28,8) medium (5), (20,16) small (1), (26,20) small (1), (3,32) large (20)
 * **Tilemap** (32 cols × 36 rows; row 0 is the top; every row is exactly 32 characters):
 
@@ -1520,7 +1520,7 @@ Tilemap fixes relative to `design/world.md` are listed in §10.6; everything els
 #...........B..................#
 #...........B...........-----..#
 #...........B..........B.......#
-#......................B.......#
+#...............---....B.......#
 #......................B.......#
 ########~~~~~~~~~~~~~~~###...###
 ##########################...###
@@ -1657,7 +1657,7 @@ Tilemap fixes relative to `design/world.md` are listed in §10.6; everything els
 ### 6.18 `ns_climb` — The Null Spire
 
 * **Zone:** Nullspire (`nullspire`) · **Size:** 48×72 tiles (1440×2160 px) · **Map grid:** gx 19, gy 4.22, 1.5×4 screens
-* **On entering:** The hollow interior of an inverted spire, four screens tall. A black spine splits it: the left face is crumbling grates and a slow lift; the right face is three sheer shafts stacked over a pit of static. Wisps hunt in the dark. Both faces meet at a crown of one-way grates under a hole in the sky.
+* **On entering:** The empty interior of an inverted spire, four screens tall. A black spine splits it: the left face is crumbling grates and a slow lift; the right face is three sheer shafts stacked over a pit of static. Wisps hunt in the dark. Both faces meet at a crown of one-way grates under a hole in the sky.
 * **Exits** (id · edge · opening · → target.exit · ability expected · arrival spawn tile):
   * `L` · left · rows 67–69 (x=0) · → `ns_base.R` · **none** · spawn (2, 69)
   * `R` · right · rows 34–36 (x=47) · → `ns_plunge.L2` · **GRIP PROTOCOL** · spawn (45, 36)
@@ -1693,17 +1693,17 @@ Tilemap fixes relative to `design/world.md` are listed in §10.6; everything els
 #......##.............####..............##.....#
 #......##.............####..............##.....#
 #......##.............####..............##.....#
-#########.............####............^^##.....#
-#########.............####............##########
-#......##.............####............##########
+####...##.............####............^^##.....#
+####...##.............####............####..####
+#......##.............####............####..####
 #......##.............####.....................#
 #......##.............####.....................#
 #......##.............####................-----#
 #......##.............####.....................#
 #......##.............####.....................#
-#......##.............####.....................#
-#......##.............####..........ccc........#
-#......##.............####.....................#
+#.....................####.....................#
+#.....................####..........ccc........#
+#.....................####.....................#
 #########.............####.....................#
 #########.............####.....................#
 #.....................####................-----#
@@ -1744,9 +1744,9 @@ Tilemap fixes relative to `design/world.md` are listed in §10.6; everything els
 #.........................##....##.............#
 #.........................##....##.............#
 #...-----.................##....##.............#
-..........................##....##......##.....#
-..........................##....##......##.....#
-..........................##....##......##.....#
+................................##......##.....#
+................................##......##.....#
+................................##......##.....#
 ##################################~~~~~~~~~~~~##
 ################################################
 ```
@@ -1778,8 +1778,8 @@ Tilemap fixes relative to `design/world.md` are listed in §10.6; everything els
 #.........B....................#
 #.........B.........B...........
 #.........B.........B...........
-#...---...B.........B...........
-####...#########################
+#.........B.........B...........
+####---#########################
 ####...#########################
 ####...#########################
 ```
@@ -1863,7 +1863,7 @@ Tilemap fixes relative to `design/world.md` are listed in §10.6; everything els
 ### 6.21 `rw_gate` — Root Gate
 
 * **Zone:** Rootwell (`rootwell`) · **Size:** 48×18 tiles (1440×540 px) · **Map grid:** gx 21.1, gy 6.77, 1.5×1 screens
-* **On entering:** Crimson dark and gold filament. Great cable-roots thick as pillars hang from the ceiling. Every corrupted form of the kingdom stands guard here: plated walkers, a ram-beast, spitters on a pedestal and a hanging grate, a brood-cell by the wall.
+* **On entering:** Crimson dark and gold filament. Great cable-roots thick as pillars hang from the ceiling. Every corrupted form of the kingdom stands guard here: plated walkers, a ram-beast, spitters on a pedestal and a hanging grate, a brood-cell by the wall, a root-bound patroller under the pedestal and a wisp hunting the dark.
 * **Exits** (id · edge · opening · → target.exit · ability expected · arrival spawn tile):
   * `T` · top · cols 14–16 (y=0) · → `ns_plunge.B` · **none** · spawn (15, 1)
   * `R` · right · rows 12–14 (x=47) · → `rw_rest.L` · **none** · spawn (45, 14)
@@ -1875,7 +1875,9 @@ Tilemap fixes relative to `design/world.md` are listed in §10.6; everything els
   * `spitvalve` (twin valve variant) · (33,7) · stationary / own logic — faces right
   * `broodcell` · (3,14) · stationary / own logic — anchored by the left wall
   * `droplatch` · (40,2) · stationary / own logic
-* **Hazards:** none.
+  * `scuttlebit` (rootbound variant) · (23,14) · patrol x 19–27 — under the pedestal
+  * `glarewisp` (rootwisp variant) · (38,9) · stationary / own logic — hunts the right half
+* **Hazards:** none. The `T` arrival grate sits at row 4 (x12–18): the body clears the ceiling lip (rows 0–1), so the player walks off either end instead of having to drop through.
 * **Bits placed (one-time, saved per tile):** (14,2) small (1), (16,2) small (1), (23,10) medium (5), (33,7) medium (5), (44,14) large (20)
 * **Tilemap** (48 cols × 18 rows; row 0 is the top; every row is exactly 48 characters):
 
@@ -1883,8 +1885,8 @@ Tilemap fixes relative to `design/world.md` are listed in §10.6; everything els
 ##############...###############################
 ##############...###############################
 #.....B.....................B.............B....#
-#.....B.....-------.........B.............B....#
 #.....B.....................B.............B....#
+#.....B.....-------.........B.............B....#
 #.....B.....................B.............B....#
 #.....B...................................B....#
 #.........................................B....#
@@ -2057,7 +2059,7 @@ Tilemap fixes relative to `design/world.md` are listed in §10.6; everything els
 ### 7.9 DROPLATCH — ceiling dropper
 * **Zones:** Driftcache, Loomworks, Brinevault, Nullspire, Rootwell (universal; colours follow the zone's tile outline/accent).
 * **Size** 26×22 · **HP** 9 · **Contact** 1, **2** during `DROP` · **Bits** 3 · **Speed** drop gravity 0.6 px/frame², scuttle 1.6 px/frame, climb 2.0 px/frame.
-* **State machine:** `CLING` (hangs under a `#` tile, eyes closed; player's x within 2 tiles and below it → `ALERT`) · `ALERT` (18 frames: eyes open, body twitches ±2 px; tell) · `DROP` (falls with gravity 0.6 until it lands on footing; contact 2) · `SPLAT` (12 frames: squash 30×14, 4 dust particles) · `SCUTTLE` (120 frames: walks toward the player at 1.6, turning at ledges; contact 1) · `CLIMB` (rises straight up at 2.0 px/frame until its top touches a `#` tile, then → `CLING` there; if it rises 20 tiles without a ceiling it clings to the first `#` tile it touches from the side) · `HURT` (10) → previous state (a hit during CLING knocks it into `DROP` immediately).
+* **State machine:** `CLING` (hangs under a `#` tile, eyes closed; player's x within 2 tiles and below it → `ALERT`) · `ALERT` (18 frames: eyes open, body twitches ±2 px; tell) · `DROP` (falls with gravity 0.6 until it lands on footing — the first `#`, `-` or `c` under it, one-way grates included (§7.0); contact 2) · `SPLAT` (12 frames: squash 30×14, 4 dust particles) · `SCUTTLE` (120 frames: walks toward the player at 1.6, turning at ledges; contact 1) · `CLIMB` (rises straight up at 2.0 px/frame, passing up through one-way grates, until its top touches a `#` tile, then → `CLING` there; if it rises 20 tiles without a ceiling it clings to the first `#` tile it touches from the side; the room's edges count as walls, so it never walks out through an exit opening) · `HURT` (10) → previous state (a hit during CLING knocks it into `DROP` immediately).
 * **Attack tells:** the 18-frame twitch with open eyes.
 * **Visual:** a hanging teardrop (circle r 11 with a pointed top, drawn upside-down), a latch hook on top (small arc), two eyes (closed = lines, open = circles), three claws at the bottom (short lines). Colours body = zone tile outline, eyes = zone accent, claws = zone tile fill. ~13 ops.
 
@@ -2078,24 +2080,25 @@ Tilemap fixes relative to `design/world.md` are listed in §10.6; everything els
 * Boss HP bar: §12.6 (bottom centre, 600 px wide, 20-frame lag ghost). Bosses have **no i-frames**: every hit counts; bosses are never knocked back or interrupted (`kbResist` 0) and only flash white 4 f (§3.4). Boss attacks carry three flags consumed by §4: `damage` (1|2), `unblockable` (not caught by Korvask's Bulwark Catch) and `projectile` (caught = destroyed). Flags per attack are in the table of §8.5.
 * Damage reference: per-fighter numbers in §4 (lights 2–8, heavies 6–14, specials 6–16); Overclock multiplies by 1.5. The fight-length estimates assume Tessik landing ~1.6 light hits per second during punish windows and taking 0–3 hits total.
 * Boss contact damage (touching the body) is 1 heart unless an attack says otherwise. Boss projectiles and hazards obey the same 60 i-frames as enemies.
-* **Enrage** triggers once, when HP first drops to or below the listed threshold: 45-frame roar (boss invulnerable, `bossPhase` SFX, screen shake 9 px / 20 f, the HP bar takes its phase-2 colours, §12.6), palette shifts toward the zone accent, then the listed changes apply for the rest of the fight.
+* **Enrage** triggers once, when HP first drops to or below the listed threshold: 45-frame roar (boss invulnerable, `bossPhase` SFX, screen shake 9 px / 20 f, the HP bar takes its phase-2 colours, §12.6), palette shifts toward the zone accent, then the listed changes apply for the rest of the fight. **Fairness floor:** an enrage tell cut never takes a telegraph below **20 frames** (`max(20, tell − cut)`), so every attack keeps a readable warning.
+* When a boss dies its shots in flight pop at once (nothing of a dead boss can hurt the player during the death animation or the reward), the defeat is recorded in `bossesDefeated` and the save is written right away; if the module is never collected (the player dies during the reward or quits), the arena reloads empty with the module waiting at its pickup tile.
 * **Defeat:** boss HP ≤ 0 → 10-frame hitstop, `bossBurst` particles and shake 12 px / 40 f, the death animation listed, bits burst (§9.3: large coins + 3 sparks), `{NAME} PURGED` toast, then the ability module (drawn as the §11.3.7 core diamond in the zone `glow`) floats to the pickup tile and bobs (±4 px, 60-frame period) until touched. Touching it: 120-frame **pickup sequence** — the world keeps running but the player is invulnerable and locked; screen darkens to 40 %, the module orbits the player twice (r 40, 1 rev per 60 f), the ability banner of §12.7 slides in with the ability name, its control hint and flavour line, `ability` SFX chord; on f120 the ability is granted, the seal lifts (opening tiles return to `.`), the boss is recorded in `bossesDefeated`, and the save is written (the only save outside a restore node). Boss music crossfades to the zone song over 120 frames. Bosses never respawn.
 * Death animations and the pickup sequence are fully skippable after 30 frames with any key (the grant/save still happens).
 
 ### 8.1 TALLOCK — Warden of the Stack (boss 1, `dc_sentinel`)
-* **Arena:** `dc_sentinel`, fight bounds x 1–39, floor row 15, two grates at row 11 (x8–11, x28–31). Sealed exit: `L`. Pickup tile (20,14).
+* **Arena:** `dc_sentinel`, fight bounds x 1–39, floor row 15, two grates at row 12 (x8–11, x28–31; 90 px above the floor, reachable with every fighter's plain jump — Echo Jump is this fight's reward). Sealed exit: `L`. Pickup tile (20,14).
 * **HP 120** · **Size** 90×120 (hit-box) · **Phases:** 1 (+ enrage) · **Ground boss**, walks at 1.5 px/frame, cannot jump except in Stack Slam. Starts at x=25 tiles (centre), facing the player.
 * **Intro title card:** `TALLOCK` / `WARDEN OF THE STACK`.
 * **Pattern:** after each attack's recovery, `WALK` toward the player for 45 frames, then choose: player within 3 tiles → Slab Swing (60%) or Stomp Quake (40%); 3–6 tiles → Stomp Quake (50%) or Stack Slam (50%); > 6 tiles → Disc Toss (70%) or Stack Slam (30%). Never the same attack three times in a row.
 
 | Attack | Tell (frames) | Active | Damage | Recovery | Movement / how to punish |
 |---|---|---|---|---|---|
-| **Slab Swing** | 30: raises the near slab-arm, arm rim glows accent | 12: arc hit-box 70×60 in front, sweeping top→bottom | 1 | 40 | Stationary. Punish: step behind it during the swing (it does not turn for 40 frames) and hit the back; or down-strike its top disc from a grate. |
-| **Stomp Quake** | 36: rises 20 px onto its base disc's edge, dust ring | lands: two shockwaves (30×20 each) run left and right along the floor at 5 px/frame, lifetime 80 | 1 each | 50 | Stationary. Jump the wave (it is 20 px tall) or stand on a row-11 grate. Punish: 50 frames of recovery at melee range. |
+| **Slab Swing** | 30: raises the near slab-arm, arm rim glows accent | 12: arc hit-box 70×40 in front, sweeping top→bottom — its top edge runs from 90 px to 40 px above the floor over the 12 frames | 1 | 40 | Stationary. Dodge: a jump started mid-tell (≈ f10–18 of the 30) sails over the arc even with the back to a wall; a standing fighter is caught as it comes down. Punish: step behind it during the swing (it does not turn for 40 frames) and hit the back; or down-strike its top disc from a grate. |
+| **Stomp Quake** | 36: rises 20 px onto its base disc's edge, dust ring | lands: two shockwaves (30×20 each) run left and right along the floor at 5 px/frame, lifetime 80 | 1 each | 50 | Stationary. Jump the wave (it is 20 px tall) or stand on a row-12 grate. Punish: 50 frames of recovery at melee range. |
 | **Disc Toss** | 24: the top disc spins up (visible rotation, rising whir) | fires one disc 30×10 at 4.5 px/frame horizontal, vy −4, gravity 0.2; bounces once on the floor (vy ×−0.6), dies on the second contact or after 150 frames | 1 | 30 | Stationary. The disc can be destroyed by any attack. Punish: close in while the disc is in the air. |
 | **Stack Slam** | 40: crouches (height ×0.8), base disc glows | jumps to the player's x recorded at tell end: 50-frame arc (vy −11, gravity 0.44, vx set to arrive); landing shock 40×30 on each side for 10 frames | 2 (shock), 1 (body while airborne) | 60 | Big movement. Dodge: move 3+ tiles from the recorded x during the arc. Punish: the longest window — 60 frames while the stack wobbles; heavy attacks here. |
 
-* **Enrage at HP ≤ 36:** walk 2.2 px/frame, all tells −6 frames, Disc Toss fires two discs (second 15 frames later, vx ×0.8), Stomp Quake waves 6.5 px/frame, WALK gap 30 frames.
+* **Enrage at HP ≤ 36:** walk 2.2 px/frame, all tells −6 frames (Disc Toss stays at the 20 f floor), Disc Toss fires two discs (second 15 frames later, vx ×0.8), Stomp Quake waves 6.5 px/frame, WALK gap 30 frames.
 * **Reward:** death animation 90 frames — discs drop one by one from the top with a thud and a 4-px shake each, the base disc cracks open revealing the module. Module → pickup tile (20,14). Banner: `ECHO JUMP ACQUIRED` / `Press JUMP again in the air` / `A second thought, taken mid-fall.` `L` unseals (and `R2` was never sealed: it is simply unreachable without the ability).
 * **Visual:** a tower of six flat discs of decreasing width (ellipses 90, 84, 78, 72, 66, 60 wide × 18 tall, stacked with 2-px gaps so the stack visibly wobbles), two slab-arms (rects 16×50, hanging from the third disc, swinging with walk cycle), a single horizontal visor slit (rect 30×6) on the top disc that glows. Colours: discs `#2a3a5c`, disc rims `#6c86b8`, visor/glow `#8fd3ff`, arm slabs `#15213a`. Silhouette: tall tapering stack with two hanging bars; nothing round-bodied or humanoid. ~20 ops.
 * **Fair fight length:** ~65 s (120 HP; ~55% of the fight is punish windows).
@@ -2108,19 +2111,19 @@ Tilemap fixes relative to `design/world.md` are listed in §10.6; everything els
 
 | Attack | Tell | Active | Damage | Recovery | Movement / punish |
 |---|---|---|---|---|---|
-| **Thread Dash** | 30: parks at the left or right arena edge at the player's current y (clamped rows 4–13), a taut thread line is drawn across the arena at that y, flickering | crosses the arena at 12 px/frame (≈100 frames), hit-box 110×40 | 1 | 36: hovers at the far edge, drooping to y = row 12 | Dodge: change height (jump or drop) once the thread stops flickering (frame 30). Punish: it droops within melee reach at the far edge for 36 frames. |
-| **Snare Line** | 24: hovers at the arena centre, both blade-arms spread | lays a horizontal thread at y = row 12 top (8 px tall) across x 1–39 that persists 240 frames; contact = 1 | 1 | 20 | The line blocks ground movement across the arena: jump it or use the grates. Punish: it hovers low at centre for the 20-frame recovery and the following Thread Dash tell. |
+| **Thread Dash** | 30: parks at the left or right arena edge at the player's current y (clamped rows 4–13), a taut thread line is drawn across the arena at that y, flickering | crosses the arena at 12 px/frame (≈100 frames) exactly along the drawn line (the shuttle snaps onto it as the pass begins — a far start cannot always reach it during the tell), hit-box 110×40 | 1 | 36: hovers at the far edge, drooping to y = row 12 | Dodge: change height (jump or drop) once the thread stops flickering (frame 30). Punish: it droops within melee reach at the far edge for 36 frames. |
+| **Snare Line** | 24: hovers at the arena centre, both blade-arms spread | lays a horizontal trip-thread at knee height (8 px tall, its bottom 14 px above the floor — every standing fighter overlaps it, any jump clears it) across x 1–39 that persists up to 240 frames; contact = 1: the first fighter it catches takes 1 and the thread snaps | 1 | 20 | The line blocks ground movement across the arena: jump it or use the grates. Punish: it hovers low at centre for the 20-frame recovery and the following Thread Dash tell. |
 | **Needle Rain** | 40: rises to row 3 at centre, shudders; six needle silhouettes blink at random x (≥ 2 tiles apart) above the arena | six needles (8×24) fall at 7 px/frame from row 0 at the marked x; each sticks in the floor as a 1-tile hazard for 90 frames | 1 (falling or stuck) | 50: descends to row 11 at centre | Dodge: stand between marks. Punish: 50 frames at row 11 — reachable from the centre grate or with an air attack. |
 | **Spool Spin** | 30: a shadow ellipse appears on the floor at the player's x; the shuttle rotates to vertical | drops to the floor at that x and spins for 60 frames: hit-box 130×60, drifting toward the player at 2 px/frame | 1 | 60: lies on the floor, dizzy stars | Dodge: get 3+ tiles from the shadow or onto a grate. Punish: 60 frames on the floor = the best window; heavies and specials here. |
 
-* **Enrage at HP ≤ 54:** Thread Dash becomes a **double pass** (after 20 frames at the far edge it dashes back at the player's new y, re-telling for only 15 frames), Needle Rain throws nine needles, cruise 4.5 px/frame, tells −5 frames.
+* **Enrage at HP ≤ 54:** Thread Dash becomes a **double pass** (after 20 frames at the far edge it dashes back at the player's new y, re-telling for only 15 frames), Needle Rain throws nine needles, cruise 4.5 px/frame, tells −5 frames (Snare Line stays at the 20 f floor).
 * **Reward:** death animation 90 frames — the shuttle spins out of control, its thread unspools around the arena (drawn as loosening coils), then it drops and snaps in half. Banner: `BURST LINE ACQUIRED` / `Press DASH to lunge 6 tiles — on the ground or once in the air` / `Skip the frames you do not need.` `L` and `B` unseal.
 * **Visual:** a long pointed spindle (polygon 110×30: pointed both ends, thicker at the centre), a bobbin at the centre (three concentric ellipses with diagonal thread hatching), two curved blade-arms (arcs, stroke 4) that fold during Thread Dash and spread during Snare Line, a single red lens near the front, a trailing thread (line to its last 4 positions). Colours: body `#5a3519`, blades `#b8733a`, thread/bobbin `#ffb24a`, lens `#ff5a3a`. Silhouette: a horizontal needle with two wings. ~22 ops.
 * **Fair fight length:** ~95 s.
 
 ### 8.3 CORROSANT — Keeper of the Brine (boss 3, `bv_corrosant`)
 * **Arena:** `bv_corrosant`, fight bounds x 1–41, floor row 21 (24 tall arena), grates at row 16 (x8–13, 20–27, 34–39) and row 11 (x14–19, 28–33). Sealed exits: `L`, `B` (hatch tiles (42..44,21..23) become `#` as a brine crust). Pickup tile (22,20).
-* **HP 240** (shared by all segments) · **Size** head 50×40 + 7 body segments 30×30 following at 24-px spacing (total ≈ 260 px) · **Phases:** 1 (+ enrage with Flood) · **Surface crawler**: moves along the floor, walls and ceiling at 3.5 px/frame, head leading, body following the head's path. Hits on the head deal ×1.5 (rounded down, minimum +1); hits on segments ×1.
+* **HP 240** (shared by all segments) · **Size** head 50×40 + 7 body segments 30×30 following at 24-px spacing (total ≈ 260 px) · **Phases:** 1 (+ enrage with Flood) · **Surface crawler**: moves along the floor, walls and ceiling at 3.5 px/frame, head leading, body following the head's path. Hits on the head deal ×1.5 (rounded down, minimum +1) — any hit box that reaches the head's 50×40 box is a head hit, even where it also covers the trailing segment (segment 0 sits 24 px behind the head, inside its box); hits on segments alone ×1.
 * **Intro:** `CORROSANT` / `KEEPER OF THE BRINE`.
 * **Pattern:** chosen by where it is: on a wall → Wall Lunge (70%) or crawl to ceiling (30%); on the ceiling → Acid Spit (50%) or Ceiling Drip (50%); on the floor → Coil Sweep (100%), then crawl to a wall. Between attacks it `CRAWL`s 60–90 frames to the next surface position (telegraphed by direction).
 
@@ -2131,7 +2134,7 @@ Tilemap fixes relative to `design/world.md` are listed in §10.6; everything els
 | **Ceiling Drip** | 36: crawls to the player's x on the ceiling, body shudders; ten drip silhouettes blink below it across a 6-tile span | ten drips (6×12) fall at 6 px/frame, one every 6 frames, at random x in the span | 1 | 40: head droops 2 tiles down from the ceiling | Dodge: leave the 6-tile span. Punish: the drooping head reaches row 4 — hit it from a row-11 grate with jump attacks (×1.5). |
 | **Coil Sweep** | 40: drops to the floor at the arena's left or right end and coils (segments bunch up) | sweeps the floor to the other end at 5 px/frame, body hit-box 1 tile tall along its whole length | 1 | 50: lies stretched along the floor | Dodge: be on any row-16 grate. Punish: 50 frames with the whole body on the floor — down-strikes from the grate chain into ground combos. |
 
-* **Enrage at HP ≤ 72 — Flood:** roar 90 frames; then every 420 frames the arena's floor row (row 20, the tile row above the solid floor) becomes acid for 120 frames (drawn rising over 20 frames; hazard, −1 HP, respawn on the nearest row-16 grate instead of the exit). Tells −8 frames, crawl 4.5 px/frame, Acid Spit puddles last 240 frames.
+* **Enrage at HP ≤ 72 — Flood:** roar 90 frames; then every 420 frames the arena's floor row (row 20, the tile row above the solid floor) becomes acid for 120 frames (drawn rising over 20 frames; hazard, −1 HP ignoring i-frames, the §3.3 freeze, respawn on the nearest row-16 grate instead of the exit). Tells −8 frames (Acid Spit stays at the 20 f floor), crawl 4.5 px/frame, Acid Spit puddles last 240 frames.
 * **Reward:** death animation 120 frames — segments burst into bubbles from tail to head, the head sinks into a spreading puddle that dries into the module. Banner: `GRIP PROTOCOL ACQUIRED` / `Hold toward a wall in the air to cling · JUMP to kick off` / `The walls were never the problem.` `L` unseals; the brine crust over the hatch cracks (tiles (42..44,21..23) return to `.`).
 * **Visual:** a flat triangular head (polygon 50×40, point forward) with a wide underslung jaw (second polygon that hinges open), four small eye dots in a row, seven body segments (rounded squares 30×30, each with a dorsal fin triangle), drip particles from every third segment. Colours: head `#1d4d3a`, segments `#0d2a20`, fins/eyes `#a8ffcf`, acid/jaw interior `#4fae84`. Silhouette: a long segmented line ending in a wedge, hugging the room edges. ~24 ops.
 * **Fair fight length:** ~120 s.
@@ -2141,7 +2144,7 @@ Tilemap fixes relative to `design/world.md` are listed in §10.6; everything els
 * **Intro (phase 1):** `KERNAUTH` / `THE ROOT PROCESS`. **Phase 2 card (60 frames, during the transition):** `KERNAUTH` / `UNBOUND`.
 
 #### Phase 1 — Kernauth, Seated
-* **HP 200** · **Size** 150×180 seated mass, centre x = tile 32 (960 px), bottom on the floor; stationary. Weak point: the **chest core**, a 60×60 hit-box centred at (960, rows 14–15); hits elsewhere on the mass deal ×0.5.
+* **HP 200** · **Size** 150×180 seated mass, centre x = tile 32 (960 px), bottom on the floor (rows 15–20); stationary. Weak point: the **chest core**, drawn as a 60 px circle centred at (960, 510) — rows 16–17, 120 px above the feet, a third of the way down the mass. Any hit box that reaches the **core band** — the mass's full width at that height, 150×60 (y 480–540) — is a core hit (×1): a plain jump's apex puts every fighter's air box on it from outside the body, so no fighter has to trade contact damage for full damage. Hits elsewhere on the mass (grounded lights at its base, a pogo on the crown) deal ×0.5.
 * **Pattern:** every 50 frames of `IDLE` (cables sway, core pulses) pick: Cable Sweep (35%), Root Spikes (30%), Orbital Flare (20%), Summon (15%, only if < 4 motes alive). Never the same twice in a row.
 
 | Attack | Tell | Active | Damage | Recovery | Dodge / punish |
@@ -2159,12 +2162,12 @@ Tilemap fixes relative to `design/world.md` are listed in §10.6; everything els
 
 | Attack | Tell | Active | Damage | Recovery | Dodge / punish |
 |---|---|---|---|---|---|
-| **Dive Bomb** | 30: rises 1 tile, a dotted aim line to the player's current position (locked at tell end) | dives at 13 px/frame to that point; on reaching the floor or the point: impact shock 90×30 for 10 frames | 2 (shock), 1 (body) | 50: sits on the floor, crown dimmed | Move 3+ tiles from the lock point. Punish: 50 frames on the floor — the main damage window. |
+| **Dive Bomb** | 30: rises 1 tile, a dotted aim line to the player's current position (locked at tell end) | dives at 13 px/frame to that point; on reaching the floor or the point: impact shock 120×30 for 10 frames, registered on the landing frame itself (hits resolve before body contact, so a fighter at the impact takes the shock, not the 1-heart body touch) | 2 (shock), 1 (body) | 50: sits on the floor, crown dimmed | Move 3+ tiles from the lock point. Punish: 50 frames on the floor — the main damage window. |
 | **Static Beam** | 40: moves to the left or right wall at the player's y (locked at tell start, clamped rows 4–19), a thin guide line spans the arena | a beam 20 px tall across the full arena for 40 frames | 1 per contact (60 i-frames) | 40: drifts to row 8 | Change height (jump over / drop under). Punish: air attacks from the row-10 grate while it drifts at row 8. |
 | **Fragment Burst** | 24: crown spikes fold inward | eight fragments (10 px) in a ring at 3.5 px/frame, lifetime 120 | 1 | 30 | Stand so a gap in the ring passes you (gaps are 45°); or shield with a heavy (destroys fragments). Punish: it hovers still for 30 frames at rows 5–7 — reachable from the centre grate. |
 | **Blink Slam** | 12 fade-out + 20: reappears 5 tiles above the player, crown spins | slams down at 14 px/frame; landing shock 120×30 for 10 frames | 2 (shock) | 45 | Dash sideways during the 20-frame reappearance. Punish: 45 frames on the floor. |
 
-* **Enrage at HP ≤ 60 — Panic Loop:** the HOVER gap is removed (attacks chain directly), Static Beam fires **twice** (the second at the player's new y, 30 frames apart, 15-frame tell), tells −8 frames, flight 5.5 px/frame, the tail grows to 160 px.
+* **Enrage at HP ≤ 60 — Panic Loop:** the HOVER gap is removed (attacks chain directly), Static Beam fires **twice** (the second at the player's new y, 30 frames apart, 15-frame tell), tells −8 frames (Fragment Burst and the Blink reappear stay at the 20 f floor), flight 5.5 px/frame, the tail grows to 160 px.
 * **Defeat:** §12.16 (victory sequence). No ability module. `kernauth` is recorded in `bossesDefeated` and the save is written with `victory: true`.
 * **Visual, phase 1:** a seated mass (rounded trapezoid 150×180 with a slight lean), a crown of seven spikes (triangles) on top, two cable-arms (thick wavy strokes, 12 px, with three knot circles each) resting on the floor to either side, the chest core (circle r 30 with a five-point star inside, pulsing scale 0.9–1.1 at 1 Hz), a lattice of thin lines across the mass. Colours: mass `#4d1018`, cables `#2a080c`, core `#ffcf5a`, crown `#b32a2a`. Silhouette: a crowned seated mountain with two arms on the floor.
 * **Visual, phase 2:** the core (circle r 35 with the star, plus an inner white-hot circle r 14 `#fff4d6`), the five crown spikes orbiting it at radius 46 (rotation 2°/frame), a cable tail of six fading circles following its path. Same colours. Silhouette: a spiked sun with a tail.
@@ -2227,7 +2230,7 @@ Boss body contact (not listed) is 1 and catchable. A caught melee attack or body
 Tallock 60 bits (3 large) · Weftyr 100 bits (5 large) · Corrosant 140 bits (7 large) · Kernauth none (victory). Every boss also drops **3 sparks**. Boss bits and sparks never expire until collected or the room is left.
 
 ### 9.4 Economy
-* Bits placed in maps total (computed from the room data in §6): **331**. Clearing every enemy in every room once yields **239** (motes excluded); bosses add 300. A thorough first playthrough collects roughly 700–900 bits; a critical-path rush about 350. All three vendor items together cost 370.
+* Bits placed in maps total (computed from the room data in §6): **331**. Clearing every enemy in every room once yields **245** (motes excluded); bosses add 300. A thorough first playthrough collects roughly 700–900 bits; a critical-path rush about 350. All three vendor items together cost 370.
 * Bits persist through death (no corpse mechanic). The HUD shows the count top-right (§12.4) with a 10-frame pop on pickup. `bitsLifetime` (total ever collected) is a separate stat shown on the victory screen.
 
 ---
@@ -2314,7 +2317,7 @@ Abilities: **EJ** = Echo Jump (boss 1) · **BL** = Burst Line (boss 2) · **GP**
 | 20 | `ns_climb.R` | `ns_plunge.L2` | GP / GP | loop C |
 | 21 | `ns_climb.T` | `ns_rest.B` | GP / none | critical |
 | 22 | `ns_rest.R` | `ns_plunge.L` | none / none | critical |
-| 23 | `ns_plunge.B` | `rw_gate.T` | none / none (row-3 grate) | critical |
+| 23 | `ns_plunge.B` | `rw_gate.T` | none / none (row-4 grate) | critical |
 | 24 | `rw_gate.R` | `rw_rest.L` | none / none | critical |
 | 25 | `rw_rest.R` | `rw_throne.L` | none / — (final) | critical |
 
@@ -2326,7 +2329,7 @@ Abilities: **EJ** = Echo Jump (boss 1) · **BL** = Burst Line (boss 2) · **GP**
 2. `dc_fall` (`L` arrival (2,4) on the entry ledge x1–10, row 4) → `R`. Pure descent: entry ledge → grate row 8 (x13–16; fall) → straight down the well (x11–18) to the grate row 24 (x12–15) → ledge C (x18–23, row 26; fall right 3 tiles, 3 rows) → drop down the x13–17 gap to the grate row 40 (x16–19) (or onto the crumble planks at rows 31/34) → ledge row 42 (x22–30; fall right) → the floor row 49 at x22–30 → `R` (rows 47–49, floor level). The 5-wide spike bed at x12–16 on the floor is **left** of this landing and is never crossed (pogo-able if curious).
 3. `dc_cross` (`L` arrival (2,14)) → `R`. Pit 1 (x14–18, spikes one tile **below** the floor): hop onto the row-12 grate (x15–17, 3 tiles up: 90 px ≤ 96) and off its right end to x19 — or jump it directly (Tessik 167 / Vellix 211 px reach ≥ 130/126 needed; Brackmaw's 112 < 118, so the grate). Mound x26–34 (2 up). Pit 2 (x40–43, 4 wide): needed `(5−1)·30 − 34 + 2 = 88 px` ≤ Brackmaw's 112 ✓ for everyone. `R` at floor level.
 4. `dc_shrine` (flat; node (9,14); Scrivvet (21,14)) → `R`.
-5. `dc_sentinel`: Tallock. Fight bounds x1–39; `L` seals; the row-11 grates (x8–11, x28–31) are the dodge platforms. Reward: **ECHO JUMP** at (20,14).
+5. `dc_sentinel`: Tallock. Fight bounds x1–39; `L` seals; the row-12 grates (x8–11, x28–31) are the dodge platforms. Reward: **ECHO JUMP** at (20,14).
 
 **Gate 1 — Echo Jump.** `dc_sentinel.R2` sits on the block x40–47 whose top is row 10, **5 tiles (150 px)** above the floor row 15. Single jump max 113.8 px (+6 px step-up) < 150: fails for every fighter. Echo Jump minimum 190 px ≥ 150 ✓ (Brackmaw 192). No `-`/`c` within 3 tiles of the block.
 
@@ -2354,10 +2357,10 @@ Abilities: **EJ** = Echo Jump (boss 1) · **BL** = Burst Line (boss 2) · **GP**
 
 **Tier 3 — all abilities (Nullspire → Rootwell → final boss).**
 
-16. `ns_climb` (`L` arrival (2,69) on the floor; the static pit x34–45 at row 70) → `T`. Right face: shaft 1 (x28–31, rows 52–69, 18 tiles; walls x27/x32) → slab row 51 → shaft 2 (x36–39, rows 39–50) → right ledge row 37 (also `R` → loop C) → grates rows 33/29/25(crumble)/21 → ledge row 17 → shaft 3 (x42–45, rows 7–16) → crown → grate row 3 (x38–44) → `T` (cols 40–42). Left face alternative: grate row 66 → crumble row 62 → grate row 58 → lift **L1** (x9–11, rows 56→40, 1.5 px/f) → ledge row 38 → crumbles rows 34/30 → ledge row 27 → wall-jump the slot x1–6 (rows 18–26) → ledge row 16 → grates rows 12/9/6/5 → grate row 3. Every shaft is a sheer `#` wall pair ≥ 2 tiles wide.
-17. `ns_rest` (flat; node (15,14); `B` is the row-14 grate cap, an auto-launch on arrival) → `R`.
+16. `ns_climb` (`L` arrival (2,69) on the floor; the static pit x34–45 at row 70) → `T`. Right face: walk the floor into shaft 1 through its doorway (x26–27, rows 67–69) → shaft 1 (x28–31, rows 52–69, 18 tiles; walls x26–27/x32–33) → slab row 51 → shaft 2 (x36–39, rows 39–50) → right ledge row 37 (also `R` → loop C) → grates rows 33/29/25(crumble)/21 → Echo Jump up through the hole x42–43 in the block rows 17–18 onto the shaft-3 floor (ledge row 17, x44–46) → shaft 3 (x42–46, rows 7–16; walls x40–41/x47) → crown → grate row 3 (x38–44) → `T` (cols 40–42). Left face alternative: grate row 66 → crumble row 62 → grate row 58 → lift **L1** (x9–11, rows 56→40, 1.5 px/f) → ledge row 38 → crumbles rows 34/30 → ledge row 27 (x1–8; the spitvalve guards it) → in through the doorway x7–8 (rows 24–26) and wall-jump the slot x1–6 (rows 18–26; walls x0/x7) → out through the hole x4–6 in rows 16–17 (the ledge row 16 is x1–3; cling the x7 face rows 12–15) → grates rows 12/9/6/5 → grate row 3. Every shaft is a sheer `#` wall pair ≥ 2 tiles wide with a walkable or jumpable way in at its foot (a single face can also be climbed by cling → wall jump → Echo Jump → re-cling, but no route depends on it).
+17. `ns_rest` (flat; node (15,14); `B` is the hatch grate in the floor line at row 15 — the auto-launch on arrival lands on it, Down + Jump drops through) → `R`.
 18. `ns_plunge` (`L` arrival (2,4)) → `B`. Pure descent (the only rises are ≤ 3 tiles): the ledge rows 5–6 → grate row 9 → crumbles row 12 → the pool shelf rows 13–14 → ceiling spikes rows 16/32 under the overhangs → `L2` ledge row 23 (loop C back into `ns_climb`) → grates rows 21/39/44 → the crumbles row 46 → the floor row 50 → the hatch x14–16 (rows 50–53).
-19. `rw_gate` (`T` arrival (15,1) lands on the row-3 grate x12–18) → `R`. Flat gauntlet: two platewalkers, a rootram, twin valves on the pedestal (x20–26, rows 11–12) and the row-8 grate (x30–36), a broodcell by the left wall, a droplatch at (40,2). `R` rows 12–14.
+19. `rw_gate` (`T` arrival (15,1) lands on the row-4 grate x12–18) → `R`. Flat gauntlet: two platewalkers, a rootram, twin valves on the pedestal (x20–26, rows 11–12) and the row-8 grate (x30–36), a broodcell by the left wall, a droplatch at (40,2). `R` rows 12–14.
 20. `rw_rest` (flat; node (9,14); Scrivvet (21,14)) → `R`.
 21. `rw_throne`: Kernauth, two phases. Victory (§12.16).
 
@@ -2370,7 +2373,7 @@ Abilities: **EJ** = Echo Jump (boss 1) · **BL** = Burst Line (boss 2) · **GP**
 
 | Core | Room / tile | Needs | Earliest | Route |
 |---|---|---|---|---|
-| 1 | `dc_loft` (27,12) | **EJ** | after boss 1 | dc_sentinel → dc_shrine → dc_cross: Echo Jump onto the hanging slab (rows 9–10, x54–60; 180 px from the floor, single max 113.8 fails), grate row 6 (3 up), grate row 2 (4 up: Echo Jump), up through `dc_cross.T`. In `dc_loft` the chute auto-launch lands you on the floor; the 7-wide spike bed (x18–24, row 14) is crossed on the two crumble planks (x19–20 and x23–24, row 11: a 4-tile rise then a 3-tile hop; the droplatch at (21,4) drops onto the planks) to the pedestal x26–28 (rows 13–14). Nobody can jump the 7-wide bed directly except by pogo. |
+| 1 | `dc_loft` (27,12) | **EJ** | after boss 1 | dc_sentinel → dc_shrine → dc_cross: Echo Jump onto the hanging slab (rows 9–10, x54–60; 180 px from the floor, single max 113.8 fails), grate row 6 (3 up), grate row 2 (4 up: Echo Jump), up through `dc_cross.T`. In `dc_loft` the chute (x5–7, nine tiles left of the spike bed) auto-launches you onto the floor whichever way you hold — RIGHT lands on x8–17, LEFT on x1–4; the 7-wide spike bed (x18–24, row 14) is crossed on the two crumble planks (x19–20 and x23–24, row 11: a 4-tile rise then a 3-tile hop; the droplatch at (21,4) drops onto the planks) to the pedestal x26–28 (rows 13–14). Nobody can jump the 7-wide bed directly except by pogo. |
 | 2 | `lw_belts` (93,6) | **BL** | after boss 2 | lw_weftyr → lw_rest → lw_belts: grate row 10 (x73–76; 5 tiles up: Echo Jump) and grate row 7 (x74–77) into the crawlspace (rows 5–6, ceiling row 4); dash the 6-tile floor gap (x84–89, rows 5–6 corridor, open below so a miss is only a fall) onto the ledge x90–94. The ledge is 8 tiles (240 px) above the floor with solid mass under it: Echo Jump maximum 196 cannot reach it from below. |
 | 3 | `dc_fall` (24,4) | **GP** | after boss 3 | bv_corrosant → bv_rest → bv_cistern → bv_catwalk (dash) → lw_rest → lw_belts → lw_shaft → dc_cross → dc_fall (arrive at the bottom). Climb: floor → grate row 46 (x10–13; 4 up: Echo Jump) → ledge row 42 (x22–30) → grate row 40 (x16–19) → ledge E (x1–12, row 35; 4 up) → crumble row 34 (x14–16) → crumble row 31 (x8–10) → ledge C (x18–23, row 26) → grate row 24 (x12–15) → **cling** on ledge B's left face (x19, rows 14–19, 6 tiles sheer) and wall-jump onto ledge B's top (row 13, x19–29) → walk right into the shaft x27–29 (walls x26 rows 5–11 and x30 rows 2–13) → wall-jump **9 tiles (270 px)** to the pocket (x23–29, rows 2–4) → the core at (24,4) (the large bit (28,3) beside it). Echo Jump maximum 196 < 270: fails without Grip Protocol. |
 
@@ -2400,6 +2403,9 @@ Every restore node and both vendor tiles are reached at the tier in which their 
 | F5 | `lw_belts` | bits (10,4),(12,4) → (10,3),(12,3) | They were inside the row-4 platform tiles. |
 | F6 | `ns_climb` | bit (40,50) → (38,50) | It was inside a wall. |
 | F7 | `ns_plunge` | droplatches (24,17) → (19,17), (22,32) → (18,32) | They sat on ceiling-spike tiles; moved under the solid ceiling beside the spike rows. |
+| F8 (QA 2) | `ns_climb` | rows 67–69, x26–27: `#` → `.`; rows 24–26, x7–8: `#` → `.`; rows 16–17, x4–6: `#` → `.`; rows 17–18, x42–43: `#` → `.` | Both §10.3 #16 routes were broken: shaft 1 was a dead-end pit walled off from the floor, the wall-jump slot x1–6 was a sealed cavity and shaft 3's floor was enclosed by the x40–41 wall, so the only way up was a 600 px single-face climb of the spine. Now shaft 1 has a doorway from the floor, the slot has a doorway from the ledge row 27 and an exit hole in its ceiling, and the shaft-3 floor opens over the grate row 21. |
+| F9 (QA 2) | `dc_loft` | rows 15–17: chute x14–16 → x5–7 (`B` cols 5–7, spawn (6,17)) | The chute mouth was two tiles from the spike bed: holding RIGHT through the auto-launch (the natural input — the core is to the right) landed every fighter on the spikes. Nine tiles of floor now lie between the chute and the bed. |
+| F10 (QA 2) | `bv_cistern` | row 8, x49–51: `.` → `-` (the grate is x46–51) | Arriving from `bv_catwalk.B` (loop B, tier 2) the row-3 grate is boxed in (x50–52 standing); a plain Down+Jump drop with LEFT held missed the row-8 grate by 4 px and dumped the player on the right bank, losing the gallery route until Grip Protocol. The grate now reaches under the standing span. |
 
 No exit needed moving: all 25 pairs lined up as authored. No tilemap row had a wrong length.
 
@@ -2808,6 +2814,7 @@ hand-drawn ±1 px vertex jitter (seeded by panel id, static).
 * Losing a heart: that cell scales 1.4→1 over 8 f and emits 3 `chip`s; gaining one (restore
   node/core) scales 0→1.2→1 over 12 f with 6 `glitter`.
 * When hp ≤ 1 the full cells pulse scale `1 + 0.08*pulse` in sync with §3.5.
+* **Occlusion:** the hearts/energy/meter block (24,22)–(210,115) fades to α 0.35 (eased 0.08 per frame) while the fighter's body box sits behind it in screen space — the camera is pinned to a room's top-left corner on the `dc_fall.L`, `ns_plunge.L`, `bv_sluice.T`, `bv_catwalk.T` and `ns_base.T` arrivals — and back to α 1 once clear. The bits counter and the rest of the HUD never fade.
 
 ### 12.2 Energy bar — under hearts
 
@@ -2842,6 +2849,11 @@ hand-drawn ±1 px vertex jitter (seeded by panel id, static).
   the zone blurb (§15.4) below at (480, 184) in `16px MONO PAPER_DIM`.
 * Timeline 150 f: fade in 20 f (α 0→1, y 160→150), hold 100 f, fade out 30 f. A 2 px
   `tileEdge` rule 260 px wide draws out from the centre under the name during the fade-in.
+* **Timers and overlays:** the toast, banner (§12.7) and boss-card (§12.13) timers freeze with the world while an
+  overlay (pause/map/settings/shop/lore) is open in play and resume where they were. One-line system toasts (§15.8:
+  `SAVE ERASED`, the gamepad toasts, the storage warning) are drawn on every screen — title, select, game over,
+  victory — and above an open overlay (`Gamepad disconnected — paused` stays up over the pause menu); the zone
+  toast and banners belong to play and sit under an overlay.
 
 ### 12.6 Boss HP bar — bottom centre
 
@@ -2907,11 +2919,11 @@ hand-drawn ±1 px vertex jitter (seeded by panel id, static).
 * **5 cards** in a row: card size 150×110, y 380..490, x positions 60, 240, 420, 600, 780
   (gap 30). Each card: panel; fighter name `bold 16px UI` at top (centre, y+22); title
   `11px MONO PAPER_DIM` (y+40); a 56 px tall mini idle rig (scale 0.9) centred at (x+75,
-  y+78). Hovered card: `SELECT` edge, lifts 8 px, scale 1.05; others α 0.75.
-* **Big preview** centred at (300, 230): the hovered fighter's rig at scale 3.0 running its
-  idle animation; every 180 f it plays a random pose from `run → light1 → light2 → light3 →
-  jump → heavy` (each pose held for its §4.2 total frames at scale 3), then idle. A
-  ground shadow ellipse 120×14 at (300, 330). Behind it a `glow` affinity halo r 110 α 0.10.
+  y+78). Hovered card: `SELECT` edge, lifts 4 px, scale 1.05; others α 0.75.
+* **Big preview** standing at (300, 300): the hovered fighter's rig at scale 3.0 running its
+  idle animation; every 180 f it plays the next pose of the cycle `run → light1 → light2 → light3 →
+  jump → heavy` (each pose held for its §4.2 total frames, within a 48 f slot, at scale 3), then idle. A
+  ground shadow ellipse 120×14 at (300, 300). Behind it a `glow` affinity halo r 110 α 0.10 centred at (300, 202).
   Switching fighters: old rig slides out 40 px and fades 8 f, new one slides in.
 * **Stat panel** at (560, 130) size 360×150: 4 bars, label `bold 13px UI PAPER` left at
   x 580, bar from x 680 to 900 (220 wide, 10 tall, radius 5), trough `#2A2230`, fill
@@ -2921,7 +2933,7 @@ hand-drawn ±1 px vertex jitter (seeded by panel id, static).
   0.2/frame.
 * **Moveset panel** at (560, 292) size 360×72: 3 lines `12px MONO PAPER`, from the §4.2
   move names: `LIGHT  L1 / L2 / L3 names`, `HEAVY  name   SPECIAL  name`, `ULTIMATE  name`.
-* **Bio** at (60, 345) width 420, `12px MONO PAPER_DIM`, word-wrapped 3 lines max (§4.3).
+* **Bio** at (60, 322) width 490, `11px MONO PAPER_DIM`, word-wrapped 4 lines max (§4.3), pitch 13: it sits below the halo and clear of the lifted card (top 373).
 * Confirm: `confirm` SFX, card flashes `PAPER` 4 f, 20 f fade to black, then the game
   starts (new game) with the zone toast.
 
@@ -2941,7 +2953,9 @@ hand-drawn ±1 px vertex jitter (seeded by panel id, static).
 * Each room is drawn as a rounded rect at **room grid coordinates × 40 px per screen**
   (rooms are W×H screens → `40W × 40H`, minus 4 px gap), using the room's `gx, gy, w, h`
   from §6 (screens; fractional allowed), with the whole graph auto-centred on the current
-  room and clamped to the panel; arrows/stick pan (240 px/s), `R` recentres. Exits whose
+  room and clamped to the panel. A **room cursor** (a `SELECT` outline) starts on the current room;
+  arrows/stick/d-pad (menu key-repeat) move it to the nearest discovered room in that direction and the
+  view pans to keep it centred (clamped); `R` / Confirm recentre (cursor back on the current room, pan 0). Exits whose
   rooms are not adjacent on the grid (`dc_cross.L2`↔`lw_shaft.R2`, `lw_belts.L`↔`lw_shaft.R`,
   `lw_rest.B`↔`bv_catwalk.T`, `ns_climb.R`↔`ns_plunge.L2`) draw a dotted `PAPER_DIM` link
   (`[3,3]`) between their stubs once both rooms are discovered.
@@ -2954,7 +2968,9 @@ hand-drawn ±1 px vertex jitter (seeded by panel id, static).
   `BITS` hexagon; core found = small `CORE_HEART` dot. Player = `ENERGY` dot r 5 with a
   pulsing ring r 5→12 every 40 f.
 * Legend at the bottom (60, 500) `11px MONO PAPER_DIM`: `◆ node  ● boss  ⬢ vendor  · you`.
-  Footer right: `Esc / M close`.
+  Footer centre: the cursor room's name (`?` while unvisited) and under it the **bestiary line** (§15.11):
+  a boss room shows `NAME · EPITHET` (`· purged` once beaten); a visited room lists the distinct enemy
+  names it spawns (`no enemies` for safe rooms). Footer right: `Esc / M close`.
 
 ### 12.13 Boss title card
 
@@ -3313,8 +3329,9 @@ Rules:
 ```
 
 Volumes are integers 0–10 mapped to gain `(v/10)^2` (perceptual). Written on every change.
-Missing keys take the defaults above; the file is never deleted by `RESET SAVE` (which
-clears only `underbyte.save`).
+Missing keys take the defaults above, and so does any value of the wrong type or outside its range
+(volumes: finite numbers 0–10, rounded; toggles: booleans; `touchControls`: `auto|on|off`); the file is
+never deleted by `RESET SAVE` (which clears only `underbyte.save`).
 
 ---
 
@@ -3423,7 +3440,7 @@ Thank you for playing.
   progress since the last node is lost. Quit?` `YES` / `NO`.
 * Settings: `SETTINGS` · `MASTER VOLUME` · `MUSIC VOLUME` · `SFX VOLUME` · `SCREEN SHAKE` ·
   `SHOW HITBOXES` · `RESET SAVE` · `BACK` · `ON` / `OFF`; reset confirm: `Erase the saved
-  run? This cannot be undone.`
+  run? This cannot be undone.`; after the erase a 90 f toast `SAVE ERASED`.
 * Map: `MAP` · legend `◆ node  ● boss  ⬢ vendor  · you` · `Esc / M close` · `R recentre`.
 * Game over: `SIGNAL LOST` · `Rebooting at the last restore node…` · `Press JUMP or CONFIRM
   to continue`.
@@ -3518,7 +3535,7 @@ Every conflict between `design/combat.md` (C), `design/world.md` (W) and `design
 
 ### 16.6 Save triggers
 
-Written at: restore node use, boss ability pickup (f120), vendor purchase, victory. Never at Game Over. Death keeps everything but position/hearts/energy/meter in memory (§3.2, §14).
+Written at: restore node use, boss death (the defeat is recorded the moment the boss falls), boss ability pickup (f120), vendor purchase, victory. Never at Game Over. Death keeps everything but position/hearts/energy/meter in memory (§3.2, §14).
 
 ### 16.7 Hearts cap
 

@@ -78,7 +78,10 @@
     this.mode = 'normal';              // normal|transition|hazard|nodeUse|bossIntro|pickupSeq|dying
     this.transition = { phase: '', timer: 0, exit: null, dx: 0, dy: 0 };
     this.hazard = { timer: 0, kind: null };
-    this.hazardRespawn = { x: 0, y: 0 };
+    this.hazardRespawn = { x: 0, y: 0, vy: 0, iframes: 0, pending: false };   // the arrival spawn incl. its launch; a chute arrival moves it to the first footing taken (DESIGN §3.3)
+    this.hazardTo = { x: 0, y: 0, on: false };               // one-off respawn override (Corrosant's Flood → nearest grate, DESIGN §8.3)
+    this.zoom = { x: 0, y: 0, t: 0 };                        // 1-frame 2 % impact zoom (DESIGN §11.3.3)
+    this.curSong = null;                                     // the song loadRoom last chose (null = quiet room)
     this.bossFight = { state: 'none', timer: 0 };   // none|intro|fight|dying|reward|done
     this.pickupSeq = { timer: 0, pickup: null };
     this.nodeUse = { timer: 0, node: null };
@@ -111,11 +114,13 @@
   /** main.js: set the device pixel ratio (canvas backing size) — cheap to call again on resize. */
   Game.prototype.setDpr = function (dpr) {
     dpr = Math.max(1, Math.min(2, dpr || 1));
-    if (dpr === this.dpr && this.canvas.width === W * dpr) return;
+    if (dpr === this.dpr && this.canvas.width === Math.round(W * dpr)) return;
     this.dpr = dpr;
-    this.canvas.width = W * dpr; this.canvas.height = H * dpr;
-    this.world.width = W * dpr; this.world.height = H * dpr;
-    this.snap.width = W * dpr; this.snap.height = H * dpr;
+    const bw = Math.round(W * dpr), bh = Math.round(H * dpr);
+    this.canvas.width = bw; this.canvas.height = bh;
+    this.world.width = bw; this.world.height = bh;
+    this.snap.width = bw; this.snap.height = bh;
+    R.setScale(dpr);   // backgrounds / fog / vignette caches follow the backing scale (no per-frame upscaling)
     if (this.level) R.buildTileCache(this.level, dpr);
   };
 
@@ -128,12 +133,15 @@
   Game.prototype.openOverlay = function (name) {
     if (this.overlay === name) return;
     this.overlayFrom = this.overlay; this.overlay = name; UI.enter(name, this);
+    In.clearBuffers();   // a buffered jump/attack must not fire when play resumes (DESIGN §2.5)
     if (this.screen === 'play') { Au.duck(0.4, 0.17); Au.stopLoops(); }
   };
   Game.prototype.closeOverlay = function () {
     const was = this.overlay;
     this.overlay = this.overlayFrom; this.overlayFrom = null;
-    if (this.overlay) UI.enter(this.overlay, this); else Au.duck(1, 0.17);
+    In.clearBuffers();   // the confirm key that closed the menu shares keys with jump/light: never carry it into play
+    if (this.overlay) UI.enter(this.overlay, this);
+    else { if (this.screen !== 'play') UI.enter(this.screen, this); Au.duck(1, 0.17); }
     if (was === 'shop' && this.shopBought) {   // DESIGN §9.5: the PURCHASED banner shows after the panel closes
       UI.banner(this.shopBought.name + ' PURCHASED', this.shopBought.effect, '', T.shopBanner);
       this.shopBought = null;
@@ -219,6 +227,8 @@
       self.player.respawn(self.player.x, self.player.y, { hp: self.player.maxHp, energy: 50, meter: 0 });
       self.mode = 'normal'; self.bossFight.state = 'none';
       self.setScreen('play');
+      // the game-over fade ducked the music to 0 and a boss death may have left 'boss' as the song: back to the zone
+      self.playRoomMusic(); Au.duck(1, 0.5);
       self.fadeTo(0, T.respawnFade, function () { self.busy = false; });
     });
   };
@@ -367,7 +377,16 @@
     let d = null;
     try { d = JSON.parse(localStorage.getItem(SETTINGS_KEY) || 'null'); } catch (e) { d = null; }
     this.settings = {};
-    for (const k in DEFAULT_SETTINGS) this.settings[k] = d && d[k] !== undefined ? d[k] : DEFAULT_SETTINGS[k];
+    // every key is validated like the save (DESIGN §14.2): wrong type / out of range → the default
+    for (const k in DEFAULT_SETTINGS) {
+      const def = DEFAULT_SETTINGS[k];
+      let v = d && typeof d === 'object' && !Array.isArray(d) ? d[k] : undefined;
+      if (typeof def === 'number') v = typeof v === 'number' && isFinite(v) && v >= 0 && v <= 10 ? Math.round(v) : def;
+      else if (typeof def === 'boolean') v = typeof v === 'boolean' ? v : def;
+      else if (k === 'touchControls') v = v === 'auto' || v === 'on' || v === 'off' ? v : def;
+      else v = v !== undefined ? v : def;
+      this.settings[k] = v;
+    }
     this.applySettings();
   };
   Game.prototype.setSetting = function (key, value) {
@@ -464,22 +483,60 @@
     } else if (arrival.x !== undefined) { pos.x = arrival.x; pos.y = arrival.y; }
     else Wd.spawnPx(room, null, pos);
     this.player.place(pos.x, pos.y, { vx: vx, vy: vy, iframes: iframes, airJumps: airJumps });
-    this.hazardRespawn.x = pos.x; this.hazardRespawn.y = pos.y;
+    // DESIGN §3.3: a hazard respawns at the entry spawn; through a chute that spawn is only usable with its launch
+    this.hazardRespawn.x = pos.x; this.hazardRespawn.y = pos.y; this.hazardRespawn.vy = vy; this.hazardRespawn.iframes = iframes;
+    this.hazardRespawn.pending = arrival.side === 'top';   // a chute launch: the first solid footing inside the room becomes the respawn point
+    this.hazardTo.on = false;
+    // a boss beaten whose module was never collected (died during the reward, quit): the module waits at its pickup tile
+    if (room.boss && !this.boss && this.save.bossesDefeated.indexOf(room.boss.id) >= 0 && !room.boss.final) {
+      const ab = IDS.bossAbility[room.boss.id];
+      if (ab && !this.save.abilities[ab] && room.boss.pickup) {
+        const bd = UB.Bosses.DATA[room.boss.id];
+        this.spawnPickup('ability', room.boss.pickup.x * TILE + TILE / 2, (room.boss.pickup.y + 1) * TILE, { ability: ab, bossId: room.boss.id, glow: bd ? bd.glow : null });
+      }
+    }
     // map bookkeeping
     const s = this.save;
     if (s.visited.indexOf(room.id) < 0) s.visited.push(room.id);
     if (s.discovered.indexOf(room.id) < 0) s.discovered.push(room.id);
     for (let i = 0; i < room.exits.length; i++) if (s.discovered.indexOf(room.exits[i].to.room) < 0) s.discovered.push(room.exits[i].to.room);
     if (this.hasDeepPing()) this.applyDeepPing();
+    const song = this.roomSong();
+    if (song === null) this.hideProp('throne', true);   // the cleared final arena: the throne stays collapsed (DESIGN §12.16)
     if (prevZone !== this.zone) {
       UI.toast(this.zone.name, this.zone.blurb, T.zoneToast);
-      Au.music(this.zone.song); Au.ambient(this.zone.id);
+      Au.music(song); this.curSong = song; Au.ambient(this.zone.id);
       // zone lore card (DESIGN §12.18): once per zone, after the toast settles; the UI draws overlay 'lore'.
       // A card still pending from the previous zone is dropped (it belongs to a zone we just left).
       this.loreZone = null; this.loreTimer = 0;
       if (this.zone.lore && !this.zone.debug && s.loreSeen.indexOf(this.zone.id) < 0) { this.loreZone = this.zone; this.loreTimer = T.loreDelay; }
     }
+    else if (song !== this.curSong) { Au.music(song); this.curSong = song; }   // the quiet throne room ↔ the zone song
     this.snapCamera();
+  };
+  /** The song a room plays: the zone song, or none in a cleared final arena (DESIGN §12.16: rw_throne stays quiet after the victory). */
+  Game.prototype.roomSong = function () {
+    const room = this.level ? this.level.room : null;
+    if (room && room.boss && room.boss.final && this.save && this.save.bossesDefeated.indexOf(room.boss.id) >= 0) return null;
+    return this.zone ? this.zone.song : null;
+  };
+  /** (Re)start the current room's music after a respawn / boss (the engine's own calls, not a zone change). */
+  Game.prototype.playRoomMusic = function () {
+    const song = this.roomSong();
+    Au.music(song); this.curSong = song;
+    if (this.zone) Au.ambient(this.zone.id);
+  };
+  /**
+   * Hide the composite zone prop(s) tagged `tag` in this room for the rest of the visit (Kernauth's throne
+   * bursts at the phase change, DESIGN §8.4): the tile cache is repainted without them and chips fly.
+   */
+  Game.prototype.hideProp = function (tag, quiet) {
+    const lv = this.level; if (!lv || !Wd.hideProp) return false;
+    const rect = Wd.hideProp(lv, tag);
+    if (!rect) return false;
+    R.redrawTiles(lv, rect.x - 1, rect.y - 1, rect.x + rect.w, rect.y + rect.h);
+    if (!quiet) FX.burst('chip', (rect.x + rect.w / 2) * TILE, (rect.y + rect.h / 2) * TILE, 24, { color: lv.zone.palette.accent });
+    return true;
   };
   /** Clear the projectile list, flagging every object dead so pooled projectiles (characters) know they were dropped. */
   Game.prototype.dropProjectiles = function () {
@@ -647,7 +704,13 @@
       if (h.onHit) h.onHit(e, res, this);
       return;
     }
+    // a pull (kbx < 0 — Korvask's Chain Haul) draws its victim in to the attacker's body edge, never into it:
+    // the tick holds it there for the rest of its hitstun (no free contact hit from the fighter's own pull)
+    if (h.owner === 'player' && h.kbx < 0 && h.src && h.src === this.player && e.hitstun > 0 && !res.killed) {
+      e.pullBy = h.src; e.pullSide = U.sign(e.x - h.src.x) || h.facing;
+    }
     FX.hitstop(h.hitstop);
+    if (h.hitstop > 5) this.impactZoom(ix, iy);
     if (h.shake) FX.shake(h.shake, h.shakeFrames);
     const n = h.kind === 'heavy' ? 8 : (h.kind === 'special' ? 10 : (h.kind === 'ultimate' ? 16 : 4));
     FX.burst('spark', ix, iy, n, { color: this.player ? this.player.data.palette.glow : P.PAPER, dir: h.facing });
@@ -656,6 +719,13 @@
     this.addEnergy(h.energy); this.addMeter(h.meter, true);
     if (h.onHit) h.onHit(e, res, this);
     if (res.killed) this.killEnemy(e, h);
+  };
+  /** Keep a pulled enemy (see hitEnemy) on its side of the puller's body, 1 px clear, until its hitstun ends. */
+  Game.prototype.holdPulled = function (e) {
+    const a = e.pullBy;
+    if (e.hitstun <= 0 || a.dead || a !== this.player) { e.pullBy = null; return; }
+    const min = a.w / 2 + e.w / 2 + 1;
+    if ((e.x - a.x) * e.pullSide < min) { e.x = a.x + e.pullSide * min; if (e.vx * e.pullSide < 0) e.vx = 0; }
   };
   Game.prototype.killEnemy = function (e, h) {
     e.dead = true;
@@ -677,6 +747,7 @@
     const res = b.takeHit ? b.takeHit(h, this) : E.applyHit(b, h);
     if (res.blocked) { if (h.onHit) h.onHit(b, res, this); return; }
     FX.hitstop(h.hitstop); FX.shake(1, 3);
+    if (h.hitstop > 5) this.impactZoom(h.x + h.w / 2, h.y + h.h / 2);
     FX.burst('spark', h.x + h.w / 2, h.y + h.h / 2, 6, { color: this.player.data.palette.glow, dir: h.facing });
     Au.sfx('bossHit', b.x); Au.sfx(h.kind === 'heavy' ? 'heavyHit' : 'lightHit', b.x);
     this.addEnergy(h.energy); this.addMeter(h.meter, true);
@@ -692,10 +763,13 @@
     if (!(obj instanceof E)) { warnOnce('proj:' + (obj && obj.constructor ? obj.constructor.name : typeof obj), 'spawnProjectile: not a UB.Entity'); return null; }
     if (obj.owner !== 'player' && obj.owner !== 'enemy') obj.owner = 'enemy';
     obj.px = obj.x; obj.py = obj.y;
+    if (this.projectiles.indexOf(obj) >= 0) return obj;   // a pooled object re-spawned before the end-of-tick sweep: never listed twice
     if (this.projectiles.length >= MAX_PROJECTILES) { this.projectiles[0].dead = true; this.projectiles.shift(); }
     this.projectiles.push(obj);
     return obj;
   };
+  /** DESIGN §11.3.3: hitstop > 5 f adds a one-frame 2 % zoom about the impact point (world px). */
+  Game.prototype.impactZoom = function (x, y) { this.zoom.x = x; this.zoom.y = y; this.zoom.t = 1; };
   Game.prototype.addEnergy = function (n) { const pl = this.player; pl.energy = U.clamp(pl.energy + n, 0, pl.energyMax); };
   Game.prototype.addMeter = function (n, fromHit) {
     const pl = this.player;
@@ -821,7 +895,14 @@
     FX.burst('chip', b.x, b.cy(), 60, { color: b.accent || P.PAPER });
     for (let i = 0; i < 6; i++) FX.burst('ring', b.x, b.cy(), 1, { radius: 60 + i * 30, life: 12 + i * 10 });
     Au.sfx('bossDeath', b.x);
-    Au.stopMusic();
+    Au.stopMusic(); this.curSong = null;
+    // its shots die with it (nothing of a dead boss may still hurt the player, DESIGN §8.0)
+    for (let i = 0; i < this.projectiles.length; i++) {
+      const p = this.projectiles[i];
+      if (p.owner !== 'player' && !p.dead) { p.dead = true; FX.burst('spark', p.x, p.cy(), 3, { color: P.PAPER }); }
+    }
+    // the defeat counts now (dying during the reward / quitting must not resurrect it); the module waits in the arena
+    if (this.save.bossesDefeated.indexOf(b.id) < 0) { this.save.bossesDefeated.push(b.id); this.writeSave(); }
   };
   Game.prototype.updateBossDying = function () {
     const bf = this.bossFight;
@@ -861,7 +942,7 @@
     this.bossFight.state = 'done';
     this.boss = null;
     this.writeSave();
-    Au.music(this.zone.song);
+    this.playRoomMusic();
   };
 
   // --- hazards, nodes, death (DESIGN §3.2, §3.3, §5.5) -----------------------------------------------------
@@ -880,12 +961,27 @@
     pl.flash = (hz.timer >> 2) & 1 ? 6 : 0;
     if (hz.timer === T.hazardFreeze) this.fadeTo(1, T.hazardFade, null);
     if (hz.timer >= T.hazardFreeze + T.hazardFade) {
-      pl.place(this.hazardRespawn.x, this.hazardRespawn.y, { iframes: T.hazardIFrames, airJumps: 1 });
+      const hr = this.hazardRespawn, to = this.hazardTo;
+      if (to.on) { to.on = false; pl.place(to.x, to.y, { iframes: T.hazardIFrames, airJumps: 1 }); }
+      else pl.place(hr.x, hr.y, { vy: hr.vy, iframes: Math.max(T.hazardIFrames, hr.iframes), airJumps: 1 });
       pl.flash = 0;
       this.fadeTo(0, T.hazardFade, null);
       this.mode = 'normal';
       this.snapCamera();
     }
+  };
+  /**
+   * A module-owned hazard (Corrosant's Flood, DESIGN §8.3): the full §3.3 hazard path (1 heart ignoring
+   * i-frames, 30 f freeze, 10 f fade) but the respawn is (rx, ry) — bottom-centre px — instead of the room
+   * entry. Ignored unless the player is alive, in normal play and not in god mode. Returns true when it fired.
+   */
+  Game.prototype.triggerHazard = function (kind, rx, ry) {
+    const pl = this.player;
+    if (!pl || pl.dead || this.god || this.mode !== 'normal' || !this.level) return false;
+    this.hazardTo.x = rx; this.hazardTo.y = ry; this.hazardTo.on = true;
+    this.startHazard(kind || 'pool');
+    if (this.mode !== 'hazard') this.hazardTo.on = false;   // it was a death instead
+    return true;
   };
   /** Restore node (▲ REST) and vendor (▲ TRADE) prompts + Up interaction (DESIGN §5.5, §9.5, §12.8). */
   Game.prototype.updateInteractions = function () {
@@ -938,7 +1034,7 @@
       const s = this.save;
       s.roomId = this.level.room.id; s.spawn.nodeId = n.id;
       if (s.nodesUsed.indexOf(n.id) < 0) s.nodesUsed.push(n.id);
-      this.hazardRespawn.x = nx; this.hazardRespawn.y = ny;
+      this.hazardRespawn.x = nx; this.hazardRespawn.y = ny; this.hazardRespawn.vy = 0; this.hazardRespawn.iframes = 0; this.hazardRespawn.pending = false;
       this.spawnRoomEnemies();
       this.writeSave();
       UI.banner('RESTORED', 'Saved · hearts full · energy full', '', 150);
@@ -946,6 +1042,24 @@
       Au.sfx('save', pl.x);
       this.mode = 'normal';
     }
+  };
+  /**
+   * Crush test (DESIGN §3.3): a mover has pushed the body so that it overlaps solid tiles by more than
+   * 6 px on both the top and bottom edges or both side edges (plain tile collision never does this).
+   */
+  Game.prototype.crushed = function (pl) {
+    const lv = this.level, hw = pl.w / 2, top = pl.y - pl.h;
+    const inSolid = function (x, y) { return E.solidAt(lv, Math.floor(x / TILE), Math.floor(y / TILE)); };
+    const up = inSolid(pl.x, top + 3), down = inSolid(pl.x, pl.y - 3);
+    const lf = inSolid(pl.x - hw + 3, pl.cy()), rt = inSolid(pl.x + hw - 3, pl.cy());
+    return (up && down) || (lf && rt);
+  };
+  /** Is any live enemy or the boss inside tile (tx, ty)? (a crumble tile only returns into empty space) */
+  Game.prototype.tileOccupied = function (tx, ty) {
+    const x = tx * TILE, y = ty * TILE;
+    for (let i = 0; i < this.enemies.length; i++) { const e = this.enemies[i]; if (!e.dead && E.overlapBox(e, x, y, TILE, TILE)) return true; }
+    const b = this.boss;
+    return !!(b && !b.dead && E.overlapBox(b, x, y, TILE, TILE));
   };
   Game.prototype.updateCrumble = function () {
     const lv = this.level, room = lv.room, pl = this.player;
@@ -968,6 +1082,7 @@
         FX.burst('chip', c.tx * TILE + 15, c.ty * TILE + 15, 4, { color: lv.zone.palette.tileFill });
         Au.sfx('crumble', c.tx * TILE);
       } else if (c.state === 2) {
+        if (this.tileOccupied(c.tx, c.ty)) { c.timer = T.crumbleBack; continue; }   // a returning plank never closes onto an enemy or the boss (the player is the crush hazard's business)
         c.state = 3; c.timer = T.crumbleBack; lv.gone[c.ty * room.w + c.tx] = 0;
         R.redrawTiles(lv, c.tx - 1, c.ty - 1, c.tx + 1, c.ty + 1);
       } else lv.crumble.splice(i, 1);
@@ -1077,9 +1192,20 @@
     if (this.overlay) { this.snapInterp(); return; }   // the vendor just opened the shop
     const playerFrozen = this.mode === 'hazard';
     if (!playerFrozen) pl.update(this);
+    // after a chute launch the first solid footing (a '#' or '-' tile row, no mover, no crumble) is the hazard respawn
+    if (this.hazardRespawn.pending && this.mode === 'normal' && pl.onGround && !pl.ground && pl.groundTy >= 0 && !pl.dead) {
+      let solid = true;
+      for (let tx = pl.groundTx0; tx <= pl.groundTx1; tx++) { const ch = E.tileAt(lv, tx, pl.groundTy); if (ch !== '#' && ch !== '-') solid = false; }
+      if (solid && pl.y - pl.h > 0 && pl.y <= lv.h * TILE) { const hr = this.hazardRespawn; hr.x = pl.x; hr.y = pl.y; hr.vy = 0; hr.iframes = 0; hr.pending = false; }
+    }
 
     // enemies / boss / projectiles
-    for (let i = 0; i < this.enemies.length; i++) { const e = this.enemies[i]; if (!e.dead) e.update(this, pl); }
+    for (let i = 0; i < this.enemies.length; i++) {
+      const e = this.enemies[i];
+      if (e.dead) continue;
+      e.update(this, pl);
+      if (e.pullBy) this.holdPulled(e);
+    }
     if (this.boss) {
       const bs = this.bossFight.state;
       if (bs === 'fight') this.boss.update(this, pl);
@@ -1100,21 +1226,30 @@
 
     // hits, contact, hazards
     this.resolveHits();
-    if (!pl.dead && !this.god && this.mode === 'normal') {
+    // body contact: never on a pogo tick / active down-strike (the bounce wins, DESIGN §3.6) nor while a
+    // special declares itself contact-immune (Brackmaw's dive, Korvask's press — the victim is being hit)
+    if (!pl.dead && !this.god && this.mode === 'normal' && !pl.pogoActive && !pl.contactImmune) {
+      let took = false;
       for (let i = 0; i < this.enemies.length; i++) {
         const e = this.enemies[i];
         if (e.dead || e.noContact || !(e.contact > 0)) continue;
-        if (E.overlap(pl, e) && pl.hurt(e.contact, e.x, null)) break;
+        if (E.overlap(pl, e) && pl.hurt(e.contact, e.x, null)) { took = true; break; }
       }
       const b = this.boss;
-      if (b && b.active && !b.dead && b.contact > 0 && E.overlap(pl, b)) pl.hurt(b.contact, b.x, null);
+      if (!took && b && b.active && !b.dead && b.contact > 0 && E.overlap(pl, b)) took = pl.hurt(b.contact, b.x, null);
+      if (took && FX.hitstopFrames > 5) this.impactZoom(pl.x, pl.cy());
     }
     if (!pl.dead && !this.god && this.mode === 'normal') {
       const hz = E.hazardAt(pl, lv, pl.pogoActive);
       if (hz) this.startHazard(hz);
+      else if (lv.platforms.length && this.crushed(pl)) this.startHazard('crush');   // DESIGN §3.3: crush by moving geometry
     }
-    // sweep the dead
-    for (let i = this.enemies.length - 1; i >= 0; i--) if (this.enemies[i].dead) this.enemies.splice(i, 1);
+    // sweep the dead (an enemy that somehow left the room downward is dropped silently: no drops, no purge count)
+    for (let i = this.enemies.length - 1; i >= 0; i--) {
+      const e = this.enemies[i];
+      if (!e.dead && e.y - e.h > rh + OFFROOM * 2) e.dead = true;
+      if (e.dead) this.enemies.splice(i, 1);
+    }
     for (let i = this.projectiles.length - 1; i >= 0; i--) if (this.projectiles[i].dead) this.projectiles.splice(i, 1);
 
     // pickups, crumble, nodes, exits, boss trigger
@@ -1148,6 +1283,7 @@
     const lv = this.level, zone = this.zone, pl = this.player;
     const cx = Math.round(U.lerp(this.cam.px, this.cam.x, alpha) + FX.shakeX), cy = Math.round(U.lerp(this.cam.py, this.cam.y, alpha) + FX.shakeY);
     R.drawBackground(ctx, zone, cx, cy);
+    R.drawAmbient(ctx, zone, lv, this.frame, cx, cy);
     R.drawTileCache(ctx, lv, cx, cy);
     ctx.save();
     ctx.translate(-cx, -cy);
@@ -1208,20 +1344,30 @@
     if (inWorld) {
       const tr = this.transition;
       if (this.mode === 'transition' && tr.phase === 'freeze') {
-        mc.drawImage(this.snap, 0, 0, W * dpr, H * dpr, 0, 0, W, H);
+        mc.drawImage(this.snap, 0, 0, this.snap.width, this.snap.height, 0, 0, W, H);
       } else if (this.mode === 'transition' && tr.phase === 'slide') {
         const k = U.easeOutCubic(1 - tr.timer / T.slide);
         const ox = tr.dx * W * k, oy = tr.dy * H * k;
-        mc.drawImage(this.snap, 0, 0, W * dpr, H * dpr, -ox, -oy, W, H);
-        mc.drawImage(this.world, 0, 0, W * dpr, H * dpr, tr.dx * W - ox, tr.dy * H - oy, W, H);
+        mc.drawImage(this.snap, 0, 0, this.snap.width, this.snap.height, -ox, -oy, W, H);
+        mc.drawImage(this.world, 0, 0, this.world.width, this.world.height, tr.dx * W - ox, tr.dy * H - oy, W, H);
+      } else if (this.zoom.t > 0) {   // DESIGN §11.3.3: one frame at 102 % about the impact point
+        this.zoom.t--;
+        const zx = U.clamp(this.zoom.x - this.cam.x, 0, W), zy = U.clamp(this.zoom.y - this.cam.y, 0, H);
+        mc.save(); mc.translate(zx, zy); mc.scale(1.02, 1.02); mc.translate(-zx, -zy);
+        mc.drawImage(this.world, 0, 0, this.world.width, this.world.height, 0, 0, W, H);
+        mc.restore();
       } else {
-        mc.drawImage(this.world, 0, 0, W * dpr, H * dpr, 0, 0, W, H);
+        mc.drawImage(this.world, 0, 0, this.world.width, this.world.height, 0, 0, W, H);
       }
       FX.drawScreen(mc);
       UI.drawHUD(mc, this);
     }
+    // a fade caught in flight by an overlay (pause/map during the hazard fade, an auto-pause) stays UNDER the
+    // overlay so the menu is readable; screen fades (title/select/game over) have no overlay and cover everything
+    const fadeUnder = inWorld && this.overlay;
+    if (fadeUnder && this.fadeLevel > 0) { mc.globalAlpha = this.fadeLevel; mc.fillStyle = '#07050A'; mc.fillRect(0, 0, W, H); mc.globalAlpha = 1; }
     UI.drawScreen(mc, this);
-    if (this.fadeLevel > 0) { mc.globalAlpha = this.fadeLevel; mc.fillStyle = '#07050A'; mc.fillRect(0, 0, W, H); mc.globalAlpha = 1; }
+    if (!fadeUnder && this.fadeLevel > 0) { mc.globalAlpha = this.fadeLevel; mc.fillStyle = '#07050A'; mc.fillRect(0, 0, W, H); mc.globalAlpha = 1; }
     In.drawTouch(mc);
   };
 
@@ -1263,7 +1409,7 @@
         arrival = { exitId: exitIdOrPos, side: ex ? OPP[ex.side] : undefined };
       }
       else arrival = {};
-      game.mode = 'normal'; game.player.locked = false; FX.hitstopFrames = 0;
+      game.mode = 'normal'; game.player.locked = false; FX.hitstopFrames = 0; game.zoom.t = 0;
       if (game.transition.phase) { game.transition.phase = ''; game.transition.timer = 0; }
       game.loadRoom(roomId, arrival);
       return true;

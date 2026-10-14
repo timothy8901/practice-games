@@ -10,7 +10,8 @@
 const { spawnSync } = require('child_process');
 const path = require('path');
 
-const SUITES = ['smoke', 'verify-core', 'world', 'characters', 'enemies', 'audio', 'ui', 'playthrough'];
+const SUITES = ['smoke', 'verify-core', 'world', 'characters', 'enemies', 'audio', 'ui', 'playthrough',
+  'critic-complete', 'qa-progression', 'qa-combat', 'qa-enemies', 'qa-ui', 'qa-perf', 'qa-ip-code'];
 const wanted = process.argv.slice(2).length ? process.argv.slice(2) : SUITES;
 const rows = [];
 let failed = 0;

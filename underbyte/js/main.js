@@ -35,7 +35,12 @@
       const left = Math.floor((ww - cw) / 2), top = Math.floor((wh - ch) / 2);
       canvas.style.left = left + 'px'; canvas.style.top = top + 'px';
       UB.Input.setViewport(left, top, cw, ch);
-      game.setDpr(window.devicePixelRatio || 1);
+      // Backing scale: the device pixel ratio times the CSS upscale, so a 1920×1080 window on a dpr-1
+      // display renders at 1920×1080 instead of stretching 960×540 (BRIEF rule 7: crisp at any size).
+      // Quantised down to 1 / 1.5 / 2 and capped at 2 (memory + fill cost); 1 whenever the canvas is
+      // shown at or below its logical size.
+      const want = (window.devicePixelRatio || 1) * s;
+      game.setDpr(Math.max(1, Math.min(2, Math.floor(want * 2) / 2)));
     }
     window.addEventListener('resize', resize);
     resize();
@@ -57,7 +62,12 @@
     requestAnimationFrame(loop);
 
     document.addEventListener('visibilitychange', function () { if (document.hidden) game.autoPause(); });
-    window.addEventListener('gamepaddisconnected', function () { if (UB.Input.device === 'gamepad') game.autoPause(); });
+    // DESIGN §2.5 / §15.8: losing the pad pauses; both events show their toast
+    window.addEventListener('gamepaddisconnected', function () {
+      if (UB.Input.device === 'gamepad') game.autoPause();
+      UB.UI.toast('Gamepad disconnected — paused', '', 150);
+    });
+    window.addEventListener('gamepadconnected', function () { UB.UI.toast('Gamepad connected', '', 120); });
   }
 
   UB.Main = { boot: boot };

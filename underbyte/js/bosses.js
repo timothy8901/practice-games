@@ -80,9 +80,11 @@
     const sx = spec.spawn.x, sy = spec.spawn.y;
     let fr = sy; while (fr < room.h - 1 && !tileSolid(room, sx, fr + 1)) fr++;
     let cr = sy; while (cr > 0 && !tileSolid(room, sx, cr - 1)) cr--;
-    // side walls: scan the rows above the spawn (exit openings sit at floor level, walls do not)
+    // side walls: scan the six air rows just above the floor of the spawn column and keep the innermost
+    // wall (exit openings sit at floor level, walls do not). The rows are air at the spawn column by
+    // construction, so a flier spawned under the ceiling or a crawler on it reads the same arena as a walker.
     let lc = 0, rc = room.w - 1;
-    for (let ry = Math.max(1, sy - 6); ry <= Math.max(1, sy - 1); ry++) {
+    for (let ry = Math.max(cr, fr - 5); ry <= fr; ry++) {
       let l = sx; while (l > 0 && !tileSolid(room, l - 1, ry)) l--;
       let r = sx; while (r < room.w - 1 && !tileSolid(room, r + 1, ry)) r++;
       if (l > lc) lc = l; if (r < rc) rc = r;
@@ -91,6 +93,8 @@
     return { x0: x0, x1: x1, cx: (x0 + x1) / 2, floorY: (fr + 1) * TILE, ceilY: cr * TILE, room: room };
   }
   function rowC(n) { return n * TILE + TILE / 2; }
+  /** A telegraph length after the enrage cut: never shorter than 20 f (DESIGN §8.0 fairness floor). */
+  function tellOf(b, n) { return Math.max(20, n - b.tellCut); }
   function bossBase(id, d, spec, w, h) {
     const sp = spec.spawn;
     const b = new E({ x: sp.x * TILE + TILE / 2, y: (sp.y + 1) * TILE, w: w, h: h, hp: d.hp, units: 'pxf', kbResist: 0 });
@@ -105,6 +109,7 @@
   function bossHurtBy(hit, game, mult) {
     const b = this;
     if (b.roar > 0 || b.state === 'transition' || b.state === 'blinkOut') return blocked();
+    if (hit.dmg <= 0) { b.flash = 4; res.dmg = 0; res.killed = false; res.blocked = false; return res; }   // a 0-damage hit (the Overclock shove, DESIGN §3.9) never rounds up
     let dmg = hit.dmg;
     if (mult > 1) { dmg = Math.floor(dmg * mult); if (dmg < hit.dmg + 1) dmg = hit.dmg + 1; }
     else if (mult < 1) { dmg = Math.floor(dmg * mult); if (dmg < 1) dmg = 1; }
@@ -190,7 +195,7 @@
     step: function (s, game) {
       if (s.stuck) return;
       s.vy = 7; s.moveAndCollide(game.level);
-      if (s.onGround) { s.stuck = true; s.life = 90; s.destructible = false; s.hit.multi = true; s.hit.flags = 1; s.hit.kind = 'contact'; s.hit.onHit = null; s.w = 20; s.vy = 0; }
+      if (s.onGround) { s.stuck = true; s.life = 90; s.destructible = false; s.hit.multi = true; s.hit.flags = 1; s.hit.kind = 'contact'; s.hit.onHit = null; s.hit.noKbx = true; s.w = 20; s.vy = 0; }
     },
     draw: function (ctx, s, x, y) {
       const k = s.stuck && s.life < 20 ? s.life / 20 : 1;
@@ -199,7 +204,8 @@
       ctx.beginPath(); ctx.moveTo(-4, -24); ctx.lineTo(4, -24); ctx.lineTo(1, 0); ctx.lineTo(-1, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
       ctx.fillStyle = WHITE; ctx.globalAlpha = 0.6 * k; ctx.fillRect(-1, -22, 1.5, 10);
     } };
-  SHOTS.snare = { w: 300, h: 8, grav: 0, life: 240, tiles: 'none', destructible: false, multi: true, dmg: 1, flags: 1,
+  // a trip-thread: the first fighter it catches takes 1 and the thread snaps (popSelf) — a floor you can jump back onto, not a 240 f damage field
+  SHOTS.snare = { w: 300, h: 8, grav: 0, life: 240, tiles: 'none', destructible: false, multi: true, dmg: 1, flags: 1, onHit: popSelf,
     draw: function (ctx, s, x, y) {
       const k = s.life < 30 ? s.life / 30 : 1, fl = (s.t & 4) ? 1 : 0.7;
       ctx.globalAlpha = k;
@@ -332,7 +338,7 @@
     else a = r < 0.7 ? 3 : 4;
     if (a === b.last1 && a === b.last2) a = adx < 90 ? (a === 1 ? 2 : 1) : (adx < 180 ? (a === 2 ? 4 : 2) : (a === 3 ? 4 : 3));
     b.last2 = b.last1; b.last1 = a; b.atk = a; b.attack = TAL_NAME[a];
-    b.state = 'tell'; b.timer = TAL_TELL[a] - b.tellCut; b.vx = 0;
+    b.state = 'tell'; b.timer = tellOf(b, TAL_TELL[a]); b.vx = 0;
   }
   function tallockActive(b, game, player) {
     const K = b.data.cols;
@@ -370,8 +376,10 @@
         break;
       case 'swing': {
         b.vx = 0;
+        // DESIGN §8.1: a 70×40 arc sweeping top→bottom over the 12 active frames — its top edge from 90 px to 40 px above
+        // the floor — so a jump started mid-tell sails over it while a standing fighter is caught on its way down
         const k = 12 - b.timer;
-        E.hitBoxWorld(b, 60, -30 + 55 * k / 11, 70, 60, b.hitA); b.hitA.facing = b.facing; game.registerHit(b.hitA);
+        E.hitBoxWorld(b, 60, -10 + 50 * k / 11, 70, 40, b.hitA); b.hitA.facing = b.facing; game.registerHit(b.hitA);
         if (--b.timer <= 0) tallockRecover(b, 40);
         break;
       }
@@ -502,10 +510,10 @@
   function weftyrTell(b, game) {
     const pl = game.player, A = b.A;
     b.state = 'tell'; b.attack = b.atk;
-    if (b.atk === 'dash') { b.lineY = weftyrClampRow(b, pl ? pl.cy() : b.y - 20, 4, 13); b.timer = 30 - b.tellCut; }
-    else if (b.atk === 'snare') { b.timer = 24 - b.tellCut; }
+    if (b.atk === 'dash') { b.lineY = weftyrClampRow(b, pl ? pl.cy() : b.y - 20, 4, 13); b.timer = tellOf(b, 30); }
+    else if (b.atk === 'snare') { b.timer = tellOf(b, 24); }
     else if (b.atk === 'rain') {
-      b.timer = 40 - b.tellCut; b.nMarks = 0;
+      b.timer = tellOf(b, 40); b.nMarks = 0;
       const c0 = Math.floor(A.x0 / TILE) + 1, c1 = Math.floor(A.x1 / TILE) - 2;
       for (let tries = 0; tries < 60 && b.nMarks < b.needles; tries++) {
         const c = c0 + Math.floor(game.rng() * (c1 - c0 + 1));
@@ -513,7 +521,7 @@
         for (let i = 0; i < b.nMarks; i++) if (Math.abs(b.marks[i] - (c * TILE + 15)) < 2 * TILE) { ok = false; break; }
         if (ok) b.marks[b.nMarks++] = c * TILE + 15;
       }
-    } else { b.timer = 30 - b.tellCut; b.shadowX = pl ? pl.x : b.x; b.tx = b.shadowX; b.ty = rowC(8); }
+    } else { b.timer = tellOf(b, 30); b.shadowX = pl ? pl.x : b.x; b.tx = b.shadowX; b.ty = rowC(8); }
   }
   function weftyrUpdate(game, player) {
     const b = this, A = b.A, K = b.data.cols; b.t++;
@@ -549,7 +557,7 @@
         break;
       case 'retell':
         seek(b, b.x, b.lineY, 6); b.moveAndCollide(game.level); b.facing = b.dashDir;
-        if (--b.timer <= 0) { b.state = 'dash'; }
+        if (--b.timer <= 0) { b.y = b.lineY + 20; b.py = b.y; b.vy = 0; b.state = 'dash'; }
         break;
       case 'spinDrop':
         b.vx = 0; b.vy = 12; b.moveAndCollide(game.level); b.rot = PI / 2;
@@ -570,9 +578,15 @@
   }
   function weftyrActive(b, game) {
     const A = b.A, K = b.data.cols;
-    if (b.atk === 'dash') { b.state = 'dash'; Au.sfx('whiff', b.x); }
-    else if (b.atk === 'snare') {
-      const s = makeShot(game, 'snare', A.cx, 12 * TILE + 8, 0, 0, K.thread, A.x1 - A.x0, 8, 240);
+    if (b.atk === 'dash') {
+      // the dash runs exactly along the telegraphed thread: coming from far away the 30 f tell cannot always reach
+      // the line (the seek is diagonal), so the shuttle snaps taut onto it as the pass begins
+      b.y = b.lineY + 20; b.py = b.y; b.vy = 0;
+      b.state = 'dash'; Au.sfx('whiff', b.x);
+    } else if (b.atk === 'snare') {
+      // a trip-line at knee height (box 8 px tall, bottom 14 px above the floor): every standing fighter overlaps it,
+      // any jump clears it (DESIGN §8.2 "blocks ground movement across the arena: jump it or use the grates")
+      const s = makeShot(game, 'snare', A.cx, A.floorY - 14, 0, 0, K.thread, A.x1 - A.x0, 8, 240);
       if (s) { s.src = b; b.snare = s; }
       b.state = 'recover'; b.timer = 20; b.tx = b.x; b.ty = b.y - 20;
     } else if (b.atk === 'rain') {
@@ -645,7 +659,16 @@
     b.lungeY = 0; b.lungeDir = 1; b.lungeMax = 0; b.lunged = 0; b.lungeX0 = 0; b.droop = 0; b.jaw = 0; b.rear = 0;
     b.dripX = 0; b.marks = new Float32Array(10); b.dripI = 0; b.floodT = 0; b.floodOn = 0; b.sweepDir = 1; b.nAtk = 0; b.lastPlan = ''; b.ceilN = 0;
     b.hitBody = mkHit('heavy', 'sweep', 1, 1); b.hitBody.src = b;
-    b.hitFlood = mkHit('contact', 'flood', 1, 1, true); b.hitFlood.src = b;
+    b.hitFlood = mkHit('contact', 'flood', 1, 1, true); b.hitFlood.src = b;   // the flood box (read by tests/debug); the damage goes through game.triggerHazard
+    // the lowest row of one-way grates above the floor: the Flood's respawn ledges (row 16 in bv_corrosant)
+    b.grates = []; b.grateRow = -1;
+    for (let ry = Math.floor(b.A.floorY / TILE) - 1; ry > 0 && b.grateRow < 0; ry--) {
+      for (let tx = 0; tx < room.w; tx++) {
+        if (room.tiles[ry][tx] !== '-' || (tx > 0 && room.tiles[ry][tx - 1] === '-')) continue;
+        let n = 1; while (tx + n < room.w && room.tiles[ry][tx + n] === '-') n++;
+        b.grates.push(tx * TILE + 12, (tx + n) * TILE - 12); b.grateRow = ry;
+      }
+    }
     // start: nearest perimeter point to the spawn tile
     const scx = spec.spawn.x * TILE + 15, scy = spec.spawn.y * TILE + 15;
     b.s = nearestS(b, scx, scy);
@@ -771,15 +794,15 @@
     const pl = game.player, A = b.A;
     b.state = 'tell'; b.attack = b.plan;
     if (b.plan === 'lunge') {
-      b.timer = 30 - b.tellCut;
+      b.timer = tellOf(b, 30);
       const py = pl ? pl.cy() + (game.rng() - 0.5) * 60 : b.hy;
       b.lungeY = U.clamp(py, A.ceilY + INS, A.floorY - INS);
       b.lungeDir = surfOf(b, b.s) === 3 ? 1 : -1;
-    } else if (b.plan === 'spit') b.timer = 24 - b.tellCut;
+    } else if (b.plan === 'spit') b.timer = tellOf(b, 24);
     else if (b.plan === 'drip') {
-      b.timer = 36 - b.tellCut; b.dripX = b.hx;
+      b.timer = tellOf(b, 36); b.dripX = b.hx;
       for (let i = 0; i < 10; i++) b.marks[i] = b.dripX - 90 + game.rng() * 180;
-    } else if (b.plan === 'sweep') { b.timer = 40 - b.tellCut; b.sweepDir = (b.s - (b.W + b.H)) < b.W / 2 ? -1 : 1; }   // u small = right end → sweep left
+    } else if (b.plan === 'sweep') { b.timer = tellOf(b, 40); b.sweepDir = (b.s - (b.W + b.H)) < b.W / 2 ? -1 : 1; }   // u small = right end → sweep left
   }
   function corroUpdate(game, player) {
     const b = this, A = b.A, K = b.data.cols; b.t++;
@@ -790,8 +813,9 @@
     if (b.enraged) {
       if (b.floodOn > 0) {
         b.floodOn--;
-        const k = Math.min(1, (120 - b.floodOn) / 20);
-        regBox(game, b.hitFlood, A.x0, A.floorY - 30 * k, A.x1 - A.x0, 30 * k, 1);
+        const k = Math.min(1, (120 - b.floodOn) / 20), fh = b.hitFlood;
+        fh.x = A.x0; fh.y = A.floorY - 30 * k; fh.w = A.x1 - A.x0; fh.h = 30 * k;
+        if (k > 0 && player && E.overlapBox(player, fh.x, fh.y, fh.w, fh.h)) corroFloodHit(b, game, player);
       } else if (++b.floodT >= 420) { b.floodT = 0; b.floodOn = 120; FX.shake(5, 20); Au.sfx('bossPhase', b.x); }
     }
     b.jaw = U.approach(b.jaw, 0, 0.05); b.rear = U.approach(b.rear, 0, 2);
@@ -850,6 +874,15 @@
     pushPath(b, b.hx, b.hy);
     corroPlaceHead(b);
     if ((b.t % 20) === 0) { FX.burst('dust', b.segX[2], b.segY[2] + 14, 1, DUST_N); }
+  }
+  /** Flood contact: the engine's hazard path with the nearest grate of the lowest grate row as the respawn. */
+  function corroFloodHit(b, game, player) {
+    let gx = player.x, gy = b.A.floorY, best = 1e9;
+    for (let i = 0; i < b.grates.length; i += 2) {
+      const x0 = b.grates[i], x1 = b.grates[i + 1], cx = U.clamp(player.x, x0, x1), d = Math.abs(cx - player.x);
+      if (d < best) { best = d; gx = cx; gy = b.grateRow * TILE; }
+    }
+    game.triggerHazard('acid', gx, gy);
   }
   function corroActive(b, game) {
     const A = b.A, K = b.data.cols;
@@ -976,8 +1009,11 @@
     b.onEnrage = function () { this.hoverGap = 0; this.tellCut = 8; this.speed = 5.5; this.tailLen = 160; };
     b.dmgMult = function (hit) {
       if (this.phase >= 2) return 1;
-      const cx = this.x, cy = this.y - 120;
-      return U.aabb(hit.x, hit.y, hit.w, hit.h, cx - 30, cy - 30, 60, 60) ? 1 : 0.5;
+      // DESIGN §8.4: the chest core sits 120 px above the feet (rows 16–17); a hit box reaching that 60 px band of the
+      // mass is a core hit (×1) — so every fighter's air box lands it from a plain jump's apex without touching the body.
+      // Anything else on the mass (grounded lights at the base, the pogo on the crown) is ×0.5.
+      const cy = this.y - 120;
+      return U.aabb(hit.x, hit.y, hit.w, hit.h, this.x - this.w / 2, cy - 30, this.w, 60) ? 1 : 0.5;
     };
     b.update = kerUpdate; b.draw = kerDraw;
     return b;
@@ -993,6 +1029,7 @@
     b.state = 'transition'; b.timer = 180; b.transT = 0; b.attack = ''; b.contact = 0; b.vx = 0; b.vy = 0;
     b.coreY = b.y - 120; b.enrageHp = b.data.enrage;
     if (game.player) game.player.iframes = 180;
+    if (game.hideProp) game.hideProp('throne');   // the throne collapses into the well: its props burst and are not redrawn
     if (UB.UI && UB.UI.bossCard) UB.UI.bossCard('KERNAUTH', 'UNBOUND', 60);
     Au.sfx('bossPhase', b.x); FX.shake(8, 40); FX.flash(WHITE, 0.4, 20);
     CHIP_O.color = b.data.cols.crown; FX.burst('chip', b.x, b.y - 40, 30, CHIP_O);
@@ -1055,9 +1092,9 @@
   function kerTell2(b, game) {
     const pl = game.player, A = b.A;
     b.state = 'tell2'; b.attack = b.atk2; b.beamN = 0;
-    if (b.atk2 === 'dive') b.timer = 30 - b.tellCut;
-    else if (b.atk2 === 'beam') { b.timer = 40 - b.tellCut; b.beamY = U.clamp(pl ? pl.cy() : rowC(10), Math.max(rowC(4), A.ceilY + 40), Math.min(rowC(19), A.floorY - 20)); b.lockX = pl && pl.x < A.cx ? A.x0 + 45 : A.x1 - 45; }
-    else if (b.atk2 === 'frag') b.timer = 24 - b.tellCut;
+    if (b.atk2 === 'dive') b.timer = tellOf(b, 30);
+    else if (b.atk2 === 'beam') { b.timer = tellOf(b, 40); b.beamY = U.clamp(pl ? pl.cy() : rowC(10), Math.max(rowC(4), A.ceilY + 40), Math.min(rowC(19), A.floorY - 20)); b.lockX = pl && pl.x < A.cx ? A.x0 + 45 : A.x1 - 45; }
+    else if (b.atk2 === 'frag') b.timer = tellOf(b, 24);
     else { b.state = 'blinkOut'; b.timer = 12; b.contact = 0; }
   }
   function kerActive2(b, game, player) {
@@ -1136,7 +1173,10 @@
         if (arrived || b.y >= A.floorY - 0.5) {
           b.state = 'shock'; b.timer = 10; b.hitShock.hitList.length = 0; b.vx = 0; b.vy = 0;
           b.y = A.floorY; FX.shake(8, 14); FX.burst('dust', b.x, b.y, 10, DUST_N); Au.sfx('heavyHit', b.x);
-          b.lockX = 90;   // shock width
+          b.lockX = 120;   // shock width (DESIGN §8.4: 120×30, a player width wider than the 70 px body on each side)
+          // the shock is registered on the landing frame itself: hits resolve before body contact, so the player at the
+          // impact takes the 2-damage shock, never the 1-damage body touch
+          regBox(game, b.hitShock, b.x - b.lockX / 2, A.floorY - 30, b.lockX, 30, b.facing);
         }
         break;
       }
@@ -1165,7 +1205,7 @@
         b.vx = 0; b.vy = 0;
         if (--b.timer <= 0) {
           b.x = U.clamp(player.x, A.x0 + 35, A.x1 - 35); b.y = Math.max(A.ceilY + 70, player.y - 150 - 35 + 35); b.px = b.x; b.py = b.y;
-          b.state = 'blinkIn'; b.timer = 20 - b.tellCut; b.contact = 1;
+          b.state = 'blinkIn'; b.timer = tellOf(b, 20); b.contact = 1;
           for (let i = 0; i < 32; i++) { b.tail[i * 2] = b.x; b.tail[i * 2 + 1] = b.y - 35; }
           FX.burst('ring', b.x, b.y - 35, 1, RING40);
         }
@@ -1176,7 +1216,10 @@
         break;
       case 'slam':
         b.vx = 0; b.vy = 14; b.moveAndCollide(game.level);
-        if (b.y >= A.floorY - 0.5) { b.state = 'shock'; b.timer = 10; b.hitShock.hitList.length = 0; b.lockX = 120; FX.shake(9, 16); FX.burst('dust', b.x, b.y, 12, DUST_N); Au.sfx('heavyHit', b.x); }
+        if (b.y >= A.floorY - 0.5) {
+          b.state = 'shock'; b.timer = 10; b.hitShock.hitList.length = 0; b.lockX = 120; FX.shake(9, 16); FX.burst('dust', b.x, b.y, 12, DUST_N); Au.sfx('heavyHit', b.x);
+          regBox(game, b.hitShock, b.x - b.lockX / 2, A.floorY - 30, b.lockX, 30, b.facing);   // the landing frame counts (as the Dive Bomb)
+        }
         break;
       case 'recover2':
         if (b.atk2 === 'beam') { seek(b, b.x, rowC(8), 2); b.moveAndCollide(game.level); }

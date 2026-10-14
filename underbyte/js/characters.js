@@ -122,10 +122,10 @@
       ocPalette: { base: '#86976E', shade: '#3A4A2E', accent: '#E6F2C8', glow: '#CBFF66' },
       bio: 'A watchdog process that trusts nothing it has not measured twice and prefers to fight from behind a wall of its own instruments. Soft-spoken and precise, it apologises to enemies as it pins them. Long reach, a returning ring, and sentries.',
       moves: {
-        light1: mv({ name: 'Whip Flick', s: 5, a: 3, r: 9, box: [44, -6, 64, 18], dmg: 2, kb: [120, -30], hitstop: 3, hitCancel: 9, whiffCancel: 13, jumpCancel: 9, energy: 4, meter: 2 }),
+        light1: mv({ name: 'Whip Flick', s: 5, a: 3, r: 9, box: [44, -2, 64, 22], dmg: 2, kb: [120, -30], hitstop: 3, hitCancel: 9, whiffCancel: 13, jumpCancel: 9, energy: 4, meter: 2 }),
         light2: mv({ name: 'Whip Cross', s: 5, a: 3, r: 9, box: [46, 0, 68, 22], dmg: 3, kb: [140, -40], hitstop: 3, hitCancel: 9, whiffCancel: 13, jumpCancel: 9, energy: 4, meter: 2 }),
         light3: mv({ name: 'Double Lash', s: 7, a: 4, r: 13, box: [50, -4, 76, 26], dmg: 4, kb: [320, -120], hitstop: 4, hitCancel: 12, rechain: 18, jumpCancel: 12, energy: 6, meter: 4, shake: [3, 6] }),
-        heavy: mv({ name: 'Ring Toss', s: 10, a: 0, r: 14, ring: { w: 20, h: 20, speed: 560, range: 220, life: 50, dmgOut: 7, dmgBack: 4, kb: [260, -120], local: 4, energy: 5, meter: 1, launch: [14, -10] } }),
+        heavy: mv({ name: 'Ring Toss', s: 10, a: 0, r: 14, ring: { w: 20, h: 20, speed: 560, range: 220, life: 50, dmgOut: 7, dmgBack: 4, kb: [260, -120], local: 4, energy: 5, meter: 1, launch: [14, -2] } }),
         special: mv({ name: 'Sentry Pin', cost: 35, s: 8, a: 0, r: 12, sentry: { life: 300, cadence: 30, range: 260, at: [[40, -8]], bolt: { w: 10, h: 10, speed: 480, life: 45, dmg: 2, kb: [80, -20], local: 2, meter: 1 } } }),
         air: mv({ name: 'Whip Circle', s: 5, a: 4, r: 10, box: [28, -4, 60, 36], dmg: 2, kb: [140, -40], hitstop: 3, energy: 4, meter: 2 }),
         down: mv({ name: 'Peg Drop', s: 5, a: 999, r: 7, box: [2, 26, 22, 28], dmg: 3, kb: [60, 120], hitstop: 3, energy: 5, meter: 3 }),
@@ -768,6 +768,33 @@
   function fillHit(h, dmg, kb, energy, meter, facing) { h.dmg = dmg; h.kbx = kb[0]; h.kby = kb[1]; h.energy = energy; h.meter = meter; h.facing = facing; h.hitstop = 0; h.shake = 0; h.shakeFrames = 0; h.multi = false; }
   function registerBox(game, p, h) { h.x = p.x - p.w / 2; h.y = p.y - p.h; h.w = p.w; h.h = p.h; game.registerHit(h); }
   function footingAt(level, tx, ty) { const ch = E.tileAt(level, tx, ty); return ch === '#' || ch === 'c' || ch === '-'; }
+  // Footing along the feet line y: '#'/'c'/'-' tiles when y is a tile top, plus every mover whose top is y (DESIGN §3.0: a mover is a floor)
+  function feetRow(y) { const r = Math.round(y / TILE); return Math.abs(y - r * TILE) < 0.5 ? r : -1; }
+  /** Pixels of [x−hw, x+hw] standing over footing at the feet line y. */
+  function footOverlap(level, y, x, hw) {
+    const row = feetRow(y), ps = level.platforms;
+    let ov = 0;
+    if (row >= 0) { const c0 = Math.floor((x - hw) / TILE), c1 = Math.floor((x + hw - 0.001) / TILE); for (let c = c0; c <= c1; c++) if (footingAt(level, c, row)) ov += Math.min(x + hw, (c + 1) * TILE) - Math.max(x - hw, c * TILE); }
+    for (let i = 0; i < ps.length; i++) { const p = ps[i]; if (Math.abs(p.y - y) > 0.5) continue; const o = Math.min(x + hw, p.x + p.w) - Math.max(x - hw, p.x); if (o > 0) ov += o; }
+    return ov;
+  }
+  /** From the point x, the far edge (along f) of the unbroken footing run under it at the feet line y (x itself when x is over none). */
+  function footEdge(level, y, x, f) {
+    const row = feetRow(y), ps = level.platforms;
+    let e = x;
+    for (let n = 0; n < 16; n++) {
+      const probe = f > 0 ? e : e - 0.001;
+      let next = e;
+      if (row >= 0) { const c = Math.floor(probe / TILE); if (footingAt(level, c, row)) next = f > 0 ? (c + 1) * TILE : c * TILE; }
+      for (let i = 0; i < ps.length; i++) {
+        const p = ps[i]; if (Math.abs(p.y - y) > 0.5 || probe < p.x || probe >= p.x + p.w) continue;
+        const pe = f > 0 ? p.x + p.w : p.x; if ((pe - next) * f > 0) next = pe;
+      }
+      if (next === e) break;
+      e = next;
+    }
+    return e;
+  }
 
   // ---- Tessik: Pulse Line — a 26×26 wedge sliding along the floor ----
   function PulseLine(owner) {
@@ -788,14 +815,20 @@
       const hw = this.w / 2, c0 = Math.floor((this.x - hw) / TILE), c1 = Math.floor((this.x + hw - 0.001) / TILE);
       if (E.overlapsSolid(lv, this.x - hw, this.y - this.h + 2, this.w, this.h - 4)) { this.dead = true; return; }   // wall
       const row = Math.floor((this.y + 0.5) / TILE);
-      let foot = false;
-      for (let tx = c0; tx <= c1; tx++) if (footingAt(lv, tx, row)) { foot = true; break; }
-      if (foot) this.y = row * TILE;
-      else { // step down at most one tile, else the wave dies at the drop
-        let below = false;
-        for (let tx = c0; tx <= c1; tx++) if (footingAt(lv, tx, row + 1)) { below = true; break; }
-        if (below) this.y = (row + 1) * TILE; else { this.dead = true; return; }
+      let fy = Infinity;
+      for (let tx = c0; tx <= c1; tx++) if (footingAt(lv, tx, row)) { fy = row * TILE; break; }
+      // a mover is a floor (DESIGN §3.0): the wave rides the top of one under it (within a few px above, or up to one tile below)
+      const ps = lv.platforms;
+      for (let i = 0; i < ps.length; i++) {
+        const q = ps[i];
+        if (this.x + hw <= q.x || this.x - hw >= q.x + q.w || q.y < this.y - 8 || q.y > this.y + TILE + 0.5) continue;
+        if (q.y < fy) fy = q.y;
       }
+      if (fy === Infinity) { // step down at most one tile, else the wave dies at the drop
+        for (let tx = c0; tx <= c1; tx++) if (footingAt(lv, tx, row + 1)) { fy = (row + 1) * TILE; break; }
+      }
+      if (fy === Infinity) { this.dead = true; return; }
+      this.y = fy;
       if (this.travelled >= s.range || this.life >= s.life) { this.dead = true; return; }
       registerBox(game, this, this.hit);
       if ((this.life & 3) === 0) fxDot(this.x - this.dir * 10, this.y - 4, 0, -0.3, 14, 2, this.pl.curPal.glow);
@@ -872,7 +905,7 @@
       const dx = tx - x, dy = ty - y, d = Math.sqrt(dx * dx + dy * dy) || 1, sp = spec.speed / 60;
       this.vx = dx / d * sp; this.vy = dy / d * sp; this.facing = dx >= 0 ? 1 : -1;
       this.life = 0; this.dead = false; this.hit.hitList.length = 0;
-      fillHit(this.hit, this.pl.dmgOf(spec.dmg), spec.kb, 0, spec.meter, this.facing);
+      fillHit(this.hit, spec.dmg, spec.kb, 0, spec.meter, this.facing);   // sheet damage: the Triad is the Overclock form already
       game.spawnProjectile(this);
     };
     p.update = function (game) {
@@ -962,6 +995,7 @@
     this.move = null; this.moveName = ''; this.moveT = 0; this.chain = 0; this.chainTimer = 0; this.connected = false;
     this.landLag = 0; this.lockout = 0; this.guard = 0; this.armor = false;
     this.pogoActive = false; this.pogoGrace = false;
+    this.contactImmune = false;             // set per frame by a special whose body is meant to collide with its victim (dive, grab-press)
     this.squashX = 1; this.squashY = 1; this.squashT = 0; this.squashMax = 1;
     this.hurtRot = 0; this.lastVy = 0; this.stepT = 0; this.wantJump = false; this.canJumpCancel = false; this.canDashCancel = false;
     this.curPal = data.pal;                  // palette in use this frame (Overclock ramp / death ramp)
@@ -989,6 +1023,12 @@
   Player.prototype.dmgOf = function (d) { return this.ocActive ? Math.floor(d * R.ocDamage) : d; };
   Player.prototype.attacking = function () { return this.move !== null; };
   Player.prototype.canAct = function () { return !this.locked && this.hurtTimer <= 0 && !this.dead && this.ocTransform <= 0; };
+  /** Would a special/ultimate press start right now? (energy for its cost, and the program's own refusals — Tessik's second Pulse Line) */
+  Player.prototype.canStartSpecial = function () {
+    const m = this.ocActive ? this.data.moves.ultimate : this.data.moves.special;
+    if (!m || this.energy < m.cost) return false;
+    return !(this.program.refuses && this.program.refuses(this));
+  };
   Player.prototype.squash = function (sx, sy, frames) { this.squashX = sx; this.squashY = sy; this.squashT = frames; this.squashMax = frames; };
   Player.prototype.freeBolt = function () { const b = this.bolts; if (!b) return null; for (let i = 0; i < b.length; i++) if (b[i].dead) return b[i]; return null; };
   /** Forget pooled projectiles the engine dropped (room load clears game.projectiles without flagging them). */
@@ -1022,7 +1062,7 @@
     else { this.setState('attack'); this.vx *= 0.5; }
   };
   Player.prototype.endMove = function () {
-    this.move = null; this.moveName = ''; this.moveT = 0; this.pogoActive = false; this.sp.phase = ''; this.armor = false;
+    this.move = null; this.moveName = ''; this.moveT = 0; this.pogoActive = false; this.sp.phase = ''; this.armor = false; this.contactImmune = false;
     this.sp.held = null; this.sp.lockMove = false;
     if (this.state === 'attack' || this.state === 'air' || this.state === 'down') this.setState(this.onGround ? 'idle' : 'fall');
   };
@@ -1031,10 +1071,13 @@
   /** Engine callback for the generic descriptor: a hit connected (enemy, boss, enemy projectile or 'spike'). */
   Player.prototype._onHit = function (victim, result, game) {
     this.connected = true;
-    if (this.moveName === 'down') this.pogo(game);
+    if (this.moveName === 'down') this.pogo(game, victim);
   };
-  Player.prototype.pogo = function (game) {
+  Player.prototype.pogo = function (game, victim) {
     this.vy = R.pogoVy; this.airJumps = 1; this.airDash = 1;
+    // the down box is registered before the move of the frame, so the body may have sunk a few px into the
+    // victim's top by now: bounce from its surface (contact is skipped on this tick either way)
+    if (victim && victim.w !== undefined && E.overlap(this, victim)) { const top = victim.y - victim.h; if (this.y > top && this.y - top < 20) this.y = top; }
     this.endMove(); this.pogoActive = true; this.pogoGrace = true;   // stays "pogo" for the engine's hazard check this tick
     this.landLag = 0; this.setState('jump'); this.jumpCutAvail = false;
     FX.burst('pogo', this.x, this.y, 5, { color: this.curPal.glow });
@@ -1069,14 +1112,16 @@
     this.flash = 6;
     if (!hazard) {
       this.iframes = R.iFrames;
-      const away = fromX === undefined || fromX === null ? -this.facing : (U.sign(this.x - fromX) || -this.facing);
+      let away = fromX === undefined || fromX === null ? -this.facing : (U.sign(this.x - fromX) || -this.facing);
+      // DESIGN §3.3: acid puddles and stuck needles knock straight up — (0, −300)·weight, no horizontal push
+      const noKbx = !!(opts && opts.hit && opts.hit.noKbx);
       if (this.armor) { // Brackmaw's Anvil Drop: damage only, never interrupted
         FX.hitstop(2); FX.burst('chip', this.x, this.cy(), 3, { color: P.DANGER, dir: away }); Au.sfx('hurt', this.x);
       } else {
         this.hurtTimer = R.hurtFrames; this.setState('hurt');
         this.cancelMove(); this.dashing = false; this.dashT = 0; this.clinging = false; this.beamT = 0;
         const k = this.data.weight * (this.ocActive ? R.ocKbTaken : 1);
-        this.vx = R.hurtKb[0] * away * k; this.vy = R.hurtKb[1] * k;
+        this.vx = noKbx ? 0 : R.hurtKb[0] * away * k; this.vy = R.hurtKb[1] * k;
         this.squash(1.15, 0.85, 4);
         FX.hitstop(R.hurtHitstop); FX.shake(R.hurtShake[0], R.hurtShake[1]);
         FX.burst('chip', this.x, this.cy(), 6, { color: P.DANGER, dir: away });
@@ -1108,7 +1153,7 @@
     this.iframes = opts.iframes || 0; this.hurtTimer = 0; this.flash = 0; this.guard = 0; this.armor = false;
     this.cancelMove(); this.dashing = false; this.dashT = 0; this.dashCd = 0; this.clinging = false;
     this.overclock = 0; this.ocTransform = 0; this.ocRevert = 0; this.ocActive = false; this.ocWarnT = 0; this.curPal = this.data.pal;
-    this.landLag = 0; this.lockout = 0; this.wallLock = 0; this.coyote = 0; this.wallCoyote = 0;
+    this.landLag = 0; this.lockout = 0; this.wallLock = 0; this.coyote = 0; this.wallCoyote = 0; this.jumpCutAvail = false; this.contactImmune = false;
     this.airJumps = opts.airJumps !== undefined ? opts.airJumps : 1; this.airDash = this.airJumps;
     this.onGround = false; this.ground = null; this.dropThrough = 0;
     this.squashX = this.squashY = 1; this.squashT = 0; this.pogoActive = false; this.pogoGrace = false;
@@ -1121,7 +1166,8 @@
     this.x = x; this.y = y; this.px = x; this.py = y;
     this.vx = opts.vx || 0; this.vy = opts.vy || 0;
     this.cancelMove(); this.dashing = false; this.dashT = 0; this.clinging = false; this.wallLock = 0; this.guard = 0; this.armor = false;
-    this.hurtTimer = 0; this.landLag = 0; this.pogoActive = false; this.pogoGrace = false;
+    this.hurtTimer = 0; this.landLag = 0; this.pogoActive = false; this.pogoGrace = false; this.contactImmune = false;
+    this.jumpCutAvail = false;   // a chute launch (vy set here) is not a jump: releasing the key must not cut it
     this.onGround = false; this.wasOnGround = false; this.ground = null; this.dropThrough = 0; this.coyote = 0; this.wallCoyote = 0;
     if (opts.iframes) this.iframes = Math.max(this.iframes, opts.iframes);
     if (opts.airJumps !== undefined) { this.airJumps = opts.airJumps; this.airDash = opts.airJumps; }
@@ -1148,11 +1194,13 @@
     if (this.dashCd > 0) this.dashCd--;
     if (this.lockout > 0) this.lockout--;
     if (this.wallLock > 0) this.wallLock--;
-    if (this.wallCoyote > 0) this.wallCoyote--;
     if (this.guard > 0) this.guard--;
     if (sp.flash > 0) sp.flash--;
     if (this.squashT > 0 && --this.squashT === 0) { this.squashX = this.squashY = 1; }
     if (this.chainTimer > 0 && --this.chainTimer === 0) this.chain = 0;
+    // Orrubel: the engine may kill the ring without running its update (off-room cull, the 64-projectile
+    // eviction) — the heavy must never stay locked behind a ring that no longer exists
+    if (sp.ringOut && this.ring && this.ring.dead) sp.ringOut = false;
 
     // ---- Overclock timers (DESIGN §3.9) ----
     if (this.ocTransform > 0) {
@@ -1183,26 +1231,10 @@
       return;
     }
 
-    const act = this.canAct();
+    let act = this.canAct();
     const dir = act ? ((inp.right.down ? 1 : 0) - (inp.left.down ? 1 : 0)) : 0;
-    const wasGround = this.onGround;
+    const wasGround = this.onGround, wasClinging = this.clinging;
     if (this.onGround) { this.coyote = R.coyote; this.airJumps = 1; this.airDash = 1; }
-    else if (this.coyote > 0) this.coyote--;
-
-    // ---- Overclock activation: idle/run/jump/fall/cling only ----
-    if (act && inp.overclock.buffer > 0 && this.meter >= this.meterMax && !this.ocActive && !this.attacking() && !this.dashing && STATES_OC[this.state]) {
-      In.consume('overclock');
-      this.ocTransform = R.ocTransform - 8; this.clinging = false; this.vx = 0; this.setState('overclock');
-      FX.hitstop(8); FX.flash('#FFFFFF', 0.6, 8); FX.shake(6, 12);
-      FX.burst('spark', this.x, this.cy(), 24, { color: d.ocPalette.glow });
-      FX.burst('ring', this.x, this.cy(), 1, { radius: 120 });
-      // shove every enemy within 60 px: (300 away, -200), no damage
-      const hp = this.hitPush; hp.hitList.length = 0;
-      hp.x = this.x - this.w / 2 - 60; hp.y = this.y - this.h - 60; hp.w = this.w + 120; hp.h = this.h + 120;
-      hp.dmg = 0; hp.kbx = 300; hp.kby = -200; hp.facing = this.facing; hp.hitstop = 0; hp.energy = 0; hp.meter = 0;
-      game.registerHit(hp);
-      Au.sfx('overclockOn', this.x);
-    }
 
     // ---- Burst Line (dash): in progress ----
     if (this.dashing) {
@@ -1227,6 +1259,24 @@
     }
     if (this.landLag > 0) this.landLag--;
 
+    // ---- Overclock activation: idle/run/jump/fall/cling only ----
+    // checked AFTER the move in progress has ticked (and possibly ended), like jump/light/dash below, so a press
+    // buffered through the end of an attack fires on the first free frame (DESIGN §2.5 "first legal frame")
+    if (act && inp.overclock.buffer > 0 && this.meter >= this.meterMax && !this.ocActive && !this.attacking() && !this.dashing && STATES_OC[this.state]) {
+      In.consume('overclock');
+      this.ocTransform = R.ocTransform - 8; this.clinging = false; this.vx = 0; this.setState('overclock');
+      FX.hitstop(8); FX.flash('#FFFFFF', 0.6, 8); FX.shake(6, 12);
+      FX.burst('spark', this.x, this.cy(), 24, { color: d.ocPalette.glow });
+      FX.burst('ring', this.x, this.cy(), 1, { radius: 120 });
+      // shove every enemy within 60 px: (300 away, -200), no damage
+      const hp = this.hitPush; hp.hitList.length = 0;
+      hp.x = this.x - this.w / 2 - 60; hp.y = this.y - this.h - 60; hp.w = this.w + 120; hp.h = this.h + 120;
+      hp.dmg = 0; hp.kbx = 300; hp.kby = -200; hp.facing = this.facing; hp.hitstop = 0; hp.energy = 0; hp.meter = 0;
+      game.registerHit(hp);
+      Au.sfx('overclockOn', this.x);
+      act = false;   // the transform owns the rest of this frame: no dash / attack / jump starts on it
+    }
+
     // ---- Burst Line: start ----
     if (act && this.abilities.burstLine && inp.dash.buffer > 0 && this.dashCd <= 0 && !this.attacking() && this.landLag <= 0 && (this.onGround || this.airDash > 0)) {
       In.consume('dash');
@@ -1240,22 +1290,31 @@
 
     // ---- Neutral attack inputs ----
     if (!this.move && act && this.landLag <= 0 && this.lockout <= 0) {
+      // DESIGN §3.5: an air attack / down-strike may start any time airborne except during dash/hurt/CLING —
+      // while clinging (`this.clinging` = last frame's cling) the press is left buffered for the wall jump
       if (inp.light.buffer > 0) {
-        In.consume('light');
         if (this.onGround) {
+          In.consume('light');
           this.chain = this.chainTimer > 0 ? this.chain + 1 : 1; if (this.chain > 3) this.chain = 1;
           if (dir !== 0) this.facing = dir;
           this.startMove('light' + this.chain);
-        } else if (inp.down.down) this.startMove('down');
-        else this.startMove('air');
-        this.tickMove(game, dir);
+          this.tickMove(game, dir);
+        } else if (!this.clinging) {
+          In.consume('light');
+          if (inp.down.down) this.startMove('down'); else this.startMove('air');
+          this.tickMove(game, dir);
+        }
       } else if (inp.heavy.buffer > 0) {
-        In.consume('heavy');
         if (this.onGround) {
+          In.consume('heavy');
           if (!(this.ring && sp.ringOut)) { if (dir !== 0) this.facing = dir; this.chain = 0; this.chainTimer = 0; this.startMove('heavy'); this.tickMove(game, dir); }
-        } else { this.startMove('down'); this.tickMove(game, dir); }
+        } else if (!this.clinging) { In.consume('heavy'); this.startMove('down'); this.tickMove(game, dir); }
       } else if (inp.special.buffer > 0) {
-        if (this.program.press(this, game, dir)) { this.chain = 0; this.chainTimer = 0; }
+        if (this.program.press(this, game, dir)) {
+          this.chain = 0; this.chainTimer = 0;
+          // the press frame is f1 of the special (DESIGN §3.7 "charged on f1"), as startMove + tickMove is for generic moves
+          if (this.move && (this.moveName === 'special' || this.moveName === 'ultimate')) physDone = this.program.tick(this, game, dir);
+        }
       }
     }
 
@@ -1312,6 +1371,9 @@
     }
     if (inp.jump.released && this.vy < 0 && this.jumpCutAvail) { this.vy *= R.jumpCut; this.jumpCutAvail = false; }
     if (this.hitCeiling) this.jumpCutAvail = false;
+    // coyote windows count down after the jump check: airborne frames 1–6 (ground) / 1–5 (wall) still jump
+    if (!this.onGround && this.coyote > 0) this.coyote--;
+    if (!this.clinging && !wasClinging && this.wallCoyote > 0) this.wallCoyote--;   // the frame the wall is let go does not count
 
     // ---- Gravity & move: half-step (leapfrog) so the analytic apex v²/2g of DESIGN §4.1 holds ----
     if (!physDone) {
@@ -1328,7 +1390,7 @@
       if (this.lastVy >= 900) FX.shake(2, 4);
       Au.sfx('land', this.x);
       if (this.moveName === 'down') { this.endMove(); this.landLag = d.downLandLag; this.chain = 0; this.chainTimer = 0; }
-      else if (this.moveName === 'air') { const m = this.move; this.endMove(); if (this.moveT > m.s) this.landLag = R.airLandLag; this.chain = 0; this.chainTimer = 0; }
+      else if (this.moveName === 'air') { const past = this.moveT > this.move.s; this.endMove(); if (past) this.landLag = R.airLandLag; this.chain = 0; this.chainTimer = 0; }
       else if (this.move && this.state === 'air') { this.setState('attack'); }   // an air-started special continues grounded
       else if (!this.move) { this.chain = 0; this.chainTimer = 0; }
       this.program.onLand(this, game);
@@ -1382,7 +1444,12 @@
       if (inHit) {
         if (inp.jump.buffer > 0 && (this.onGround || this.coyote > 0)) { this.cancelMove(); return; }
         if (this.abilities.burstLine && inp.dash.buffer > 0 && this.dashCd <= 0) { this.cancelMove(); return; }
-        if (inp.special.buffer > 0) { this.cancelMove(); return; }
+        if (inp.special.buffer > 0) {
+          if (this.canStartSpecial()) { this.cancelMove(); return; }
+          // DESIGN §3.7: a press that cannot start (energy, a second Pulse Line) is only the deny — sfx, bar flash,
+          // 10 f lockout — and never cancels the light, which runs to its end
+          In.consume('special'); this.lockout = 10; Au.sfx('deny'); game.denyFlash = 6;
+        }
       }
     } else if (act && name === 'heavy' && m.jumpCancel > 0 && this.connected && mt >= m.jumpCancel && inp.jump.buffer > 0 && this.onGround) { this.cancelMove(); return; }
     const active = mt > m.s && mt <= m.s + m.a;
@@ -1398,7 +1465,7 @@
     if (active && m.box) {
       const h = this.hit;
       this.boxHit(h, m.box, m.dmg, m.kb, m.hitstop, m.energy, m.meter, m.shake);
-      if (name === 'counter') { h.dmg = m.dmg; }
+      if (name === 'counter') { h.dmg = m.dmg; h.meter = 0; }   // +15 meter was granted on the catch (DESIGN §4.2.5: "+15 on catch")
       game.registerHit(h);
       if (name === 'down' && E.hazardInBox(game.level, h.x, h.y, h.w, h.h, false) === 'spike' && E.lastHazard.ch === '^') this.pogo(game);
     }
@@ -1444,11 +1511,12 @@
 
   // ---- TESSIK: Pulse Line (floor wave) / Sightline (beam) ----
   SPECIALS.tessik = {
+    refuses: function (pl) { return !pl.ocActive && !!pl.pulse && !pl.pulse.dead; },   // only one Pulse Line at a time
     press: function (pl, game, dir) {
       if (!pl.onGround) return false;                       // grounded only; the 6 f buffer fires on landing
       In.consume('special');
       const oc = pl.ocActive, m = oc ? pl.data.moves.ultimate : pl.data.moves.special;
-      if (!oc && pl.pulse && !pl.pulse.dead) return true;   // only one Pulse Line: a second press is ignored
+      if (!oc && pl.pulse && !pl.pulse.dead) { pl.lockout = 10; Au.sfx('deny'); game.denyFlash = 6; return true; }   // only one Pulse Line: a second press is refused (deny, no energy)
       if (!spend(pl, game, m.cost)) return true;
       beginSpecial(pl, oc ? 'ultimate' : 'special', dir);
       pl.beamT = 0;
@@ -1525,6 +1593,7 @@
       if (sp.phase === 'windAir') { if (mt > m.air.s) { sp.phase = 'dive'; sp.t = 0; } else return false; }
       if (sp.phase === 'dive') {
         const a = m.air;
+        pl.contactImmune = true;   // the dive drives the body through its victim: no contact damage until the burst is done
         pl.vy = a.diveVy; pl.vx = dir * a.drift; pl.lastVy = pl.vy;
         pl.moveAndCollide(game.level);
         pl.boxHit(pl.hitS2, a.box, a.dmg, m.kb, 4, 0, m.meter, null); pl.hitS2.kbx = 200; pl.hitS2.kby = -100; if (sp.ult) pl.hitS2.dmg = a.dmg;
@@ -1534,7 +1603,7 @@
         return true;
       }
       if (sp.phase === 'burst') {
-        sp.t++; sp.lockMove = true; pl.vx = 0;
+        sp.t++; sp.lockMove = true; pl.vx = 0; pl.contactImmune = sp.dive;
         if (sp.t === 1) {
           FX.shake(m.shake[0], m.shake[1]); FX.burst('chip', pl.x, pl.y, sp.ult ? 10 : 5, { color: pl.data.palette.accent });
           FX.burst('ring', pl.x, pl.y - 6, 1, { radius: m.ringR, life: 14 }); Au.sfx('heavyHit', pl.x);
@@ -1545,7 +1614,7 @@
         if (sp.t >= m.a) { sp.phase = 'recover'; sp.t = 0; }
         return false;
       }
-      if (sp.phase === 'recover') { sp.t++; sp.lockMove = true; if (sp.t > m.r) { pl.endMove(); sp.lockMove = false; } return false; }
+      if (sp.phase === 'recover') { sp.t++; sp.lockMove = true; pl.contactImmune = false; if (sp.t > m.r) { pl.endMove(); sp.lockMove = false; } return false; }
       pl.endMove(); return false;
     },
     onHit: function (pl, victim, result, game) { if (pl.sp.phase === 'burst') kbAway(pl, victim, result); },
@@ -1568,22 +1637,16 @@
       const mt = pl.moveT, lv = game.level, hw = pl.w / 2, f = pl.facing;
       if (!sp.ult) { // Blink Strike: f1–4 crouch, f5–12 slide, f13–20 recovery
         sp.lockMove = true;
-        if (mt <= m.s) return false;
+        if (mt <= m.s) { pl.vx = 0; return false; }   // the crouch plants the feet (no residual run drift into the slide)
         if (mt <= m.s + m.a) {
-          sp.phase = 'slide'; pl.guard = 2;
+          sp.phase = 'slide'; pl.guard = 1;   // read by this tick's hit resolution; the next update clears it (f5–12 only)
+          // stop at a drop: never leave less than half the body over footing — '#', '-', 'c' tiles under the feet
+          // or a mover (DESIGN §4.2.3). On a mover the body is also carried by its dx this frame (moveAndCollide).
+          const gp = pl.ground && pl.onGround ? pl.ground : null, bx = pl.x + (gp ? gp.dx : 0), fy = pl.y + (gp ? gp.dy : 0);
           let step = m.slide;
-          if (!pl.ground) { // stop at a drop: never leave less than half the body over footing
-            const rowBelow = Math.floor((pl.y + 0.5) / TILE), nx = pl.x + step * f;
-            const c0 = Math.floor((nx - hw) / TILE), c1 = Math.floor((nx + hw - 0.001) / TILE);
-            let overlap = 0;
-            for (let c = c0; c <= c1; c++) if (footingAt(lv, c, rowBelow)) overlap += Math.min(nx + hw, (c + 1) * TILE) - Math.max(nx - hw, c * TILE);
-            if (overlap < hw) {
-              let c = Math.floor((pl.x + f * (hw - 0.001)) / TILE), n = 0;
-              while (n++ < 4 && footingAt(lv, c, rowBelow)) c += f;
-              const edge = f > 0 ? c * TILE : (c + 1) * TILE;
-              const lim = edge - f * hw;
-              step = Math.max(0, (lim - pl.x) * f);
-            }
+          if (footOverlap(lv, fy, bx + step * f, hw) < hw) {
+            const lim = footEdge(lv, fy, bx + f * (hw - 0.001), f) - f * hw;   // front edge flush with the ledge edge
+            step = Math.max(0, Math.min(step, (lim - bx) * f));
           }
           pl.vx = step * 60 * f; pl.vy = 0; pl.lastVy = 0;
           pl.moveAndCollide(lv);
@@ -1598,7 +1661,7 @@
         return false;
       }
       // Afterimage Storm
-      if (mt <= m.guard) pl.guard = 2;
+      if (mt <= m.guard) pl.guard = 1;   // f1–38 exactly (cleared at the top of the next update)
       if (mt <= m.s) { sp.lockMove = true; return false; }
       const bi = Math.floor((mt - m.s - 1) / m.blinkFrames), bf = (mt - m.s - 1) % m.blinkFrames;
       if (bi < m.blinks) {
@@ -1689,7 +1752,7 @@
         return true;
       }
       if (sp.phase === 'press') {
-        sp.t++;
+        sp.t++; pl.contactImmune = true;   // the victim is held against the body (DESIGN §4.2.5)
         const half = pr.frames / 2;
         pl.vy = (sp.t <= half ? -1 : 1) * (pr.hop / half) * 60; pl.vx = 0; pl.lastVy = 0;
         pl.moveAndCollide(game.level);
@@ -1699,7 +1762,7 @@
         return true;
       }
       if (sp.phase === 'slam') {
-        sp.t++; pl.vx = 0;
+        sp.t++; pl.vx = 0; pl.contactImmune = true;
         if (sp.t === 1) { FX.shake(sl.shake[0], sl.shake[1]); FX.burst('ring', pl.x + pl.facing * 20, pl.y, 1, { radius: 40 }); FX.burst('dust', pl.x + pl.facing * 24, pl.y, 6); Au.sfx('heavyHit', pl.x); }
         const v = sp.held;
         if (v && !v.dead) { // the held victim takes the full press
@@ -1711,7 +1774,7 @@
         if (sp.t >= sl.frames) { sp.phase = 'recover'; sp.t = 0; sp.held = null; }
         return false;
       }
-      if (sp.phase === 'recover') { sp.t++; sp.lockMove = true; if (sp.t > sl.r) { pl.endMove(); sp.lockMove = false; } return false; }
+      if (sp.phase === 'recover') { sp.t++; sp.lockMove = true; pl.contactImmune = false; if (sp.t > sl.r) { pl.endMove(); sp.lockMove = false; } return false; }
       if (sp.phase === 'whiff') { sp.t++; sp.lockMove = true; if (sp.t > m.r) { pl.endMove(); sp.lockMove = false; } return false; }
       pl.endMove(); return false;
     },
@@ -1806,16 +1869,29 @@
       connected: false, hurtTimer: 0, flash: 0, dashing: false, clinging: false, w: d.box.w, h: d.box.h, data: d, sp: { phase: '', ringOut: false, flash: 0 }, beamT: 0 };
   }
   for (const id in DATA) previews[id] = previewView(DATA[id]);
-  function drawPreview(ctx, id, x, y, scale, t) {
+  // DESIGN §12.10 showcase: 180 f of idle, then one pose of the cycle held for its §4.2 frames (48 f slot)
+  const POSES = ['run', 'light1', 'light2', 'light3', 'jump', 'heavy'], POSE_SLOT = 228, POSE_IDLE = 180;
+  function drawPreview(ctx, id, x, y, scale, t, showcase) {
     const d = DATA[id] || list[0], v = previews[d.id], rigDef = RIGS[d.id];
-    v.t = v.stateT = t | 0;
+    t = t | 0;
+    v.t = v.stateT = t;
+    let bob = 1 + 0.015 * Math.sin(t / 40 * TAU), dy = 0;
+    if (showcase) {
+      const slot = t % POSE_SLOT, k = slot - POSE_IDLE, pose = POSES[Math.floor(t / POSE_SLOT) % POSES.length];
+      if (k >= 0) {
+        if (pose === 'run') { v.state = 'run'; v.vx = d.run; v.stateT = k; bob = 1; }
+        else if (pose === 'jump') { const a = k / 47; v.state = a < 0.5 ? 'jump' : 'fall'; v.onGround = false; v.vy = -600 + a * 1200; v.stateT = k; dy = -4 * Math.sin(a * Math.PI) * d.jumpHeight / 3; bob = 1; }
+        else { const m = d.moves[pose], total = m.s + m.a + m.r; if (k < total) { v.state = 'attack'; v.moveName = pose; v.move = m; v.moveT = k + 1; v.stateT = k; bob = 1; } }
+      }
+    }
     ctx.save();
-    ctx.translate(x, y); ctx.scale(scale, scale * (1 + 0.015 * Math.sin(t / 40 * TAU)));
+    ctx.translate(x, y + dy); ctx.scale(scale, scale * bob);
     ctx.translate(0, -d.box.h / 2);
     rigDef.pose(rigDef.rig, v);
     drawRig(ctx, rigDef.rig.shapes, d.pal, null, 0);
     rigDef.extras(ctx, v, d.pal);
     ctx.restore();
+    v.state = 'idle'; v.moveName = ''; v.move = null; v.moveT = 0; v.vx = 0; v.vy = 0; v.onGround = true;   // the view is shared with the card previews
   }
 
   UB.Characters = {

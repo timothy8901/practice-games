@@ -969,7 +969,7 @@ Order: zone by zone along the critical path. Each room lists exits, enemies, haz
 ### `ns_climb` — The Null Spire
 
 * **Zone:** Nullspire (Zone 4)  **Size:** 48×72 tiles (1440×2160 px)
-* **On entering:** The hollow interior of an inverted spire, four screens tall. A black spine splits it: the left face is crumbling grates and a slow lift; the right face is three sheer shafts stacked over a pit of static. Wisps hunt in the dark. Both faces meet at a crown of one-way grates under a hole in the sky.
+* **On entering:** The empty interior of an inverted spire, four screens tall. A black spine splits it: the left face is crumbling grates and a slow lift; the right face is three sheer shafts stacked over a pit of static. Wisps hunt in the dark. Both faces meet at a crown of one-way grates under a hole in the sky.
 * **Exits** (id · edge · tile range · → target.exit · ability · arrival spawn tile):
   * `L` · left edge · rows 67–69 (x=0) · → `ns_base.R` · **none** · spawn (2,69)
   * `R` · right edge · rows 34–36 (x=47) · → `ns_plunge.L2` · **Grip Protocol (wall cling/jump)** · spawn (45,36) — reached from the top of shaft 2 (right ledge row 37)

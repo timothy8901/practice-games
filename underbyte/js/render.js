@@ -18,8 +18,12 @@
   const TILE = 30;
   const BG_W = 1280, BG_H = 720;
   const P = UB.Palette;
-  const bgCache = Object.create(null);  // zoneId → {bg0,bg1,bg2}
+  const bgCache = Object.create(null);  // zoneId → {bg0,bg1,bg2,scale}
   let vignette = null;
+  // Backing scale (the canvas devicePixelRatio / crisp-letterbox scale, 1–2). Every full-screen cache
+  // (parallax layers, fog hole, vignette) is built at this scale and blitted 1:1, so a DPR-2 frame costs
+  // the pixel count, not a bilinear upscale of 1× caches (which was ~10× in software raster).
+  let scale = 1;
 
   function makeCanvas(w, h) {
     const c = document.createElement('canvas'); c.width = w; c.height = h; return c;
@@ -32,19 +36,29 @@
     ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y); ctx.closePath();
   }
 
-  const Render = { rrect: rrect, makeCanvas: makeCanvas };
+  const Render = { rrect: rrect, makeCanvas: makeCanvas, scale: 1 };
+  /** main.js/engine: the backing scale changed → every scale-bound cache is rebuilt on first use. */
+  Render.setScale = function (s) {
+    s = s > 0 ? s : 1;
+    if (s === scale) return;
+    scale = s; Render.scale = s;
+    for (const k in bgCache) delete bgCache[k];
+    vignette = null;   // the fog hole compares its own scale
+  };
 
   // --- backgrounds (DESIGN §11.1.5, simplified) --------------------------------------
   Render.buildBackground = function (zone) {
-    if (bgCache[zone.id]) return bgCache[zone.id];
+    const have = bgCache[zone.id];
+    if (have && have.scale === scale) return have;
     // The WORLD module paints the per-zone parallax of DESIGN §11.1.5 (UB.World.background);
     // the generic painter below is only the fallback when it is absent.
-    if (UB.World && typeof UB.World.background === 'function') { bgCache[zone.id] = UB.World.background(zone); return bgCache[zone.id]; }
+    if (UB.World && typeof UB.World.background === 'function') { bgCache[zone.id] = UB.World.background(zone, scale); return bgCache[zone.id]; }
     const pal = zone.palette;
     const rng = UB.Util.rng(zone.index * 1000 + 7);
-    const bg0 = makeCanvas(BG_W, BG_H), bg1 = makeCanvas(BG_W, BG_H), bg2 = makeCanvas(BG_W, BG_H);
+    const s = scale;
+    const bg0 = makeCanvas(Math.round(BG_W * s), Math.round(BG_H * s)), bg1 = makeCanvas(Math.round(BG_W * s), Math.round(BG_H * s)), bg2 = makeCanvas(Math.round(BG_W * s), Math.round(BG_H * s));
     // bg0: void gradient + dust dots
-    let c = bg0.getContext('2d');
+    let c = bg0.getContext('2d'); c.setTransform(s, 0, 0, s, 0, 0);
     const g = c.createLinearGradient(0, 0, 0, BG_H);
     g.addColorStop(0, pal.bg0); g.addColorStop(0.6, pal.bg0); g.addColorStop(1, pal.bg1);
     c.fillStyle = g; c.fillRect(0, 0, BG_W, BG_H);
@@ -54,7 +68,7 @@
       c.beginPath(); c.arc(rng() * BG_W, rng() * BG_H, 1 + rng(), 0, Math.PI * 2); c.fill();
     }
     // bg1: far silhouettes — hanging cables and leaning slabs
-    c = bg1.getContext('2d');
+    c = bg1.getContext('2d'); c.setTransform(s, 0, 0, s, 0, 0);
     c.strokeStyle = pal.bg1; c.fillStyle = pal.bg1; c.lineCap = 'round';
     for (let i = 0; i < 12; i++) {
       const x0 = rng() * BG_W, x1 = x0 + 120 + rng() * 300, sag = 80 + rng() * 120;
@@ -68,7 +82,7 @@
       c.restore();
     }
     // bg2: mid layer — smaller, denser slabs and a few glow lamps
-    c = bg2.getContext('2d');
+    c = bg2.getContext('2d'); c.setTransform(s, 0, 0, s, 0, 0);
     c.fillStyle = pal.bg2;
     for (let i = 0; i < 11; i++) {
       const w = 20 + rng() * 30, h = 60 + rng() * 90, x = rng() * BG_W, lean = (rng() - 0.5) * 0.3;
@@ -84,22 +98,80 @@
       c.globalAlpha = 0.35; c.beginPath(); c.arc(rng() * BG_W, BG_H - 60 - rng() * 300, 3, 0, Math.PI * 2); c.fill();
     }
     c.globalAlpha = 1;
-    bgCache[zone.id] = { bg0: bg0, bg1: bg1, bg2: bg2 };
+    bgCache[zone.id] = { bg0: bg0, bg1: bg1, bg2: bg2, scale: s };
     return bgCache[zone.id];
   };
 
+  // Layers are BG_W×BG_H logical px at the backing scale: the 9-argument drawImage maps the whole
+  // bitmap onto BG_W×BG_H logical px, which under the dpr transform is a 1:1 copy.
   function drawWrapped(ctx, img, ox, oy) {
     ox = ((ox % BG_W) + BG_W) % BG_W; oy = ((oy % BG_H) + BG_H) % BG_H;
+    const iw = img.width, ih = img.height;
     for (let dx = ox - BG_W; dx < 960; dx += BG_W) {
-      for (let dy = oy - BG_H; dy < 540; dy += BG_H) ctx.drawImage(img, dx, dy);
+      for (let dy = oy - BG_H; dy < 540; dy += BG_H) ctx.drawImage(img, 0, 0, iw, ih, dx, dy, BG_W, BG_H);
     }
   }
   /** Draw the three parallax layers for the camera position (logical px). */
   Render.drawBackground = function (ctx, zone, camX, camY) {
     const b = Render.buildBackground(zone);
-    ctx.drawImage(b.bg0, 0, 0);
+    ctx.drawImage(b.bg0, 0, 0, b.bg0.width, b.bg0.height, 0, 0, BG_W, BG_H);
     drawWrapped(ctx, b.bg1, -camX * 0.25, -camY * 0.125 - 180);
     drawWrapped(ctx, b.bg2, -camX * 0.5, -camY * 0.25 - 180);
+  };
+
+  // --- ambient dynamic layer (DESIGN §11.1.6): per zone, ≤ 60 primitives, stateless (seeded by index + frame)
+  // Drawn between bg2 and the tiles in screen space; particles follow the camera at 0.8× so they read as
+  // part of the room rather than the backdrop. Nothing is allocated per frame.
+  const AMB_N = { driftcache: 24, loomworks: 20, brinevault: 20, nullspire: 40, rootwell: 24 };
+  const FW = 1024, FH = 604;   // particle field (screen + 64 px margin) so wrapped motes never pop at the edges
+  function fieldX(i, frame, v, camX, k) { const b = UB.Util.hash(i, 11, k, 1) % FW; return ((b + v * frame - camX * 0.8) % FW + FW) % FW - 32; }
+  function fieldY(i, frame, v, camY, k) { const b = UB.Util.hash(i, 23, k, 2) % FH; return ((b + v * frame - camY * 0.8) % FH + FH) % FH - 32; }
+  Render.drawAmbient = function (ctx, zone, level, frame, camX, camY) {
+    const n = AMB_N[zone.id]; if (!n) return;
+    const pal = zone.palette, id = zone.id, hash = UB.Util.hash;
+    ctx.save();
+    if (id === 'driftcache') {            // drifting dust motes r 1.5 PAPER α 0.25; vx −6..6, vy −10 px/s, wrap
+      ctx.fillStyle = P.PAPER; ctx.globalAlpha = 0.25;
+      for (let i = 0; i < n; i++) {
+        const vx = ((hash(i, 3, 0, 9) % 13) - 6) / 60, x = fieldX(i, frame, vx, camX, 1), y = fieldY(i, frame, -10 / 60, camY, 1);
+        ctx.beginPath(); ctx.arc(x, y, 1.5, 0, Math.PI * 2); ctx.fill();
+      }
+    } else if (id === 'loomworks') {      // sparks r 1–2 glow α 0.4 rising 40 px/s from the floor channels, sway ±6, life 50 f
+      ctx.fillStyle = pal.glow;
+      for (let i = 0; i < n; i++) {
+        const age = (frame + i * 17) % 50, r = 1 + (hash(i, 5, 0, 9) % 2);
+        const x = fieldX(i, 0, 0, camX, 2) + Math.sin((age + i * 5) / 8) * 6, y0 = fieldY(i, 0, 0, camY, 2);
+        ctx.globalAlpha = 0.4 * (age < 10 ? age / 10 : (age > 40 ? (50 - age) / 10 : 1));
+        ctx.beginPath(); ctx.arc(x, y0 - age * (40 / 60), r, 0, Math.PI * 2); ctx.fill();
+      }
+    } else if (id === 'brinevault') {     // 12 drips (2×6 hazard beads, 240 px/s, splash into 3 dots) + 8 slow bubbles r 2–3
+      ctx.fillStyle = pal.hazard;
+      for (let i = 0; i < 12; i++) {
+        const len = 160 + (hash(i, 7, 0, 9) % 300), cycle = len / 4 + 24, age = (frame * 1 + i * 37) % cycle;
+        const x = fieldX(i, 0, 0, camX, 3), y0 = fieldY(i, 0, 0, camY, 3) - 300;
+        if (age * 4 < len) { ctx.globalAlpha = 0.8; ctx.fillRect(x - 1, y0 + age * 4, 2, 6); }
+        else {
+          const k = (age - len / 4) / 24; ctx.globalAlpha = 0.6 * (1 - k);
+          for (let d = -1; d <= 1; d++) { ctx.beginPath(); ctx.arc(x + d * (4 + k * 8), y0 + len - k * 10 + 6, 1.5, 0, Math.PI * 2); ctx.fill(); }
+        }
+      }
+      ctx.fillStyle = pal.glow; ctx.globalAlpha = 0.3;
+      for (let i = 0; i < 8; i++) {
+        const x = fieldX(i + 50, 0, 0, camX, 4) + Math.sin((frame + i * 9) / 20) * 3, y = fieldY(i + 50, frame, -18 / 60, camY, 4), r = 2 + (hash(i, 9, 0, 9) % 2);
+        ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+      }
+    } else if (id === 'nullspire') {      // static flecks 2×2 glow α 0.5, teleporting every 3 f
+      ctx.fillStyle = pal.glow; ctx.globalAlpha = 0.5;
+      const step = Math.floor(frame / 3);
+      for (let i = 0; i < n; i++) ctx.fillRect(hash(step, i, 1, 7) % 960, hash(step, i, 2, 7) % 540, 2, 2);
+    } else if (id === 'rootwell') {       // ember motes r 2 glow α 0.35, vy −14, sin drift ±8, wrap
+      ctx.fillStyle = pal.glow; ctx.globalAlpha = 0.35;
+      for (let i = 0; i < n; i++) {
+        const x = fieldX(i, 0, 0, camX, 5) + Math.sin((frame + i * 13) / 30) * 8, y = fieldY(i, frame, -14 / 60, camY, 5);
+        ctx.beginPath(); ctx.arc(x, y, 2, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+    ctx.restore();
   };
 
   // --- static tile cache (DESIGN §11.1.4, §11.1.8) ------------------------------------
@@ -335,29 +407,32 @@
   };
 
   // --- fog & vignette (DESIGN §11.1.7) -----------------------------------------------------
-  // The fog "hole" (radial gradient: clear at r 120 → zone fog at r 520) is pre-rendered once
-  // per zone at half resolution (520×520, drawn 2× = 1040 px square) so no gradient is
-  // created per frame; the area outside the square is plain fog colour.
+  // The fog "hole" (radial gradient: clear at r 120 → zone fog at r 520) is pre-rendered once per
+  // zone/scale into ONE 1040 px square canvas at the backing scale (a 1:1 blit of its visible part
+  // per frame; 4.3 MB at scale 1, 17 MB at scale 2 — rebuilt on a zone change, never per frame);
+  // the area outside the square is plain fog colour.
   const HOLE = 1040, HOLE_HALF = HOLE / 2;
-  const fogCache = Object.create(null);   // zoneId → canvas
+  let fogHoleC = null, fogHoleZone = null, fogHoleScale = 0;
   function fogHole(zone) {
-    let c = fogCache[zone.id];
-    if (c) return c;
-    c = makeCanvas(HOLE / 2, HOLE / 2);
-    const g2 = c.getContext('2d');
-    const g = g2.createRadialGradient(HOLE / 4, HOLE / 4, 60, HOLE / 4, HOLE / 4, 260);
+    if (fogHoleC && fogHoleZone === zone.id && fogHoleScale === scale) return fogHoleC;
+    const s = scale, size = Math.round(HOLE * s);
+    if (!fogHoleC || fogHoleC.width !== size) fogHoleC = makeCanvas(size, size);
+    const g2 = fogHoleC.getContext('2d'); g2.setTransform(s, 0, 0, s, 0, 0); g2.clearRect(0, 0, HOLE, HOLE);
+    const g = g2.createRadialGradient(HOLE_HALF, HOLE_HALF, 120, HOLE_HALF, HOLE_HALF, 520);
     g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, zone.palette.fog);
-    g2.fillStyle = g; g2.fillRect(0, 0, HOLE / 2, HOLE / 2);
-    fogCache[zone.id] = c;
-    return c;
+    g2.fillStyle = g; g2.fillRect(0, 0, HOLE, HOLE);
+    fogHoleZone = zone.id; fogHoleScale = s;
+    return fogHoleC;
   }
   Render.drawFog = function (ctx, zone, px, py, isBoss) {
     ctx.fillStyle = zone.palette.fog; ctx.fillRect(0, 0, 960, 540);
     if (isBoss) return;
-    const hole = fogHole(zone);
+    const hole = fogHole(zone), s = scale;
     const hx = px - HOLE_HALF, hy = py - HOLE_HALF;
     ctx.globalAlpha = 0.5;
-    ctx.drawImage(hole, hx, hy, HOLE, HOLE);
+    // only the visible part of the square is blitted (1:1 at the backing scale)
+    const x0 = Math.max(0, hx), y0 = Math.max(0, hy), x1 = Math.min(960, hx + HOLE), y1 = Math.min(540, hy + HOLE);
+    if (x1 > x0 && y1 > y0) ctx.drawImage(hole, (x0 - hx) * s, (y0 - hy) * s, (x1 - x0) * s, (y1 - y0) * s, x0, y0, x1 - x0, y1 - y0);
     ctx.fillStyle = zone.palette.fog;
     // the four bands around the square (only the parts inside the screen)
     if (hy > 0) ctx.fillRect(0, 0, 960, hy);
@@ -368,13 +443,14 @@
   };
   Render.drawVignette = function (ctx) {
     if (!vignette) {
-      vignette = makeCanvas(960, 540);
-      const c = vignette.getContext('2d');
+      const s = scale;
+      vignette = makeCanvas(Math.round(960 * s), Math.round(540 * s));
+      const c = vignette.getContext('2d'); c.setTransform(s, 0, 0, s, 0, 0);
       const g = c.createRadialGradient(480, 270, 300, 480, 270, 640);
       g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,0.55)');
       c.fillStyle = g; c.fillRect(0, 0, 960, 540);
     }
-    ctx.drawImage(vignette, 0, 0);
+    ctx.drawImage(vignette, 0, 0, vignette.width, vignette.height, 0, 0, 960, 540);
   };
 
   UB.Render = Render;

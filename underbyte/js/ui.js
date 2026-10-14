@@ -32,7 +32,7 @@
     ui26b: UB.font(26, 'UI', true), ui30b: UB.font(30, 'UI', true), ui34b: UB.font(34, 'UI', true), ui36b: UB.font(36, 'UI', true),
     ui40b: UB.font(40, 'UI', true), ui44b: UB.font(44, 'UI', true), ui92b: UB.font(92, 'UI', true),
     mono11: UB.font(11, 'MONO'), mono12: UB.font(12, 'MONO'), mono12b: UB.font(12, 'MONO', true), mono13: UB.font(13, 'MONO'),
-    mono14: UB.font(14, 'MONO'), mono15: UB.font(15, 'MONO'), mono16: UB.font(16, 'MONO'), mono16b: UB.font(16, 'MONO', true),
+    mono14: UB.font(14, 'MONO'), mono15: UB.font(15, 'MONO'), mono16: UB.font(16, 'MONO'), mono16b: UB.font(16, 'MONO', true), mono18: UB.font(18, 'MONO'),
     mono20b: UB.font(20, 'MONO', true),
   };
 
@@ -129,9 +129,11 @@
     confirmQuit: false, confirmReset: false, confirmNew: false,
     fromTitle: false, pauseSel: -1,
     mapPan: { x: 0, y: 0 }, mapMin: { x: 0, y: 0 }, mapMax: { x: 0, y: 0 }, recentreReq: false,
-    mapRoomLine: '',
+    mapRoomLine: '', mapBestiary: '', mapBestiary2: '', mapCur: null,   // the map cursor room (null = the current room) + its footer lines (a long bestiary wraps to a 2nd row)
+    mapFootFree: -1,            // free footer width between the legend and the hints (measured once)
+    hudAlpha: 1,                // the hearts/energy/meter block fades while the fighter stands behind it (§12.1)
     toastT: 0, toastDur: 0, toast1: '', toast2: '', toastBottom: false,
-    bannerT: 0, bannerDur: 0, banner1: '', banner2: '', banner3: '', banner2Font: F.mono16,
+    bannerT: 0, bannerDur: 0, banner1: '', banner2: '', banner2b: '', banner3: '', banner2Font: F.mono16,
     cardT: 0, cardDur: 0, cardName: '', cardSub: '',
     // HUD animation state
     plRef: null, lastHp: 0, lastEnergy: 0, energyShown: 0, ghostFrom: 0, ghostTo: 0, ghostT: 0,
@@ -318,6 +320,16 @@
     if (own) { UI.banner2 = In.device === 'gamepad' ? own[1] : own[0]; if (!l3 || own[2]) UI.banner3 = own[2]; }
     measure.font = F.mono16;
     UI.banner2Font = measure.measureText(UI.banner2).width > 440 ? F.mono12 : F.mono16;
+    UI.banner2b = '';
+    if (UI.banner2Font === F.mono12) {   // still too wide for the 480 px panel: break it in two at the dash or the middle space
+      measure.font = F.mono12;
+      if (measure.measureText(UI.banner2).width > 440) {
+        const s = UI.banner2;
+        let cut = s.indexOf(' — ');
+        if (cut < 0) { let best = -1; for (let i = 0; i < s.length; i++) if (s[i] === ' ' && (best < 0 || Math.abs(i - s.length / 2) < Math.abs(best - s.length / 2))) best = i; cut = best; }
+        if (cut > 0) { UI.banner2b = s.slice(cut).replace(/^( — | )/, '').trim(); UI.banner2 = s.slice(0, cut).trim(); }
+      }
+    }
     UI.bannerDur = frames || 182; UI.bannerT = UI.bannerDur;
     const g = UI.game;
     if (g && g.level && g.cam) {   // 10 glitter from the panel corners (world space = screen + camera)
@@ -341,9 +353,14 @@
   /** Timers + HUD/select animation state; called every logic frame regardless of screen. */
   UI.tick = function (game) {
     UI.t++;
-    if (UI.toastT > 0) UI.toastT--;
-    if (UI.bannerT > 0) UI.bannerT--;
-    if (UI.cardT > 0) UI.cardT--;
+    // message timers freeze with the world while an overlay (pause/map/settings/shop/lore) is up in play: a boss card,
+    // zone toast or banner resumes where it was, and the "Gamepad disconnected — paused" toast stays up while paused
+    const frozen = game.screen === 'play' && !!game.overlay;
+    if (!frozen) {
+      if (UI.toastT > 0) UI.toastT--;
+      if (UI.bannerT > 0) UI.bannerT--;
+      if (UI.cardT > 0) UI.cardT--;
+    }
     if (UI.bitsPop > 0) UI.bitsPop--;
     if (UI.cardFlash > 0) UI.cardFlash--;
     if (UI.selSlide > 0) UI.selSlide--;
@@ -439,9 +456,15 @@
       }
     } else if (s === 'map') {
       if (st.map.pressed || st.back.pressed || st.pause.pressed) { Au.sfx('menuBack'); game.closeOverlay(); return; }
-      if (st.left.down) UI.mapPan.x += 4; if (st.right.down) UI.mapPan.x -= 4;   // 240 px/s
-      if (st.up.down) UI.mapPan.y += 4; if (st.down.down) UI.mapPan.y -= 4;
-      if (st.confirm.pressed || UI.recentreReq) { UI.mapPan.x = 0; UI.mapPan.y = 0; UI.recentreReq = false; }
+      // arrows / d-pad move the room cursor (key-repeat); the view pans to keep it centred (DESIGN §12.12, §15.11)
+      let dx = 0, dy = 0;
+      if (In.repeat('left')) dx = -1; else if (In.repeat('right')) dx = 1; else if (In.repeat('up')) dy = -1; else if (In.repeat('down')) dy = 1;
+      if (dx || dy) mapMoveCursor(game, dx, dy);
+      else {   // a held direction also pans the view freely (240 px/s) between cursor hops
+        if (st.left.down) UI.mapPan.x += 4; if (st.right.down) UI.mapPan.x -= 4;
+        if (st.up.down) UI.mapPan.y += 4; if (st.down.down) UI.mapPan.y -= 4;
+      }
+      if (st.confirm.pressed || UI.recentreReq) { UI.recentreReq = false; mapCursorTo(game, null); }
       UI.mapPan.x = U.clamp(UI.mapPan.x, UI.mapMin.x, UI.mapMax.x); UI.mapPan.y = U.clamp(UI.mapPan.y, UI.mapMin.y, UI.mapMax.y);
     } else if (s === 'settings') {
       const rows = UI.fromTitle ? 7 : 6;   // RESET SAVE only from the title; the last row is BACK
@@ -462,7 +485,7 @@
       if (st.confirm.pressed) {
         const r = game.buy(VENDOR[UI.sel].id);
         if (r === 'bought') { Au.sfx('vendorBuy'); UI.shopMsgT = 0; if (game.save.vendor.length >= VENDOR.length) UI.shopLine = TXT.vendorSoldOut; }
-        else { Au.sfx('deny'); game.denyFlash = 6; UI.shopMsg = r === 'poor' ? TXT.vendorPoor : TXT.vendorSoldOut; UI.shopMsgT = 90; }
+        else { Au.sfx('deny'); game.denyFlash = 6; if (r === 'poor') { UI.shopMsg = TXT.vendorPoor; UI.shopMsgT = 90; } }   // a SOLD row just refuses
       }
     } else if (s === 'lore') {
       UI.loreT++;
@@ -620,8 +643,14 @@
     ctx.save(); ctx.globalAlpha = a;
     UI.panel(ctx, 240, y, 480, 120);
     UI.text(ctx, UI.banner1, 480, y + 36, F.ui26b, P.SELECT, 'center', 'middle', 3);
-    UI.text(ctx, UI.banner2, 480, y + 68, UI.banner2Font, P.PAPER, 'center', 'middle');
-    UI.text(ctx, UI.banner3, 480, y + 96, F.mono13, P.PAPER_DIM, 'center', 'middle');
+    if (UI.banner2b) {
+      UI.text(ctx, UI.banner2, 480, y + 60, UI.banner2Font, P.PAPER, 'center', 'middle');
+      UI.text(ctx, UI.banner2b, 480, y + 75, UI.banner2Font, P.PAPER, 'center', 'middle');
+      UI.text(ctx, UI.banner3, 480, y + 100, F.mono13, P.PAPER_DIM, 'center', 'middle');
+    } else {
+      UI.text(ctx, UI.banner2, 480, y + 68, UI.banner2Font, P.PAPER, 'center', 'middle');
+      UI.text(ctx, UI.banner3, 480, y + 96, F.mono13, P.PAPER_DIM, 'center', 'middle');
+    }
     ctx.restore();
   }
   /** Boss title card (§12.13): INK band y 190–270 slides in from the left over 12 f, exits upward over 10 f. */
@@ -658,13 +687,21 @@
     }
     if (UI.hintStr) UI.text(ctx, UI.hintStr, 24, 520, F.mono13, P.PAPER_DIM, 'left', 'middle', 3);
   }
+  /** A toast drawn by drawScreen (above everything) rather than the HUD: any toast outside play, bottom toasts over an overlay. */
+  function toastOnTop(game) { return game.screen !== 'play' || (!!game.overlay && UI.toastBottom); }
   UI.drawHUD = function (ctx, game) {
     const pl = game.player; if (!pl) return;
     ctx.save();
     ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    // the hearts/energy/meter block (24..210 × 22..115) dims while the fighter's body is behind it (top-left arrivals)
+    const cam = game.cam, bx = pl.x - pl.w / 2 - cam.x, by = pl.y - pl.h - cam.y;
+    const behind = bx < 210 && bx + pl.w > 24 && by < 115 && by + pl.h > 22;
+    UI.hudAlpha = U.approach(UI.hudAlpha, behind ? 0.35 : 1, 0.08);
+    if (UI.hudAlpha < 1) ctx.globalAlpha = UI.hudAlpha;
     drawHearts(ctx, pl);
     drawEnergy(ctx, game, pl);
     drawMeter(ctx, pl);
+    ctx.globalAlpha = 1;
     drawBits(ctx);
     if (game.prompt) {   // ▲ REST / ▲ TRADE floating above the object, bobbing 2 px, with the bound key (§12.8)
       const bob = Math.sin(UI.t / 15) * 2, py = game.prompt.y - 24 + bob;
@@ -672,7 +709,7 @@
       UI.text(ctx, In.glyph('up'), game.prompt.x, py + 15, F.mono11, P.PAPER_DIM, 'center', 'middle', 2);
     }
     drawBossBar(ctx, game);
-    drawToast(ctx, game);
+    if (!toastOnTop(game)) drawToast(ctx, game);
     drawBanner(ctx);
     drawBossCard(ctx);
     if (pl.hp <= (pl.maxHp >= 7 ? 2 : 1) && pl.hp > 0 && !pl.dead) FX.drawLowHp(ctx, UI.lowPulse);
@@ -701,7 +738,7 @@
       ctx.drawImage(logoScan, -350, -60, 700, 120);
     }
     ctx.restore();
-    UI.text(ctx, TXT.tagline, 480, 232, F.mono16, P.PAPER_DIM, 'center', 'middle', 3);
+    UI.text(ctx, TXT.tagline, 480, 232, F.mono18, P.PAPER_DIM, 'center', 'middle', 3);
     const disabled = TITLE_DISABLED; disabled[1] = !game.hasSave();
     menuList(ctx, TXT.titleMenu, 480, 320, 44, F.ui24b, UI.confirmNew ? -1 : UI.sel, disabled);
     if (game.hasSave()) UI.text(ctx, UI.saveSum, 480, 386, F.mono12, P.PAPER_DIM, 'center', 'middle', 2);
@@ -732,10 +769,10 @@
   }
   function drawPreviewRig(ctx, d, x, alpha, t) {
     ctx.save(); ctx.globalAlpha = alpha;
-    ctx.fillStyle = d.palette.glow; ctx.globalAlpha = 0.10 * alpha; ctx.beginPath(); ctx.arc(x, 222, 110, 0, TAU); ctx.fill();
-    ctx.globalAlpha = 0.35 * alpha; ctx.fillStyle = P.INK; ctx.beginPath(); ctx.ellipse(x, 320, 60, 7, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = d.palette.glow; ctx.globalAlpha = 0.10 * alpha; ctx.beginPath(); ctx.arc(x, 202, 110, 0, TAU); ctx.fill();
+    ctx.globalAlpha = 0.35 * alpha; ctx.fillStyle = P.INK; ctx.beginPath(); ctx.ellipse(x, 300, 60, 7, 0, 0, TAU); ctx.fill();
     ctx.globalAlpha = alpha;
-    UB.Characters.drawPreview(ctx, d.id, x, 320, 3, t);
+    UB.Characters.drawPreview(ctx, d.id, x, 300, 3, t, true);   // showcase: a pose every 180 f (DESIGN §12.10)
     ctx.restore();
   }
   function drawSelect(ctx, game) {
@@ -757,14 +794,15 @@
     UI.panel(ctx, 560, 292, 360, 72);
     const ml = moveLinesFor(d);
     for (let i = 0; i < 3; i++) UI.text(ctx, ml[i], 576, 312 + i * 20, F.mono12, P.PAPER, 'left', 'middle');
-    // bio at (60,345) — the §15.3 paragraphs run 4 lines at 11px over 490 px, so they sit just above the cards
+    // bio — the §15.3 paragraphs run 4 lines at 11px over 490 px: y 322..361, under the preview halo (bottom 312)
+    // and above the lifted card (top 373)
     const bio = wrapped(d.bio || '', F.mono11, 490);
-    for (let i = 0; i < bio.length && i < 4; i++) UI.text(ctx, bio[i], 60, 328 + i * 13, F.mono11, P.PAPER_DIM, 'left', 'middle');
+    for (let i = 0; i < bio.length && i < 4; i++) UI.text(ctx, bio[i], 60, 322 + i * 13, F.mono11, P.PAPER_DIM, 'left', 'middle');
     // five cards, y 380..490
     for (let i = 0; i < list.length && i < 5; i++) {
       const f = list[i], on = i === UI.sel, x = CARD_X[i], y = 380;
       ctx.save();
-      if (on) { ctx.translate(x + 75, y + 55 - 8); ctx.scale(1.05, 1.05); ctx.translate(-(x + 75), -(y + 55)); }
+      if (on) { ctx.translate(x + 75, y + 55 - 4); ctx.scale(1.05, 1.05); ctx.translate(-(x + 75), -(y + 55)); }
       else ctx.globalAlpha = 0.75;
       UI.panel(ctx, x, y, 150, 110);
       if (on) { ctx.strokeStyle = P.SELECT; ctx.lineWidth = 3; Rn.rrect(ctx, x, y, 150, 110, 10); ctx.stroke(); }
@@ -850,7 +888,65 @@
       UI.mapMin.x = Math.min(0, 84 - 480 - (maxx * MAP_S - cx)); UI.mapMax.x = Math.max(0, 876 - 480 - (minx * MAP_S - cx));
       UI.mapMin.y = Math.min(0, 130 - 270 - (maxy * MAP_S - cy)); UI.mapMax.y = Math.max(0, 430 - 270 - (miny * MAP_S - cy));
     }
-    UI.mapRoomLine = cur ? (cur.name + (cur.boss && UB.Bosses.DATA[cur.boss.id] ? ' · ' + UB.Bosses.DATA[cur.boss.id].name : '')) : '';
+    mapCursorTo(game, null);
+  }
+  const VARIANT_NAMES = { brinecrab: 'Brinecrab', staticshot: 'Static-shot', rootbound: 'Rootbound', dripnode: 'Dripnode', nullnode: 'Nullnode', rootwisp: 'Rootwisp', acidvalve: 'Acid Valve', twinvalve: 'Twin Valve', rootram: 'Rootram', rootplate: 'Rootplate' };
+  const bestiaryTmp = [];
+  /** Point the map cursor at `room` (null = the current room): the view centres on it; footer lines rebuilt (DESIGN §12.12, §15.11). */
+  function mapCursorTo(game, room) {
+    const cur = game.level ? game.level.room : null, save = game.save;
+    const r = room || cur;
+    UI.mapCur = room;
+    if (!r || !cur) { UI.mapRoomLine = ''; UI.mapBestiary = ''; UI.mapBestiary2 = ''; UI.mapPan.x = 0; UI.mapPan.y = 0; return; }
+    UI.mapPan.x = room ? ((cur.gx + cur.gw / 2) - (r.gx + r.gw / 2)) * MAP_S : 0;
+    UI.mapPan.y = room ? ((cur.gy + cur.gh / 2) - (r.gy + r.gh / 2)) * MAP_S : 0;
+    UI.mapPan.x = U.clamp(UI.mapPan.x, UI.mapMin.x, UI.mapMax.x); UI.mapPan.y = U.clamp(UI.mapPan.y, UI.mapMin.y, UI.mapMax.y);
+    const visited = save.visited.indexOf(r.id) >= 0;
+    UI.mapRoomLine = visited ? r.name : '?';
+    let line = '';
+    if (r.boss && UB.Bosses.DATA[r.boss.id] && (visited || game.hasDeepPing())) {
+      const bd = UB.Bosses.DATA[r.boss.id];
+      line = bd.name + (bd.subtitle ? ' · ' + bd.subtitle : '') + (save.bossesDefeated.indexOf(r.boss.id) >= 0 ? ' · purged' : '');
+    } else if (visited && r.spawns.length) {
+      bestiaryTmp.length = 0;
+      for (let i = 0; i < r.spawns.length; i++) {
+        const sp = r.spawns[i], t = UB.Enemies.TYPES[sp.type];
+        const nm = sp.variant && VARIANT_NAMES[sp.variant] ? VARIANT_NAMES[sp.variant] : (t ? t.name : sp.type);
+        if (bestiaryTmp.indexOf(nm) < 0) bestiaryTmp.push(nm);
+      }
+      line = bestiaryTmp.join(' · ');
+    } else if (visited) line = 'no enemies';
+    // fit the line between the legend and the "R recentre · Esc / M close" hints: a long roster wraps at a ' · ' to a 2nd row
+    measure.font = F.mono11;
+    if (UI.mapFootFree < 0) {
+      const legendR = 60 + measure.measureText(TXT.mapLegend).width;
+      const rightL = 900 - measure.measureText(TXT.mapClose).width - 18 - measure.measureText(TXT.mapRecentre).width;
+      UI.mapFootFree = rightL - legendR - 24;
+    }
+    UI.mapBestiary2 = '';
+    if (measure.measureText(line).width > UI.mapFootFree) {
+      let best = -1, bestD = 1e9, i = line.indexOf(' · ');
+      while (i >= 0) { const dd = Math.abs(i - line.length / 2); if (dd < bestD) { bestD = dd; best = i; } i = line.indexOf(' · ', i + 3); }
+      if (best > 0) { UI.mapBestiary2 = line.slice(best + 3); line = line.slice(0, best); }
+    }
+    UI.mapBestiary = line;
+  }
+  /** Move the cursor to the nearest discovered room in the direction (dx, dy). */
+  function mapMoveCursor(game, dx, dy) {
+    const cur = game.level ? game.level.room : null, save = game.save;
+    const from = UI.mapCur || cur; if (!from) return;
+    const fx = from.gx + from.gw / 2, fy = from.gy + from.gh / 2;
+    let best = null, bestD = 1e9;
+    for (let i = 0; i < MAP_ROOMS.length; i++) {
+      const r = MAP_ROOMS[i];
+      if (r === from || save.discovered.indexOf(r.id) < 0 || (r.debug && !cur.debug)) continue;
+      const cx = r.gx + r.gw / 2 - fx, cy = r.gy + r.gh / 2 - fy;
+      const along = dx ? cx * dx : cy * dy, across = dx ? Math.abs(cy) : Math.abs(cx);
+      if (along <= 0.05 || across > along * 1.5 + 0.6) continue;
+      const d = along + across * 2;
+      if (d < bestD) { bestD = d; best = r; }
+    }
+    if (best) { mapCursorTo(game, best === cur ? null : best); Au.sfx('menuMove'); }
   }
   function stubX(e, r, x, w) { return e.side === 'left' ? x : (e.side === 'right' ? x + w : x + (e.x + e.w / 2) / r.w * w); }
   function stubY(e, r, y, h) { return e.side === 'top' ? y : (e.side === 'bottom' ? y + h : y + (e.y + e.h / 2) / r.h * h); }
@@ -920,6 +1016,7 @@
           ctx.beginPath(); ctx.arc(x + w - 11, y + 11, 5, 0, TAU); ctx.fill(); ctx.stroke();
           ctx.fillStyle = P.INK; ctx.fillRect(x + w - 14, y + 9, 2, 2); ctx.fillRect(x + w - 10, y + 9, 2, 2);
         }
+        if (UI.mapCur === r) { ctx.save(); ctx.strokeStyle = P.SELECT; ctx.lineWidth = 2; ctx.globalAlpha = 0.6 + 0.4 * Math.sin(UI.t / 10); Rn.rrect(ctx, x - 3, y - 3, w + 6, h + 6, 6); ctx.stroke(); ctx.restore(); }
         if (r === cur && game.player) {   // you: ENERGY dot r 5 + pulsing ring 5→12 every 40 f
           const pxr = x + U.clamp(game.player.x / (r.w * 30), 0, 1) * w, pyr = y + U.clamp(game.player.y / (r.h * 30), 0, 1) * h;
           const k = (UI.t % 40) / 40;
@@ -932,7 +1029,10 @@
     UI.text(ctx, TXT.map, 60, 56, F.ui22b, P.PAPER, 'left', 'middle', 3);
     UI.text(ctx, game.zone ? game.zone.name : '', 900, 56, F.mono14, P.PAPER_DIM, 'right', 'middle');
     UI.text(ctx, TXT.mapLegend, 60, 500, F.mono11, P.PAPER_DIM, 'left', 'middle');
-    UI.text(ctx, UI.mapRoomLine, 480, 500, F.mono11, P.PAPER, 'center', 'middle');
+    const two = !!UI.mapBestiary2;
+    UI.text(ctx, UI.mapRoomLine, 480, UI.mapBestiary ? (two ? 486 : 493) : 500, F.mono11, P.PAPER, 'center', 'middle');
+    if (UI.mapBestiary) UI.text(ctx, UI.mapBestiary, 480, two ? 498 : 507, F.mono11, P.PAPER_DIM, 'center', 'middle');
+    if (two) UI.text(ctx, UI.mapBestiary2, 480, 510, F.mono11, P.PAPER_DIM, 'center', 'middle');
     UI.text(ctx, TXT.mapClose, 900, 500, F.mono11, P.PAPER_DIM, 'right', 'middle');
     UI.text(ctx, TXT.mapRecentre, 900 - textW(ctx, TXT.mapClose, F.mono11) - 18, 500, F.mono11, P.PAPER_DIM, 'right', 'middle');
   }
@@ -1017,6 +1117,9 @@
     else if (game.overlay === 'settings') drawSettings(ctx, game);
     else if (game.overlay === 'shop') drawShop(ctx, game);
     else if (game.overlay === 'lore') drawLore(ctx, game);
+    // toasts set outside play (SAVE ERASED on the title, the gamepad toasts, a storage warning) and bottom toasts
+    // while an overlay is open draw here, above the screen/overlay — the HUD (play only) draws the rest
+    if (UI.toastT > 0 && toastOnTop(game)) drawToast(ctx, game);
     ctx.restore();
   };
 

@@ -176,8 +176,8 @@ function staticChecks() {
   check('static: movers in lw_hoist (2), lw_belts (2), lw_shaft (1), ns_climb (1), nowhere else', ['lw_hoist', 'lw_belts'].every(id => W.rooms[id].platforms.length === 2) && W.rooms.lw_shaft.platforms.length === 1 && W.rooms.ns_climb.platforms.length === 1 && real.every(id => W.rooms[id].platforms.length === 0 || ['lw_hoist', 'lw_belts', 'lw_shaft', 'ns_climb'].includes(id)));
   const hazardChars = id => { const s = {}; for (const row of W.rooms[id].tiles) for (const ch of row) if ('^v~c-'.includes(ch)) s[ch] = (s[ch] || 0) + 1; return s; };
   const bySize = (id, ch) => hazardChars(id)[ch] || 0;
-  check('static: hazard counts match DESIGN §6 (dc_fall 9^ 5v 6c · lw_hoist 7v 18~ · bv_cistern 27~ 4c · ns_climb 2^ 12~ 14c · ns_plunge 20v 23~ 6c)',
-    bySize('dc_fall', '^') === 9 && bySize('dc_fall', 'v') === 5 && bySize('dc_fall', 'c') === 6 && bySize('lw_hoist', 'v') === 7 && bySize('lw_hoist', '~') === 18 &&
+  check('static: hazard counts match DESIGN §6 (dc_fall 9^ 5v 6c · lw_hoist 7v 21~ · bv_cistern 27~ 4c · ns_climb 2^ 12~ 14c · ns_plunge 20v 23~ 6c)',
+    bySize('dc_fall', '^') === 9 && bySize('dc_fall', 'v') === 5 && bySize('dc_fall', 'c') === 6 && bySize('lw_hoist', 'v') === 7 && bySize('lw_hoist', '~') === 21 &&
     bySize('bv_cistern', '~') === 27 && bySize('bv_cistern', 'c') === 4 && bySize('ns_climb', '^') === 2 && bySize('ns_climb', '~') === 12 && bySize('ns_climb', 'c') === 14 &&
     bySize('ns_plunge', 'v') === 20 && bySize('ns_plunge', '~') === 23 && bySize('ns_plunge', 'c') === 6,
     { dc_fall: hazardChars('dc_fall'), lw_hoist: hazardChars('lw_hoist'), bv_cistern: hazardChars('bv_cistern'), ns_climb: hazardChars('ns_climb'), ns_plunge: hazardChars('ns_plunge') });

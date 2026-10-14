@@ -308,6 +308,15 @@
 
   /** Consume a buffered action (clears buffer + pressed). */
   Input.consume = function (action) { const s = Input.state[action]; s.buffer = 0; s.pressed = false; };
+  /**
+   * Drop every pending gameplay buffer (jump, light, heavy, special, dash, overclock) and its press edge.
+   * The engine calls it when an overlay opens or closes so a menu key that shares a binding with a
+   * gameplay action (Z/J = confirm + light, Space/A = confirm + jump, Up/W = menu up + jump) never
+   * fires the action on the frame play resumes (DESIGN §2.5).
+   */
+  Input.clearBuffers = function () {
+    for (const a in BUFFERED) { const s = Input.state[a]; if (!s) continue; s.buffer = 0; s.pressed = false; edgePress[a] = 0; }
+  };
   /** True if the action is buffered (pressed within the last 6 frames). */
   Input.buffered = function (action) { return Input.state[action].buffer > 0; };
   /** Menu navigation with key repeat: initial 18 f, then every 8 f. */

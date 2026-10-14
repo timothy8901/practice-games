@@ -623,15 +623,25 @@
     }
     ctx.restore();
   };
-  /** The zone's three cached layers {bg0, bg1, bg2} (1280×720 canvases), built on first use. */
-  World.background = function (zone) {
-    let b = bgCache[zone.id];
+  /**
+   * The zone's three cached layers {bg0, bg1, bg2}: 1280×720 logical px painted at `scale` (the canvas
+   * backing scale, default 1) so the renderer blits them 1:1 at any devicePixelRatio. Built on first use;
+   * only the two most recent zone/scale combinations stay cached (a layer set is 44 MB at scale 2).
+   */
+  const bgOrder = [];
+  World.background = function (zone, scale) {
+    const s = scale > 0 ? scale : 1, key = zone.id + '@' + s;
+    let b = bgCache[key];
     if (b) return b;
-    const bg0 = mkCanvas(BG_W, BG_H), bg1 = mkCanvas(BG_W, BG_H), bg2 = mkCanvas(BG_W, BG_H);
-    World.paintBackground(zone, 0, bg0.getContext('2d'), BG_W, BG_H);
-    World.paintBackground(zone, 1, bg1.getContext('2d'), BG_W, BG_H);
-    World.paintBackground(zone, 2, bg2.getContext('2d'), BG_W, BG_H);
-    b = bgCache[zone.id] = { bg0: bg0, bg1: bg1, bg2: bg2 };
+    const mk = function (layer) {
+      const c = mkCanvas(Math.round(BG_W * s), Math.round(BG_H * s)), g = c.getContext('2d');
+      g.setTransform(s, 0, 0, s, 0, 0);
+      World.paintBackground(zone, layer, g, BG_W, BG_H);
+      return c;
+    };
+    b = bgCache[key] = { bg0: mk(0), bg1: mk(1), bg2: mk(2), scale: s, w: BG_W, h: BG_H };
+    bgOrder.push(key);
+    while (bgOrder.length > 2) { const old = bgOrder.shift(); delete bgCache[old]; }
     return b;
   };
 
@@ -788,7 +798,26 @@
     glowDot(c, pal, x + w / 2, y + 15, 3, 10);
   }
   const COMPOSITES = {
-    rw_throne: [{ draw: propCanopy, x: 30, y: 8, w: 4, h: 2 }, { draw: propThrone, x: 30, y: 17, w: 4, h: 4 }],
+    rw_throne: [{ draw: propCanopy, x: 30, y: 8, w: 4, h: 2, tag: 'canopy' }, { draw: propThrone, x: 30, y: 17, w: 4, h: 4, tag: 'throne' }],
+  };
+  /**
+   * Hide the composite prop(s) tagged `tag` for the rest of this room visit (the level's hiddenProps set;
+   * DESIGN §8.4: the throne bursts into particles at Kernauth's phase change). Returns the tile rect
+   * covering them (for the caller's tile-cache repaint) or null when the room has no such prop.
+   */
+  World.hideProp = function (level, tag) {
+    const comps = level && level.room ? COMPOSITES[level.room.id] : null;
+    if (!comps) return null;
+    if (!level.hiddenProps) level.hiddenProps = [];
+    let rect = null;
+    for (let i = 0; i < comps.length; i++) {
+      const k = comps[i];
+      if (k.tag !== tag) continue;
+      if (level.hiddenProps.indexOf(i) < 0) level.hiddenProps.push(i);
+      if (!rect) rect = { x: k.x, y: k.y, w: k.w, h: k.h };
+      else { const x1 = Math.max(rect.x + rect.w, k.x + k.w), y1 = Math.max(rect.y + rect.h, k.y + k.h); rect.x = Math.min(rect.x, k.x); rect.y = Math.min(rect.y, k.y); rect.w = x1 - rect.x; rect.h = y1 - rect.y; }
+    }
+    return rect;
   };
   const jitterOf = (function () {
     let seed = 0;
@@ -835,6 +864,7 @@
         const k = comps[i];
         if (k.x + k.w <= tx0 - 1 || k.x > tx1 + 1 || k.y + k.h <= ty0 - 1 || k.y > ty1 + 1) continue;
         for (let yy = k.y; yy < k.y + k.h; yy++) for (let xx = k.x; xx < k.x + k.w; xx++) if (tiles[yy][xx] === 'B') clearStub(c, xx, yy);
+        if (level.hiddenProps && level.hiddenProps.indexOf(i) >= 0) continue;   // burst away this visit
         c.save(); k.draw(c, zone.palette, k.x * TILE, k.y * TILE, k.w * TILE, k.h * TILE, jitterOf.seed(U.hash(k.x, k.y, i, 5))); c.restore();
       }
     }
@@ -1074,12 +1104,12 @@
       '#...B....B.....................#',
       '#...B....B................###..#',
       '#...B....B........^^^^^^^.###..#',
-      '##############...###############',
-      '##############...###############',
-      '##############...###############',
+      '#####...########################',
+      '#####...########################',
+      '#####...########################',
     ],
     exits: [
-      { id: 'B', side: 'bottom', x: 14, y: 17, w: 3, h: 1, to: { room: 'dc_cross', exit: 'T' }, spawn: { x: 15, y: 17 }, ability: null },
+      { id: 'B', side: 'bottom', x: 5, y: 17, w: 3, h: 1, to: { room: 'dc_cross', exit: 'T' }, spawn: { x: 6, y: 17 }, ability: null },
     ],
     spawns: [
       { type: 'droplatch', x: 21, y: 4 },
@@ -1157,8 +1187,8 @@
       '#...............................................',
       '#...............................................',
       '#.......................................########',
-      '#.......----................----........########',
-      '........................................########',
+      '#.......................................########',
+      '........----................----........########',
       '......B...........................B.....########',
       '......B...........................B.....########',
       '################################################',
@@ -1218,7 +1248,7 @@
       '#............#...#.............#',
       '#............#...#.............#',
       '#............#...#.............#',
-      '####~~~~~~~~~#...#~~~~~~~~~#####',
+      '#~~~~~~~~~~~~#...#~~~~~~~~~#####',
       '##############...###############',
       '##############...###############',
     ],
@@ -1375,7 +1405,7 @@
   R.lw_rest = {
     id: 'lw_rest', zone: 'loomworks', name: 'Spool Rest',
     w: 32, h: 18, gx: 9.5, gy: 4, gw: 1, gh: 1,
-    intro: 'A quiet mezzanine of stacked spools around a restore node. A grated hatch in the floor at the left leads down into green-lit dark.',
+    intro: 'A quiet mezzanine of stacked spools around a restore node. A grated hatch in the floor at the left (one-way grate: press Down + Jump to drop through) leads down into green-lit dark.',
     tiles: [
       '################################',
       '################################',
@@ -1391,8 +1421,8 @@
       '#.........B....................#',
       '..........B...........B.........',
       '..........B...........B.........',
-      '....---...B...........B.........',
-      '####...#########################',
+      '..........B...........B.........',
+      '####---#########################',
       '####...#########################',
       '####...#########################',
     ],
@@ -1512,7 +1542,7 @@
       '#..............................................................#',
       '#..............................................................#',
       '#...............B..............................................#',
-      '#...............B.............................---..............#',
+      '#...............B.............................------...........#',
       '#...............B..............................................#',
       '#.........................----.........B................########',
       '#......................................B................########',
@@ -1608,7 +1638,7 @@
       '#...........B..................#',
       '#...........B...........-----..#',
       '#...........B..........B.......#',
-      '#......................B.......#',
+      '#...............---....B.......#',
       '#......................B.......#',
       '########~~~~~~~~~~~~~~~###...###',
       '##########################...###',
@@ -1792,7 +1822,7 @@
   R.ns_climb = {
     id: 'ns_climb', zone: 'nullspire', name: 'The Null Spire',
     w: 48, h: 72, gx: 19, gy: 4.22, gw: 1.5, gh: 4,
-    intro: 'The hollow interior of an inverted spire, four screens tall. A black spine splits it: the left face is crumbling grates and a slow lift; the right face is three sheer shafts stacked over a pit of static. Wisps hunt in the dark. Both faces meet at a crown of one-way grates under a hole in the sky.',
+    intro: 'The empty interior of an inverted spire, four screens tall. A black spine splits it: the left face is crumbling grates and a slow lift; the right face is three sheer shafts stacked over a pit of static. Wisps hunt in the dark. Both faces meet at a crown of one-way grates under a hole in the sky.',
     tiles: [
       '########################################...#####',
       '#..............................................#',
@@ -1810,17 +1840,17 @@
       '#......##.............####..............##.....#',
       '#......##.............####..............##.....#',
       '#......##.............####..............##.....#',
-      '#########.............####............^^##.....#',
-      '#########.............####............##########',
-      '#......##.............####............##########',
+      '####...##.............####............^^##.....#',
+      '####...##.............####............####..####',
+      '#......##.............####............####..####',
       '#......##.............####.....................#',
       '#......##.............####.....................#',
       '#......##.............####................-----#',
       '#......##.............####.....................#',
       '#......##.............####.....................#',
-      '#......##.............####.....................#',
-      '#......##.............####..........ccc........#',
-      '#......##.............####.....................#',
+      '#.....................####.....................#',
+      '#.....................####..........ccc........#',
+      '#.....................####.....................#',
       '#########.............####.....................#',
       '#########.............####.....................#',
       '#.....................####................-----#',
@@ -1861,9 +1891,9 @@
       '#.........................##....##.............#',
       '#.........................##....##.............#',
       '#...-----.................##....##.............#',
-      '..........................##....##......##.....#',
-      '..........................##....##......##.....#',
-      '..........................##....##......##.....#',
+      '................................##......##.....#',
+      '................................##......##.....#',
+      '................................##......##.....#',
       '##################################~~~~~~~~~~~~##',
       '################################################',
     ],
@@ -1921,8 +1951,8 @@
       '#.........B....................#',
       '#.........B.........B...........',
       '#.........B.........B...........',
-      '#...---...B.........B...........',
-      '####...#########################',
+      '#.........B.........B...........',
+      '####---#########################',
       '####...#########################',
       '####...#########################',
     ],
@@ -2034,13 +2064,13 @@
   R.rw_gate = {
     id: 'rw_gate', zone: 'rootwell', name: 'Root Gate',
     w: 48, h: 18, gx: 21.1, gy: 6.77, gw: 1.5, gh: 1,
-    intro: 'Crimson dark and gold filament. Great cable-roots thick as pillars hang from the ceiling. Every corrupted form of the kingdom stands guard here: plated walkers, a ram-beast, spitters on a pedestal and a hanging grate, a brood-cell by the wall.',
+    intro: 'Crimson dark and gold filament. Great cable-roots thick as pillars hang from the ceiling. Every corrupted form of the kingdom stands guard here: plated walkers, a ram-beast, spitters on a pedestal and a hanging grate, a brood-cell by the wall, a root-bound patroller under the pedestal and a wisp hunting the dark.',
     tiles: [
       '##############...###############################',
       '##############...###############################',
       '#.....B.....................B.............B....#',
-      '#.....B.....-------.........B.............B....#',
       '#.....B.....................B.............B....#',
+      '#.....B.....-------.........B.............B....#',
       '#.....B.....................B.............B....#',
       '#.....B...................................B....#',
       '#.........................................B....#',
@@ -2067,6 +2097,8 @@
       { type: 'spitvalve', x: 33, y: 7, variant: 'twinvalve', facing: 1 },
       { type: 'broodcell', x: 3, y: 14 },
       { type: 'droplatch', x: 40, y: 2 },
+      { type: 'scuttlebit', x: 23, y: 14, variant: 'rootbound', patrol: [19, 27] },
+      { type: 'glarewisp', x: 38, y: 9, variant: 'rootwisp' },
     ],
     platforms: [],
     nodes: [],
