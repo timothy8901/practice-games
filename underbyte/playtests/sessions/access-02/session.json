@@ -1,0 +1,4279 @@
+{
+ "session": "access-02",
+ "startedAt": "2026-10-14T13:46:21.295Z",
+ "size": [
+  844,
+  390
+ ],
+ "pad": true,
+ "turns": [
+  {
+   "turn": 1,
+   "video": 0,
+   "cmd": {
+    "shot": true
+   },
+   "room": null,
+   "hp": 0,
+   "events": []
+  },
+  {
+   "turn": 2,
+   "video": 0.95,
+   "cmd": {
+    "act": [
+     {
+      "pad": {
+       "press": [
+        "down"
+       ]
+      },
+      "ms": 120
+     },
+     {
+      "pad": {
+       "release": [
+        "down"
+       ]
+      },
+      "ms": 250
+     },
+     {
+      "pad": {
+       "press": [
+        "a"
+       ]
+      },
+      "ms": 120
+     },
+     {
+      "pad": {
+       "release": [
+        "a"
+       ]
+      },
+      "ms": 400
+     }
+    ]
+   },
+   "room": null,
+   "hp": 0,
+   "events": [
+    {
+     "f": 52,
+     "type": "screen",
+     "from": "title",
+     "to": "settings"
+    }
+   ]
+  },
+  {
+   "turn": 3,
+   "video": 2.31,
+   "cmd": {
+    "act": [
+     {
+      "pad": {
+       "press": [
+        "down"
+       ]
+      },
+      "ms": 100
+     },
+     {
+      "pad": {
+       "release": [
+        "down"
+       ]
+      },
+      "ms": 180
+     },
+     {
+      "pad": {
+       "press": [
+        "down"
+       ]
+      },
+      "ms": 100
+     },
+     {
+      "pad": {
+       "release": [
+        "down"
+       ]
+      },
+      "ms": 180
+     },
+     {
+      "pad": {
+       "press": [
+        "down"
+       ]
+      },
+      "ms": 100
+     },
+     {
+      "pad": {
+       "release": [
+        "down"
+       ]
+      },
+      "ms": 180
+     },
+     {
+      "pad": {
+       "press": [
+        "a"
+       ]
+      },
+      "ms": 100
+     },
+     {
+      "pad": {
+       "release": [
+        "a"
+       ]
+      },
+      "ms": 350
+     }
+    ]
+   },
+   "room": null,
+   "hp": 0,
+   "events": []
+  },
+  {
+   "turn": 4,
+   "video": 3.14,
+   "cmd": {
+    "act": [
+     {
+      "pad": {
+       "press": [
+        "down"
+       ]
+      },
+      "ms": 100
+     },
+     {
+      "pad": {
+       "release": [
+        "down"
+       ]
+      },
+      "ms": 180
+     },
+     {
+      "pad": {
+       "press": [
+        "b"
+       ]
+      },
+      "ms": 100
+     },
+     {
+      "pad": {
+       "release": [
+        "b"
+       ]
+      },
+      "ms": 400
+     }
+    ]
+   },
+   "room": null,
+   "hp": 0,
+   "events": [
+    {
+     "f": 184,
+     "type": "screen",
+     "from": "settings",
+     "to": "title"
+    }
+   ]
+  },
+  {
+   "turn": 5,
+   "video": 4.29,
+   "cmd": {
+    "act": [
+     {
+      "pad": {
+       "press": [
+        "down"
+       ]
+      },
+      "ms": 100
+     },
+     {
+      "pad": {
+       "release": [
+        "down"
+       ]
+      },
+      "ms": 200
+     },
+     {
+      "pad": {
+       "press": [
+        "a"
+       ]
+      },
+      "ms": 100
+     },
+     {
+      "pad": {
+       "release": [
+        "a"
+       ]
+      },
+      "ms": 700
+     }
+    ]
+   },
+   "room": null,
+   "hp": 0,
+   "events": [
+    {
+     "f": 234,
+     "type": "screen",
+     "from": "title",
+     "to": "settings"
+    }
+   ]
+  },
+  {
+   "turn": 6,
+   "video": 5.14,
+   "cmd": {
+    "act": [
+     {
+      "pad": {
+       "press": [
+        "down"
+       ]
+      },
+      "ms": 100
+     },
+     {
+      "pad": {
+       "release": [
+        "down"
+       ]
+      },
+      "ms": 700
+     }
+    ]
+   },
+   "room": null,
+   "hp": 0,
+   "events": []
+  },
+  {
+   "turn": 7,
+   "video": 5.68,
+   "cmd": {
+    "act": [
+     {
+      "pad": {
+       "press": [
+        "b"
+       ]
+      },
+      "ms": 100
+     },
+     {
+      "pad": {
+       "release": [
+        "b"
+       ]
+      },
+      "ms": 400
+     }
+    ]
+   },
+   "room": null,
+   "hp": 0,
+   "events": [
+    {
+     "f": 334,
+     "type": "screen",
+     "from": "settings",
+     "to": "title"
+    }
+   ]
+  },
+  {
+   "turn": 8,
+   "video": 6.83,
+   "cmd": {
+    "act": [
+     {
+      "pad": {
+       "press": [
+        "a"
+       ]
+      },
+      "ms": 100
+     },
+     {
+      "pad": {
+       "release": [
+        "a"
+       ]
+      },
+      "ms": 1000
+     }
+    ]
+   },
+   "room": "dc_shrine",
+   "hp": 5,
+   "events": [
+    {
+     "f": 365,
+     "type": "maxHp",
+     "maxHp": 5
+    },
+    {
+     "f": 365,
+     "type": "death",
+     "room": null
+    },
+    {
+     "f": 365,
+     "type": "bits",
+     "bits": 24,
+     "delta": 24
+    },
+    {
+     "f": 385,
+     "type": "screen",
+     "from": "title",
+     "to": "play"
+    },
+    {
+     "f": 385,
+     "type": "room",
+     "from": null,
+     "to": "dc_shrine"
+    }
+   ]
+  },
+  {
+   "turn": 9,
+   "video": 7.77,
+   "cmd": {
+    "act": [
+     {
+      "pad": {
+       "axes": [
+        1,
+        0,
+        0,
+        0
+       ]
+      },
+      "ms": 300
+     },
+     {
+      "pad": {
+       "press": [
+        "rb"
+       ]
+      },
+      "ms": 100
+     },
+     {
+      "pad": {
+       "release": [
+        "rb"
+       ]
+      },
+      "ms": 300
+     },
+     {
+      "pad": {
+       "axes": [
+        0,
+        0,
+        0,
+        0
+       ]
+      },
+      "ms": 200
+     }
+    ]
+   },
+   "room": "dc_shrine",
+   "hp": 5,
+   "events": []
+  },
+  {
+   "turn": 10,
+   "video": 10.01,
+   "cmd": {
+    "act": [
+     {
+      "pad": {
+       "axes": [
+        1,
+        0,
+        0,
+        0
+       ]
+      },
+      "ms": 2000
+     },
+     {
+      "pad": {
+       "axes": [
+        0,
+        0,
+        0,
+        0
+       ]
+      },
+      "ms": 200
+     }
+    ]
+   },
+   "room": "dc_shrine",
+   "hp": 5,
+   "events": []
+  },
+  {
+   "turn": 11,
+   "video": 10.95,
+   "cmd": {
+    "act": [
+     {
+      "pad": {
+       "axes": [
+        1,
+        0,
+        0,
+        0
+       ]
+      },
+      "ms": 600
+     },
+     {
+      "pad": {
+       "axes": [
+        0,
+        0,
+        0,
+        0
+       ]
+      },
+      "ms": 300
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 5,
+   "events": [
+    {
+     "f": 642,
+     "type": "room",
+     "from": "dc_shrine",
+     "to": "dc_sentinel"
+    },
+    {
+     "f": 665,
+     "type": "bossFight",
+     "state": "intro",
+     "boss": "tallock"
+    }
+   ]
+  },
+  {
+   "turn": 12,
+   "video": 12.79,
+   "cmd": {
+    "act": [
+     {
+      "wait": 1800
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 5,
+   "events": []
+  },
+  {
+   "turn": 13,
+   "video": 13.82,
+   "cmd": {
+    "act": [
+     {
+      "wait": 1000
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 5,
+   "events": [
+    {
+     "f": 815,
+     "type": "bossFight",
+     "state": "fight",
+     "boss": "tallock"
+    }
+   ]
+  },
+  {
+   "turn": 14,
+   "video": 14.66,
+   "cmd": {
+    "act": [
+     {
+      "pad": {
+       "axes": [
+        1,
+        0,
+        0,
+        0
+       ]
+      },
+      "ms": 700
+     },
+     {
+      "pad": {
+       "axes": [
+        0,
+        0,
+        0,
+        0
+       ]
+      },
+      "ms": 100
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 5,
+   "events": []
+  },
+  {
+   "turn": 15,
+   "video": 15.15,
+   "cmd": {
+    "act": [
+     {
+      "pad": {
+       "axes": [
+        1,
+        0,
+        0,
+        0
+       ],
+       "press": [
+        "rb"
+       ]
+      },
+      "ms": 100
+     },
+     {
+      "pad": {
+       "release": [
+        "rb"
+       ]
+      },
+      "ms": 250
+     },
+     {
+      "pad": {
+       "axes": [
+        0,
+        0,
+        0,
+        0
+       ]
+      },
+      "ms": 100
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 5,
+   "events": []
+  },
+  {
+   "turn": 16,
+   "video": 15.74,
+   "cmd": {
+    "act": [
+     {
+      "pad": {
+       "axes": [
+        -1,
+        0,
+        0,
+        0
+       ],
+       "press": [
+        "rb"
+       ]
+      },
+      "ms": 100
+     },
+     {
+      "pad": {
+       "release": [
+        "rb"
+       ]
+      },
+      "ms": 350
+     },
+     {
+      "pad": {
+       "axes": [
+        0,
+        0,
+        0,
+        0
+       ]
+      },
+      "ms": 100
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 4,
+   "events": [
+    {
+     "f": 943,
+     "type": "hurt",
+     "hp": 4,
+     "maxHp": 5,
+     "room": "dc_sentinel",
+     "hazard": false
+    }
+   ]
+  },
+  {
+   "turn": 17,
+   "video": 16.84,
+   "cmd": {
+    "act": [
+     {
+      "wait": 200
+     },
+     {
+      "pad": {
+       "axes": [
+        1,
+        0,
+        0,
+        0
+       ]
+      },
+      "ms": 60
+     },
+     {
+      "pad": {
+       "axes": [
+        0,
+        0,
+        0,
+        0
+       ],
+       "press": [
+        "x"
+       ]
+      },
+      "ms": 90
+     },
+     {
+      "pad": {
+       "release": [
+        "x"
+       ]
+      },
+      "ms": 130
+     },
+     {
+      "pad": {
+       "press": [
+        "x"
+       ]
+      },
+      "ms": 90
+     },
+     {
+      "pad": {
+       "release": [
+        "x"
+       ]
+      },
+      "ms": 130
+     },
+     {
+      "pad": {
+       "press": [
+        "x"
+       ]
+      },
+      "ms": 90
+     },
+     {
+      "pad": {
+       "release": [
+        "x"
+       ]
+      },
+      "ms": 250
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 4,
+   "events": []
+  },
+  {
+   "turn": 18,
+   "video": 17.37,
+   "cmd": {
+    "act": [
+     {
+      "pad": {
+       "press": [
+        "y"
+       ]
+      },
+      "ms": 100
+     },
+     {
+      "pad": {
+       "release": [
+        "y"
+       ]
+      },
+      "ms": 400
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 4,
+   "events": []
+  },
+  {
+   "turn": 19,
+   "video": 18.2,
+   "cmd": {
+    "act": [
+     {
+      "pad": {
+       "press": [
+        "x"
+       ]
+      },
+      "ms": 90
+     },
+     {
+      "pad": {
+       "release": [
+        "x"
+       ]
+      },
+      "ms": 130
+     },
+     {
+      "pad": {
+       "press": [
+        "x"
+       ]
+      },
+      "ms": 90
+     },
+     {
+      "pad": {
+       "release": [
+        "x"
+       ]
+      },
+      "ms": 130
+     },
+     {
+      "pad": {
+       "press": [
+        "x"
+       ]
+      },
+      "ms": 90
+     },
+     {
+      "pad": {
+       "release": [
+        "x"
+       ]
+      },
+      "ms": 250
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 4,
+   "events": []
+  },
+  {
+   "turn": 20,
+   "video": 19.13,
+   "cmd": {
+    "act": [
+     {
+      "wait": 150
+     },
+     {
+      "pad": {
+       "press": [
+        "a"
+       ]
+      },
+      "ms": 350
+     },
+     {
+      "pad": {
+       "release": [
+        "a"
+       ]
+      },
+      "ms": 400
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 3,
+   "events": [
+    {
+     "f": 1120,
+     "type": "hurt",
+     "hp": 3,
+     "maxHp": 5,
+     "room": "dc_sentinel",
+     "hazard": false
+    }
+   ]
+  },
+  {
+   "turn": 21,
+   "video": 19.87,
+   "cmd": {
+    "act": [
+     {
+      "pad": {
+       "axes": [
+        -1,
+        0,
+        0,
+        0
+       ]
+      },
+      "ms": 200
+     },
+     {
+      "pad": {
+       "axes": [
+        0,
+        1,
+        0,
+        0
+       ],
+       "press": [
+        "x"
+       ]
+      },
+      "ms": 100
+     },
+     {
+      "pad": {
+       "release": [
+        "x"
+       ]
+      },
+      "ms": 300
+     },
+     {
+      "pad": {
+       "axes": [
+        0,
+        0,
+        0,
+        0
+       ]
+      },
+      "ms": 100
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 2,
+   "events": [
+    {
+     "f": 1189,
+     "type": "hurt",
+     "hp": 2,
+     "maxHp": 5,
+     "room": "dc_sentinel",
+     "hazard": false
+    }
+   ]
+  },
+  {
+   "turn": 22,
+   "video": 20.81,
+   "cmd": {
+    "act": [
+     {
+      "pad": {
+       "axes": [
+        1,
+        0,
+        0,
+        0
+       ],
+       "press": [
+        "a"
+       ]
+      },
+      "ms": 300
+     },
+     {
+      "pad": {
+       "release": [
+        "a"
+       ]
+      },
+      "ms": 500
+     },
+     {
+      "pad": {
+       "axes": [
+        0,
+        0,
+        0,
+        0
+       ]
+      },
+      "ms": 100
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 2,
+   "events": []
+  },
+  {
+   "turn": 23,
+   "video": 21.97,
+   "cmd": {
+    "act": [
+     {
+      "pad": {
+       "axes": [
+        1,
+        0,
+        0,
+        0
+       ]
+      },
+      "ms": 350
+     },
+     {
+      "pad": {
+       "axes": [
+        1,
+        0,
+        0,
+        0
+       ],
+       "press": [
+        "a"
+       ]
+      },
+      "ms": 350
+     },
+     {
+      "pad": {
+       "release": [
+        "a"
+       ]
+      },
+      "ms": 300
+     },
+     {
+      "pad": {
+       "axes": [
+        0,
+        0,
+        0,
+        0
+       ]
+      },
+      "ms": 100
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 1,
+   "events": [
+    {
+     "f": 1255,
+     "type": "hurt",
+     "hp": 1,
+     "maxHp": 5,
+     "room": "dc_sentinel",
+     "hazard": false
+    }
+   ]
+  },
+  {
+   "turn": 24,
+   "video": 22.81,
+   "cmd": {
+    "act": [
+     {
+      "pad": {
+       "axes": [
+        1,
+        0,
+        0,
+        0
+       ],
+       "press": [
+        "a"
+       ]
+      },
+      "ms": 300
+     },
+     {
+      "pad": {
+       "release": [
+        "a"
+       ]
+      },
+      "ms": 400
+     },
+     {
+      "pad": {
+       "axes": [
+        0,
+        0,
+        0,
+        0
+       ]
+      },
+      "ms": 100
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 1,
+   "events": []
+  },
+  {
+   "turn": 25,
+   "video": 23.51,
+   "cmd": {
+    "act": [
+     {
+      "wait": 250
+     },
+     {
+      "pad": {
+       "press": [
+        "a"
+       ]
+      },
+      "ms": 300
+     },
+     {
+      "pad": {
+       "release": [
+        "a"
+       ]
+      },
+      "ms": 100
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 1,
+   "events": []
+  },
+  {
+   "turn": 26,
+   "video": 24.06,
+   "cmd": {
+    "act": [
+     {
+      "pad": {
+       "axes": [
+        1,
+        0,
+        0,
+        0
+       ],
+       "press": [
+        "rb"
+       ]
+      },
+      "ms": 100
+     },
+     {
+      "pad": {
+       "release": [
+        "rb"
+       ]
+      },
+      "ms": 300
+     },
+     {
+      "pad": {
+       "axes": [
+        0,
+        0,
+        0,
+        0
+       ]
+      },
+      "ms": 100
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 1,
+   "events": []
+  },
+  {
+   "turn": 27,
+   "video": 24.76,
+   "cmd": {
+    "act": [
+     {
+      "pad": {
+       "axes": [
+        -1,
+        0,
+        0,
+        0
+       ]
+      },
+      "ms": 50
+     },
+     {
+      "pad": {
+       "axes": [
+        0,
+        0,
+        0,
+        0
+       ],
+       "press": [
+        "b"
+       ]
+      },
+      "ms": 100
+     },
+     {
+      "pad": {
+       "release": [
+        "b"
+       ]
+      },
+      "ms": 500
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 1,
+   "events": []
+  },
+  {
+   "turn": 28,
+   "video": 25.32,
+   "cmd": {
+    "act": [
+     {
+      "pad": {
+       "press": [
+        "a"
+       ],
+       "axes": [
+        1,
+        0,
+        0,
+        0
+       ]
+      },
+      "ms": 300
+     },
+     {
+      "pad": {
+       "release": [
+        "a"
+       ]
+      },
+      "ms": 200
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 0,
+   "events": [
+    {
+     "f": 1486,
+     "type": "hurt",
+     "hp": 0,
+     "maxHp": 5,
+     "room": "dc_sentinel",
+     "hazard": false
+    },
+    {
+     "f": 1486,
+     "type": "death",
+     "room": "dc_sentinel"
+    }
+   ]
+  },
+  {
+   "turn": 29,
+   "video": 27.85,
+   "cmd": {
+    "act": [
+     {
+      "wait": 2500
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 0,
+   "events": [
+    {
+     "f": 1592,
+     "type": "screen",
+     "from": "play",
+     "to": "gameover"
+    }
+   ]
+  },
+  {
+   "turn": 30,
+   "video": 28.9,
+   "cmd": {
+    "act": [
+     {
+      "pad": {
+       "press": [
+        "a"
+       ]
+      },
+      "ms": 100
+     },
+     {
+      "pad": {
+       "release": [
+        "a"
+       ]
+      },
+      "ms": 900
+     }
+    ]
+   },
+   "room": "dc_shrine",
+   "hp": 5,
+   "events": [
+    {
+     "f": 1689,
+     "type": "screen",
+     "from": "gameover",
+     "to": "play"
+    },
+    {
+     "f": 1689,
+     "type": "room",
+     "from": "dc_sentinel",
+     "to": "dc_shrine"
+    },
+    {
+     "f": 1689,
+     "type": "bossFight",
+     "state": "none",
+     "boss": null
+    }
+   ]
+  },
+  {
+   "turn": 31,
+   "video": 30.11,
+   "cmd": {
+    "act": [
+     {
+      "pad": {
+       "press": [
+        "back"
+       ]
+      },
+      "ms": 100
+     },
+     {
+      "pad": {
+       "release": [
+        "back"
+       ]
+      },
+      "ms": 300
+     },
+     {
+      "pad": {
+       "press": [
+        "left"
+       ]
+      },
+      "ms": 100
+     },
+     {
+      "pad": {
+       "release": [
+        "left"
+       ]
+      },
+      "ms": 150
+     },
+     {
+      "pad": {
+       "press": [
+        "left"
+       ]
+      },
+      "ms": 100
+     },
+     {
+      "pad": {
+       "release": [
+        "left"
+       ]
+      },
+      "ms": 400
+     }
+    ]
+   },
+   "room": "dc_shrine",
+   "hp": 5,
+   "events": [
+    {
+     "f": 1731,
+     "type": "screen",
+     "from": "play",
+     "to": "map"
+    }
+   ]
+  },
+  {
+   "turn": 32,
+   "video": 30.65,
+   "cmd": {
+    "act": [
+     {
+      "pad": {
+       "press": [
+        "a"
+       ]
+      },
+      "ms": 100
+     },
+     {
+      "pad": {
+       "release": [
+        "a"
+       ]
+      },
+      "ms": 400
+     }
+    ]
+   },
+   "room": "dc_shrine",
+   "hp": 5,
+   "events": []
+  },
+  {
+   "turn": 33,
+   "video": 31.81,
+   "cmd": {
+    "act": [
+     {
+      "pad": {
+       "press": [
+        "b"
+       ]
+      },
+      "ms": 100
+     },
+     {
+      "pad": {
+       "release": [
+        "b"
+       ]
+      },
+      "ms": 300
+     },
+     {
+      "pad": {
+       "press": [
+        "up"
+       ]
+      },
+      "ms": 100
+     },
+     {
+      "pad": {
+       "release": [
+        "up"
+       ]
+      },
+      "ms": 600
+     }
+    ]
+   },
+   "room": "dc_shrine",
+   "hp": 5,
+   "events": [
+    {
+     "f": 1833,
+     "type": "screen",
+     "from": "map",
+     "to": "play"
+    }
+   ]
+  },
+  {
+   "turn": 34,
+   "video": 34.95,
+   "cmd": {
+    "act": [
+     {
+      "pad": {
+       "axes": [
+        1,
+        0,
+        0,
+        0
+       ]
+      },
+      "ms": 2900
+     },
+     {
+      "pad": {
+       "axes": [
+        0,
+        0,
+        0,
+        0
+       ]
+      },
+      "ms": 200
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 5,
+   "events": [
+    {
+     "f": 2084,
+     "type": "room",
+     "from": "dc_shrine",
+     "to": "dc_sentinel"
+    }
+   ]
+  },
+  {
+   "turn": 35,
+   "video": 38,
+   "cmd": {
+    "act": [
+     {
+      "wait": 3000
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 5,
+   "events": [
+    {
+     "f": 2107,
+     "type": "bossFight",
+     "state": "intro",
+     "boss": "tallock"
+    },
+    {
+     "f": 2257,
+     "type": "bossFight",
+     "state": "fight",
+     "boss": "tallock"
+    }
+   ]
+  },
+  {
+   "turn": 36,
+   "video": 38.53,
+   "cmd": {
+    "act": [
+     {
+      "wait": 500
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 5,
+   "events": []
+  },
+  {
+   "turn": 37,
+   "video": 39.08,
+   "cmd": {
+    "act": [
+     {
+      "pad": {
+       "press": [
+        "b"
+       ]
+      },
+      "ms": 100
+     },
+     {
+      "pad": {
+       "release": [
+        "b"
+       ]
+      },
+      "ms": 400
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 5,
+   "events": []
+  },
+  {
+   "turn": 38,
+   "video": 39.46,
+   "cmd": {
+    "act": [
+     {
+      "wait": 350
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 5,
+   "events": []
+  },
+  {
+   "turn": 39,
+   "video": 40.09,
+   "cmd": {
+    "act": [
+     {
+      "wait": 600
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 5,
+   "events": []
+  },
+  {
+   "turn": 40,
+   "video": 41.11,
+   "cmd": {
+    "act": [
+     {
+      "wait": 250
+     },
+     {
+      "pad": {
+       "press": [
+        "a"
+       ]
+      },
+      "ms": 350
+     },
+     {
+      "pad": {
+       "release": [
+        "a"
+       ]
+      },
+      "ms": 350
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 5,
+   "events": []
+  },
+  {
+   "turn": 41,
+   "video": 41.9,
+   "cmd": {
+    "act": [
+     {
+      "pad": {
+       "axes": [
+        1,
+        0,
+        0,
+        0
+       ]
+      },
+      "ms": 500
+     },
+     {
+      "pad": {
+       "axes": [
+        1,
+        0,
+        0,
+        0
+       ],
+       "press": [
+        "rb"
+       ]
+      },
+      "ms": 100
+     },
+     {
+      "pad": {
+       "release": [
+        "rb"
+       ],
+       "axes": [
+        0,
+        0,
+        0,
+        0
+       ]
+      },
+      "ms": 150
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 5,
+   "events": []
+  },
+  {
+   "turn": 42,
+   "video": 42.54,
+   "cmd": {
+    "act": [
+     {
+      "pad": {
+       "press": [
+        "a"
+       ]
+      },
+      "ms": 350
+     },
+     {
+      "pad": {
+       "release": [
+        "a"
+       ]
+      },
+      "ms": 250
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 5,
+   "events": []
+  },
+  {
+   "turn": 43,
+   "video": 43.08,
+   "cmd": {
+    "act": [
+     {
+      "pad": {
+       "axes": [
+        1,
+        0,
+        0,
+        0
+       ]
+      },
+      "ms": 450
+     },
+     {
+      "pad": {
+       "axes": [
+        0,
+        0,
+        0,
+        0
+       ]
+      },
+      "ms": 50
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 4,
+   "events": [
+    {
+     "f": 2564,
+     "type": "hurt",
+     "hp": 4,
+     "maxHp": 5,
+     "room": "dc_sentinel",
+     "hazard": false
+    }
+   ]
+  },
+  {
+   "turn": 44,
+   "video": 43.58,
+   "cmd": {
+    "act": [
+     {
+      "pad": {
+       "axes": [
+        -1,
+        0,
+        0,
+        0
+       ],
+       "press": [
+        "rb"
+       ]
+      },
+      "ms": 100
+     },
+     {
+      "pad": {
+       "release": [
+        "rb"
+       ]
+      },
+      "ms": 250
+     },
+     {
+      "pad": {
+       "axes": [
+        0,
+        0,
+        0,
+        0
+       ]
+      },
+      "ms": 100
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 4,
+   "events": []
+  },
+  {
+   "turn": 45,
+   "video": 44.54,
+   "cmd": {
+    "act": [
+     {
+      "pad": {
+       "press": [
+        "a"
+       ],
+       "axes": [
+        -1,
+        0,
+        0,
+        0
+       ]
+      },
+      "ms": 200
+     },
+     {
+      "pad": {
+       "release": [
+        "a"
+       ],
+       "axes": [
+        0,
+        1,
+        0,
+        0
+       ]
+      },
+      "ms": 100
+     },
+     {
+      "pad": {
+       "press": [
+        "x"
+       ]
+      },
+      "ms": 100
+     },
+     {
+      "pad": {
+       "release": [
+        "x"
+       ]
+      },
+      "ms": 200
+     },
+     {
+      "pad": {
+       "press": [
+        "x"
+       ]
+      },
+      "ms": 100
+     },
+     {
+      "pad": {
+       "release": [
+        "x"
+       ],
+       "axes": [
+        0,
+        0,
+        0,
+        0
+       ]
+      },
+      "ms": 200
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 4,
+   "events": []
+  },
+  {
+   "turn": 46,
+   "video": 45.38,
+   "cmd": {
+    "act": [
+     {
+      "pad": {
+       "axes": [
+        1,
+        0,
+        0,
+        0
+       ]
+      },
+      "ms": 50
+     },
+     {
+      "pad": {
+       "axes": [
+        0,
+        0,
+        0,
+        0
+       ],
+       "press": [
+        "x"
+       ]
+      },
+      "ms": 90
+     },
+     {
+      "pad": {
+       "release": [
+        "x"
+       ]
+      },
+      "ms": 120
+     },
+     {
+      "pad": {
+       "press": [
+        "x"
+       ]
+      },
+      "ms": 90
+     },
+     {
+      "pad": {
+       "release": [
+        "x"
+       ]
+      },
+      "ms": 120
+     },
+     {
+      "pad": {
+       "press": [
+        "x"
+       ]
+      },
+      "ms": 90
+     },
+     {
+      "pad": {
+       "release": [
+        "x"
+       ]
+      },
+      "ms": 200
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 4,
+   "events": []
+  },
+  {
+   "turn": 47,
+   "video": 46.14,
+   "cmd": {
+    "act": [
+     {
+      "pad": {
+       "press": [
+        "x"
+       ]
+      },
+      "ms": 90
+     },
+     {
+      "pad": {
+       "release": [
+        "x"
+       ]
+      },
+      "ms": 120
+     },
+     {
+      "pad": {
+       "press": [
+        "x"
+       ]
+      },
+      "ms": 90
+     },
+     {
+      "pad": {
+       "release": [
+        "x"
+       ]
+      },
+      "ms": 120
+     },
+     {
+      "pad": {
+       "press": [
+        "x"
+       ]
+      },
+      "ms": 90
+     },
+     {
+      "pad": {
+       "release": [
+        "x"
+       ]
+      },
+      "ms": 200
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 4,
+   "events": []
+  },
+  {
+   "turn": 48,
+   "video": 46.68,
+   "cmd": {
+    "act": [
+     {
+      "pad": {
+       "axes": [
+        -1,
+        0,
+        0,
+        0
+       ],
+       "press": [
+        "rb"
+       ]
+      },
+      "ms": 100
+     },
+     {
+      "pad": {
+       "release": [
+        "rb"
+       ]
+      },
+      "ms": 200
+     },
+     {
+      "pad": {
+       "axes": [
+        0,
+        0,
+        0,
+        0
+       ]
+      },
+      "ms": 200
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 3,
+   "events": [
+    {
+     "f": 2761,
+     "type": "hurt",
+     "hp": 3,
+     "maxHp": 5,
+     "room": "dc_sentinel",
+     "hazard": false
+    }
+   ]
+  },
+  {
+   "turn": 49,
+   "video": 46.91,
+   "cmd": {
+    "act": [
+     {
+      "wait": 200
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 3,
+   "events": []
+  },
+  {
+   "turn": 50,
+   "video": 47.71,
+   "cmd": {
+    "act": [
+     {
+      "pad": {
+       "axes": [
+        1,
+        0,
+        0,
+        0
+       ]
+      },
+      "ms": 300
+     },
+     {
+      "pad": {
+       "axes": [
+        0,
+        0,
+        0,
+        0
+       ],
+       "press": [
+        "y"
+       ]
+      },
+      "ms": 100
+     },
+     {
+      "pad": {
+       "release": [
+        "y"
+       ]
+      },
+      "ms": 350
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 3,
+   "events": []
+  },
+  {
+   "turn": 51,
+   "video": 48.2,
+   "cmd": {
+    "act": [
+     {
+      "pad": {
+       "press": [
+        "y"
+       ]
+      },
+      "ms": 100
+     },
+     {
+      "pad": {
+       "release": [
+        "y"
+       ]
+      },
+      "ms": 350
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 3,
+   "events": []
+  },
+  {
+   "turn": 52,
+   "video": 48.91,
+   "cmd": {
+    "act": [
+     {
+      "pad": {
+       "press": [
+        "x"
+       ]
+      },
+      "ms": 90
+     },
+     {
+      "pad": {
+       "release": [
+        "x"
+       ]
+      },
+      "ms": 120
+     },
+     {
+      "pad": {
+       "press": [
+        "x"
+       ]
+      },
+      "ms": 90
+     },
+     {
+      "pad": {
+       "release": [
+        "x"
+       ]
+      },
+      "ms": 120
+     },
+     {
+      "pad": {
+       "press": [
+        "x"
+       ]
+      },
+      "ms": 90
+     },
+     {
+      "pad": {
+       "release": [
+        "x"
+       ]
+      },
+      "ms": 150
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 3,
+   "events": []
+  },
+  {
+   "turn": 53,
+   "video": 49.65,
+   "cmd": {
+    "act": [
+     {
+      "pad": {
+       "press": [
+        "a"
+       ]
+      },
+      "ms": 400
+     },
+     {
+      "pad": {
+       "release": [
+        "a"
+       ]
+      },
+      "ms": 300
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 3,
+   "events": []
+  },
+  {
+   "turn": 54,
+   "video": 50.37,
+   "cmd": {
+    "act": [
+     {
+      "pad": {
+       "press": [
+        "x"
+       ]
+      },
+      "ms": 90
+     },
+     {
+      "pad": {
+       "release": [
+        "x"
+       ]
+      },
+      "ms": 120
+     },
+     {
+      "pad": {
+       "press": [
+        "x"
+       ]
+      },
+      "ms": 90
+     },
+     {
+      "pad": {
+       "release": [
+        "x"
+       ]
+      },
+      "ms": 120
+     },
+     {
+      "pad": {
+       "press": [
+        "x"
+       ]
+      },
+      "ms": 90
+     },
+     {
+      "pad": {
+       "release": [
+        "x"
+       ]
+      },
+      "ms": 150
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 3,
+   "events": []
+  },
+  {
+   "turn": 55,
+   "video": 51.07,
+   "cmd": {
+    "act": [
+     {
+      "pad": {
+       "press": [
+        "x"
+       ]
+      },
+      "ms": 90
+     },
+     {
+      "pad": {
+       "release": [
+        "x"
+       ]
+      },
+      "ms": 120
+     },
+     {
+      "pad": {
+       "press": [
+        "x"
+       ]
+      },
+      "ms": 90
+     },
+     {
+      "pad": {
+       "release": [
+        "x"
+       ]
+      },
+      "ms": 120
+     },
+     {
+      "pad": {
+       "press": [
+        "x"
+       ]
+      },
+      "ms": 90
+     },
+     {
+      "pad": {
+       "release": [
+        "x"
+       ]
+      },
+      "ms": 150
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 3,
+   "events": []
+  },
+  {
+   "turn": 56,
+   "video": 51.81,
+   "cmd": {
+    "act": [
+     {
+      "pad": {
+       "press": [
+        "a"
+       ]
+      },
+      "ms": 400
+     },
+     {
+      "pad": {
+       "release": [
+        "a"
+       ]
+      },
+      "ms": 300
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 2,
+   "events": [
+    {
+     "f": 3069,
+     "type": "hurt",
+     "hp": 2,
+     "maxHp": 5,
+     "room": "dc_sentinel",
+     "hazard": false
+    }
+   ]
+  },
+  {
+   "turn": 57,
+   "video": 52.09,
+   "cmd": {
+    "act": [
+     {
+      "wait": 250
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 2,
+   "events": []
+  },
+  {
+   "turn": 58,
+   "video": 53.17,
+   "cmd": {
+    "act": [
+     {
+      "wait": 150
+     },
+     {
+      "pad": {
+       "axes": [
+        1,
+        0,
+        0,
+        0
+       ]
+      },
+      "ms": 200
+     },
+     {
+      "pad": {
+       "axes": [
+        0,
+        0,
+        0,
+        0
+       ],
+       "press": [
+        "x"
+       ]
+      },
+      "ms": 90
+     },
+     {
+      "pad": {
+       "release": [
+        "x"
+       ]
+      },
+      "ms": 120
+     },
+     {
+      "pad": {
+       "press": [
+        "x"
+       ]
+      },
+      "ms": 90
+     },
+     {
+      "pad": {
+       "release": [
+        "x"
+       ]
+      },
+      "ms": 120
+     },
+     {
+      "pad": {
+       "press": [
+        "x"
+       ]
+      },
+      "ms": 90
+     },
+     {
+      "pad": {
+       "release": [
+        "x"
+       ]
+      },
+      "ms": 150
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 2,
+   "events": []
+  },
+  {
+   "turn": 59,
+   "video": 53.89,
+   "cmd": {
+    "act": [
+     {
+      "pad": {
+       "press": [
+        "x"
+       ]
+      },
+      "ms": 90
+     },
+     {
+      "pad": {
+       "release": [
+        "x"
+       ]
+      },
+      "ms": 120
+     },
+     {
+      "pad": {
+       "press": [
+        "x"
+       ]
+      },
+      "ms": 90
+     },
+     {
+      "pad": {
+       "release": [
+        "x"
+       ]
+      },
+      "ms": 120
+     },
+     {
+      "pad": {
+       "press": [
+        "x"
+       ]
+      },
+      "ms": 90
+     },
+     {
+      "pad": {
+       "release": [
+        "x"
+       ]
+      },
+      "ms": 150
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 2,
+   "events": []
+  },
+  {
+   "turn": 60,
+   "video": 54.63,
+   "cmd": {
+    "act": [
+     {
+      "pad": {
+       "press": [
+        "a"
+       ]
+      },
+      "ms": 400
+     },
+     {
+      "pad": {
+       "release": [
+        "a"
+       ]
+      },
+      "ms": 300
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 2,
+   "events": []
+  },
+  {
+   "turn": 61,
+   "video": 55.34,
+   "cmd": {
+    "act": [
+     {
+      "pad": {
+       "press": [
+        "x"
+       ]
+      },
+      "ms": 90
+     },
+     {
+      "pad": {
+       "release": [
+        "x"
+       ]
+      },
+      "ms": 120
+     },
+     {
+      "pad": {
+       "press": [
+        "x"
+       ]
+      },
+      "ms": 90
+     },
+     {
+      "pad": {
+       "release": [
+        "x"
+       ]
+      },
+      "ms": 120
+     },
+     {
+      "pad": {
+       "press": [
+        "x"
+       ]
+      },
+      "ms": 90
+     },
+     {
+      "pad": {
+       "release": [
+        "x"
+       ]
+      },
+      "ms": 150
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 2,
+   "events": []
+  },
+  {
+   "turn": 62,
+   "video": 56.05,
+   "cmd": {
+    "act": [
+     {
+      "pad": {
+       "press": [
+        "x"
+       ]
+      },
+      "ms": 90
+     },
+     {
+      "pad": {
+       "release": [
+        "x"
+       ]
+      },
+      "ms": 120
+     },
+     {
+      "pad": {
+       "press": [
+        "x"
+       ]
+      },
+      "ms": 90
+     },
+     {
+      "pad": {
+       "release": [
+        "x"
+       ]
+      },
+      "ms": 120
+     },
+     {
+      "pad": {
+       "press": [
+        "x"
+       ]
+      },
+      "ms": 90
+     },
+     {
+      "pad": {
+       "release": [
+        "x"
+       ]
+      },
+      "ms": 150
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 2,
+   "events": []
+  },
+  {
+   "turn": 63,
+   "video": 56.77,
+   "cmd": {
+    "act": [
+     {
+      "pad": {
+       "press": [
+        "x"
+       ]
+      },
+      "ms": 90
+     },
+     {
+      "pad": {
+       "release": [
+        "x"
+       ]
+      },
+      "ms": 120
+     },
+     {
+      "pad": {
+       "press": [
+        "x"
+       ]
+      },
+      "ms": 90
+     },
+     {
+      "pad": {
+       "release": [
+        "x"
+       ]
+      },
+      "ms": 120
+     },
+     {
+      "pad": {
+       "press": [
+        "x"
+       ]
+      },
+      "ms": 90
+     },
+     {
+      "pad": {
+       "release": [
+        "x"
+       ]
+      },
+      "ms": 150
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 2,
+   "events": []
+  },
+  {
+   "turn": 64,
+   "video": 57.51,
+   "cmd": {
+    "act": [
+     {
+      "wait": 100
+     },
+     {
+      "pad": {
+       "press": [
+        "a"
+       ]
+      },
+      "ms": 400
+     },
+     {
+      "pad": {
+       "release": [
+        "a"
+       ]
+      },
+      "ms": 200
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 1,
+   "events": [
+    {
+     "f": 3373,
+     "type": "hurt",
+     "hp": 1,
+     "maxHp": 5,
+     "room": "dc_sentinel",
+     "hazard": false
+    }
+   ]
+  },
+  {
+   "turn": 65,
+   "video": 58.39,
+   "cmd": {
+    "act": [
+     {
+      "pad": {
+       "axes": [
+        1,
+        0,
+        0,
+        0
+       ]
+      },
+      "ms": 150
+     },
+     {
+      "pad": {
+       "axes": [
+        0,
+        0,
+        0,
+        0
+       ],
+       "press": [
+        "x"
+       ]
+      },
+      "ms": 90
+     },
+     {
+      "pad": {
+       "release": [
+        "x"
+       ]
+      },
+      "ms": 120
+     },
+     {
+      "pad": {
+       "press": [
+        "x"
+       ]
+      },
+      "ms": 90
+     },
+     {
+      "pad": {
+       "release": [
+        "x"
+       ]
+      },
+      "ms": 120
+     },
+     {
+      "pad": {
+       "press": [
+        "x"
+       ]
+      },
+      "ms": 90
+     },
+     {
+      "pad": {
+       "release": [
+        "x"
+       ]
+      },
+      "ms": 150
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 1,
+   "events": []
+  },
+  {
+   "turn": 66,
+   "video": 59.11,
+   "cmd": {
+    "act": [
+     {
+      "pad": {
+       "press": [
+        "x"
+       ]
+      },
+      "ms": 90
+     },
+     {
+      "pad": {
+       "release": [
+        "x"
+       ]
+      },
+      "ms": 120
+     },
+     {
+      "pad": {
+       "press": [
+        "x"
+       ]
+      },
+      "ms": 90
+     },
+     {
+      "pad": {
+       "release": [
+        "x"
+       ]
+      },
+      "ms": 120
+     },
+     {
+      "pad": {
+       "press": [
+        "x"
+       ]
+      },
+      "ms": 90
+     },
+     {
+      "pad": {
+       "release": [
+        "x"
+       ]
+      },
+      "ms": 150
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 1,
+   "events": [
+    {
+     "f": 3493,
+     "type": "bossFight",
+     "state": "dying",
+     "boss": "tallock"
+    }
+   ]
+  },
+  {
+   "turn": 67,
+   "video": 60.34,
+   "cmd": {
+    "act": [
+     {
+      "wait": 1200
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 1,
+   "events": []
+  },
+  {
+   "turn": 68,
+   "video": 61.87,
+   "cmd": {
+    "act": [
+     {
+      "wait": 1500
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 1,
+   "events": [
+    {
+     "f": 3592,
+     "type": "bossFight",
+     "state": "reward",
+     "boss": "tallock"
+    },
+    {
+     "f": 3628,
+     "type": "bits",
+     "bits": 44,
+     "delta": 20
+    }
+   ]
+  },
+  {
+   "turn": 69,
+   "video": 63.82,
+   "cmd": {
+    "act": [
+     {
+      "pad": {
+       "axes": [
+        1,
+        0,
+        0,
+        0
+       ]
+      },
+      "ms": 1600
+     },
+     {
+      "pad": {
+       "axes": [
+        0,
+        0,
+        0,
+        0
+       ]
+      },
+      "ms": 300
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 1,
+   "events": [
+    {
+     "f": 3677,
+     "type": "bits",
+     "bits": 64,
+     "delta": 20
+    },
+    {
+     "f": 3703,
+     "type": "bits",
+     "bits": 84,
+     "delta": 20
+    }
+   ]
+  },
+  {
+   "turn": 70,
+   "video": 65.01,
+   "cmd": {
+    "act": [
+     {
+      "pad": {
+       "axes": [
+        1,
+        0,
+        0,
+        0
+       ]
+      },
+      "ms": 550
+     },
+     {
+      "pad": {
+       "axes": [
+        0,
+        0,
+        0,
+        0
+       ]
+      },
+      "ms": 600
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 1,
+   "events": []
+  },
+  {
+   "turn": 71,
+   "video": 66.12,
+   "cmd": {
+    "act": [
+     {
+      "pad": {
+       "axes": [
+        1,
+        0,
+        0,
+        0
+       ]
+      },
+      "ms": 250
+     },
+     {
+      "pad": {
+       "axes": [
+        0,
+        0,
+        0,
+        0
+       ]
+      },
+      "ms": 800
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 1,
+   "events": []
+  },
+  {
+   "turn": 72,
+   "video": 67.66,
+   "cmd": {
+    "act": [
+     {
+      "wait": 1500
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 1,
+   "events": [
+    {
+     "f": 3982,
+     "type": "bossFight",
+     "state": "done",
+     "boss": null
+    },
+    {
+     "f": 3982,
+     "type": "ability",
+     "ability": "echoJump"
+    }
+   ]
+  },
+  {
+   "turn": 73,
+   "video": 68.25,
+   "cmd": {
+    "act": [
+     {
+      "pad": {
+       "press": [
+        "lt"
+       ]
+      },
+      "ms": 150
+     },
+     {
+      "pad": {
+       "release": [
+        "lt"
+       ]
+      },
+      "ms": 400
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 1,
+   "events": [
+    {
+     "f": 4029,
+     "type": "overclock"
+    }
+   ]
+  },
+  {
+   "turn": 74,
+   "video": 69.04,
+   "cmd": {
+    "act": [
+     {
+      "pad": {
+       "press": [
+        "a"
+       ]
+      },
+      "ms": 250
+     },
+     {
+      "pad": {
+       "release": [
+        "a"
+       ]
+      },
+      "ms": 120
+     },
+     {
+      "pad": {
+       "press": [
+        "a"
+       ]
+      },
+      "ms": 250
+     },
+     {
+      "pad": {
+       "release": [
+        "a"
+       ]
+      },
+      "ms": 100
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 1,
+   "events": []
+  },
+  {
+   "turn": 75,
+   "video": 70,
+   "cmd": {
+    "act": [
+     {
+      "wait": 900
+     }
+    ]
+   },
+   "room": "dc_sentinel",
+   "hp": 1,
+   "events": []
+  },
+  {
+   "turn": 76,
+   "video": 72.95,
+   "cmd": {
+    "act": [
+     {
+      "pad": {
+       "axes": [
+        -1,
+        0,
+        0,
+        0
+       ]
+      },
+      "ms": 2600
+     },
+     {
+      "pad": {
+       "axes": [
+        0,
+        0,
+        0,
+        0
+       ]
+      },
+      "ms": 300
+     }
+    ]
+   },
+   "room": "dc_shrine",
+   "hp": 1,
+   "events": [
+    {
+     "f": 4286,
+     "type": "room",
+     "from": "dc_sentinel",
+     "to": "dc_shrine"
+    },
+    {
+     "f": 4286,
+     "type": "bossFight",
+     "state": "none",
+     "boss": null
+    }
+   ]
+  },
+  {
+   "turn": 77,
+   "video": 75.09,
+   "cmd": {
+    "act": [
+     {
+      "pad": {
+       "axes": [
+        -1,
+        0,
+        0,
+        0
+       ]
+      },
+      "ms": 1900
+     },
+     {
+      "pad": {
+       "axes": [
+        0,
+        0,
+        0,
+        0
+       ]
+      },
+      "ms": 200
+     }
+    ]
+   },
+   "room": "dc_shrine",
+   "hp": 1,
+   "events": []
+  },
+  {
+   "turn": 78,
+   "video": 76.34,
+   "cmd": {
+    "act": [
+     {
+      "pad": {
+       "axes": [
+        -1,
+        0,
+        0,
+        0
+       ]
+      },
+      "ms": 280
+     },
+     {
+      "pad": {
+       "axes": [
+        0,
+        0,
+        0,
+        0
+       ]
+      },
+      "ms": 100
+     },
+     {
+      "pad": {
+       "press": [
+        "up"
+       ]
+      },
+      "ms": 100
+     },
+     {
+      "pad": {
+       "release": [
+        "up"
+       ]
+      },
+      "ms": 700
+     }
+    ]
+   },
+   "room": "dc_shrine",
+   "hp": 5,
+   "events": [
+    {
+     "f": 4500,
+     "type": "heal",
+     "hp": 5
+    }
+   ]
+  },
+  {
+   "turn": 79,
+   "video": 78.04,
+   "cmd": {
+    "act": [
+     {
+      "pad": {
+       "axes": [
+        1,
+        0,
+        0,
+        0
+       ]
+      },
+      "ms": 250
+     },
+     {
+      "pad": {
+       "axes": [
+        1,
+        0,
+        0,
+        0
+       ],
+       "press": [
+        "a"
+       ]
+      },
+      "ms": 250
+     },
+     {
+      "pad": {
+       "release": [
+        "a"
+       ]
+      },
+      "ms": 80
+     },
+     {
+      "pad": {
+       "press": [
+        "a"
+       ]
+      },
+      "ms": 250
+     },
+     {
+      "pad": {
+       "release": [
+        "a"
+       ],
+       "axes": [
+        0.4,
+        0,
+        0,
+        0
+       ]
+      },
+      "ms": 500
+     },
+     {
+      "pad": {
+       "axes": [
+        0,
+        0,
+        0,
+        0
+       ]
+      },
+      "ms": 300
+     }
+    ]
+   },
+   "room": "dc_shrine",
+   "hp": 5,
+   "events": [
+    {
+     "f": 4557,
+     "type": "bits",
+     "bits": 85,
+     "delta": 1
+    }
+   ]
+  },
+  {
+   "turn": 80,
+   "video": 78.87,
+   "cmd": {
+    "act": [
+     {
+      "wait": 800
+     }
+    ]
+   },
+   "room": "dc_shrine",
+   "hp": 5,
+   "events": []
+  },
+  {
+   "turn": 81,
+   "video": 80.13,
+   "cmd": {
+    "act": [
+     {
+      "pad": {
+       "axes": [
+        -1,
+        0,
+        0,
+        0
+       ],
+       "press": [
+        "a"
+       ]
+      },
+      "ms": 250
+     },
+     {
+      "pad": {
+       "release": [
+        "a"
+       ]
+      },
+      "ms": 80
+     },
+     {
+      "pad": {
+       "press": [
+        "a"
+       ]
+      },
+      "ms": 200
+     },
+     {
+      "pad": {
+       "release": [
+        "a"
+       ]
+      },
+      "ms": 150
+     },
+     {
+      "pad": {
+       "axes": [
+        0,
+        0,
+        0,
+        0
+       ]
+      },
+      "ms": 500
+     }
+    ]
+   },
+   "room": "dc_shrine",
+   "hp": 5,
+   "events": [
+    {
+     "f": 4714,
+     "type": "bits",
+     "bits": 86,
+     "delta": 1
+    }
+   ]
+  },
+  {
+   "turn": 82,
+   "video": 82.71,
+   "cmd": {
+    "act": [
+     {
+      "pad": {
+       "axes": [
+        -1,
+        0,
+        0,
+        0
+       ]
+      },
+      "ms": 2200
+     },
+     {
+      "pad": {
+       "axes": [
+        0,
+        0,
+        0,
+        0
+       ]
+      },
+      "ms": 300
+     }
+    ]
+   },
+   "room": "dc_cross",
+   "hp": 5,
+   "events": [
+    {
+     "f": 4877,
+     "type": "room",
+     "from": "dc_shrine",
+     "to": "dc_cross"
+    }
+   ]
+  },
+  {
+   "turn": 83,
+   "video": 83.99,
+   "cmd": {
+    "act": [
+     {
+      "pad": {
+       "axes": [
+        -1,
+        0,
+        0,
+        0
+       ]
+      },
+      "ms": 150
+     },
+     {
+      "pad": {
+       "axes": [
+        -1,
+        0,
+        0,
+        0
+       ],
+       "press": [
+        "a"
+       ]
+      },
+      "ms": 250
+     },
+     {
+      "pad": {
+       "release": [
+        "a"
+       ]
+      },
+      "ms": 80
+     },
+     {
+      "pad": {
+       "press": [
+        "a"
+       ]
+      },
+      "ms": 250
+     },
+     {
+      "pad": {
+       "release": [
+        "a"
+       ]
+      },
+      "ms": 200
+     },
+     {
+      "pad": {
+       "axes": [
+        0,
+        0,
+        0,
+        0
+       ]
+      },
+      "ms": 300
+     }
+    ]
+   },
+   "room": "dc_cross",
+   "hp": 5,
+   "events": []
+  },
+  {
+   "turn": 84,
+   "video": 84.74,
+   "cmd": {
+    "act": [
+     {
+      "pad": {
+       "axes": [
+        -1,
+        0,
+        0,
+        0
+       ]
+      },
+      "ms": 200
+     },
+     {
+      "pad": {
+       "axes": [
+        0,
+        0,
+        0,
+        0
+       ],
+       "press": [
+        "y"
+       ]
+      },
+      "ms": 100
+     },
+     {
+      "pad": {
+       "release": [
+        "y"
+       ]
+      },
+      "ms": 400
+     }
+    ]
+   },
+   "room": "dc_cross",
+   "hp": 5,
+   "events": []
+  },
+  {
+   "turn": 85,
+   "video": 85.43,
+   "cmd": {
+    "act": [
+     {
+      "pad": {
+       "axes": [
+        -1,
+        0,
+        0,
+        0
+       ]
+      },
+      "ms": 150
+     },
+     {
+      "pad": {
+       "axes": [
+        0,
+        0,
+        0,
+        0
+       ],
+       "press": [
+        "y"
+       ]
+      },
+      "ms": 100
+     },
+     {
+      "pad": {
+       "release": [
+        "y"
+       ]
+      },
+      "ms": 400
+     }
+    ]
+   },
+   "room": "dc_cross",
+   "hp": 4,
+   "events": [
+    {
+     "f": 5045,
+     "type": "hurt",
+     "hp": 4,
+     "maxHp": 5,
+     "room": "dc_cross",
+     "hazard": false
+    }
+   ]
+  },
+  {
+   "turn": 86,
+   "video": 86.34,
+   "cmd": {
+    "act": [
+     {
+      "wait": 150
+     },
+     {
+      "pad": {
+       "press": [
+        "x"
+       ]
+      },
+      "ms": 90
+     },
+     {
+      "pad": {
+       "release": [
+        "x"
+       ]
+      },
+      "ms": 120
+     },
+     {
+      "pad": {
+       "press": [
+        "x"
+       ]
+      },
+      "ms": 90
+     },
+     {
+      "pad": {
+       "release": [
+        "x"
+       ]
+      },
+      "ms": 120
+     },
+     {
+      "pad": {
+       "press": [
+        "x"
+       ]
+      },
+      "ms": 90
+     },
+     {
+      "pad": {
+       "release": [
+        "x"
+       ]
+      },
+      "ms": 200
+     }
+    ]
+   },
+   "room": "dc_cross",
+   "hp": 4,
+   "events": []
+  },
+  {
+   "turn": 87,
+   "video": 87.3,
+   "cmd": {
+    "act": [
+     {
+      "pad": {
+       "axes": [
+        -1,
+        0,
+        0,
+        0
+       ]
+      },
+      "ms": 60
+     },
+     {
+      "pad": {
+       "axes": [
+        0,
+        0,
+        0,
+        0
+       ],
+       "press": [
+        "x"
+       ]
+      },
+      "ms": 90
+     },
+     {
+      "pad": {
+       "release": [
+        "x"
+       ]
+      },
+      "ms": 120
+     },
+     {
+      "pad": {
+       "press": [
+        "x"
+       ]
+      },
+      "ms": 90
+     },
+     {
+      "pad": {
+       "release": [
+        "x"
+       ]
+      },
+      "ms": 120
+     },
+     {
+      "pad": {
+       "press": [
+        "y"
+       ]
+      },
+      "ms": 90
+     },
+     {
+      "pad": {
+       "release": [
+        "y"
+       ]
+      },
+      "ms": 300
+     }
+    ]
+   },
+   "room": "dc_cross",
+   "hp": 4,
+   "events": []
+  }
+ ],
+ "marks": [
+  {
+   "turn": 1,
+   "video": 0,
+   "note": "844x390 window: game is pillarboxed and scaled down; save summary under CONTINUE and the footer are tiny (~7-8px) and crowd the menu"
+  },
+  {
+   "turn": 6,
+   "video": 5.14,
+   "note": "BUG repro: one d-pad Down in Settings also moved the title cursor behind the panel from NEW GAME to CONTINUE (visible through the panel)"
+  },
+  {
+   "turn": 8,
+   "video": 6.83,
+   "note": "In-game at 844x390: ENERGY/OVERCLOCK labels and zone subtitle are ~6px, hero is ~20px tall"
+  },
+  {
+   "turn": 11,
+   "video": 10.95,
+   "note": "Boss intro TALLOCK - screen shake is OFF this clip"
+  },
+  {
+   "turn": 14,
+   "video": 14.66,
+   "note": "Stack Slam tell: pale blue ellipse under my feet - subtle against the blue floor at this size"
+  },
+  {
+   "turn": 16,
+   "video": 15.74,
+   "note": "My fault: dashed back into the slam marker. Slam landing has no flash or shake with shake OFF - comfortable"
+  },
+  {
+   "turn": 20,
+   "video": 19.13,
+   "note": "Hit by Slab Swing despite jumping - hard to read when the swing actually starts; then I blink invisible on the ledge"
+  },
+  {
+   "turn": 25,
+   "video": 23.51,
+   "note": "Disc Toss: the thrown disc is a small blue-grey sliver - hard to track against the dark blue room"
+  },
+  {
+   "turn": 28,
+   "video": 25.32,
+   "note": "Died to Tallock: a returning disc I could barely see clipped me. Tallock at 89/120"
+  },
+  {
+   "turn": 31,
+   "video": 30.11,
+   "note": "Map at 844x390: legend/room text ~6px; boss (red dot) and vendor (green dot) look like the same tiny dot - red/green only"
+  },
+  {
+   "turn": 32,
+   "video": 30.65,
+   "note": "A (Confirm) does recentre the map - only the hint is keyboard-only (R)"
+  },
+  {
+   "turn": 43,
+   "video": 43.08,
+   "note": "Full-screen red/pink hurt flash fires even with screen shake OFF - no option to reduce it"
+  },
+  {
+   "turn": 48,
+   "video": 46.68,
+   "note": "Slab Swing hit me again: I pressed dash during its tell but was still finishing my light combo, so I barely moved - the window feels very short"
+  },
+  {
+   "turn": 53,
+   "video": 49.65,
+   "note": "Dodged the Stomp Quake by jumping right on the tell"
+  },
+  {
+   "turn": 56,
+   "video": 51.81,
+   "note": "Slab Swing hit me a 3rd time - jumped immediately this time and came down into it. I cannot read its timing from the visuals"
+  },
+  {
+   "turn": 61,
+   "video": 55.34,
+   "note": "Tallock enrages at 34 HP - roar, bar turns pink"
+  },
+  {
+   "turn": 66,
+   "video": 59.11,
+   "note": "BEAT TALLOCK at 1 heart! Delight. But the death sequence washes the whole screen white-pink - a big flash even with shake off"
+  },
+  {
+   "turn": 68,
+   "video": 61.87,
+   "note": "Nice: HUD shows OVERCLOCK - READY [LT] with the pad button (tiny at this size though)"
+  },
+  {
+   "turn": 71,
+   "video": 66.12,
+   "note": "ECHO JUMP ACQUIRED says Press A - pad-aware text here, unlike the menus"
+  },
+  {
+   "turn": 74,
+   "video": 69.04,
+   "note": "The ECHO JUMP banner sits in the middle of the screen for 3+ s and hides my hero while I try the double jump it is teaching"
+  },
+  {
+   "turn": 79,
+   "video": 78.04,
+   "note": "RESTORED banner covers the platform I am trying to jump to - banners sit right over the play area"
+  }
+ ],
+ "debugCalls": [],
+ "errors": [],
+ "segments": [
+  [
+   10.911,
+   11.865
+  ],
+  [
+   20.714,
+   22.07
+  ],
+  [
+   32.417,
+   33.245
+  ],
+  [
+   54.815,
+   55.97
+  ],
+  [
+   64.785,
+   65.628
+  ],
+  [
+   75.252,
+   75.794
+  ],
+  [
+   85.696,
+   86.843
+  ],
+  [
+   96.652,
+   97.599
+  ],
+  [
+   102.824,
+   105.058
+  ],
+  [
+   113.08,
+   114.025
+  ],
+  [
+   122.157,
+   123.995
+  ],
+  [
+   131.549,
+   132.583
+  ],
+  [
+   141.634,
+   142.474
+  ],
+  [
+   152.173,
+   152.661
+  ],
+  [
+   162.203,
+   162.796
+  ],
+  [
+   173.636,
+   174.727
+  ],
+  [
+   179.711,
+   180.247
+  ],
+  [
+   188.974,
+   189.798
+  ],
+  [
+   197.989,
+   198.927
+  ],
+  [
+   211.985,
+   212.721
+  ],
+  [
+   221.882,
+   222.825
+  ],
+  [
+   232.096,
+   233.256
+  ],
+  [
+   243.483,
+   244.322
+  ],
+  [
+   253.165,
+   253.86
+  ],
+  [
+   263.719,
+   264.274
+  ],
+  [
+   274.343,
+   275.046
+  ],
+  [
+   283.662,
+   284.216
+  ],
+  [
+   290.009,
+   292.541
+  ],
+  [
+   301.153,
+   302.205
+  ],
+  [
+   307.937,
+   309.144
+  ],
+  [
+   320.156,
+   320.694
+  ],
+  [
+   331.528,
+   332.691
+  ],
+  [
+   338.191,
+   341.335
+  ],
+  [
+   345.559,
+   348.601
+  ],
+  [
+   353.902,
+   354.434
+  ],
+  [
+   362.777,
+   363.331
+  ],
+  [
+   371.925,
+   372.306
+  ],
+  [
+   381.346,
+   381.974
+  ],
+  [
+   390.649,
+   391.67
+  ],
+  [
+   400.767,
+   401.556
+  ],
+  [
+   410.259,
+   410.896
+  ],
+  [
+   420.135,
+   420.68
+  ],
+  [
+   431.08,
+   431.579
+  ],
+  [
+   441.848,
+   442.805
+  ],
+  [
+   451.657,
+   452.502
+  ],
+  [
+   457.467,
+   458.222
+  ],
+  [
+   465.856,
+   466.392
+  ],
+  [
+   473.614,
+   473.844
+  ],
+  [
+   479.411,
+   480.214
+  ],
+  [
+   485.753,
+   486.247
+  ],
+  [
+   494.959,
+   495.667
+  ],
+  [
+   500.712,
+   501.448
+  ],
+  [
+   507.312,
+   508.032
+  ],
+  [
+   513.029,
+   513.733
+  ],
+  [
+   520.071,
+   520.81
+  ],
+  [
+   529.365,
+   529.649
+  ],
+  [
+   536.403,
+   537.484
+  ],
+  [
+   545.925,
+   546.641
+  ],
+  [
+   551.667,
+   552.408
+  ],
+  [
+   557.927,
+   558.632
+  ],
+  [
+   569.14,
+   569.859
+  ],
+  [
+   575.756,
+   576.474
+  ],
+  [
+   584.249,
+   584.99
+  ],
+  [
+   591.749,
+   592.624
+  ],
+  [
+   598.327,
+   599.048
+  ],
+  [
+   609.392,
+   610.622
+  ],
+  [
+   619.178,
+   620.71
+  ],
+  [
+   629.992,
+   631.939
+  ],
+  [
+   641.316,
+   642.51
+  ],
+  [
+   651.185,
+   652.297
+  ],
+  [
+   662.993,
+   664.529
+  ],
+  [
+   669.673,
+   670.263
+  ],
+  [
+   679.646,
+   680.439
+  ],
+  [
+   690.319,
+   691.274
+  ],
+  [
+   698.738,
+   701.687
+  ],
+  [
+   706.387,
+   708.526
+  ],
+  [
+   713.465,
+   714.723
+  ],
+  [
+   726.969,
+   728.661
+  ],
+  [
+   738.786,
+   739.619
+  ],
+  [
+   749.36,
+   750.621
+  ],
+  [
+   756.992,
+   759.567
+  ],
+  [
+   770.097,
+   771.384
+  ],
+  [
+   781.155,
+   781.9
+  ],
+  [
+   791.417,
+   792.107
+  ],
+  [
+   802.775,
+   803.691
+  ],
+  [
+   815.578,
+   816.532
+  ]
+ ],
+ "endedAt": "2026-10-14T14:00:17.428Z",
+ "liveSeconds": 87.3,
+ "video": "recordings/access-02-small-window-tallock-844x390.mp4",
+ "convertError": null
+}
