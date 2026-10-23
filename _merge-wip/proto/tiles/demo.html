@@ -16,7 +16,7 @@
 <canvas id="c"></canvas>
 <div id="hud"></div>
 <script type="module">
-  import { createTileset, drawMap, drawSheet, gradeFor } from './render.js';
+  import { createTileset, drawMap, drawSheet, sheetLayout, gradeFor } from './render.js';
   import { HARBOR } from './map-harbor.js';
 
   const q = new URLSearchParams(location.search);
@@ -33,28 +33,32 @@
     frame: num('frame', 0),
     scale: num('scale', 2),
   };
-  const cams = { harbor: [3 * 16, 0], town: [3 * 16, 9 * 16], flats: [10 * 16, 0], west: [0, 6 * 16] };
+  const cams = { harbor: [3 * 16, 0], town: [3 * 16, 9 * 16], flats: [10 * 16, 0], west: [0, 6 * 16], point: [0, 2 * 16], green: [14 * 16, 9 * 16] };
   const canvas = document.getElementById('c');
   const full = state.cam === 'full';
   const states = state.cam === 'states';
-  // `states`: a 3x2 contact sheet (noon / dusk / night x low / high tide) of the harbor view.
+  // `states`: a 3x2 contact sheet (noon / dusk / night x low / high tide) framed on the quay, river
+  // mouth and the west edge of the flats, where the tide line moves most.
   const STATES = [
     { hour: 12, tide: 0, label: 'noon, low tide' }, { hour: 18.25, tide: 0, label: 'dusk, low tide' }, { hour: 22, tide: 0, label: 'night, low tide' },
     { hour: 12, tide: 1, label: 'noon, high tide' }, { hour: 18.25, tide: 1, label: 'dusk, high tide' }, { hour: 22, tide: 1, label: 'night, high tide' },
   ];
+  const tileset = createTileset();
+  const sheetL = state.sheet ? sheetLayout(tileset, { width: 480 }) : null;
   canvas.width = full ? HARBOR.w * 16 : states ? 960 : 480;
-  canvas.height = full ? HARBOR.h * 16 + 40 : states ? 540 : 270;
+  canvas.height = full ? HARBOR.h * 16 + 40 : states ? 540 : sheetL ? sheetL.h : 270;
   const scale = full || states ? 1 : state.scale;
+  if (sheetL) { document.body.style.overflow = 'auto'; document.body.style.alignItems = 'flex-start'; }
   canvas.style.width = canvas.width * scale + 'px';
   canvas.style.height = canvas.height * scale + 'px';
   const ctx = canvas.getContext('2d');
   ctx.imageSmoothingEnabled = false;
-  const tileset = createTileset();
   const hud = document.getElementById('hud');
 
   function render() {
     const g = gradeFor(state.hour, state.weather);
-    const lit = state.lit === null ? g.night > 0.5 : state.lit;
+    // the lamp stays dark until the Relighting (all 7 scaffold sections); then it burns every night
+    const lit = state.lit === null ? state.stage >= 7 && g.night > 0.5 : state.lit;
     if (state.sheet) { drawSheet(ctx, tileset, { hour: state.hour, frame: state.frame }); return; }
     if (states) {
       ctx.fillStyle = '#141B33';
@@ -66,8 +70,8 @@
         ctx.translate(px, py);
         drawMap(ctx, HARBOR, tileset, {
           frame: state.frame, hour: st.hour, weather: state.weather, tide: st.tide,
-          camX: 5 * 16, camY: 2 * 16, view: { x: 0, y: 24, w: 320, h: 246 }, skybandH: 24,
-          lighthouseStage: state.stage, lighthouseLit: state.lit === null ? gs.night > 0.5 : state.lit,
+          camX: 13 * 16, camY: 2 * 16, view: { x: 0, y: 24, w: 320, h: 246 }, skybandH: 24,
+          lighthouseStage: state.stage, lighthouseLit: state.lit === null ? state.stage >= 7 && gs.night > 0.5 : state.lit,
         });
         ctx.fillStyle = '#F4F1E6';
         ctx.font = '10px monospace';

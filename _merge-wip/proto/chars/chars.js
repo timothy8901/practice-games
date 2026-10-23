@@ -6,7 +6,8 @@
 //   PALETTES[palId]  -> { letter: '#rrggbb' }
 //   CHARACTERS[id]   -> { name, species, body, palette }
 //   PORTRAITS[id]    -> { w: 48, h: 48, rows, palette }
-//   frame(bodyId|body, facing, step) -> rows      (facing: down|up|left|right|sit|fish|hang)
+//   frame(bodyId|body, facing, step, gait) -> rows (facing: down|up|left|right|sit|fish|hang; gait walk|run)
+//   animatedPalette(palId, t)        -> palette with Juniper's sheen cycled
 //   walkStep(t, ms)                  -> 0..3      (idle, step A, idle, step B)
 //   sprite(charId, facing, step, opts) -> decoded Sprite (via js/core/pixelart.js)
 //
@@ -17,6 +18,7 @@
 import { HEADS, TORSOS, TAILS, LEGS, EXTRAS, buildMammal } from './mammals.js';
 import { buildTrainerBodies } from './trainers.js';
 import { buildOtherBodies } from './others.js';
+import './backs.js'; // hand-finished back-of-head views (must run before BODIES)
 import { PALETTES, CHARACTERS } from './palettes.js';
 import { PORTRAITS } from './portraits.js';
 import { decodeSprite } from '../../js/core/pixelart.js';
@@ -37,18 +39,26 @@ export const BODIES = {
 };
 
 // Characters whose body carries an extra prop pick the variant here.
-CHARACTERS.agathe.body = 'trainerCoatBand';
-CHARACTERS.teo.body = 'trainerVestGoggles';
+CHARACTERS.idris.body = 'idris';
+CHARACTERS.agathe.body = 'agathe';
+CHARACTERS.teo.body = 'teo';
 
-/** Frame rows for a body. facing: down|up|left|right|sit|fish|hang. step 0..3. */
-export function frame(body, facing = 'down', step = 0) {
+/**
+ * Frame rows for a body. facing: down|up|left|right|sit|fish|hang. step 0..3.
+ * gait 'run' picks the run cycle where the body has one (player species and
+ * every rig body), else falls back to the walk. For 'fish', step is the cast
+ * phase: 0 hold, 1 wind-up, 2 cast, 3 bite.
+ */
+export function frame(body, facing = 'down', step = 0, gait = 'walk') {
   const b = typeof body === 'string' ? BODIES[body] : body;
   if (!b) throw new Error(`chars: unknown body ${body}`);
-  if (facing === 'sit' || facing === 'fish') return b[facing];
+  const i = ((step % 4) + 4) % 4;
+  if (facing === 'sit') return b.sit;
+  if (facing === 'fish') return b.fishFrames ? b.fishFrames[i] : b.fish;
   if (facing === 'hang') return (b.poses && b.poses.hang) || b.down[0];
-  const set = b[facing];
+  const set = (gait === 'run' && b.run && b.run[facing]) || b[facing];
   if (!set) throw new Error(`chars: body has no facing ${facing}`);
-  return set[((step % 4) + 4) % 4];
+  return set[i];
 }
 
 /** Walk-cycle step for a time in ms (idle, A, idle, B at `ms` per frame). */
@@ -56,11 +66,30 @@ export function walkStep(t, ms = 125) {
   return Math.floor(t / ms) % 4;
 }
 
-/** Decoded sprite for a character id (cached by pixelart). */
-export function sprite(charId, facing = 'down', step = 0, opts) {
+/** Decoded sprite for a character id (cached by pixelart). opts.gait = 'run' | 'walk'; opts.t (ms) animates sheen. */
+export function sprite(charId, facing = 'down', step = 0, opts = {}) {
   const ch = CHARACTERS[charId];
   if (!ch) throw new Error(`chars: unknown character ${charId}`);
-  return decodeSprite(frame(ch.body, facing, step), PALETTES[ch.palette], opts);
+  const { gait, t, ...dec } = opts || {};
+  const pal = t == null ? PALETTES[ch.palette] : animatedPalette(ch.palette, t);
+  return decodeSprite(frame(ch.body, facing, step, gait), pal, dec);
+}
+
+/**
+ * Palette with any cycling letters advanced to time t (ms). Juniper's
+ * iridescent sheen (I/i) rolls through teal -> green -> violet -> teal like
+ * light moving across magpie feathers; other palettes come back unchanged.
+ * Returns a shared object per step, so decodeSprite's cache stays warm.
+ */
+const SHEEN = [['#2a6f8f', '#3fae8c'], ['#3fae8c', '#2a6f8f'], ['#3a5a9a', '#3fae8c'], ['#5a4a8f', '#2a6f8f']];
+const sheenCache = new Map();
+export function animatedPalette(palId, t = 0, ms = 220) {
+  const base = PALETTES[palId];
+  if (!base || !('I' in base)) return base;
+  const k = Math.floor(t / ms) % SHEEN.length;
+  const key = palId + k;
+  if (!sheenCache.has(key)) sheenCache.set(key, { ...base, I: SHEEN[k][0], i: SHEEN[k][1] });
+  return sheenCache.get(key);
 }
 
 /** Decoded portrait bust for a character id, or null if none is drawn. */
@@ -73,7 +102,8 @@ export function portrait(charId, opts) {
 export function lettersUsed(body) {
   const b = typeof body === 'string' ? BODIES[body] : body;
   const s = new Set();
-  const all = [...b.down, ...b.up, ...b.left, ...b.right, b.sit, b.fish, ...(b.poses ? Object.values(b.poses) : [])];
+  const all = [...b.down, ...b.up, ...b.left, ...b.right, b.sit, b.fish, ...(b.fishFrames || []),
+    ...(b.run ? Object.values(b.run).flat() : []), ...(b.poses ? Object.values(b.poses) : [])];
   for (const f of all) for (const r of f) for (const ch of r) if (ch !== '.') s.add(ch);
   return [...s].sort();
 }

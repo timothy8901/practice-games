@@ -35,7 +35,7 @@ export const COLORS = {
   cl0: '#2A2433', cl1: '#4A3E44', cl2: '#6E5A58', cl3: '#8C7A6E', cl4: '#A8927C',
   // ground
   pa0: '#8E6B45', pa1: '#B08A5E', pa2: '#C9A77C', pa3: '#D9C19A',
-  co0: '#4E4A5A', co1: '#6B6672', co2: '#8E8A86', co3: '#ABA6A0', co4: '#C4BFB6', cow1: '#7E7068', cow2: '#9C8E80',
+  co0: '#4E4A5A', co1: '#6B6672', co2: '#8E8A86', co3: '#ABA6A0', co4: '#C4BFB6', co15: '#7C7780', cow1: '#857868', cow2: '#A39484',
   // wood / building
   wd0: '#4E3620', wd1: '#7A5A36', wd2: '#A5794B', wd3: '#C9A16B', wd4: '#E0BE86',
   pl0: '#B8A88A', pl1: '#D6C8A6', pl2: '#EADFC4', pl3: '#F4E8C1',
@@ -191,7 +191,7 @@ const TUFT = [
   '..ooo..',
 ];
 const lean = (tuft, dx) => tuft.map((r, i) => (i < 3 && dx ? (dx > 0 ? '.' + r.slice(0, -1) : r.slice(1) + '.') : r));
-const TG = { ...GP, o: 'grass0', m: 'grass3', b: 'grass1' };
+const TG = { ...GP, o: 'grass0', m: 'grass3', b: 'grass1', h: 'grass3' };
 const tgFrame = (dx) => {
   let r = tiles.grass_a.frames[0];
   for (const [x, y] of [[1, 0], [9, 3], [4, 9]]) r = blit(r, lean(TUFT, dx), x, y);
@@ -321,7 +321,9 @@ function erode(row, e, fromLeft) {
 }
 const WAVES = [0, 1, 2, 1].map((e) => WATER_BASE.map((row, y) => erode(row, e, (y & 1) === 0)));
 def('water_deep', { w: 'deep1', h: 'deep2', k: 'deep0' }, WAVES);
-def('water_shallow', { w: 'sh2', h: 'sh3', k: 'sh1' }, WAVES);
+// Shallows are calmer than the open sea: half the strokes, so the deep/shallow shelf reads.
+const SHALLOW_BASE = WATER_BASE.map((r, y) => ([2, 5, 9, 14].includes(y) ? 'w'.repeat(16) : r));
+def('water_shallow', { w: 'sh2', h: 'sh3', k: 'sh1' }, [0, 1, 2, 1].map((e) => SHALLOW_BASE.map((row, y) => erode(row, e, (y & 1) === 0))));
 def('water_mud', { w: 'shm1', h: 'shm2', k: 'shm0' }, WAVES);
 // River: light flow streaks that slide downstream (rows rotate 4 per frame → seamless loop).
 const RIVER_BASE = [
@@ -493,21 +495,18 @@ def('cliff_face', CP, [
   'kkkkkkkkkkkkkkkk',
   'kkkkkkkkkkkkkkkk',
 ]);
-// Side faces for cliff-top edges (drawn over the cliff-top grass): a lit 3px face with a dark base
-// line on the west, a shaded one on the east, and a lit lip along the north edge.
-def('cliff_rim_w', { k: 'cl0', m: 'cl2', d: 'cl1', l: 'cl4', b: 'cl3' }, [
-  'kml.............', 'kmb.............', 'kml.............', 'kdb.............',
-  'kml.............', 'kmb.............', 'kml.............', 'kml.............',
-  'kdb.............', 'kml.............', 'kmb.............', 'kml.............',
-  'kml.............', 'kdb.............', 'kml.............', 'kmb.............',
-]);
-def('cliff_rim_e', { k: 'cl0', m: 'cl2', d: 'cl1' }, [
-  '.............mdk', '.............ddk', '.............mdk', '.............mdk',
-  '.............ddk', '.............mdk', '.............mdk', '.............ddk',
-  '.............mdk', '.............mdk', '.............ddk', '.............mdk',
-  '.............mdk', '.............ddk', '.............mdk', '.............mdk',
-]);
-def('cliff_rim_n', { l: 'cl4', b: 'cl3' }, ['llllllllllllllll', 'bbbbbbbbbbbbbbbb', ...blank(16, 14)]);
+// Cliff face end pieces: where the front face meets water or turf, the rock rounds off with a lit
+// edge on the west end and a deep shaded edge on the east end.
+const CF = tiles.cliff_face.frames[0];
+def('cliff_face_l', CP, CF.map((r, y) => (y === 0 ? r : y < 2 ? 'k' + r.slice(1) : 'kl' + r.slice(2))));
+def('cliff_face_r', CP, CF.map((r, y) => (y === 0 ? r : r.slice(0, 13) + 'dkk')));
+// Side faces for cliff-top edges (drawn over the cliff-top grass): a 5px stratified rock face. The
+// west face takes the light (lit lip, mid body, dark base line); the east face is in shade.
+const RIM_W = ['kmbbl', 'kmbbl', 'kdmbl', 'kmmbl', 'kmbbl', 'kdmbl', 'kmbbl', 'kmmbl', 'kdmbl', 'kmbbl', 'kmbbl', 'kdmml', 'kmbbl', 'kmmbl', 'kdmbl', 'kmbbl'];
+def('cliff_rim_w', { k: 'cl0', m: 'cl2', d: 'cl1', l: 'cl4', b: 'cl3' }, RIM_W.map((r) => r + '.'.repeat(11)));
+const RIM_E = ['bmddk', 'bmddk', 'bdmdk', 'bmmdk', 'bmddk', 'bmkdk', 'bmddk', 'bdmdk', 'bmddk', 'bmmdk', 'bmkdk', 'bmddk', 'bdmdk', 'bmddk', 'bmmdk', 'bmddk'];
+def('cliff_rim_e', { k: 'cl0', m: 'cl2', d: 'cl1', b: 'cl3' }, RIM_E.map((r) => '.'.repeat(11) + r));
+def('cliff_rim_n', { l: 'cl4', b: 'cl3', d: 'cl2' }, ['dddddddddddddddd', 'llllllllllllllll', 'bbbbbbbbbbbbbbbb', ...blank(16, 13)]);
 // Ledge (one-way): grass above, light lip, 2px shadow, chevron notch.
 def('ledge', { g: 'grass2', y: 'sand3', l: 'cl4', m: 'cl2', d: 'cl1', k: 'cl0', s: 'grass0' }, [
   'gggggggggggggggg',
@@ -527,6 +526,25 @@ def('ledge', { g: 'grass2', y: 'sand3', l: 'cl4', m: 'cl2', d: 'cl1', k: 'cl0', 
   'ssssssssssssssss',
   'gggggggggggggggg',
 ]);
+
+// Ledge with the chevron notch (placed on every other ledge tile): a light V pointing the way down.
+def('ledge_b', tiles.ledge.pal, tiles.ledge.frames[0].map((r, y) => {
+  const v = { 7: 'llllllyllyllllll', 8: 'mmmmmmmyymmmmmmm', 9: 'mmmmmmdmmdmmmmmm' };
+  return v[y] || r;
+}));
+
+// Ledge ends: the lip and face taper back into the turf over 5px so a ledge never stops square.
+const LEDGE_TAPER = { 6: 0, 7: 0, 8: 1, 9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 6 };
+const ledgeEnd = (rows, fromLeft) => rows.map((r, y) => {
+  if (!(y in LEDGE_TAPER)) return r;
+  const n = LEDGE_TAPER[y];
+  const line = r.split('');
+  for (let i = 0; i < n; i++) line[fromLeft ? i : 15 - i] = 'g';
+  if (n < 16 && y >= 8 && y <= 12) line[fromLeft ? n : 15 - n] = 'k';
+  return line.join('');
+});
+def('ledge_l', tiles.ledge.pal, ledgeEnd(tiles.ledge.frames[0], true));
+def('ledge_r', tiles.ledge.pal, ledgeEnd(tiles.ledge.frames[0], false));
 
 /* ----------------------------------------------------- paths & floors */
 def('path', { p: 'pa1', d: 'pa0', l: 'pa2', h: 'pa3' }, [
@@ -556,7 +574,7 @@ const SETT_COURSES = [
   { y: 5, h: 4, cuts: [1, 6, 11] },
   { y: 10, h: 5, cuts: [3, 8, 13] },
 ];
-const SETT_TINTS = { n: ['l', 'c', 'd'], w: ['l', 'w', 'u'], k: ['c', 'd', 'g'] };
+const SETT_TINTS = { n: ['l', 'c', 'd'], w: ['l', 'w', 'u'], k: ['c', 'u', 'd'] };
 function cobbleTile(tints) {
   const g = blank(16, 16, 'g').map((r) => r.split(''));
   let si = 0;
@@ -582,7 +600,7 @@ function cobbleTile(tints) {
   }
   return g.map((r) => r.join(''));
 }
-const COBP = { g: 'co0', d: 'co1', c: 'co2', l: 'co3', h: 'co4', w: 'cow2', u: 'cow1' };
+const COBP = { g: 'co1', d: 'co15', c: 'co2', l: 'co3', h: 'co4', w: 'cow2', u: 'cow1' };
 def('cobbles', COBP, cobbleTile(['n', 'w', 'n', 'n', 'k', 'n', 'w', 'n', 'n']));
 def('cobbles_b', COBP, cobbleTile(['k', 'n', 'n', 'w', 'n', 'n', 'n', 'k', 'w']));
 // Quay coping: dressed granite blocks along the water edge (wet dark waterline, lit nosing, block
@@ -641,41 +659,25 @@ def('pier_end', PP, [
 // stern (left), a pointed bow (right), a lit gunwale rim, the recessed hull floor in shade under the
 // near rim, two thwarts, the red-painted strake showing along the south side, and its shadow on
 // the water.
-function rowboat() {
-  const W = 32, H = 16, cy = 6, x0 = 3, xs = 19, xb = 29;
-  const half = (x) => (x < x0 || x > xb ? -1 : x <= xs ? 4.5 : 4.5 * Math.sqrt(Math.max(0, 1 - ((x - xs) / (xb - xs + 0.6)) ** 2)));
-  const inHull = (x, y) => { const hh = half(x); return hh > 0 && Math.abs(y + 0.5 - cy - 0.5) <= hh; };
-  const g = blank(W, H).map((r) => r.split(''));
-  for (let y = 0; y < H; y++) {
-    for (let x = 0; x < W; x++) {
-      if (!inHull(x, y)) continue;
-      const out = !inHull(x - 1, y) || !inHull(x + 1, y) || !inHull(x, y - 1) || !inHull(x, y + 1);
-      if (out) { g[y][x] = 'k'; continue; }
-      const rim = !inHull(x - 2, y) || !inHull(x + 2, y) || !inHull(x, y - 2) || !inHull(x, y + 2) || !inHull(x + 1, y + 1) || !inHull(x - 1, y - 1);
-      if (rim) { g[y][x] = y <= cy ? 'l' : 'w'; continue; }
-      const nearTop = !inHull(x, y - 3);
-      let c = nearTop ? 'd' : 'p';
-      if (y === cy + 1 && x % 5 !== 0) c = nearTop ? 'd' : 'q'; // plank seam
-      if (x === 9 || x === 17) c = 't';
-      if (x === 10 || x === 18) c = nearTop ? 'k' : 'd';
-      g[y][x] = c;
-    }
-  }
-  // painted strake under the south rim, then the hull's shadow on the water
-  for (let x = 0; x < W; x++) {
-    let yb = -1;
-    for (let y = H - 1; y >= 0; y--) if (g[y][x] === 'k' && inHull(x, y)) { yb = y; break; }
-    if (yb < 0) continue;
-    const bow = x > xb - 3;
-    if (!bow && yb + 1 < H) g[yb][x] = 'r';
-    if (!bow && yb + 1 < H) g[yb + 1][x] = x === x0 ? 'k' : 'e';
-    if (yb + 2 < H) g[yb + 2][x] = bow ? 's' : 'k';
-    if (yb + 3 < H && x > x0) g[yb + 3][x] = 's';
-    if (yb + 4 < H && x > x0 + 1 && x % 2 === 0) g[yb + 4][x] = 's';
-  }
-  return g.map((r) => r.join(''));
-}
-def('boat', { k: 'wd0', d: 'wd1', p: 'wd2', q: 'wd1', w: 'wd3', l: 'wd4', t: 'wd4', r: 'red2', e: 'red1', s: 'deep0' }, rowboat(), 32, 16);
+const BOAT = [
+  '................................',
+  '................................',
+  '...kkkkkkkkkkkkkkkkkkkkk........',
+  '...kllllllllllllllllllllkkk.....',
+  '...klddddtkddddddtkdddddlllkk...',
+  '...klpppptdpppppptdpppppdddllk..',
+  '...klpppptdpppppptdppppppppdlk..',
+  '...kwpqqqtdqqqqpqtdqpqqqqpqwwk..',
+  '...kwpppptdpppppptdpppppwwwkk...',
+  '...kwwwwwwwwwwwwwwwwwwwwkkk.....',
+  '...krrrrrrrrrrrrrrrrrrrrrrkk....',
+  '...keeeeeeeeeeeeeeeeeeeeekks....',
+  '...kkkkkkkkkkkkkkkkkkkkkkss.....',
+  '....sssssssssssssssssssssss.....',
+  '......s.s.s.s.s.s.s.s.s.s.......',
+  '................................',
+];
+def('boat', { k: 'wd0', d: 'wd1', p: 'wd2', q: 'wd1', w: 'wd3', l: 'wd4', t: 'wd4', r: 'red2', e: 'red1', s: 'deep0' }, BOAT, 32, 16);
 // Steps cut into a cliff face (the ramp down from the point): three treads, each a lit nosing,
 // two rows of riser and a shadow line, between dark side walls.
 def('steps', { g: 'grass1', k: 'cl0', d: 'cl1', b: 'cl3', l: 'cl4' }, [
@@ -1003,43 +1005,59 @@ def('rock_b', { k: 'st0', d: 'st1', m: 'st2', l: 'st3', h: 'st4', s: 'shadow' },
 
 // Trees are 32x32 (2x2 tiles); anchor = bottom-left tile. Every tree has a trunk, a dark base line
 // and a dithered cast shadow bottom-right so it reads as blocking (never as tall grass).
-const TREEPAL = {
-  k: 'pine0', d: 'pine1', b: 'pine2', l: 'pine3', t: 'wd0', u: 'wd1', s: 'shadow', x: 'uiink',
-};
-def('tree_pine', TREEPAL, [
-  '...............kk...............',
-  '..............kllk..............',
-  '..............klbdk.............',
-  '.............klbbdk.............',
-  '.............klbbddk............',
-  '............kllbbbddk...........',
-  '............klbbbbddk...........',
-  '...........kllbbbbdddk..........',
-  '..........kklbbbbbdddkk.........',
-  '.............klbbbbdk...........',
-  '............kllbbbbddk..........',
-  '...........kllbbbbbdddk.........',
-  '..........kllbbbbbbddddk........',
-  '.........kllbbbbbbbbddddk.......',
-  '........kklbbbbbbbbbdddddkk.....',
-  '...........kllbbbbbdddk.........',
-  '..........kllbbbbbbddddk........',
-  '.........kllbbbbbbbbddddk.......',
-  '........kllbbbbbbbbbbdddddk.....',
-  '.......kllbbbbbbbbbbbddddddk....',
-  '......kklbbbbbbbbbbbbdddddddkk..',
-  '.........kllbbbbbbbbbdddddk.....',
-  '........kllbbbbbbbbbbddddddk....',
-  '.......kllbbbbbbbbbbbbddddddk...',
-  '......kkkkkkkkkkbbbkkkkkkkkkkk..',
-  '...............utt..............',
-  '...............utt..............',
-  '...............utt....ss........',
-  '..............uuttt..ssss.......',
-  '.............xxxxxxxssssss......',
-  '...........ssssssssssssssss.....',
-  '..............sssssssssss.......',
-], 32, 32);
+// Pine: four stacked tiers, each a cone lit from the top-left (lit flank, mid, shaded flank) with a
+// sawtoothed drooping skirt and a deep shadow band where the tier above overhangs it. Outline is
+// selective: own-hue dark on the lit side, the deepest green on the shaded side and underside.
+// Sway bends the tree: the top tier moves a pixel, the lowest stays planted.
+const PINE_TIERS = [
+  { t: 0, b: 8, w: 4 }, { t: 4, b: 13, w: 7 }, { t: 8, b: 18, w: 10 }, { t: 12, b: 24, w: 13 },
+];
+function pineCrown(sway) {
+  const g = blank(32, 32).map((r) => r.split(''));
+  const cx = 15.5;
+  for (let i = PINE_TIERS.length - 1; i >= 0; i--) {
+    const T = PINE_TIERS[i];
+    const dx = i === 0 ? sway : i === 1 && sway ? sway * 0.5 : 0;
+    const ox = cx + Math.round(dx);
+    const halfAt = (y) => 0.6 + ((y - T.t) / (T.b - T.t)) * T.w;
+    // the bottom row is a row of hanging branch tips (teeth), not a solid line
+    const inT = (x, y) => {
+      if (y < T.t || y > T.b || Math.abs(x + 0.5 - ox) > halfAt(y)) return false;
+      return y < T.b || (x + i) % 3 !== 0;
+    };
+    for (let y = T.t; y <= T.b; y++) {
+      for (let x = 0; x < 32; x++) {
+        if (!inT(x, y)) continue;
+        const u = (x + 0.5 - ox) / Math.max(1, halfAt(y));
+        const edgeL = !inT(x - 1, y) && y < T.b, edgeR = !inT(x + 1, y) && y < T.b, edgeB = !inT(x, y + 1);
+        let c;
+        if (edgeB) c = u < -0.4 ? 'd' : 'n';
+        else if (edgeL) c = 'k';
+        else if (edgeR) c = 'n';
+        else {
+          const checker = ((x + y) & 1) === 0;
+          c = u < -0.45 || (u < -0.3 && checker) ? 'l' : u < 0.25 || (u < 0.4 && checker) ? 'b' : 'd';
+          if (y === T.b - 1 && c === 'b') c = 'd'; // the skirt's underside turns away from the light
+          if (c === 'l' && (x * 5 + y * 3) % 7 === 0) c = 'h';
+          else if (c === 'b' && (x * 3 + y * 7) % 9 === 0) c = u < 0 ? 'l' : 'd';
+        }
+        g[y][x] = c;
+      }
+    }
+  }
+  return g.map((r) => r.join(''));
+}
+const PINE_TRUNK = [
+  '..............vutt..............',
+  '..............vutt......s.......',
+  '.............vvuttt...sssss.....',
+  '............xxxxxxxxxsssssss....',
+  '.........sssssssssssssssssssss..',
+  '...........sssssssssssssssssss..',
+  '..............ssssssssssss......',
+];
+def('tree_pine', { n: 'pinek', k: 'pine0', d: 'pine1', b: 'pine2', l: 'pine3', h: 'pine4', t: 'wd0', u: 'wd1', v: 'wd2', s: 'shadow', x: 'uiink' },
+  [0, 1, 0, -1].map((sw) => blit(blit(blank(32, 32), PINE_TRUNK, 0, 25), pineCrown(sw), 0, 0)), 32, 32);
 // Broadleaf trees: procedural clustered canopies (see `canopy`) over a hand-drawn trunk, base line
 // and dithered cast shadow. Four sway frames shift the crown a pixel against the trunk.
 const TRUNK_ROWS = [
@@ -1063,19 +1081,32 @@ function treeFrames(lobes, chars, decorate = (rows) => rows) {
 const ALDER_LOBES = [
   { cx: 15.5, cy: 8, r: 7.5 }, { cx: 9, cy: 13, r: 7 }, { cx: 22, cy: 13, r: 7 }, { cx: 15.5, cy: 16, r: 6.5 },
 ];
-def('tree_alder', { k: 'ald0', n: 'pine1', d: 'ald1', b: 'ald2', l: 'ald3', t: 'aldbark0', u: 'aldbark1', v: 'aldbark2', s: 'shadow', x: 'uiink' },
-  treeFrames(ALDER_LOBES, { out: 'k', deep: 'n', l: 'l', b: 'b', d: 'd' }), 32, 32);
+const ALDERPAL = { k: 'ald0', n: 'pine1', d: 'ald1', b: 'ald2', l: 'ald3', t: 'aldbark0', u: 'aldbark1', v: 'aldbark2', s: 'shadow', x: 'uiink' };
+def('tree_alder', ALDERPAL, treeFrames(ALDER_LOBES, { out: 'k', deep: 'n', l: 'l', b: 'b', d: 'd' }), 32, 32);
+// Second crown layout: lopsided, taller on the west, a low lobe hanging east, so groves vary.
+const ALDER_LOBES_B = [
+  { cx: 12.5, cy: 7, r: 6.5 }, { cx: 20.5, cy: 9.5, r: 6.5 }, { cx: 8.5, cy: 15, r: 6 }, { cx: 17, cy: 15.5, r: 7.5 }, { cx: 24.5, cy: 16, r: 4.5 },
+];
+def('tree_alder_b', ALDERPAL, treeFrames(ALDER_LOBES_B, { out: 'k', deep: 'n', l: 'l', b: 'b', d: 'd' }), 32, 32);
 const FRUIT_LOBES = [
   { cx: 15.5, cy: 7.5, r: 7 }, { cx: 9, cy: 12.5, r: 7.5 }, { cx: 22, cy: 12.5, r: 7.5 }, { cx: 15.5, cy: 15, r: 7 },
 ];
 const PEAR = ['gf', 'ff', 'ee'];
-const PEAR_SPOTS = [[8, 8], [19, 5], [13, 13], [23, 13], [9, 16], [17, 18]];
-const hangFruit = (rows) => PEAR_SPOTS.reduce((r, [x, y]) => blit(r, PEAR, x, y), rows);
+const PEAR_SPOTS = [[8, 8], [19, 5], [13, 13], [23, 13], [9, 16], [17, 18], [21, 9], [6, 12]];
+// hang a pear only where it sits fully inside the crown (not on the outline)
+const hangFruit = (rows) => PEAR_SPOTS.reduce((r, [x, y]) => {
+  const solid = (xx, yy) => rows[yy] && rows[yy][xx] && rows[yy][xx] !== '.' && rows[yy][xx] !== 'k' && rows[yy][xx] !== 'n';
+  return solid(x, y) && solid(x + 1, y + 2) && solid(x - 1, y + 1) && solid(x + 2, y + 1) ? blit(r, PEAR, x, y) : r;
+}, rows);
 const FRUITPAL = { k: 'fr0', n: 'pine0', d: 'fr1', b: 'fr2', l: 'fr3', t: 'wd0', u: 'wd1', v: 'wd2', s: 'shadow', x: 'uiink', f: 'pear', g: 'pear2', e: 'pear0' };
 const FRUIT_CH = { out: 'k', deep: 'n', l: 'l', b: 'b', d: 'd' };
 def('tree_fruit', FRUITPAL, treeFrames(FRUIT_LOBES, FRUIT_CH, hangFruit), 32, 32);
 // Bare variant: fruit chars become canopy.
 def('tree_fruit_bare', { ...FRUITPAL, f: 'fr2', g: 'fr3', e: 'fr1' }, treeFrames(FRUIT_LOBES, FRUIT_CH, hangFruit), 32, 32);
+const FRUIT_LOBES_B = [
+  { cx: 18, cy: 7, r: 6.5 }, { cx: 10.5, cy: 10.5, r: 6.5 }, { cx: 23, cy: 14, r: 6.5 }, { cx: 13.5, cy: 16, r: 7.5 },
+];
+def('tree_fruit_b', FRUITPAL, treeFrames(FRUIT_LOBES_B, FRUIT_CH, hangFruit), 32, 32);
 
 /* ---------------------------------------------------------- landmarks */
 // Waystone: a dock marker; stone pillar, iron ring, glowing rune (exempt). 16x32, anchor bottom tile.

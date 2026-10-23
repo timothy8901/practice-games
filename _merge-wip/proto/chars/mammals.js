@@ -17,6 +17,7 @@
 // (row 17 of the legs is covered by the torso hem). On the two stride frames the
 // head + torso + tail drop by one pixel (contact bounce); the legs stay put.
 import { blank, stamp, under, rows, flipH } from './rig.js';
+import { drawRod } from './rod.js';
 
 const assertW = (name, part, w) => {
   part.forEach((r, i) => { if (r.length !== w) throw new Error(`${name} row ${i} is ${r.length} wide, want ${w}: ${r}`); });
@@ -397,6 +398,44 @@ const MASK = {
     '....oxxxxohho...',
     '.....oxxxxo.....',
   ],
+  // front/back walk: viewer-left arm swung back (short), viewer-right arm forward (long)
+  downA: [
+    '....oxxxxxxo....',
+    '...oxxxxxxxxo...',
+    '...oxxxxxxxxo...',
+    '...ohxxxxxxxo...',
+    '...ohxxxxxxxo...',
+    '....oxxxxxxho...',
+    '....oxxxxxxho...',
+  ],
+  downB: [
+    '....oxxxxxxo....',
+    '...oxxxxxxxxo...',
+    '...oxxxxxxxxo...',
+    '...oxxxxxxxho...',
+    '...oxxxxxxxho...',
+    '...ohxxxxxxo....',
+    '...ohxxxxxxo....',
+  ],
+  // run, side view: elbows bent, fists pumped high
+  runFwd: [
+    '.....oxxxxo.....',
+    '....oxxxxxxo....',
+    '...oxxoxxxxo....',
+    '..ohhoxxxxxo....',
+    '..ohhoxxxxxo....',
+    '....oxxxxxxo....',
+    '.....oxxxxo.....',
+  ],
+  runBack: [
+    '.....oxxxxo.....',
+    '....oxxxxxxo....',
+    '....oxxxxoxxo...',
+    '....oxxxxxoxxo..',
+    '....oxxxxxohho..',
+    '....oxxxxxohho..',
+    '.....oxxxxo.....',
+  ],
   fish: [
     '.....oxxxxo.....',
     '....oxxxxxxo....',
@@ -421,10 +460,12 @@ const MASK = {
  * Build a torso set from a fill function. fill(r, c, info) -> letter for an
  * 'x' pixel; info = { shadeCol (true on the right-most interior column), side }.
  */
-export function makeTorso(fill, { hand = 'S', outline = 'k' } = {}) {
+const CREASE = { C: 'c', D: 'd', F: 'f' };
+export function makeTorso(fill, { hand = 'S', outline = 'k', crease = true } = {}) {
   const out = {};
   for (const [key, mask] of Object.entries(MASK)) {
-    const side = key !== 'down' && key !== 'sit';
+    const front = key === 'down' || key === 'sit' || key === 'downA' || key === 'downB';
+    const side = !front;
     out[key] = mask.map((row, r) => {
       let last = -1;
       for (let c = 0; c < row.length; c++) if (row[c] === 'x') last = c;
@@ -432,7 +473,11 @@ export function makeTorso(fill, { hand = 'S', outline = 'k' } = {}) {
         if (ch === '.') return '.';
         if (ch === 'o') return outline;
         if (ch === 'h') return hand;
-        return fill(r, c, { shadeCol: c === last, side, key });
+        const v = fill(r, c, { shadeCol: c === last, side, key });
+        // front view: a 1px fold where each sleeve meets the body (armpit
+        // crease) so the arms read as arms, not a box; shade only.
+        if (crease && front && r >= 2 && r <= 5 && (c === 5 || c === 10) && CREASE[v]) return CREASE[v];
+        return v;
       }).join('');
     });
   }
@@ -525,6 +570,25 @@ export const LEGS = {
       '.........BbbK...',
       '.........KKK....',
     ],
+    // run passing pose: weight on the viewer-left foot, right heel up
+    passA: [
+      '....SSS..SSS....',
+      '....SSS..SSS....',
+      '....SSs..SSs....',
+      '....SSs..BBb....',
+      '...KBBB..BbbK...',
+      '...KBBb..KKK....',
+      '....KKK.........',
+    ],
+    passB: [
+      '....SSS..SSS....',
+      '....SSS..SSS....',
+      '....SSs..SSs....',
+      '....BBB..SSs....',
+      '...KBBb..BBbK...',
+      '....KKK..BbbK...',
+      '.........KKK....',
+    ],
     // seated on a step: thighs toward the viewer, boots below
     sit: [
       '....SSS..SSS....',
@@ -562,6 +626,36 @@ export const LEGS = {
       '.....K..KBBBbK..',
       '........KBBbbK..',
       '.........KKKK...',
+    ],
+    // run: long stride, near leg reaching forward, far foot kicked up behind
+    runA: [
+      '......SSS.......',
+      '.....SSSSs......',
+      '....SSs.sSs.....',
+      '...SSs...sSsK...',
+      '..KBBBbK..KbbK..',
+      '..KBBbbK...KK...',
+      '...KKKK.........',
+    ],
+    // run: far leg reaching forward, near foot pushing off behind
+    runB: [
+      '......SSS.......',
+      '.....sSSSS......',
+      '....sSs.SSs.....',
+      '...KsK...SSs....',
+      '..KbbK..KBBBbK..',
+      '...KK...KBBbbK..',
+      '.........KKKK...',
+    ],
+    // run: passing, knee driven up and forward, support foot under the hip
+    pass: [
+      '......SSS.......',
+      '.....SSSS.......',
+      '...KSSsSs.......',
+      '...KBBKSs.......',
+      '...KBbKSs.......',
+      '....KKBBBbK.....',
+      '.....KBBbbK.....',
     ],
   },
 };
@@ -741,11 +835,6 @@ EXTRAS.readingGlass = {
 // line can reach out past the 16px cell; the figure sits in cols 8..23.
 // ---------------------------------------------------------------------------
 export const FISH_W = 24, FISH_OX = -8;
-const ROD = [
-  // x, y in the 24-wide frame
-  [3, 6], [4, 7], [5, 8], [6, 9], [7, 10], [8, 11], [9, 12], [10, 13],
-];
-const LINE_X = 2, LINE_Y0 = 7, LINE_Y1 = 20;
 
 // ---------------------------------------------------------------------------
 // Builder
@@ -766,26 +855,25 @@ export function buildMammal(def) {
   const tail = def.tail || {};
   const extras = def.extras || [];
   const headY = def.headY ?? 0;
+  const legSet = (facing) => legs[facing === 'up' ? 'down' : facing];
+  const legPart = (facing, key) => legSet(facing)[key] || legSet(facing)[key.startsWith('run') ? key.slice(3).toLowerCase() : 'idle'] || legSet(facing).idle;
 
-  function body(g, facing, legKey, bob, torsoKey, dx = 0) {
+  // draw order: behind-tail, legs, torso, head, front-tail, extras
+  function body(g, facing, legKey, bob, torsoKey, dx = 0, headDx = 0) {
     const t = tail[facing];
     const ex = extras.map((e) => e && e[facing]).filter(Boolean);
     const h = head[facing];
-    const tor = torso[torsoKey];
-    // draw order: behind-tail, legs, torso, head, front-tail, extras
+    const tor = torso[torsoKey] || torso[facing === 'up' ? 'down' : facing];
     if (t && t.behind) place(g, t, dx, bob, false);
-    stamp(g, legs[facing === 'up' ? 'down' : facing][legKey], dx, 17);
+    stamp(g, legPart(facing, legKey), dx, 17);
     stamp(g, tor, dx, 11 + bob);
     if (facing === 'up') { if (t && !t.behind) place(g, t, dx, bob, false); }
-    stamp(g, h, 2 + dx, headY + bob);
+    stamp(g, h, 2 + dx + headDx, headY + bob);
     if (facing !== 'up' && t && !t.behind) place(g, t, dx, bob, false);
-    for (const e of ex) place(g, e, dx, bob, false);
+    for (const e of ex) place(g, e, dx + headDx, bob, false);
     return g;
   }
-
-  const frameDown = (legKey, bob) => rows(body(blank(), 'down', legKey, bob, 'down'));
-  const frameUp = (legKey, bob) => rows(body(blank(), 'up', legKey, bob, 'up'));
-  const frameLeft = (legKey, bob, torsoKey) => rows(body(blank(), 'left', legKey, bob, torsoKey));
+  const mk = (facing, legKey, bob, torsoKey, headDx = 0) => rows(body(blank(), facing, legKey, bob, torsoKey, 0, headDx));
 
   function frameSit() {
     const g = blank();
@@ -800,18 +888,27 @@ export function buildMammal(def) {
     return rows(g);
   }
 
-  function frameFish() {
+  // hand of the fish torso (row 3, cols 3-4) sits at (11, 14) in the 24-wide frame
+  function frameFish(phase) {
     const g = blank(FISH_W, 24);
     body(g, 'left', 'idle', 0, 'fish', -FISH_OX);
-    for (const [x, y] of ROD) if (g[y][x] === '.') g[y][x] = 'a';
-    for (let y = LINE_Y0; y <= LINE_Y1; y++) if (g[y][LINE_X] === '.') g[y][LINE_X] = 'k';
-    g[LINE_Y1 + 1][LINE_X] = 'Y'; g[LINE_Y1 + 1][LINE_X + 1] = 'Y';
+    drawRod(g, 10, 13, phase);
     return rows(g);
   }
 
-  const down = [frameDown('idle', 0), frameDown('a', 1), frameDown('idle', 0), frameDown('b', 1)];
-  const up = [frameUp('idle', 0), frameUp('a', 1), frameUp('idle', 0), frameUp('b', 1)];
-  const left = [frameLeft('idle', 0, 'left'), frameLeft('a', 1, 'leftFwd'), frameLeft('idle', 0, 'left'), frameLeft('b', 1, 'leftBack')];
+  // walk: idle, A, idle, B. Arms swing against the legs on every facing.
+  const down = [mk('down', 'idle', 0, 'down'), mk('down', 'a', 1, 'downA'), mk('down', 'idle', 0, 'down'), mk('down', 'b', 1, 'downB')];
+  const up = [mk('up', 'idle', 0, 'down'), mk('up', 'a', 1, 'downB'), mk('up', 'idle', 0, 'down'), mk('up', 'b', 1, 'downA')];
+  const left = [mk('left', 'idle', 0, 'left'), mk('left', 'a', 1, 'leftFwd'), mk('left', 'idle', 0, 'left'), mk('left', 'b', 1, 'leftBack')];
   const right = left.map(flipH);
-  return { w: 16, h: 24, down, up, left, right, sit: frameSit(), fish: frameFish(), fishW: FISH_W, fishOx: FISH_OX };
+  // run: stride, pass, stride, pass. Body drops on the strides; the side
+  // view leans the head a pixel into the run and pumps bent arms.
+  const run = {
+    down: [mk('down', 'a', 1, 'downA'), mk('down', 'passA', 0, 'downB'), mk('down', 'b', 1, 'downB'), mk('down', 'passB', 0, 'downA')],
+    up: [mk('up', 'a', 1, 'downB'), mk('up', 'passA', 0, 'downA'), mk('up', 'b', 1, 'downA'), mk('up', 'passB', 0, 'downB')],
+    left: [mk('left', 'runA', 1, 'runBack', -1), mk('left', 'pass', 0, 'runFwd', -1), mk('left', 'runB', 1, 'runFwd', -1), mk('left', 'pass', 0, 'runBack', -1)],
+  };
+  run.right = run.left.map(flipH);
+  const fishFrames = [0, 1, 2, 3].map(frameFish);
+  return { w: 16, h: 24, down, up, left, right, run, sit: frameSit(), fish: fishFrames[0], fishFrames, fishW: FISH_W, fishOx: FISH_OX };
 }

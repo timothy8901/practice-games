@@ -91,8 +91,8 @@ const GRADES = [
   { h: 7.75, mul: [0.97, 0.96, 1.0], scr: [0.04, 0.04, 0.06], sat: 1.0, lamp: 0, night: 0 },    // morning
   { h: 9.5, mul: [1, 1, 1], scr: [0, 0, 0], sat: 1, lamp: 0, night: 0 },                        // day
   { h: 15.5, mul: [1, 1, 1], scr: [0, 0, 0], sat: 1, lamp: 0, night: 0 },
-  { h: 17.25, mul: [1.04, 0.93, 0.76], scr: [0.08, 0.04, 0.0], sat: 1.05, lamp: 0.25, night: 0 }, // golden
-  { h: 18.25, mul: [0.98, 0.78, 0.62], scr: [0.08, 0.04, 0.06], sat: 1.0, lamp: 0.75, night: 0.15 }, // sunset (amber, never magenta)
+  { h: 17.25, mul: [1.04, 0.93, 0.76], scr: [0.08, 0.04, 0.0], sat: 1.05, lamp: 0.25, night: 0, wmul: [0.94, 0.94, 0.98], glint: 0.35 }, // golden
+  { h: 18.25, mul: [0.98, 0.78, 0.62], scr: [0.08, 0.04, 0.06], sat: 1.0, lamp: 0.75, night: 0.15, wmul: [0.80, 0.80, 0.94], glint: 0.5 }, // sunset (amber, never magenta)
   { h: 19.25, mul: [0.48, 0.54, 0.80], scr: [0.06, 0.08, 0.18], sat: 0.85, lamp: 1, night: 0.6 }, // blue hour
   { h: 20.0, mul: [0.38, 0.46, 0.72], scr: [0.08, 0.10, 0.20], sat: 0.78, lamp: 1, night: 0.85 }, // night
   { h: 22.5, mul: [0.38, 0.46, 0.72], scr: [0.08, 0.10, 0.20], sat: 0.78, lamp: 1, night: 1 },
@@ -118,17 +118,31 @@ export function gradeFor(hour, weather = 'clear') {
   const g = {
     mul: lerp3(a.mul, b.mul, t), scr: lerp3(a.scr, b.scr, t), sat: lerp(a.sat, b.sat, t),
     lamp: lerp(a.lamp, b.lamp, t), night: lerp(a.night, b.night, t),
+    // water keeps its blue at golden hour (the sea mirrors the high sky), and its highlights pick
+    // up the low sun instead
+    wmul: lerp3(a.wmul || a.mul, b.wmul || b.mul, t), glint: lerp(a.glint || 0, b.glint || 0, t),
   };
-  if (weather === 'rain') { g.mul = [g.mul[0] * 0.82, g.mul[1] * 0.86, g.mul[2] * 0.94]; g.sat *= 0.85; g.lamp = Math.max(g.lamp, 0.35); }
-  if (weather === 'fog') { g.mul = [g.mul[0] * 0.92, g.mul[1] * 0.93, g.mul[2] * 0.96]; g.scr = [g.scr[0] + 0.06, g.scr[1] + 0.07, g.scr[2] + 0.08]; g.sat *= 0.9; }
+  if (weather === 'rain') { const k = [0.82, 0.86, 0.94]; g.mul = g.mul.map((v, i) => v * k[i]); g.wmul = g.wmul.map((v, i) => v * k[i]); g.sat *= 0.85; g.lamp = Math.max(g.lamp, 0.35); g.glint *= 0.3; }
+  if (weather === 'fog') { const k = [0.92, 0.93, 0.96]; g.mul = g.mul.map((v, i) => v * k[i]); g.wmul = g.wmul.map((v, i) => v * k[i]); g.scr = [g.scr[0] + 0.06, g.scr[1] + 0.07, g.scr[2] + 0.08]; g.sat *= 0.9; g.glint *= 0.3; }
   g.key = `${h}|${weather}`;
   return g;
 }
 
-/** Apply a grade to one hex colour: multiply → screen floor → saturation. Never below ink. */
-export function gradeHex(hex, g) {
+/** Water colour names: body tones take the water grade, highlight tones also catch the sun glint. */
+const WATER_BODY = /^(deep[0-2]|sh[0-2]|riv[0-2]|shm[01])$/;
+const WATER_HI = /^(deep3|sh3|riv3|shm2|dapple|foam)$/;
+const GLINT = hexToRgb01('#F3C178');
+
+/**
+ * Apply a grade to one hex colour: multiply → screen floor → saturation. Never below ink.
+ * `name` (optional, a COLORS key) selects the per-material water grade.
+ */
+export function gradeHex(hex, g, name = '') {
   let c = hexToRgb01(hex);
-  c = [c[0] * g.mul[0], c[1] * g.mul[1], c[2] * g.mul[2]];
+  const water = WATER_BODY.test(name) || WATER_HI.test(name);
+  const m = water && g.wmul ? g.wmul : g.mul;
+  c = [c[0] * m[0], c[1] * m[1], c[2] * m[2]];
+  if (WATER_HI.test(name) && g.glint) c = lerp3(c, GLINT, g.glint);
   c = [1 - (1 - c[0]) * (1 - g.scr[0]), 1 - (1 - c[1]) * (1 - g.scr[1]), 1 - (1 - c[2]) * (1 - g.scr[2])];
   const l = 0.3 * c[0] + 0.59 * c[1] + 0.11 * c[2];
   c = [l + (c[0] - l) * g.sat, l + (c[1] - l) * g.sat, l + (c[2] - l) * g.sat];
@@ -170,8 +184,6 @@ function derivedTiles() {
   d.shelf_e = { ...shelf, name: 'shelf_e', frames: shelf.frames.map(rotateCW) };
   d.shelf_s = { ...shelf, name: 'shelf_s', frames: shelf.frames.map(flipV) };
   d.shelf_w = { ...shelf, name: 'shelf_w', frames: shelf.frames.map((f) => rotateCW(rotateCW(rotateCW(f)))) };
-  const lip = ['hhhhhhhhhhhhhhhh', 'mmmmmmmmmmmmmmmm', 'dddddddddddddddd', ...Array.from({ length: 13 }, () => '................')];
-  d.quay_lip = { name: 'quay_lip', w: 16, h: 16, frames: [lip], pal: { h: 'st3', m: 'st2', d: 'st1' } };
   const bank = ['................', '................', '................', '................', '................', '................', '................', '................', '................', '................', '................', '................', '................', '................', 'dddddddddddddddd', 'kkkkkkkkkkkkkkkk'];
   d.bank_s = { name: 'bank_s', w: 16, h: 16, frames: [bank], pal: { d: 'wet0', k: 'wet0' } };
   return d;
@@ -193,7 +205,7 @@ export function createTileset() {
     for (const [ch, name] of Object.entries(tile.pal)) {
       if (name === 'shadow') { pal[ch] = null; continue; }
       const hex = COLORS[name];
-      pal[ch] = name.startsWith('!') ? hex : gradeHex(hex, g);
+      pal[ch] = name.startsWith('!') ? hex : gradeHex(hex, g, name);
     }
     return pal;
   }
@@ -243,9 +255,12 @@ export function createTileset() {
  *  Q tide pool   G/g grass   T tall grass   Z/z flowers   C cliff top   F cliff face
  *  L ledge   P dirt path   O cobbles   K pier   k pier end (north tip)
  */
-export function resolveGround(ch, { tide = 0, night = 0, frame = 0 } = {}) {
+export function resolveGround(ch, { tide = 0, night = 0, frame = 0, x = 0, y = 0 } = {}) {
   const wf = Math.floor(frame / 10);
-  const glow = night > 0.5;
+  // Bioluminescence gathers in patches (2x2-tile cells) with a few strays, never as an even field;
+  // the pulse rolls across the flats as a slow wave.
+  const glow = night > 0.5 && (hash2(x >> 1, y >> 1) % 3 === 0 || hash2(x, y) % 7 === 0);
+  const gf = Math.floor(frame / 14) + ((x + (y >> 1)) % 3);
   switch (ch) {
     case 'D': return { tile: 'water_deep', frame: wf, water: true };
     case 'S': return { tile: 'water_shallow', frame: wf, water: true };
@@ -255,10 +270,10 @@ export function resolveGround(ch, { tide = 0, night = 0, frame = 0 } = {}) {
     case 'M':
       if (tide > 0.6) return { tile: 'water_mud', frame: wf, water: true };
       if (tide > 0.35) return { tile: 'mud_wet' };
-      return glow ? { tile: 'mud_glow', frame: Math.floor(frame / 14) } : { tile: 'mud_dry' };
+      return glow ? { tile: 'mud_glow', frame: gf } : night > 0.5 ? { tile: 'mud_wet' } : { tile: 'mud_dry' };
     case 'U':
       if (tide > 0.35) return { tile: 'water_mud', frame: wf, water: true };
-      return glow ? { tile: 'mud_glow', frame: Math.floor(frame / 14) + 1 } : { tile: 'mud_wet' };
+      return glow ? { tile: 'mud_glow', frame: gf + 1 } : { tile: 'mud_wet' };
     case 'B': return tide > 0.6 ? { tile: 'stepstone_sub', water: true, self: true } : { tile: 'stepstone', water: true, self: true };
     case 'E': return tide > 0.5 ? { tile: 'causeway_sub', water: true, self: true } : { tile: 'causeway', water: true, self: true };
     case 'Q': return tide > 0.6 ? { tile: 'water_mud', frame: wf, water: true } : { tile: 'tidepool' };
@@ -269,14 +284,21 @@ export function resolveGround(ch, { tide = 0, night = 0, frame = 0 } = {}) {
     case 'z': return { tile: 'flowers_b' };
     case 'C': return { tile: 'grass_a', cliffTop: true };
     case 'F': return { tile: 'cliff_face' };
-    case 'L': return { tile: 'ledge' };
+    case 'L': return { tile: x & 1 ? 'ledge_b' : 'ledge' };
     case 'P': return { tile: 'path' };
     case 'Y': return { tile: 'steps' };
-    case 'O': return { tile: 'cobbles', quay: true };
+    case 'O': return { tile: hash2(x, y) % 3 === 0 ? 'cobbles_b' : 'cobbles', quay: true };
     case 'K': return { tile: 'pier', water: true, self: true };
     case 'k': return { tile: 'pier_end', water: true, self: true };
     default: return { tile: 'grass_a' };
   }
+}
+
+/** Small integer hash of a tile coordinate (stable variant picks). */
+function hash2(x, y) {
+  let h = (x * 374761393 + y * 668265263) >>> 0;
+  h = Math.imul(h ^ (h >>> 13), 1274126177) >>> 0;
+  return (h ^ (h >>> 16)) >>> 0;
 }
 
 /** Sun-driven shadow offset (always bottom-right; short at noon, long at golden hour, gone at night). */
@@ -305,10 +327,12 @@ function expandHouse(p) {
     out.push({ kind: lo, lit: winLit, unlit: winUnlit, name: lo, x: p.x + i, y: p.y });
   }
   for (let i = 0; i < w; i++) {
-    out.push({ name: `roof_${roof}_ridge`, x: p.x + i, y: p.y - 3 });
-    out.push({ name: `roof_${roof}_eave`, x: p.x + i, y: p.y - 2 });
+    const end = i === 0 ? '_l' : i === w - 1 ? '_r' : '';
+    out.push({ name: `roof_${roof}_ridge${end}`, x: p.x + i, y: p.y - 3 });
+    out.push({ name: `roof_${roof}_eave${end}`, x: p.x + i, y: p.y - 2 });
   }
-  if (p.chimney !== false) out.push({ name: 'chimney', x: p.x + w - 1, y: p.y - 3 });
+  out.push({ eaveShade: true, x: p.x, y: p.y - 1, w });
+  if (p.chimney !== false) out.push({ name: 'chimney', x: p.x + w - (w >= 4 ? 2 : 1), y: p.y - 3 });
   return out;
 }
 
@@ -339,7 +363,7 @@ export function drawMap(ctx, map, tileset, opts = {}) {
   const at = (x, y) => (x < 0 || y < 0 || x >= W || y >= H ? null : ground[y][x]);
   const info = (x, y) => {
     const ch = at(x, y);
-    return ch === null ? null : resolveGround(ch, { tide, night: g.night, frame });
+    return ch === null ? null : resolveGround(ch, { tide, night: g.night, frame, x, y });
   };
 
   ctx.save();
@@ -354,6 +378,7 @@ export function drawMap(ctx, map, tileset, opts = {}) {
   const x1 = Math.min(W - 1, Math.ceil((camX + view.w) / TILE) + 1);
   const y1 = Math.min(H - 1, Math.ceil((camY + view.h) / TILE) + 1);
   const foamF = Math.floor(frame / 10);
+  const rain = weather === 'rain';
 
   // ---- ground + autotile edges
   for (let y = y0; y <= y1; y++) {
@@ -395,8 +420,19 @@ export function drawMap(ctx, map, tileset, opts = {}) {
       }
       if (t.quay) {
         const n = info(x, y - 1);
-        if (n && n.water) ctx.drawImage(tileset.sprite('quay_lip', 0, g).canvas, px, py);
+        if (n && n.water) ctx.drawImage(tileset.sprite(hash2(x, y) % 4 === 1 ? 'quay_lip_b' : 'quay_lip', 0, g).canvas, px, py);
       }
+      if (t.tile === 'ledge' || t.tile === 'ledge_b') {
+        const isL = (q) => q && q.tile.startsWith('ledge');
+        if (!isL(info(x - 1, y))) ctx.drawImage(tileset.sprite('ledge_l', 0, g).canvas, px, py);
+        else if (!isL(info(x + 1, y))) ctx.drawImage(tileset.sprite('ledge_r', 0, g).canvas, px, py);
+      }
+      if (t.tile === 'cliff_face') {
+        const face = (q) => q && (q.tile === 'cliff_face' || q.tile === 'steps');
+        if (!face(info(x - 1, y))) ctx.drawImage(tileset.sprite('cliff_face_l', 0, g).canvas, px, py);
+        if (!face(info(x + 1, y))) ctx.drawImage(tileset.sprite('cliff_face_r', 0, g).canvas, px, py);
+      }
+      if (rain && RAIN_WALK.has(t.tile)) rainRipple(ctx, x, y, px, py, frame, g);
       if (!t.water && !t.cliffTop && t.tile !== 'cliff_face') {
         // a 1px darker bank where land meets water to the south (a lip the eye reads as height)
         const s = info(x, y + 1);
@@ -418,6 +454,7 @@ export function drawMap(ctx, map, tileset, opts = {}) {
   items.sort((a, b) => (a.sortY - b.sortY) || (a.sortX - b.sortX));
   const sh = shadowOffset(hour, g);
   const lampPools = [];
+  let sweep = null;
   const shadePattern = getShadePattern(ctx);
   const castShadow = (px, py, w, h) => {
     if (sh.alpha < 0.01) return;
@@ -453,7 +490,11 @@ export function drawMap(ctx, map, tileset, opts = {}) {
     switch (it.type) {
       case 'tree': {
         const kind = it.kind || 'alder';
-        const name = kind === 'fruit' ? (it.fruit === false ? 'tree_fruit_bare' : 'tree_fruit') : `tree_${kind}`;
+        const alt = hash2(it.x, it.y) & 1 ? '_b' : '';
+        let name = kind === 'fruit' ? (it.fruit === false ? 'tree_fruit_bare' : `tree_fruit${alt}`) : `tree_${kind}`;
+        if (kind === 'alder') name += alt;
+        if (it.variant !== undefined) name = name.replace(/_b$/, '') + (it.variant ? '_b' : '');
+        if (!tileset.has(name)) name = name.replace(/_b$/, '');
         // wind: a slow 4-frame sway, phase-shifted per tree so a grove never moves in lockstep
         drawProp(name, Math.floor(frame / 22) + it.x + it.y, it.x, it.y, true);
         break;
@@ -494,10 +535,19 @@ export function drawMap(ctx, map, tileset, opts = {}) {
           ctx.drawImage(sc.canvas, 0, top, sc.w, rows, r.px, r.py + top, sc.w, rows);
         }
         if (lit) lampPools.push({ x: r.px + 16, y: r.py + 8, a: 1, big: true });
+        if (lit && stage >= 7) sweep = { x: r.px + 16, y: r.py + 8 };
         break;
       }
       default:
-        if (it.house) {
+        if (it.eaveShade) {
+          // the eave's shadow on the upper wall: 2 solid rows then a dithered row
+          ctx.fillStyle = gradeHex(COLORS.shadow, g);
+          ctx.globalAlpha = 0.42;
+          const ex = it.x * TILE, ey = it.y * TILE, ew = it.w * TILE;
+          ctx.fillRect(ex, ey, ew, 2);
+          for (let i = (ey & 1); i < ew; i += 2) ctx.fillRect(ex + i, ey + 2, 1, 1);
+          ctx.globalAlpha = 1;
+        } else if (it.house) {
           let name = it.name;
           if (it.kind === 'win') name = lampsOn > 0.05 && it.litWindows !== false ? it.lit : it.unlit;
           drawProp(name, 0, it.x, it.y, false);
@@ -519,6 +569,7 @@ export function drawMap(ctx, map, tileset, opts = {}) {
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
   }
+  if (sweep) drawSweep(ctx, sweep, frame, { x: camX, y: camY, w: view.w, h: view.h });
   ctx.restore();
 
   // ---- weather (never above 35% opacity, never over the Skyband/UI)
@@ -526,6 +577,51 @@ export function drawMap(ctx, map, tileset, opts = {}) {
 
   // ---- Skyband (the strip directly above the view)
   if (skyH > 0) drawSkyband(ctx, tileset, { x: view.x, y: view.y - skyH, w: view.w, h: skyH, hour, frame, weather, grade: g });
+}
+
+/**
+ * After the Relighting the lighthouse's beam sweeps the town once every 8 s (480 frames at 60 fps):
+ * a dithered amber cone, two densities, screen-blended at low alpha. Slow and steady, it never
+ * flashes (photosensitivity rule).
+ */
+const SWEEP_PERIOD = 480;
+const sweepBuf = { canvas: null, img: null };
+function drawSweep(ctx, src, frame, rect) {
+  const w = rect.w, h = rect.h;
+  if (!sweepBuf.canvas || sweepBuf.canvas.width !== w || sweepBuf.canvas.height !== h) {
+    sweepBuf.canvas = document.createElement('canvas');
+    sweepBuf.canvas.width = w; sweepBuf.canvas.height = h;
+    sweepBuf.img = sweepBuf.canvas.getContext('2d').createImageData(w, h);
+  }
+  const d = sweepBuf.img.data;
+  d.fill(0);
+  const ang = (frame % SWEEP_PERIOD) / SWEEP_PERIOD * Math.PI * 2;
+  const half = 0.2, reach = 300;
+  const [ar, ag, ab] = hexToRgb01(COLORS['!lhamber']).map((v) => Math.round(v * 255));
+  const sx = src.x - rect.x, sy = src.y - rect.y;
+  const ca = Math.cos(ang), sa = Math.sin(ang);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const dx = x - sx, dy = (y - sy) * 1.6; // flattened: the beam rakes the ground in perspective
+      const along = dx * ca + dy * sa;
+      if (along < 6 || along > reach) continue;
+      const across = Math.abs(-dx * sa + dy * ca) / along;
+      if (across > half) continue;
+      // three dither densities: a 50% core near the lamp, 25% body, 12.5% fringe and far reach
+      const f = along / reach, e = across / half;
+      const lvl = e < 0.45 && f < 0.55 ? 2 : e < 0.8 && f < 0.85 ? 1 : 0;
+      const on = lvl === 2 ? ((x + y) & 1) === 0 : lvl === 1 ? (x & 1) === 0 && (y & 1) === 0 : (x & 3) === 0 && (y & 1) === 0 && ((x >> 2) + (y >> 1)) % 2 === 0;
+      if (!on) continue;
+      const i = (y * w + x) * 4;
+      d[i] = ar; d[i + 1] = ag; d[i + 2] = ab; d[i + 3] = 255;
+    }
+  }
+  sweepBuf.canvas.getContext('2d').putImageData(sweepBuf.img, 0, 0);
+  ctx.save();
+  ctx.globalCompositeOperation = 'screen';
+  ctx.globalAlpha = 0.3;
+  ctx.drawImage(sweepBuf.canvas, rect.x, rect.y);
+  ctx.restore();
 }
 
 let shadePatternCache = null;
@@ -542,6 +638,28 @@ function getShadePattern(ctx) {
 }
 
 /* ------------------------------------------------------------ weather */
+
+/** Walkable ground that shows rain puddle ripples (water and blocking tiles never do). */
+const RAIN_WALK = new Set(['path', 'cobbles', 'cobbles_b', 'sand', 'wetsand', 'mud_dry', 'mud_wet', 'grass_a', 'grass_b', 'flowers_a', 'flowers_b', 'tallgrass', 'steps', 'pier', 'pier_end', 'causeway', 'stepstone']);
+// Flattened ripple rings (never a plus: that glyph is the Heartmark's). 4 visible stages of 6 frames,
+// then the spot rests for 8 stages so ripples stay sparse.
+const RIPPLE = [
+  ['x'],
+  ['.xx.', 'x..x', '.xx.'],
+  ['.xxxx.', 'x....x', '.xxxx.'],
+  ['..x..x..', 'x......x', '..x..x..'],
+];
+function rainRipple(ctx, x, y, px, py, frame, g) {
+  const h = hash2(x * 3 + 1, y * 5 + 2);
+  const st = (Math.floor(frame / 6) + (h & 15)) % 9;
+  if (st >= RIPPLE.length) return;
+  const r = RIPPLE[st];
+  const ox = px + 3 + ((h >>> 5) % 6) - (r[0].length >> 1) + 2, oy = py + 4 + ((h >>> 9) % 7) - 1;
+  ctx.fillStyle = gradeHex('#EAF2F8', g);
+  ctx.globalAlpha = st === 3 ? 0.45 : 0.8;
+  for (let j = 0; j < r.length; j++) for (let i = 0; i < r[j].length; i++) if (r[j][i] === 'x') ctx.fillRect(ox + i, oy + j, 1, 1);
+  ctx.globalAlpha = 1;
+}
 
 function drawWeather(ctx, tileset, view, weather, frame, g) {
   if (weather === 'clear') return;
@@ -565,20 +683,25 @@ function drawWeather(ctx, tileset, view, weather, frame, g) {
       }
     }
   } else if (weather === 'rain') {
-    ctx.globalAlpha = 0.15;
-    ctx.fillStyle = COLORS.deep;
-    ctx.fillRect(view.x, view.y, view.w, view.h);
-    ctx.globalAlpha = 0.7;
-    let seed = (Math.floor(frame / 2) * 2654435761) >>> 0;
-    const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
-    const n = Math.floor((view.w * view.h) / 400);
+    // 1px streaks angled by the wind (falling down-left), each drop moving continuously; well under
+    // 20% coverage. Streak colours are graded so night rain never glows.
+    const c1 = gradeHex('#41A6F6', g), c2 = gradeHex('#73EFF7', g);
+    const n = Math.floor((view.w * view.h) / 420);
+    const span = view.h + 24;
+    ctx.globalAlpha = 0.55;
     for (let i = 0; i < n; i++) {
-      const x = view.x + Math.floor(rnd() * view.w);
-      const y = view.y + Math.floor(rnd() * view.h);
-      ctx.fillStyle = i % 3 === 0 ? '#73eff7' : '#41a6f6';
-      ctx.fillRect(x, y, 1, 4);
-      ctx.fillRect(x - 1, y + 4, 1, 1);
+      const hx = hash2(i, 17), hy = hash2(i, 91);
+      const sp = 5 + (hx % 3);
+      const yy = (hy % span) + frame * sp;
+      const y = view.y - 12 + (yy % span);
+      const wrapW = view.w + 40;
+      const x = view.x + ((((hx >>> 4) - Math.floor(yy / 2)) % wrapW) + wrapW) % wrapW - 20;
+      ctx.fillStyle = i % 3 === 0 ? c2 : c1;
+      ctx.fillRect(x, y, 1, 2);
+      ctx.fillRect(x - 1, y + 2, 1, 2);
+      ctx.fillRect(x - 2, y + 4, 1, 1);
     }
+    ctx.globalAlpha = 1;
   }
   ctx.restore();
 }
@@ -718,7 +841,7 @@ export function drawSkyband(ctx, tileset, { x, y, w, h, hour, frame, weather = '
   ctx.drawImage(isle.canvas, x + w - 140, horizonY - 4);
   ctx.drawImage(isle.canvas, x + 30, horizonY - 3, 32, 3);
   ctx.globalAlpha = 1;
-  const sea0 = gradeHex(COLORS.deep0, g), sea1 = gradeHex(COLORS.deep1, g), sea2 = gradeHex(COLORS.deep2, g), sea3 = gradeHex(COLORS.deep3, g);
+  const sea0 = gradeHex(COLORS.deep0, g, 'deep0'), sea1 = gradeHex(COLORS.deep1, g, 'deep1'), sea2 = gradeHex(COLORS.deep2, g, 'deep2'), sea3 = gradeHex(COLORS.deep3, g, 'deep3');
   ctx.fillStyle = sea0; ctx.fillRect(x, horizonY, w, 1);
   ctx.fillStyle = sea1; ctx.fillRect(x, horizonY + 1, w, 3);
   ctx.fillStyle = sea1; ctx.fillRect(x, horizonY + 4, w, 5);
@@ -748,19 +871,41 @@ export function drawSkyband(ctx, tileset, { x, y, w, h, hour, frame, weather = '
 
 /* ------------------------------------------------------------ helpers */
 
-/** Draw every tile in a grid (debug sheet). */
-export function drawSheet(ctx, tileset, { hour = 12, frame = 0, cols = 12, cell = 36 } = {}) {
-  const g = gradeFor(hour);
-  const names = Object.keys(tileset.tiles);
-  ctx.fillStyle = '#4E4A5A';
-  ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-  let i = 0;
-  for (const name of names) {
-    const t = tileset.tiles[name];
-    const s = tileset.sprite(name, frame, g);
-    const cx = (i % cols) * cell + 2, cy = Math.floor(i / cols) * cell + 2;
-    ctx.drawImage(s.canvas, cx, cy);
-    i += t.w > 16 || t.h > 16 ? (t.w > 48 ? 2 : 1) : 1;
-    if (t.h > cell) i += cols; // crude: tall ones take extra rows
+/** Tiles left out of the atlas because they are mechanical rotations or verge variants of another. */
+const SHEET_SKIP = /_(e|s|w)$|_ridge_[lr]$|_eave_[lr]$/;
+
+/**
+ * Atlas layout: tiles flow left to right in rows sized to their tallest member, grouped by height
+ * so tall props never overlap a row. Returns the canvas size and each tile's rect.
+ * @returns {{w:number, h:number, cells:{name:string,x:number,y:number,w:number,h:number}[]}}
+ */
+export function sheetLayout(tileset, { width = 960, pad = 6 } = {}) {
+  const names = Object.keys(tileset.tiles).filter((n) => !SHEET_SKIP.test(n) || n === 'foam_e');
+  const order = names.map((n, i) => ({ n, i, t: tileset.tiles[n] }))
+    .sort((a, b) => (a.t.h > 16) - (b.t.h > 16) || a.t.h - b.t.h || a.i - b.i);
+  const cells = [];
+  let x = pad, y = pad, rowH = 0;
+  for (const { n, t } of order) {
+    if (x + t.w + pad > width) { x = pad; y += rowH + pad; rowH = 0; }
+    cells.push({ name: n, x, y, w: t.w, h: t.h });
+    x += t.w + pad;
+    rowH = Math.max(rowH, t.h);
   }
+  return { w: width, h: y + rowH + pad, cells };
+}
+
+/** Draw the tile atlas (every tile once, on a neutral checker so transparency reads). */
+export function drawSheet(ctx, tileset, { hour = 12, frame = 0, width } = {}) {
+  const g = gradeFor(hour);
+  const L = sheetLayout(tileset, { width: width || ctx.canvas.width });
+  ctx.fillStyle = '#3B3A48';
+  ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+  for (const c of L.cells) {
+    ctx.fillStyle = '#4E4C62';
+    ctx.fillRect(c.x - 1, c.y - 1, c.w + 2, c.h + 2);
+    ctx.fillStyle = '#56546C';
+    for (let yy = 0; yy < c.h; yy += 8) for (let xx = ((yy >> 3) & 1) * 8; xx < c.w; xx += 16) ctx.fillRect(c.x + xx, c.y + yy, Math.min(8, c.w - xx), Math.min(8, c.h - yy));
+    ctx.drawImage(tileset.sprite(c.name, frame, g).canvas, c.x, c.y);
+  }
+  return L;
 }

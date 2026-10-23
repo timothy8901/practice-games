@@ -2,7 +2,8 @@
 // Wildshift people on the shared rig: Corin Vale (barn owl) and the generic
 // trainer body (pointed-ear head) that Idris, Agathe, Teo and the route
 // trainers share through palette swaps. Same 12x11 head format as mammals.js.
-import { HEADS, TORSOS, LEGS, BIRDLEGS, EXTRAS, buildMammal, backHead } from './mammals.js';
+import { HEADS, TORSOS, TAILS, LEGS, BIRDLEGS, EXTRAS, buildMammal, backHead } from './mammals.js';
+import './heads2.js';
 
 // Barn owl: heart-shaped white facial disc, tawny crown, big dark eyes, small pale beak.
 HEADS.owl = {
@@ -79,12 +80,32 @@ EXTRAS.goggles = {
   left: { x: 5, y: 3, part: ['AGGAAk'] },
 };
 
+// Tails for the leads: wolf (thick, low, dark tip), hare (cotton puff),
+// fox (big brush, white tip).
+TAILS.wolf = {
+  down: { x: 10, y: 15, behind: true, part: ['KK...', 'KFFK.', 'KFFfK', '.KFfK', '.KSfK', '..KK.'] },
+  up: { x: 1, y: 15, behind: false, part: ['...KK', '.KFFK', 'KFFfK', 'KFFfK', 'KSSK.', '.KK..'] },
+  left: { x: 10, y: 15, behind: true, part: ['KK...', 'KFFK.', 'KFFfK', '.KFfK', '.KSfK', '..KK.'] },
+};
+TAILS.hare = {
+  down: null,
+  up: { x: 6, y: 16, behind: false, part: ['.KK.', 'KMMK', 'KmMK', '.KK.'] },
+  left: { x: 11, y: 16, behind: true, part: ['KK.', 'KMK', 'KmK', 'KK.'] },
+};
+TAILS.fox = {
+  down: { x: 10, y: 13, behind: true, part: ['.KK...', 'KFFK..', 'KFFFK.', 'KFFFfK', '.KFFfK', '.KMMMK', '..KKK.'] },
+  up: { x: 0, y: 13, behind: false, part: ['...KK.', '..KFFK', '.KFFFK', 'KFFFfK', 'KFFfK.', 'KMMMK.', '.KKK..'] },
+  left: { x: 10, y: 13, behind: true, part: ['.KK...', 'KFFK..', 'KFFFK.', 'KFFFfK', '.KFFfK', '.KMMMK', '..KKK.'] },
+};
+
 export function buildTrainerBodies() {
   return {
     corin: buildMammal({ head: HEADS.owl, torso: TORSOS.coat, legs: BIRDLEGS, extras: [EXTRAS.readingGlass] }),
     trainerCoat: buildMammal({ head: HEADS.trainer, torso: TORSOS.coat, legs: LEGS }),
-    trainerCoatBand: buildMammal({ head: HEADS.trainer, torso: TORSOS.coat, legs: LEGS, extras: [EXTRAS.armband] }),
     trainerVest: buildMammal({ head: HEADS.trainer, torso: TORSOS.vest, legs: LEGS }),
-    trainerVestGoggles: buildMammal({ head: HEADS.trainer, torso: TORSOS.vest, legs: LEGS, extras: [EXTRAS.goggles] }),
+    // the three Wildshift leads get their own heads (heads2.js)
+    idris: buildMammal({ head: HEADS.wolf, torso: TORSOS.coat, legs: LEGS, tail: TAILS.wolf }),
+    agathe: buildMammal({ head: HEADS.hare, torso: TORSOS.coat, legs: LEGS, tail: TAILS.hare, extras: [EXTRAS.armband] }),
+    teo: buildMammal({ head: HEADS.fox, torso: TORSOS.vest, legs: LEGS, tail: TAILS.fox, extras: [EXTRAS.goggles] }),
   };
 }

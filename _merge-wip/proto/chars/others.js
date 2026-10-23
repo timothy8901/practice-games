@@ -7,6 +7,7 @@
 // Frames are 16x24 with the feet on row 23. Light from top-left.
 import { blank, stamp, under, rows, flipH, compose } from './rig.js';
 import { FISH_W, FISH_OX } from './mammals.js';
+import { drawRod } from './rod.js';
 
 const F = (parts) => parts; // readability
 const pad = (part, w = 16, h = 24) => rows(stamp(blank(w, h), part, 0, 0));
@@ -27,17 +28,17 @@ function legged({ body, legs, bodyY = 0, legsY = 0, behind = null, bob = 1, fron
   return [mk('idle', 0), mk('a', bob), mk('idle', 0), mk('b', bob)];
 }
 
-/** Put a 16x24 frame into the 24-wide fish frame with a rod + line on the left. */
+/**
+ * Put a 16x24 frame into the 24-wide fish frame with a rod + line on the left.
+ * Returns the four cast phases (hold, wind-up, cast, bite); see rod.js.
+ */
 function withRod(frame16, { rod = true, handX = 10, handY = 13 } = {}) {
-  const g = blank(FISH_W, 24);
-  stamp(g, frame16, -FISH_OX, 0);
-  if (rod) {
-    for (let i = 0; i <= 7; i++) { const x = handX - i, y = handY - i; if (g[y] && g[y][x] === '.') g[y][x] = 'a'; }
-  }
-  const lx = 2;
-  for (let y = Math.max(0, handY - 6); y <= 20; y++) if (g[y][lx] === '.') g[y][lx] = 'k';
-  g[21][lx] = 'Y'; g[21][lx + 1] = 'Y';
-  return rows(g);
+  return [0, 1, 2, 3].map((phase) => {
+    const g = blank(FISH_W, 24);
+    stamp(g, frame16, -FISH_OX, 0);
+    drawRod(g, handX, handY, phase, { rod });
+    return rows(g);
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -145,7 +146,7 @@ export function buildMagpie() {
   // sit: hunkered on a step, legs tucked, tail across the step
   const sit = frame([MAGPIE.downTail, 0, 15], [MAGPIE.downBody, 0, 3], [['....KSSSKSSSK...', '.....KKK.KKK....'], 0, 22]);
   const fish = withRod(left[0], { handX: 9, handY: 12 });
-  return { w: 16, h: 24, down, up, left, right: left.map(flipH), sit, fish, fishW: FISH_W, fishOx: FISH_OX };
+  return { w: 16, h: 24, down, up, left, right: left.map(flipH), sit, fish: fish[0], fishFrames: fish, fishW: FISH_W, fishOx: FISH_OX };
 }
 
 // ---------------------------------------------------------------------------
@@ -234,7 +235,7 @@ export function buildCrab() {
   const left = legged({ body: CRAB.leftBody, legs: CRAB.downLegs, legsY: 21 });
   const sit = frame([CRAB.downBody, 0, 1], [CRAB.downLegs.idle, 0, 22]);
   const fish = withRod(left[0], { handX: 9, handY: 18 });
-  return { w: 16, h: 24, down, up, left, right: left.map(flipH), sit, fish, fishW: FISH_W, fishOx: FISH_OX };
+  return { w: 16, h: 24, down, up, left, right: left.map(flipH), sit, fish: fish[0], fishFrames: fish, fishW: FISH_W, fishOx: FISH_OX };
 }
 
 // ---------------------------------------------------------------------------
@@ -335,7 +336,7 @@ export function buildSnail() {
   // sit: she is always sitting; fish: rod propped in the satchel strap
   const sit = SNAIL.down;
   const fish = withRod(SNAIL.left, { rod: true, handX: 11, handY: 15 });
-  return { w: 16, h: 24, down, up, left, right: left.map(flipH), sit, fish, fishW: FISH_W, fishOx: FISH_OX };
+  return { w: 16, h: 24, down, up, left, right: left.map(flipH), sit, fish: fish[0], fishFrames: fish, fishW: FISH_W, fishOx: FISH_OX };
 }
 
 // ---------------------------------------------------------------------------
@@ -420,7 +421,7 @@ export function buildHeron() {
   const sit = frame([sitBody, 0, 8], [['......KSSSSK....', '.....KSSSSSSK...', '......KKKKKK....'], 0, 21]);
   // fish: he fishes with a hand line held in the bill
   const fish = withRod(left[0], { rod: false, handX: 1, handY: 4 });
-  return { w: 16, h: 24, down, up, left, right: left.map(flipH), sit, fish, fishW: FISH_W, fishOx: FISH_OX };
+  return { w: 16, h: 24, down, up, left, right: left.map(flipH), sit, fish: fish[0], fishFrames: fish, fishW: FISH_W, fishOx: FISH_OX };
 }
 
 // ---------------------------------------------------------------------------
@@ -500,7 +501,7 @@ export function buildPuffling() {
   const left = lean(PUFF.leftBody, PUFF.leftLegs);
   const sit = frame([PUFF.downBody, 0, 9], [['...KBBBK.KBBBK..', '....KKKK.KKKK...'], 0, 22]);
   const fish = withRod(left[0], { handX: 9, handY: 16 });
-  return { w: 16, h: 24, down, up, left, right: left.map(flipH), sit, fish, fishW: FISH_W, fishOx: FISH_OX };
+  return { w: 16, h: 24, down, up, left, right: left.map(flipH), sit, fish: fish[0], fishFrames: fish, fishW: FISH_W, fishOx: FISH_OX };
 }
 
 // ---------------------------------------------------------------------------
@@ -710,7 +711,7 @@ export function buildBat() {
   const left = [BAT.sideMid, BAT.sideUp, BAT.sideMid, BAT.sideDown].map((f) => lant(membrane(f, 3, 9), 2, 13));
   const hang = lant(BAT.hang, 12, 15);
   const fish = withRod(hang, { rod: false, handX: 10, handY: 17 });
-  return { w: 16, h: 24, down, up, left, right: left.map(flipH), sit: hang, fish, fishW: FISH_W, fishOx: FISH_OX, poses: { hang } };
+  return { w: 16, h: 24, down, up, left, right: left.map(flipH), sit: hang, fish: fish[0], fishFrames: fish, fishW: FISH_W, fishOx: FISH_OX, poses: { hang } };
 }
 
 // ---------------------------------------------------------------------------
@@ -804,7 +805,7 @@ export function buildMoth() {
   const left = [at(MOTH.side), at(MOTH.sideUp, 8), at(MOTH.side), at(MOTH.sideDown, 10)];
   const sit = frame([MOTH.rest, 0, 15]);
   const fish = withRod(sit, { rod: false, handX: 6, handY: 19 });
-  return { w: 16, h: 24, down, up, left, right: left.map(flipH), sit, fish, fishW: FISH_W, fishOx: FISH_OX };
+  return { w: 16, h: 24, down, up, left, right: left.map(flipH), sit, fish: fish[0], fishFrames: fish, fishW: FISH_W, fishOx: FISH_OX };
 }
 
 export function buildOtherBodies() {
