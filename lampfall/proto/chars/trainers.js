@@ -1,6 +1,7 @@
 // proto/chars/trainers.js
-// Wildshift people on the shared rig: Corin Vale (barn owl) and the generic
-// trainer body (pointed-ear head) that Idris, Agathe, Teo and the route
+// Wildshift people on the shared rig: Corin Vale (barn owl), the three leads
+// with their own heads (heads2.js: Idris wolf, Agathe hare, Teo fox) and the
+// generic trainer body (pointed-ear head) that the route
 // trainers share through palette swaps. Same 12x11 head format as mammals.js.
 import { HEADS, TORSOS, TAILS, LEGS, BIRDLEGS, EXTRAS, buildMammal, backHead } from './mammals.js';
 import './heads2.js';

@@ -213,7 +213,7 @@
           }
           const help = { x: 260, y: 170, w: 208, h: 76 };
           const hi = drawPanel(c, help, 'notice', { pin: true });
-          drawText(c, 'Rows marked – are locked and say why. ✦ new, ★ one of a kind.', hi.x + 2, hi.y + 4, { color: COLORS.paper.ink, maxWidth: hi.w - 4 });
+          drawText(c, 'Rows marked – are locked and say why.\n✦ = new    ★ = one of a kind', hi.x + 2, hi.y + 4, { color: COLORS.paper.ink, maxWidth: hi.w - 4 });
           drawText(c, `page ${list.page + 1} of ${list.pages}  ${tabId}`, hi.x + 2, hi.y + hi.h - 8, { font: 'small', color: COLORS.paper.inkSoft });
         },
         text: () => (list.selected() || {}).label || 'EMPTY',
@@ -633,6 +633,9 @@
         return n;
       },
       get errors() { return errors; },
+      get frames() { return frames; },
+      get clock() { return clockMs; },
+      toasts,
       get stations() { return stations; },
     };
   </script>

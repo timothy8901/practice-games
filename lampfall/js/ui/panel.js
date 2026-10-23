@@ -79,6 +79,28 @@ export function tearDepth(x, salt = 0) {
   return v < 3 ? 0 : v < 6 ? 1 : 2;
 }
 
+/**
+ * Tear profile for a whole edge: `tearDepth` per column with neighbouring columns differing by at
+ * most 1px, so the ripped line stays connected (diagonal steps, never floating pixels). The two
+ * corner columns are always 1. Pure.
+ * @param {number} w
+ * @param {number} salt
+ * @param {number} [offset=0] Column offset fed to `tearDepth` (top and bottom tear differently).
+ * @returns {number[]}
+ */
+export function tearProfile(w, salt, offset = 0) {
+  const out = new Array(Math.max(0, w));
+  let prev = 1;
+  for (let x = 0; x < w; x++) {
+    let d = x === 0 || x === w - 1 ? 1 : tearDepth(x + offset, salt);
+    d = Math.max(prev - 1, Math.min(prev + 1, d));
+    out[x] = d;
+    prev = d;
+  }
+  if (w > 1) out[w - 1] = 1;
+  return out;
+}
+
 // ---- caches -------------------------------------------------------------------------------------
 /** @type {Map<string, {body: any, shadow: any}>} */
 const cache = new Map();
@@ -167,15 +189,17 @@ function paintBody(c, w, h, style, torn, useGrain, lg) {
     c.fillRect(0, 0, 1, h); c.fillRect(w - 1, 0, 1, h);
     if (!top) c.fillRect(0, 0, w, 1);
     if (!bottom) c.fillRect(0, h - 1, w, 1);
+    const topP = top ? tearProfile(w, w) : null;
+    const botP = bottom ? tearProfile(w, w * 3 + 1, 97) : null;
     for (let x = 0; x < w; x++) {
       if (top) {
-        const d = x === 0 || x === w - 1 ? 1 : tearDepth(x, w);
+        const d = topP[x];
         if (d > 0) c.clearRect(x, 0, 1, d);
         c.fillStyle = P.deep; c.fillRect(x, d, 1, 1);
         c.fillStyle = P.shade; c.fillRect(x, d + 1, 1, 1);
       }
       if (bottom) {
-        const d = x === 0 || x === w - 1 ? 1 : tearDepth(x + 97, w * 3 + 1);
+        const d = botP[x];
         if (d > 0) c.clearRect(x, h - d, 1, d);
         c.fillStyle = P.deep; c.fillRect(x, h - d - 1, 1, 1);
       }
@@ -217,9 +241,10 @@ function paintBody(c, w, h, style, torn, useGrain, lg) {
  * @param {string} edge @param {string} fill
  */
 function tearEdge(c, w, h, side, edge, fill) {
+  const prof = side === 'top' ? tearProfile(w, w) : tearProfile(w, w * 3 + 1, 97);
   for (let x = 0; x < w; x++) {
     const sideCol = x === 0 || x === w - 1;
-    const d = sideCol ? 1 : tearDepth(side === 'top' ? x : x + 97, side === 'top' ? w : w * 3 + 1);
+    const d = prof[x];
     const y0 = side === 'top' ? 0 : h - d;
     if (d > 0) c.clearRect(x, y0, 1, d);
     const ey = side === 'top' ? d : h - d - 1;

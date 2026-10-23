@@ -12,7 +12,7 @@ import { createTextbox, paginate } from '../js/ui/textbox.js';
 import { createToasts, clampLines, TOAST_MAX_LINES } from '../js/ui/toast.js';
 import { PALETTE, COLORS, TYPE_CHIPS, isPureBlackOrWhite } from '../js/ui/theme.js';
 import { drawKeyGlyph, keyGlyphWidth } from '../js/ui/widgets.js';
-import { drawPanel, LEDGER_RULE_OFFSET, panelInner } from '../js/ui/panel.js';
+import { drawPanel, LEDGER_RULE_OFFSET, panelInner, tearProfile } from '../js/ui/panel.js';
 import { layoutConfirm } from '../js/ui/confirm.js';
 import { drawHud } from '../js/ui/hud.js';
 import * as pixelart from '../js/core/pixelart.js';
@@ -311,6 +311,23 @@ test('ledger rules clear every descender of text drawn from the content top', ()
     assert.doesNotThrow(() => drawPanel(ctx, { x: 4, y: 4, w: 60, h: 40 }, style, { torn, title: 'T', seal: true }));
   }
   assert.deepEqual(panelInner({ x: 0, y: 0, w: 10, h: 10 }, 'ledger'), { x: 6, y: 6, w: 0, h: 0 });
+  for (const w of [4, 17, 144, 448]) {
+    const p = tearProfile(w, w);
+    assert.equal(p.length, w);
+    assert.equal(p[0], 1); assert.equal(p[w - 1], 1);
+    for (let x = 1; x < w; x++) assert.ok(Math.abs(p[x] - p[x - 1]) <= 1 && p[x] >= 0 && p[x] <= 2, 'torn edge stays connected');
+    assert.deepEqual(tearProfile(w, w), p, 'deterministic');
+  }
+});
+
+test('textbox: a full page leaves the bottom-right corner to the more-arrow and page counter', () => {
+  const box = createTextbox({ rect: { x: 16, y: 186, w: 448, h: 64 } });
+  box.setText(paragraph(600));
+  const T = box.textRect;
+  const lastLineBottom = T.y + (T.maxLines - 1) * T.lineH + 9; // cap + descender of the last line
+  const markTop = 186 + 64 - 10; // where draw() puts the ▼ and the counter
+  assert.ok(lastLineBottom < markTop, `last line ends at ${lastLineBottom}, marks start at ${markTop}`);
+  assert.equal(T.maxLines, 4);
 });
 
 test('confirm: a destructive confirm puts its note on its own row between body and seals', () => {

@@ -29,6 +29,9 @@ import { COLORS, ROLE_GLYPH, SPACE, TEXT_SPEEDS, TIMING, TYPE } from './theme.js
 import { drawPanel } from './panel.js';
 import { getPortraitPlaceholder } from './icons.js';
 
+/** Rows reserved under the text for the `▼` more-arrow and the `n/N` page counter. */
+export const PAGE_MARK_H = 6;
+
 /** Row height of the choice slip. */
 export const CHOICE_ROW_H = 11;
 
@@ -155,7 +158,9 @@ export function createTextbox(o) {
       const cy = above >= 2 ? above : below;
       choiceRect = { x: rect.x + rect.w - cw, y: cy, w: cw, h: chh };
     }
-    const maxLines = Math.max(1, Math.floor((inner.h + 1) / lineH));
+    // The bottom PAGE_MARK_H rows belong to the more-arrow and page counter, so the last line of
+    // a full page never crowds them.
+    const maxLines = Math.max(1, Math.floor((inner.h + 1 - PAGE_MARK_H) / lineH));
     layoutCache = { inner, portrait: { x: px, y: inner.y, w: 32, h: 32 }, text: { x: textX, y: inner.y, w: Math.max(16, textW) }, maxLines, choiceRect };
     return layoutCache;
   }

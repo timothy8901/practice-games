@@ -432,7 +432,7 @@ const LINNET_PAL = {
 };
 
 // ---------------------------------------------------------------------------
-// Idris Fenwake, Champion (master keys): grey fox-like trainer, pale muzzle,
+// Idris Fenwake, Champion (master keys): grey wolf, pale muzzle and ruff,
 // calm half-lidded gold eyes, high navy collar, brass clasp, anchor pin.
 // ---------------------------------------------------------------------------
 function idris() {

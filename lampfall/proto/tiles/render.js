@@ -10,8 +10,14 @@
  * `#141B33`. Colours whose names start with `!` (lamps, bioluminescence, skyglass,
  * lit windows) bypass the LUT so they read as light sources at night.
  *
- * Layer order: ground → autotile edges (foam, cliff rims, quay lips) → props sorted
- * by their anchor row (shadows first) → lamp light pools → weather → Skyband.
+ * Water colours take their own grade (`wmul`) so the sea keeps its blue at golden hour while
+ * its highlights catch the low sun (`glint`).
+ *
+ * Layer order: ground → autotile edges (foam, banks, cliff rims and face ends, quay coping, ledge
+ * ends, rain puddle ripples) → props sorted by their anchor row (shadows first) → lamp light pools
+ * → lighthouse sweep (after the Relighting) → weather → Skyband.
+ *
+ * `contrast-check.mjs` verifies walkable vs blocking contrast (>= 3:1) in every grade and weather.
  */
 
 import { TILES, COLORS, TILE, SCAFFOLD_SECTION_ROWS, SCAFFOLD_BASE_ROW } from './tiles.js';
@@ -354,7 +360,8 @@ function expandHouse(p) {
  *          camX?:number, camY?:number, view?:{x:number,y:number,w:number,h:number} (map viewport;
  *          the Skyband draws in the `skybandH` px directly above it),
  *          lighthouseStage?:number, lighthouseLit?:boolean, lamps?:'auto'|'on'|'off',
- *          skyband?:boolean, skybandH?:number}} opts
+ *          skyband?:boolean, skybandH?:number, focus?:{x:number,y:number} (player position in map px:
+ *          fog stays clear within 4 tiles of it)}} opts
  */
 export function drawMap(ctx, map, tileset, opts = {}) {
   const frame = opts.frame || 0;
@@ -804,7 +811,12 @@ export function drawSkyband(ctx, tileset, { x, y, w, h, hour, frame, weather = '
     c.width = w; c.height = skyRows;
     const c2 = c.getContext('2d');
     const img = c2.createImageData(w, skyRows);
-    const stops = skyStops(hour);
+    let stops = skyStops(hour);
+    // overcast: rain and fog pull the sky toward a cool grey (keeping its brightness by hour)
+    if (weather !== 'clear') {
+      const grey = hexToRgb01(weather === 'rain' ? '#7E8C9C' : '#A8B4BE');
+      stops = stops.map((c) => { const l = 0.3 * c[0] + 0.59 * c[1] + 0.11 * c[2]; return lerp3(c, grey.map((v) => v * (0.35 + l)), 0.65); });
+    }
     const LEVELS = 9;
     for (let yy = 0; yy < skyRows; yy++) {
       const t = yy / (skyRows - 1);
@@ -861,13 +873,15 @@ export function drawSkyband(ctx, tileset, { x, y, w, h, hour, frame, weather = '
     ctx.fillRect(cx + 1, cy - r + 1, 1, 1);
     ctx.fillRect(cx + r - 1, cy + 1, 1, r - 1);
   };
-  if (sunT > -0.02 && sunT < 1.02) {
+  if (sunT > -0.02 && sunT < 1.02 && weather !== 'rain') {
+    if (weather === 'fog') ctx.globalAlpha = 0.45;
     const cx = x + Math.round(24 + sunT * (w - 48));
     const cy = Math.round(horizonY - 4 - Math.sin(Math.max(0, Math.min(1, sunT)) * Math.PI) * (skyRows - 10));
     const low = Math.sin(Math.max(0, Math.min(1, sunT)) * Math.PI) < 0.35;
     disc(cx, cy, 4, low ? '#F28C28' : '#FFE29A', low ? '#E07A3F' : '#F6F1E3');
     ctx.fillStyle = low ? '#F3C178' : '#F6F1E3';
     ctx.fillRect(cx - 1, cy - 1, 2, 2);
+    ctx.globalAlpha = 1;
   }
   const moonT = hour >= 19 ? (hour - 19) / 11 : hour < 6 ? (hour + 5) / 11 : -1;
   if (moonT >= 0 && moonT <= 1) {
@@ -912,7 +926,7 @@ export function drawSkyband(ctx, tileset, { x, y, w, h, hour, frame, weather = '
     ctx.fillRect(gx, horizonY + 6, 3, 1);
   }
   // sun / moon glitter path on the sea
-  if (sunT > 0 && sunT < 1) {
+  if (sunT > 0 && sunT < 1 && weather === 'clear') {
     const cx = x + Math.round(24 + sunT * (w - 48));
     ctx.fillStyle = '#FFE29A'; ctx.globalAlpha = 0.6;
     for (let i = 0; i < 4; i++) ctx.fillRect(cx - 3 + ((i * 3 + Math.floor(frame / 10)) % 7), horizonY + 2 + i * 2, 2, 1);
