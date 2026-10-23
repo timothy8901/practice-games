@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>canvas.js — display demo</title>
+  <link rel="icon" href="data:,">
+  <style>
+    html, body {
+      margin: 0; height: 100%; overflow: hidden; background: #2b3140;
+      font: 12px/1.45 ui-monospace, Menlo, Consolas, monospace; color: #e8ecf5;
+    }
+    #stage { position: fixed; left: 0; top: 0; width: 100vw; height: 100vh; }
+    #hud {
+      position: fixed; left: 8px; bottom: 8px; padding: 6px 8px; border-radius: 4px;
+      background: rgba(0, 0, 0, .7); pointer-events: none; white-space: pre;
+    }
+    #controls { position: fixed; right: 8px; top: 8px; display: flex; gap: 4px; }
+    button {
+      font: inherit; padding: 4px 8px; background: #3a4258; color: #fff;
+      border: 1px solid #5b6680; border-radius: 3px; cursor: pointer;
+    }
+    button:hover { background: #4a5470; }
+    .pass { color: #7ee787; }
+    .fail { color: #ff7b72; }
+  </style>
+</head>
+<body>
+  <div id="stage"></div>
+  <div id="hud">booting…</div>
+  <div id="controls">
+    <button data-mode="integer">integer</button>
+    <button data-mode="fit">fit</button>
+    <button data-stage="800,540">800×540</button>
+    <button data-stage="600,300">600×300</button>
+    <button data-stage="full">full</button>
+  </div>
+
+  <script type="module">
+    import { createDisplay, computeLayout, pointToGame, gameToPoint } from '../../js/core/canvas.js';
+
+    const stage = document.getElementById('stage');
+    const hud = document.getElementById('hud');
+
+    // ----------------------------------------------------------------------------------------
+    // Tiny assertion helpers (results also land on window.__canvasTest for the harness)
+    // ----------------------------------------------------------------------------------------
+    const results = [];
+    let passed = 0;
+    let failed = 0;
+    function check(name, ok, detail = '') {
+      results.push({ name, ok, detail });
+      if (ok) {
+        passed++;
+        console.log(`PASS ${name}`);
+      } else {
+        failed++;
+        console.error(`FAIL ${name}${detail ? `: ${detail}` : ''}`);
+      }
+    }
+    const near = (a, b, eps = 1e-6) => Math.abs(a - b) <= eps;
+    const rgbEq = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
+    const nextFrame = () => new Promise((r) => requestAnimationFrame(r));
+    async function waitFor(pred, frames = 60) {
+      for (let i = 0; i < frames; i++) {
+        if (pred()) return true;
+        await nextFrame();
+      }
+      return pred();
+    }
+
+    // ----------------------------------------------------------------------------------------
+    // Display + a test pattern that makes scaling / cropping / smoothing mistakes obvious
+    // ----------------------------------------------------------------------------------------
+    let resizeCount = 0;
+    let lastLayout = null;
+    const display = createDisplay({
+      parent: stage,
+      onResize: (layout) => {
+        resizeCount++;
+        lastLayout = layout;
+      },
+    });
+    const { ctx, width: W, height: H } = display;
+    const BORDER = [255, 210, 63]; // #ffd23f
+    const PROBE = [255, 0, 255]; // #ff00ff
+
+    let pointer = null;
+    stage.addEventListener('pointermove', (e) => {
+      pointer = display.toGame(e.clientX, e.clientY);
+    });
+
+    let frame = 0;
+    function draw(t) {
+      ctx.fillStyle = '#1b2838';
+      ctx.fillRect(0, 0, W, H);
+
+      // 16x16 tile grid
+      ctx.fillStyle = '#243447';
+      for (let x = 16; x < W; x += 16) ctx.fillRect(x, 0, 1, H);
+      for (let y = 16; y < H; y += 16) ctx.fillRect(0, y, W, 1);
+
+      // 1px checkerboard: blurs if smoothing or fractional scaling creeps in
+      for (let y = 0; y < 16; y++) {
+        for (let x = 0; x < 16; x++) {
+          ctx.fillStyle = (x + y) & 1 ? '#ffffff' : '#000000';
+          ctx.fillRect(8 + x, 8 + y, 1, 1);
+        }
+      }
+
+      // Pixel-art-ish "lantern" sprite rows, drawn at x3 to show integer upscales inside the buffer
+      const rows = ['..ooo..', '.o###o.', 'o#####o', 'o##*##o', 'o#####o', '.o###o.', '..ooo..'];
+      const pal = { o: '#8a5a2b', '#': '#ffb347', '*': '#ffffff' };
+      for (let r = 0; r < rows.length; r++) {
+        for (let c = 0; c < rows[r].length; c++) {
+          const col = pal[rows[r][c]];
+          if (!col) continue;
+          ctx.fillStyle = col;
+          ctx.fillRect(W - 40 + c * 3, 8 + r * 3, 3, 3);
+        }
+      }
+
+      // 1px frame border: proves the full 480x270 frame is visible, never cropped
+      ctx.fillStyle = '#ffd23f';
+      ctx.fillRect(0, 0, W, 1);
+      ctx.fillRect(0, H - 1, W, 1);
+      ctx.fillRect(0, 0, 1, H);
+      ctx.fillRect(W - 1, 0, 1, H);
+
+      // Bouncing block
+      const bx = Math.round((W - 16) / 2 + Math.sin(t / 700) * (W / 2 - 24));
+      const by = Math.round(H - 24 - Math.abs(Math.sin(t / 400)) * 60);
+      ctx.fillStyle = '#4fd1c5';
+      ctx.fillRect(bx, by, 16, 16);
+
+      // Centre probe block read back by the tests
+      ctx.fillStyle = '#ff00ff';
+      ctx.fillRect(W / 2 - 5, H / 2 - 5, 10, 10);
+
+      ctx.fillStyle = '#e8ecf5';
+      ctx.font = '8px monospace';
+      ctx.textBaseline = 'top';
+      ctx.fillText(`${W}x${H} native  frame ${frame}`, 30, 9);
+      ctx.fillText(`${display.mode} x${display.pixelScale.toFixed(2)} dpr ${display.dpr}`, 30, 19);
+
+      if (pointer && pointer.inside) {
+        const px = Math.floor(pointer.x);
+        const py = Math.floor(pointer.y);
+        ctx.fillStyle = '#ff5c8a';
+        ctx.fillRect(px - 4, py, 9, 1);
+        ctx.fillRect(px, py - 4, 1, 9);
+        ctx.fillText(`${px},${py}`, Math.min(px + 6, W - 40), Math.min(py + 6, H - 10));
+      }
+      frame++;
+    }
+
+    function hudText() {
+      const L = display.layout;
+      const status = failed ? `FAIL ${failed}` : `PASS ${passed}`;
+      return [
+        `mode ${display.mode}  scale ${L.scale.toFixed(3)} css/px  pixelScale ${L.pixelScale.toFixed(3)}  dpr ${L.dpr}`,
+        `canvas ${L.cssWidth}x${L.cssHeight} css  ${L.backingWidth}x${L.backingHeight} device`,
+        `frame ${L.destWidth.toFixed(1)}x${L.destHeight.toFixed(1)} @ (${L.deviceOffsetX}, ${L.deviceOffsetY})  resizes ${resizeCount}`,
+        `pointer ${pointer ? `${pointer.x.toFixed(1)}, ${pointer.y.toFixed(1)} ${pointer.inside ? 'in' : 'out'}` : '-'}`,
+        `tests ${status}`,
+      ].join('\n');
+    }
+
+    function loop(t) {
+      draw(t);
+      display.present();
+      hud.textContent = hudText();
+      hud.className = failed ? 'fail' : 'pass';
+      requestAnimationFrame(loop);
+    }
+
+    // ----------------------------------------------------------------------------------------
+    // Controls (also used by the Playwright harness through window.__demo)
+    // ----------------------------------------------------------------------------------------
+    function setStage(w, h) {
+      if (w === 'full') {
+        stage.style.width = '100vw';
+        stage.style.height = '100vh';
+      } else {
+        stage.style.width = `${w}px`;
+        stage.style.height = `${h}px`;
+      }
+    }
+    document.getElementById('controls').addEventListener('click', (e) => {
+      const btn = e.target.closest('button');
+      if (!btn) return;
+      if (btn.dataset.mode) display.setMode(btn.dataset.mode);
+      if (btn.dataset.stage === 'full') setStage('full');
+      else if (btn.dataset.stage) setStage(...btn.dataset.stage.split(',').map(Number));
+    });
+    window.__demo = { display, setStage, setMode: (m) => display.setMode(m) };
+
+    // ----------------------------------------------------------------------------------------
+    // Self-test sequence
+    // ----------------------------------------------------------------------------------------
+    const visibleCtx = display.canvas.getContext('2d');
+    const probe = (dx, dy) => Array.from(visibleCtx.getImageData(Math.floor(dx), Math.floor(dy), 1, 1).data).slice(0, 3);
+    const centre = (L) => [L.deviceOffsetX + L.destWidth / 2, L.deviceOffsetY + L.destHeight / 2];
+    const sameLayout = (a, b) =>
+      ['mode', 'dpr', 'cssWidth', 'cssHeight', 'backingWidth', 'backingHeight', 'pixelScale', 'deviceOffsetX', 'deviceOffsetY']
+        .every((k) => a[k] === b[k]);
+
+    async function runTests() {
+      await nextFrame();
+      const dpr = window.devicePixelRatio;
+      const L0 = display.layout;
+
+      check('canvas attached to the stage', display.canvas.parentNode === stage);
+      check(
+        'backing store equals stage size × dpr',
+        display.canvas.width === Math.round(stage.clientWidth * dpr) && display.canvas.height === Math.round(stage.clientHeight * dpr),
+        `${display.canvas.width}x${display.canvas.height} vs ${stage.clientWidth}x${stage.clientHeight}@${dpr}`,
+      );
+      check(
+        'integer mode gives a whole device-pixel scale (or fit fallback when too small)',
+        L0.integer ? Number.isInteger(L0.pixelScale) && L0.pixelScale >= 1 : L0.pixelScale < 1,
+        JSON.stringify(L0),
+      );
+      check('frame is centred', near(L0.deviceOffsetX * 2 + L0.destWidth, L0.backingWidth, 1) && near(L0.deviceOffsetY * 2 + L0.destHeight, L0.backingHeight, 1));
+      check('resize callback fired once with the initial layout', resizeCount === 1 && lastLayout === L0, `count ${resizeCount}`);
+      check('buffer context has smoothing disabled', ctx.imageSmoothingEnabled === false);
+      check('visible context has smoothing disabled', visibleCtx.imageSmoothingEnabled === false);
+      check('layout matches pure computeLayout', sameLayout(L0, computeLayout({ cssWidth: stage.clientWidth, cssHeight: stage.clientHeight, dpr })));
+
+      draw(0);
+      display.present();
+      check('centre pixel is blitted from the buffer', rgbEq(probe(...centre(L0)), PROBE), probe(...centre(L0)).join(','));
+      check('top-left game pixel shows the border', rgbEq(probe(L0.deviceOffsetX, L0.deviceOffsetY), BORDER));
+      check('bottom-right game pixel shows the border (frame not cropped)', rgbEq(probe(L0.deviceOffsetX + L0.destWidth - 1, L0.deviceOffsetY + L0.destHeight - 1), BORDER));
+      if (L0.integer) {
+        // Nearest-neighbour: the whole first pixelScale×pixelScale block must be the border colour.
+        const k = L0.pixelScale;
+        check('nearest-neighbour upscale (no smoothing bleed)', rgbEq(probe(L0.deviceOffsetX + k - 1, L0.deviceOffsetY + k - 1), BORDER) && rgbEq(probe(L0.deviceOffsetX + k, L0.deviceOffsetY + k), [27, 40, 56]));
+      }
+
+      const rect = display.canvas.getBoundingClientRect();
+      const origin = display.toGame(rect.left + L0.offsetX, rect.top + L0.offsetY);
+      check('toGame maps the frame origin to (0,0)', near(origin.x, 0) && near(origin.y, 0) && origin.inside, JSON.stringify(origin));
+      let roundTrip = true;
+      for (const [x, y] of [[0, 0], [479, 269], [123.5, 45.25], [240, 135]]) {
+        const c = display.toClient(x, y);
+        const g = display.toGame(c.clientX, c.clientY);
+        if (!near(g.x, x) || !near(g.y, y) || !g.inside) roundTrip = false;
+      }
+      check('toClient → toGame round-trips', roundTrip);
+      check('points outside the canvas are flagged', !display.toGame(rect.left - 5, rect.top - 5).inside);
+      const pure = pointToGame(...Object.values(gameToPoint(100, 50, L0)), L0);
+      check('pure pointToGame/gameToPoint agree', near(pure.x, 100) && near(pure.y, 50) && pure.inside);
+
+      // Resize via the stage → ResizeObserver
+      const before = resizeCount;
+      setStage(800, 540);
+      const resized = await waitFor(() => display.layout.cssWidth === 800 && display.layout.cssHeight === 540);
+      check('ResizeObserver relayout after stage shrink', resized && resizeCount === before + 1, `count ${resizeCount} vs ${before + 1}`);
+      const L1 = display.layout;
+      check('shrunk layout matches computeLayout', sameLayout(L1, computeLayout({ cssWidth: 800, cssHeight: 540, dpr })));
+      draw(0);
+      display.present();
+      if (L1.deviceOffsetX > 0 || L1.deviceOffsetY > 0) {
+        check('letterbox bar painted with background', rgbEq(probe(0, 0), [0, 0, 0]), probe(0, 0).join(','));
+        check('letterbox bar painted at the far corner', rgbEq(probe(L1.backingWidth - 1, L1.backingHeight - 1), [0, 0, 0]));
+      }
+      check('shrunk: centre pixel still blitted', rgbEq(probe(...centre(L1)), PROBE));
+      check('shrunk: frame edges intact', rgbEq(probe(L1.deviceOffsetX, L1.deviceOffsetY), BORDER) && rgbEq(probe(L1.deviceOffsetX + L1.destWidth - 1, L1.deviceOffsetY + L1.destHeight - 1), BORDER));
+
+      // Fit mode
+      const n2 = resizeCount;
+      const Lfit = display.setMode('fit');
+      check('setMode(fit) fills one axis and notifies', display.mode === 'fit' && resizeCount === n2 + 1 && (near(Lfit.destWidth, Lfit.backingWidth, 1) || near(Lfit.destHeight, Lfit.backingHeight, 1)), JSON.stringify(Lfit));
+      check('setMode(fit) scale is fractional here', !Lfit.integer && !Number.isInteger(Lfit.pixelScale), String(Lfit.pixelScale));
+      check('setMode with the same mode is a no-op', display.setMode('fit') === Lfit && resizeCount === n2 + 1);
+      let threw = false;
+      try { display.setMode('bogus'); } catch (e) { threw = e instanceof TypeError; }
+      check('setMode rejects unknown modes', threw && display.mode === 'fit');
+      draw(0);
+      display.present();
+      check('fit: centre pixel blitted', rgbEq(probe(...centre(Lfit)), PROBE));
+      check('fit: bar above the frame painted', Lfit.deviceOffsetY === 0 || rgbEq(probe(Lfit.backingWidth / 2, 0), [0, 0, 0]));
+
+      const n3 = resizeCount;
+      display.resize();
+      display.resize();
+      check('resize() with no change does not notify', resizeCount === n3);
+
+      // Restore
+      display.setMode('integer');
+      setStage('full');
+      const restored = await waitFor(() => sameLayout(display.layout, L0));
+      check('restored to the initial layout', restored, JSON.stringify(display.layout));
+
+      // Second display: options + destroy
+      const box = document.createElement('div');
+      box.style.cssText = 'position:fixed;left:-2000px;top:0;width:320px;height:180px;';
+      document.body.appendChild(box);
+      const d2 = createDisplay({ parent: box, mode: 'fit', background: '#102030', dpr: 1 });
+      check('second display: fit scale 2/3 at forced dpr 1', near(d2.scale, 320 / 480) && d2.dpr === 1 && d2.canvas.parentNode === box, JSON.stringify(d2.layout));
+      d2.destroy();
+      check('destroy() removes the canvas', d2.canvas.parentNode === null && box.children.length === 0);
+      box.remove();
+
+      window.__canvasTest = { done: true, passed, failed, results };
+      console.log(`canvas.js page tests: ${passed} passed, ${failed} failed`);
+    }
+
+    requestAnimationFrame(loop);
+    runTests().catch((err) => {
+      check('test sequence completed', false, String(err && err.stack || err));
+      window.__canvasTest = { done: true, passed, failed, results, error: String(err) };
+    });
+  </script>
+</body>
+</html>
