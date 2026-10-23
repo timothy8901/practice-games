@@ -28,3 +28,9 @@
 - Lease-card palette options, markings and eye shapes not implemented on the rig.
 - Sit frames stiff; Ansel's sit crude. Fish wind-up arm does not rise with the rod.
 - Ludo front flight muddy at 1x.
+
+## Creature art, second pass (art director verdict: usable)
+- Coilcrest reads as a blob of fins at 1x; give it a clear coiled body line.
+- Hulkwight's shell hides the face; open the visor so the eyes read.
+- Emberjaw needs a brighter ember accent and a heavier jaw.
+- Duskwisp is a dark oval with eyes; add a trailing wisp tail and a lighter rim.

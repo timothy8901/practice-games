@@ -86,3 +86,10 @@ From the economy/town chapters:
 - Maps: Pellwick needs a 'flats' reach (dab, sand eel, glimmer sprat are flats fish); reaches need a kind from collections.REACH_KINDS; bug spots need a habitat from BUG_HABITATS.
 - A listener must keep the stamp.* counters (each stamp names its bus event); capture:ok should carry `scripted`, battle:end should carry `porchDuel`.
 - Market night is dow 5 (Saturday) 20:00-24:00 and dow 6 00:00-02:00 (fixed in shops.js).
+
+From the creature-art + engine-weather lane (engine verdict: ship):
+- ENGINE now has arena weather (js/battle/weather.js) and held items (js/battle/heldItems.js). FLOW must: copy a party member's held item into the battle creature's `heldItem`; pass `weatherKinds`, the Spire's posted cycle and each trainer's `onEntry` weather into createBattle; and party.applyOutcome must drop items the battle consumed.
+- Ballast Stone item text must match the engine rule (heldItems.js is authoritative; fix items.js text).
+- spires.js Mirror Spire dossier text is stale after the level retune; regenerate from trainers.js.
+- Heartmark anchors: every form has head/chest/back/tail anchors (also for idle2 and back frames). validate-data checks each anchor sits on the sprite.
+- Weakest forms after the art pass: Coilcrest, Hulkwight, Emberjaw, Duskwisp (see polish-backlog).
