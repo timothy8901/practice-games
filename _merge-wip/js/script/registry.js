@@ -5,7 +5,8 @@
  * NPC priority, fixed: (1) the next beat of the npc's life thread whose `cond` holds; (2) a pending
  * favour topic (`topic.favour` ∈ `npcs[id].favours`); (3) the highest-priority eligible `topics`
  * entry (`once` / `repeatDays` honoured through `npcs[id].saidLines`); (4) the schedule pose line
- * (`lines[pose]`, then `lines[phase]`); (5) porch talk at the porch trigger inside the porch window;
+ * (`lines[pose]`); (5) porch talk at the porch trigger inside the porch window, then the phase line
+ * (`lines[phase]`, the fallback half of (4));
  * (6) the memory-filtered generic pool (`lines.generic`, excluding ids said within
  * `tuning.noRepeatDays`; the least recently said wins; `linger` skips `lastLineId`); (7) the
  * default line. Line sources return an inline `say` script. No randomness.
@@ -33,6 +34,7 @@ import { t } from '../data/strings.js';
  * @property {string} [script]      explicit script (triggers, use-verbs)
  * @property {string} [text]        sign text
  * @property {string|null} [mapId]
+ * @property {boolean} [atPorch]    the player is at this npc's porch trigger (npc targets; `kind: 'porch'` with an npc id implies it)
  */
 
 /**
@@ -76,6 +78,7 @@ export function resolveScript(world, data, target) {
     throw new TypeError('resolveScript: target needs {kind, id}');
   }
   if (target.kind === 'npc') return resolveNpc(world, data, target);
+  if (target.kind === 'porch' && data.has('npcs', target.id)) return resolveNpc(world, data, { ...target, atPorch: true });
   if (target.kind === 'sign') {
     return { scriptId: `${target.id}#sign`, source: 'default', lineId: 'sign', ops: [{ op: 'say', text: target.text ?? t('npc.default') }, { op: 'end' }] };
   }
@@ -144,15 +147,17 @@ function resolveNpc(world, data, target) {
     const row = (fresh.length ? fresh : rows).sort((a, b) => (said[a.id] ?? -1) - (said[b.id] ?? -1))[0];
     return line(npcId, npcId, row.id, row.text, source);
   };
-  if (target.pose) { const r = pick(target.pose, 'schedule'); if (r) return r; }
-  { const r = pick(sel.phase(world), 'schedule'); if (r) return r; }
+  if (target.pose && target.pose !== 'porch') { const r = pick(target.pose, 'schedule'); if (r) return r; }
 
-  // (5) porch talk inside the porch window
+  // (5) porch talk inside the porch window. Checked before the phase-line fallback of (4): standing
+  // at the porch is the more specific context, and the porch window overlaps the evening/night
+  // phases, so a `lines.night` pool would otherwise make porch talk unreachable.
   const minute = sel.minuteOfDay(world);
-  if ((target.kind === 'porch' || target.pose === 'porch') && minute >= porchWindow[0] && minute < porchWindow[1]) {
+  if ((target.atPorch || target.pose === 'porch') && minute >= porchWindow[0] && minute < porchWindow[1]) {
     const r = pick('porch', 'porch');
     if (r) return r;
   }
+  { const r = pick(sel.phase(world), 'schedule'); if (r) return r; }
 
   // (6) memory-filtered generic pool
   const generic = Array.isArray(lines.generic) ? lines.generic : [];

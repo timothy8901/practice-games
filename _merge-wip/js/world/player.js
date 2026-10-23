@@ -20,7 +20,7 @@
  * @module world/player
  */
 
-import { createEntity, DIR_INDEX, DX, DY, WALK_MS } from './entities.js';
+import { createEntity, updatePixels, DIR_INDEX, DX, DY, WALK_MS } from './entities.js';
 
 /** @typedef {import('./entities.js').Entity} Entity */
 /** @typedef {import('./entities.js').Dir} Dir */
@@ -67,7 +67,7 @@ export const PLAYER_ID = 'player';
  * @property {string|null} lastTool
  * @property {(itemId: string|null) => void} setTool
  * @property {() => void} swapTool          tap gesture: swap `tool` and `lastTool`
- * @property {(state: object) => void} readFrom   copies x, y, facing, tool, lastTool from a PlayerState (schema §3.1); use `ents.teleport` after if managed
+ * @property {(state: object, ents?: EntityManager) => void} readFrom   copies x, y, facing, tool, lastTool from a PlayerState (schema §3.1); when the entity is already in a manager, pass it so the move goes through `ents.teleport` and the spatial grid stays right (throws otherwise)
  * @property {(state: object) => object} writeTo  copies x, y, facing, tool, lastTool into a PlayerState and returns it
  */
 
@@ -236,9 +236,17 @@ export function createPlayer(init) {
       tool = itemId ?? null;
     },
     swapTool() { const t = tool; tool = lastTool; lastTool = t; },
-    readFrom(state) {
-      ent.x = state.x; ent.y = state.y; ent.fromX = state.x; ent.fromY = state.y; ent.t = 1; ent.moving = false; ent.spill = 0;
-      if (state.facing in DIR_INDEX) ent.facing = state.facing;
+    readFrom(state, ents) {
+      const facingOk = typeof state.facing === 'string' && state.facing in DIR_INDEX;
+      if (ent.slot !== -1) {
+        if (!ents) throw new Error('player.readFrom: the player entity is managed; pass its EntityManager');
+        ents.teleport(ent, state.x, state.y, facingOk ? state.facing : undefined);
+      } else {
+        ent.x = state.x; ent.y = state.y; ent.fromX = state.x; ent.fromY = state.y; ent.t = 1; ent.moving = false; ent.spill = 0;
+        if (facingOk) ent.facing = state.facing;
+        updatePixels(ent);
+      }
+      dropIntents();
       tool = state.tool ?? null;
       lastTool = state.lastTool ?? null;
     },

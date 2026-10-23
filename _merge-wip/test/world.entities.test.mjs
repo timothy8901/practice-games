@@ -170,6 +170,24 @@ describe('movement', () => {
   });
 });
 
+describe('tickAll', () => {
+  it('advances every moving entity and returns the arrivals in a reused array', () => {
+    const ents = createEntities(map);
+    const a = ents.add(createEntity({ id: 'a', kind: 'npc', x: 1, y: 4, speedMs: 100 }));
+    const b = ents.add(createEntity({ id: 'b', kind: 'npc', x: 1, y: 6, speedMs: 200 }));
+    ents.add(createEntity({ id: 'c', kind: 'sign', x: 3, y: 6 }));
+    ents.tryMove(a, 'right', { map, tideState: 'low', speedMs: 100 });
+    ents.tryMove(b, 'right', { map, tideState: 'low', speedMs: 200 });
+    const first = ents.tickAll(100);
+    assert.deepEqual(first.map((e) => e.id), ['a']);
+    assert.equal(b.t, 0.5);
+    const second = ents.tickAll(100);
+    assert.equal(second, first, 'reused');
+    assert.deepEqual(second.map((e) => e.id), ['b']);
+    assert.equal(ents.tickAll(100).length, 0);
+  });
+});
+
 describe('ySorted', () => {
   it('orders by py + z, stable by slot, and reuses the buffer', () => {
     const ents = createEntities(map);
@@ -186,6 +204,19 @@ describe('ySorted', () => {
     ents.remove('a');
     ents.add(createEntity({ id: 'e', kind: 'npc', x: 1, y: 0 }));
     assert.deepEqual(ents.ySorted().map((e) => e.id), ['e', 'd', 'c', 'b']);
+  });
+
+  it('refreshes membership when an entity is removed and re-added between frames', () => {
+    const ents = createEntities(map);
+    const a = ents.add(createEntity({ id: 'a', kind: 'npc', x: 1, y: 6 }));
+    ents.add(createEntity({ id: 'b', kind: 'npc', x: 2, y: 4 }));
+    ents.ySorted();
+    ents.remove('a');
+    const a2 = createEntity({ id: 'a', kind: 'npc', x: 3, y: 1 });
+    ents.add(a2);
+    const s = ents.ySorted();
+    assert.ok(s.includes(a2) && !s.includes(a), 'the stale record is gone');
+    assert.deepEqual(s.map((e) => e.id), ['a', 'b']);
   });
 });
 
@@ -227,6 +258,18 @@ describe('rebuildFromDefs', () => {
     const wren = ents.find('wren');
     assert.deepEqual([wren.x, wren.y, wren.facing], [7, 2, 'left']);
     assert.equal(ents.rebuildFromDefs(world, data, 'low', { placeNpc: () => null }).removed.includes('wren'), true);
+  });
+
+  it('never removes dynamic entities: the player, roamers (def.dynamic) and ids not in the map defs', () => {
+    const ents = createEntities(map);
+    ents.add(createEntity({ id: 'player', kind: 'player', x: 2, y: 4 }));
+    ents.add(createEntity({ id: 'roamer:test-grass:0', kind: 'roamer', x: 8, y: 2, def: { kind: 'roamer', id: 'roamer:test-grass:0', dynamic: true } }));
+    ents.add(createEntity({ id: 'cutscene-gull', kind: 'prop', x: 7, y: 5, def: { kind: 'prop', id: 'cutscene-gull' } }));
+    const world = createWorldStub();
+    ents.rebuildFromDefs(world, data, 'low');
+    const r = ents.rebuildFromDefs(world, data, 'low', { evalCond: () => false });
+    assert.deepEqual(r.removed, ['ghost']);
+    for (const id of ['player', 'roamer:test-grass:0', 'cutscene-gull']) assert.ok(ents.find(id), `${id} kept`);
   });
 
   it('defaults: every cond holds when no evaluator is given', () => {

@@ -274,7 +274,7 @@ const M_NIGHT_DEEP = P(`
   r:4 F#4:4 A4:4 B4:4 | A4:8 r:8 | F#4:4 E4:4 D4:6 r:2 | E4:8 r:8 |
   r:4 F#4:4 A4:4 B4:4 | D5:6 C#5:2 B4:4 A4:4 | F#4:12 r:4 | E4:8 F#4:8 |
   r:4 A4:4 B4:4 D5:4 | C#5:8 E5:4 D5:4 | B4:8 D5:4 F#5:4 | G5:8 r:8 |
-  E5:4 D5:4 B4:8 | C#5:8 A4:8 | B4:6 D5:2 B4:4 G4:4 | F#4:4 E4:4 F#4:4 r:4`, { v: 0.6 });
+  E5:4 D5:4 B4:8 | C#5:8 A4:8 | B4:6 D5:2 B4:4 G4:4 | F#4:6 E4:6 r:4`, { v: 0.6 }); // last bar: 6-5 suspension over A, so the loop steps E4 -> F#4 back into the sigh
 
 // 03–06 "Before the Gulls" — E dorian, 88 bpm. Plucked guitar, rising hopeful motif E G A B.
 const H_PREDAWN = [

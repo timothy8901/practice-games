@@ -223,6 +223,16 @@ export const ICON_ART = Object.freeze({
     '#..##..#',
     '........',
   ],
+  clock: [
+    '..####..',
+    '.#wwww#.',
+    '#www#ww#',
+    '#www#ww#',
+    '#www##w#',
+    '#wwwwww#',
+    '.#wwww#.',
+    '..####..',
+  ],
   // ---- status ---------------------------------------------------------------------------------
   burn: [
     '....#...',
@@ -426,7 +436,48 @@ export const ICON_ART = Object.freeze({
     '#.....#.',
     '........',
   ],
-  // ---- UI marks -------------------------------------------------------------------------------
+  // ---- UI marks ----
+  warn: [
+    '...##...',
+    '...##...',
+    '..#oo#..',
+    '..#oo#..',
+    '.#.oo.#.',
+    '.#....#.',
+    '#..oo..#',
+    '########',
+  ],
+  star: [
+    '...#....',
+    '..#o#...',
+    '###o###.',
+    '#ooooo#.',
+    '.#ooo#..',
+    '.#o#o#..',
+    '##.#.##.',
+    '........',
+  ],
+  info: [
+    '..####..',
+    '.#.oo.#.',
+    '#......#',
+    '#..oo..#',
+    '#..oo..#',
+    '#..oo..#',
+    '.#....#.',
+    '..####..',
+  ],
+  keyboard: [
+    '........',
+    '########',
+    '#w.w.w.#',
+    '#.w.w.w#',
+    '#w.www.#',
+    '########',
+    '........',
+    '........',
+  ],
+  // (marks)---------------------------------------------------------------------------
   check: [
     '........',
     '......#.',
@@ -556,22 +607,46 @@ const DEFAULT_ACCENT = Object.freeze({
   dig: PALETTE.tallyLight, shake: PALETTE.g, sit: PALETTE.tallyLight, read: PALETTE.waxRed,
   key: PALETTE.ledgerRule, button: PALETTE.ledgerRule, tap: PALETTE.waxRed, pad: PALETTE.ledgerRule,
   tally: PALETTE.waxRed, 'type-kiln': PALETTE.o, talk: PALETTE.inkSoft, fish: PALETTE.s,
+  warn: PALETTE.o, star: PALETTE.y, info: PALETTE.s, clock: PALETTE.waxRed,
 });
 
-/** 11x11 wax seal (the only non-8x8 art here), used by panel title tabs and seal buttons. */
+/** 11x11 wax seal blank (the only non-8x8 art here); an emblem is stamped into its centre. */
 export const SEAL_ART = Object.freeze([
   '...#####...',
   '.##ooooo##.',
-  '.#ooowooo#.',
-  '#ooo#w#ooo#',
-  '#oo##w##oo#',
-  '#owwwwwwwo#',
-  '#oo##w##oo#',
-  '#ooo#w#ooo#',
+  '.#owwoooo#.',
+  '#owooooooo#',
+  '#ooooooooo#',
+  '#ooooooooo#',
+  '#ooooooooo#',
+  '#ooooooooo#',
   '.#ooooooo#.',
   '.##ooooo##.',
   '...#####...',
 ]);
+
+/** 5x5 emblems pressed into a seal (drawn in the seal's ink): role symbols, never colour alone. */
+export const SEAL_EMBLEMS = Object.freeze({
+  plus: ['..#..', '..#..', '#####', '..#..', '..#..'],
+  check: ['....#', '...##', '#.##.', '###..', '.#...'],
+  cross: ['#...#', '.#.#.', '..#..', '.#.#.', '#...#'],
+  star: ['..#..', '.###.', '#####', '.#.#.', '#...#'],
+  none: ['.....', '.....', '.....', '.....', '.....'],
+});
+
+/**
+ * Seal rows with an emblem stamped at (3,3).
+ * @param {keyof typeof SEAL_EMBLEMS} emblem
+ * @returns {string[]}
+ */
+export function sealRows(emblem = 'plus') {
+  const e = SEAL_EMBLEMS[emblem] || SEAL_EMBLEMS.plus;
+  return SEAL_ART.map((row, y) => {
+    if (y < 3 || y > 7) return row;
+    const er = e[y - 3];
+    return row.slice(0, 3) + [...er].map((c, i) => (c === '#' ? '#' : row[3 + i])).join('') + row.slice(8);
+  });
+}
 
 /** 32x32 bust silhouette for an empty portrait slot. */
 export const PORTRAIT_PLACEHOLDER_ART = Object.freeze([
@@ -660,12 +735,12 @@ export function drawIcon(ctx, name, x, y, opts) {
 
 /**
  * The wax seal sprite.
- * @param {{fill?: string, light?: string, ink?: string}} [colors]
+ * @param {{fill?: string, light?: string, ink?: string, emblem?: keyof typeof SEAL_EMBLEMS}} [colors]
  * @returns {import('../core/pixelart.js').Sprite}
  */
 export function getSeal(colors) {
   const c = colors || {};
-  return decodeSprite(SEAL_ART, {
+  return decodeSprite(sealRows(c.emblem || 'plus'), {
     '#': c.ink || COLORS.wax.dark,
     o: c.fill || COLORS.wax.fill,
     w: c.light || COLORS.wax.light,
@@ -678,7 +753,7 @@ export function getSeal(colors) {
  * @param {CanvasRenderingContext2D} ctx
  * @param {number} x
  * @param {number} y
- * @param {{fill?: string, light?: string, ink?: string}} [colors]
+ * @param {{fill?: string, light?: string, ink?: string, emblem?: keyof typeof SEAL_EMBLEMS}} [colors]
  */
 export function drawSeal(ctx, x, y, colors) {
   drawSprite(ctx, getSeal(colors), Math.round(x), Math.round(y));

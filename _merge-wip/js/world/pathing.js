@@ -16,6 +16,8 @@
  * @module world/pathing
  */
 
+import { tideVariant } from './tide.js';
+
 /** @typedef {import('../core/time.js').TideState} TideState */
 /** @typedef {import('./entities.js').Mover} Mover */
 /** @typedef {(x: number, y: number, tideState: TideState, mover: Mover) => boolean} Passable */
@@ -199,8 +201,8 @@ export function pathLength(path) {
 }
 
 /**
- * Cache key for a path request. `variant` is the tide passability class (from `world/tide.tideVariant`,
- * typically `'low'` vs `'high'`); passing the raw tide state also works, at the cost of duplicate entries.
+ * Cache key for a path request. `variant` is the tide passability class (from `world/tide.tideVariant`:
+ * `'low'`, `'mid'` or `'high'`); passing the raw tide state also works, at the cost of duplicate entries.
  * @param {string} mapId
  * @param {number} fx @param {number} fy @param {number} tx @param {number} ty
  * @param {string} variant
@@ -217,6 +219,7 @@ export function pathKey(mapId, fx, fy, tx, ty, variant, mover, adjacent = false)
  * @property {(key: string) => (readonly number[]|null|undefined)} get   `undefined` = miss; `null` = cached "unreachable"
  * @property {(key: string, path: readonly number[]|null) => readonly number[]|null} set
  * @property {(pred?: string|((key: string) => boolean)) => number} invalidate   drop entries whose key starts with `pred` (a map id prefix) or satisfies the predicate; no argument clears all; returns the count dropped
+ * @property {(variant: string, mapId?: string) => number} invalidateVariant   drop every entry computed under a tide variant (optionally on one map); call on a tide flip to free the stale half early; returns the count dropped
  * @property {() => void} clear
  * @property {() => number} size
  * @property {{hits: number, misses: number, evictions: number}} stats
@@ -257,15 +260,27 @@ export function createPathCache(opts = {}) {
       for (const k of map.keys()) if (test(k)) { map.delete(k); n++; }
       return n;
     },
+    invalidateVariant(variant, mapId) {
+      let n = 0;
+      const mid = `|${variant}|`;
+      const prefix = mapId === undefined ? null : mapId + '|';
+      for (const k of map.keys()) {
+        if (prefix !== null && !k.startsWith(prefix)) continue;
+        if (k.includes(mid)) { map.delete(k); n++; }
+      }
+      return n;
+    },
     clear() { map.clear(); },
     size: () => map.size,
   };
 }
 
 /**
- * Cached {@link findPath}. The key uses `opts.variant` (default: `opts.tideState`), so a tide change
- * naturally misses the cache and re-searches with the new passability. `opts.blocked` is NOT part
- * of the key: pass dynamic obstacles only to uncached `findPath` calls.
+ * Cached {@link findPath}. The key uses `opts.variant` (default: `world/tide.tideVariant(opts.tideState)`,
+ * so `'rising'` and `'falling'` share the `'mid'` entries), and a tide change therefore misses the
+ * cache and re-searches with the new passability; stale entries age out by LRU or go at once with
+ * `cache.invalidateVariant(old)`. `opts.blocked` is NOT part of the key: pass dynamic obstacles only
+ * to uncached `findPath` calls.
  * @param {PathCache} cache
  * @param {PathGrid & {id: string}} map
  * @param {{x: number, y: number}} from
@@ -275,7 +290,9 @@ export function createPathCache(opts = {}) {
  */
 export function findPathCached(cache, map, from, to, opts) {
   if (opts.blocked) throw new TypeError('findPathCached: opts.blocked is not cacheable; use findPath');
-  const key = pathKey(map.id, from.x, from.y, to.x, to.y, opts.variant ?? opts.tideState, opts.mover || 'npc', opts.adjacent === true);
+  if (!opts || typeof opts.tideState !== 'string') throw new TypeError('findPathCached: opts.tideState is required');
+  const variant = opts.variant ?? tideVariant(opts.tideState);
+  const key = pathKey(map.id, from.x, from.y, to.x, to.y, variant, opts.mover || 'npc', opts.adjacent === true);
   const hit = cache.get(key);
   if (hit !== undefined) return hit;
   return cache.set(key, findPath(map, from, to, opts));

@@ -36,6 +36,8 @@ export const POSES = Object.freeze(['stand', 'wander', 'sit', 'sleep', 'fish', '
 export const COLLECTION_KINDS = Object.freeze(['fish', 'bug', 'relic', 'fruit']);
 export const TIDE_STATES = Object.freeze(['low', 'rising', 'high', 'falling']);
 export const ADVANCE_KEYS = Object.freeze(['dayOfWeek', 'days', 'immediate']);
+export const TILE_TIDES = Object.freeze(['low', 'high', 'floods', 'glow']);
+export const SPAWN_CLASSES = Object.freeze(['grass', 'water', 'mud']);
 export const ENTITY_KINDS = Object.freeze(['npc', 'tree', 'rock', 'crack', 'sign', 'item', 'prop', 'roamer', 'boat']);
 
 /**
@@ -215,7 +217,8 @@ export function validateData(DATA, opts = {}) {
       else if (seenChars.has(tdef.char)) err('tilesets', tdef.id, `char '${tdef.char}' already used by '${seenChars.get(tdef.char)}'`);
       else seenChars.set(tdef.char, tdef.id);
     }
-    if (tdef.tide !== null && tdef.tide !== undefined && !['low', 'high', 'floods'].includes(tdef.tide)) err('tilesets', tdef.id, `tide must be low|high|floods|null`);
+    if (tdef.tide !== null && tdef.tide !== undefined && !TILE_TIDES.includes(tdef.tide)) err('tilesets', tdef.id, `tide must be ${TILE_TIDES.join('|')}|null`);
+    if (tdef.anim !== undefined && tdef.anim !== null && !(int(tdef.anim) && tdef.anim >= 0) && !(tdef.anim && typeof tdef.anim === 'object' && int(tdef.anim.frames) && tdef.anim.frames > 0)) err('tilesets', tdef.id, 'anim must be a frame count >= 0, {frames, fps?} or null');
   }
   const mapIndex = new Map(list('maps').map((m) => [m.id, m]));
   /** @type {Map<string, (x: number, y: number, tide: 'low'|'high') => boolean>} */
@@ -269,7 +272,7 @@ export function validateData(DATA, opts = {}) {
     // animated tiles
     if (groundOk) {
       let animated = 0;
-      for (let y = 0; y < map.h; y++) for (let x = 0; x < map.w; x++) { const t = tileAt(x, y); if (t && t.anim > 0) animated++; }
+      for (let y = 0; y < map.h; y++) for (let x = 0; x < map.w; x++) { const t = tileAt(x, y); if (t && ((num(t.anim) && t.anim > 0) || (t.anim && typeof t.anim === 'object'))) animated++; }
       const cap = num(tuning.animatedTileCap) ? tuning.animatedTileCap : 400;
       if (animated > cap) warn('maps', id, `${animated} animated tiles (cap ${cap})`);
     }
@@ -332,6 +335,10 @@ export function validateData(DATA, opts = {}) {
       if (!has('encounters', s.table)) err('maps', id, `spawn table '${s.table}' is not in encounters`);
       if (!num(s.rate) || s.rate < 0 || s.rate > 1) err('maps', id, `spawn '${s.table}' rate must be 0..1`);
       if (typeof s.area === 'object' && s.area && !(inBounds(map, s.area.x, s.area.y) && inBounds(map, s.area.x + s.area.w - 1, s.area.y + s.area.h - 1))) err('maps', id, `spawn '${s.table}' area is out of bounds`);
+      else if (typeof s.area === 'string') {
+        if (!SPAWN_CLASSES.includes(s.area)) err('maps', id, `spawn '${s.table}' area '${s.area}' must be a rect or one of ${SPAWN_CLASSES.join(' ')}`);
+        else if (groundOk && !spawnClassPresent(map, lg, tiles, s.area)) err('maps', id, `spawn '${s.table}' area '${s.area}' matches no tile on this map`);
+      } else if (!s.area || typeof s.area !== 'object') err('maps', id, `spawn '${s.table}' area must be a rect or a class keyword`);
       checkCond('maps', id, s.cond, `spawn '${s.table}' cond`);
     }
     for (const [name, r] of Object.entries(map.regions ?? {})) {
@@ -592,6 +599,29 @@ export function validateData(DATA, opts = {}) {
   }
 
   return { errors, warnings };
+}
+
+/**
+ * Whether any cell of a map matches a keyword spawn class, by the same rule `world/tilemap` uses
+ * (`tile.spawn` when set, else water for `'water'`, else the tile id contains the keyword; the
+ * detail layer wins over ground).
+ * @param {any} map
+ * @param {Record<string, string>} lg     merged legend
+ * @param {Map<string, any>} tiles        tile id -> def
+ * @param {string} cls
+ * @returns {boolean}
+ */
+function spawnClassPresent(map, lg, tiles, cls) {
+  for (let y = 0; y < map.h; y++) {
+    for (let x = 0; x < map.w; x++) {
+      const dch = Array.isArray(map.detail) && typeof map.detail[y] === 'string' ? map.detail[y][x] : '.';
+      const id = dch && dch !== '.' && lg[dch] ? lg[dch] : lg[map.ground[y][x]];
+      const t = id ? tiles.get(id) : null;
+      if (!t) continue;
+      if (typeof t.spawn === 'string' ? t.spawn === cls : cls === 'water' ? t.water === true : id.includes(cls)) return true;
+    }
+  }
+  return false;
 }
 
 /**

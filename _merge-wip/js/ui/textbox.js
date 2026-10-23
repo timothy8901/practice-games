@@ -21,7 +21,7 @@ import { drawText, drawTextTyped, wrapText, measureText } from '../core/font.js'
 import { drawSprite, isSprite } from '../core/pixelart.js';
 import { createFocus } from './focus.js';
 import { COLORS, ROLE_GLYPH, SPACE, TEXT_SPEEDS, TIMING, TYPE } from './theme.js';
-import { drawPanel, drawRule } from './panel.js';
+import { drawPanel } from './panel.js';
 import { getPortraitPlaceholder } from './icons.js';
 
 /** Characters that trigger beat pauses. */
@@ -262,7 +262,6 @@ export function createTextbox(o) {
       ctx.fillRect(P.x, P.y, P.w, 1); ctx.fillRect(P.x, P.y + P.h - 1, P.w, 1); ctx.fillRect(P.x, P.y, 1, P.h); ctx.fillRect(P.x + P.w - 1, P.y, 1, P.h);
       if (isSprite(portrait)) drawSprite(ctx, portrait, P.x, P.y);
       else drawSprite(ctx, getPortraitPlaceholder(), P.x, P.y);
-      drawRule(ctx, P.x + P.w + SPACE.sm, L.inner.y, 1, {});
       ctx.fillStyle = COLORS.paper.rule;
       ctx.fillRect(P.x + P.w + SPACE.sm, L.inner.y, 1, L.inner.h);
     }

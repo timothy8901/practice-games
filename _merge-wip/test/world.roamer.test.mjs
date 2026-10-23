@@ -2,7 +2,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  spawn, tickRoamer, shouldDespawn, applyStep, despawn, toEntity, toEncounter, createRoamerField,
+  spawn, tickRoamer, shouldDespawn, applyStep, despawn, toEntity, toEncounter, createRoamerField, touching,
   rowCondHolds, eligibleRows, rollRow, rollLevel, tuningValue, ROAMER_DEFAULTS,
 } from '../js/world/roamer.js';
 import { createEntities, DIRS } from '../js/world/entities.js';
@@ -89,6 +89,32 @@ describe('spawn', () => {
     assert.deepEqual([w.behaviour, w.catchable, w.fleeR, w.ttlMs, w.approachR], ['approach', true, 9, 5, ROAMER_DEFAULTS.approachR]);
   });
 
+  it('works with the bare (rng, table, map, tideState) signature', () => {
+    const a = spawn(makeRng(42), ENCOUNTERS['test-flats'], map, 'low');
+    const b = spawn(makeRng(42), ENCOUNTERS['test-flats'], map, 'low');
+    assert.ok(a);
+    assert.deepEqual(a, b, 'same seed, same roamer');
+    assert.equal(a.id, 'roamer:roamer:0');
+    assert.equal(a.tableId, 'roamer');
+    assert.ok(map.passable(a.x, a.y, 'low', 'roamer'));
+  });
+
+  it('a seeded field spawns the same sequence of roamers every run', () => {
+    const run = () => {
+      const field = createRoamerField({ cap: 8 });
+      const rng = makeRng('field-seq');
+      const out = [];
+      for (let i = 0; i < 8; i++) {
+        const r = field.spawn(rng, grass, map, 'low', base);
+        out.push(r && `${r.id}:${r.speciesId}:${r.level}:${r.x},${r.y}:${r.facing}:${r.waitMs}`);
+      }
+      return out;
+    };
+    const a = run();
+    assert.deepEqual(run(), a);
+    assert.ok(a.filter(Boolean).length >= 6, 'most attempts place a roamer');
+  });
+
   it('toEntity and toEncounter expose the shapes other lanes read', () => {
     const r = spawn(makeRng('e'), grass, map, 'low', base);
     const e = toEntity(r);
@@ -158,6 +184,21 @@ describe('tick', () => {
     despawn(r, 'caught');
     assert.deepEqual([r.state, r.despawnReason], ['gone', 'caught']);
     assert.equal(tickRoamer(r, makeRng(0), 16, ctxFor(null)), null);
+  });
+});
+
+describe('touching', () => {
+  it('a roamer touches its own tile and the four orthogonal neighbours, never once gone', () => {
+    const r = { ...spawn(makeRng('t'), grass, map, 'low', { ...base, player: null }), x: 8, y: 4 };
+    assert.ok(touching(r, 8, 4) && touching(r, 9, 4) && touching(r, 8, 3));
+    assert.ok(!touching(r, 9, 5), 'diagonal does not touch');
+    assert.ok(!touching(r, 10, 4));
+    const field = createRoamerField();
+    const f = field.spawn(makeRng('t2'), grass, map, 'low', { ...base, player: null });
+    assert.equal(field.touchingAt(f.x + 1, f.y), f);
+    assert.equal(field.touchingAt(f.x + 3, f.y), null);
+    despawn(r, 'caught');
+    assert.ok(!touching(r, 8, 4));
   });
 });
 

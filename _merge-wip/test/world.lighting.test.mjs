@@ -90,7 +90,9 @@ describe('gradeFor', () => {
     assert.equal(dayPartAt(18 * 60 + 30), 'sunset');
     assert.equal(dayPartAt(19 * 60 + 30), 'blue-hour');
     assert.equal(dayPartAt(21 * 60), 'night');
-    assert.equal(dayPartAt(23 * 60), 'deep-night');
+    assert.equal(dayPartAt(23 * 60), 'night', 'the ramp toward deep night starts at 22:30 on night values');
+    assert.equal(dayPartAt(3 * 60), 'deep-night');
+    assert.equal(dayPartAt(-60), 'night', 'wraps');
     assert.ok(Object.isFrozen(DAY_PARTS));
   });
 
@@ -151,8 +153,12 @@ describe('gradeHex', () => {
       const c = [out.slice(1, 3), out.slice(3, 5), out.slice(5, 7)].map((h) => parseInt(h, 16));
       assert.ok(c[0] >= ink[0] && c[1] >= ink[1] && c[2] >= ink[2], `${hex} -> ${out} not below ink`);
     }
-    assert.equal(gradeHex('#000000', night), NIGHT_INK);
-    assert.equal(gradeHex('#000000', night, '#000000'), '#000000', 'custom ink');
+    // black lands on the ambient floor at midnight: within a step of ink, blue channel clamped to ink
+    const black = gradeHex('#000000', night);
+    assert.equal(black.slice(5, 7), NIGHT_INK.slice(5, 7));
+    for (const k of [1, 3, 5]) assert.ok(Math.abs(parseInt(black.slice(k, k + 2), 16) - parseInt(NIGHT_INK.slice(k, k + 2), 16)) <= 4, black);
+    assert.equal(gradeHex('#000000', night, '#FFFFFF'), '#FFFFFF', 'custom ink is the floor');
+    assert.equal(gradeHex('#000000', gradeFor(12 * 60), '#000000'), '#000000');
     assert.throws(() => gradeHex('red', noon), TypeError);
     assert.throws(() => gradeHex('#FFF', noon), TypeError);
     assert.equal(gradeHex('#808080', INDOOR_GRADE).length, 7);
@@ -178,7 +184,8 @@ describe('lightSources', () => {
   it('lamps and runes: nothing but the rune at noon, lamps after dusk', () => {
     const w = world();
     assert.deepEqual(ids(lightSources(harbor, w, 12)), ['rune@9,3']);
-    const evening = lightSources(harbor, w, 20);
+    // high tide keeps the bioluminescent flats dark so only lamps and the rune remain
+    const evening = lightSources(harbor, w, { minute: 20 * 60, tide: 'high' });
     assert.deepEqual(ids(evening), ['lamp@5,3', 'lamp@7,3', 'rune@9,3']);
     const lamp = evening.find((l) => l.id === 'lamp@5,3');
     assert.deepEqual(lamp, { id: 'lamp@5,3', kind: 'lamp', x: 5, y: 3, px: 5 * 16 + 8, py: 3 * 16 + 8 - 8, radius: 40, color: '#F9C46B', intensity: 1 });
@@ -208,17 +215,20 @@ describe('lightSources', () => {
     const dark = lightSources(harbor, world(), 21);
     assert.equal(dark.some((l) => l.kind === 'porch'), false);
     const home = lightSources(harbor, world({ flags: { 'np.wren.home': true } }), 21);
-    assert.deepEqual(home.filter((l) => l.kind === 'porch').map((l) => l.id), ['porch@5,8']);
+    assert.deepEqual(home.filter((l) => l.kind === 'porch').map((l) => l.id), ['porch@5,8'], 'the inn porch prop is absent: its cond fails');
     assert.equal(lightSources(harbor, world({ flags: { 'np.wren.home': true } }), 12).some((l) => l.kind === 'porch'), false, 'not by day');
     assert.equal(lightSources(harbor, world({ flags: { 'np.wren.home': 0 } }), 21).some((l) => l.kind === 'porch'), false, 'falsy flag');
-    // the inn porch prop also carries a cond: it is only filtered when an evaluator is given
-    const noEval = lightSources(harbor, world({ flags: { 'np.wren.home': true } }), 21);
-    assert.equal(noEval.filter((l) => l.kind === 'porch').length, 2);
-    const evalCond = (w, cond) => Boolean(w.flags[cond.flag]);
-    const withEval = lightSources(harbor, world({ flags: { 'np.wren.home': true } }), { minute: 21 * 60, evalCond });
-    assert.deepEqual(withEval.filter((l) => l.kind === 'porch').map((l) => l.id), ['porch@5,8']);
-    const innOpen = lightSources(harbor, world({ flags: { 'np.wren.home': true, 'sp.inn-open': true } }), { minute: 21 * 60, evalCond });
-    assert.equal(innOpen.filter((l) => l.kind === 'porch').length, 2);
+    // the inn porch prop carries a cond, evaluated by the condition DSL by default
+    const innOpen = lightSources(harbor, world({ flags: { 'np.wren.home': true, 'sp.inn-open': true } }), 21);
+    assert.deepEqual(innOpen.filter((l) => l.kind === 'porch').map((l) => l.id), ['porch@5,8', 'porch@11,7']);
+    // the porch-light tile itself names the occupancy flag, so the prop also needs the house lit
+    assert.equal(lightSources(harbor, world({ flags: { 'sp.inn-open': true } }), 21).some((l) => l.kind === 'porch'), false);
+    // a caller may supply its own evaluator (called with the map id and the prop tile)
+    const seen = [];
+    const evalCond = (w, cond, ctx) => { seen.push(ctx); return true; };
+    const forced = lightSources(harbor, world({ flags: { 'np.wren.home': true } }), { minute: 21 * 60, evalCond });
+    assert.equal(forced.filter((l) => l.kind === 'porch').length, 2);
+    assert.deepEqual(seen, [{ mapId: 'harbor', x: 11, y: 7 }]);
   });
 
   it('bioluminescent mud glows only at night on a low tide', () => {
@@ -268,5 +278,22 @@ describe('lightSources', () => {
     assert.equal(r, out);
     assert.equal(out.some((l) => l.stale), false);
     assert.equal(out.find((l) => l.id === 'lamp@5,3').px, 5 * 8 + 4);
+  });
+
+  it('reuses its own light records across calls (no per-frame allocation)', () => {
+    const w = world();
+    const out = [];
+    lightSources(harbor, w, { minute: 23 * 60, tide: 'low', out });
+    const first = out.slice();
+    assert.equal(first.length, 11, '2 lamps + rune + 8 bio cells');
+    lightSources(harbor, w, { minute: 23 * 60 + 5, tide: 'low', out });
+    assert.equal(out.length, first.length);
+    out.forEach((l, i) => assert.equal(l, first[i], `record ${i} reused`));
+    // shrinking truncates; growing again reuses the survivors
+    lightSources(harbor, w, { minute: 23 * 60, tide: 'high', out });
+    assert.equal(out.length, 3);
+    assert.equal(out[0], first[0]);
+    // results are the same values as a fresh call
+    assert.deepEqual(lightSources(harbor, w, { minute: 23 * 60, tide: 'low', out }).map((l) => ({ ...l })), lightSources(harbor, w, { minute: 23 * 60, tide: 'low' }).map((l) => ({ ...l })));
   });
 });

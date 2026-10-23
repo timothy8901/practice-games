@@ -114,6 +114,42 @@ describe('path cache', () => {
     assert.equal(cache.stats.misses, 2);
   });
 
+  it('keys on tideVariant by default: rising and falling share the mid entry; a flip to low re-searches', () => {
+    const cache = createPathCache();
+    assert.equal(findPathCached(cache, map, P(1, 4), P(9, 3), { tideState: 'rising' }), null, 'causeway shut while rising');
+    assert.equal(findPathCached(cache, map, P(1, 4), P(9, 3), { tideState: 'falling' }), null);
+    assert.deepEqual(cache.stats, { hits: 1, misses: 1, evictions: 0 }, 'falling hit the rising (mid) entry');
+    assert.notEqual(cache.get(pathKey(map.id, 1, 4, 9, 3, 'mid', 'npc')), undefined);
+    const low = findPathCached(cache, map, P(1, 4), P(9, 3), { tideState: 'low' });
+    assert.ok(low && pathLength(low) > 0, 'the tide went out: a fresh search finds the causeway');
+    assert.throws(() => findPathCached(cache, map, P(0, 4), P(1, 4), {}), TypeError);
+  });
+
+  it('invalidateVariant drops the stale tide half on a flip, optionally per map', () => {
+    const cache = createPathCache();
+    const other = { ...map, id: 'other-isle' };
+    findPathCached(cache, map, P(0, 4), P(1, 4), { tideState: 'low' });
+    findPathCached(cache, map, P(0, 4), P(2, 4), { tideState: 'low' });
+    findPathCached(cache, map, P(0, 4), P(1, 4), { tideState: 'high' });
+    findPathCached(cache, other, P(0, 4), P(1, 4), { tideState: 'low' });
+    assert.equal(cache.invalidateVariant('low', map.id), 2);
+    assert.equal(cache.size(), 2);
+    assert.equal(cache.get(pathKey(map.id, 0, 4, 1, 4, 'low', 'npc')), undefined, 'stale low entry gone');
+    assert.notEqual(cache.get(pathKey(map.id, 0, 4, 1, 4, 'high', 'npc')), undefined, 'high entry kept');
+    assert.equal(cache.invalidateVariant('low'), 1, 'all maps');
+    assert.equal(cache.invalidateVariant('mid'), 0);
+  });
+
+  it('a cached path is never served under a tide that would make it impassable', () => {
+    const cache = createPathCache();
+    const low = findPathCached(cache, map, P(1, 4), P(9, 3), { tideState: 'low' });
+    for (const t of ['rising', 'high', 'falling']) {
+      const got = findPathCached(cache, map, P(1, 4), P(9, 3), { tideState: t });
+      assert.notEqual(got, low, `not the low-tide path at ${t}`);
+      assert.equal(got, null);
+    }
+  });
+
   it('caches "unreachable" as null distinct from a miss', () => {
     const cache = createPathCache();
     assert.equal(findPathCached(cache, map, P(1, 4), P(0, 0), { tideState: 'low' }), null);

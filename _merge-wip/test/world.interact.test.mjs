@@ -50,6 +50,7 @@ describe('resolveFacing', () => {
     const { act, ents } = setup(2, 4, 'down');     // wren stands on the bench trigger at (2,5)
     const a = act();
     assert.deepEqual(pick(a), { verb: 'talk', kind: 'npc', targetId: 'wren', disabled: null });
+    assert.equal(a.targetKind, 'npc', 'targetKind mirrors kind');
     assert.equal(a.prompt, 'Talk to Wren'); assert.equal(a.label, 'Talk'); assert.equal(a.icon, 'talk');
     assert.deepEqual([a.payload.x, a.payload.y], [2, 5]);
     ents.remove('wren');
@@ -121,6 +122,28 @@ describe('resolveFacing', () => {
     assert.equal(resolveFacing(p, m, e2, w2, data).targetId, 'chest');
     w2.maps[MAP_DEF.id].opened.push('chest');
     assert.equal(resolveFacing(p, m, e2, w2, data), null);
+  });
+
+  it('honours cond on use triggers and door warps through opts.evalCond', () => {
+    const def = {
+      ...MAP_DEF,
+      triggers: [{ x: 7, y: 1, kind: 'use', id: 'shrine', verb: 'use', cond: { flag: 'sp.shrine' } }],
+      warps: [{ x: 7, y: 1, to: { mapId: 'int-shrine', x: 1, y: 1 }, kind: 'door', cond: { flag: 'sp.door' } }],
+    };
+    const m = buildRuntimeMap(def);
+    const ents = createEntities(m);
+    const p = ents.add(createEntity({ id: 'player', kind: 'player', x: 6, y: 1, facing: 'right' }));
+    const world = createWorldStub({ x: 6, y: 1, facing: 'right' });
+    const seen = [];
+    const evalCond = (w, cond, ctx) => { seen.push([ctx.mapId, ctx.x, ctx.y]); return Boolean(w.flags[cond.flag]); };
+    assert.equal(resolveFacing(p, m, ents, world, data, { evalCond }), null, 'both gated shut');
+    assert.deepEqual(seen[0], [MAP_DEF.id, 7, 1]);
+    world.flags['sp.door'] = true;
+    assert.deepEqual(pick(resolveFacing(p, m, ents, world, data, { evalCond })), { verb: 'enter', kind: 'door', targetId: 'int-shrine', disabled: null });
+    world.flags['sp.shrine'] = true;
+    assert.deepEqual(pick(resolveFacing(p, m, ents, world, data, { evalCond })), { verb: 'use', kind: 'trigger', targetId: 'shrine', disabled: null });
+    world.flags = {};
+    assert.equal(resolveFacing(p, m, ents, world, data).targetId, 'shrine', 'no evaluator: conds hold');
   });
 
   it('accepts a tide override and reuses its result record', () => {

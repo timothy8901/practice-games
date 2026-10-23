@@ -76,8 +76,8 @@ import { SCRIPTS } from './placeholder/scripts.js';
  * @typedef {Object} TileDef
  * @property {string} id  @property {string} char   DEFAULT_LEGEND character
  * @property {string} art  @property {boolean} solid  @property {boolean} water
- * @property {'low'|'high'|'floods'|null} tide  @property {string|null} verb  @property {string|null} sfx
- * @property {number} anim  frames (0 = static)  @property {boolean} glow
+ * @property {'low'|'high'|'floods'|'glow'|null} tide  @property {string|null} verb  @property {string|null} sfx
+ * @property {number|{frames: number, fps?: number}} anim  frames (0 = static)  @property {boolean} glow  @property {string} [spawn]  keyword spawn class
  */
 
 /**
@@ -194,6 +194,13 @@ export const TABLE_NAMES = Object.freeze(Object.keys(DATA));
 
 /** Seed-code toggle registry, append-only (`setSeedToggles(TOGGLE_ORDER)` at boot, §9). */
 export { TOGGLE_ORDER };
+
+/**
+ * Tile definitions keyed by id: the `tiles` argument `world/tilemap.loadMap` takes
+ * (`data/tilesets.TILES` in the manifest).
+ * @type {Readonly<Record<string, import('./index.js').TileDef>>}
+ */
+export const TILES = Object.freeze(Object.fromEntries(TILESETS.map((t) => [t.id, t])));
 
 /**
  * `char -> tile id` built from the tileset rows (§8.4: the prototype's hard-coded legend is data).

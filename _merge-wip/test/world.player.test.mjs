@@ -155,13 +155,26 @@ describe('lock and tools and state sync', () => {
   });
 
   it('readFrom / writeTo round-trip the PlayerState fields', () => {
-    const { player } = setup();
+    const { player, ents } = setup();
     const world = createWorldStub({ x: 9, y: 1, facing: 'left', tool: 'net' });
-    player.readFrom(world.player);
+    assert.throws(() => player.readFrom(world.player), /pass its EntityManager/, 'managed entity needs the manager');
+    player.readFrom(world.player, ents);
+    assert.equal(ents.at(9, 1), player.ent, 'spatial grid follows the load');
+    assert.equal(ents.at(2, 4), null, 'old tile freed');
     assert.deepEqual([player.ent.x, player.ent.y, player.ent.facing, player.tool], [9, 1, 'left', 'net']);
     player.setTool('rod');
     const out = player.writeTo({ ...world.player });
     assert.deepEqual([out.x, out.y, out.facing, out.tool, out.lastTool], [9, 1, 'left', 'rod', 'net']);
     assert.equal(player.ent.id, PLAYER_ID);
+  });
+
+  it('readFrom on an unmanaged player sets the tile and pixels and drops queued intents', () => {
+    const player = createPlayer({ x: 0, y: 0, facing: 'down' });
+    player.intend('left');
+    player.readFrom({ x: 4, y: 3, facing: 'right', tool: null, lastTool: null });
+    assert.deepEqual([player.ent.x, player.ent.y, player.ent.facing, player.ent.px > 0], [4, 3, 'right', true]);
+    const ents = createEntities(map);
+    ents.add(player.ent);
+    assert.deepEqual(player.update(TICK, { ents, map, tideState: 'low' }), [], 'the pre-load tap was dropped');
   });
 });

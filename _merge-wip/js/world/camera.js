@@ -213,8 +213,9 @@ export function createCamera(opts) {
         shakeT += dt;
         const decay = shakeTotal > 0 ? shakeLeft / shakeTotal : 0;
         const a = shakeOn ? shakeAmp * decay : 0;
-        shakeX = Math.round(a * Math.sin(shakeT * SHAKE_WX));
-        shakeY = Math.round(a * Math.cos(shakeT * SHAKE_WY));
+        // `+ 0` folds Math.round's -0 into 0 so offsets compare and serialise cleanly
+        shakeX = Math.round(a * Math.sin(shakeT * SHAKE_WX)) + 0;
+        shakeY = Math.round(a * Math.cos(shakeT * SHAKE_WY)) + 0;
         if (shakeLeft === 0) {
           shakeX = 0;
           shakeY = 0;

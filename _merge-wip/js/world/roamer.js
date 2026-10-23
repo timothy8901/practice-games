@@ -157,7 +157,7 @@ export function rollLevel(rng, row) {
 
 /**
  * @typedef {Object} SpawnOpts
- * @property {string} tableId
+ * @property {string} [tableId='roamer']   encounter table id (goes into the roamer id and its EncounterResult)
  * @property {object} [spawnDef]     the map SpawnDef; its `area` restricts tiles (rect, or a class resolved through `map.spawnAt`)
  * @property {{x: number, y: number}|null} [player]
  * @property {(x: number, y: number) => boolean} [occupied]   tiles already holding an entity
@@ -173,11 +173,12 @@ export function rollLevel(rng, row) {
  * @param {readonly EncounterRow[]} table
  * @param {{id: string, w: number, h: number, passable: Passable, spawnAt?: Function}} map
  * @param {TideState} tideState
- * @param {SpawnOpts} opts
+ * @param {SpawnOpts} [opts]
  * @returns {Roamer|null}   null when no row or no tile qualifies (no draw is wasted on the tile search in that case beyond the tries)
  */
-export function spawn(rng, table, map, tideState, opts) {
+export function spawn(rng, table, map, tideState, opts = {}) {
   const tun = opts.tuning;
+  const tableId = opts.tableId ?? 'roamer';
   const condCtx = { phase: opts.phase, tideState, weather: opts.weather, world: opts.world, evalCond: opts.evalCond, data: opts.data };
   const rows = eligibleRows(table, condCtx);
   const row = rollRow(rng, rows);
@@ -203,11 +204,11 @@ export function spawn(rng, table, map, tideState, opts) {
   if (x < 0) return null;
 
   return {
-    id: `roamer:${opts.tableId}:${opts.seq ?? 0}`,
+    id: `roamer:${tableId}:${opts.seq ?? 0}`,
     speciesId: row.species,
     level,
     errant: row.errant === true,
-    tableId: opts.tableId,
+    tableId,
     catchable: row.catchable === true,
     behaviour: row.behaviour || 'flee',
     fleeR: row.fleeR ?? tuningValue(tun, 'fleeR'),
@@ -368,6 +369,19 @@ export function applyStep(r, dir) {
 }
 
 /**
+ * Whether a roamer touches the tile (x, y): on it or orthogonally next to it. The encounter system
+ * asks this after each player step (and after each roamer step) with the player's tile; a touch
+ * starts the {@link toEncounter} battle (§4.6).
+ * @param {Roamer} r
+ * @param {number} x
+ * @param {number} y
+ * @returns {boolean}
+ */
+export function touching(r, x, y) {
+  return r.state !== 'gone' && Math.abs(r.x - x) + Math.abs(r.y - y) <= 1;
+}
+
+/**
  * Marks a roamer gone (the caller removes its entity).
  * @param {Roamer} r
  * @param {string} reason
@@ -384,6 +398,7 @@ export function despawn(r, reason) {
  * @property {(rng: Rng, table: readonly EncounterRow[], map: object, tideState: TideState, opts: Omit<SpawnOpts, 'seq'>) => Roamer|null} spawn   respects the cap
  * @property {(rng: Rng, ms: number, ctx: RoamerTickCtx & {tryStep: (r: Roamer, dir: Dir) => boolean}) => {stepped: Roamer[], despawned: Roamer[]}} tick   REUSED result record and arrays
  * @property {(id: string, reason?: string) => Roamer|null} remove
+ * @property {(x: number, y: number) => Roamer|null} touchingAt   first live roamer (in spawn order) touching the tile, see {@link touching}
  * @property {(ms: number) => boolean} spawnDue   advances the spawn timer; true when an attempt is due (resets the timer)
  * @property {() => void} clear
  */
@@ -437,6 +452,7 @@ export function createRoamerField(opts = {}) {
       return result;
     },
     remove,
+    touchingAt(x, y) { for (let i = 0; i < list.length; i++) if (touching(list[i], x, y)) return list[i]; return null; },
     spawnDue(ms) {
       spawnTimer += ms;
       if (spawnTimer < spawnEveryMs) return false;

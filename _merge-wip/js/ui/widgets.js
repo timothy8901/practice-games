@@ -409,10 +409,57 @@ export function drawSealButton(ctx, text, x, y, o) {
   ctx.fillStyle = opt.focused ? COLORS.paper.light : COLORS.paper.shade;
   ctx.fillRect(x + 1, y + 1, w - 2, h - 2);
   drawNotchedFrame(ctx, x, y, w, h, opt.focused ? COLORS.paper.ink : COLORS.paper.edge);
-  drawSeal(ctx, x + 1, y + 1, role === 'safe' ? { fill: PALETTE.g, light: PALETTE.l, ink: PALETTE.t } : role === 'danger' ? undefined : { fill: COLORS.brass.fill, light: COLORS.brass.light, ink: COLORS.brass.dark });
-  const glyph = role === 'safe' ? ROLE_GLYPH.safe : role === 'danger' ? ROLE_GLYPH.danger : '';
-  drawText(ctx, (glyph ? glyph + ' ' : '') + text, x + 15, y + 3, { color: ink });
+  // The seal is stamped with the role's symbol (check = safe, cross = destructive), so the role
+  // never rests on the seal's colour alone.
+  const seal = role === 'safe' ? { fill: PALETTE.g, light: PALETTE.l, ink: PALETTE.t, emblem: 'check' }
+    : role === 'danger' ? { emblem: 'cross' }
+      : { fill: COLORS.brass.fill, light: COLORS.brass.light, ink: COLORS.brass.dark, emblem: 'plus' };
+  drawSeal(ctx, x + 1, y + 1, seal);
+  drawText(ctx, text, x + 15, y + 3, { color: ink });
   return { x, y, w, h };
+}
+
+/** Ward shimmer timing (wildshift-visuals §13.3): 6 frames x 8 f = 800 ms, replayed every ~4 s. */
+export const WARD_SHIMMER = Object.freeze({ frames: 6, frameMs: 133, loopMs: 800, everyMs: 4000 });
+
+/**
+ * Shimmer frame for a time in ms: 0..5 while the lattice sweeps, -1 between sweeps.
+ * @param {number} t
+ * @returns {number}
+ */
+export function wardShimmerFrame(t) {
+  const k = ((Number(t) || 0) % WARD_SHIMMER.everyMs + WARD_SHIMMER.everyMs) % WARD_SHIMMER.everyMs;
+  return k < WARD_SHIMMER.loopMs ? Math.min(WARD_SHIMMER.frames - 1, Math.floor(k / WARD_SHIMMER.frameMs)) : -1;
+}
+
+/**
+ * The Ward badge: hex glyph + `Ward ?` / `Ward: known`, with the shimmer lattice (1px w/i diagonal
+ * lines) sweeping across it every ~4 s. Reduced motion draws a static lattice instead.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} x @param {number} y
+ * @param {{known?: boolean, t?: number, reducedMotion?: boolean, small?: boolean}} [o]
+ * @returns {{x: number, y: number, w: number, h: number}}
+ */
+export function drawWardBadge(ctx, x, y, o) {
+  const opt = o || {};
+  const r = drawBadge(ctx, opt.known ? STRINGS.wardKnown : STRINGS.wardUnknown, x, y, { style: opt.known ? 'wardKnown' : 'ward', small: opt.small });
+  const frame = opt.reducedMotion ? -2 : wardShimmerFrame(opt.t || 0);
+  if (frame === -1) return r;
+  ctx.save();
+  ctx.beginPath(); ctx.rect(r.x + 1, r.y + 1, r.w - 2, r.h - 2); ctx.clip();
+  const span = r.w + r.h;
+  const lines = frame === -2 ? [0.25, 0.55, 0.85] : [frame / (WARD_SHIMMER.frames - 1)];
+  for (let li = 0; li < lines.length; li++) {
+    const off = Math.round(lines[li] * span) - r.h;
+    for (let k = 0; k < r.h; k++) {
+      const px = r.x + off + k;
+      ctx.fillStyle = (k + li) % 2 ? PALETTE.i : PALETTE.w;
+      ctx.fillRect(px, r.y + r.h - 1 - k, 1, 1);
+      if (frame !== -2) { ctx.fillStyle = PALETTE.i; ctx.fillRect(px - 3, r.y + r.h - 1 - k, 1, 1); }
+    }
+  }
+  ctx.restore();
+  return r;
 }
 
 /**

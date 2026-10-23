@@ -28,6 +28,7 @@ import { tideState as tideStateOf } from '../state/selectors.js';
  * @property {string} prompt         full HUD line, e.g. 'Talk to Wren'
  * @property {string} icon           icon id for ui/icons.js (the verb)
  * @property {string} kind           target kind: 'npc'|'roamer'|'item'|'sign'|'trigger'|'tree'|'rock'|'water'|'crack'|'mud'|'door'|'boat'|'prop'|'tile'
+ * @property {string} targetKind     same value as `kind` (the name the HUD / flow lanes were briefed with)
  * @property {string|null} targetId  entity id, trigger id, warp target map id or tile id
  * @property {Entity|object|null} target   the entity, trigger, warp or TileInfo
  * @property {string|null} disabled  reason the verb cannot run right now, or null
@@ -89,7 +90,7 @@ export function toolUse(world, data) {
 }
 
 /** Reused result record; copy if you keep it across frames. */
-const action = { verb: '', label: '', prompt: '', icon: '', kind: '', targetId: null, target: null, disabled: null, payload: { x: 0, y: 0, tool: null, tideState: 'low', script: null, to: null, text: null } };
+const action = { verb: '', label: '', prompt: '', icon: '', kind: '', targetKind: '', targetId: null, target: null, disabled: null, payload: { x: 0, y: 0, tool: null, tideState: 'low', script: null, to: null, text: null } };
 
 /**
  * @param {string} kind @param {string} verb @param {string|null} targetId @param {object|null} target
@@ -98,6 +99,7 @@ const action = { verb: '', label: '', prompt: '', icon: '', kind: '', targetId: 
  */
 function fill(kind, verb, targetId, target, prompt, disabled) {
   action.kind = kind;
+  action.targetKind = kind;
   action.verb = verb;
   action.label = VERB_LABELS[verb] || verb;
   action.prompt = prompt;
@@ -120,6 +122,19 @@ function nameOf(e, data) {
   return e.itemId || e.speciesId || e.npcId || e.id;
 }
 
+/** Reused condition context for trigger / warp conds. */
+const condCtx = { data: null, mapId: '', x: 0, y: 0 };
+
+/**
+ * @param {Function} evalCond @param {object} world @param {object} cond @param {object} data
+ * @param {string} mapId @param {number} x @param {number} y
+ * @returns {boolean}
+ */
+function condHolds(evalCond, world, cond, data, mapId, x, y) {
+  condCtx.data = data; condCtx.mapId = mapId; condCtx.x = x; condCtx.y = y;
+  return Boolean(evalCond(world, cond, condCtx));
+}
+
 /**
  * Resolves the context action for the tile the player faces.
  * @param {Entity} player
@@ -127,7 +142,9 @@ function nameOf(e, data) {
  * @param {EntityManager} ents
  * @param {object} world
  * @param {object} data
- * @param {{tideState?: string}} [opts]   tide override (default: read from world.clock via state/selectors)
+ * @param {{tideState?: string, evalCond?: (world: object, cond: object, ctx: object) => boolean}} [opts]
+ *   `tideState` overrides the tide read from world.clock (state/selectors); `evalCond` is script/cond.evalCond,
+ *   used for `cond` on use triggers and door warps (without it every cond holds, matching entities.rebuildFromDefs)
  * @returns {ContextAction|null}   a REUSED record, or null when nothing is there
  */
 export function resolveFacing(player, map, ents, world, data, opts) {
@@ -140,6 +157,7 @@ export function resolveFacing(player, map, ents, world, data, opts) {
   const p = action.payload;
   p.x = x; p.y = y; p.tool = world && world.player ? world.player.tool : null; p.tideState = tide;
   p.script = null; p.to = null; p.text = null;
+  const evalCond = (opts && opts.evalCond) || null;
 
   // 1. Entities that outrank triggers: npc, roamer, item, sign.
   const e = ents.at(x, y);
@@ -158,6 +176,7 @@ export function resolveFacing(player, map, ents, world, data, opts) {
   for (let i = 0; i < trigs.length; i++) {
     const t = trigs[i];
     if (t.kind !== 'use') continue;
+    if (t.cond != null && evalCond !== null && !condHolds(evalCond, world, t.cond, data, map.id, x, y)) continue;
     if (t.once && world && world.maps && world.maps[map.id] && world.maps[map.id].opened && world.maps[map.id].opened.indexOf(t.id) !== -1) continue;
     const verb = t.verb || 'use';
     p.script = t.script || null;
@@ -190,7 +209,7 @@ export function resolveFacing(player, map, ents, world, data, opts) {
     }
   }
   const warp = map.warpAt(x, y);
-  if (warp && warp.kind === 'door') {
+  if (warp && warp.kind === 'door' && (warp.cond == null || evalCond === null || condHolds(evalCond, world, warp.cond, data, map.id, x, y))) {
     p.to = warp.to;
     return fill('door', 'enter', warp.to ? warp.to.mapId : null, warp, 'Enter', null);
   }

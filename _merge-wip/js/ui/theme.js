@@ -110,9 +110,18 @@ export const COLORS = Object.freeze({
   dim: 'rgba(20, 27, 51, 0.55)',
 });
 
-/** Every role pairs with a glyph (font symbol) so colour is never the only channel. */
+/**
+ * Every role pairs with a glyph (a symbol the bitmap font really has) so colour is never the only
+ * channel. The font has no check mark, so `safe` draws as `+` in running text; widgets that have
+ * room draw the 8x8 icon from `ROLE_ICON` instead.
+ */
 export const ROLE_GLYPH = Object.freeze({
-  safe: '✓', warn: '!', danger: '×', disabled: '–', unique: '★', info: '•', shift: '✦',
+  safe: '+', warn: '!', danger: '×', disabled: '–', unique: '★', info: '•', shift: '✦',
+});
+
+/** The 8x8 icon (ui/icons) for each role. */
+export const ROLE_ICON = Object.freeze({
+  safe: 'check', warn: 'warn', danger: 'cross', disabled: 'strike', unique: 'star', info: 'info', shift: 'heartmark',
 });
 
 /** Spacing grid: everything in the kit snaps to 4px (2px for hairline insets). */

@@ -48,6 +48,7 @@ import * as flags from '../systems/flags.js';
  * @property {string|null} [mapId]
  * @property {string|null} [scriptId]          id of `ops` (for `seen.<id>` and call frames)
  * @property {ScriptSystems} [systems]
+ * @property {{emit: (evt: string, payload: any) => any}|null} [bus]   forwarded to the default flag bindings
  */
 
 /** @typedef {{id: number, op: string, [k: string]: any}} Request */
@@ -67,10 +68,19 @@ import * as flags from '../systems/flags.js';
  * @property {Record<string, any>} vars
  */
 
-const DEFAULT_SYSTEMS = Object.freeze({
-  setFlag: (world, id, value) => flags.setFlag(world, id, value),
-  inc: (world, id, by) => flags.inc(world, id, by),
-});
+/**
+ * Default flag/counter bindings (systems/flags), forwarding `bus` so `flag:set` / `counter:inc`
+ * reach listeners exactly as when a scene calls the system directly.
+ * @param {{emit: (evt: string, payload: any) => any}|null} bus
+ * @returns {ScriptSystems}
+ */
+function defaultSystems(bus) {
+  const sctx = bus ? { bus } : undefined;
+  return {
+    setFlag: (world, id, value) => flags.setFlag(world, id, value, sctx),
+    inc: (world, id, by) => flags.inc(world, id, by, sctx),
+  };
+}
 
 /**
  * Fills `{player}`, `{nick:uid}`, `{npcNick}`, `{npc}`, `{wallet}`, `{var:name}` in text. `|` page
@@ -118,7 +128,7 @@ export function createRunner(ops, ctx, state = null) {
   if (!Array.isArray(ops)) throw new TypeError('createRunner: ops must be an array');
   if (!ctx || typeof ctx !== 'object' || !ctx.world || typeof ctx.world !== 'object') throw new TypeError('createRunner: ctx.world is required');
   const data = ctx.data ?? null;
-  const systems = { ...DEFAULT_SYSTEMS, ...(ctx.systems ?? {}) };
+  const systems = { ...defaultSystems(ctx.bus ?? null), ...(ctx.systems ?? {}) };
   const isNpcId = (id) => Boolean(data && data.has('npcs', id));
   const vars = state?.vars ? { ...state.vars } : { ...(ctx.vars ?? {}) };
   const ictx = { ...ctx, vars };

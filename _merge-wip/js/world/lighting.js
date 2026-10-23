@@ -21,6 +21,7 @@
 
 import { MINUTES_PER_DAY } from '../core/time.js';
 import { minuteOfDay, tideState as tideStateOf } from '../state/selectors.js';
+import { evalCond as dslEvalCond } from '../script/cond.js';
 import { tideVariant } from './tide.js';
 
 /** @typedef {import('../state/schema.js').World} World */
@@ -228,8 +229,10 @@ export function shadowFor(minute, grade) {
  * @property {import('../core/time.js').TideState|number} [tide]   default `selectors.tideState(world)`
  * @property {number} [tile=16]       tile size in pixels
  * @property {boolean} [indoor]       default `map.indoor`
- * @property {(world: World, cond: any, ctx: any) => boolean} [evalCond]   filters prop lights whose prop has a `cond`
- * @property {Light[]} [out]          array to fill (cleared first) instead of allocating
+ * @property {(world: World, cond: any, ctx: any) => boolean} [evalCond]   evaluates the `cond` of a lit prop
+ *   (default: the condition DSL, `script/cond.evalCond`, with `{mapId, x, y}` as context)
+ * @property {Light[]} [out]          array to fill (truncated to the result); records from an earlier
+ *   call are reused, so a per-frame caller allocates nothing
  */
 
 /**
@@ -238,8 +241,8 @@ export function shadowFor(minute, grade) {
  * Rules: `when: 'night'` lights (lamps, windows, porches) are lit once {@link lampsLit}; indoors
  * they are always lit. `when: 'night-low'` (bioluminescent mud) needs `grade.night >= BIO_ON` and a
  * low tide. `when: 'always'` (runes, fire) is always lit. A light with a `flag` is lit only while
- * `world.flags[flag]` is truthy — porches read the occupancy flag of their house this way, and a
- * porch without a flag stays dark.
+ * `world.flags[flag]` is truthy — porches read the occupancy flag of their house this way. A light
+ * from a prop whose `cond` fails is dark (the prop is not there).
  * @param {RuntimeMap} map
  * @param {World} world
  * @param {number|LightOptions} [hourOrOpts]   an hour of day (0..24, fractional) or options
@@ -253,13 +256,14 @@ export function lightSources(map, world, hourOrOpts) {
   const grade = gradeFor(minute, weather, indoor);
   const tile = o.tile ?? 16;
   const out = o.out || [];
-  out.length = 0;
   const lit = lampsLit(grade);
+  const evalCond = o.evalCond || dslEvalCond;
   let tideV = null;
+  let n = 0;
   for (const g of map.glows) {
     const glow = g.glow;
     if (glow.flag && !world?.flags?.[glow.flag]) continue;
-    if (g.prop && g.prop.cond !== undefined && g.prop.cond !== null && o.evalCond && !o.evalCond(world, g.prop.cond, { map: map.id, x: g.x, y: g.y })) continue;
+    if (g.prop && g.prop.cond !== undefined && g.prop.cond !== null && !evalCond(world, g.prop.cond, { mapId: map.id, x: g.x, y: g.y })) continue;
     let intensity;
     if (glow.when === 'always') intensity = 1;
     else if (glow.when === 'night') {
@@ -271,19 +275,45 @@ export function lightSources(map, world, hourOrOpts) {
       if (tideV !== 'low') continue;
       intensity = clamp01(grade.night);
     }
-    out.push({
-      id: `${glow.kind}@${g.x},${g.y}`,
-      kind: glow.kind,
-      x: g.x,
-      y: g.y,
-      px: g.x * tile + tile / 2 + glow.ox,
-      py: g.y * tile + tile / 2 + glow.oy,
-      radius: glow.radius,
-      color: glow.color,
-      intensity,
-    });
+    // reuse a record this module created earlier in `out` (no per-frame allocation, §12)
+    let light = out[n];
+    if (!light || !OWN_LIGHTS.has(light)) {
+      light = { id: '', kind: '', x: 0, y: 0, px: 0, py: 0, radius: 0, color: null, intensity: 0 };
+      OWN_LIGHTS.add(light);
+      out[n] = light;
+    }
+    light.id = lightId(g);
+    light.kind = glow.kind;
+    light.x = g.x;
+    light.y = g.y;
+    light.px = g.x * tile + tile / 2 + glow.ox;
+    light.py = g.y * tile + tile / 2 + glow.oy;
+    light.radius = glow.radius;
+    light.color = glow.color;
+    light.intensity = intensity;
+    n++;
   }
+  out.length = n;
   return out;
+}
+
+/** Light records created by {@link lightSources}; only these are recycled from a caller's `out`. */
+const OWN_LIGHTS = new WeakSet();
+
+/** @type {WeakMap<object, string>} glow entry -> `'<kind>@<x>,<y>'`, built once per map cell */
+const LIGHT_IDS = new WeakMap();
+
+/**
+ * @param {{x: number, y: number, glow: GlowDef}} g an entry of `RuntimeMap.glows`
+ * @returns {string}
+ */
+function lightId(g) {
+  let id = LIGHT_IDS.get(g);
+  if (id === undefined) {
+    id = `${g.glow.kind}@${g.x},${g.y}`;
+    LIGHT_IDS.set(g, id);
+  }
+  return id;
 }
 
 // --- helpers --------------------------------------------------------------------------------------

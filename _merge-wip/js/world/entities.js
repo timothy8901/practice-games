@@ -181,9 +181,10 @@ export function updatePixels(e) {
  * @property {(x:number, y:number, r:number, out?: Entity[]) => Entity[]} near   entities with Chebyshev distance <= r; returns a REUSED array unless `out` is given
  * @property {(e: Entity, dir: Dir, ctx: MoveCtx) => boolean} tryMove   faces `dir`; starts the step when the target tile is passable and free
  * @property {(e: Entity, ms: number) => 'arrived'|'moving'|'idle'} tickMovement
+ * @property {(ms: number) => Entity[]} tickAll   advances every moving entity; returns the entities that arrived this call (REUSED array)
  * @property {(e: Entity, x:number, y:number, facing?: Dir) => void} teleport   instant placement (no collision check)
  * @property {() => Entity[]} ySorted            live entities ordered by draw order (py + z); REUSED array
- * @property {(world: object, data: object, tideState: TideState, ctx?: RebuildCtx) => {added: string[], removed: string[], skipped: string[]}} rebuildFromDefs
+ * @property {(world: object, data: object, tideState: TideState, ctx?: RebuildCtx) => {added: string[], removed: string[], skipped: string[]}} rebuildFromDefs   reconciles only entities built from this map's defs; dynamic ones (`def === null` or `def.dynamic`) are never touched
  * @property {() => void} clear
  */
 
@@ -217,6 +218,11 @@ export function createEntities(map, opts = {}) {
   const nearBuf = [];
   /** @type {Entity[]} */
   const sortBuf = [];
+  /** @type {Entity[]} */
+  const arrivedBuf = [];
+  /** bumped by add/remove so ySorted() knows when to refresh its membership */
+  let version = 0;
+  let sortedVersion = -1;
 
   const inside = (x, y) => x >= 0 && y >= 0 && x < w && y < h;
 
@@ -275,6 +281,7 @@ export function createEntities(map, opts = {}) {
     slots[e.slot] = e;
     byId.set(e.id, e);
     list.push(e);
+    version++;
     e.moving = false; e.t = 1; e.fromX = e.x; e.fromY = e.y; e.spill = 0;
     updatePixels(e);
     link(e, e.x, e.y);
@@ -292,6 +299,7 @@ export function createEntities(map, opts = {}) {
     byId.delete(id);
     const i = list.indexOf(e);
     if (i !== -1) list.splice(i, 1);
+    version++;
     return true;
   }
 
@@ -362,17 +370,25 @@ export function createEntities(map, opts = {}) {
     updatePixels(e);
   }
 
+  /** @param {number} ms @returns {Entity[]} */
+  function tickAll(ms) {
+    arrivedBuf.length = 0;
+    for (let i = 0; i < list.length; i++) {
+      const e = list[i];
+      if (e.moving && tickMovement(e, ms) === 'arrived') arrivedBuf.push(e);
+    }
+    return arrivedBuf;
+  }
+
   /** Insertion sort on the reused buffer: near-sorted every frame, so ~O(n). */
   function ySorted() {
     const n = list.length;
-    if (sortBuf.length !== n) {
+    if (sortedVersion !== version) {
+      // Membership changed since the last sort: refill from the live list (keeps the old order's
+      // benefit only when nothing changed, which is the common per-frame case).
       sortBuf.length = n;
       for (let i = 0; i < n; i++) sortBuf[i] = list[i];
-    } else {
-      // Refresh membership in place (entities may have been swapped by add/remove).
-      let same = true;
-      for (let i = 0; i < n; i++) if (sortBuf[i].slot === -1) { same = false; break; }
-      if (!same) for (let i = 0; i < n; i++) sortBuf[i] = list[i];
+      sortedVersion = version;
     }
     for (let i = 1; i < n; i++) {
       const e = sortBuf[i];
@@ -400,6 +416,8 @@ export function createEntities(map, opts = {}) {
   function rebuildFromDefs(world, data, tideState, ctx = {}) {
     const evalCond = ctx.evalCond || (() => true);
     const defs = (map.def && map.def.entities) || [];
+    const defIds = new Set();
+    for (let i = 0; i < defs.length; i++) defIds.add(defs[i].id);
     const mapState = world && world.maps ? world.maps[map.id] : null;
     const condCtx = { data, mapId: map.id, x: 0, y: 0 };
     const added = [], removed = [], skipped = [];
@@ -419,7 +437,7 @@ export function createEntities(map, opts = {}) {
     }
     for (let i = list.length - 1; i >= 0; i--) {
       const e = list[i];
-      if (e.def === null) continue;
+      if (e.def === null || e.def.dynamic === true || !defIds.has(e.id)) continue;
       if (!wanted.has(e.id)) { remove(e.id); removed.push(e.id); }
     }
     for (const [id, { def, place }] of wanted) {
@@ -441,6 +459,6 @@ export function createEntities(map, opts = {}) {
   return {
     list, w, h,
     add, remove, find: (id) => byId.get(id) || null,
-    at, solidAt, near, tryMove, tickMovement, teleport, ySorted, rebuildFromDefs, clear,
+    at, solidAt, near, tryMove, tickMovement, tickAll, teleport, ySorted, rebuildFromDefs, clear,
   };
 }

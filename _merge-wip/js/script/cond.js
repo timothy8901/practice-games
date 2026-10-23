@@ -20,6 +20,7 @@
  */
 
 import * as sel from '../state/selectors.js';
+import { PHASES } from '../core/time.js';
 
 /** @typedef {import('../state/schema.js').World} World */
 /** @typedef {boolean | Record<string, any>} Cond */
@@ -200,7 +201,7 @@ export function validateCond(cond, opts = {}, path = 'cond') {
     case 'hasItem': ref('items', v, 'hasItem'); if (cond.n !== undefined && typeof cond.n !== 'number') out.push(`${path}: hasItem.n must be a number`); break;
     case 'wallet': if (obj(v, 'wallet') && typeof v.gte !== 'number') out.push(`${path}: wallet.gte must be a number`); break;
     case 'hour': if (!Array.isArray(v) || v.length !== 2 || v.some((n) => typeof n !== 'number' || n < 0 || n > 24)) out.push(`${path}: hour must be [from, to] in 0..24`); break;
-    case 'phase': strs(v, 'phase'); break;
+    case 'phase': strs(v, 'phase'); if (Array.isArray(v)) for (const s of v) if (typeof s === 'string' && !PHASES.includes(s)) out.push(`${path}: unknown phase '${s}' (${PHASES.join(' ')})`); break;
     case 'tide': strs(v, 'tide'); if (Array.isArray(v)) for (const s of v) if (!['low', 'rising', 'high', 'falling'].includes(s)) out.push(`${path}: unknown tide state '${s}'`); break;
     case 'weather': strs(v, 'weather'); break;
     case 'dial': strs(v, 'dial'); if (Array.isArray(v)) for (const s of v) if (typeof s === 'string' && !has('dials', s)) out.push(`${path}: dial '${s}' is not in dials`); break;

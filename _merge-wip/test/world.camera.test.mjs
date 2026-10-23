@@ -55,11 +55,13 @@ describe('createCamera', () => {
     const cam = createCamera();
     const target = { px: 0, py: 0 };
     cam.follow(target, { snap: true, lerp: 0.2 });
+    // the camera centres on the target tile's centre (px + tile/2): origin -232, goal 88
+    assert.equal(cam.rawX, 0 + 8 - 240);
     target.px = 320;
     cam.update(TICK);
     const afterOne = cam.rawX;
-    assert.ok(afterOne > -240 && afterOne < 80, 'moved part of the way');
-    assert.ok(Math.abs(afterOne - (-240 + 320 * 0.2)) < 1e-9, 'one tick moves lerp of the gap');
+    assert.ok(afterOne > -232 && afterOne < 88, 'moved part of the way');
+    assert.ok(Math.abs(afterOne - (-232 + 320 * 0.2)) < 1e-9, 'one tick moves lerp of the gap');
     // two half ticks equal one full tick
     const cam2 = createCamera();
     const t2 = { px: 0, py: 0 };
@@ -69,8 +71,8 @@ describe('createCamera', () => {
     cam2.update(TICK / 2);
     assert.ok(Math.abs(cam2.rawX - afterOne) < 1e-9, 'frame-rate independent');
     settle(cam);
-    assert.equal(cam.rawX, 80, 'settles exactly on the target');
-    assert.equal(cam.x, 80);
+    assert.equal(cam.rawX, 88, 'settles exactly on the target');
+    assert.equal(cam.x, 88);
     // lerp 1 is instant
     const cam3 = createCamera();
     cam3.follow({ px: 1000, py: 1000 }, { lerp: 1 });
@@ -181,10 +183,10 @@ describe('visibleTiles, conversions, visibility', () => {
     small.bounds(harbor);
     small.follow({ px: 0, py: 0 }, { snap: true });
     assert.deepEqual(small.visibleTiles(), { x: 0, y: 0, w: 16, h: 10 });
-    // unbounded camera: raw tile rect, may be negative
+    // unbounded camera: raw tile rect, may be negative; y spans -135..135 px = rows -9..8 (18, partial at both ends)
     const free = createCamera();
     free.lookAt(0, 0, { snap: true });
-    assert.deepEqual(free.visibleTiles(), { x: -15, y: -9, w: 30, h: 17 });
+    assert.deepEqual(free.visibleTiles(), { x: -15, y: -9, w: 30, h: 18 });
   });
 
   it('worldToScreen / screenToWorld / screenToTile round trip and reuse their point', () => {

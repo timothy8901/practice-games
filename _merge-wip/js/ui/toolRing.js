@@ -52,6 +52,38 @@ export function socketPos(i, cx, cy, radius) {
 }
 
 /**
+ * Pixel-exact filled disc (scanline spans), so the plate stays crisp at 1x.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} cx @param {number} cy @param {number} r @param {string} color
+ */
+export function fillDisc(ctx, cx, cy, r, color) {
+  ctx.fillStyle = color;
+  for (let dy = -r; dy <= r; dy++) {
+    const half = Math.floor(Math.sqrt(r * r - dy * dy) + 0.5);
+    ctx.fillRect(cx - half, cy + dy, half * 2 + 1, 1);
+  }
+}
+
+/**
+ * 1px circle outline, pixel-exact (each pixel plotted once).
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} cx @param {number} cy @param {number} r @param {string} color
+ */
+export function ringPixels(ctx, cx, cy, r, color) {
+  ctx.fillStyle = color;
+  const seen = new Set();
+  const n = Math.max(16, Math.round(r * 2 * Math.PI));
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2;
+    const px = Math.round(cx + Math.cos(a) * r), py = Math.round(cy + Math.sin(a) * r);
+    const k = px * 4096 + py;
+    if (seen.has(k)) continue;
+    seen.add(k);
+    ctx.fillRect(px, py, 1, 1);
+  }
+}
+
+/**
  * @typedef {Object} RingTool
  * @property {string} id @property {string} name @property {string} [icon]
  */
@@ -169,9 +201,10 @@ export function createToolRing(o) {
     const r = Math.round(radius * (0.6 + 0.4 * anim));
     ctx.save();
     ctx.globalAlpha *= anim;
-    // ring plate
-    ctx.fillStyle = COLORS.dim;
-    ctx.beginPath(); ctx.arc(center.x, center.y, r + 14, 0, Math.PI * 2); ctx.fill();
+    // ring plate: a crisp pixel disc of night ink with a 1px brass rim (no anti-aliased arcs)
+    fillDisc(ctx, center.x, center.y, r + 14, COLORS.dim);
+    ringPixels(ctx, center.x, center.y, r + 14, COLORS.brass.dark);
+    ringPixels(ctx, center.x, center.y, r, COLORS.tally.dark);
     for (let i = 0; i < SOCKETS; i++) {
       const p = socketPos(i, center.x, center.y, r);
       const t = tools[i];

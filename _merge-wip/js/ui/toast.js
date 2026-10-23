@@ -40,7 +40,8 @@ function easeOut(t) { return 1 - (1 - t) * (1 - t); }
  * @returns {Toasts}
  */
 export function createToasts(opts = {}) {
-  const width = opts.width || 480;
+  // Accepts plain options or the game context G (architecture signature `createToasts(G)`).
+  const width = opts.width || (opts.display && opts.display.width) || 480;
   const defaultMs = opts.ms || TIMING.toastMs;
   const max = opts.max || 3;
   const maxTextW = opts.maxWidth || 176;
