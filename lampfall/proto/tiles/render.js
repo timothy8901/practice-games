@@ -89,7 +89,7 @@ const GRADES = [
   { h: 0, mul: [0.60, 0.76, 0.96], scr: [0.02, 0.03, 0.07], sat: 0.72, lamp: 1, night: 1 },      // deep night
   { h: 4.25, mul: [0.60, 0.76, 0.96], scr: [0.02, 0.03, 0.07], sat: 0.72, lamp: 1, night: 1 },
   { h: 5.25, mul: [0.62, 0.77, 0.96], scr: [0.02, 0.03, 0.07], sat: 0.78, lamp: 1, night: 0.8 }, // night
-  { h: 6.5, mul: [0.96, 0.84, 0.78], scr: [0.04, 0.03, 0.05], sat: 0.95, lamp: 0.6, night: 0.2 }, // dawn (peach over a cool floor)
+  { h: 6.5, mul: [0.96, 0.84, 0.78], scr: [0.04, 0.03, 0.05], sat: 0.95, lamp: 0.6, night: 0.2, wmul: [0.84, 0.84, 0.96], glint: 0.25 }, // dawn (peach over a cool floor)
   { h: 7.75, mul: [0.98, 0.97, 1.0], scr: [0.02, 0.02, 0.03], sat: 1.0, lamp: 0, night: 0 },    // morning
   { h: 9.5, mul: [1, 1, 1], scr: [0, 0, 0], sat: 1, lamp: 0, night: 0 },                        // day
   { h: 15.5, mul: [1, 1, 1], scr: [0, 0, 0], sat: 1, lamp: 0, night: 0 },
@@ -268,7 +268,7 @@ export function resolveGround(ch, { tide = 0, night = 0, frame = 0, x = 0, y = 0
   const wf = Math.floor(frame / 10);
   // Bioluminescence gathers in patches (2x2-tile cells) with a few strays, never as an even field;
   // the pulse rolls across the flats as a slow wave.
-  const glow = night > 0.5 && (hash2(x >> 1, y >> 1) % 3 === 0 || hash2(x, y) % 7 === 0);
+  const glow = night > 0.5 && (hash2(x >> 1, y >> 1) % 4 === 0 || hash2(x, y) % 13 === 0);
   const gf = Math.floor(frame / 14) + ((x + (y >> 1)) % 3);
   switch (ch) {
     case 'D': return { tile: 'water_deep', frame: wf, water: true };
@@ -441,7 +441,7 @@ export function drawMap(ctx, map, tileset, opts = {}) {
         if (!face(info(x - 1, y))) ctx.drawImage(tileset.sprite('cliff_face_l', 0, g).canvas, px, py);
         if (!face(info(x + 1, y))) ctx.drawImage(tileset.sprite('cliff_face_r', 0, g).canvas, px, py);
       }
-      if (rain && RAIN_WALK.has(t.tile)) rainRipple(ctx, x, y, px, py, frame, g);
+      if (rain && RAIN_WALK.has(t.tile) && (!TURF.has(t.tile) || hash2(x + 7, y) % 4 === 0)) rainRipple(ctx, x, y, px, py, frame, g);
       if (!t.water && !t.cliffTop && t.tile !== 'cliff_face') {
         // a 1px darker bank where land meets water to the south (a lip the eye reads as height)
         const open = (q) => q && q.water && !q.self;
@@ -653,6 +653,7 @@ function getShadePattern(ctx) {
 /* ------------------------------------------------------------ weather */
 
 /** Walkable ground that shows rain puddle ripples (water and blocking tiles never do). */
+const TURF = new Set(['grass_a', 'grass_b', 'flowers_a', 'flowers_b', 'tallgrass']);
 const RAIN_WALK = new Set(['path', 'cobbles', 'cobbles_b', 'sand', 'wetsand', 'mud_dry', 'mud_wet', 'grass_a', 'grass_b', 'flowers_a', 'flowers_b', 'tallgrass', 'steps', 'pier', 'pier_end', 'causeway', 'stepstone']);
 // Flattened ripple rings (never a plus: that glyph is the Heartmark's). 4 visible stages of 6 frames,
 // then the spot rests for 8 stages so ripples stay sparse.
@@ -668,12 +669,14 @@ function rainRipple(ctx, x, y, px, py, frame, g) {
   if (st >= RIPPLE.length) return;
   const r = RIPPLE[st];
   const ox = px + 3 + ((h >>> 5) % 6) - (r[0].length >> 1) + 2, oy = py + 4 + ((h >>> 9) % 7) - 1;
-  ctx.fillStyle = gradeHex('#EAF2F8', g);
-  ctx.globalAlpha = st === 3 ? 0.45 : 0.8;
+  ctx.fillStyle = gradeHex('#D4E4EE', g);
+  ctx.globalAlpha = st === 3 ? 0.35 : 0.7;
   for (let j = 0; j < r.length; j++) for (let i = 0; i < r[j].length; i++) if (r[j][i] === 'x') ctx.fillRect(ox + i, oy + j, 1, 1);
   ctx.globalAlpha = 1;
 }
 
+/** Fog layer opacities (the contrast check models their worst-case overlap). */
+export const FOG_ALPHA = [0.26, 0.2];
 const fogBuf = { canvas: null };
 function drawWeather(ctx, tileset, view, weather, frame, g, focus = null) {
   if (weather === 'clear') return;
@@ -694,16 +697,24 @@ function drawWeather(ctx, tileset, view, weather, frame, g, focus = null) {
     ctx.clearRect(0, 0, fogBuf.canvas.width, fogBuf.canvas.height);
     ctx.imageSmoothingEnabled = false;
     const band = tileset.sprite('fog_band', 0, g);
+    // Two layers drifting opposite ways. Each band row is broken into separate banks: a 64px segment
+    // shows only when its (world-stable) hash says so, rows sit at uneven heights, and every row has
+    // its own phase, so fog reads as drifting patches with clear gaps (about a third coverage),
+    // never as regular stripes.
     const layers = [
-      { speed: 0.25, alpha: 0.18, yoff: 0, phase: 0 },
-      { speed: -0.15, alpha: 0.14, yoff: 9, phase: 31 },
+      { speed: 0.25, alpha: FOG_ALPHA[0], seed: 3, step: 22 },
+      { speed: -0.15, alpha: FOG_ALPHA[1], seed: 11, step: 30 },
     ];
     for (const L of layers) {
       ctx.globalAlpha = L.alpha;
-      const shift = Math.floor(frame * L.speed) % band.w;
-      for (let y = view.y - 16 + L.yoff; y < view.y + view.h; y += 24) {
-        for (let x = view.x - band.w + ((shift + L.phase) % band.w) - band.w; x < view.x + view.w + band.w; x += band.w) {
-          ctx.drawImage(band.canvas, x, y);
+      let row = 0;
+      for (let y = view.y - 16; y < view.y + view.h; y += L.step, row++) {
+        const hy = hash2(row, L.seed);
+        const yy = y + (hy % 9) - 4;
+        const shift = Math.floor(frame * L.speed + (hy >>> 4) % band.w);
+        for (let seg = Math.floor((-shift - band.w) / band.w); seg * band.w + shift < view.w + band.w; seg++) {
+          if (hash2(seg, row * 31 + L.seed) % 5 >= 2) continue; // 2 in 5 segments carry a bank
+          ctx.drawImage(band.canvas, view.x + seg * band.w + shift, yy);
         }
       }
     }

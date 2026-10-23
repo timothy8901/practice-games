@@ -14,7 +14,7 @@
   <canvas id="game" width="480" height="270"></canvas>
   <script type="module">
     // Kitchen sink for js/ui/* [UI-KIT]. Every widget on fake data, one station at a time.
-    // Keys: PageDown / PageUp (or 1-9) switch station. Arrows/WASD, Z (confirm), X (cancel), [ ] (L/R),
+    // Keys: PageDown / PageUp (or 1-9, 0 = 10) switch station. Arrows/WASD, Z (confirm), X (cancel), [ ] (L/R),
     // C (tool, hold for the ring) drive the station's widget through core/input. V cycles text speed,
     // G cycles the HUD device glyphs, T adds a toast, M toggles reduced motion.
     // `?station=n` opens a station directly. Pure checks log `PASS name` / `FAIL name` to the console.
@@ -274,14 +274,21 @@
       let scene = null;
       let reopenAt = 0;
       let lastChoice = '—';
-      const opts = { title: 'Satchel', body: 'Use the Old Porch Key? You have only one.', options: ['Use it', 'Keep it'], defaultIndex: 1, lockMs: 500 };
+      const variants = [
+        { title: 'Satchel', body: 'Use the Old Porch Key? You have only one.', options: ['Use it', 'Keep it'], defaultIndex: 1, lockMs: 500 },
+        { title: 'Party', body: 'Release PUDDLE? It goes back to the tide pools.', options: ['Release', 'Keep'], defaultIndex: 1, lockMs: 500, danger: true },
+      ];
+      let vi = 0;
+      let opts = variants[0];
       const open = () => {
+        opts = variants[vi];
         scene = createConfirmScene({ ...opts, input, onDone: (i) => { lastChoice = opts.options[i]; toasts.show(`Chose: ${opts.options[i]}`, { kind: i === opts.defaultIndex ? 'safe' : 'warn' }); scene = null; reopenAt = clockMs + 1200; } });
         scene.enter();
       };
       stations.push({
-        name: 'Confirm', hint: 'locked 0.5 s  Z choose  X = safe',
+        name: 'Confirm', hint: 'locked 0.5 s  Z choose  X = safe  D danger',
         enter: open,
+        key(code) { if (code === 'KeyD') { vi = (vi + 1) % variants.length; open(); } },
         update(dt) {
           if (scene) { scene.update(dt); scene.handleInput(input); }
           else if (reopenAt && clockMs > reopenAt) { reopenAt = 0; open(); }
@@ -307,6 +314,7 @@
 
     // 5. HUD + toasts ---------------------------------------------------
     const devices = ['keyboard', 'gamepad', 'touch'];
+    let toastTurn = 0;
     let devIndex = 0;
     function hudState(extra) {
       const minutes = 16 * 60 + 52 + Math.floor(clockMs / 1000);
@@ -331,7 +339,7 @@
         enter: seed,
         key(code) {
           if (code === 'KeyG') devIndex = (devIndex + 1) % devices.length;
-          if (code === 'KeyT') toasts.show(['Not saved', 'Tuck left a request on the board', 'Lamp lit: Hearth porch'][Math.floor(Math.random() * 3)], { kind: ['danger', 'info', 'safe'][Math.floor(Math.random() * 3)] });
+          if (code === 'KeyT') { const k = toastTurn++ % 3; toasts.show(['Not saved', 'Tuck left a request on the board', 'Lamp lit: Hearth porch'][k], { kind: ['danger', 'info', 'safe'][k] }); }
         },
         update() {},
         draw(c, t) {
@@ -376,17 +384,19 @@
         drawDesk(c);
         const specs = [
           ['paper', { title: 'Paper' }, 'Ledger paper, notched 1px edge, inner rule, grain.'],
-          ['ledger', { title: 'Ledger', seal: true }, 'Rules every 8px and a wax margin; seal on the corner.'],
+          ['ledger', { title: 'Ledger', seal: true }, 'Rules every 10px under each line, a wax margin, a seal.'],
           ['notice', { pin: true }, 'Torn-paper notice with a brass pin. Requests and slips.'],
           ['card', { title: 'Card' }, 'Small card with a brass edge, for entries and prices.'],
           ['dark', { title: 'Battle' }, 'Wildshift chrome: n fill, 1px v border, inner d line.'],
-          ['notice', { title: 'Letter', torn: 'bottom' }, 'Notice torn on the bottom only, wax title tab.'],
+          ['paper', { title: 'Torn page', titleStyle: 'wax', torn: 'bottom' }, 'Ledger paper torn along the bottom: a page from the book.'],
         ];
         specs.forEach(([style, o, blurb], i) => {
           const r = { x: 12 + (i % 3) * 156, y: 22 + Math.floor(i / 3) * 120, w: 144, h: 100 };
           const inner = drawPanel(c, r, style, o);
           const dark = style === 'dark';
-          drawText(c, blurb, inner.x + (style === 'ledger' ? 6 : 0), inner.y + 6, { color: dark ? COLORS.dark.text : COLORS.paper.ink, maxWidth: inner.w - 6, lineSpacing: style === 'ledger' ? -2 : 0 });
+          // Ledger text starts at the content top so each line rests on its rule (LEDGER_RULE_OFFSET).
+          const tx = inner.x + (style === 'ledger' ? 8 : 0);
+          drawText(c, blurb, tx, inner.y + (style === 'ledger' ? 0 : 2), { color: dark ? COLORS.dark.text : COLORS.paper.ink, maxWidth: inner.x + inner.w - tx });
           drawText(c, style, inner.x + inner.w, inner.y + inner.h - 6, { font: 'small', align: 'right', color: dark ? COLORS.dark.textSoft : COLORS.paper.inkSoft });
         });
       },
@@ -503,6 +513,42 @@
       });
     }
 
+    // 10. Stress: 2,000 characters + unicode + an unbreakable word, with long toasts ---------
+    const STRESS = (() => {
+      const words = 'tide lamp gull harbour ledger brass wick ladder porch kelp salt moon glass ember perch goby'.split(' ');
+      let t = 'Paid ◉ 1,240 to the Hearth ✦ and left a ♥ on the ledger. ' + 'Ladderkeepers'.repeat(6) + ' ◉◉◉ ✦✦✦ ♥♥♥ … ×3 ★ ';
+      for (let k = 0; t.length < 2000; k++) t += words[(k * 7 + 3) % words.length] + (k % 11 === 10 ? ', ' : k % 17 === 16 ? '. ' : ' ');
+      return t.slice(0, 2000);
+    })();
+    {
+      const box = createTextbox({ rect: { x: 16, y: 186, w: 448, h: 64 }, speed: 'instant', input });
+      const start = () => {
+        box.setText(STRESS, { who: 'Stress test', portrait: null });
+        toasts.clear();
+        toasts.setBottom(box.rect.y - 4);
+        for (let i = 0; i < 4; i++) toasts.show(`Toast ${i + 1}: ` + STRESS.slice(i * 90, i * 90 + 400), { kind: ['info', 'warn', 'safe', 'danger'][i], ms: 60000 });
+      };
+      stations.push({
+        name: 'Stress', hint: 'Z next page',
+        enter: start,
+        update(dt) { box.handle(input); box.update(dt); if (box.finished) start(); },
+        draw(c, t) {
+          drawBackdrop(c, t);
+          drawText(c, `2,000 chars  page ${box.page + 1}/${box.pages}`, 20, 172, { font: 'small', color: PALETTE.paperLightest });
+          box.draw(c);
+        },
+        text: () => box.pageText,
+        audit() {
+          const T = box.textRect;
+          const linesFit = box.pageText.split('\n').every((l) => measureText(l).w <= T.w) && box.pageText.split('\n').length <= T.maxLines;
+          const toastsClear = toasts.rects().every((r) => r.y + r.h <= box.rect.y);
+          check('stress: every line fits the textbox', linesFit);
+          check('stress: toasts never cover the textbox', toastsClear, JSON.stringify(toasts.rects()));
+          return linesFit && toastsClear;
+        },
+      });
+    }
+
     // ------------------------------------------------------------------ station switching
     const params = new URLSearchParams(location.search);
     let current = Math.max(0, Math.min(stations.length - 1, (Number(params.get('station')) || 1) - 1));
@@ -510,13 +556,15 @@
       current = ((i % stations.length) + stations.length) % stations.length;
       input.flush();
       const s = stations[current];
+      if (s !== stations[9]) toasts.setBottom(H - 84);
       if (s.enter) s.enter();
     }
     window.addEventListener('keydown', (ev) => {
       if (ev.code === 'PageDown') { go(current + 1); ev.preventDefault(); return; }
       if (ev.code === 'PageUp') { go(current - 1); ev.preventDefault(); return; }
-      const m = /^Digit([1-9])$/.exec(ev.code);
-      if (m && Number(m[1]) <= stations.length) { go(Number(m[1]) - 1); return; }
+      const m = /^Digit([0-9])$/.exec(ev.code);
+      const n = m ? (Number(m[1]) || 10) : 0;
+      if (m && n <= stations.length) { go(n - 1); return; }
       if (ev.code === 'KeyM') { reducedMotion = !reducedMotion; toasts.show(`Reduced motion ${reducedMotion ? 'on' : 'off'}`); return; }
       const s = stations[current];
       if (s.key) s.key(ev.code);
@@ -581,6 +629,7 @@
       audit() {
         const n = pureCount();
         check(`frame: no pure black/white pixels (${stations[current].name})`, n === 0, `${n} px`);
+        if (stations[current].audit) stations[current].audit();
         return n;
       },
       get errors() { return errors; },

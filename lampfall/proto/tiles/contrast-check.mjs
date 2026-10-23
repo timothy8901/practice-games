@@ -12,7 +12,7 @@
  * Run: node _merge-wip/proto/tiles/contrast-check.mjs   (exit 1 on any failure)
  */
 import { COLORS } from './tiles.js';
-import { gradeFor, gradeHex } from './render.js';
+import { gradeFor, gradeHex, FOG_ALPHA } from './render.js';
 
 const BOUNDARIES = [
   { what: 'turf | tree trunk base line', walk: 'grass2', cues: ['base'] },
@@ -35,7 +35,7 @@ const STATES = [
   ['dawn', 6.5], ['day', 12], ['golden', 17.25], ['sunset', 18.25], ['blue hour', 19.25], ['night', 22], ['deep night', 2],
 ];
 const WEATHER = ['clear', 'rain', 'fog'];
-const FOG_COVER = 1 - (1 - 0.18) * (1 - 0.14); // both drifting layers overlapping
+const FOG_COVER = 1 - (1 - FOG_ALPHA[0]) * (1 - FOG_ALPHA[1]); // both drifting layers overlapping
 const FOG = COLORS.st4;
 
 const lin = (v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
