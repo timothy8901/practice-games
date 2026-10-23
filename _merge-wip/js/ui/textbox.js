@@ -14,8 +14,12 @@
  *  - Ledger-paper slip with the speaker name on a wax tab (in the speaker's key colour), a 32x32
  *    portrait slot on the left (placeholder bust when no sprite is given) and a bobbing `▼` when
  *    more text waits.
- *  - Choices (`setText(text, {choices})`) appear inside the box once the last page is shown, as a
- *    focus list on the right; `onChoice(index)` resolves them. Cancel picks `cancelIndex` if given.
+ *  - Choices (`setText(text, {choices})`) appear once the last page is shown, on a small paper slip
+ *    docked to the box's top-right corner (below the box when there is no room above), so the
+ *    text keeps the full width on every page. A focus list drives them; `onChoice(index)`
+ *    resolves them; cancel picks `cancelIndex` if given. For `choiceLockMs` (250 ms) after they
+ *    appear they ignore input, so mashing confirm through the text never picks one by accident.
+ *    The default choice shows a faint cursor during that guard.
  * @module ui/textbox
  */
 import { drawText, drawTextTyped, wrapText, measureText } from '../core/font.js';
@@ -24,6 +28,9 @@ import { createFocus } from './focus.js';
 import { COLORS, ROLE_GLYPH, SPACE, TEXT_SPEEDS, TIMING, TYPE } from './theme.js';
 import { drawPanel } from './panel.js';
 import { getPortraitPlaceholder } from './icons.js';
+
+/** Row height of the choice slip. */
+export const CHOICE_ROW_H = 11;
 
 /** Characters that trigger beat pauses. */
 export const BEAT_SHORT = ',;:';
@@ -88,6 +95,7 @@ function visibleChars(page) {
  * @property {(index: number, choice: any) => void} [onChoice]
  * @property {(page: number) => void} [onPage]
  * @property {boolean} [cancelAdvances=true]
+ * @property {number} [choiceLockMs=250]  Input guard after choices appear (0 = none).
  * @property {import('../core/input.js').Input} [input]
  */
 
@@ -118,6 +126,9 @@ export function createTextbox(o) {
   let choiceFocus = null;
   let layoutCache = null;
   let fastForward = false; // confirm held (wildshift §15.2: hold a button to fast-forward)
+  const choiceLockMs = o.choiceLockMs === undefined ? TIMING.choiceLockMs : Math.max(0, o.choiceLockMs);
+  let choiceSeen = false;
+  let choiceLock = 0;
 
   function resolveSpeed(s) {
     if (typeof s === 'number' && s > 0) return s;
@@ -126,18 +137,23 @@ export function createTextbox(o) {
 
   function hasPortrait() { return o.portraitSlot || portrait !== undefined; }
 
-  /** Text area and choice column for the current content. */
+  /** Text area and choice slip for the current content. */
   function layout() {
     if (layoutCache) return layoutCache;
     const inner = { x: rect.x + 6, y: rect.y + 6, w: rect.w - 12, h: rect.h - 12 };
     const px = inner.x;
     const textX = hasPortrait() ? px + 32 + SPACE.lg : inner.x;
-    let textW = inner.x + inner.w - textX - 8; // room for the more-arrow
+    const textW = inner.x + inner.w - textX - 8; // room for the more-arrow
     let choiceRect = null;
     if (choices.length) {
-      const cw = Math.min(Math.floor(textW * 0.45), choices.reduce((m, c) => Math.max(m, measureText(c.label).w), 0) + 20);
-      choiceRect = { x: inner.x + inner.w - cw, y: inner.y, w: cw, h: inner.h };
-      textW = choiceRect.x - textX - SPACE.md;
+      // Slip docked to the top-right corner: 10px cursor gutter + label + padding, rows of 11px.
+      const labelW = choices.reduce((m, c) => Math.max(m, measureText(c.enabled === false ? `${ROLE_GLYPH.disabled} ${c.label}` : c.label).w), 0);
+      const cw = Math.max(48, Math.min(Math.floor(rect.w / 2), labelW + 24));
+      const chh = choices.length * CHOICE_ROW_H + 10;
+      const above = rect.y - chh - 3;
+      const below = rect.y + rect.h + 3;
+      const cy = above >= 2 ? above : below;
+      choiceRect = { x: rect.x + rect.w - cw, y: cy, w: cw, h: chh };
     }
     const maxLines = Math.max(1, Math.floor((inner.h + 1) / lineH));
     layoutCache = { inner, portrait: { x: px, y: inner.y, w: 32, h: 32 }, text: { x: textX, y: inner.y, w: Math.max(16, textW) }, maxLines, choiceRect };
@@ -169,10 +185,10 @@ export function createTextbox(o) {
   function buildChoiceFocus() {
     if (!choices.length) { choiceFocus = null; return; }
     const L = layout();
-    const rowH = 11;
+    const C = L.choiceRect;
     const items = choices.map((c, i) => ({
       id: String(i), enabled: c.enabled !== false, reason: c.reason,
-      rect: { x: L.choiceRect.x + 8, y: L.choiceRect.y + i * rowH, w: L.choiceRect.w - 8, h: rowH },
+      rect: { x: C.x + 12, y: C.y + 5 + i * CHOICE_ROW_H, w: C.w - 17, h: CHOICE_ROW_H },
     }));
     choiceFocus = createFocus({ items, cols: 1, wrap: true, index: 0, input: o.input });
     choiceFocus.on('activate', (ev) => { finished = true; if (o.onChoice) o.onChoice(ev.index, choices[ev.index]); });
@@ -196,6 +212,8 @@ export function createTextbox(o) {
     choices = Array.isArray(opts.choices) ? opts.choices.slice() : [];
     cancelIndex = opts.cancelIndex === undefined ? -1 : opts.cancelIndex;
     finished = false;
+    choiceSeen = false;
+    choiceLock = 0;
     repaginate();
     buildChoiceFocus();
     if (choiceFocus && opts.defaultChoice !== undefined) choiceFocus.set(opts.defaultChoice);
@@ -220,9 +238,16 @@ export function createTextbox(o) {
     return true;
   }
 
+  /** Start the mash-through guard the first time the choices are seen. */
+  function noteChoices() {
+    if (!choiceSeen && choicesUp()) { choiceSeen = true; choiceLock = choiceLockMs; }
+  }
+
   function update(dt) {
     bob = (bob + dt) % TIMING.cursorBobMs;
     if (choiceFocus) choiceFocus.update(dt);
+    if (choiceSeen && choiceLock > 0) choiceLock = Math.max(0, choiceLock - dt);
+    noteChoices();
     if (pageDone()) return;
     if (!Number.isFinite(cps)) { skip(); return; }
     if (beat > 0) { beat -= dt; if (beat > 0) return; dt = -beat; beat = 0; }
@@ -240,7 +265,11 @@ export function createTextbox(o) {
   function handle(input = o.input) {
     if (!input) return null;
     fastForward = !!(input.held && input.held('confirm') && input.heldFor && input.heldFor('confirm') >= 250);
-    if (choicesUp() && choiceFocus) return choiceFocus.handle(input);
+    if (choicesUp() && choiceFocus) {
+      noteChoices();
+      if (choiceLock > 0) return null; // swallowed: the guard never asks for a press in time
+      return choiceFocus.handle(input);
+    }
     if (input.pressed('confirm') || (o.cancelAdvances !== false && input.pressed('cancel'))) {
       advance();
       return { type: 'advance' };
@@ -281,16 +310,23 @@ export function createTextbox(o) {
     }
     if (choicesUp() && choiceFocus) {
       const C = L.choiceRect;
-      ctx.fillStyle = COLORS.paper.rule;
-      ctx.fillRect(C.x - SPACE.sm, C.y, 1, C.h);
+      drawPanel(ctx, C, 'paper', { grain: false });
       choiceFocus.items.forEach((it, i) => {
         const c = choices[i];
         const enabled = c.enabled !== false;
-        if (i === choiceFocus.index) { ctx.fillStyle = COLORS.focus.bandOnPaper; ctx.fillRect(it.rect.x - 1, it.rect.y, it.rect.w + 1, it.rect.h); }
+        if (i === choiceFocus.index) {
+          ctx.fillStyle = choiceFocus.pointerActive ? COLORS.focus.hoverOnPaper : COLORS.focus.bandOnPaper;
+          ctx.fillRect(it.rect.x - 1, it.rect.y, it.rect.w + 1, it.rect.h);
+        }
         const label = enabled ? c.label : `${ROLE_GLYPH.disabled} ${c.label}`;
-        drawText(ctx, label, it.rect.x + 2, it.rect.y + 2, { color: enabled ? COLORS.paper.ink : COLORS.role.disabled, maxWidth: it.rect.w - 3 });
+        drawText(ctx, label, it.rect.x + 1, it.rect.y + 2, { color: enabled ? COLORS.paper.ink : COLORS.role.disabled, maxWidth: it.rect.w - 2 });
       });
-      choiceFocus.drawCursor(ctx, { style: 'paper', ring: false });
+      if (choiceLock > 0 || !choiceSeen) {
+        const r = choiceFocus.items[choiceFocus.index] && choiceFocus.items[choiceFocus.index].rect;
+        if (r) drawText(ctx, TYPE.cursor, r.x - 7, r.y + 2, { color: COLORS.paper.inkFaint });
+      } else {
+        choiceFocus.drawCursor(ctx, { style: 'paper', ring: false });
+      }
     }
   }
 
@@ -313,6 +349,8 @@ export function createTextbox(o) {
     get pageText() { return pages[pageIndex]; },
     get shown() { return shown; },
     get choicesUp() { return choicesUp(); },
+    get choiceLocked() { return choicesUp() && (!choiceSeen || choiceLock > 0); },
+    get choiceRect() { return layout().choiceRect; },
     get choiceFocus() { return choiceFocus; },
     get who() { return who; },
     get rect() { return rect; },

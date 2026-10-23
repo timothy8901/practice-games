@@ -35,34 +35,34 @@ HEADS.wolf = {
   ],
 };
 
-// Provost Agathe Merrow: hare with long ears laid down either side of a
-// narrow, unsmiling face, like a magistrate's wig.
+// Provost Agathe Merrow: hare. Tall upright ears with black tips over a
+// small, wide-eyed, unsmiling face (split lip).
 HEADS.hare = {
   down: [
-    '...KKKKKK...',
-    '..KLLFFFfK..',
+    '..KK....KK..',
+    '.KSPK..KPSK.',
+    '.KFPK..KPfK.',
+    '.KFPK..KPfK.',
+    '..KFKKKKfK..',
     '.KLLFFFFFfK.',
-    'KFKFFFFFFKfK',
-    'KFKWEFFWEKfK',
-    'KFKEEFFEEKfK',
-    'KFKFMMMMfKfK',
-    'KfKMMNNMMKfK',
-    'KfKmMMMMmKfK',
-    'KffKKmmKKffK',
-    '.KK......KK.',
+    'KLFWEFFWEffK',
+    'KFFEEFFEEffK',
+    'KMMFMNNMFMMK',
+    '.KMMMKKMMmK.',
+    '..KKmmmmKK..',
   ],
   left: [
-    '....KKKKK...',
-    '...KLLFFFK..',
-    '..KLFFFFFFK.',
-    '.KLFFFFFKKfK',
-    '.KFWEFFKFFfK',
-    'KMFEEFFKFFfK',
-    'NMMFFFFKFffK',
-    'KMMMFFFKFffK',
-    '.KMMMFfKffK.',
-    '..KKKKKKfK..',
-    '.......KK...',
+    '.....KK.KK..',
+    '....KSPKSfK.',
+    '....KFPKFfK.',
+    '.....KFPKFfK',
+    '....KKKFfKK.',
+    '...KLLFFFFK.',
+    '..KLWEFFFFfK',
+    '.KFFEEFFFffK',
+    'KMMFFFFFfffK',
+    'NMMMMFFffffK',
+    '.KKmmKKKKKK.',
   ],
 };
 

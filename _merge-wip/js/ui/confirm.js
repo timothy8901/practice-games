@@ -33,7 +33,7 @@ import { drawSealButton } from './widgets.js';
 /**
  * Geometry for a confirm box: centred notice sized to the wrapped body and the option row.
  * @param {ConfirmOptions} o
- * @returns {{panel: {x: number, y: number, w: number, h: number}, body: {x: number, y: number, w: number, h: number}, buttons: {x: number, y: number, w: number, h: number}[], title?: {x: number, y: number}}}
+ * @returns {{panel: {x: number, y: number, w: number, h: number}, body: {x: number, y: number, w: number, h: number}, buttons: {x: number, y: number, w: number, h: number}[], note?: {x: number, y: number, w: number, h: number}, title?: {x: number, y: number}}}
  */
 export function layoutConfirm(o) {
   const W = o.width || 480, H = o.height || 270;
@@ -45,12 +45,18 @@ export function layoutConfirm(o) {
   const rowW = btnWs.reduce((a, b) => a + b, 0) + (options.length - 1) * gap;
   const w = Math.max(bodyW + 24, rowW + 24, (o.title ? measureText(o.title).w + 40 : 0));
   const bodyH = Math.max(TYPE.lineH, m.h);
-  const h = 12 + bodyH + 10 + 13 + 12;
+  // A destructive confirm gets its own note line ("× cannot be undone") between body and seals.
+  const noteH = o.danger ? 8 : 0;
+  const h = 12 + bodyH + noteH + 10 + 13 + 12;
   const x = Math.floor((W - w) / 2), y = Math.floor((H - h) / 2);
   const by = y + h - 12 - 13;
   let bx = x + Math.floor((w - rowW) / 2);
   const buttons = btnWs.map((bw) => { const r = { x: bx, y: by, w: bw, h: 13 }; bx += bw + gap; return r; });
-  return { panel: { x, y, w, h }, body: { x: x + 12, y: y + 12, w: w - 24, h: bodyH }, buttons, title: o.title ? { x: x + 6, y: y - 9 } : undefined };
+  return {
+    panel: { x, y, w, h }, body: { x: x + 12, y: y + 12, w: w - 24, h: bodyH }, buttons,
+    note: o.danger ? { x: x + 12, y: y + 12 + bodyH + 3, w: w - 24, h: 5 } : undefined,
+    title: o.title ? { x: x + 6, y: y - 9 } : undefined,
+  };
 }
 
 /**
@@ -121,12 +127,15 @@ export function createConfirmScene(o) {
       if (lockLeft > 0 && lockMs > 0) {
         ctx.fillStyle = COLORS.paper.rule;
         ctx.fillRect(gx, gy, Math.round(gw * (lockLeft / lockMs)), 1);
-        drawText(ctx, '…', lay.panel.x + lay.panel.w - 14, gy - 7, { color: COLORS.paper.inkFaint });
+        // The default is visible from the first frame: a still, faint cursor on the safe option
+        // that wakes (wax red, bobbing) once input is accepted.
+        const b = lay.buttons[focus.index];
+        if (b) drawText(ctx, TYPE.cursor, b.x - 7, b.y + Math.floor((b.h - TYPE.capH) / 2), { color: COLORS.paper.inkFaint });
       } else {
         focus.drawCursor(ctx, { style: 'paper', ring: false });
       }
-      if (o.danger) {
-        drawText(ctx, `${ROLE_GLYPH.danger} cannot be undone`, lay.panel.x + 12, gy - 4, { font: 'small', color: PALETTE.r });
+      if (lay.note) {
+        drawText(ctx, `${ROLE_GLYPH.danger} cannot be undone`, lay.note.x, lay.note.y, { font: 'small', color: PALETTE.r });
       }
     },
   };

@@ -10,7 +10,7 @@
  */
 import { drawText } from '../core/font.js';
 import { createFocus } from './focus.js';
-import { COLORS, SPACE, surfaceFor } from './theme.js';
+import { COLORS, SPACE, TIMING, TYPE, surfaceFor } from './theme.js';
 import { drawIcon, hasIcon } from './icons.js';
 import { drawNotchedFrame } from './panel.js';
 
@@ -70,6 +70,9 @@ export function pageIndexRange(page, perPage, n) {
  * @property {(item: GridItem, index: number) => void} [onChange]
  * @property {'paper'|'dark'} [style]
  * @property {boolean} [cards=true]  Draw a card behind each cell.
+ * @property {boolean} [cursor]      Draw the ▶ cursor inside the focused cell's left padding
+ *                                   (default: true on dark menus, false on paper card grids).
+ * @property {import('./focus.js').Focus} [focus]  Share a focus model (rare); one is created otherwise.
  * @property {import('../core/input.js').Input} [input]
  */
 
@@ -82,13 +85,14 @@ export function createGrid(o) {
   const perPage = g.cols * g.rows;
   const style = o.style === 'dark' ? 'dark' : 'paper';
   const cards = o.cards !== false;
+  const insideCursor = o.cursor === undefined ? style === 'dark' : !!o.cursor;
   /** @type {GridItem[]} */
   let items = [];
   /** @type {import('./focus.js').FocusItem[]} */
   let fitems = [];
   let page = 0;
 
-  const focus = createFocus({ cols: g.cols, wrap: true, input: o.input });
+  const focus = o.focus || createFocus({ cols: g.cols, wrap: true, input: o.input });
   focus.on('activate', (ev) => { if (o.onSelect && ev.item) o.onSelect(items[ev.index], ev.index); });
   focus.on('cancel', () => { if (o.onCancel) o.onCancel(); });
   focus.on('change', (ev) => { syncPage(); if (o.onChange && ev.item) o.onChange(items[ev.index], ev.index); });
@@ -112,11 +116,19 @@ export function createGrid(o) {
     syncPage();
   }
 
-  /** @param {number} dir */
+  /**
+   * Jump a page. Lands on the same cell of the next page, or the nearest enabled cell past it in
+   * the paging direction, else the nearest one back towards the cursor (never wraps to item 0).
+   * @param {number} dir
+   */
   function pageBy(dir) {
     if (!items.length) return;
-    const target = Math.min(items.length - 1, Math.max(0, focus.index + dir * perPage));
-    focus.set(target);
+    const step = dir < 0 ? -1 : 1;
+    const target = Math.min(items.length - 1, Math.max(0, focus.index + step * perPage));
+    let pick = -1;
+    for (let i = target; i >= 0 && i < items.length; i += step) if (fitems[i].enabled) { pick = i; break; }
+    if (pick < 0) for (let i = target - step; i >= 0 && i < items.length && i !== focus.index; i -= step) if (fitems[i].enabled) { pick = i; break; }
+    if (pick >= 0 && pick !== focus.index) focus.set(pick);
     syncPage();
   }
 
@@ -143,9 +155,19 @@ export function createGrid(o) {
       const focused = i === focus.index;
       const enabled = it.enabled !== false;
       if (cards) {
-        ctx.fillStyle = focused ? (focus.pointerActive ? s.hover : s.band) : s.dark ? COLORS.dark.inner : COLORS.paper.light;
-        ctx.fillRect(cell.x + 1, cell.y + 1, cell.w - 2, cell.h - 2);
-        drawNotchedFrame(ctx, cell.x, cell.y, cell.w, cell.h, enabled ? s.rule : COLORS.role.disabled);
+        if (s.dark) {
+          // Dark menus: resting cells are an outline on the panel fill; the focused cell is lifted
+          // onto the inner tone with a light frame, so focus reads by shape and value, not hue.
+          if (focused) {
+            ctx.fillStyle = focus.pointerActive ? s.hover : s.band;
+            ctx.fillRect(cell.x + 1, cell.y + 1, cell.w - 2, cell.h - 2);
+          }
+          drawNotchedFrame(ctx, cell.x, cell.y, cell.w, cell.h, focused ? COLORS.dark.border : enabled ? COLORS.dark.inner : COLORS.role.disabled);
+        } else {
+          ctx.fillStyle = focused ? (focus.pointerActive ? s.hover : s.band) : COLORS.paper.light;
+          ctx.fillRect(cell.x + 1, cell.y + 1, cell.w - 2, cell.h - 2);
+          drawNotchedFrame(ctx, cell.x, cell.y, cell.w, cell.h, enabled ? s.rule : COLORS.role.disabled);
+        }
       }
       if (o.render) { o.render(ctx, it, cell, focused); continue; }
       const ink = enabled ? s.text : COLORS.role.disabled;
@@ -166,7 +188,14 @@ export function createGrid(o) {
       drawText(ctx, `${page + 1}/${pages}`, g.rect.x + gw, py, { font: 'small', align: 'right', color: s.soft });
     }
     if (!items.length) drawText(ctx, 'EMPTY', g.rect.x + SPACE.xs, g.rect.y + SPACE.xs, { color: COLORS.role.disabled });
-    focus.drawCursor(ctx, { style, cursor: false });
+    focus.drawCursor(ctx, { style, cursor: false, ring: !(s.dark && cards) });
+    if (insideCursor) {
+      const cur = items.length ? cellRect(focus.index, g) : null;
+      if (cur && focus.index >= start && focus.index < end) {
+        const lift = focus.bob < TIMING.cursorBobMs / 2 ? 0 : 1;
+        drawText(ctx, TYPE.cursor, cur.x + 3 + lift, cur.y + Math.min(3, Math.floor((cur.h - TYPE.capH) / 2)), { color: s.cursor });
+      }
+    }
   }
 
   setItems(o.items || []);

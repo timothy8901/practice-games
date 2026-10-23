@@ -155,6 +155,8 @@ export const TYPE = Object.freeze({
 /** Timing constants shared by widgets (ms). */
 export const TIMING = Object.freeze({
   inputLockMs: 500,
+  /** Dialogue choices ignore input this long after they appear (mash-through guard, not a timer). */
+  choiceLockMs: 250,
   toastMs: 3000,
   toastSlideMs: 180,
   toastFadeMs: 300,

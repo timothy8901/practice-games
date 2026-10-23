@@ -14,11 +14,13 @@ export const TILE = 16;
 /** Master colours used by the tiles (names → hex). No pure black / white. */
 export const COLORS = {
   ink: '#141B33', deep: '#2B3A67', uiink: '#2A2433', cream: '#F6F1E3',
+  // Wildshift master k: the 1px base line under everything that blocks (trees, bushes, walls, cliffs)
+  base: '#1A1C2C',
   // grass
   grass0: '#2E5A48', grass1: '#3F7A5A', grass2: '#5E9E6A', grass3: '#7DB874', grass4: '#A8D5A2',
   // sand / wet sand
   sand0: '#A98B64', sand1: '#C9A77C', sand2: '#E8D3A0', sand3: '#F4E8C1',
-  wet0: '#6E5A44', wet1: '#8C7352', wet2: '#A98B64',
+  wet0: '#6E5A44', wet1: '#8C7352', wet2: '#A98B64', bank: '#2A2228',
   // mud
   mud0: '#5A4A3E', mud1: '#7D6A58', mud2: '#A8927C',
   wmud0: '#43392F', wmud1: '#5A4E44', wmud2: '#6E6456', skyref: '#6E8CA8', skyref2: '#B8CFE0',
@@ -50,7 +52,7 @@ export const COLORS = {
   straw0: '#7A5A36', straw1: '#B08A42', straw2: '#D9B46A', straw3: '#EBD08A',
   dark0: '#2A2433', dark1: '#3B3A48', dark2: '#4E4C62', dark3: '#6A6882',
   // flora
-  pinek: '#16302E', pine0: '#1F4A3C', pine1: '#2E5A48', pine2: '#3F7A5A', pine3: '#5E9E6A', pine4: '#7FB08A',
+  pinek: '#11262A', pine0: '#1F4A3C', pine1: '#2E5A48', pine2: '#3F7A5A', pine3: '#5E9E6A', pine4: '#7FB08A',
   ald0: '#3F7A5A', ald1: '#5E9E6A', ald2: '#7DB874', ald3: '#A8D5A2', aldbark0: '#5A4A3E', aldbark1: '#8C7A6E', aldbark2: '#B8A88A',
   fr0: '#2E5A48', fr1: '#4F8A52', fr2: '#6BAA75', fr3: '#8FC27C', pear: '#F3C178', pear2: '#FFE29A', pear0: '#B08A42',
   blossom: '#F2A7B5', blossom2: '#E07A9A', marigold: '#F28C28', petal: '#F6F1E3', yellow: '#FFE29A',
@@ -476,7 +478,7 @@ def('causeway_sub', { w: 'sh2', d: 'sh1', m: 'sh0', f: 'foam', s: 'sh3' }, [
 
 /* ---------------------------------------------------------- cliffs */
 // Cliff face: 16px tall, strata, dark base line, lit top lip.
-const CP = { k: 'cl0', d: 'cl1', m: 'cl2', b: 'cl3', l: 'cl4', g: 'grass1' };
+const CP = { k: 'base', d: 'cl1', m: 'cl2', b: 'cl3', l: 'cl4', g: 'grass1' };
 def('cliff_face', CP, [
   'gggggggggggggggg',
   'llllllllllllllll',
@@ -614,11 +616,11 @@ const COPE = [
   'dddddddddddddddd',
   'ssssssssssssssss',
 ];
-def('quay_lip', { k: 'st1', h: 'st4', l: 'st3', m: 'st3', d: 'st2', s: 'co0' }, [...COPE, ...blank(16, 9)]);
-def('quay_lip_b', { k: 'st1', h: 'st4', l: 'st3', m: 'st3', d: 'st2', s: 'co0', i: 'iron', j: 'st1', e: 'pane1' },
+def('quay_lip', { k: 'ink', h: 'st4', l: 'st3', m: 'st3', d: 'st2', s: 'co0' }, [...COPE, ...blank(16, 9)]);
+def('quay_lip_b', { k: 'ink', h: 'st4', l: 'st3', m: 'st3', d: 'st2', s: 'co0', i: 'iron', j: 'st1', e: 'pane1' },
   blit([...COPE, ...blank(16, 9)], ['.jiij.', 'jieiij', 'jiiiij', '.jjjj.'], 9, 1));
 // Pier: one tile wide, cross planks with water showing through the gaps, posts on both sides.
-const PP = { p: 'wd2', d: 'wd1', l: 'wd3', k: 'wd0', w: 'deep0', h: 'wd4' };
+const PP = { p: 'wd2', d: 'wd1', l: 'wd3', k: 'wd0', w: 'ink', h: 'wd4' };
 const PLANKS = [
   'klllllllllllllkk',
   'klppppppppppppdk',
@@ -699,7 +701,7 @@ def('steps', { g: 'grass1', k: 'cl0', d: 'cl1', b: 'cl3', l: 'cl4' }, [
   'kkkkkkkkkkkkkkkk',
 ]);
 /* ------------------------------------------------------- buildings */
-const WP = { p: 'pl2', s: 'pl1', d: 'pl0', h: 'pl3', t: 'wd1', k: 'wd0' };
+const WP = { p: 'pl2', s: 'pl1', d: 'pl0', h: 'pl3', t: 'wd1', k: 'wd0', X: 'base' };
 def('wall_timber', WP, [
   'tttttttttttttttt',
   'hppppppppppppppd',
@@ -716,7 +718,7 @@ def('wall_timber', WP, [
   'hpppppppppppppsd',
   'hpppppppppppppsd',
   'hssssssssssssssd',
-  'kkkkkkkkkkkkkkkk',
+  'XXXXXXXXXXXXXXXX',
 ]);
 def('wall_timber_x', WP, [
   'tttttttttttttttt',
@@ -734,9 +736,9 @@ def('wall_timber_x', WP, [
   'hpptpppppppppsts'.slice(0, 15) + 'd',
   'hptppppppppppptd',
   'htsssssssssssstd',
-  'kkkkkkkkkkkkkkkk',
+  'XXXXXXXXXXXXXXXX',
 ]);
-const BP = { b: 'br2', d: 'br1', k: 'br0', l: 'br3', m: 'pl1', t: 'wd1', x: 'wd0' };
+const BP = { b: 'br2', d: 'br1', k: 'br0', l: 'br3', m: 'pl1', t: 'wd1', x: 'base' };
 def('wall_brick', BP, [
   'tttttttttttttttt',
   'lbbbdmlbbbdmlbbd',
@@ -756,7 +758,7 @@ def('wall_brick', BP, [
   'xxxxxxxxxxxxxxxx',
 ]);
 // Door on timber wall.
-def('door', { p: 'pl2', s: 'pl1', h: 'pl3', t: 'wd1', k: 'wd0', w: 'wd2', d: 'wd1', l: 'wd3', b: 'brass', x: 'uiink' }, [
+def('door', { X: 'base', p: 'pl2', s: 'pl1', h: 'pl3', t: 'wd1', k: 'wd0', w: 'wd2', d: 'wd1', l: 'wd3', b: 'brass', x: 'base' }, [
   'tttttttttttttttt',
   'hppppppppppppppk',
   'hpppkkkkkkkkpppk',
@@ -772,7 +774,7 @@ def('door', { p: 'pl2', s: 'pl1', h: 'pl3', t: 'wd1', k: 'wd0', w: 'wd2', d: 'wd
   'hppkwwwwwwwwkppk',
   'hppkdwdwdwdwkppk',
   'hsskkkkkkkkkkssk',
-  'kkkkkkkkkkkkkkkk',
+  'XXXXXXXXXXXXXXXX',
 ]);
 // Windows (unlit / lit) on timber wall. Lit pane colours are LUT-exempt.
 const WINROWS = [
@@ -791,13 +793,13 @@ const WINROWS = [
   'hppppppppppppppk',
   'hppppppppppppppk',
   'hsssssssssssssss',
-  'kkkkkkkkkkkkkkkk',
+  'XXXXXXXXXXXXXXXX',
 ];
-def('window_unlit', { p: 'pl2', s: 'pl1', h: 'pl3', t: 'wd1', k: 'wd0', a: 'pane0', b: 'pane1', m: 'wd0' }, WINROWS);
-def('window_lit', { p: 'pl2', s: 'pl1', h: 'pl3', t: 'wd1', k: 'wd0', a: '!wglow', b: '!amber', m: 'wd0' }, WINROWS);
+def('window_unlit', { X: 'base', p: 'pl2', s: 'pl1', h: 'pl3', t: 'wd1', k: 'wd0', a: 'pane0', b: 'pane1', m: 'wd0' }, WINROWS);
+def('window_lit', { X: 'base', p: 'pl2', s: 'pl1', h: 'pl3', t: 'wd1', k: 'wd0', a: '!wglow', b: '!amber', m: 'wd0' }, WINROWS);
 // Brick variants of the window.
-def('window_brick_unlit', { p: 'br2', s: 'br1', h: 'pl1', t: 'wd1', k: 'br0', a: 'pane0', b: 'pane1', m: 'wd0' }, WINROWS);
-def('window_brick_lit', { p: 'br2', s: 'br1', h: 'pl1', t: 'wd1', k: 'br0', a: '!wglow', b: '!amber', m: 'wd0' }, WINROWS);
+def('window_brick_unlit', { X: 'base', p: 'br2', s: 'br1', h: 'pl1', t: 'wd1', k: 'br0', a: 'pane0', b: 'pane1', m: 'wd0' }, WINROWS);
+def('window_brick_lit', { X: 'base', p: 'br2', s: 'br1', h: 'pl1', t: 'wd1', k: 'br0', a: '!wglow', b: '!amber', m: 'wd0' }, WINROWS);
 
 // Roof tiles: staggered shingle courses (lit nosing top-left, dark joint, shadow line under each
 // course), one shape, six palettes.
@@ -878,7 +880,7 @@ def('lamp_unlit', { k: 'iron', g: 'pane1', a: 'pane0', G: 'pane1', p: 'wd1', x: 
 def('lamp_lit', { k: 'iron', g: '!amber', a: '!lampcore', G: '!amber', p: 'wd1', x: 'wd0' }, LAMP, 16, 24);
 
 // Fence: horizontal rail segment and a post (end/corner).
-const FENP = { p: 'wd2', d: 'wd1', l: 'wd3', k: 'wd0', s: 'shadow' };
+const FENP = { p: 'wd2', d: 'wd1', l: 'wd3', k: 'base', s: 'shadow' };
 def('fence_h', FENP, [
   '................',
   '................',
@@ -963,7 +965,7 @@ const BUSH_BASE = [
   '.....xxxxxxxssss',
   '........ssssss..',
 ];
-def('bush', { k: 'grass0', n: 'pine0', d: 'grass1', b: 'grass3', l: 'grass4', s: 'shadow', x: 'uiink' },
+def('bush', { k: 'grass0', n: 'pine0', d: 'grass1', b: 'grass3', l: 'grass4', s: 'shadow', x: 'base' },
   blit(blit(blank(16, 16), BUSH_BASE, 0, 12), canopy(16, 16, BUSH_LOBES, { out: 'k', deep: 'n', l: 'l', b: 'b', d: 'd' }), 0, 0));
 // Rocks.
 def('rock_a', { k: 'st0', d: 'st1', m: 'st2', l: 'st3', h: 'st4', s: 'shadow' }, [
@@ -1056,7 +1058,7 @@ const PINE_TRUNK = [
   '...........sssssssssssssssssss..',
   '..............ssssssssssss......',
 ];
-def('tree_pine', { n: 'pinek', k: 'pine0', d: 'pine1', b: 'pine2', l: 'pine3', h: 'pine4', t: 'wd0', u: 'wd1', v: 'wd2', s: 'shadow', x: 'uiink' },
+def('tree_pine', { n: 'pinek', k: 'pine0', d: 'pine1', b: 'pine2', l: 'pine3', h: 'pine4', t: 'wd0', u: 'wd1', v: 'wd2', s: 'shadow', x: 'base' },
   [0, 1, 0, -1].map((sw) => blit(blit(blank(32, 32), PINE_TRUNK, 0, 25), pineCrown(sw), 0, 0)), 32, 32);
 // Broadleaf trees: procedural clustered canopies (see `canopy`) over a hand-drawn trunk, base line
 // and dithered cast shadow. Four sway frames shift the crown a pixel against the trunk.
@@ -1081,7 +1083,7 @@ function treeFrames(lobes, chars, decorate = (rows) => rows) {
 const ALDER_LOBES = [
   { cx: 15.5, cy: 8, r: 7.5 }, { cx: 9, cy: 13, r: 7 }, { cx: 22, cy: 13, r: 7 }, { cx: 15.5, cy: 16, r: 6.5 },
 ];
-const ALDERPAL = { k: 'ald0', n: 'pine1', d: 'ald1', b: 'ald2', l: 'ald3', t: 'aldbark0', u: 'aldbark1', v: 'aldbark2', s: 'shadow', x: 'uiink' };
+const ALDERPAL = { k: 'ald0', n: 'pine1', d: 'ald1', b: 'ald2', l: 'ald3', t: 'aldbark0', u: 'aldbark1', v: 'aldbark2', s: 'shadow', x: 'base' };
 def('tree_alder', ALDERPAL, treeFrames(ALDER_LOBES, { out: 'k', deep: 'n', l: 'l', b: 'b', d: 'd' }), 32, 32);
 // Second crown layout: lopsided, taller on the west, a low lobe hanging east, so groves vary.
 const ALDER_LOBES_B = [
@@ -1098,7 +1100,7 @@ const hangFruit = (rows) => PEAR_SPOTS.reduce((r, [x, y]) => {
   const solid = (xx, yy) => rows[yy] && rows[yy][xx] && rows[yy][xx] !== '.' && rows[yy][xx] !== 'k' && rows[yy][xx] !== 'n';
   return solid(x, y) && solid(x + 1, y + 2) && solid(x - 1, y + 1) && solid(x + 2, y + 1) ? blit(r, PEAR, x, y) : r;
 }, rows);
-const FRUITPAL = { k: 'fr0', n: 'pine0', d: 'fr1', b: 'fr2', l: 'fr3', t: 'wd0', u: 'wd1', v: 'wd2', s: 'shadow', x: 'uiink', f: 'pear', g: 'pear2', e: 'pear0' };
+const FRUITPAL = { k: 'fr0', n: 'pine0', d: 'fr1', b: 'fr2', l: 'fr3', t: 'wd0', u: 'wd1', v: 'wd2', s: 'shadow', x: 'base', f: 'pear', g: 'pear2', e: 'pear0' };
 const FRUIT_CH = { out: 'k', deep: 'n', l: 'l', b: 'b', d: 'd' };
 def('tree_fruit', FRUITPAL, treeFrames(FRUIT_LOBES, FRUIT_CH, hangFruit), 32, 32);
 // Bare variant: fruit chars become canopy.
@@ -1110,7 +1112,7 @@ def('tree_fruit_b', FRUITPAL, treeFrames(FRUIT_LOBES_B, FRUIT_CH, hangFruit), 32
 
 /* ---------------------------------------------------------- landmarks */
 // Waystone: a dock marker; stone pillar, iron ring, glowing rune (exempt). 16x32, anchor bottom tile.
-def('waystone', { k: 'st0', d: 'st1', m: 'st2', l: 'st3', h: 'st4', i: 'iron', r: '!rune', w: '!runew', g: 'grass1', s: 'shadow', x: 'uiink' }, [
+def('waystone', { k: 'st0', d: 'st1', m: 'st2', l: 'st3', h: 'st4', i: 'iron', r: '!rune', w: '!runew', g: 'grass1', s: 'shadow', x: 'base' }, [
   '.....kkkkk......',
   '....khhllmk.....',
   '...khhlllmmk....',
@@ -1145,7 +1147,7 @@ def('waystone', { k: 'st0', d: 'st1', m: 'st2', l: 'st3', h: 'st4', i: 'iron', r
   '................',
 ], 16, 32);
 // Skyglass node: irregular faceted shard (>= 5 sides, never a plus or 4-point star). 2 frames = 1 s pulse.
-const SGP = { k: '!m0', m: '!m1', h: '!m2', s: 'shadow', x: 'uiink', r: 'st1', q: 'st2' };
+const SGP = { k: '!m0', m: '!m1', h: '!m2', s: 'shadow', x: 'base', r: 'st1', q: 'st2' };
 def('skyglass', SGP, [[
   '................',
   '.........k......',
@@ -1186,7 +1188,7 @@ def('skyglass', SGP, [[
 // gallery, lamp room. Lamp lit / dark via palette. Scaffolding is a separate overlay clipped per stage.
 const LHP = {
   k: 'uiink', i: 'iron', w: 'pl2', s: 'pl1', d: 'pl0', h: 'pl3', r: 'red2', q: 'red1', e: 'red3',
-  g: 'pane0', G: 'pane1', a: 'pane0', A: 'pane1', c: 'pane1', t: 'wd0', u: 'wd1', x: 'uiink', m: 'st2', n: 'st1', o: 'st3', b: 'brass', y: 'shadow',
+  g: 'pane0', G: 'pane1', a: 'pane0', A: 'pane1', c: 'pane1', t: 'wd0', u: 'wd1', x: 'base', m: 'st2', n: 'st1', o: 'st3', b: 'brass', y: 'shadow',
 };
 const LH_ROWS = [
   '..............kkkk..............',

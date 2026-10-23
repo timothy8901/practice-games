@@ -346,6 +346,18 @@ export function drawTally(ctx, o) {
 }
 
 /**
+ * Width `drawKeyGlyph` will use, without drawing (for laying out chips around it).
+ * @param {'keyboard'|'gamepad'|'touch'} device
+ * @param {string} label
+ * @returns {number}
+ */
+export function keyGlyphWidth(device, label) {
+  const tw = measureText(String(label), { font: 'small' }).w;
+  if (device === 'touch') return 9 + tw;
+  return Math.max(9, tw + 6);
+}
+
+/**
  * Device glyph: a key cap, a face button or a tap mark with its label. Returns the width used.
  * @param {CanvasRenderingContext2D} ctx
  * @param {'keyboard'|'gamepad'|'touch'} device

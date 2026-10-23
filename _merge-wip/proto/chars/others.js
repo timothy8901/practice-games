@@ -245,34 +245,37 @@ export function buildCrab() {
 // skirt ripples (2 px per cycle), stalks sway.
 // ---------------------------------------------------------------------------
 const SNAIL = {};
+// Front: the canvas mail satchel IS her shell, a round dome rising behind
+// her; she holds the day's envelope (wax seal) to her chest; eyestalks in
+// a wide V. Satchel strap + brass buckle at the right shoulder.
 SNAIL.down = [
   '................',
-  '................',
-  '................',
-  '................',
-  '................',
-  '................',
-  '.KK..........KK.',
-  'KLFK........KFLK',
-  'KEWK..K.K.K.KWEK',
-  '.KFK.KMKMKMKKFK.',
-  '..KFKCCCCCCKFK..',
-  '.KCKFKCAACKFKcK.',
-  '.KCCKFKCCKFKccK.',
-  '.KCCCKFFFFKcccK.',
-  '.KCCKLFFFFfKccK.',
-  '.KCKLFFFFFFfKcK.',
-  '.KcKLFfFFfFfKcK.',
-  '.KcKFFFffFFfKcK.',
-  '.KKKFKxxYxKfKKK.',
-  '..KFFKxxxxKffK..',
-  '.KFFFFKKKKFfffK.',
-  'KLWFFFFFFFFFffK.',
-  'KLLFFFFFFFFfffK.',
-  '.KKKKKKKKKKKKK..',
+  '..KK........KK..',
+  '.KWEK......KWEK.',
+  '.KEEK......KEEK.',
+  '..KFK......KFK..',
+  '...KFK....KFK...',
+  '....KFKKKKFK....',
+  '....KKFKKFKK....',
+  '..KKMKLLFfKCKK..',
+  '.KMMKFLFFFfKCCK.',
+  '.KMCKLFFFFfKCCK.',
+  'KMCCKLfKKffKaCcK',
+  'KCCCKLFFFFfKAacK',
+  'KCCCKkkkkkkKcccK',
+  'KCCCkxWWWWxkcccK',
+  'KCCCkWxYYxWkcccK',
+  '.KCCkWWxxWWkccK.',
+  '.KCCKkkkkkkKccK.',
+  '..KKKLFFFFfKKK..',
+  '.KKFFLFFFFfFFKK.',
+  'KFFFFFFFFFFFfffK',
+  'KLWLLLFFFFFffffK',
+  'KLLLFFFFFFFffffK',
+  '.KKKKKKKKKKKKKK.',
 ];
 // walk: the eyestalks sway left / right while the foot glides
-const sway = (f, d) => f.map((r, i) => (i >= 6 && i <= 9 ? (d < 0 ? r.slice(1) + '.' : '.' + r.slice(0, 15)) : r));
+const sway = (f, d) => f.map((r, i) => (i >= 1 && i <= 4 ? (d < 0 ? r.slice(1) + '.' : '.' + r.slice(0, 15)) : r));
 SNAIL.downA = sway(SNAIL.down, -1);
 SNAIL.downB = sway(SNAIL.down, 1);
 SNAIL.up = [
@@ -347,7 +350,7 @@ export function buildSnail() {
 const HERON = {};
 HERON.downBody = [
   '......kCCCk.....',
-  '.....kCCCCCk....',
+  '.....kCCYCCk....',
   '....kcccccccK...',
   '.KNNNMMWEMFFRK..',
   '..KKKMMMMMFFRK..',
@@ -373,24 +376,24 @@ HERON.upBody = [
   '......kCCCk.....',
   '.....kCCCCCk....',
   '....kcccccccK...',
-  '....KFFFFFFRRK..',
-  '....KFFFFFFfRK..',
-  '.....KFFFFfK....',
-  '......KFFfK.....',
+  '....KLFFFFFRRK..',
+  '....KLFFFFfRRK..',
+  '.....KFFFffRK...',
+  '......KFFfKRK...',
+  '......KFfK.K....',
   '......KFfK......',
-  '......KFfK......',
-  '.....KFFfFK.....',
-  '....KFFFFFffK...',
-  '...KFFFFFFFffK..',
-  '...KFFFFFFFffK..',
-  '...KfFFFFFfffK..',
-  '....KfffffffK...',
-  '.....KKfffKK....',
+  '.....KLFFfK.....',
+  '....KLFFKFffK...',
+  '...KLFFFKFFffK..',
+  '...KLFFfKFFffK..',
+  '...KRFFfKFfRRK..',
+  '....KRRfKfRRK...',
+  '.....KKRRRKK....',
   '......KKKK......',
 ];
 HERON.leftBody = [
   '.....kCCCk......',
-  '....kCCCCCk.....',
+  '....kCYCCCk.....',
   '...kcccccccK....',
   'KNNNMMWEMFFRRK..',
   '.KKKKMMMMFFFRK..',
@@ -753,38 +756,44 @@ MOTH.topDown = [
   '.....KYMmMYK....',
   '......KmmKK.....',
 ];
+// Side flight: the near wing is drawn big and patterned (pink base and tip,
+// yellow band) and swings through up / level / down, so the profile reads as
+// a moth at 1x instead of a flat sliver. Fuzzy cream thorax, feathered antenna.
 MOTH.side = [
-  '....K...........',
-  '...K............',
-  '..KKMMK.........',
-  '.KYYKEMMKKK.....',
-  'KYFFYMMMYYYK....',
-  'KFFFFYMMYFFFK...',
-  '.KKFFYMmYFFfK...',
-  '...KKKKmKKKK....',
   '................',
+  '..K.......KKK...',
+  '...K.....KLLFK..',
+  '..KKMK..KLFFFfK.',
+  '.KEMMMKKYYYFFfK.',
+  'KMMMMMMYYYFFffK.',
+  '.KmMMMMKYFFffK..',
+  '..KKmmMMKKKKK...',
+  '....KKKKK.......',
 ];
 MOTH.sideUp = [
-  '....K...........',
-  '...K............',
-  '..KKMMK...KK....',
-  '.KYYKEMMKKYFK...',
-  'KYFFYMMMYYFFK...',
-  'KFFFFYMMYFFfK...',
-  '.KKFFYMmYffK....',
-  '...KKKKmKKK.....',
-  '................',
+  '.........KK.....',
+  '........KLFK....',
+  '..K....KLFFK....',
+  '...K...KFYYK....',
+  '..KKMKKFYYFK....',
+  '.KEMMMKYYFfK....',
+  'KMMMMMMYYKK.....',
+  '.KmMMMMMmK......',
+  '..KKmmmmK.......',
+  '....KKKK........',
 ];
 MOTH.sideDown = [
-  '....K...........',
-  '...K............',
-  '..KKMMK.........',
-  '.KYYKEMMKK......',
-  'KYFFYMMMYYK.....',
-  'KFFFFYMMYYFKKK..',
-  '.KKFFYMmYFFFffK.',
-  '...KKKKmKKKKKK..',
   '................',
+  '..K.............',
+  '...K............',
+  '..KKMK..........',
+  '.KEMMMKKKK......',
+  'KMMMMMMYYFKK....',
+  '.KmMMMKYYYFFK...',
+  '..KKmmKFYYFfK...',
+  '.....KLFFFffK...',
+  '......KFFffK....',
+  '.......KKKK.....',
 ];
 MOTH.rest = [ // wings folded like a tent
   '....K...K.......',
@@ -802,7 +811,7 @@ export function buildMoth() {
   const at = (p, y = 9) => groundShadow(frame([p, 0, y]), 4, 7);
   const down = [at(MOTH.top), at(MOTH.topUp, 8), at(MOTH.top), at(MOTH.topDown, 10)];
   const up = down.map((f) => f); // top view reads the same from behind
-  const left = [at(MOTH.side), at(MOTH.sideUp, 8), at(MOTH.side), at(MOTH.sideDown, 10)];
+  const left = [at(MOTH.side, 9), at(MOTH.sideUp, 8), at(MOTH.side, 9), at(MOTH.sideDown, 9)];
   const sit = frame([MOTH.rest, 0, 15]);
   const fish = withRod(sit, { rod: false, handX: 6, handY: 19 });
   return { w: 16, h: 24, down, up, left, right: left.map(flipH), sit, fish: fish[0], fishFrames: fish, fishW: FISH_W, fishOx: FISH_OX };

@@ -117,12 +117,17 @@ test('choices appear after the last page and resolve through the focus model', (
   box.skip();
   assert.equal(box.choicesUp, true);
   assert.equal(box.choiceFocus.index, 1, 'default choice holds the cursor');
+  box.handle(input.press('confirm'));
+  assert.deepEqual(picks, [], 'a mashed confirm right as the choices appear is swallowed');
+  box.update(300);
+  input.clear();
   box.handle(input.press('up'));
   box.handle(input.press('confirm'));
   assert.deepEqual(picks, [0]);
   assert.equal(box.finished, true);
   box.setText('Again?', { choices: [{ label: 'Yes' }, { label: 'No' }], cancelIndex: 1 });
   box.skip();
+  box.update(0); box.update(300);
   box.handle(input.press('cancel'));
   assert.deepEqual(picks, [0, 1], 'cancel picks the cancel index');
 });

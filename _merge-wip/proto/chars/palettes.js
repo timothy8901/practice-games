@@ -91,7 +91,7 @@ export const PALETTES = {
   },
   agathe: {
     O: '#c9a16b',
-    K: SW.k, k: SW.k, F: SW.v, f: SW.e, L: SW.w, M: SW.w, m: SW.v, E: SW.k, W: SW.w, N: SW.k, P: SW.o,
+    K: SW.k, k: SW.k, F: SW.v, f: SW.e, L: SW.w, M: SW.w, m: SW.v, E: SW.k, W: SW.w, N: SW.k, P: SW.e,
     C: SW.d, c: SW.k, D: SW.v, d: SW.e, Y: SW.i, A: SW.i, a: SW.u, G: SW.i, S: SW.e, s: SW.d, B: SW.k, b: SW.k,
   },
   teo: {
@@ -124,7 +124,7 @@ export const PALETTES = {
   ansel: {
     O: '#c9a16b',
     K: '#2a3340', F: '#8ea0b0', f: '#607486', L: '#b8c8d4', M: '#e8edf0', m: '#c8d2da', E: '#141b33', W: PAPER,
-    N: '#d9a441', n: '#b07a2a', S: '#607486', s: '#3b4a6b', B: '#d9a441', R: '#3b4a6b', k: '#2a3340', C: '#4e6e5d', c: '#34505c', Y: '#f2a541', a: '#7a5a36',
+    N: '#d9a441', n: '#b07a2a', S: '#607486', s: '#3b4a6b', B: '#d9a441', R: '#3b4a6b', k: '#1e2433', C: '#2b3a67', c: '#1e2a4a', Y: '#f2c14e', a: '#7a5a36',
   },
   wick: {
     O: '#c9a16b',

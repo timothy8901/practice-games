@@ -32,16 +32,24 @@ export const PANEL_STYLES = Object.freeze(['paper', 'ledger', 'notice', 'card', 
  * @property {'paper'|'wax'|'dark'} [titleStyle] Tab material (default: wax for notice, paper otherwise, dark for dark).
  * @property {string} [titleColor]            Override the tab fill (speaker key colour).
  * @property {boolean} [seal]                 Wax seal on the top-right corner.
- * @property {'top'|'bottom'|'both'|'none'} [torn] Torn edges for `notice` (default both).
+ * @property {'top'|'bottom'|'both'|'none'} [torn] Torn edges: `notice` defaults to both; paper,
+ *                                          ledger and card tear only when asked; dark never tears.
  * @property {boolean} [pin]                  Brass pin at the top centre (notice).
  * @property {number} [rulePitch=10]       Ledger: distance between rules (match the row height).
- * @property {number} [ruleStart]           Ledger: y of the first rule from the panel top (default 14,
- *                                          under the first text line at the inner top).
+ * @property {number} [ruleStart]           Ledger: y of the first rule from the panel top (default 15 =
+ *                                          padding + LEDGER_RULE_OFFSET, under the first text line).
  * @property {number} [margin=10]           Ledger: x of the wax margin line from the panel left (0 = none).
  * @property {boolean} [shadow=true]
  * @property {boolean} [grain=true]
  * @property {number} [alpha]
  */
+
+/**
+ * Default ledger rule offset below the content top: row 9 of a main-font line (cap 0-6,
+ * descender 7-8, leading 9), so text drawn from `panelInner().y` at `TYPE.lineH` pitch sits on
+ * the rules and no descender is ever struck through.
+ */
+export const LEDGER_RULE_OFFSET = TYPE.lineH - 1;
 
 /** Padding from the panel edge to its content, per style. */
 const PADDING = Object.freeze({ paper: 6, ledger: 6, notice: 5, card: 4, dark: 5 });
@@ -196,6 +204,35 @@ function paintBody(c, w, h, style, torn, useGrain, lg) {
       c.fillRect(lg.margin, 3, 1, h - 6);
     }
   }
+  if (torn === 'top' || torn === 'both') tearEdge(c, w, h, 'top', style === 'card' ? COLORS.brass.dark : P.edge, P.fill);
+  if (torn === 'bottom' || torn === 'both') tearEdge(c, w, h, 'bottom', style === 'card' ? COLORS.brass.dark : P.edge, P.fill);
+}
+
+/**
+ * Tear one edge of an already painted paper body: clear above the tear profile, redraw the edge
+ * line along it and cover the frame/inner rule rows just inside so the tear reads as ripped paper.
+ * @param {CanvasRenderingContext2D} c
+ * @param {number} w @param {number} h
+ * @param {'top'|'bottom'} side
+ * @param {string} edge @param {string} fill
+ */
+function tearEdge(c, w, h, side, edge, fill) {
+  for (let x = 0; x < w; x++) {
+    const sideCol = x === 0 || x === w - 1;
+    const d = sideCol ? 1 : tearDepth(side === 'top' ? x : x + 97, side === 'top' ? w : w * 3 + 1);
+    const y0 = side === 'top' ? 0 : h - d;
+    if (d > 0) c.clearRect(x, y0, 1, d);
+    const ey = side === 'top' ? d : h - d - 1;
+    if (!sideCol) {
+      c.fillStyle = fill;
+      if (side === 'top') c.fillRect(x, ey + 1, 1, Math.max(0, 3 - d));
+      else c.fillRect(x, ey - Math.max(0, 3 - d), 1, Math.max(0, 3 - d));
+      c.fillStyle = COLORS.paper.shade;
+      c.fillRect(x, side === 'top' ? ey + 1 : ey - 1, 1, 1);
+    }
+    c.fillStyle = edge;
+    c.fillRect(x, ey, 1, 1);
+  }
 }
 
 function cached(ctx, w, h, style, torn, useGrain, lg) {
@@ -232,9 +269,9 @@ export function drawPanel(ctx, rect, style = 'paper', opts) {
   if (!PANEL_STYLES.includes(style)) throw new RangeError(`drawPanel: unknown style ${JSON.stringify(style)}`);
   const x = Math.round(rect.x), y = Math.round(rect.y);
   const w = Math.max(4, Math.round(rect.w)), h = Math.max(4, Math.round(rect.h));
-  const torn = style === 'notice' ? (o.torn || 'both') : 'none';
+  const torn = style === 'notice' ? (o.torn || 'both') : style === 'dark' ? 'none' : (o.torn || 'none');
   const useGrain = o.grain !== false;
-  const lg = { pitch: o.rulePitch || TYPE.lineH, start: o.ruleStart === undefined ? PADDING.ledger + 8 : o.ruleStart, margin: o.margin === undefined ? 10 : o.margin };
+  const lg = { pitch: o.rulePitch || TYPE.lineH, start: o.ruleStart === undefined ? PADDING.ledger + LEDGER_RULE_OFFSET : o.ruleStart, margin: o.margin === undefined ? 10 : o.margin };
   const entry = cached(ctx, w, h, style, torn, useGrain, lg);
   const prevAlpha = ctx.globalAlpha;
   if (o.alpha !== undefined) ctx.globalAlpha = prevAlpha * o.alpha;

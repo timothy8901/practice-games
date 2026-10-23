@@ -177,7 +177,7 @@ export function hitTest(items, x, y) {
  * @returns {Focus}
  */
 export function createFocus(a, b) {
-  const looksLikeInput = a && typeof a.pressed === 'function' && typeof a.repeat === 'function';
+  const looksLikeInput = !!(a && typeof a.pressed === 'function' && typeof a.repeat === 'function');
   /** @type {FocusOptions} */
   const opts = looksLikeInput ? { ...(b || {}), input: a } : { ...(a || {}) };
   /** @type {FocusItem[]} */
@@ -194,6 +194,11 @@ export function createFocus(a, b) {
   let bob = 0;
   /** @type {'keyboard'|'gamepad'|'touch'|'pointer'} */
   let device = 'keyboard';
+  // Architecture form (`createFocus(input, opts)`): `update(dt)` also reads input and returns the
+  // frame's event. Guarded by `input.frame` so an owner that also calls `handle()` in the same
+  // frame (in either order) never processes one press twice.
+  const autoHandle = looksLikeInput;
+  let handledFrame = NaN;
   const handlers = {
     change: opts.onChange || null,
     activate: opts.onActivate || null,
@@ -315,6 +320,10 @@ export function createFocus(a, b) {
    */
   function handle(input = opts.input) {
     if (!input) return null;
+    if (autoHandle && typeof input.frame === 'number') {
+      if (input.frame === handledFrame) return null;
+      handledFrame = input.frame;
+    }
     let ev = null;
     // d-pad
     for (const dir of Object.keys(DIRS)) {
@@ -353,13 +362,20 @@ export function createFocus(a, b) {
     return ev;
   }
 
-  /** @param {number} dt */
+  /**
+   * Advance the cursor bob and tooltip timer. With the architecture form (`createFocus(input, o)`)
+   * this also reads the frame's input (once per `input.frame`) and returns its event.
+   * @param {number} dt
+   * @returns {FocusEvent|null}
+   */
   function update(dt) {
     bob = (bob + dt) % TIMING.cursorBobMs;
     if (tooltip) {
       tooltip.left -= dt;
       if (tooltip.left <= 0) tooltip = null;
     }
+    if (autoHandle && opts.input && typeof opts.input.frame === 'number') return handle(opts.input);
+    return null;
   }
 
   /**
@@ -378,7 +394,7 @@ export function createFocus(a, b) {
       if (opt.ring !== false) drawDottedRect(ctx, r.x + inset, r.y + inset, r.w - inset * 2, r.h - inset * 2, s.ring);
       if (opt.cursor !== false) {
         const lift = bob < TIMING.cursorBobMs / 2 ? 0 : 1;
-        drawText(ctx, TYPE.cursor, r.x - 7 + lift, r.y + Math.floor((r.h - TYPE.capH) / 2), { color: s.cursor });
+        drawText(ctx, TYPE.cursor, Math.max(0, r.x - 7) + lift, r.y + Math.floor((r.h - TYPE.capH) / 2), { color: s.cursor });
       }
     }
     if (tooltip) drawTooltip(ctx, tooltip, items[tooltip.index], s);
@@ -502,8 +518,10 @@ function drawTooltip(ctx, tip, item, s) {
   const canvasH = (ctx.canvas && ctx.canvas.height) || 270;
   const padX = 4;
   const text = tip.text;
-  const w = Math.min(canvasW - 8, textWidth(text) + padX * 2 + 10);
-  const h = 13;
+  const maxTextW = Math.min(200, canvasW - 8 - padX * 2 - 7);
+  const m = measureText(text, { maxWidth: maxTextW });
+  const w = m.w + padX * 2 + 8;
+  const h = Math.max(13, m.h + 5);
   let x = r ? r.x + r.w - w : 8;
   let y = r ? r.y - h - 2 : 8;
   if (y < 2) y = r ? r.y + r.h + 2 : 2;
@@ -519,9 +537,5 @@ function drawTooltip(ctx, tip, item, s) {
   ctx.fillStyle = COLORS.paper.light;
   ctx.fillRect(x + 3, y, 2, 1); ctx.fillRect(x + w - 6, y, 2, 1);
   drawText(ctx, '×', x + padX - 1, y + 3, { color: COLORS.role.danger });
-  drawText(ctx, text, x + padX + 7, y + 3, { color: s.dark ? COLORS.paper.ink : COLORS.paper.ink });
-}
-
-function textWidth(text) {
-  return measureText(text).w;
+  drawText(ctx, text, x + padX + 7, y + 3, { color: COLORS.paper.ink, maxWidth: maxTextW });
 }

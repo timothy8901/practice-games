@@ -14,7 +14,7 @@ import './trainers.js';
 import './heads2.js';
 
 /** Re-light a front head silhouette as the back of a ball lit from top-left. */
-export function shadeBack(front, { ears = 2, keep = 'K', fill = { L: 'L', F: 'F', f: 'f' } } = {}) {
+export function shadeBack(front, { ears = 2, keep = 'K', fill = { L: 'L', F: 'F', f: 'f' }, dither = true } = {}) {
   const h = front.length, w = front[0].length;
   let x0 = w, x1 = -1, y0 = h, y1 = -1;
   front.forEach((r, y) => { if (y < ears) return; [...r].forEach((ch, x) => { if (ch !== '.') { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); } }); });
@@ -26,8 +26,8 @@ export function shadeBack(front, { ears = 2, keep = 'K', fill = { L: 'L', F: 'F'
     const d = nx * 0.62 + ny * 0.78; // + = facing away from the light
     if (y >= y1) return fill.f;      // nape under the skull
     if (d < -0.42) return fill.L;
-    if (d < 0.22) return fill.F;
-    if (d < 0.5) return ((x + y) & 1) ? fill.f : fill.F;
+    if (d < 0.34) return fill.F;
+    if (d < 0.5) return dither && ((x + y) & 1) ? fill.f : fill.F; // 1-2px dithered terminator
     return fill.f;
   }).join(''));
 }
@@ -97,13 +97,13 @@ back('opossum', [
   '.KK......KK.',
   'KRRK....KRRK',
   'KRRRKKKKRRRK',
-  '.KMLLFFFFmK.',
-  '.KMLFFFFFmK.',
-  '.KMFFFFFFmK.',
-  '.KMFFFFFfmK.',
-  '.KMfFFFFfmK.',
+  '.KLLLFFFFfK.',
+  '.KLLFFFFFfK.',
+  '.KLFFFFFFfK.',
+  '.KMFFFFFffK.',
+  '.KMFFFFfffK.',
   '..KMfFffmK..',
-  '...KmffmK...',
+  '...KmMMmK...',
   '....KKKK....',
 ], { fill: { L: 'L', F: 'F', f: 'f' } });
 
@@ -127,14 +127,14 @@ back('ferret', [
 back('mongoose', [
   '............',
   '...KKKKKK...',
-  '..KLLfLFFK..',
-  'KfKLFLFfFKfK',
-  'KKLFfFFfFfKK',
-  '.K.F.f.F.f..',
-  '.K.f.F.f.F..',
-  '.K.F.f.F.f..',
-  '..K.f.F.fK..',
-  '...K.f.fK...',
+  '..KLLLfFFK..',
+  'KfKLLFFFfKfK',
+  'KKLFFfFFFfKK',
+  '.K.....f....',
+  '.K..f.......',
+  '.K......f...',
+  '..K..f...K..',
+  '...K....K...',
   '....KKKK....',
 ]);
 
@@ -200,7 +200,7 @@ back('stoat', [
   '............',
   '............',
   '..KKffffKK..',
-]);
+], { dither: false });
 
 // Barn owl (Corin): golden-buff crown with grey mottling and white seed
 // spots; the pale facial-disc rim shows at the sides.
@@ -208,12 +208,12 @@ back('owl', [
   '............',
   '...KKKKKK...',
   '..KLLFLFFK..',
-  '.KMLmLFmFfK.',
-  '.KMFFMFFmfK.',
-  '.KMmFFmFFfK.',
-  '.KMFMFFMffK.',
-  '.KMFFmFFmfK.',
-  '.KmfFFfFffK.',
+  '.KMLLLFFFfK.',
+  '.KMLFMFFFfK.',
+  '.KMFFFFmFfK.',
+  '.KMFmFFFffK.',
+  '.KMFFFMFffK.',
+  '.KmfFFFfffK.',
   '..KmffmffK..',
   '...KKffKK...',
 ], { fill: { L: 'L', F: 'F', f: 'f' } });
@@ -252,18 +252,18 @@ back('wolf', [
 // Agathe (hare): the laid-back ears frame the head from behind too, their
 // dark tips hanging past the jaw.
 back('hare', [
-  '...KKKKKK...',
-  '..KLLLFFfK..',
-  '.KLLFFFFFfK.',
-  'KFKLFFFFFKfK',
-  'KFKFFFFFfKfK',
-  'KFKFFFFFfKfK',
-  'KFKFFFFffKfK',
-  'KfKfFFFffKfK',
-  'KfKffFfffKfK',
-  'KffKKffKKffK',
-  '.KK......KK.',
-], { ears: 0 });
+  '..KK....KK..',
+  '.KSfK..KSfK.',
+  '.KffK..KffK.',
+  '.KffK..KffK.',
+  '..KfKKKKfK..',
+  '............',
+  '............',
+  '............',
+  'KM........MK',
+  '.K........K.',
+  '..KKffffKK..',
+], { ears: 5, fill: { L: 'F', F: 'F', f: 'f' } });
 
 // Teo (fox): big ear backs with dark tips, white cheek tufts flaring out.
 back('fox', [

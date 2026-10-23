@@ -84,19 +84,21 @@ const INK = hexToRgb01(COLORS.ink);
  * `sat` = saturation, `lamp` = how lit the lamps/windows are, `night` = star/glow weight.
  */
 const GRADES = [
-  { h: 0, mul: [0.30, 0.36, 0.60], scr: [0.08, 0.10, 0.20], sat: 0.70, lamp: 1, night: 1 },      // deep night
-  { h: 4.25, mul: [0.30, 0.36, 0.60], scr: [0.08, 0.10, 0.20], sat: 0.70, lamp: 1, night: 1 },
-  { h: 5.25, mul: [0.38, 0.46, 0.72], scr: [0.08, 0.10, 0.20], sat: 0.78, lamp: 1, night: 0.8 }, // night
-  { h: 6.5, mul: [0.92, 0.78, 0.72], scr: [0.10, 0.07, 0.12], sat: 0.95, lamp: 0.6, night: 0.2 }, // dawn (peach over a cool floor)
-  { h: 7.75, mul: [0.97, 0.96, 1.0], scr: [0.04, 0.04, 0.06], sat: 1.0, lamp: 0, night: 0 },    // morning
+  // Night keeps its blue mood but a low ambient floor: lifting the darks (screen) flattens the 1px
+  // base lines that make blocking things read, so night brightness comes from the multiply instead.
+  { h: 0, mul: [0.58, 0.74, 0.95], scr: [0.02, 0.03, 0.07], sat: 0.72, lamp: 1, night: 1 },      // deep night
+  { h: 4.25, mul: [0.58, 0.74, 0.95], scr: [0.02, 0.03, 0.07], sat: 0.72, lamp: 1, night: 1 },
+  { h: 5.25, mul: [0.62, 0.77, 0.96], scr: [0.02, 0.03, 0.07], sat: 0.78, lamp: 1, night: 0.8 }, // night
+  { h: 6.5, mul: [0.96, 0.84, 0.78], scr: [0.04, 0.03, 0.05], sat: 0.95, lamp: 0.6, night: 0.2 }, // dawn (peach over a cool floor)
+  { h: 7.75, mul: [0.98, 0.97, 1.0], scr: [0.02, 0.02, 0.03], sat: 1.0, lamp: 0, night: 0 },    // morning
   { h: 9.5, mul: [1, 1, 1], scr: [0, 0, 0], sat: 1, lamp: 0, night: 0 },                        // day
   { h: 15.5, mul: [1, 1, 1], scr: [0, 0, 0], sat: 1, lamp: 0, night: 0 },
-  { h: 17.25, mul: [1.04, 0.93, 0.76], scr: [0.08, 0.04, 0.0], sat: 1.05, lamp: 0.25, night: 0, wmul: [0.94, 0.94, 0.98], glint: 0.35 }, // golden
-  { h: 18.25, mul: [0.98, 0.78, 0.62], scr: [0.08, 0.04, 0.06], sat: 1.0, lamp: 0.75, night: 0.15, wmul: [0.80, 0.80, 0.94], glint: 0.5 }, // sunset (amber, never magenta)
-  { h: 19.25, mul: [0.48, 0.54, 0.80], scr: [0.06, 0.08, 0.18], sat: 0.85, lamp: 1, night: 0.6 }, // blue hour
-  { h: 20.0, mul: [0.38, 0.46, 0.72], scr: [0.08, 0.10, 0.20], sat: 0.78, lamp: 1, night: 0.85 }, // night
-  { h: 22.5, mul: [0.38, 0.46, 0.72], scr: [0.08, 0.10, 0.20], sat: 0.78, lamp: 1, night: 1 },
-  { h: 24, mul: [0.30, 0.36, 0.60], scr: [0.08, 0.10, 0.20], sat: 0.70, lamp: 1, night: 1 },
+  { h: 17.25, mul: [1.04, 0.95, 0.80], scr: [0.04, 0.02, 0.0], sat: 1.05, lamp: 0.25, night: 0, wmul: [0.94, 0.94, 0.98], glint: 0.35 }, // golden
+  { h: 18.25, mul: [1.0, 0.82, 0.68], scr: [0.04, 0.02, 0.03], sat: 1.0, lamp: 0.75, night: 0.15, wmul: [0.80, 0.80, 0.94], glint: 0.5 }, // sunset (amber, never magenta)
+  { h: 19.25, mul: [0.70, 0.80, 0.96], scr: [0.02, 0.03, 0.07], sat: 0.85, lamp: 1, night: 0.6 }, // blue hour
+  { h: 20.0, mul: [0.62, 0.77, 0.96], scr: [0.02, 0.03, 0.07], sat: 0.78, lamp: 1, night: 0.85 }, // night
+  { h: 22.5, mul: [0.62, 0.77, 0.96], scr: [0.02, 0.03, 0.07], sat: 0.78, lamp: 1, night: 1 },
+  { h: 24, mul: [0.58, 0.74, 0.95], scr: [0.02, 0.03, 0.07], sat: 0.72, lamp: 1, night: 1 },
 ];
 
 /**
@@ -122,8 +124,8 @@ export function gradeFor(hour, weather = 'clear') {
     // up the low sun instead
     wmul: lerp3(a.wmul || a.mul, b.wmul || b.mul, t), glint: lerp(a.glint || 0, b.glint || 0, t),
   };
-  if (weather === 'rain') { const k = [0.82, 0.86, 0.94]; g.mul = g.mul.map((v, i) => v * k[i]); g.wmul = g.wmul.map((v, i) => v * k[i]); g.sat *= 0.85; g.lamp = Math.max(g.lamp, 0.35); g.glint *= 0.3; }
-  if (weather === 'fog') { const k = [0.92, 0.93, 0.96]; g.mul = g.mul.map((v, i) => v * k[i]); g.wmul = g.wmul.map((v, i) => v * k[i]); g.scr = [g.scr[0] + 0.06, g.scr[1] + 0.07, g.scr[2] + 0.08]; g.sat *= 0.9; g.glint *= 0.3; }
+  if (weather === 'rain') { const k = [0.95, 0.96, 0.99]; g.mul = g.mul.map((v, i) => v * k[i]); g.wmul = g.wmul.map((v, i) => v * k[i]); g.sat *= 0.92; g.lamp = Math.max(g.lamp, 0.35); g.glint *= 0.3; }
+  if (weather === 'fog') { const k = [0.92, 0.93, 0.96]; g.mul = g.mul.map((v, i) => v * k[i]); g.wmul = g.wmul.map((v, i) => v * k[i]); g.sat *= 0.9; g.glint *= 0.3; } // the drifting bands supply the haze
   g.key = `${h}|${weather}`;
   return g;
 }
@@ -184,8 +186,14 @@ function derivedTiles() {
   d.shelf_e = { ...shelf, name: 'shelf_e', frames: shelf.frames.map(rotateCW) };
   d.shelf_s = { ...shelf, name: 'shelf_s', frames: shelf.frames.map(flipV) };
   d.shelf_w = { ...shelf, name: 'shelf_w', frames: shelf.frames.map((f) => rotateCW(rotateCW(rotateCW(f)))) };
-  const bank = ['................', '................', '................', '................', '................', '................', '................', '................', '................', '................', '................', '................', '................', '................', 'dddddddddddddddd', 'kkkkkkkkkkkkkkkk'];
-  d.bank_s = { name: 'bank_s', w: 16, h: 16, frames: [bank], pal: { d: 'wet0', k: 'wet0' } };
+  // wet bank: where land meets open water the ground darkens along the edge (2px on the south, the
+  // side the camera sees, 1px elsewhere), so the walkable edge always has a dark cue
+  const bank = [...Array.from({ length: 14 }, () => '................'), 'dddddddddddddddd', 'kkkkkkkkkkkkkkkk'];
+  d.bank_s = { name: 'bank_s', w: 16, h: 16, frames: [bank], pal: { d: 'wet0', k: 'bank' } };
+  const bankN = ['kkkkkkkkkkkkkkkk', ...Array.from({ length: 15 }, () => '................')];
+  d.bank_n = { name: 'bank_n', w: 16, h: 16, frames: [bankN], pal: { k: 'bank' } };
+  d.bank_e = { name: 'bank_e', w: 16, h: 16, frames: [rotateCW(bankN)], pal: { k: 'bank' } };
+  d.bank_w = { name: 'bank_w', w: 16, h: 16, frames: [rotateCW(rotateCW(rotateCW(bankN)))], pal: { k: 'bank' } };
   return d;
 }
 
@@ -435,8 +443,11 @@ export function drawMap(ctx, map, tileset, opts = {}) {
       if (rain && RAIN_WALK.has(t.tile)) rainRipple(ctx, x, y, px, py, frame, g);
       if (!t.water && !t.cliffTop && t.tile !== 'cliff_face') {
         // a 1px darker bank where land meets water to the south (a lip the eye reads as height)
-        const s = info(x, y + 1);
-        if (s && s.water && !s.self) ctx.drawImage(tileset.sprite('bank_s', 0, g).canvas, px, py);
+        const open = (q) => q && q.water && !q.self;
+        if (open(info(x, y + 1))) ctx.drawImage(tileset.sprite('bank_s', 0, g).canvas, px, py);
+        if (!t.quay && open(info(x, y - 1))) ctx.drawImage(tileset.sprite('bank_n', 0, g).canvas, px, py);
+        if (open(info(x + 1, y))) ctx.drawImage(tileset.sprite('bank_e', 0, g).canvas, px, py);
+        if (open(info(x - 1, y))) ctx.drawImage(tileset.sprite('bank_w', 0, g).canvas, px, py);
       }
     }
   }

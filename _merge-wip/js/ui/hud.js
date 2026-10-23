@@ -16,7 +16,7 @@ import { drawText, measureText } from '../core/font.js';
 import { COLORS, DEVICE_LABELS, PALETTE, SPACE, STRINGS } from './theme.js';
 import { drawIcon, hasIcon } from './icons.js';
 import { drawNotchedFrame } from './panel.js';
-import { drawCurrency, drawKeyGlyph, drawBadge } from './widgets.js';
+import { drawCurrency, drawKeyGlyph, drawBadge, keyGlyphWidth, formatNumber } from './widgets.js';
 
 /**
  * Word for a tide level (0 = low, 1 = high) and its direction.
@@ -60,10 +60,21 @@ function chip(ctx, x, y, w, h) {
 }
 
 /**
+ * Draw the HUD. Takes the plain HudState (`drawHud(ctx, state)`), or the architecture's call shape
+ * `drawHud(ctx, G, {verb, showClock, ...state})`, where only `G.display`'s size is read and every
+ * value comes from the third argument (the HUD never reads world state itself).
  * @param {CanvasRenderingContext2D} ctx
- * @param {HudState} s
+ * @param {HudState|{display?: {width?: number, height?: number}}} a
+ * @param {HudState & {verb?: HudState['contextVerb']}} [b]
  */
-export function drawHud(ctx, s) {
+export function drawHud(ctx, a, b) {
+  /** @type {HudState} */
+  const s = b === undefined ? (a || {}) : {
+    ...b,
+    contextVerb: b.contextVerb !== undefined ? b.contextVerb : (b.verb || null),
+    width: b.width || (a && a.display && a.display.width) || undefined,
+    height: b.height || (a && a.display && a.display.height) || undefined,
+  };
   const W = s.width || (ctx.canvas && ctx.canvas.width) || 480;
   const H = s.height || (ctx.canvas && ctx.canvas.height) || 270;
   const device = s.device === 'gamepad' || s.device === 'touch' ? s.device : 'keyboard';
@@ -113,12 +124,10 @@ export function drawHud(ctx, s) {
 
   // ---- wallet + pending shift (top-right) ----
   if (s.wallet !== undefined && s.wallet !== null) {
-    const num = measureText(`${s.wallet}`).w;
-    const w = 7 + 2 + measureText(formatWallet(s.wallet)).w + 8, h = 13;
+    const w = 7 + 2 + measureText(formatNumber(s.wallet)).w + 8, h = 13;
     const wx = W - SPACE.sm - w;
     chip(ctx, wx, SPACE.sm, w, h);
     drawCurrency(ctx, s.wallet, wx + 4, SPACE.sm + 3);
-    void num;
   }
   const pending = typeof s.pendingShift === 'number' ? s.pendingShift : s.pendingShift ? 1 : 0;
   if (pending > 0) {
@@ -132,7 +141,7 @@ export function drawHud(ctx, s) {
   if (s.tool !== undefined) {
     const name = s.tool && s.tool.name ? s.tool.name : STRINGS.empty;
     const tw = measureText(name).w;
-    const glyphW = measureText(labels.tool, { font: 'small' }).w + 6;
+    const glyphW = keyGlyphWidth(device, labels.tool);
     const w = 2 + glyphW + 3 + 8 + 3 + tw + 4, h = 13;
     const tx = SPACE.sm, ty = H - SPACE.sm - h;
     chip(ctx, tx, ty, w, h);
@@ -149,7 +158,7 @@ export function drawHud(ctx, s) {
     const word = v.label || v.verb;
     const icon = v.icon || (hasIcon(v.verb) ? v.verb : null);
     const key = labels.confirm;
-    const glyphW = device === 'touch' ? 9 + measureText(key, { font: 'small' }).w : Math.max(9, measureText(key, { font: 'small' }).w + 6);
+    const glyphW = keyGlyphWidth(device, key);
     const tw = measureText(word).w;
     const reason = !enabled && v.reason ? v.reason : '';
     const rw = reason ? measureText(reason, { font: 'small' }).w + 6 : 0;
@@ -167,10 +176,4 @@ export function drawHud(ctx, s) {
 /** @param {string} w */
 function capitalize(w) {
   return w ? w[0].toUpperCase() + w.slice(1) : w;
-}
-
-/** @param {number} n */
-function formatWallet(n) {
-  const v = Math.trunc(Number(n) || 0);
-  return String(Math.abs(v)).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 }
