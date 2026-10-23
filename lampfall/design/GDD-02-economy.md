@@ -9,7 +9,9 @@ Chapter 2 of the full GDD. It turns GDD-00 §5–§9 and §15 into data and keep
 | `js/data/dials.js` | `DIALS`, `CHALLENGES`, `TOGGLE_ORDER`, `DEFAULT_DIAL` | Drift / Flux / Freefall rule tables, the four challenge seals, the seed toggle bits |
 | `js/data/shops.js` | `SHOPS` | all eight shops and counters: keepers, hours, staples, rotating pools, Wanted Today, decor, auction, refining, services |
 | `js/data/items.js` | `ITEMS` | 65 rows: 26 items, 12 discs, 12 key items, 9 keepsakes, 6 goods and wallet rows |
-| `test/data.economy-tables.test.mjs` | — | validator + manifest + cross-chapter references + every system accepts `TUNING` + GDD-00 numbers + the economy sim |
+| `test/data.economy-tables.test.mjs` | — | validator + manifest + cross-chapter references + every system accepts `TUNING` + GDD-00 numbers + the average-day sim (§4.1) |
+| `tools/economy-sim.mjs` | `simulate`, `runAll`, `grindMinutes`, `PROFILES`, `SOURCES`, `SINKS` | the headless real-table sim (§4.4): `node tools/economy-sim.mjs [casual\|typical\|ideal\|grinder\|--json]` |
+| `test/data.economy.test.mjs` | — | the economy and continuity verifier: validator + manifest over the economy and town tables, every GDD-00 §7/§9 number, every system tuning key, the Archive rows, and the §4.4 acceptance for three profiles |
 
 ---
 
@@ -149,6 +151,32 @@ Results at defaults: **Relighting on day 15** (acceptance 11–16); Spire shares
 
 The model is deliberately the *average* player: GDD-00 §12's Day 10 is a *good* day (loan 5 already paid by day 10's dawn), one day ahead of the sim. Both land inside 11–16.
 
+### 4.4 The real-table sim (`tools/economy-sim.mjs`, verified by `test/data.economy.test.mjs`)
+
+§4.1 checks the *model*; this sim checks the *content*. It plays the season day by day against the shipped rows and the real money systems, and a profile decides only what a player chooses to do:
+
+- **Income from data:** 100 town trees (town `TREES`) on a per-tree regrow / ripen clock, plus foreign trees from seedlings and the Greenhouse; purses and bee trees; the Glint through `wallet.collectGlint`; fish drawn from `collections.FISH` with `gather.rowActive` / `modsFor` on the Pellwick map's reaches at the real tide (`clockSys.tidesForDay`). The player casts at the biggest shadow class in view, lands it by bite window × skill, and reach health dips 10% a fish, floors at 40% and recovers over a day, as in `systems/fishing`. Bugs and finds come from `BUGS` / `FINDS`, and the first of each find is pinned and never sold. Skyglass comes at the real night lows (`gather.lowTouchesNight`). Route trainers and Spires pay their `data/trainers` payouts; Porch Duels pay `porchDuelPerCurve` × `PORCH_DUELS.curveByBadges`; Errants, Wanted Today and the Crate use their tuning values.
+- **Credits through `systems/loans`:** `pay`, `errand`, `spireShare` and `residentShare`. Commissions are picked as tiers clear, one build lands each night at 05:40 through `landDue`, and the Relighting fires at the dusk the Lamp Room lands. Commons projects go through `depositJar` / `fundProject`.
+- **Sinks at shipped prices:** wicks by badge, medicine per battle (half a Salve → Tonic → Full Salve), discs, held items, Starsalt, stones, seedlings, Commons shares, Pell's furniture and clothes, the ferry, blackouts (`wallet.blackout`; half comes back through the Glints).
+- **Time:** every verb costs real seconds of running clock (a tree 9 s, a cast 11 s, a crack 9 s…) and every scene costs paused minutes (a route trainer 1.3, a Spire 5, a duel 1.2…). The verbs must fit the waking clock; the test fails on any overflow.
+
+| Profile | Plays | Loans cleared on day | Relighting | Real min / day | Sinks | Top sources |
+|---|---|---|---|---|---|---|
+| **Casual** | sleeps at 22:00, 21 min of talk a day, decorates, crates 30% | 1 / 3 / 6 / 9 / 12 / 15 / 19 | **day 20** | 45.6 | 17.6% | fruit 28%, fish 12%, Spire shares 9%, finds 9%, Spires 9% |
+| **Typical** | the average day: ~10–13 trees, a leg most days, 1–3 duels, 4–9 night casts, most night lows; sleeps at 01:00 | **1 / 3 / 5 / 7 / 9 / 11 / 13** | **day 14** | 37.4 | 19.1% | fruit 23%, fish 20%, Spires 8%, finds 8%, Spire shares 7% |
+| Ideal (reference) | GDD-00 §5's "what a good day does", every day | 1 / 3 / 4 / 6 / 8 / 10 / 12 | day 13 | 37.7 | 19.0% | fruit 21%, fish 20%, finds 11% |
+| **Grinder** | never sleeps; every capped verb at its cap; fishes every second left | 1 / 2 / 2 / 3 / 4 / 5 / 7 | **day 8** (the floor) | 40.3 | 4.7% | fruit 34%, fish 26%, finds 11% |
+
+The typical player clears every loan on its target day; the day before each target it is still 3,000–31,000 short, so the result is not balanced on a knife edge. Its night one pays loan 1 in ~15 real minutes. Its Spire shares come to 28,800 (GDD-00: ~27,000) and its resident shares to 19,600. Because every loan lands on its target day, it never needs grind. Daily gross runs above the §2.1 model early and meets it late: days 2–3 ≈ 14,000, 4–6 ≈ 20,000, 7–9 ≈ 27,000, 10–12 ≈ 44,000. The early surplus is the flat town income (fruit, purses, the Glint) against a model that starts at 8,000. The *ideal* day runs a day ahead, as §4.1 says of GDD-00's Day 10. The grinder earns ~451,000 by day 7 and is held by the one-build-a-night floor alone. **No source is above 35%** of any profile's income, and every profile lives on at least six sources above 3%.
+
+**What the verifier changed to get here** (all inside GDD-00's ranges):
+
+1. **Night headliners** (`collections.js`): John Dory weight 2 → **0.4**, lantern wolffish 1 → **0.15**, sea bass 3 → **2**. Prices are untouched (2,400 / 4,200 / 900). At the old weights a forked shadow was in view on ~70% of fresh night casts, and the typical player relit on day 10 with fish at a third of all income; the grinder's fish share was 44%. Now a forked tail shows in about one view in four, and a ten-cast session lands one or two headliners, as GDD-05 §1.2 estimates.
+2. **Greenhouse indoor trees** (`loans.js`): 4 → **2**. Four foreign trees on top of the seedlings put fruit alone at ~15,000 on harvest days by day 10.
+3. **Weather effects** (`tuning.js`): synced with `town.WEATHER_TUNING` (GDD-05). No pacing effect.
+
+No GDD-00 number had to move.
+
 ### 4.2 Shares pull the two tracks together
 
 A Spire share is 10% of the **open** loan, so a badge earned late is worth more: badge 4 on day 10 notches 6,600 onto loan 6 (the Day 10 script's number). A battler who holds six badges early still owes a lot (the shares only cover ~10% of each tier); a grinder who relights with two badges has paid in fish. Neither is walled: loans gate only the house, badges only the reader tools and the Summit.
@@ -167,7 +195,7 @@ GDD-00's order of levers, encoded as reference keys: raise `porchDuelPerCurve` f
 |---|---|---|---|
 | Training Yard | chalked yard; Tully trains there | 3 stored creatures earn 25% of party EXP | `yardSlots 3`, `yardShare 0.25` |
 | Workshop | fossil cleaning bench (+40% overnight) | polish a skyglass relic into a type tilt | `cleanMult 1.4`, `tiltsFrom`, `tiltIds` |
-| Greenhouse | grafting bench, indoor fruit | +1 Bond once with the favourite fruit; Moss lead ripens a graft a day sooner | `bondNight 1`, `mossGraftNightsSooner 1` |
+| Greenhouse | grafting bench, indoor fruit (two indoor foreign trees) | +1 Bond once with the favourite fruit; Moss lead ripens a graft a day sooner | `indoorTrees 2`, `bondNight 1`, `mossGraftNightsSooner 1` |
 | Cellar | cold storage, Keepsakes safe, satchel +10 | storage 20 → 40 | `satchel 10`, `boxCapacity 40` |
 | Porch & Loft | second porch seat; Porch Duels at home | telescope shows Errants on the map | `porchSeats 2`, `telescopeErrants` |
 | Gallery | tally wall, Odile's canvases, Field Log plates | Shiftlog strip +1 Bond once; 1,000 per 6 Held forms framed | `frameButtons 1000`, `framePerForms 6` |
@@ -274,6 +302,9 @@ Spares sell back at 50% (`spareSellRate`); goods kinds sell at full price.
 7. **Collections are not items.** `systems/shops` (`sell`, `wantedToday`, `crateDeposit`) looks only in `items`, so fish, bugs, finds and fruit cannot be sold, wanted or crated until shops falls back to `collections` (or the orchestrator merges the lookups). Pell's `wantedPool` already lists them.
 8. **The cond DSL's `day.dow` counts from core day 0** (dow 6 = GDD Saturday), unlike the calendar (0 = Monday). The Lantern Market's `cond` uses dow 6 / 0 accordingly; if `cond.js` moves to the calendar weekday, change it to 5 / 6.
 9. The validator's `buys` kinds are the four collection kinds; honey, timber and silk sell through the two `buysAll` buyers and the Crate.
+10. **Maps (GDD-01): Pellwick has no `flats` reach.** Its reaches are two `river` reaches, two `quay` reaches and the north creek. Dab, sand eel and glimmer sprat (`where: ['flats', …]`) therefore cannot be caught in town, though GDD-05 places them in "the point flats channel". The sim fishes the reaches as drawn, so it already allows for this. Adding a point-channel reach of kind `flats` would bring them back.
+11. **`test/data.tables.test.mjs` is stale against the shipped tables.** It requires every `TUNING` value to be a number or object (systems need string and boolean keys) and expects `wallet.main` to read "coin" (the currency is buttons). Neither can be fixed in data; the test needs updating.
+12. **`tools/economy-sim.mjs` reads every system's numbers at run time,** so a lane that changes a payout, a weight or a tuning key moves the §4.4 table. `test/data.economy.test.mjs` re-checks the acceptance on every run.
 
 ## 11. Manifest requests
 

@@ -91,7 +91,8 @@ test('tuning: frozen table with named exports that mirror it', () => {
   assert.equal(tuning.noRepeatDays, TUNING.noRepeatDays);
   assert.equal(tuning.toolRingHoldMs, 220);
   assert.deepEqual(tuning.porchWindow, TUNING.porchWindow);
-  for (const [k, v] of Object.entries(TUNING)) assert.ok(typeof v === 'number' || typeof v === 'object', k);
+  // Systems also read string and boolean keys (flag ids, modes), so allow every JSON scalar and objects.
+  for (const [k, v] of Object.entries(TUNING)) assert.ok(['number', 'object', 'string', 'boolean'].includes(typeof v), k);
 });
 
 test('strings: t fills placeholders and plurals; missing keys render as [key]', () => {

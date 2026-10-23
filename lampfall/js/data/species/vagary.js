@@ -12,7 +12,7 @@ import { sp, family as fam, anchors } from './_helpers.js';
 
 export const forms = Object.freeze([
   sp('vagary', 'Vagary', ['Star'], 'vagary', 4, [100, 90, 90, 120, 100, 100], 'unfixed',
-    [[1, 'starfall'], [1, 'tailfall'], [20, 'shardlight'], [30, 'hoarfrost'], [40, 'riptide'], [50, 'kiln-maw'], [60, 'bandlight'], [70, 'echo-drain']],
+    [[1, 'starfall'], [1, 'tailfall'], [10, 'shardlight'], [15, 'hoarfrost'], [20, 'riptide'], [24, 'kiln-maw'], [27, 'bandlight'], [30, 'echo-drain']],
     null, 18, 300, 'slow', {
       roleTag: 'comet_legendary', legendary: true, neverShifts: true, neverOnForecast: true, displayName: 'Vagary (the Passenger)',
       sprite: 'drawn', size: 96, conceptSize: 32, palette: 'kmpwi', heartmarkHighlight: 'w', idle: 'hover',

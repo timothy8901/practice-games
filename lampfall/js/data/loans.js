@@ -5,7 +5,7 @@
  * LOANS — Hearthwright & Daughter, interest-free, no deadline, one build a night (hard floor seven
  * nights). 6,000 + 15,000 + 25,000 + 36,000 + 50,000 + 66,000 + 80,000 = 278,000. Row ids are
  * `tier-N` because the cond DSL (`{loan: {tier}}`), `systems/loans` and the validator look loans up
- * by tier; `manifestId` carries the GDD-ids name (`loan-N`) of the same row. `notch` is the 5% one
+ * by tier; `manifestId` equals the GDD-ids id of the same row (the manifest now uses `tier-N` too). `notch` is the 5% one
  * finished thread is worth on that stick; `scaffoldStage` is the lighthouse section that climbs when
  * the loan clears; `commissionSlot` marks the four tiers whose build is a room you pick.
  *
@@ -35,7 +35,7 @@ const ROOFS = ['slate-blue', 'ochre', 'harbor-red', 'moss', 'sea-blue', 'straw',
 /**
  * @typedef {Object} LoanDef
  * @property {string} id            'tier-N'
- * @property {string} manifestId    'loan-N' (GDD-ids)
+ * @property {string} manifestId    'tier-N' (GDD-ids)
  * @property {number} tier  @property {number} amount  @property {number} notch   5% of amount
  * @property {string|null} build    fixed build id, null on commission tiers
  * @property {boolean} commissionSlot  @property {boolean} commission   (both spellings systems/loans reads)
@@ -50,7 +50,7 @@ const ROOFS = ['slate-blue', 'ochre', 'harbor-red', 'moss', 'sea-blue', 'straw',
 /** @type {ReadonlyArray<LoanDef>} */
 export const LOANS = freeze([
   {
-    id: 'tier-1', manifestId: 'loan-1', tier: 1, amount: 6000, notch: 300,
+    id: 'tier-1', manifestId: 'tier-1', tier: 1, amount: 6000, notch: 300,
     build: 'bedsit', commissionSlot: false, commission: false, commissionNo: 0,
     roofChoices: ROOFS, scaffoldStage: 1, targetDay: 1, satchel: 0,
     clearFlags: [], buildFlags: [],
@@ -59,7 +59,7 @@ export const LOANS = freeze([
     wren: 'Six thousand buttons, no interest. Pay it when you can. We build while you sleep.',
   },
   {
-    id: 'tier-2', manifestId: 'loan-2', tier: 2, amount: 15000, notch: 750,
+    id: 'tier-2', manifestId: 'tier-2', tier: 2, amount: 15000, notch: 750,
     build: 'cottage', commissionSlot: false, commission: false, commissionNo: 0,
     roofChoices: ROOFS, scaffoldStage: 2, targetDay: 3, satchel: 10,
     clearFlags: [], buildFlags: [],
@@ -68,7 +68,7 @@ export const LOANS = freeze([
     wren: 'Two rooms. A mirror, so you can change your mind about your ears. Ambrose says alder.',
   },
   {
-    id: 'tier-3', manifestId: 'loan-3', tier: 3, amount: 25000, notch: 1250,
+    id: 'tier-3', manifestId: 'tier-3', tier: 3, amount: 25000, notch: 1250,
     build: null, commissionSlot: true, commission: true, commissionNo: 1,
     roofChoices: ROOFS, scaffoldStage: 3, targetDay: 5, satchel: 0,
     clearFlags: [], buildFlags: [],
@@ -77,7 +77,7 @@ export const LOANS = freeze([
     wren: 'This one\'s mine. Not Dad\'s plans, mine. Pick a room and I\'ll draw it tonight.',
   },
   {
-    id: 'tier-4', manifestId: 'loan-4', tier: 4, amount: 36000, notch: 1800,
+    id: 'tier-4', manifestId: 'tier-4', tier: 4, amount: 36000, notch: 1800,
     build: null, commissionSlot: true, commission: true, commissionNo: 2,
     roofChoices: ROOFS, scaffoldStage: 4, targetDay: 7, satchel: 0,
     clearFlags: [], buildFlags: [],
@@ -86,7 +86,7 @@ export const LOANS = freeze([
     wren: 'Another room. The scaffold\'s past the gallery rail now; you can see it from the quay.',
   },
   {
-    id: 'tier-5', manifestId: 'loan-5', tier: 5, amount: 50000, notch: 2500,
+    id: 'tier-5', manifestId: 'tier-5', tier: 5, amount: 50000, notch: 2500,
     build: null, commissionSlot: true, commission: true, commissionNo: 3,
     roofChoices: ROOFS, scaffoldStage: 5, targetDay: 9, satchel: 0,
     clearFlags: [], buildFlags: [],
@@ -95,7 +95,7 @@ export const LOANS = freeze([
     wren: 'Dad walked the frame twice last night. He says it\'s square. He says that about everything I build now.',
   },
   {
-    id: 'tier-6', manifestId: 'loan-6', tier: 6, amount: 66000, notch: 3300,
+    id: 'tier-6', manifestId: 'tier-6', tier: 6, amount: 66000, notch: 3300,
     build: null, commissionSlot: true, commission: true, commissionNo: 4,
     roofChoices: ROOFS, scaffoldStage: 6, targetDay: 11, satchel: 0,
     clearFlags: [], buildFlags: [],
@@ -104,7 +104,7 @@ export const LOANS = freeze([
     wren: 'Last room. And then... I have one more drawing. I\'ve had it a while.',
   },
   {
-    id: 'tier-7', manifestId: 'loan-7', tier: 7, amount: 80000, notch: 4000,
+    id: 'tier-7', manifestId: 'tier-7', tier: 7, amount: 80000, notch: 4000,
     build: 'lamp-room', commissionSlot: false, commission: false, commissionNo: 0,
     roofChoices: ROOFS, scaffoldStage: 7, targetDay: 13, satchel: 0,
     clearFlags: [], buildFlags: [],
@@ -149,7 +149,7 @@ export const COMMISSIONS = freeze([
     id: 'greenhouse', name: 'Greenhouse',
     town: 'A grafting bench for foreign fruit, and fruit trees that grow indoors.',
     creature: 'A creature left overnight with its favourite fruit gains +1 Bond, once each; a Moss lead ripens a graft a day sooner.',
-    effects: { graftBench: true, indoorTrees: 4, bondNight: 1, bondNightOncePerCreature: true, mossGraftNightsSooner: 1 },
+    effects: { graftBench: true, indoorTrees: 2, bondNight: 1, bondNightOncePerCreature: true, mossGraftNightsSooner: 1 },
     satchel: 0, flags: [],
     text: 'South-facing glass and a grafting bench. Bring a knife and a little patience.',
   },

@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Menus — SCN-MENU test page</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="../../css/style.css">
+</head>
+<body>
+  <div id="stage"></div><div id="touch"></div>
+  <!-- Boots the real game (js/main.js reads ?debug=1&skipTitle=1&mute=1 from this URL), then the fixture
+       below swaps in the full content registry and gives the keeper a party, a satchel and buttons.
+       Query: open=menu|party|summary|bag|box|settings|saveLoad|remap  fixture=full|small|empty
+       pocket=<id> noRewind=1 contrast=1 large=1 reduced=1 cellar=1 slots=1 (pre-fills save slots)
+       Harness: window.__menus = {ready: Promise, G, setup(name), open(name, params)} -->
+  <script type="module" src="../../js/main.js"></script>
+  <script type="module">
+    import { createRegistry } from '../../js/data/registry.js';
+    import { DATA } from '../../js/data/index.js';
+    import { TYPES } from '../../js/data/types.js';
+    import { MOVES } from '../../js/data/moves/index.js';
+    import { ABILITIES } from '../../js/data/abilities.js';
+    import { SPECIES, FAMILIES } from '../../js/data/species/index.js';
+    import { ITEMS } from '../../js/data/items.js';
+    import { MAPS } from '../../js/data/maps/index.js';
+    import * as partySys from '../../js/systems/party.js';
+    import * as bagSys from '../../js/systems/bag.js';
+    import * as settingsSys from '../../js/systems/settings.js';
+    import * as creatureSys from '../../js/systems/creature.js';
+    import { makeRng } from '../../js/core/rng.js';
+    import { TUNING } from '../../js/data/tuning.js';
+    import { writeExt, resetExtCache } from '../../js/scenes/menuKit.js';
+
+    const q = new URLSearchParams(location.search);
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    async function untilGame() {
+      for (let i = 0; i < 400; i++) {
+        const g = window.__game;
+        if (g && g.scene() === 'overworld' && !g.G.scenes.isTransitioning) return g;
+        await wait(25);
+      }
+      throw new Error('menus.html: the game never reached the overworld');
+    }
+
+    const FULL = [
+      { species: 'siltback', level: 23, nick: 'PUDDLE', held: 'whetstone', shiftlog: ['sloshkin', 'siltback'], bond: 3 },
+      { species: 'caldermaw', level: 21, nick: 'Cinder', hpFrac: 0.3 },
+      { species: 'knuckleback', level: 19, nick: 'Knuckles', status: 'burn', ppDrain: true },
+      { species: 'tossup', level: 7, nick: 'Toss', held: 'still-knot' },
+      { species: 'prismoth', level: 18, nick: 'Glim', hpFrac: 0 },
+      { species: 'rushling', level: 20, nick: 'Reed', shiftlog: ['reedkit', 'rushling'] },
+    ];
+    const SMALL = [
+      { species: 'scrapling', level: 7, nick: 'Scrap' },
+      { species: 'tossup', level: 5, nick: 'Toss' },
+    ];
+
+    function setup(name) {
+      const g = window.__game;
+      const G = g.G;
+      const data = createRegistry({ ...DATA, types: TYPES, moves: MOVES, abilities: ABILITIES, species: SPECIES, families: FAMILIES, items: ITEMS, maps: MAPS });
+      G.data = data;
+      const ctx = { data, bus: G.bus, tuning: TUNING };
+      const roster = name === 'empty' ? [] : name === 'small' ? SMALL : FULL;
+      G.store.tx('fixture:menus', (w) => {
+        w.party.splice(0); w.box.splice(0); w.pendingShifts.splice(0);
+        for (const p of Object.keys(w.bag.pockets)) w.bag.pockets[p].splice(0);
+        const rng = makeRng('menus-fixture');
+        for (const spec of roster) {
+          const r = partySys.giveCreature(w, { species: spec.species, level: spec.level, nickname: spec.nick }, data, rng, { tuning: TUNING });
+          if (!r.ok) continue;
+          const c = r.creature;
+          if (spec.shiftlog) c.shiftlog = spec.shiftlog.slice();
+          if (spec.bond) c.bond = spec.bond;
+          if (spec.held) partySys.setHeldItem(w, c.uid, spec.held, data, {});
+          if (spec.hpFrac !== undefined) c.hp = Math.floor(c.stats.hp * spec.hpFrac);
+          if (spec.status) c.status = { kind: spec.status, turns: 0 };
+          if (spec.ppDrain) { c.moves[0].pp = 0; if (c.moves[1]) c.moves[1].pp = 2; }
+        }
+        if (roster === FULL) {
+          // a box: eleven creatures
+          for (const [sp, lv] of [['mothling', 9], ['sootling', 12], ['wirewhisk', 10], ['chillnub', 14], ['duskwisp', 16], ['rayling', 11], ['bilgebob', 8], ['rustcreel', 13], ['skirl', 9], ['mudfist', 12], ['reedkit', 6]]) {
+            partySys.giveCreature(w, { species: sp, level: lv }, data, rng, { tuning: TUNING, to: 'box' });
+          }
+          w.pendingShifts.push(w.party[3]?.uid ?? w.party[0].uid);
+          const items = [['tallow-wick', 12], ['brass-wick', 3], ['skyglass-wick', 1], ['salve', 6], ['tonic', 2], ['revive', 1], ['ether', 2], ['poultice', 1], ['crackdust', 2],
+            ['disc-flashover', 1], ['disc-hoarfrost', 1], ['disc-drowned-bell', 1], ['disc-sandtrap', 1], ['oilskin', 1], ['lucky-button', 1], ['still-knot', 1],
+            ['honeycomb', 4], ['timber', 9], ['moth-silk', 2], ['isoldes-lantern', 1], ['dorrow-kettle', 1], ['brack-still-knot', 1], ['fleet-bell', 1]];
+          for (const [id, n] of items) bagSys.give(w, id, n, { ...ctx, source: 'fixture' });
+          w.wallet.main = 12480;
+        } else if (roster === SMALL) {
+          bagSys.give(w, 'salve', 2, { ...ctx, source: 'fixture' });
+          bagSys.give(w, 'tallow-wick', 5, { ...ctx, source: 'fixture' });
+          w.wallet.main = 600;
+        }
+        if (q.get('noRewind') === '1' && !w.run.challenges.includes('no-rewind')) w.run.challenges.push('no-rewind');
+        if (q.get('cellar') === '1' && !w.loans.commissions.includes('cellar')) w.loans.commissions.push('cellar');
+        if (w.party[0]) settingsSys.setAutoAnchor(w, w.party[0].uid, 'auto-up', {});
+        w.player.name = 'Wren';
+        w.player.mapId = 'lowmoor';
+        w.stats.playMs = 2 * 3600e3 + 17 * 60e3;
+        if (q.get('reduced') === '1') w.settings.reducedMotion = true;
+      });
+      resetExtCache();
+      if (q.get('contrast') === '1' || q.get('large') === '1') writeExt({ highContrast: q.get('contrast') === '1', largeText: q.get('large') === '1' });
+      else writeExt({ highContrast: false, largeText: false });
+      if (q.get('slots') === '1') {
+        G.persist.setNoRewind(q.get('noRewind') === '1');
+        if (q.get('noRewind') !== '1') { G.persist.saveManual(G, 1); G.persist.saveManual(G, 3); }
+        G.persist.autosave(G, 'fixture');
+        G.persist.autosave(G, 'fixture');
+      }
+      return G;
+    }
+
+    function open(name, params) {
+      const G = window.__game.G;
+      if (name === 'summary') { G.push('party', { summary: 0 }); return; }
+      if (name === 'remap') { G.push('settings', { page: 'remap' }); return; }
+      if (name === 'menu') { G.push('menu'); return; }
+      G.push(name, params ?? (name === 'saveLoad' ? { mode: 'save', from: 'menu' } : name === 'bag' && q.get('pocket') ? { pocket: q.get('pocket') } : {}));
+    }
+
+    const ready = (async () => {
+      const g = await untilGame();
+      setup(q.get('fixture') || 'full');
+      const what = q.get('open');
+      if (what) open(what);
+      return g.G;
+    })();
+    window.__menus = { ready, setup, open, get G() { return window.__game?.G; } };
+  </script>
+</body>
+</html>

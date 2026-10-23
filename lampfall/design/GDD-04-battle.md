@@ -110,7 +110,7 @@ The 54 prototype rows keep their ids, numbers, effects and text, with two text e
 | `lowmoor-dunlin` | Mudlarker Dunlin | lowmoor-mud-bank | Puddlepip 6, Mudfist 7 | trainer | 350 | Brine lead, Grit ace |
 | `lowmoor-colm` | Ferry Hand Colm | lowmoor-pavilion-steps | Bilgebob 6, Puddlepip 7 | trainer | 350 | two Brine, slow and sturdy (declinable) |
 | `lowmoor-perrin` | Marsh Walker Perrin | lowmoor-boardwalk-bend | Reedkit 7, Sloshkin 8 | trainer | 400 | Moss lead, Undertow slows you |
-| `lowmoor-tibby` | Pavilion Regular Tibby | lowmoor-pavilion-bench | Tossup 7, Scrapling 8, Wirewhisk 9 | trainer | 450 | three-deep; Wirewhisk pings your moves first (declinable) |
+| `lowmoor-tibby` | Pavilion Regular Tibby | lowmoor-pavilion-bench | Tossup 7, Scrapling 8, Wirewhisk 8 | trainer | 400 | three-deep; Wirewhisk pings your moves first (declinable) |
 | `cairnhold-ruddock` | Quarryman Ruddock | cairnhold-quarry-road | Mudfist 11, Knuckleback 12 | trainer | 600 | two Grit punchers; lowers your Attack |
 | `cairnhold-prudence` | Mooring Clerk Prudence | cairnhold-clinic-gate | Mothling 11, Chillnub 12 | trainer | 600 | Ward: Stillcoat (hits under 50 power do nothing) (Salve) |
 | `cairnhold-jory` | Stonecutter Jory | cairnhold-standing-stones | Scrapling 11, Rushling 12, Siltback 13 | trainer | 650 | Siltback ace: Brine/Stone, Settles in |
@@ -141,8 +141,8 @@ The 54 prototype rows keep their ids, numbers, effects and text, with two text e
 | `osric-spire` | Spire Leader Osric Penhallow | spire-ward-dais | Siltback 14, Rimeplate 15, Prismoth 16 | spire | 3,200 | stone pair, then a Glasshide Prismoth (Kiln, Rime, chip) (Salve+Salve) |
 | `ines-spire` | Spire Leader Ines Calloway | spire-weather-dais | Rayling 20, Coilcrest 21, Emberjaw 22 | spire | 4,400 | posted 3-turn weather: steam, ash, squall, clear (Tonic) |
 | `wendel-spire` | Spire Leader Wendel Teague | spire-hollow-dais | Duskwisp 27, Creelwight 28, Hulkwight 29 (oilskin) | spire | 5,800 | all Hollow: immune to Plain and Grit; Oilskin halves chip (Tonic+Tonic) |
-| `hallorans-spire` | Spire Leaders Ada & Ivo Halloran | spire-relay-dais | Skirl 33, Gillwick 34, Rimeplate 34, Sedgehare 35, Duskowl 35, Coilcrest 36 (whetstone) | spire | 7,200 | three rounds, no repeats: one carry will not do (Tonic+Tonic) |
-| `seraphine-spire` | Spire Leader Seraphine Locke | spire-mirror-dais | Rushling 40, Floeback 41, Skeinwing 42, Lumenveil 43 (ballast-stone) | spire | 8,600 | evasion to +2, three Mends each, Mirrorveil ace (Full Salve+Tonic) |
+| `hallorans-spire` | Spire Leaders Ada & Ivo Halloran | spire-relay-dais | Skirl 33, Gillwick 35, Rimeplate 34, Stillox 35, Duskowl 35, Coilcrest 36 (whetstone) | spire | 7,200 | three rounds, no repeats: one carry will not do (Tonic+Tonic) |
+| `seraphine-spire` | Spire Leader Seraphine Locke | spire-mirror-dais | Gillwick 42, Rimeplate 42, Floeback 42, Strandrunner 42, Skeinwing 42, Lumenveil 43 (ballast-stone) | spire | 8,600 | evasion to +2, three Mends each, Mirrorveil ace (Full Salve+Full Salve) |
 | `bar-corwen` | Wreck Diver Corwen | bar-wreck-ribs | Bilgebob 40, Rustcreel 40, Creelwight 41, Hulkwight 41 | spire | 2,050 | Long Road 1: hulls and Hollow (Tonic) |
 | `bar-tilda` | Tide-pool Warden Tilda | bar-tide-pools | Rayling 40, Rushling 40, Gillwick 41, Strandrunner 41 | spire | 2,050 | Long Road 2: Brine everywhere; bring Bolt or Moss (Tonic) |
 | `bar-ezra` | Ex-Mooring Quartermaster Ezra | bar-ration-cairn | Stillox 41, Rimeplate 41, Siltback 42, Cairnward 42 | spire | 2,100 | Long Road 3: Ward (Stillcoat) and Sandtrap attrition; count your PP (Tonic) |
@@ -240,16 +240,65 @@ The curve rises in even steps of 6–7 levels per isle, and every boss sits exac
 | Stop | Posted curve | Route trainers (mandatory / optional) | Boss | Boss − curve |
 |---|---|---|---|---|
 | Night one (Pellwick) | 4 | Pip 4; Linnet's dock hold-out 5 | — | — |
-| Lowmoor | 7 | 5–8 / 6–9 | Maud: Bilgebob 10 | +3 |
+| Lowmoor | 7 | 5–8 / 6–8 | Maud: Bilgebob 10 | +3 |
 | Cairnhold | 13 | 11–13 / 12–15 | Osric: Prismoth 16 | +3 |
 | Emberstep | 19 | 16–20 / 18–21 | Ines: Emberjaw 22 | +3 |
 | Drownwood | 26 | 24–27 / 26–28 | Wendel: Hulkwight 29 | +3 |
 | Thistlewind | 33 | 30–33 / 31–35 | Hallorans: Coilcrest 36 | +3 |
-| Rimeholt | 40 | 37–40 / 38–42 | Seraphine: Lumenveil 43 | +3 |
+| Rimeholt | 40 | 37–40 / 38–42 | Seraphine: Lumenveil 43 (a full six) | +3 |
 | The Bar (Long Road) | 41 | 40–44 (six, in rising order) | Linnet at the gate: 46 | +5 |
 | Shardcrown | 47 | — | Bastien 46 · Cass 48 · Idris 50 | −1 / +1 / +3 |
 
-Side fights sit on the same rails: Linnet's rematch (one-carry Caldermaw 11, the hardest badge-1 fight on purpose, but story and costless), Wick at Cairnhold (12, a gift), Varga (25–28, rolled Shifts), Merrow's Engine (35–38, Anchor Pulse levels every stage every 3 turns), Linnet at Rimeholt (36–39, a balanced six), Corin's exhibitions at 8 / 20 / 34. Teams grow from 2 creatures (Lowmoor) to 3 (Cairnhold–Drownwood), 3–4 (Thistlewind, Rimeholt), 4–5 (the Bar), 5–6 (the Summit). Heal pips appear on route trainers only from Cairnhold onward (Mooring Clerk Prudence's Salve is the first), and never more than one. Payouts climb from 300 to 2,200 a route trainer, so the Spire share and the leader prize, not grinding, carry the battler toward the loans (GDD-00 §7).
+Side fights sit on the same rails: Linnet's rematch (one-carry Caldermaw 11, the hardest badge-1 fight on purpose, but story and costless), Wick at Cairnhold (12, a gift), Varga (25–28, rolled Shifts), Merrow's Engine (35–38, Anchor Pulse levels every stage every 3 turns), Linnet at Rimeholt (36–39, a balanced six), Corin's exhibitions at 8 / 20 / 34. Teams grow from 2 creatures (Lowmoor) to 3 (Cairnhold–Drownwood), 3–4 (Thistlewind, Rimeholt), 4–5 (the Bar), 5–6 (the Summit); the last two leaders field six. Heal pips appear on route trainers only from Cairnhold onward (Mooring Clerk Prudence's Salve is the first), and never more than one. Payouts climb from 300 to 2,200 a route trainer, so the Spire share and the leader prize, not grinding, carry the battler toward the loans (GDD-00 §7).
+
+
+### 7.1 Balance (verified by simulation)
+
+`tools/balance-sim.mjs` plays the real tables through the real engine (`js/battle/engine.js`); `test/data.balance.test.mjs` runs it on every check and holds the targets. Each fight is played 200 times for each of three starter lines (600 battles), with a competent player brain on side 0 (finishes when it can, heals when a heal buys a turn, switches out of walls and lost matchups, throws Crackdust at a Ward nothing lands on, Plumblines boosts, chips what it cannot hurt, else the best expected hit; it knows the dossier) and the trainer's own AI profile on side 1. Posted boss Shifts are applied by the harness at the Flux odds; the Relay is three rounds of two fresh creatures with the split planned against the posted rounds; the Summit is one run of three fights with no Waystone, +5 PP between fights and the bag used between fights. Weather and held items are not in the engine yet and are left out.
+
+**The on-curve party** (starter at curve +1, everyone else at the curve; the starter line is Sloshkin, Scrapling or Reedkit, steered Up at the windows; movesets are the best four from each learnset plus the discs owned by then):
+
+| Fight | Curve | Party after the starter | Discs | Bag |
+|---|---|---|---|---|
+| Turn | 7 | Tossup, Wirewhisk, Mudfist | — | 2 Salves |
+| Ward | 13 | Tossup, Wirewhisk, Mudfist, Chillnub | Spore Drift | 2 Salves, 2 Crackdust |
+| Weather | 19 | Wirewhisk, Mudfist, Chillnub, Sootling, Sedgehare | Spore Drift | Tonic, Salve |
+| Hollow | 26 | Coilcrest, Rimeplate, Sootling, Rushling, Bilgebob | + Flashover | 2 Tonics |
+| Relay | 33 | Coilcrest, Rimeplate, Emberjaw, Rushling, Duskowl | + Gale Cut | 2 Tonics |
+| Mirror | 40 | Coilcrest, Floeback, Emberjaw, Gillwick, Duskowl | + Hoarfrost | 2 Tonics |
+| Summit | 47 | Coilcrest, Floeback, Caldermaw, Strandrunner, Duskowl | + Drowned Bell, Plumbline | 4 Tonics; between fights 3 Revives, 2 Full Salves |
+
+**Results** (win rate; Sloshkin / Scrapling / Reedkit line; average turns):
+
+| Fight | Target | Win | By line | Turns |
+|---|---|---|---|---|
+| Turn (Maud) | 55–85% | **78%** | 93 / 100 / 43 | 7.8 |
+| Ward (Osric) | 55–85% | **62%** | 100 / 32 / 54 | 14.1 |
+| Weather (Ines) | 55–85% | **72%** | 90 / 52 / 73 | 10.7 |
+| Hollow (Wendel) | 55–85% | **70%** | 24 / 88 / 100 | 12.0 |
+| Relay (Hallorans) | 55–85% | **75%** | 96 / 33 / 96 | 12.3 |
+| Mirror (Seraphine) | 55–85% | **73%** | 68 / 74 / 79 | 22.9 |
+| Summit run | 35–65% | **51%** | 54 / 61 / 39 | 15.8 |
+| 30 route trainers | 85%+ | min **88%** (Bette), mean 99% | — | ≤ 12.4 |
+
+No fight averages more than 23 turns. Every starter line wins every Spire at least one time in five; the low cells are type matchups the dossier names and the party can answer: Reedkit's Moss is weak into Maud's Brine (Wirewhisk is the answer), Scrapling's Grit takes Strong Shardlight from Osric's Prismoth (Chillnub's Frost Nip or Crackdust), Bogmonarch's Stone takes Strong Hollow hits (Coilcrest's Gust, the Flashover disc), and the Hallorans' Gust and Moss lean against a Grit carry (Duskowl and Coilcrest from Thistlewind). The Ward readout names an answer to every Ward a trainer fields, for every on-curve party.
+
+**What the sim changed** (data only; every change is inside the GDD-00 ranges):
+
+| Where | Was | Now | Why |
+|---|---|---|---|
+| Tibby (optional, Lowmoor) | Wirewhisk 9 with Jolt | Wirewhisk 8 with Fizz | At 9 it swept a Lv7 party (18% win); now 93%. GDD-ids lists Lv7–9; the range is 7–8. |
+| Hallorans (Relay) | Skirl 33, Gillwick 34, Rimeplate (Stand Firm), Sedgehare 35 | Skirl 33 (Murk), Gillwick 35, Rimeplate (Shard Fling), **Stillox 35** | Six Gust or Moss bodies walled any Grit carry (1%); Stillox, Thistlewind's rare, gives round 2 a Stone face instead. |
+| Seraphine (Mirror) | four: Rushling 40 … Lumenveil 43; Full Salve + Tonic | **six** at 42 (Gillwick, Rimeplate, Floeback, Strandrunner, Skeinwing) + Lumenveil 43; two Full Salves | Four creatures at 40–43 lost to every on-curve party 9 times in 10 (89–93%); the sixth Spire now fields a full six. GDD-ids lists 4: Lv40–43. |
+| Wirewhisk (GDD-03) | 350 total, Jolt at 6 | 335 (SpA 62, Spe 88), Jolt at 9 | The stage-1 outlier (+2.2 deviations); the reason Tibby swept. |
+| Chillnub (GDD-03) | 300 | 318 (HP 63, SpA 50, SpD 60) | The Ward Spire's Rime answer must survive one Shardlight from the Lv16 ace. |
+| Sootling (GDD-03) | 300 | 316 (HP 54, SpD 50, Spe 45) | Under the stage-1 band's spread (−1.6 deviations); Linnet's lead. |
+| Bogmonarch (GDD-03) | Riptide at 28 | Riptide at 24 | Same as Siltback, so an Up Shift at the Lv20 window loses no step. |
+| Vagary (GDD-03) | phase moves learned at 50–70 | all eight by 30 | The Reading's level floor is 30; every phase move is now legal. |
+
+Stat totals by stage after tuning: stage 1 300–335 (mean 322), stage 2 420–470 plus Vesperay 520 (two-form line, Idris's ace), stage 3 495–520. No form is strictly dominated by a same-typed form of its stage. Outliers past 1.5 deviations are all documented: Vesperay (high, by design), Tossup (low, Plain blank slate), Lumenveil (low; a Ward pays for itself), Rayling and Wirewhisk (top of the stage-1 band), Stillox (the titan under the two Errants and the Vagary).
+
+**The Reading cannot be lost**: `THE_READING.rules` sets `canLose: false`, both HP floors at 1, no blackout, no buttons, no Run, no Lantern, and `endsOn: 'accept'`; Anchor and Reroll are free and each adds a phase. The test asserts all of it.
 
 ---
 
@@ -268,11 +317,11 @@ Side fights sit on the same rails: Linnet's rematch (one-carry Caldermaw 11, the
 
 1. **Wiring:** `DATA.moves = MOVES` (moves/index.js), `DATA.trainers = TRAINERS`, `DATA.scripts = {...story scripts, ...TRAINER_SCRIPTS}`; add a `spires` table (`SPIRES`) and move `spires` from `UNMAPPED` to `MANIFEST` when it lands.
 2. **Engine follow-ups (not this chapter's files):**
-   - `battle/effects.wardCheck` blocks every status move on a `no-status` Ward, including Plumbline. GDD-00 rules Plumbline ignores Wards and Mirrorveil: `wardCheck` should let a move with `effect.plumbline` through any Ward (one line).
+   - Plumbline through Wards: done in the engine (`DEFAULTS.plumblineIgnoresWards: true`).
    - Not yet implemented in `js/battle`: posted boss Shifts (`bossShift`), arena weather (`onEntry`, the Weather Spire cycle), the Relay round structure, Merrow's Anchor Pulse, and the Reading's HP floors / phase loop. All are data here; the flow or engine needs a hook for each.
    - Engine `DEFAULTS` that differ from GDD-00 and need `tuning` overrides: `payoutPerLevel` 40 → 50; `expYieldDivisor` 7 → 5; growth curves → the single 8·L² curve; `captureOddsMax` 0.99 → 0.95; `blackoutCap` 3,000 → 1,500 with a 500 floor; `captureBands` Low/Fair/Good → Slim/Fair/Good/Sure; Lantern grades → wick grades (Tallow ×1 100, Brass ×1.5 300, Skyglass ×2 600). `js/systems/exp.js` uses `EXP_DIVISOR: 7` too.
    - `js/data/tuning.js` currently sets `wardCount: 3` while the placeholder abilities have none, so `node tools/validate-data.mjs` fails on `abilities:*` until GDD-03's abilities land (not caused by this chapter).
-3. **GDD-03 (creatures):** Errants need a catch rate near 168 for GDD-00's "~22% with a Tallow wick"; Tossup's yield should be 50 for the night-one check (40 EXP from a Lv4 catch). The moves this chapter's trainers use on forms without a prototype learnset (each must be learnable at or below the level shown, or the validator warns):
+3. **GDD-03 (creatures):** Errant catch rate: GDD-03 reads GDD-00's "~22% with a Tallow wick" at the Capture Stance floor (catch 56) rather than at full HP (catch 168); the verifier kept that reading, since Capture Stance is how every capture is taught. Tossup's yield is 50 for the night-one check (40 EXP from a Lv4 catch). The moves this chapter's trainers use on forms without a prototype learnset (each must be learnable at or below the level shown, or the validator warns):
 
 | Form | Moves used (latest level they must be known by) |
 |---|---|
@@ -292,7 +341,7 @@ Side fights sit on the same rails: Linnet's rematch (one-carry Caldermaw 11, the
 | Hulkwight | snuff (29), iron-pin (29), drowned-bell (29), stand-firm (29) |
 | Cairnward | shardlight (38), stand-firm (38), cairn-crash (38), dazzle (38) |
 
-   Ward sentinels: Chillnub 13 (tap, frost-nip, settle), Cairnward 14 (shard-fling, settle, dazzle). The Reading's Vagary uses tailfall, starfall, riptide, kiln-maw, shardlight, hoarfrost, bandlight, echo-drain (the prototype learnset; the Reading ignores learn levels).
+   Ward sentinels: Chillnub 13 (tap, frost-nip, settle), Cairnward 14 (shard-fling, settle, dazzle). The Reading's Vagary uses tailfall, starfall, riptide, kiln-maw, shardlight, hoarfrost, bandlight, echo-drain; its learnset now holds all eight by Lv30, the Reading's level floor, so no phase needs a learn-level exception.
 4. **GDD-01 (world):** every trainer's `post` is a marker id to place on its `map`; route trainers' optional/mandatory status is in `declinable`. Spire interiors need the `order` steps' positions (door, sentinels, gallery, dais).
 5. **GDD-02 (economy):** Crackdust 300 is below every Cairnhold route payout (600–750); heal-item fractions used by trainers: Salve 0.3, Tonic 0.6, Full Salve 1.0; held items used: Oilskin, Whetstone, Ballast Stone, Still Knot.
 6. **GDD-07 (story):** owns the story script ids the rows point at; `TRAINER_SCRIPTS` never reuses a manifest script id (asserted). The Linnet arc forms used: Sootling "Cinder" Lv5 → Caldermaw at the dock; Caldermaw 11 at Brackenford; Sootling 39 at Rimeholt; **Emberjaw 46 at the gate** (Sootling's line's own middle form after two off-screen Shifts, same mark).

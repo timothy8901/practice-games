@@ -113,12 +113,12 @@ Stats are `[HP, Atk, Def, SpA, SpD, Spe]`. Catch rate is on the 3–255 scale (`
 | 21 | **Rustcreel** `rustcreel` | creelwight | 1 | Rust | scavenger | rust-bite | 55/62/80/40/55/30 (322) | 140 | 62 | medium-fast | brief |
 | 22 | **Creelwight** `creelwight` | creelwight | 2 | Hollow/Rust | empty-weave | snuff | 70/65/110/70/95/30 (440) | 60 | 150 | medium-slow | drawn |
 | 23 | **Hulkwight** `hulkwight` | creelwight | 3 | Hollow/Rust | empty-weave | snuff | 90/80/130/80/105/30 (515) | 30 | 235 | medium-slow | brief |
-| 24 | **Wirewhisk** `wirewhisk` | wirewhisk | 1 | Bolt | tailhum | arc-ping | 45/40/45/70/55/95 (350) | 190 | 55 | medium-fast | drawn |
+| 24 | **Wirewhisk** `wirewhisk` | wirewhisk | 1 | Bolt | tailhum | arc-ping | 45/40/45/62/55/88 (335) | 190 | 55 | medium-fast | drawn |
 | 25 | **Coilcrest** `coilcrest` | wirewhisk | 2 | Bolt/Gust | still-mind | arc-ping | 65/55/60/100/65/105 (450) | 45 | 165 | medium-fast | brief |
-| 26 | **Chillnub** `chillnub` | rimeplate | 1 | Rime | stillcoat | frost-nip | 61/50/67/44/50/28 (300) | 160 | 52 | medium-slow | drawn |
+| 26 | **Chillnub** `chillnub` | rimeplate | 1 | Rime | stillcoat | frost-nip | 63/50/67/50/60/28 (318) | 160 | 52 | medium-slow | drawn |
 | 27 | **Rimeplate** `rimeplate` | rimeplate | 2 | Rime/Stone | plateshed | plate-toss | 80/85/115/50/75/30 (435) | 90 | 150 | medium-slow | drawn |
 | 28 | **Floeback** `floeback` | rimeplate | 3 | Rime/Stone | plateshed | plate-toss | 105/100/135/60/90/25 (515) | 30 | 235 | medium-slow | brief |
-| 29 | **Sootling** `sootling` | caldermaw | 1 | Kiln | ember-core | ember-lick | 50/56/44/67/44/39 (300) | 160 | 54 | slow | brief |
+| 29 | **Sootling** `sootling` | caldermaw | 1 | Kiln | ember-core | ember-lick | 54/56/44/67/50/45 (316) | 160 | 54 | slow | brief |
 | 30 | **Emberjaw** `emberjaw` | caldermaw | 2 | Kiln | furnace-jaw | kiln-maw | 75/95/65/90/60/60 (445) | 45 | 150 | slow | brief |
 | 31 | **Caldermaw** `caldermaw` | caldermaw | 3 | Kiln/Stone | furnace-jaw | kiln-maw | 90/110/100/95/70/55 (520) | 30 | 210 | slow | drawn |
 | 32 | **Rillfin** `rillfin` | rillfin | 1 | Brine | scavenger | breaker | 48/55/45/55/45/75 (323) | 170 | 58 | medium-fast | brief |
@@ -167,8 +167,11 @@ Totals sit on the prototype's ladder: hatchling 270–290, stage 1 300–355, st
 | Form | Prototype | Here | Why |
 |---|---|---|---|
 | Siltback | 375 total | **430** (same shape ×1.15) | The forward Up card from Sloshkin sat *below* Skeinwing (420) and below every other stage 2; landing "Up" on a weaker body breaks pillar 1's promise that Up means up. |
-| Chillnub | stage 0, 270 | **stage 1, 300** (same shape) | GDD-ids ruling 4 makes it stage 1; 270 sat under the stage-1 floor. Still the line's smallest form; Stillcoat carries it. |
-| Sootling | stage 0, 270 | **stage 1, 300** (same shape) | Same ruling; it is Linnet's lead in Acts III–IV and must not fold to a stray hit. |
+| Chillnub | stage 0, 270 | **stage 1, 318** (HP 63, SpA 50, SpD 60) | GDD-ids ruling 4 makes it stage 1; 270 sat under the stage-1 floor. It is the Ward Spire's Rime answer to Prismoth, so the balance sim (GDD-04 §Balance) asks it to survive one Shardlight from the Lv16 ace; at 300 it did not. Still the line's slowest form; Stillcoat carries it. |
+| Sootling | stage 0, 270 | **stage 1, 316** (HP 54, SpD 50, Spe 45) | Same ruling; it is Linnet's lead in Acts III–IV and must not fold to a stray hit. 300 sat 1.6 deviations under the stage-1 mean in the balance sim. |
+| Wirewhisk | 350; Jolt at 6 | **335** (SpA 62, Spe 88); **Jolt at 9** | The balance sim's stage-1 outlier (+2.2 deviations). Met on night one and in every Lowmoor band, a Lv9 Wirewhisk with Jolt swept on-curve Lv7 parties; Fizz carries it to 9. |
+| Bogmonarch | Riptide at 28 | **Riptide at 24** | Same level as Siltback's, so a Siltback that Shifts Up at the Lv20 window loses no step. |
+| Vagary | learns its last moves at 50–70 | **every move by 30** | The Reading's Vagary is party max +2 (floor 30); each phase's moves are now legal at that floor. |
 | Vesperay | stage 3, 520 | **stage 2, 520 kept** | GDD-00 makes it stage 2. Its line has only two forms, so its top carries a stage-3 total. Idris's ace has to be the hardest single creature short of an Errant. |
 | Prismoth | `prism-ward` | **`glasshide`** | GDD-00 §8 merge. `hpMultiplier: 0.25` is kept: one Strong hit ends it. |
 | Puddlepip | `glasshide` | **`shoresense`** | GDD-ids ruling 4: Wards on four forms only. |
@@ -339,7 +342,7 @@ Weights are relative inside one card. The dial sets the card odds (GDD-00 §8: D
 | Sloshkin | 1 tap, 1 salt-spray, 5 undertow, 9 settle, 13 shell-rattle, 17 shellguard, 22 riptide, 25 breaker, 28 tidal-mend, 34 grind-down | sandtrap, stand-firm, hoarfrost, drowned-bell, cairn-crash, plumbline |
 | Siltback | 1 tap, 1 salt-spray, 1 undertow, 5 shard-fling, 12 settle, 18 stand-firm, 24 riptide, 30 sandtrap, 36 bedrock-charge, 42 tidal-mend | cairn-crash, hoarfrost, drowned-bell, plumbline |
 | Skeinwing | 1 tap, 1 salt-spray, 5 undertow, 8 downdraft, 12 gale-cut, 18 skein-sweep, 24 updraft, 30 mirror-step, 36 riptide, 42 hoarfrost | shardlight, drowned-bell, plumbline |
-| Bogmonarch | 1 tap, 1 salt-spray, 1 undertow, 5 shard-fling, 12 settle, 20 stand-firm, 28 riptide, 32 breaker, 36 sandtrap, 44 bedrock-charge, 52 tidal-mend, 60 grind-down | cairn-crash, hoarfrost, drowned-bell, gnash, plumbline, spore-drift |
+| Bogmonarch | 1 tap, 1 salt-spray, 1 undertow, 5 shard-fling, 12 settle, 20 stand-firm, 24 riptide, 32 breaker, 36 sandtrap, 44 bedrock-charge, 52 tidal-mend, 60 grind-down | cairn-crash, hoarfrost, drowned-bell, gnash, plumbline, spore-drift |
 | Scrapling | 1 tap, 1 knuckle, 5 shadowbox, 10 sand-smother, 15 pummel, 20 stand-firm, 26 grind-down, 32 shellguard, 38 rust-bite | sandtrap, cairn-crash, gnash, live-wire, plumbline |
 | Mudfist | 1 tap, 1 knuckle, 8 sand-smother, 14 pummel, 20 stand-firm, 26 grind-down, 32 shellguard, 38 iron-pin | sandtrap, cairn-crash, gnash, plumbline, spore-drift, live-wire |
 | Knuckleback | 1 tap, 1 knuckle, 6 shadowbox, 10 sand-smother, 15 pummel, 20 stand-firm, 26 grind-down, 32 shellguard, 38 rust-bite, 45 iron-pin | sandtrap, cairn-crash, gnash, live-wire, gale-cut, plumbline |
@@ -358,7 +361,7 @@ Weights are relative inside one card. The dial sets the card odds (GDD-00 §8: D
 | Rustcreel | 1 tap, 1 rust-bite, 5 corrode, 10 settle, 15 murk, 21 iron-pin, 27 stand-firm, 33 shellguard, 40 hullburst | sandtrap, drowned-bell, gnash, plumbline, live-wire |
 | Creelwight | 1 tap, 1 snuff, 8 rust-bite, 12 murk, 15 corrode, 22 echo-drain, 29 iron-pin, 36 stand-firm, 40 drowned-bell, 43 shellguard, 50 hullburst | gnash, sandtrap, plumbline, live-wire |
 | Hulkwight | 1 tap, 1 snuff, 1 rust-bite, 8 corrode, 15 murk, 22 echo-drain, 24 stand-firm, 28 drowned-bell, 29 iron-pin, 34 hush, 50 shellguard, 56 hullburst | gnash, sandtrap, cairn-crash, plumbline, live-wire |
-| Wirewhisk | 1 tap, 1 arc-ping, 3 fizz, 6 jolt, 12 static-net, 18 updraft, 24 shell-rattle, 30 mirror-step, 36 gale-cut | live-wire, shardlight, plumbline, flashover |
+| Wirewhisk | 1 tap, 1 arc-ping, 3 fizz, 9 jolt, 12 static-net, 18 updraft, 24 shell-rattle, 30 mirror-step, 36 gale-cut | live-wire, shardlight, plumbline, flashover |
 | Coilcrest | 1 arc-ping, 1 fizz, 1 downdraft, 8 jolt, 14 static-net, 18 updraft, 20 gale-cut, 30 live-wire, 40 bandlight, 44 mirror-step | shardlight, plumbline, flashover |
 | Chillnub | 1 tap, 1 frost-nip, 8 settle, 14 shard-fling, 17 floe-ram, 20 plate-toss, 26 rime-lock, 32 hoarfrost | sandtrap, stand-firm, plumbline |
 | Rimeplate | 1 tap, 1 frost-nip, 8 shard-fling, 14 plate-toss, 17 floe-ram, 20 stand-firm, 26 hoarfrost, 32 rime-lock, 38 sandtrap, 44 bedrock-charge | cairn-crash, plumbline |
@@ -376,7 +379,7 @@ Weights are relative inside one card. The dial sets the card odds (GDD-00 §8: D
 | Duskwisp | 1 tap, 1 murk, 6 hush, 11 dust-veil, 16 echo-drain, 22 mirror-step, 28 drowned-bell, 34 snuff | spore-drift, shardlight, gnash, plumbline, flashover |
 | Duskowl | 1 tap, 1 murk, 1 downdraft, 8 hush, 14 gale-cut, 20 echo-drain, 26 updraft, 32 drowned-bell, 38 skein-sweep, 44 snuff | gnash, shardlight, plumbline, flashover |
 | Stillox | 1 tap, 1 shard-fling, 10 stand-firm, 20 grind-down, 28 bedrock-charge, 34 sandtrap, 42 cairn-crash, 50 iron-pin, 60 hullburst | gnash, plumbline |
-| Vagary | 1 starfall, 1 tailfall, 20 shardlight, 30 hoarfrost, 40 riptide, 50 kiln-maw, 60 bandlight, 70 echo-drain | — |
+| Vagary | 1 starfall, 1 tailfall, 10 shardlight, 15 hoarfrost, 20 riptide, 24 kiln-maw, 27 bandlight, 30 echo-drain (all by Lv30, the Reading's level floor, so every phase move is legal) | — |
 
 ## 8. Sprite briefs (20 undrawn forms)
 

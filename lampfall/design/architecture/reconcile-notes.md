@@ -70,3 +70,19 @@ From the SYS-GATHER+WORLD verifier (fishing, gather, fieldLog, encounter; lane t
 - Real Clock: day numbers are absolute, so the Glint (500 + 60 x day) would pay ~a million. Use a run-relative day (days since new game) in wallet/clockSys/gather.
 - DATA: wire js/data/collections.js and encounters into js/data/index.js; DATA has no `tuning` table: scenes must pass ctx.tuning = data/tuning.TUNING (or add it to DATA).
 - Kept: Brine tell threshold 1 catch (GDD-00 §9); encounter floor 8 free steps; night low = night now and within ±90 min of a low.
+
+From the creatures/battle chapters and the balance verifier:
+- ENGINE GAP: arena weather (Weather Spire's posted 3-turn cycle; Cass's and Idris's squall on entry) and held items are NOT implemented in js/battle/engine.js. The Weather Spire theme depends on weather. Add a weather field + per-type modifiers + posted turns, and held-item hooks, then re-run tools/balance-sim.mjs.
+- Boss Shifts, Relay no-repeat rounds and between-fight bag use are modelled by the balance harness, not the engine; battleFlow/spire scenes must implement them from js/data/spires.js.
+- systems/forecast refuses a star card when the star form equals the current form, so Star-touched Sloshkin can never appear from Sloshkin; fix the comparison (Star-touched is a palette variant of the same form).
+- Disc teaching: systems/creature.canLearn and the shop learner strips must read species flags.teachable (species/index.canBeTaught is the rule).
+- Heartmark: drawMark picks one of the four anchors and keeps that key through every Shift.
+- Dusksight has hook null plus a nightHook that the battle flow applies under night rules.
+
+From the economy/town chapters:
+- Wire DATA.loans / commissions / commons / shops / items / dials / challenges / toggleOrder / collections / festivals / weather (staged in js/data/content.js).
+- Pass tuning via ctx.tuning, not as a DATA table (registry flags camelCase keys as bad ids).
+- systems/party BOX_CAPACITY is one constant: the Cellar's 40 slots need a per-world capacity.
+- Maps: Pellwick needs a 'flats' reach (dab, sand eel, glimmer sprat are flats fish); reaches need a kind from collections.REACH_KINDS; bug spots need a habitat from BUG_HABITATS.
+- A listener must keep the stamp.* counters (each stamp names its bus event); capture:ok should carry `scripted`, battle:end should carry `porchDuel`.
+- Market night is dow 5 (Saturday) 20:00-24:00 and dow 6 00:00-02:00 (fixed in shops.js).

@@ -32,8 +32,9 @@
 import { TUNING } from '../js/data/tuning.js';
 import { LOANS, COMMISSIONS, COMMONS } from '../js/data/loans.js';
 import { ITEMS } from '../js/data/items.js';
+import { SHOPS } from '../js/data/shops.js';
 import { FISH, BUGS, FINDS, FRUIT } from '../js/data/collections.js';
-import { TREES, PORCH_DUELS, FURNITURE } from '../js/data/town.js';
+import { TREES, PORCH_DUELS, FURNITURE, CLOTHES } from '../js/data/town.js';
 import { TRAINERS } from '../js/data/trainers.js';
 import { MAPS_BY_ID } from '../js/data/maps/index.js';
 import { createNewWorld } from '../js/state/schema.js';
@@ -102,8 +103,8 @@ export const PAUSED_MINUTES = Object.freeze({
  */
 export const PROFILES = Object.freeze({
   casual: Object.freeze({
-    id: 'casual', label: 'Casual (≈45 real min a day, sleeps at 22:00, talks to everyone)',
-    awakeUntil: 22 * H, dialogue: 21, reserve: 600, payDaily: true,
+    id: 'casual', label: 'Casual (≈45 real min a day: sleeps at 22:00, talks to everyone, decorates)',
+    awakeUntil: 22 * H, dialogue: 21, reserve: 600,
     trees: 9, purses: 2, nests: 1, glint: 0.7, cracks: 2, dayLows: 1, rakes: 2, nightLows: 0,
     castsDay: 3, castsNight: 2, skill: 1.0, bugsDay: 2, bugsNight: 1,
     duels: 1, duelsFrom: 2, errant: 0.25, wantedHits: 0.5, crate: 0.3,
@@ -115,28 +116,47 @@ export const PROFILES = Object.freeze({
     rooms: ['greenhouse', 'porch-loft', 'gallery', 'cellar'],
   }),
   typical: Object.freeze({
-    id: 'typical', label: 'Typical (≈32 real min a day, sleeps at 01:00, a leg most days)',
-    awakeUntil: 25 * H, dialogue: 9, reserve: 400, payDaily: true,
-    trees: 16, purses: 4, nests: 2, glint: 0.95, cracks: 3, dayLows: 1, rakes: 3, nightLows: 1,
-    castsDay: 4, castsNight: 9, skill: 1.2, bugsDay: 2, bugsNight: 3,
-    duels: 2, duelsFrom: 2, duelsAllFrom: 8, errant: 0.5, wantedHits: 1.2, crate: 0.05,
+    id: 'typical', label: 'Typical (the average day: orchard, a leg, porch hours, most night lows; sleeps at 01:00)',
+    awakeUntil: 25 * H, dialogue: 6, reserve: 400, refine: 0.5,
+    trees: [[2, 9], [5, 11], [9, 13]], purses: [[2, 2], [5, 3]], nests: [[2, 1], [7, 2]], glint: 0.9,
+    cracks: 2, dayLows: 0.7, rakes: 2, nightLows: 0.7,
+    castsDay: 2, castsNight: [[2, 4], [5, 7], [9, 9]], skill: 1.2, bugsDay: 1, bugsNight: 2,
+    duels: [[2, 1], [6, 2], [10, 3]], duelsFrom: 2, errant: 0.5, wantedHits: [[2, 0.6], [6, 1]], crate: 0.05,
     badgeDays: [3, 5, 7, 10, 11, 13], optional: 0.5, longRoad: true,
     threadDays: [8, 9, 10, 11, 12, 13], captures: 1.3, wicksPerCatch: 1.8,
-    seedlings: [5, 7, 9, 11], commons: [[4, 'dark-house-1'], [7, 'quay-lamps'], [10, 'mudlark-mile-flags']],
-    discs: [[4, 'disc-spore-drift'], [8, 'disc-flashover'], [10, 'disc-cairn-crash'], [12, 'disc-live-wire']],
-    held: [], starsalt: [[5, 1], [8, 1], [10, 1], [12, 1]], anchors: [[6, 1], [11, 1]],
-    decorFrom: 5, decorEvery: 3, ferryLegs: 1, blackouts: [9],
+    seedlings: [5, 7, 9, 11],
+    commons: [[4, 'dark-house-1'], [6, 'quay-lamps'], [9, 'mudlark-mile-flags'], [12, 'north-creek-footbridge']],
+    discs: [[4, 'disc-spore-drift'], [6, 'disc-gale-cut'], [8, 'disc-flashover'], [10, 'disc-cairn-crash'], [12, 'disc-live-wire']],
+    held: [[7, 'cork-float'], [11, 'tally-charm']], starsalt: [[6, 1], [10, 2], [12, 1]], anchors: [[6, 1], [11, 1]],
+    decorFrom: 4, decorEvery: 2, ferryLegs: 1, blackouts: [9],
+    rooms: ['workshop', 'greenhouse', 'training-yard', 'porch-loft'],
+  }),
+  /** GDD-00 §5's ideal day, every day ("what a good day does"): the reference the GDD's Day 10 follows. */
+  ideal: Object.freeze({
+    id: 'ideal', label: 'Ideal (GDD-00 §5 "what a good day does", every day)',
+    awakeUntil: 25 * H, dialogue: 6, reserve: 400, refine: 0.3,
+    trees: [[2, 10], [5, 12], [9, 14]], purses: [[2, 2], [5, 3], [9, 4]], nests: [[2, 1], [7, 2]], glint: 0.9,
+    cracks: 2, dayLows: 1, rakes: 2, nightLows: 1,
+    castsDay: 2, castsNight: [[2, 5], [5, 8], [9, 10]], skill: 1.2, bugsDay: 1, bugsNight: 2,
+    duels: [[2, 1], [6, 2], [10, 3]], duelsFrom: 2, errant: 0.5, wantedHits: [[2, 0.6], [6, 1]], crate: 0.05,
+    badgeDays: [3, 5, 7, 10, 11, 13], optional: 0.5, longRoad: true,
+    threadDays: [8, 9, 10, 11, 12, 13], captures: 1.3, wicksPerCatch: 1.8,
+    seedlings: [5, 7, 9, 11],
+    commons: [[4, 'dark-house-1'], [6, 'quay-lamps'], [9, 'mudlark-mile-flags'], [12, 'north-creek-footbridge']],
+    discs: [[4, 'disc-spore-drift'], [6, 'disc-gale-cut'], [8, 'disc-flashover'], [10, 'disc-cairn-crash'], [12, 'disc-live-wire']],
+    held: [[7, 'cork-float'], [11, 'tally-charm']], starsalt: [[4, 1], [6, 1], [8, 1], [10, 2], [12, 1]], anchors: [[6, 1], [11, 1]],
+    decorFrom: 4, decorEvery: 2, ferryLegs: 1, blackouts: [9],
     rooms: ['workshop', 'greenhouse', 'training-yard', 'porch-loft'],
   }),
   grinder: Object.freeze({
-    id: 'grinder', label: 'Grinder (≈35 real min a day, never sleeps, every verb at its cap)',
-    awakeUntil: 30 * H, dialogue: 3, reserve: 200, payDaily: true,
+    id: 'grinder', label: 'Grinder (never sleeps; every capped verb at its cap, fishes every second left)',
+    awakeUntil: 30 * H, dialogue: 3, reserve: 200,
     trees: 50, purses: 6, nests: 4, glint: 1, cracks: 4, dayLows: 2, rakes: 4, nightLows: 2,
-    castsDay: 8, castsNight: 22, skill: 1.5, bugsDay: 4, bugsNight: 5,
+    castsDay: 8, castsNight: 'fill', skill: 1.5, refine: 0, bugsDay: 4, bugsNight: 5,
     duels: 3, duelsFrom: 1, errant: 0.9, wantedHits: 2, crate: 0,
     badgeDays: [3, 5, 7, 9, 11, 13], optional: 1, longRoad: false,
     threadDays: [7, 8, 9, 10, 11, 12], captures: 0.5, wicksPerCatch: 1.6,
-    seedlings: [2, 3, 4, 5, 6, 7, 7, 7, 7, 8], commons: [[3, 'quay-lamps']],
+    seedlings: [2, 3, 4, 5, 6], commons: [[3, 'quay-lamps']],
     discs: [[4, 'disc-spore-drift']], held: [[5, 'lucky-button']], starsalt: [], anchors: [],
     decorFrom: 99, decorEvery: 99, ferryLegs: 0, blackouts: [],
     rooms: ['greenhouse', 'workshop', 'porch-loft', 'training-yard'],
@@ -147,6 +167,13 @@ export const PROFILES = Object.freeze({
 // Content lookups
 // ---------------------------------------------------------------------------------------------
 
+/** A profile value, or `[[fromDay, value], ...]` stepping up over the season. */
+export function ramp(v, d) {
+  if (!Array.isArray(v) || !Array.isArray(v[0])) return v;
+  let out = v[0][1];
+  for (const [from, val] of v) if (d >= from) out = val;
+  return out;
+}
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const avg = (a, b) => (a + b) / 2;
 const totalAt = (day, minute) => (day - 1) * DAY + minute;
@@ -257,6 +284,19 @@ const NATIVE = FRUIT.find((f) => f.origin === 'native');
 const FOREIGN = FRUIT.filter((f) => f.origin === 'foreign');
 const FOREIGN_PRICE = FOREIGN[0].price;
 const FOREIGN_RIPE = FOREIGN[0].ripePrice;
+/** Mean price of the six fossils (what the Workshop bench cleans). */
+const FOSSIL_AVG = FINDS.filter((f) => f.group === 'fossil').reduce((s, f, _, a) => s + f.price / a.length, 0);
+/** Mean price of a single fish or bug on Pell's Wanted Today list (a stack of one). */
+const WANTED_POOL = SHOPS.find((x) => x.id === 'pells-sundries').wantedPool;
+const WANTED_SINGLE = [...FISH, ...BUGS].filter((r) => WANTED_POOL.includes(r.id)).reduce((s, r, _, a) => s + r.price / a.length, 0);
+/** Medicine burned per trainer battle by badges held: half a Salve, then half a Tonic, then half a Full Salve. */
+const MEDICINE_PER_BATTLE = ['salve', 'salve', 'tonic', 'tonic', 'full-salve', 'full-salve', 'full-salve'].map((id) => ITEM.get(id).price / 2);
+/** The day a profile first walks isle `i` (the day before its Spire when it spends two days there). */
+function legDay(P, i) {
+  const bd = P.badgeDays[i];
+  const twoDays = i === 0 ? bd >= 3 : bd - P.badgeDays[i - 1] >= 2;
+  return twoDays ? bd - 1 : bd;
+}
 /** The six lead threads; finishing one credits the resident share (5% of the open loan). */
 const THREADS = ['mudlark-mile', 'twelve-lights', 'oyster-boat', 'the-fence', 'heirlooms-going-home', 'the-bell'];
 
@@ -296,7 +336,7 @@ export function simulate(profileOrId, opts = {}) {
   const findCounts = new Map();
   const badges = [];
   let heldForms = 1; let framed = 0; let luckyButton = false; let quayLamps = false;
-  let workshop = false; let greenhouse = false; let gallery = false;
+  let workshop = false; let gallery = false;
   const cleared = {}; let relightDay = null; let lampRoomDay = null;
   const days = [];
   const income = Object.fromEntries(SOURCES.map((s) => [s, 0]));
@@ -392,20 +432,23 @@ export function simulate(profileOrId, opts = {}) {
   const purseAvg = avg(...tuning.purseRange);
   const honey = ITEM.get('honeycomb').price;
   const seedlingPrice = ITEM.get('fruit-seedling').price;
-  const decorQueue = FURNITURE.filter((f) => !f.cond && f.source.some((s) => s === 'pells' || s === 'market')).map((f) => f.price);
+  // Pell's rotating decor, alternating a piece of furniture and an item of clothing (town FURNITURE / CLOTHES)
+  const furn = FURNITURE.filter((f) => !f.cond && f.source.some((s) => s === 'pells' || s === 'market')).map((f) => f.price);
+  const clothes = CLOTHES.filter((c) => c.price > 0 && c.source.some((s) => s === 'pells' || s === 'market')).map((c) => c.price);
+  const decorQueue = furn.flatMap((p, i) => (i < clothes.length ? [p, clothes[i]] : [p]));
   let decorIdx = 0;
   let ferryLeft = P.ferryLegs;
+  let starsaltFree = 0;
 
   for (let d = 1; d <= maxDays; d++) {
     const day = { day: d, gross: {}, sinks: {}, skipped: [], running: 0, paused: 0, tierBefore: world.loans.tier };
-    const dayStart = totalAt(d, 6 * H);
     const arrival = d === 1;
 
     // 05:40: the overnight build lands; the Relighting fires at the dusk the Lamp Room lands
     if (!arrival) {
       const r = loans.landDue(world, ctxAt(totalAt(d, 5 * H + 40)));
       for (const b of r.landed) {
-        if (b.id === 'greenhouse') { greenhouse = true; const indoor = COMMISSIONS.find((c) => c.id === 'greenhouse').effects.indoorTrees; for (let i = 0; i < indoor; i++) trees.push({ fruitDay: d + 3, foreign: true }); }
+        if (b.id === 'greenhouse') { const indoor = COMMISSIONS.find((c) => c.id === 'greenhouse').effects.indoorTrees; for (let i = 0; i < indoor; i++) trees.push({ fruitDay: d + 3, foreign: true }); }
         if (b.id === 'workshop') workshop = true;
         if (b.id === 'gallery') gallery = true;
         if (b.tier === LOANS.length) lampRoomDay = d;
@@ -413,6 +456,7 @@ export function simulate(profileOrId, opts = {}) {
       if (lampRoomDay !== null && relightDay === null) relightDay = lampRoomDay; // dusk of the landing day
     }
 
+    const at = (key) => ramp(P[key], d);
     const awakeEnd = arrival ? 23 * H + 30 : P.awakeUntil;
     const runningMin = arrival ? (awakeEnd - (17 * H + 40)) : (awakeEnd - 6 * H);
     day.running = Math.min(24, runningMin / 60);
@@ -422,55 +466,56 @@ export function simulate(profileOrId, opts = {}) {
     if (arrival) {
       // GDD-00 §12, the first 30 minutes: six trees, a purse, a nest, a perch, Pip, the errands
       for (let i = 0; i < 6; i++) earn(day, 'fruit', harvest(1, 1).value, totalAt(1, 19 * H + 20), false);
-      if (P.trees > 20) earn(day, 'fruit', harvest(1, Math.min(P.trees, 24) - 6).value, totalAt(1, 20 * H), false);
+      if (ramp(P.trees, 1) > 20) earn(day, 'fruit', harvest(1, Math.min(ramp(P.trees, 1), 24) - 6).value, totalAt(1, 20 * H), false);
       earn(day, 'purses', 300, totalAt(1, 19 * H + 20), false);
       earn(day, 'honey', honey, totalAt(1, 19 * H + 20), false);
       earn(day, 'fish', FISH.find((f) => f.id === 'perch').price, totalAt(1, 20 * H + 45), false);
       earn(day, 'trainers', PIP.payout, totalAt(1, 21 * H + 30), false);
       for (let i = 0; i < tuning.errandCount; i++) credit(day, 'errands', loans.errand(world, `errand-${i + 1}`, ctxAt(totalAt(1, 18 * H + 30))));
       if (P.duelsFrom <= 1) earn(day, 'duels', tuning.porchDuelPerCurve * duelCurve[0], totalAt(1, 22 * H + 45), false);
-      if (P.castsNight > 10) earn(day, 'fish', fishSession(TOWN_REACHES, 8, totalAt(1, 22 * H + 50), 'pellwick').value, totalAt(1, 23 * H + 20), false);
+      if (P.castsNight === 'fill') earn(day, 'fish', fishSession(TOWN_REACHES, 8, totalAt(1, 22 * H + 50), 'pellwick').value, totalAt(1, 23 * H + 20), false);
       day.paused += PAUSED_MINUTES.trainer * 2 + PAUSED_MINUTES.capture + PAUSED_MINUTES.ceremony;
     } else {
       // ---- the morning: the Glint at the day's low, the orchard, purses, bees, cracks ----
       const lows = tidesForDay(d).filter((e) => e.kind === 'low');
       const awakeLows = lows.filter((l) => l.minute + tuning.flatsWindowMinutes >= 6 * H && l.minute - tuning.flatsWindowMinutes <= awakeEnd);
-      if (awakeLows.length && take('glint', P.glint)) {
+      if (awakeLows.length && take('glint', at('glint'))) {
         const g = wallet.collectGlint(world, { ...ctxAt(awakeLows[0].total, 'glint'), gameDay: d });
         income.glint += g.total; day.gross.glint = (day.gross.glint ?? 0) + g.total;
         seconds += ACTION_SECONDS.glint;
       }
-      const h = harvest(d, P.trees);
+      const h = harvest(d, at('trees'));
       earn(day, 'fruit', h.value, totalAt(d, 9 * H));
       seconds += ACTION_SECONDS.tree * h.shaken;
-      const purses = Math.min(P.purses, TREES.purse.trees);
+      const purses = Math.min(at('purses'), TREES.purse.trees);
       earn(day, 'purses', purses * purseAvg, totalAt(d, 8 * H));
       seconds += ACTION_SECONDS.purse * purses;
-      const nests = Math.min(P.nests, TREES.bees.trees);
+      const nests = Math.min(at('nests'), TREES.bees.trees);
       earn(day, 'honey', nests * honey, totalAt(d, 8 * H));
       seconds += ACTION_SECONDS.nest * nests;
-      const cracks = Math.min(P.cracks, tuning.cracksPerDay);
-      const workshopBonus = workshop ? (tuning.findCleanMult - 1) : 0;
-      earn(day, 'finds', findsValue(findPool('crack', 'pellwick'), cracks) + (workshop ? workshopBonus * avg(300, 800) : 0), totalAt(d, 10 * H));
+      const cracks = Math.min(at('cracks'), tuning.cracksPerDay);
+      // the Workshop bench cleans one fossil a night (+40%)
+      const cleaned = workshop ? (tuning.findCleanMult - 1) * FOSSIL_AVG : 0;
+      earn(day, 'finds', findsValue(findPool('crack', 'pellwick'), cracks) + cleaned, totalAt(d, 10 * H));
       seconds += ACTION_SECONDS.crack * cracks;
 
       // ---- low-tide flats in daylight: sparkles, cockle rakes, sandhoppers ----
       const dayLows = awakeLows.filter((l) => !lowTouchesNight(l.total, { tuning }));
-      const flatsVisits = Math.min(P.dayLows, Math.max(dayLows.length, awakeLows.length));
+      const flatsVisits = Math.min(take('dayLows', at('dayLows')), Math.max(dayLows.length, awakeLows.length));
       for (let i = 0; i < flatsVisits; i++) {
         earn(day, 'finds', findsValue(findPool('sparkle', 'pellwick'), tuning.sparklesPerLow), totalAt(d, 12 * H));
-        const rakes = Math.min(P.rakes, tuning.cockleRakesPerLow);
+        const rakes = Math.min(at('rakes'), tuning.cockleRakesPerLow);
         earn(day, 'finds', rakes * avg(...tuning.cockleRange) * FINDS.find((f) => f.id === 'cockle').price, totalAt(d, 12 * H));
         earn(day, 'bugs', bugValue(bugPool(world, (awakeLows[i] ?? lows[0]).total, BUG_FLATS)), totalAt(d, 12 * H));
         seconds += ACTION_SECONDS.sparkle * tuning.sparklesPerLow + ACTION_SECONDS.rake * rakes + ACTION_SECONDS.bug;
       }
 
       // ---- day fishing and day bugs ----
-      const dayFish = fishSession(TOWN_REACHES, P.castsDay, totalAt(d, 10 * H + 30), 'pellwick');
+      const dayFish = fishSession(TOWN_REACHES, at('castsDay'), totalAt(d, 10 * H + 30), 'pellwick');
       earn(day, 'fish', dayFish.value, totalAt(d, 11 * H));
-      seconds += ACTION_SECONDS.cast * P.castsDay;
-      earn(day, 'bugs', P.bugsDay * bugValue(bugPool(world, totalAt(d, 11 * H), BUG_DAY)), totalAt(d, 11 * H));
-      seconds += ACTION_SECONDS.bug * P.bugsDay;
+      seconds += ACTION_SECONDS.cast * at('castsDay');
+      earn(day, 'bugs', at('bugsDay') * bugValue(bugPool(world, totalAt(d, 11 * H), BUG_DAY)), totalAt(d, 11 * H));
+      seconds += ACTION_SECONDS.bug * at('bugsDay');
 
       // ---- the leg: route trainers, the Spire, a catch or two ----
       const k = P.badgeDays.indexOf(d);
@@ -482,13 +527,12 @@ export function simulate(profileOrId, opts = {}) {
         if (!pathOpen && ferryLeft > 0) { ferryLeft--; spend(day, 'ferry', tuning.ferryFare, totalAt(d, 10 * H)); }
         const firstHalf = k < 0; // the day before the Spire
         const twoDays = (visit === 0 ? P.badgeDays[0] >= 3 : P.badgeDays[visit] - P.badgeDays[visit - 1] >= 2);
-        const roster = ROUTE[isle].filter((t) => !t.declinable || take(`opt-${isle}-${t.id}`, P.optional));
+        const roster = ROUTE[isle].filter((t) => !t.declinable || take(`opt-${isle}-${t.id}`, at('optional')));
         const mine = roster.filter((_, i) => !twoDays || (firstHalf ? i < Math.ceil(roster.length / 2) : i >= Math.ceil(roster.length / 2)));
-        const mult = luckyButton ? 1 + (ITEM.get('lucky-button').held.payoutMult - 1) : 1;
+        const mult = luckyButton ? ITEM.get('lucky-button').held.payoutMult : 1;
         for (const t of mine) earn(day, 'trainers', t.payout * mult, totalAt(d, 12 * H));
         day.paused += PAUSED_MINUTES.trainer * mine.length;
-        const medBy = [40, 60, 100, 160, 240, 300, 360];
-        spend(day, 'medicine', medBy[badges.length] * mine.length, totalAt(d, 9 * H));
+        spend(day, 'medicine', MEDICINE_PER_BATTLE[badges.length] * mine.length, totalAt(d, 9 * H));
         // isle fishing while the tide turns
         earn(day, 'fish', fishSession(ISLE_REACHES, 2, totalAt(d, 13 * H), isle).value, totalAt(d, 13 * H));
         seconds += ACTION_SECONDS.cast * 2;
@@ -507,11 +551,11 @@ export function simulate(profileOrId, opts = {}) {
       // the Long Road and the Summit the days after badge 6, for a player who walks it before the light
       if (P.longRoad && badges.length === 6 && relightDay === null) {
         const after = d - P.badgeDays[5];
-        if (after === 1) { for (const t of LONG_ROAD) earn(day, 'trainers', t.payout, totalAt(d, 12 * H)); day.paused += PAUSED_MINUTES.trainer * LONG_ROAD.length; spend(day, 'medicine', 360 * LONG_ROAD.length, totalAt(d, 9 * H)); }
+        if (after === 1) { for (const t of LONG_ROAD) earn(day, 'trainers', t.payout, totalAt(d, 12 * H)); day.paused += PAUSED_MINUTES.trainer * LONG_ROAD.length; spend(day, 'medicine', MEDICINE_PER_BATTLE[6] * LONG_ROAD.length, totalAt(d, 9 * H)); }
       }
 
       // captures (wild, wicks burned) and the Gallery frames
-      const caps = take('captures', P.captures);
+      const caps = take('captures', at('captures'));
       if (caps) {
         heldForms += caps;
         const wickPrice = badges.length < 2 ? ITEM.get('tallow-wick').price : badges.length < 4 ? avg(ITEM.get('tallow-wick').price, ITEM.get('brass-wick').price) : avg(ITEM.get('brass-wick').price, ITEM.get('skyglass-wick').price);
@@ -525,39 +569,45 @@ export function simulate(profileOrId, opts = {}) {
       day.paused += PAUSED_MINUTES.forecast * 1.3;
 
       // Errants: Squallcoil from the Emberstep leg on, Hailcoil from the Rimeholt leg on; each returns the next day
-      const errants = (badges.length >= 2 || (P.badgeDays[2] - 1 <= d) ? 1 : 0) + (badges.length >= 5 ? 1 : 0);
+      const errants = (d >= legDay(P, 2) ? 1 : 0) + (d >= legDay(P, 5) ? 1 : 0);
       for (let e = 0; e < errants; e++) {
-        if (take(`errant-${e}`, P.errant)) { earn(day, 'errants', tuning.errantButtons, totalAt(d, 15 * H), false); day.paused += PAUSED_MINUTES.errant; }
+        if (take(`errant-${e}`, at('errant'))) { earn(day, 'errants', tuning.errantButtons, totalAt(d, 15 * H), false); day.paused += PAUSED_MINUTES.errant; }
       }
 
       // Wanted Today: one stack each of three items at +50% (sold at Pell's)
-      const hits = take('wanted', P.wantedHits);
-      if (hits) earn(day, 'wanted', hits * (tuning.wantedTodayMult - 1) * (0.6 * 10 * NATIVE.ripePrice + 0.4 * 300), totalAt(d, 9 * H), false);
+      const hits = take('wanted', at('wantedHits'));
+      if (hits) earn(day, 'wanted', hits * (tuning.wantedTodayMult - 1) * (0.6 * tuning.stackByKind.fruit * NATIVE.ripePrice + 0.4 * WANTED_SINGLE), totalAt(d, 9 * H), false);
 
       // ---- evening and night: Porch Duels, night fishing, moths, the night low ----
       if (d >= P.duelsFrom) {
-        const n = Math.min(tuning.porchDuelsPerDay, d >= (P.duelsAllFrom ?? 99) ? tuning.porchDuelsPerDay : P.duels);
+        const n = Math.min(tuning.porchDuelsPerDay, at('duels'));
         const mult = luckyButton ? ITEM.get('lucky-button').held.payoutMult : 1;
         earn(day, 'duels', n * tuning.porchDuelPerCurve * duelCurve[Math.min(badges.length, duelCurve.length - 1)] * mult, totalAt(d, 21 * H), false);
         day.paused += PAUSED_MINUTES.duel * n;
       }
-      const nightStart = totalAt(d, 21 * H + 30);
-      const nightCasts = awakeEnd > 21 * H + 30 ? P.castsNight : Math.min(P.castsNight, 2);
-      const nf = fishSession(TOWN_REACHES, nightCasts, nightStart, 'pellwick');
-      earn(day, 'fish', nf.value, nightStart);
-      seconds += ACTION_SECONDS.cast * nightCasts;
-      earn(day, 'bugs', P.bugsNight * bugValue(bugPool(world, totalAt(d, 21 * H), BUG_NIGHT)), totalAt(d, 21 * H));
-      seconds += ACTION_SECONDS.bug * P.bugsNight;
+      earn(day, 'bugs', at('bugsNight') * bugValue(bugPool(world, totalAt(d, 21 * H), BUG_NIGHT)), totalAt(d, 21 * H));
+      seconds += ACTION_SECONDS.bug * at('bugsNight');
       // night lows (this evening's and the small hours' before the player sleeps)
       const nightLows = [...tidesForDay(d), ...tidesForDay(d + 1)].filter((e) => e.kind === 'low' && e.total >= totalAt(d, 17 * H) && e.total < totalAt(d, awakeEnd + 60) && e.total - tuning.flatsWindowMinutes <= totalAt(d, awakeEnd) && lowTouchesNight(e.total, { tuning }));
-      for (const low of nightLows.slice(0, P.nightLows)) {
+      for (const low of nightLows.slice(0, take('nightLows', at('nightLows')))) {
         const sky = avg(...tuning.skyglassPerNightLow);
-        earn(day, 'finds', findsValue(findPool('skyglass', 'pellwick'), sky, () => tuning.relicBarnabyPrice), low.total);
+        const refined = sky * (P.refine ?? 0);
+        earn(day, 'finds', findsValue(findPool('skyglass', 'pellwick'), sky, () => tuning.relicBarnabyPrice) * (1 - (P.refine ?? 0)), low.total);
+        starsaltFree += refined * tuning.relicStarsaltRate;
         earn(day, 'bugs', bugValue(bugPool(world, low.total, BUG_GLOW)), low.total);
         earn(day, 'finds', findsValue(findPool('sparkle', 'pellwick'), tuning.sparklesPerLow), low.total);
         seconds += ACTION_SECONDS.skyglass * sky + ACTION_SECONDS.bug + ACTION_SECONDS.sparkle * tuning.sparklesPerLow;
       }
       seconds += ACTION_SECONDS.townWalk;
+      // night fishing on the quay and the river mouth: a fixed habit, or every second left awake
+      const nightStart = totalAt(d, 21 * H + 30);
+      const wantCasts = P.castsNight === 'fill' ? Math.max(0, Math.floor((runningMin - seconds) / ACTION_SECONDS.cast)) : ramp(P.castsNight, d);
+      const nightCasts = awakeEnd > 21 * H + 30 ? wantCasts : Math.min(wantCasts, 2);
+      const nf = fishSession(TOWN_REACHES, nightCasts, nightStart, 'pellwick');
+      earn(day, 'fish', nf.value, nightStart);
+      day.headliners = nf.headliners;
+      day.casts = nightCasts + at('castsDay');
+      seconds += ACTION_SECONDS.cast * nightCasts;
     }
     day.paused += PAUSED_MINUTES.ceremony;
 
@@ -600,15 +650,16 @@ export function simulate(profileOrId, opts = {}) {
     // ---- the yard before midnight: pay everything above the reserve ----
     const payAt = totalAt(d, Math.min(awakeEnd, 23 * H + 30) - 15);
     const before = { tier: world.loans.tier, paid: world.loans.paid };
-    const cash = wallet.balance(world) - P.reserve;
+    const reserve = arrival ? 0 : P.reserve;
+    const cash = wallet.balance(world) - reserve;
     if (cash > 0 && !loans.isPaidOff(world, ctxAt(payAt))) {
       const r = loans.pay(world, cash, ctxAt(payAt, 'pay'));
       day.paid = r.ok ? r.paid : 0;
       // pay on through every loan this cash clears
       let guard = 0;
-      while (r.ok && !loans.isPaidOff(world, ctxAt(payAt)) && wallet.balance(world) - P.reserve > 0 && guard++ < 8) {
+      while (r.ok && !loans.isPaidOff(world, ctxAt(payAt)) && wallet.balance(world) - reserve > 0 && guard++ < 8) {
         if (loans.needsCommission(world, ctxAt(payAt))) pickRoom(payAt);
-        const more = loans.pay(world, wallet.balance(world) - P.reserve, ctxAt(payAt, 'pay'));
+        const more = loans.pay(world, wallet.balance(world) - reserve, ctxAt(payAt, 'pay'));
         if (!more.ok) break;
         day.paid += more.paid;
       }
@@ -648,7 +699,7 @@ export function simulate(profileOrId, opts = {}) {
   return {
     profile: P.id, label: P.label, days, cleared, relightDay, lampRoomDay,
     income, sinks, mix, totalIncome, totalSinks, sinkShare: buttonsIncome ? totalSinks / buttonsIncome : 0,
-    realMinutesPerDay: Math.round(realPerDay * 10) / 10, warnings, badges: [...badges],
+    realMinutesPerDay: Math.round(realPerDay * 10) / 10, warnings, badges: [...badges], starsaltFromRelics: Math.round(starsaltFree),
     day1RealMinutes: days[0]?.realMinutes ?? 0,
   };
 }

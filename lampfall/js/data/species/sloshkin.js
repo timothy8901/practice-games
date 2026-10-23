@@ -58,7 +58,7 @@ export const forms = Object.freeze([
       teachable: ['shardlight', 'drowned-bell', 'plumbline'],
     }),
   sp('bogmonarch', 'Bogmonarch', ['Brine', 'Stone'], 'sloshkin', 3, [100, 105, 95, 75, 80, 45], 'tidecall',
-    [[1, 'tap'], [1, 'salt-spray'], [1, 'undertow'], [5, 'shard-fling'], [12, 'settle'], [20, 'stand-firm'], [28, 'riptide'], [32, 'breaker'], [36, 'sandtrap'], [44, 'bedrock-charge'], [52, 'tidal-mend'], [60, 'grind-down']],
+    [[1, 'tap'], [1, 'salt-spray'], [1, 'undertow'], [5, 'shard-fling'], [12, 'settle'], [20, 'stand-firm'], [24, 'riptide'], [32, 'breaker'], [36, 'sandtrap'], [44, 'bedrock-charge'], [52, 'tidal-mend'], [60, 'grind-down']],
     'undertow', 45, 240, 'medium-slow', {
       roleTag: 'skip_ahead',
       sprite: 'drawn', size: 32, palette: 'ksbnorev', heartmarkHighlight: 'w', idle: 'squash',

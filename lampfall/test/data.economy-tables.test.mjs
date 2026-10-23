@@ -53,10 +53,10 @@ describe('validator and manifest', () => {
     assert.deepEqual(CHALLENGES.map((c) => c.id), [...M.CHALLENGE_IDS]);
   });
 
-  test('loans: tier-N ids (cond DSL, systems/loans, validator) map one-to-one onto the manifest loan-N ids', () => {
+  test('loans: tier-N ids (cond DSL, systems/loans, validator) equal the manifest LOAN_IDS', () => {
     assert.deepEqual(LOANS.map((l) => l.id), LOANS.map((l) => `tier-${l.tier}`));
+    assert.deepEqual(LOANS.map((l) => l.id), [...M.LOAN_IDS]);
     assert.deepEqual(LOANS.map((l) => l.manifestId), [...M.LOAN_IDS]);
-    assert.deepEqual(LOANS.map((l) => l.manifestId.replace('loan-', 'tier-')), LOANS.map((l) => l.id));
   });
 
   test('commissions and Commons projects match the manifest', () => {

@@ -15,22 +15,56 @@ import { DATA as PLACEHOLDER } from './index.js';
 import { LETTERS } from './letters/index.js';
 import { THREADS, THREAD_SCRIPTS } from './threads/index.js';
 import { CREDITS } from './credits.js';
+// GDD-02 economy
+import { ITEMS } from './items.js';
+import { LOANS, COMMISSIONS, COMMONS } from './loans.js';
+import { SHOPS } from './shops.js';
+import { DIALS, CHALLENGES, TOGGLE_ORDER } from './dials.js';
+// GDD-03 creatures and GDD-04 battle
+import { TYPES } from './types.js';
+import { ABILITIES } from './abilities.js';
+import { SPECIES, FAMILIES } from './species/index.js';
+import { MOVES } from './moves/index.js';
+import { TRAINERS, TRAINER_SCRIPTS } from './trainers.js';
+import { SPIRES } from './spires.js';
+// GDD-05 town life
+import { COLLECTIONS } from './collections.js';
+import { FESTIVALS, WEATHER } from './town.js';
 
 /** Which tables are real content (true) and which still fall back to placeholders (false). */
 export const CONTENT_STATUS = Object.freeze({
   letters: true, threads: true, credits: true,
-  types: false, moves: false, abilities: false, species: false, families: false,
-  items: false, loans: false, shops: false, dials: false, challenges: false, trainers: false,
+  items: true, loans: true, commissions: true, commons: true, shops: true, dials: true, challenges: true,
+  collections: true, festivals: true, weather: true,
+  types: true, moves: true, abilities: true, species: true, families: true, trainers: true, spires: true,
   npcs: false, schedules: false, scripts: false, eventScripts: false,
-  maps: false, tilesets: false, regions: false, encounters: false, collections: false,
+  maps: false, tilesets: false, regions: false, encounters: false,
 });
 
 export const DATA_CONTENT = deepFreeze({
   ...PLACEHOLDER,
   letters: LETTERS,
   threads: THREADS,
-  scripts: { ...PLACEHOLDER.scripts, ...THREAD_SCRIPTS },
+  scripts: { ...PLACEHOLDER.scripts, ...THREAD_SCRIPTS, ...TRAINER_SCRIPTS },
   credits: CREDITS,
+  items: ITEMS,
+  loans: LOANS,
+  commissions: COMMISSIONS,
+  commons: COMMONS,
+  shops: SHOPS,
+  dials: DIALS,
+  challenges: CHALLENGES,
+  toggleOrder: TOGGLE_ORDER,
+  collections: COLLECTIONS,
+  festivals: FESTIVALS,
+  weather: WEATHER,
+  types: TYPES,
+  abilities: ABILITIES,
+  species: SPECIES,
+  families: FAMILIES,
+  moves: MOVES,
+  trainers: TRAINERS,
+  spires: SPIRES,
 });
 
 export default DATA_CONTENT;

@@ -102,7 +102,8 @@ test('species/families: type names, window order, star form, every form in a fam
 });
 
 test('abilities: Ward count must equal tuning.wardCount; hook keys checked when HOOKS is known', () => {
-  const d = variant((x) => { x.abilities[0].hook = 'shore'; });
+  // A second (non-Ward) row: the Ward-count rule only applies once a real abilities table is in.
+  const d = variant((x) => { x.abilities[0].hook = 'shore'; x.abilities.push({ ...x.abilities[0], id: 'ph-second', name: 'Second', hook: null, ward: null }); });
   const { errors } = validateData(d, { tuning: { ...TUNING, wardCount: 1 }, hooks: new Set(['other']), legend: DEFAULT_LEGEND });
   assert.ok(errors.includes('abilities:*: 0 Ward abilities, tuning.wardCount is 1'));
   assert.ok(errors.includes("abilities:ph-shoresense: hook 'shore' has no entry in battle/abilityHooks.HOOKS"));

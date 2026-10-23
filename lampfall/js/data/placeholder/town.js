@@ -85,10 +85,8 @@ export const TRAINERS = Object.freeze([
   },
 ]);
 
-/** Loan ladder. // [GDD values] */
-export const LOANS = Object.freeze([
-  { id: 'tier-1', tier: 1, amount: 500, build: 'ph-roof', roofChoices: ['ph-roof-a', 'ph-roof-b'], scaffoldStage: 1, commissionSlot: false },
-]);
+/** Loan ladder: the real GDD-02 table (its ids are the manifest's tier-N, so a partial stand-in would trip the manifest check). */
+export { LOANS } from '../loans.js';
 
 /**
  * Dial rule rows (§5.1 change 4: `DialRules`). // [GDD values]

@@ -177,7 +177,7 @@ export const FISH = deepFreeze([
   fish({
     id: 'sea-bass', name: 'Sea Bass', where: ['quay', 'flats'], habitat: 'Quay and the point flats from dusk into the evening; storms bring them in.',
     when: { phase: ['dusk', 'evening'] }, tide: 'any', mods: { storm: 1.5 }, tags: ['storm'], hours: [[17.5, 22]], shadow: 'large', silhouette: 'finned', size: [40, 80],
-    biteFrames: [12, 17], feints: [1, 2], w: 3, rarity: 'uncommon', price: 900,
+    biteFrames: [12, 17], feints: [1, 2], w: 2, rarity: 'uncommon', price: 900,
     tell: { shape: 'a big shadow that patrols the edge of the surf', sound: 'a sharp slap of a tail', word: 'Patrolling', text: 'A big shadow runs the edge of the surf at dusk, turning at the same rock every time. Cast ahead of the turn.' },
     archive: 'Sea bass (the handsome one at the dance). Off the point, golden hour sliding into evening, a tail-slap I heard from the green. Odile was painting; she put it in. It is the second-best fish in the painting.',
   }),
@@ -191,14 +191,14 @@ export const FISH = deepFreeze([
   fish({
     id: 'john-dory', name: 'John Dory', where: ['quay', 'sea'], habitat: 'The night sea off the quay; it comes into the flats channels at a night low.',
     night: true, tide: 'any', headliner: true, hours: NIGHT, shadow: 'forked', silhouette: 'forked', size: [25, 50],
-    biteFrames: [9, 13], feints: [1, 3], w: 2, rarity: 'rare', price: 2400,
+    biteFrames: [9, 13], feints: [1, 3], w: 0.4, rarity: 'rare', price: 2400,
     tell: { shape: 'a tall, thin, forked-tail shadow with a dark thumbprint', sound: 'a hollow tock, like a knuckle on a barrel', word: 'Thumbprint', text: 'Side-on it is huge; head-on it all but disappears. A dark thumbprint on the flank. It stalks the bait for a long while, then tocks once. Now.' },
     archive: 'A John Dory, by night (the thumbprint, see? Somebody very old pressed it there, in the story). Quay, night sea, forked tail, a hollow tock. I have put it on the good shelf. Ludo has asked twice what I would want for it.',
   }),
   fish({
     id: 'lantern-wolffish', name: 'Lantern Wolffish', where: ['quay', 'sea'], habitat: 'The night sea off the quay, rising on the night high water.',
     night: true, tide: 'any', mods: { high: 1.5 }, headliner: true, hours: NIGHT, shadow: 'forked', silhouette: 'forked', size: [60, 110],
-    biteFrames: [7, 10], feints: [2, 3], w: 1, rarity: 'rare', price: 4200,
+    biteFrames: [7, 10], feints: [2, 3], w: 0.15, rarity: 'rare', price: 4200,
     tell: { shape: 'a long forked-tail shadow with a faint light at its brow', sound: 'a grinding crunch under the water', word: 'Lantern', text: 'A long dark shape with a faint glow at the brow, rising on the night high. It crunches at the bait twice. The third time is the only time.' },
     archive: 'The lantern wolffish. (I have taken my helmet off. Figuratively.) Night sea, high water, the little light at its brow lit up the slab. It has teeth like a mason\'s chisel and a face like a disappointed uncle. My favourite thing in the Archive.',
   }),

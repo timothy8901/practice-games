@@ -137,12 +137,12 @@ put(detail, 'F', 4, 21); // blossom
 put(detail, '8', 0, 22, 2, 23, 36, 13, 38, 14, 46, 13, 1, 26, 5, 31); // pines
 put(detail, "'", 5, 16, 13, 16, 13, 21, 36, 30, 39, 29, 42, 31, 45, 30, 33, 25); // fruit trees
 put(detail, '?', 18, 21); // a bare fruit tree
-put(detail, 'v', 14, 12, 27, 15, 36, 19, 1, 13, 27, 17, 12, 26, 40, 24); // bushes
+put(detail, 'v', 14, 12, 27, 15, 39, 20, 1, 13, 27, 18, 12, 26, 40, 24); // bushes
 put(detail, 'L', 7, 10, 14, 10, 21, 10, 3, 18, 11, 19, 19, 17, 33, 18, 37, 22, 44, 18, 16, 28, 33, 28, 46, 9); // lamp posts
-put(detail, '`', 7, 9, 2, 17, 18, 16, 31, 17, 43, 17, 9, 26); // porch lamps beside the doors
+put(detail, '`', 7, 9, 1, 17, 19, 16, 32, 17, 44, 17, 10, 26); // porch lamps beside the doors
 put(detail, 'o', 11, 10, 29, 6, 33, 8, 47, 12); // rocks
 put(detail, ';', 8, 12, 35, 5, 31, 8); // rock-b
-put(detail, '-', 9, 5, 31, 22); // skyglass nodes
+put(detail, '-', 9, 5, 2, 25); // skyglass nodes
 put(detail, '>', 17, 9); // the Waystone (16x32, y-sorted)
 put(detail, ')', 13, 8, 19, 8, 22, 8); // mooring posts on the quay edge
 put(detail, 'c', 20, 9); put(detail, '(', 21, 9); put(detail, 'J', 14, 9); put(detail, 'j', 13, 11); // crates, barrel, creel, net rack
@@ -198,7 +198,7 @@ export const HARBOR_RENDER = Object.freeze({
     Object.freeze({ art: 'chimney-stone', x: 10, y: 23 }),
     Object.freeze({ art: 'chimney', x: 31, y: 23 }),
     Object.freeze({ art: 'market-stall-red', x: 18, y: 12 }),
-    Object.freeze({ art: 'commons-board', x: 24, y: 17 }),
+    Object.freeze({ art: 'commons-board', x: 28, y: 16 }),
     Object.freeze({ art: 'post-box', x: 27, y: 26 }),
     Object.freeze({ art: 'signpost', x: 21, y: 26 }),
     Object.freeze({ art: 'bench', x: 34, y: 26 }),

@@ -98,7 +98,16 @@ Rules this table keeps: night sea fishing is the best income (the two headliners
 `forked` shadows and the two tightest windows); no species is exclusive to a tide or to night except
 where GDD-ids says so, and every one of those has a daily window; the north creek holds nothing
 until the weir turns (the reach's own `cond`), then stickleback, brown trout, sea trout, silver eels
-and the grayling come back. Weights by rarity: common 6–10, uncommon 3–6, rare 1–3.
+and the grayling come back. Weights by rarity: common 6–10, uncommon 2–6, rare 1–3, and the two
+night headliners far rarer: **John Dory 0.4, lantern wolffish 0.15** (×1.5 on the night high).
+
+*Economy verifier note (GDD-02 §4.4).* A player casts at the shadow they choose, and the headliners
+are the only `forked` shadows, so their weight is the chance a forked tail is *in view*, not the
+chance it bites. At the first draft's weights (2 and 1) a fresh night quay showed a forked shadow in
+about 70% of views and selective casting paid ~1,100◉ a cast, enough for night fishing to carry the
+whole ladder. At 0.4 / 0.15 a forked tail shows in about one view in four (`test/data.economy.test.mjs`),
+a ten-cast quay session lands one or two headliners (the §1.2 figure), and fish settle at ~20% of a
+typical season's income. Sea bass (the dusk `large` shadow) went from 3 to 2 for the same reason.
 
 ## 3. Bugs (10)
 

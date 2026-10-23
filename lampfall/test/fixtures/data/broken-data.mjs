@@ -54,7 +54,7 @@ export const EXPECTED = Object.freeze([
   ['species:ph-paw:', "learnset move 'ph-ghost-move' is not in moves"],
   ['moves:ph-tap:', "effect key 'zap' is not in EFFECT_KEYS"],
   ['moves:ph-settle:', 'duplicate id'],
-  ['families:ph-line:', "shiftTable.ph-pip.up -> 'ph-stranger' is not a form of this family"],
+  ['families:ph-line:', "shiftTable.ph-pip.up -> 'ph-stranger' is not a known species"],
   ['items:ph-lantern:', "pocket 'satchel' unknown"],
   ['maps:ph-field:', "warp at (10,4) targets unknown map 'ph-nowhere'"],
   ['maps:ph-field:', "spawn table 'ph-no-table' is not in encounters"],

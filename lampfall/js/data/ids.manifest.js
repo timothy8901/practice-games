@@ -196,7 +196,13 @@ export const COMMONS_PROJECT_IDS = Object.freeze([
 
 /** 7 loans (278,000 total). */
 export const LOAN_IDS = Object.freeze([
-  'loan-1', 'loan-2', 'loan-3', 'loan-4', 'loan-5', 'loan-6', 'loan-7',
+  'tier-1', 'tier-2', 'tier-3', 'tier-4', 'tier-5', 'tier-6', 'tier-7',
+]);
+
+/** Overnight builds (systems/loans build queue, sys.build.<id> flags): the three fixed builds plus the six commissions. */
+export const BUILD_IDS = Object.freeze([
+  'bedsit', 'cottage', 'lamp-room',
+  'training-yard', 'workshop', 'greenhouse', 'cellar', 'porch-loft', 'gallery',
 ]);
 
 /** Shops and buy-only counters (DATA.shops). */

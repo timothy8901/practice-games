@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Render harbor</title>
+<link rel="icon" href="data:,">
+<style>
+  :root { --ink: #141B33; --paper: #F4F1E6; --rule: #C9A77C; --deep: #2B3A67; }
+  html, body { margin: 0; background: var(--ink); color: var(--paper); font: 11px/1.35 ui-monospace, monospace; overflow: hidden; }
+  canvas { display: block; image-rendering: pixelated; image-rendering: crisp-edges; }
+  #perf { position: fixed; right: 6px; top: 86px; background: #141B33E6; border: 1px solid var(--deep); padding: 4px 6px; white-space: pre; pointer-events: none; }
+  #help { position: fixed; left: 6px; bottom: 6px; background: #141B33E6; border: 1px solid var(--deep); padding: 4px 6px; white-space: pre; pointer-events: none; }
+  #err { position: fixed; left: 8px; top: 8px; color: #F9C46B; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<canvas id="c" width="480" height="270"></canvas>
+<div id="perf"></div>
+<div id="help">1-5 hour (noon, golden, dusk, night, deep night)  [ ] -/+30 min  C clock
+T tide low/high  W weather  B Relighting beam  L Lantern  S scaffold stage
+V shore view  M map raster  P pause walkers  F perf  arrows: walk</div>
+<div id="err"></div>
+<script type="module">
+  import { loadMap } from '../../js/world/tilemap.js';
+  import { TILES, DEFAULT_LEGEND } from '../../js/data/tilesets.js';
+  import { HARBOR_RENDER, EXTRA_TILES, ROUTE, NPC_ROUTES } from '../fixtures/maps/harbor-render.js';
+  import { createEntities, createEntity, DIRS, DX, DY, RUN_MS } from '../../js/world/entities.js';
+  import { createCamera } from '../../js/world/camera.js';
+  import { findPath } from '../../js/world/pathing.js';
+  import { tideVariant } from '../../js/world/tide.js';
+  import { gradeFor } from '../../js/world/lighting.js';
+  import '../../js/art/chars/index.js';
+  import { createMapRenderer } from '../../js/render/mapRenderer.js';
+  import { drawShoreView, drawSkyband } from '../../js/render/sky.js';
+  import { buildMinimap, drawMinimap } from '../../js/render/minimap.js';
+
+  const q = new URLSearchParams(location.search);
+  const num = (k, d) => (q.has(k) ? Number(q.get(k)) : d);
+  const HOURS = [['noon', 12 * 60], ['golden', 17 * 60 + 30], ['dusk', 19 * 60], ['night', 22 * 60], ['deep night', 2 * 60]];
+  const WEATHERS = ['clear', 'rain', 'fog', 'snow', 'storm', 'overcast'];
+  const scale = num('scale', 2);
+  const canvas = document.getElementById('c');
+  canvas.style.width = 480 * scale + 'px';
+  canvas.style.height = 270 * scale + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  const perfEl = document.getElementById('perf');
+  const helpEl = document.getElementById('help');
+  if (q.get('perf') === '0') { perfEl.style.display = 'none'; helpEl.style.display = 'none'; }
+
+  const state = {
+    minute: q.has('hour') ? Math.round(num('hour', 12) * 60) : 12 * 60,
+    tide: q.get('tide') === 'high' ? 0.95 : q.get('tide') === 'mid' ? 0.5 : q.get('tide') === 'low' || !q.has('tide') ? 0.05 : num('tide', 0.05),
+    weather: q.get('weather') || 'clear',
+    relit: q.get('beam') === '1',
+    stage: num('stage', q.get('beam') === '1' ? 7 : 3),
+    lantern: q.get('lantern') === '1',
+    walking: q.get('walk') !== '0',
+    clock: q.get('clock') === '1',
+    mode: q.get('mode') || 'map',
+    comet: num('comet', 0.35),
+    day: num('day', 9),
+    speed: num('speed', 1),
+  };
+
+  // ---- world --------------------------------------------------------------------------------------
+  const map = loadMap(HARBOR_RENDER, { ...TILES, ...EXTRA_TILES }, { legend: DEFAULT_LEGEND });
+  const ents = createEntities(map);
+  const start = q.has('at') ? q.get('at').split(',').map(Number) : [HARBOR_RENDER.entry.x, HARBOR_RENDER.entry.y];
+  const player = ents.add(createEntity({ id: 'player', kind: 'player', x: start[0], y: start[1], artId: 'char-player', facing: 'down' }));
+  const wren = ents.add(createEntity({ id: 'wren', kind: 'npc', x: 16, y: 11, artId: 'char-wren', npcId: 'wren' }));
+  const corin = ents.add(createEntity({ id: 'corin', kind: 'npc', x: 20, y: 19, artId: 'char-corin', npcId: 'corin' }));
+  const walkers = [
+    { e: player, route: ROUTE, i: 0, path: null, wait: 0, run: false },
+    { e: wren, route: NPC_ROUTES.wren, i: 0, path: null, wait: 0, run: false, emote: 'music' },
+    { e: corin, route: NPC_ROUTES.corin, i: 0, path: null, wait: 0, run: false, emote: '!' },
+  ];
+  if (q.has('at')) { // start the route at the nearest waypoint
+    let best = 0, bd = 1e9;
+    ROUTE.forEach(([x, y], k) => { const d = Math.abs(x - start[0]) + Math.abs(y - start[1]); if (d < bd) { bd = d; best = k; } });
+    walkers[0].i = best;
+  }
+  const camera = createCamera({ w: 480, h: 230 });
+  camera.bounds(map);
+  camera.follow(player, { snap: true });
+  const renderer = createMapRenderer();
+  const flags = {};
+  const syncFlags = () => { if (state.relit) flags['sp.relighting'] = true; else delete flags['sp.relighting']; };
+  syncFlags();
+
+  function tideV() { return tideVariant(state.tide); }
+
+  function stepWalker(w, dt) {
+    const e = w.e;
+    if (e.moving) return;
+    if (w.wait > 0) { w.wait -= dt; return; }
+    if (!w.path || !w.path.length) {
+      const [tx, ty] = w.route[w.i];
+      if (e.x === tx && e.y === ty) {
+        w.i = (w.i + 1) % w.route.length;
+        if (w.emote) { e.emote = w.emote; setTimeout(() => { e.emote = null; }, 1600); }
+        w.wait = w === walkers[0] ? 120 : 900;
+        return;
+      }
+      w.path = findPath(map, { x: e.x, y: e.y }, { x: tx, y: ty }, { tideState: tideV(), mover: 'walk', maxLen: 240 });
+      if (!w.path) { w.i = (w.i + 1) % w.route.length; w.wait = 200; return; }
+    }
+    const nx = w.path[0], ny = w.path[1];
+    const dir = nx > e.x ? 'right' : nx < e.x ? 'left' : ny > e.y ? 'down' : 'up';
+    const ok = ents.tryMove(e, dir, { map, tideState: tideV(), run: w.run, speedMs: w === walkers[0] ? undefined : 220 });
+    if (ok) w.path.splice(0, 2);
+    else { w.path = null; w.wait = 300; }
+  }
+
+  const keys = new Set();
+  function manualStep() {
+    if (player.moving) return false;
+    const dir = keys.has('ArrowLeft') ? 'left' : keys.has('ArrowRight') ? 'right' : keys.has('ArrowUp') ? 'up' : keys.has('ArrowDown') ? 'down' : null;
+    if (!dir) return false;
+    ents.tryMove(player, dir, { map, tideState: tideV(), run: keys.has('ShiftLeft') || keys.has('ShiftRight') });
+    walkers[0].path = null;
+    return true;
+  }
+
+  // ---- loop -------------------------------------------------------------------------------------------
+  const TICK = 1000 / 60;
+  let simMs = num('t', 0), acc = 0, last = performance.now();
+  const drawTimes = [], updTimes = [], imgs = [];
+  let frames = 0, bakedTotal = 0, lastStats = null;
+
+  function update(ms) {
+    const t0 = performance.now();
+    if (state.clock) state.minute = (state.minute + (ms / 1000) * state.speed) % 1440;
+    if (!manualStep() && state.walking) for (const w of walkers) stepWalker(w, ms);
+    else if (state.walking) for (const w of walkers.slice(1)) stepWalker(w, ms);
+    ents.tickAll(ms);
+    camera.update(ms);
+    simMs += ms;
+    updTimes.push(performance.now() - t0);
+    if (updTimes.length > 120) updTimes.shift();
+  }
+
+  function draw() {
+    const t0 = performance.now();
+    if (state.mode === 'shore') {
+      const grade = gradeFor(state.minute, state.weather);
+      drawShoreView(ctx, { x: 0, y: 0, w: 480, h: 270 }, { minute: state.minute, weather: state.weather, grade, ms: simMs, day: state.day, tide: state.tide, comet: state.comet, lighthouse: { stage: state.stage, lit: state.relit }, porches: 8 });
+      lastStats = { drawImages: 0 };
+    } else {
+      lastStats = renderer.drawFrame(null, {
+        ctx, map, entities: ents, camera, minute: state.minute, weather: state.weather, tide: state.tide,
+        time: simMs, day: state.day, flags, lighthouse: { stage: state.stage, relit: state.relit },
+        player, lantern: state.lantern, comet: state.comet, roof: 'dark',
+      });
+      bakedTotal += lastStats.bakes;
+      if (state.mode === 'minimap') {
+        const mini = buildMinimap(map, { scale: 4, tide: state.tide, grade: gradeFor(state.minute, state.weather) });
+        const mx = 480 - mini.w - 8, my = 270 - mini.h - 8;
+        ctx.fillStyle = '#141B33'; ctx.fillRect(mx - 2, my - 2, mini.w + 4, mini.h + 4);
+        drawMinimap(ctx, mini, mx, my, { ms: simMs, markers: [{ x: player.x, y: player.y, kind: 'player' }, { x: wren.x, y: wren.y, kind: 'npc' }, { x: corin.x, y: corin.y, kind: 'npc' }, { x: 4, y: 7, kind: 'lighthouse' }] });
+      }
+    }
+    const dms = performance.now() - t0;
+    drawTimes.push(dms); imgs.push(lastStats.drawImages);
+    if (drawTimes.length > 120) { drawTimes.shift(); imgs.shift(); }
+    frames++;
+  }
+
+  function perf() {
+    const avg = (a) => (a.length ? a.reduce((s, v) => s + v, 0) / a.length : 0);
+    const sorted = drawTimes.slice().sort((a, b) => a - b);
+    return {
+      frames, drawAvg: +avg(drawTimes).toFixed(2), drawP95: +(sorted[Math.floor(sorted.length * 0.95)] || 0).toFixed(2), drawMax: +Math.max(0, ...drawTimes).toFixed(2),
+      updAvg: +avg(updTimes).toFixed(3), drawImages: Math.round(avg(imgs)), bakedTotal, last: lastStats, tiles: renderer.tiles.stats(),
+    };
+  }
+
+  function showPerf() {
+    if (perfEl.style.display === 'none') return;
+    const p = perf();
+    const h = HOURS.find(([, m]) => m === Math.round(state.minute));
+    perfEl.textContent = `${String(Math.floor(state.minute / 60)).padStart(2, '0')}:${String(Math.floor(state.minute % 60)).padStart(2, '0')} ${h ? h[0] : ''}  tide ${tideV()}  ${state.weather}${state.relit ? '  beam' : ''}
+update ${p.updAvg} ms   draw ${p.drawAvg} ms (p95 ${p.drawP95}, max ${p.drawMax})
+drawImage ${p.drawImages}/frame   chunks baked ${p.bakedTotal} (resident ${p.tiles.size}, queued ${p.tiles.queued})
+grade ${p.last && p.last.grade}  lights ${p.last && p.last.lights}  sprites ${p.last && p.last.sprites}  particles ${p.last && p.last.particles}`;
+  }
+
+  function frame(now) {
+    requestAnimationFrame(frame);
+    const dt = Math.min(now - last, 250);
+    last = now;
+    acc += dt;
+    let steps = 0;
+    while (acc >= TICK && steps < 4) { update(TICK); acc -= TICK; steps++; }
+    if (steps === 4) acc = 0;
+    draw();
+    if (frames % 15 === 0) showPerf();
+  }
+
+  window.addEventListener('keydown', (ev) => {
+    keys.add(ev.code);
+    const k = ev.key;
+    if (k >= '1' && k <= '5') state.minute = HOURS[Number(k) - 1][1];
+    else if (k === '[') state.minute = (state.minute + 1410) % 1440;
+    else if (k === ']') state.minute = (state.minute + 30) % 1440;
+    else if (k === 'c' || k === 'C') state.clock = !state.clock;
+    else if (k === 't' || k === 'T') state.tide = state.tide < 0.5 ? 0.95 : 0.05;
+    else if (k === 'w' || k === 'W') state.weather = WEATHERS[(WEATHERS.indexOf(state.weather) + 1) % WEATHERS.length];
+    else if (k === 'b' || k === 'B') { state.relit = !state.relit; if (state.relit) state.stage = 7; syncFlags(); }
+    else if (k === 'l' || k === 'L') state.lantern = !state.lantern;
+    else if (k === 's' || k === 'S') state.stage = (state.stage + 1) % 8;
+    else if (k === 'v' || k === 'V') state.mode = state.mode === 'shore' ? 'map' : 'shore';
+    else if (k === 'm' || k === 'M') state.mode = state.mode === 'minimap' ? 'map' : 'minimap';
+    else if (k === 'p' || k === 'P') state.walking = !state.walking;
+    else if (k === 'f' || k === 'F') { const s = perfEl.style.display === 'none'; perfEl.style.display = s ? '' : 'none'; helpEl.style.display = s ? '' : 'none'; }
+    if (ev.code.startsWith('Arrow')) ev.preventDefault();
+  });
+  window.addEventListener('keyup', (ev) => keys.delete(ev.code));
+
+  // headless hooks: set state, run N fixed steps synchronously, read perf
+  window.__render = {
+    state, perf, renderer, map, player,
+    set(o) { Object.assign(state, o); syncFlags(); },
+    run(n = 60) { for (let i = 0; i < n; i++) { update(TICK); draw(); } return perf(); },
+    bench(n = 120, flush = true) {
+      drawTimes.length = 0; imgs.length = 0;
+      const frameMs = [];
+      for (let i = 0; i < n; i++) {
+        update(TICK);
+        const t0 = performance.now();
+        draw();
+        if (flush) ctx.getImageData(0, 0, 1, 1); // force the raster to finish so the time is real
+        frameMs.push(performance.now() - t0);
+      }
+      const p = perf();
+      const s = frameMs.slice().sort((a, b) => a - b);
+      p.flushAvg = +(frameMs.reduce((a, b) => a + b, 0) / n).toFixed(2);
+      p.flushP95 = +s[Math.floor(n * 0.95)].toFixed(2);
+      p.flushMax = +s[n - 1].toFixed(2);
+      return p;
+    },
+  };
+  try {
+    window.__render.run(num('warm', 2));
+    requestAnimationFrame(frame);
+  } catch (e) {
+    document.getElementById('err').textContent = String(e && e.stack || e);
+    console.error(e);
+  }
+</script>
+</body>
+</html>

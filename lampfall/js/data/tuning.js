@@ -380,13 +380,13 @@ export const TUNING = freeze({
   WEATHER_ODDS_WEIGHTS: [[5, 1], [6, 2], [7, 3], [8, 3], [9, 1]], // Augusta's "n in 10" odds
   WEATHER_ONSET_LEAD: [0, 120],
   WEATHER_INTENSITY: { clear: [0, 0], overcast: [0.2, 0.5], rain: [0.3, 0.9], fog: [0.4, 1], storm: [0.7, 1], snow: [0, 0] },
-  WEATHER_EFFECTS: {
-    clear: [],
-    overcast: [],
-    rain: [{ target: 'bug', tag: '*', mult: 1.5 }, { target: 'encounter', tag: 'brine', mult: 1.25 }],   // rain brings bugs
-    fog: [{ target: 'fish', tag: 'silver', mult: 2 }, { target: 'encounter', tag: 'hollow', mult: 1.25 }], // fog pulls silver schools in
-    storm: [{ target: 'errant', tag: 'lightning', mult: 2 }, { target: 'find', tag: 'shore', mult: 2 }, { target: 'fish', tag: 'storm', mult: 1.5 }], // Errant lightning on the sea
-    snow: [],
+  WEATHER_EFFECTS: {                   // = data/town.js WEATHER_TUNING (GDD-05): bonuses, never locks
+    clear: [{ target: 'bug', tag: 'day', mult: 1.25 }],
+    overcast: [{ target: 'fish', tag: '*', mult: 1.1 }],
+    rain: [{ target: 'bug', tag: '*', mult: 1.5 }, { target: 'encounter', tag: 'brine', mult: 1.25 }, { target: 'encounter', tag: 'moss', mult: 1.25 }],   // rain brings bugs
+    fog: [{ target: 'fish', tag: 'silver', mult: 2 }, { target: 'shoal', tag: 'quay', mult: 1.5 }, { target: 'encounter', tag: 'hollow', mult: 1.25 }], // fog pulls silver schools in
+    storm: [{ target: 'errant', tag: 'lightning', mult: 2 }, { target: 'find', tag: 'shore', mult: 2 }, { target: 'fish', tag: 'storm', mult: 1.5 }, { target: 'encounter', tag: 'bolt', mult: 1.25 }], // Errant lightning on the sea
+    snow: [{ target: 'encounter', tag: 'rime', mult: 1.5 }],
   },
   WEATHER_OVERLAY_CAP: 0.35,           // weather overlays cap at 35% [fixed]
   WEATHER_FIXED: { 1: 'clear' },       // arrival evening is clear

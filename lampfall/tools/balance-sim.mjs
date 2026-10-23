@@ -408,17 +408,17 @@ export const STARTER_LINES = Object.freeze({
  * The on-curve party for each fight: `starterStage` indexes STARTER_LINES, `members` are the
  * commonly caught forms by then (this isle's band plus earlier ones), `discs` the discs a player
  * owns by then, `items` the heal items carried (amount = HP healed, as on the item rows),
- * `crackdust` how many Crackdust.
+ * `crackdust` how many Crackdust, `alt` the forms that fill a slot when the starter's line already holds a member.
  */
 export const PARTIES = Object.freeze({
-  turn: { curve: 7, starterStage: 0, members: ['tossup', 'wirewhisk', 'mudfist'], discs: [], items: [['salve', 25], ['salve', 25]], crackdust: 0 },
-  ward: { curve: 13, starterStage: 1, members: ['tossup', 'wirewhisk', 'mudfist', 'chillnub'], discs: ['spore-drift'], items: [['salve', 25], ['salve', 25]], crackdust: 2 },
-  weather: { curve: 19, starterStage: 1, members: ['wirewhisk', 'mudfist', 'chillnub', 'sootling', 'sedgehare'], discs: ['spore-drift'], items: [['tonic', 70], ['salve', 25]], crackdust: 0 },
-  hollow: { curve: 26, starterStage: 2, members: ['coilcrest', 'rimeplate', 'sootling', 'rushling', 'bilgebob'], discs: ['spore-drift', 'flashover'], items: [['tonic', 70], ['tonic', 70]], crackdust: 0 },
-  relay: { curve: 33, starterStage: 2, members: ['coilcrest', 'rimeplate', 'emberjaw', 'rushling', 'duskwisp'], discs: ['spore-drift', 'flashover', 'gale-cut'], items: [['tonic', 70], ['tonic', 70]], crackdust: 0 },
-  mirror: { curve: 40, starterStage: 2, members: ['coilcrest', 'floeback', 'emberjaw', 'gillwick', 'duskowl'], discs: ['spore-drift', 'flashover', 'gale-cut', 'hoarfrost'], items: [['tonic', 70], ['tonic', 70]], crackdust: 0 },
-  summit: { curve: 47, starterStage: 2, members: ['coilcrest', 'floeback', 'caldermaw', 'strandrunner', 'duskowl'], discs: ['spore-drift', 'flashover', 'gale-cut', 'hoarfrost', 'drowned-bell', 'plumbline'], items: [['tonic', 70], ['tonic', 70], ['tonic', 70], ['tonic', 70]], crackdust: 0,
-    between: { revive: 3, fullSalve: 4 } },
+  turn: { curve: 7, starterStage: 0, members: ['tossup', 'wirewhisk', 'mudfist'], discs: [], items: [['salve', 25], ['salve', 25]], crackdust: 0, alt: ['puddlepip'] },
+  ward: { curve: 13, starterStage: 1, members: ['tossup', 'wirewhisk', 'mudfist', 'chillnub'], discs: ['spore-drift'], items: [['salve', 25], ['salve', 25]], crackdust: 2, alt: ['mothling'] },
+  weather: { curve: 19, starterStage: 1, members: ['wirewhisk', 'mudfist', 'chillnub', 'sootling', 'sedgehare'], discs: ['spore-drift'], items: [['tonic', 70], ['salve', 25]], crackdust: 0, alt: ['rayling'] },
+  hollow: { curve: 26, starterStage: 2, members: ['coilcrest', 'rimeplate', 'sootling', 'rushling', 'bilgebob'], discs: ['spore-drift', 'flashover'], items: [['tonic', 70], ['tonic', 70]], crackdust: 0, alt: ['creelwight'] },
+  relay: { curve: 33, starterStage: 2, members: ['coilcrest', 'rimeplate', 'emberjaw', 'rushling', 'duskowl'], discs: ['spore-drift', 'flashover', 'gale-cut'], items: [['tonic', 70], ['tonic', 70]], crackdust: 0, alt: ['gillwick'] },
+  mirror: { curve: 40, starterStage: 2, members: ['coilcrest', 'floeback', 'emberjaw', 'gillwick', 'duskowl'], discs: ['spore-drift', 'flashover', 'gale-cut', 'hoarfrost'], items: [['tonic', 70], ['tonic', 70]], crackdust: 0, alt: ['strandrunner', 'lumenveil'] },
+  summit: { curve: 47, starterStage: 2, members: ['coilcrest', 'floeback', 'caldermaw', 'strandrunner', 'duskowl'], discs: ['spore-drift', 'flashover', 'gale-cut', 'hoarfrost', 'drowned-bell', 'plumbline'], items: [['tonic', 70], ['tonic', 70], ['tonic', 70], ['tonic', 70]], crackdust: 0, alt: ['gillwick', 'lumenveil'],
+    between: { revive: 3, fullSalve: 2 } },
 });
 
 /** Party for a fight, starter variant, optionally at another curve (route trainers). */
@@ -427,9 +427,9 @@ export function buildParty(key, starter, curveOverride = null) {
   const curve = curveOverride ?? p.curve;
   const line = STARTER_LINES[starter];
   const starterForm = line[Math.min(p.starterStage, line.length - 1)];
-  const forms = [starterForm, ...p.members.filter((m) => !line.includes(m))].slice(0, p.members.length + 1);
-  // keep the party size constant when the starter's line overlaps a member
-  while (forms.length < p.members.length + 1) forms.push(p.members[forms.length - 1]);
+  const forms = [starterForm, ...p.members.filter((m) => !line.includes(m))];
+  // keep the party size constant when the starter's line overlaps a member: the isle's alternate
+  for (const a of p.alt) if (forms.length < p.members.length + 1 && !forms.includes(a)) forms.push(a);
   return forms.map((f, i) => {
     const level = Math.max(2, i === 0 ? curve + 1 : curve);
     return mon(f, level, pickMoves(f, level, p.discs));

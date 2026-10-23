@@ -1,53 +1,169 @@
 /**
- * Pause menu root. [SCN-MENU] DAY-1 STUB: lists Party, Bag, Field Log, Map, Ledger, Settings, Save
- * and pushes the matching scene by name. Modal over the overworld; `cancel` pops.
+ * Pause root. [SCN-MENU] — GDD-00 §13, GDD-09 §3.24.
+ *
+ * A non-opaque column over the field (night-ink scrim): Party, Satchel, Ledger, Map, Field Log,
+ * Journal, Settings and **Save, always last**. One Up from the top lands on Save (the focus wraps and
+ * Save is never skipped: under No Rewind it stays focusable, greyed, and opens the save screen in its
+ * no-manual-saves mode). The column slides in from the right over 6 frames and out over 4 (a dissolve
+ * under reduced motion). Opening flushes input (the stack does, and `enter` does again so a pause
+ * press never leaks into the column). The overworld clock is paused while the menu is up by
+ * construction: the stack updates only the top scene and this scene never sets `updateBelow`.
+ *
+ * Input: up/down (auto-repeat) move, confirm opens, cancel or the pause button closes, a pointer
+ * hover focuses and a tap opens (two-step on touch, through `ui/focus`).
  * @module scenes/menu
  */
 import { drawText } from '../core/font.js';
-import { createLocalList, drawPaper, KIT } from './day1kit.js';
+import { COLORS, PALETTE } from '../ui/theme.js';
+import { createFocus } from '../ui/focus.js';
+import { drawCurrency } from '../ui/widgets.js';
+import { t } from '../data/strings.js';
+import { formatTime, day as dayOf } from '../state/selectors.js';
+import { MENU_ITEMS as MODEL_ITEMS, pauseRows, placeName, isNoRewind } from './menuModel.js';
+import { prefsOf, skinOf, drawSkinPanel, createSlide, drawGlyph, drawCursorAt, drawHints, sfx, toast } from './menuKit.js';
 
-/** Menu entries in order; Save is always last. */
-export const MENU_ITEMS = Object.freeze([
-  Object.freeze({ label: 'Party', scene: 'party' }),
-  Object.freeze({ label: 'Bag', scene: 'bag' }),
-  Object.freeze({ label: 'Field Log', scene: 'fieldLog' }),
-  Object.freeze({ label: 'Map', scene: 'mapScreen' }),
-  Object.freeze({ label: 'Ledger', scene: 'ledger' }),
-  Object.freeze({ label: 'Settings', scene: 'settings' }),
-  Object.freeze({ label: 'Save', scene: 'saveLoad' }),
-]);
+/** Menu entries in order (`{label, scene}`); Save is always last. */
+export const MENU_ITEMS = Object.freeze(MODEL_ITEMS.map((it) => Object.freeze({ id: it.id, label: it.label, scene: it.scene })));
+
+/** Column geometry (GDD-09 §3.24). */
+export const MENU_RECT = Object.freeze({ x: 320, y: 24, w: 140 });
+const ROW_H = 14;
+const HEAD_H = 20;
 
 /**
- * @param {object} G
- * @returns {import('../core/scene.js').Scene & {debugText: () => string}}
+ * @param {any} G
+ * @returns {import('../core/scene.js').Scene & {debugText: () => string, isBusy: () => boolean}}
  */
 export function createMenuScene(G) {
-  const x = 320;
-  const y = 24;
-  const w = 140;
-  const list = createLocalList({
-    items: MENU_ITEMS.map((it) => ({ label: it.label, value: it.scene })),
-    x: x + 6, y: y + 22, w: w - 12, rowH: 14,
-    onPick: (i, item) => G.push(item.value),
-  });
-  return {
+  const slide = createSlide({ dx: 12 });
+  let rows = pauseRows(G.world);
+  let ms = 0;
+  const focus = createFocus({ cols: 1, wrap: true, index: 0, items: [] });
+
+  function layout(off = 0) {
+    rows = pauseRows(G.world);
+    focus.setItems(rows.map((r, i) => ({
+      id: r.id,
+      rect: { x: MENU_RECT.x + 6 + off, y: MENU_RECT.y + HEAD_H + i * ROW_H, w: MENU_RECT.w - 12, h: ROW_H },
+      enabled: true,
+    })));
+  }
+
+  function open(row) {
+    if (!row) return;
+    if (typeof G.sceneFactories?.[row.scene] !== 'function' && G.sceneFactories) {
+      sfx(G, 'blocked');
+      toast(G, `${row.label}: not open yet.`); // str
+      return;
+    }
+    sfx(G, 'confirm');
+    G.push(row.scene, row.params ? { ...row.params } : { from: 'menu' });
+  }
+
+  function close() {
+    if (slide.closing) return;
+    sfx(G, 'cancel');
+    slide.close(() => { if (G.scenes.top() === scene) G.scenes.pop(); }, prefsOf(G));
+  }
+
+  focus.on('activate', (ev) => open(rows[ev.index]));
+  focus.on('cancel', () => close());
+  focus.on('change', () => sfx(G, 'cursor'));
+
+  const scene = {
     name: 'menu',
     opaque: false,
-    enter() { list.index = 0; },
-    resume() {},
-    update() {},
+    enter() {
+      G.input?.flush?.();
+      layout();
+      focus.set(0, { force: true });
+      ms = 0;
+      slide.open(prefsOf(G));
+    },
+    exit() {},
+    pause() {},
+    resume() {
+      G.input?.flush?.();
+      layout();
+    },
+    update(dt) {
+      ms += dt;
+      slide.update(dt);
+      focus.update(dt);
+    },
     handleInput(input) {
-      if (input.pressed('cancel')) { G.scenes.pop(); return; }
-      list.handleInput(input);
+      if (slide.closing) return;
+      if (input.pressed('start')) { close(); return; }
+      focus.handle(input);
     },
     draw(ctx) {
-      ctx.fillStyle = 'rgba(10,12,24,0.45)';
+      const prefs = prefsOf(G);
+      const skin = skinOf(prefs);
+      const a = slide.alpha();
+      const off = slide.offset();
+      ctx.save();
+      ctx.globalAlpha = 0.45 * a;
+      ctx.fillStyle = COLORS.night.ink;
       ctx.fillRect(0, 0, 480, 270);
-      drawPaper(ctx, x, y, w, 22 + 14 * MENU_ITEMS.length + 10);
-      drawText(ctx, 'MENU', x + 8, y + 6, { color: KIT.ink });
-      drawText(ctx, G.clock ? G.clock.formatTime() : '', x + w - 8, y + 6, { color: KIT.inkSoft, align: 'right' });
-      list.draw(ctx);
+      ctx.globalAlpha = prefs.reduced ? a : 1;
+      layout(off);
+      const x = MENU_RECT.x + off, y = MENU_RECT.y;
+      const h = HEAD_H + rows.length * ROW_H + 40;
+      drawSkinPanel(ctx, { x, y, w: MENU_RECT.w, h }, skin, 'paper');
+      // heading + clock
+      drawText(ctx, t('menu.heading'), x + 8, y + 7, { color: skin.text });
+      const clock = G.clock?.formatTime ? G.clock.formatTime() : formatTime(G.world);
+      drawText(ctx, clock, x + MENU_RECT.w - 8, y + 7, { color: skin.soft, align: 'right' });
+      ctx.fillStyle = skin.rule;
+      ctx.fillRect(x + 6, y + HEAD_H - 3, MENU_RECT.w - 12, 1);
+      // rows
+      rows.forEach((r, i) => {
+        const ry = y + HEAD_H + i * ROW_H;
+        const focused = i === focus.index;
+        if (r.id === 'save') {
+          ctx.fillStyle = skin.rule;
+          for (let dx = 0; dx < MENU_RECT.w - 12; dx += 2) ctx.fillRect(x + 6 + dx, ry - 1, 1, 1);
+        }
+        if (focused) {
+          ctx.fillStyle = focus.pointerActive ? (skin.dark ? PALETTE.deepBlue : COLORS.paper.grain) : skin.band;
+          ctx.fillRect(x + 5, ry, MENU_RECT.w - 10, ROW_H - 1);
+        }
+        const ink = r.locked ? skin.faint : skin.text;
+        drawGlyph(ctx, r.icon, x + 16, ry + 3, { ink, accent: r.locked ? skin.faint : (skin.dark ? PALETTE.y : COLORS.wax.fill), light: skin.dark ? COLORS.night.ink : COLORS.paper.light });
+        drawText(ctx, r.label, x + 28, ry + 4, { color: ink });
+        if (r.locked) drawText(ctx, '–', x + MENU_RECT.w - 14, ry + 4, { color: skin.faint });
+        if (focused) drawCursorAt(ctx, x + 6, ry + 4, ms, skin);
+      });
+      // footer: day, place, buttons
+      const fy = y + HEAD_H + rows.length * ROW_H + 4;
+      ctx.fillStyle = skin.rule;
+      ctx.fillRect(x + 6, fy, MENU_RECT.w - 12, 1);
+      const w = G.world;
+      const place = placeName(w?.player?.mapId, G.data);
+      drawText(ctx, `Day ${dayOf(w) + 1}`, x + 8, fy + 5, { color: skin.soft }); // str
+      drawText(ctx, place, x + MENU_RECT.w - 8, fy + 5, { color: skin.soft, align: 'right', maxWidth: 84 });
+      drawCurrency(ctx, w?.wallet?.main ?? 0, x + 8, fy + 17, { dark: skin.dark });
+      const cur = rows[focus.index];
+      if (cur && cur.locked) {
+        drawText(ctx, cur.note, x + 8, fy + 27, { color: skin.faint, font: 'small', maxWidth: MENU_RECT.w - 16 });
+      } else if (isNoRewind(w)) {
+        drawText(ctx, 'No Rewind', x + MENU_RECT.w - 8, fy + 16, { color: skin.faint, font: 'small', align: 'right' }); // str
+      }
+      focus.drawCursor(ctx, { style: skin.style, cursor: false, ring: false });
+      // key hints on a strip under the column, clear of whatever the field draws
+      const hy = y + h + 5;
+      ctx.fillStyle = COLORS.night.ink;
+      ctx.globalAlpha = 0.85 * (prefs.reduced ? a : 1);
+      ctx.fillRect(x, hy - 2, MENU_RECT.w, 13);
+      ctx.globalAlpha = prefs.reduced ? a : 1;
+      drawHints(ctx, G.input, [['confirm', 'Open'], ['cancel', 'Close']], { x: x + MENU_RECT.w - 4, y: hy }); // str
+      ctx.restore();
     },
-    debugText: () => ['MENU', ...list.texts()].join('\n'),
+    debugText: () => [t('menu.heading'), ...rows.map((r, i) => `${i === focus.index ? '>' : ' '} ${r.label}${r.locked ? ' (locked)' : ''}`)].join('\n'),
+    isBusy: () => slide.phase === 'in' || slide.phase === 'out',
+    /** Test/harness view of the column. */
+    get index() { return focus.index; },
+    get rows() { return rows; },
   };
+  return scene;
 }

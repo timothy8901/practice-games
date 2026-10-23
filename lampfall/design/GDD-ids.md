@@ -852,13 +852,13 @@ K = Keeper (Isolde to "the Keeper", one each 06:00, K1 day 2 … K20 day 21). F 
 
 | id | Amount | Builds |
 |---|---|---|
-| `loan-1` | 6000 | porch lamp lit at payment (Dimity); bedsit roof |
-| `loan-2` | 15000 | the cottage |
-| `loan-3` | 25000 | commission 1 |
-| `loan-4` | 36000 | commission 2 |
-| `loan-5` | 50000 | commission 3 |
-| `loan-6` | 66000 | commission 4; Wren offers the Lamp Room |
-| `loan-7` | 80000 | the Lamp Room; the Relighting next dusk |
+| `tier-1` | 6000 | porch lamp lit at payment (Dimity); bedsit roof |
+| `tier-2` | 15000 | the cottage |
+| `tier-3` | 25000 | commission 1 |
+| `tier-4` | 36000 | commission 2 |
+| `tier-5` | 50000 | commission 3 |
+| `tier-6` | 66000 | commission 4; Wren offers the Lamp Room |
+| `tier-7` | 80000 | the Lamp Room; the Relighting next dusk |
 
 ### Shops and counters (8)
 

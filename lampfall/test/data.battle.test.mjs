@@ -26,10 +26,12 @@ const REGION_CURVE = { pellwick: 4, lowmoor: 7, cairnhold: 13, emberstep: 19, dr
 // Isle wild bands (GDD-00 §4): mandatory route trainers sit in the day band, optional ones in the night band (+2).
 const WILD = { lowmoor: [3, 8], cairnhold: [9, 14], emberstep: [15, 20], drownwood: [22, 27], thistlewind: [29, 34], rimeholt: [36, 41] };
 
-// GDD-ids §11: id -> [ace species, ace level | null (scaled), team size | null, [min, max] | null]
+// GDD-ids §11: id -> [ace species, ace level | null (scaled), team size | null, [min, max] | null]. Two rows differ from
+// the GDD-ids table on purpose (tools/balance-sim.mjs, GDD-04 §Balance): Tibby's Wirewhisk is Lv8 (at Lv9 it swept on-curve
+// parties) and Seraphine fields six (Lv42-43; four at Lv40-43 lost to on-curve parties 9 times in 10).
 const EXPECTED = {
   'lowmoor-osier': ['reedkit', 6, 2, [5, 6]], 'lowmoor-dunlin': ['mudfist', 7, 2, [6, 7]], 'lowmoor-colm': ['puddlepip', 7, 2, [6, 7]],
-  'lowmoor-perrin': ['sloshkin', 8, 2, [7, 8]], 'lowmoor-tibby': ['wirewhisk', 9, 3, [7, 9]],
+  'lowmoor-perrin': ['sloshkin', 8, 2, [7, 8]], 'lowmoor-tibby': ['wirewhisk', 8, 3, [7, 8]],
   'cairnhold-ruddock': ['knuckleback', 12, 2, [11, 12]], 'cairnhold-prudence': ['chillnub', 12, 2, [11, 12]], 'cairnhold-jory': ['siltback', 13, 3, [11, 13]],
   'cairnhold-ellery': ['mothling', 13, 2, [12, 13]], 'cairnhold-bette': ['prismoth', 15, 3, [13, 15]],
   'emberstep-asha': ['rayling', 18, 2, [17, 18]], 'emberstep-kip': ['sootling', 18, 3, [16, 18]], 'emberstep-roswitha': ['sedgehare', 19, 2, [18, 19]],
@@ -42,7 +44,7 @@ const EXPECTED = {
   'rimeholt-sunniva': ['lumenveil', 41, 4, [38, 41]], 'rimeholt-aldous': ['caldermaw', 42, 4, [39, 42]],
   pip: ['wirewhisk', 4, 1, [4, 4]],
   'maud-spire': ['bilgebob', 10, 2, [8, 10]], 'osric-spire': ['prismoth', 16, 3, [14, 16]], 'ines-spire': ['emberjaw', 22, 3, [20, 22]],
-  'wendel-spire': ['hulkwight', 29, 3, [27, 29]], 'hallorans-spire': ['coilcrest', 36, 6, [33, 36]], 'seraphine-spire': ['lumenveil', 43, 4, [40, 43]],
+  'wendel-spire': ['hulkwight', 29, 3, [27, 29]], 'hallorans-spire': ['coilcrest', 36, 6, [33, 36]], 'seraphine-spire': ['lumenveil', 43, 6, [42, 43]],
   'bar-corwen': ['hulkwight', 41, 4, [40, 41]], 'bar-tilda': ['strandrunner', 41, 4, [40, 41]], 'bar-ezra': ['cairnward', 42, 4, [41, 42]],
   'bar-ottilie': ['lumenveil', 43, 5, [41, 43]], 'bar-hamish': ['brinelance', 43, 5, [42, 43]], 'bar-delphine': ['cragmitt', 44, 5, [42, 44]],
   'bastien-keeper': ['hulkwight', 46, 5, [43, 46]], 'cass-keeper': ['skeinwing', 48, 5, [45, 48]], 'idris-champion': ['vesperay', 50, 6, [46, 50]],

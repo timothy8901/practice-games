@@ -15,8 +15,9 @@
  * Crate at your gate, which pays 90% at 06:00 through `systems/shops.settleCrate`).
  *
  * Hours are `[open, close)` minutes of day and wrap midnight. Stock `cond`s use the cond DSL; note
- * that the DSL's `day.dow` counts from core day 0 (`dow 6` = GDD day 7, 14, 21 = Saturday, `dow 0`
- * = Sunday), while `fromDay` is a GDD day.
+ * that the DSL's `day.dow` is the GDD calendar weekday, 0 = Monday … 6 = Sunday (state/selectors
+ * DAY0_WEEKDAY: GDD day 1 is a Sunday), so the spring-tide Saturdays (GDD days 7, 14, 21) are `dow 5`
+ * and the small hours after market night are `dow 6`; `fromDay` is a GDD day.
  * Pure data; deep-frozen.
  * @module data/shops
  */
@@ -39,7 +40,7 @@ const ALL_KINDS = ['fish', 'bug', 'fruit', 'relic'];
 const STONES_SOLD = { dial: ['drift', 'flux'] };
 
 /** Saturday 20:00 to Sunday 02:00 (core-day weekday 6, then 0 before 02:00). */
-const MARKET_NIGHT = { any: [{ all: [{ day: { dow: [6] } }, { hour: [20, 24] }] }, { all: [{ day: { dow: [0] } }, { hour: [0, 2] }] }] };
+const MARKET_NIGHT = { any: [{ all: [{ day: { dow: [5] } }, { hour: [20, 24] }] }, { all: [{ day: { dow: [6] } }, { hour: [0, 2] }] }] };
 
 /** Furniture Pell's rotates (all 24; the first 12 survive cut-order 14). */
 const FURNITURE = [
