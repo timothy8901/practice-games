@@ -551,7 +551,7 @@ export function simulateRoute(n = 200, seed = 'balance') {
       const st = STARTERS[i % STARTERS.length];
       const rng = makeRng(`${seed}:route:${tr.id}:${i}`);
       const party = buildParty(key, st, curve);
-      const r = playBattle(party, trainerParty(tr), { rng, trainer: tr, source: 'route', items: itemRows(key, party).slice(0, 1) });
+      const r = playBattle(party, trainerParty(tr), { rng, trainer: tr, source: 'route', items: itemRows(key, party).slice(0, 1), crackdust: PARTIES[key].crackdust });
       if (r.outcome === 'win') w++;
       turns += r.turns;
     }
