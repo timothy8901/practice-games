@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>Audio Adversarial Checks</title>
+<style>
+  body { margin: 0; padding: 16px; background: #14181f; color: #e8edf3; font: 13px/1.45 ui-monospace, monospace; }
+  h1 { font-size: 16px; margin: 0 0 8px; font-family: system-ui, sans-serif; }
+  #status { color: #8e9ab0; margin-bottom: 8px; }
+  pre { background: #0d1015; border-radius: 6px; padding: 10px; white-space: pre-wrap; margin: 0; }
+  .pass { color: #6fd18a; } .fail { color: #ff6b6b; } .info { color: #8e9ab0; }
+</style>
+</head>
+<body>
+<h1>core/audio adversarial checks</h1>
+<div id="status">running…</div>
+<pre id="log"></pre>
+<script type="module">
+  import { audio, createAudio, SFX_NAMES, DEMO_TRACK, DEMO_TRACK_ID, analyzeBuffer, sfxDuration, stepSeconds } from '../../js/core/audio.js';
+
+  const logEl = document.getElementById('log');
+  const summary = { pass: 0, fail: 0, lines: [], done: false, uncaught: [] };
+  window.addEventListener('error', (e) => summary.uncaught.push(`error: ${e.message}`));
+  window.addEventListener('unhandledrejection', (e) => summary.uncaught.push(`rejection: ${e.reason && (e.reason.message || e.reason)}`));
+
+  function report(kind, msg) {
+    const line = `${kind} ${msg}`;
+    summary.lines.push(line);
+    if (kind === 'PASS') summary.pass++;
+    else if (kind === 'FAIL') { summary.fail++; console.error(line); }
+    const div = document.createElement('div');
+    div.className = kind === 'PASS' ? 'pass' : kind === 'FAIL' ? 'fail' : 'info';
+    div.textContent = line;
+    logEl.appendChild(div);
+  }
+  const check = (ok, msg) => report(ok ? 'PASS' : 'FAIL', msg);
+  const info = (msg) => report('INFO', msg);
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  /** Run fn, report whether it threw. Returns the value or the error. */
+  function noThrow(label, fn) {
+    try {
+      const v = fn();
+      check(true, `${label} did not throw`);
+      return v;
+    } catch (err) {
+      check(false, `${label} threw ${err && (err.name + ': ' + err.message)}`);
+      return err;
+    }
+  }
+  async function noReject(label, fn) {
+    try {
+      const v = await fn();
+      check(true, `${label} resolved`);
+      return v;
+    } catch (err) {
+      check(false, `${label} rejected ${err && (err.name + ': ' + err.message)}`);
+      return err;
+    }
+  }
+  /** Peak of the live analyser sampled every frame for `ms`. */
+  async function livePeak(ms) {
+    const an = audio.analyser;
+    const buf = new Float32Array(an.fftSize);
+    let peak = 0;
+    const end = performance.now() + ms;
+    while (performance.now() < end) {
+      await new Promise(requestAnimationFrame);
+      an.getFloatTimeDomainData(buf);
+      peak = Math.max(peak, analyzeBuffer([buf]).peak);
+    }
+    return peak;
+  }
+
+  async function run() {
+    // ── 1. everything before unlock ────────────────────────────────────────────────────────
+    info('--- before unlock ---');
+    const fresh = createAudio();
+    check(fresh.sfx('coin') === null, 'sfx before unlock returns null');
+    noThrow('sfx(name, null) before unlock', () => fresh.sfx('coin', null));
+    noThrow('sfx junk opts before unlock', () => fresh.sfx('coin', { pitch: 'x', volume: 'loud', pan: 'left', delay: -1 }));
+    noThrow('setVolume(null)', () => fresh.setVolume(null));
+    noThrow('setVolume(0.5) (number)', () => fresh.setVolume(0.5));
+    noThrow('setVolume out of range', () => fresh.setVolume({ master: 99, music: -5, sfx: NaN }));
+    const v = fresh.getVolume();
+    check(v.master <= 1 && v.music >= 0 && Number.isFinite(v.sfx), `volumes clamped ${JSON.stringify(v)}`);
+    noThrow('mute("yes")', () => fresh.mute('yes'));
+    noThrow('playMusic(id, null)', () => fresh.playMusic(DEMO_TRACK_ID, null));
+    noThrow('stopMusic(null)', () => fresh.stopMusic(null));
+    noThrow('setMusicParam(null)', () => fresh.setMusicParam(null));
+    noThrow('setMusicParam({intensity: "x"})', () => fresh.setMusicParam({ intensity: 'x' }));
+    noThrow('setStem(undefined, true)', () => fresh.setStem(undefined, true));
+    noThrow('nowPlaying before unlock', () => fresh.nowPlaying());
+    check(fresh.nowPlaying() === null, 'nowPlaying null before any play');
+
+    // ── 2. unlock + music basics ───────────────────────────────────────────────────────────
+    info('--- unlock ---');
+    fresh.setMusicParam({ intensity: 0.2 });
+    const ok = await audio.unlock();
+    check(ok && audio.ready && audio.state === 'running', `unlock → ${ok}, state ${audio.state}`);
+    check((await audio.unlock()) === true, 'second unlock() resolves true');
+    const ctx = audio.context;
+    const sr = ctx.sampleRate;
+
+    // Empirical: does AudioParam.value reflect a future setValueAtTime? (used to validate the splash fix)
+    {
+      const o = ctx.createOscillator();
+      o.frequency.setValueAtTime(3000, ctx.currentTime + 1);
+      info(`AudioParam.value after future setValueAtTime(3000) reads ${o.frequency.value}`);
+    }
+
+    // ── 3. junk options after unlock must not throw ────────────────────────────────────────
+    info('--- sfx argument hardening (live) ---');
+    noThrow('sfx(name, null)', () => audio.sfx('coin', null));
+    noThrow('sfx pan "left"', () => audio.sfx('blip', { pan: 'left' }));
+    noThrow('sfx pan NaN', () => audio.sfx('blip', { pan: NaN }));
+    noThrow('sfx pan 9', () => audio.sfx('blip', { pan: 9 }));
+    noThrow('sfx volume "loud"', () => audio.sfx('blip', { volume: 'loud' }));
+    noThrow('sfx volume 50', () => audio.sfx('confirm', { volume: 50 }));
+    noThrow('sfx volume -1', () => audio.sfx('confirm', { volume: -1 }));
+    noThrow('sfx pitch 0', () => audio.sfx('cancel', { pitch: 0 }));
+    noThrow('sfx pitch 1000', () => audio.sfx('cancel', { pitch: 1000 }));
+    noThrow('sfx pitch 0.0001', () => audio.sfx('error', { pitch: 0.0001 }));
+    noThrow('sfx semitones NaN', () => audio.sfx('error', { semitones: NaN }));
+    noThrow('sfx semitones +60', () => audio.sfx('step', { semitones: 60 }));
+    noThrow('sfx delay -5', () => audio.sfx('step', { delay: -5 }));
+    noThrow('sfx delay "x"', () => audio.sfx('toast', { delay: 'x' }));
+    noThrow('sfx unknown name', () => audio.sfx('kazoo'));
+    noThrow('sfx undefined name', () => audio.sfx(undefined));
+    noThrow('sfx alias tailSlap', () => audio.sfx('tailSlap'));
+    check(audio.sfx('kazoo') === null, 'unknown sfx returns null');
+    await sleep(150);
+
+    // ── 4. rapid fire ──────────────────────────────────────────────────────────────────────
+    info('--- 200 sfx in one frame ---');
+    let accepted = 0;
+    let threw = null;
+    const names = SFX_NAMES;
+    try {
+      for (let i = 0; i < 200; i++) if (audio.sfx(names[i % names.length], { pan: (i % 7) / 3 - 1, pitch: 0.5 + (i % 5) * 0.4 })) accepted++;
+    } catch (err) { threw = err; }
+    check(threw === null, `200 sfx in a frame did not throw${threw ? ': ' + threw.message : ''}`);
+    check(accepted > 0 && accepted <= 20, `voice limiting: ${accepted} of 200 accepted (burst cap 20)`);
+    const burstPeak = await livePeak(700);
+    check(burstPeak < 1.0, `post-limiter analyser peak during burst ${burstPeak.toFixed(3)} < 1.0`);
+    // Sustained spam across frames: 20 per 100 ms allowed → never more than ~230 per second.
+    let sustained = 0;
+    const t0 = performance.now();
+    while (performance.now() - t0 < 1000) {
+      for (let i = 0; i < 10; i++) if (audio.sfx(names[(sustained + i) % names.length])) sustained++;
+      await sleep(4);
+    }
+    check(sustained <= 240, `sustained spam capped: ${sustained} accepted in 1 s`);
+    const spamPeak = await livePeak(500);
+    check(spamPeak < 1.0, `analyser peak after sustained spam ${spamPeak.toFixed(3)} < 1.0`);
+    await sleep(800);
+
+    // ── 5. playMusic twice quickly / crossfade / no stuck layers ───────────────────────────
+    info('--- playMusic churn ---');
+    audio.defineTrack('b', { ...DEMO_TRACK, bpm: 130 });
+    const startCall = ctx.currentTime;
+    noThrow('playMusic(harbor)', () => audio.playMusic(DEMO_TRACK_ID, { fade: 800 }));
+    await sleep(60);
+    noThrow('playMusic(b) 60ms later (inside fade-in)', () => audio.playMusic('b', { fade: 800 }));
+    await sleep(60);
+    noThrow('playMusic(harbor) 60ms later (inside crossfade)', () => audio.playMusic(DEMO_TRACK_ID, { fade: 800 }));
+    await sleep(30);
+    noThrow('playMusic(harbor) again (same id, no-op)', () => audio.playMusic(DEMO_TRACK_ID, { fade: 800 }));
+    noThrow('playMusic(harbor, restart) immediately', () => audio.playMusic(DEMO_TRACK_ID, { fade: 100, restart: true }));
+    noThrow('playMusic fade NaN', () => audio.playMusic('b', { fade: NaN }));
+    noThrow('playMusic fade -1000', () => audio.playMusic(DEMO_TRACK_ID, { fade: -1000 }));
+    noThrow('playMusic fade 0 then stop fade 0', () => { audio.playMusic('b', { fade: 0, restart: true }); audio.stopMusic({ fade: 0 }); });
+    noThrow('playMusic after stop', () => audio.playMusic(DEMO_TRACK_ID, { fade: 500 }));
+    check(audio.nowPlaying() && audio.nowPlaying().id === DEMO_TRACK_ID, 'nowPlaying reports last requested track');
+    await sleep(1500);
+    const musicPeak = await livePeak(600);
+    check(musicPeak > 0.01, `music audible after churn (peak ${musicPeak.toFixed(3)})`);
+    check(musicPeak < 1.0, `music not clipping at the analyser (peak ${musicPeak.toFixed(3)})`);
+
+    // ── 6. nowPlaying correctness ──────────────────────────────────────────────────────────
+    info('--- nowPlaying ---');
+    {
+      const np1 = audio.nowPlaying();
+      await sleep(1000);
+      const np2 = audio.nowPlaying();
+      check(np1 && np2 && np1.id === DEMO_TRACK_ID && np2.id === DEMO_TRACK_ID, 'nowPlaying id stable');
+      const stepSec = stepSeconds(92, 4);
+      const expectedAdvance = 1.0 / stepSec; // steps per second ≈ 6.13
+      const adv = ((np2.step - np1.step) + 128 * (np2.loop - np1.loop));
+      check(Math.abs(adv - expectedAdvance) <= 1.5, `step counter advances with time (${adv} steps in 1 s, expected ≈ ${expectedAdvance.toFixed(1)})`);
+      check(np2.bar === Math.floor(np2.step / 16) && np2.beat === Math.floor((np2.step % 16) / 4), `bar/beat derived from step (${JSON.stringify({ bar: np2.bar, beat: np2.beat, step: np2.step })})`);
+      check(np2.bpm === 92 && Array.isArray(np2.stems) && typeof np2.intensity === 'number', 'nowPlaying shape {id,bpm,bar,beat,step,loop,stems,intensity}');
+    }
+
+    // ── 7. stems ───────────────────────────────────────────────────────────────────────────
+    info('--- stems / params ---');
+    const stemsAfter = noThrow('setStem(unknown)', () => audio.setStem('kazooLayer', true));
+    check(Array.isArray(stemsAfter) && stemsAfter.includes('kazooLayer'), 'unknown stem remembered harmlessly');
+    noThrow('setStem(night, true)', () => audio.setStem('night', true));
+    noThrow('setStem(night, "")', () => audio.setStem('night', ''));
+    noThrow('setStem(tide, 1)', () => audio.setStem('tide', 1));
+    noThrow('setStem(42, true)', () => audio.setStem(42, true));
+    audio.setStem('kazooLayer', false);
+    audio.setStem('42', false);
+    for (const i of [-1, 2, NaN, '0.5', null, undefined]) noThrow(`setMusicParam({intensity: ${String(i)}})`, () => audio.setMusicParam({ intensity: i }));
+    check(audio.setMusicParam({ intensity: -1 }).intensity === 0 && audio.setMusicParam({ intensity: 2 }).intensity === 1, 'intensity clamped 0..1');
+    audio.setMusicParam({ intensity: 1 });
+    noThrow('setVolume junk live', () => audio.setVolume({ master: '0.9', music: Infinity, sfx: -0 }));
+    check(audio.getVolume().music === 1 || audio.getVolume().music === 0.8, `Infinity volume handled (${audio.getVolume().music})`);
+    audio.setVolume({ master: 1, music: 0.8, sfx: 1 });
+    noThrow('mute toggle', () => { audio.mute(true); audio.mute(false); });
+
+    // ── 8. stopMusic then playMusic / silence check ────────────────────────────────────────
+    info('--- stop → silence → play ---');
+    noThrow('stopMusic({fade: 300})', () => audio.stopMusic({ fade: 300 }));
+    check(audio.nowPlaying() === null, 'nowPlaying null right after stopMusic');
+    check(audio.stopMusic() === false, 'second stopMusic returns false');
+    await sleep(2500);
+    const silence = await livePeak(500);
+    check(silence < 0.02, `silent after stop (peak ${silence.toFixed(4)}) → no stuck layers/players`);
+    noThrow('playMusic after silence', () => audio.playMusic(DEMO_TRACK_ID, { fade: 300 }));
+    await sleep(1200);
+    const back = await livePeak(500);
+    check(back > 0.01, `music back after stop/play (peak ${back.toFixed(3)})`);
+    check(audio.nowPlaying() && audio.nowPlaying().id === DEMO_TRACK_ID, 'nowPlaying after restart');
+
+    // ── 9. suspend / resume ────────────────────────────────────────────────────────────────
+    info('--- suspend / resume ---');
+    await ctx.suspend();
+    check(audio.state === 'suspended', `context suspended (${audio.state})`);
+    noThrow('sfx while suspended', () => audio.sfx('coin'));
+    noThrow('playMusic while suspended', () => audio.playMusic('b', { fade: 400 }));
+    noThrow('nowPlaying while suspended', () => audio.nowPlaying());
+    await sleep(400);
+    // sfx() calls resume() itself; make sure the engine's own unlock also brings it back.
+    const r = await audio.unlock();
+    await sleep(100);
+    check(r === true && audio.state === 'running', `unlock() resumes a suspended context (${audio.state})`);
+    await sleep(1200);
+    const afterResume = await livePeak(600);
+    check(afterResume > 0.01, `music audible after resume (peak ${afterResume.toFixed(3)})`);
+    check(audio.nowPlaying() && audio.nowPlaying().id === 'b', 'track switched while suspended is now playing');
+
+    // ── 10. hidden tab simulation + main-thread stall ──────────────────────────────────────
+    info('--- hidden tab / stall ---');
+    let hidden = true;
+    const desc = Object.getOwnPropertyDescriptor(Document.prototype, 'hidden');
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => hidden });
+    document.dispatchEvent(new Event('visibilitychange'));
+    await sleep(1500);
+    const hiddenNp = audio.nowPlaying();
+    hidden = false;
+    document.dispatchEvent(new Event('visibilitychange'));
+    await sleep(300);
+    check(hiddenNp && audio.nowPlaying().id === 'b', 'music survives hidden→visible');
+    if (desc) Object.defineProperty(document, 'hidden', desc); else delete document.hidden;
+    // Block the main thread for 1.2 s (4× the lookahead) → scheduler stall.
+    const npBefore = audio.nowPlaying();
+    const tBefore = ctx.currentTime;
+    const stallEnd = performance.now() + 1200;
+    while (performance.now() < stallEnd) { /* busy wait */ }
+    await sleep(50);
+    const npAfter = audio.nowPlaying();
+    const elapsedSteps = (ctx.currentTime - tBefore) / stepSeconds(130, 4);
+    const advanced = (npAfter.step - npBefore.step) + 128 * (npAfter.loop - npBefore.loop);
+    check(Math.abs(advanced - elapsedSteps) < 2, `clock position stays on wall time through a stall (${advanced} vs ${elapsedSteps.toFixed(1)})`);
+    await sleep(1000);
+    const postStall = await livePeak(600);
+    check(postStall > 0.01 && postStall < 1.0, `music continues after stall (peak ${postStall.toFixed(3)})`);
+
+    // ── 11. offline render of every sfx ────────────────────────────────────────────────────
+    info('--- offline sfx renders ---');
+    let worst = { name: '', peak: 0 };
+    let quietest = { name: '', rms: 1 };
+    for (const name of SFX_NAMES) {
+      try {
+        const b = await audio.renderSfx(name, { seed: 3 });
+        const ch = [b.getChannelData(0), b.getChannelData(1)];
+        const { peak } = analyzeBuffer(ch);
+        const nominal = sfxDuration(name);
+        const win = Math.min(ch[0].length, Math.ceil((0.02 + nominal) * sr));
+        const { rms } = analyzeBuffer(ch.map((c) => c.subarray(0, win)));
+        const tail = analyzeBuffer(ch.map((c) => c.subarray(c.length - Math.floor(0.03 * sr))));
+        if (peak > worst.peak) worst = { name, peak };
+        if (rms < quietest.rms) quietest = { name, rms };
+        check(peak < 0.99, `offline ${name}: peak ${peak.toFixed(3)} < 0.99`);
+        check(rms > 0.005, `offline ${name}: rms ${rms.toFixed(4)} > 0.005`);
+        check(Math.abs(b.duration - (nominal + 0.3)) < 0.01 && nominal > 0 && nominal <= 3.5, `offline ${name}: duration sane (${b.duration.toFixed(2)}s for nominal ${nominal}s)`);
+        check(tail.peak < 0.05, `offline ${name}: decayed by end of render (tail peak ${tail.peak.toFixed(4)})`);
+      } catch (err) {
+        check(false, `offline ${name} threw ${err && err.message}`);
+      }
+    }
+    info(`loudest ${worst.name} ${worst.peak.toFixed(3)}; quietest ${quietest.name} rms ${quietest.rms.toFixed(4)}`);
+    await noReject('renderSfx volume "x"', () => audio.renderSfx('coin', { volume: 'x' }));
+    await noReject('renderSfx pitch 4 volume 2 pan 1', () => audio.renderSfx('achievement', { pitch: 4, volume: 2, pan: 1 }));
+    await noReject('renderSfx pitch 0.25', () => audio.renderSfx('thunder', { pitch: 0.25 }));
+    // A deliberately overloaded track must still come out of the master chain under 0.99.
+    audio.defineTrack('loud', {
+      bpm: 140, bars: 1, key: 'D',
+      layers: {
+        b1: { inst: 'bass', pattern: [{ t: 0, n: ['D2', 'A2', 'D3'], d: 16, v: 1 }], gain: 2 },
+        b2: { inst: 'pad', pattern: [{ t: 0, n: ['D3', 'F#3', 'A3', 'D4', 'F#4'], d: 16, v: 1 }], gain: 2 },
+        k: { inst: 'kick', pattern: 'XXXXXXXXXXXXXXXX', gain: 2 },
+        s: { inst: 'snare', pattern: 'XXXXXXXXXXXXXXXX', gain: 2 },
+        g: { inst: 'glass', pattern: [{ t: 0, n: ['D5', 'A5', 'D6'], d: 16, v: 1 }], gain: 2 },
+        m: { inst: 'marimba', pattern: 'XXXXXXXXXXXXXXXX', gain: 2 },
+      },
+    });
+    const loud = await noReject('renderTrack(loud)', () => audio.renderTrack('loud', { bars: 2 }));
+    if (loud && loud.getChannelData) {
+      const { peak, rms } = analyzeBuffer([loud.getChannelData(0), loud.getChannelData(1)]);
+      check(peak < 0.99, `overloaded track peak ${peak.toFixed(3)} < 0.99 (rms ${rms.toFixed(3)})`);
+    }
+    await noReject('renderTrack bars 0 / NaN', () => audio.renderTrack(DEMO_TRACK_ID, { bars: NaN }).then(() => audio.renderTrack(DEMO_TRACK_ID, { bars: 0 })));
+
+    // ── 12. dispose of a secondary engine must be clean ────────────────────────────────────
+    info('--- secondary engine lifecycle ---');
+    const second = createAudio();
+    const errsBefore = summary.uncaught.length;
+    await second.unlock();
+    second.playMusic(DEMO_TRACK_ID, { fade: 100 });
+    second.sfx('coin');
+    await sleep(300);
+    await noReject('second.dispose()', () => second.dispose());
+    await sleep(300);
+    check(second.ready === false && second.state === 'closed', 'disposed engine reports closed');
+    noThrow('sfx after dispose', () => second.sfx('coin'));
+    noThrow('playMusic after dispose', () => second.playMusic(DEMO_TRACK_ID));
+    check(summary.uncaught.length === errsBefore, `no uncaught errors around dispose (${summary.uncaught.slice(errsBefore).join('; ') || 'none'})`);
+    await noReject('re-unlock after dispose', () => second.unlock());
+    check(second.ready === true, 'engine can be re-unlocked after dispose');
+    await second.dispose();
+
+    // Was the pre-unlock intensity of `fresh` applied to its filter once unlocked?
+    await fresh.unlock();
+    const cutoff = fresh.ready ? fresh.context && fresh.analyser ? 'n/a' : 'n/a' : 'n/a';
+    info(`fresh engine state ${fresh.state} (${cutoff})`);
+    await fresh.dispose();
+
+    audio.stopMusic({ fade: 500 });
+    check(summary.uncaught.length === 0, `no uncaught errors / rejections overall (${summary.uncaught.join('; ') || 'none'})`);
+    info(`done: ${summary.pass} passed, ${summary.fail} failed`);
+  }
+
+  window.__adv = { summary: () => ({ ...summary }), audio };
+  run().catch((err) => { check(false, `run threw ${err && err.stack}`); }).finally(() => {
+    summary.done = true;
+    document.getElementById('status').textContent = `done: ${summary.pass} passed, ${summary.fail} failed`;
+  });
+</script>
+</body>
+</html>

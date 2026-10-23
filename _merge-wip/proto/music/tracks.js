@@ -157,6 +157,36 @@ function rainLayer(bars, { v = 0.2, spb = 16, steps = [2, 6, 10, 14] } = {}) {
   return out;
 }
 
+/**
+ * Chord-following counter line (marimba in the battles). `cells` = [[step, tone], ...] per chord slice, where
+ * `tone` is an index into the voicing's notes sorted low→high (indices past the end wrap up an octave), or
+ * 'r' / '3' / '5' for the chord root, third and fifth placed inside [lo, lo+12). Keeps the ostinato rhythm
+ * while never planting a non-chord tone a semitone from what the pad is holding.
+ */
+function counterLayer(bars, cells, { v = 0.45, spb = 16, oct = 0, lo = 57 } = {}) {
+  const out = [];
+  bars.forEach((bar, i) => {
+    const chords = parseBar(bar);
+    const slice = spb / chords.length;
+    chords.forEach((c, j) => {
+      const tones = [...c.notes].sort((a, b) => a - b);
+      const rootPc = midi(c.root + '0') % 12;
+      const place = (pc) => { let n = pc; while (n < lo) n += 12; return n; };
+      const third = tones.map(n => (n - rootPc + 120) % 12).find(iv => iv === 3 || iv === 4);
+      for (const [s, tone] of cells) {
+        if (s >= slice) continue;
+        let n;
+        if (tone === 'r') n = place(rootPc);
+        else if (tone === '5') n = place((rootPc + 7) % 12);
+        else if (tone === '3') n = place((rootPc + (third ?? 7)) % 12);
+        else n = tones[tone % tones.length] + 12 * Math.floor(tone / tones.length) + oct;
+        out.push({ t: i * spb + j * slice + s, n, d: 2, v });
+      }
+    });
+  });
+  return out;
+}
+
 /** Brushed drum kit patterns. One bar given; repeated. */
 const KICK = 36, SNARE = 38, HAT = 42, RIM = 37;
 const PERC = {
@@ -189,19 +219,26 @@ const PERC = {
 function percLayer(style, bars, spb = 16) { return rep(PERC[style], bars, spb); }
 
 /** Builds a day-part theme from hand-written harmony + melody. */
-function theme(id, { title, bpm, key, scale, bars, melody, melodyInst = 'flute', melodyGain = 0.8, perc = 'brush', bass = 'calm',
+/**
+ * Melody gain per lead instrument so every hour's tune sits at about the same loudness: the engine's
+ * flute peaks at 0.24, pluck 0.32, marimba 0.42, bell ~0.45 (see INSTRUMENTS in js/core/audio.js).
+ */
+const MELODY_GAIN = { flute: 0.95, pluck: 0.8, marimba: 0.62, bell: 0.58, glass: 0.7 };
+
+function theme(id, { title, bpm, key, scale, bars, melody, melodyInst = 'flute', melodyGain, perc = 'brush', bass = 'calm',
   padGain = 0.5, nightSteps, motif, mood }) {
   const n = bars.length;
   return {
     id, title, bpm, key, scale, bars: n, stepsPerBar: 16, mood, motif,
     layers: {
       core:   { inst: 'pad',   gain: padGain, default: true,  role: 'core',   pattern: padLayer(bars) },
-      melody: { inst: melodyInst, gain: melodyGain, default: true, role: 'melody', pattern: melody },
-      bass:   { inst: 'bass',  gain: 0.75, default: true,  role: 'bass',   pattern: bassLayer(bars, { style: bass }) },
+      melody: { inst: melodyInst, gain: melodyGain ?? MELODY_GAIN[melodyInst] ?? 0.8, default: true, role: 'melody', pattern: melody },
+      // bass preset peaks at 0.55 (the hottest pitched voice): 0.6 keeps it under the tune, not on top of it
+      bass:   { inst: 'bass',  gain: 0.6,  default: true,  role: 'bass',   pattern: bassLayer(bars, { style: bass }) },
       perc:   { inst: 'kit',   gain: 0.6,  default: true,  role: 'perc',   pattern: percLayer(perc, n) },
-      night:  { inst: 'glass', gain: 0.5,  default: false, role: 'night',  pattern: nightLayer(bars, { steps: nightSteps }) },
+      night:  { inst: 'glass', gain: 0.65, default: false, role: 'night',  pattern: nightLayer(bars, { steps: nightSteps }) },
       tide:   { inst: 'pad',   gain: 0.45, default: false, role: 'tide',   pattern: tideLayer(bars) },
-      rain:   { inst: 'bell',  gain: 0.35, default: false, role: 'rain',   pattern: rainLayer(bars) },
+      rain:   { inst: 'bell',  gain: 0.45, default: false, role: 'rain',   pattern: rainLayer(bars) },
     },
   };
 }
@@ -233,9 +270,9 @@ const H_PREDAWN = [
 ];
 const M_PREDAWN = P(`
   E4:3 G4:3 A4:2 B4:8 | r:4 A4:2 G4:2 E4:8 | F#4:3 A4:3 D5:2 r:8 | D5:4 B4:4 F#4:8 |
-  E4:3 G4:3 A4:2 B4:8 | C#5:4 B4:4 A4:8 | B4:6 A4:2 G4:4 F#4:4 | E4:16 |
-  r:2 D5:2 E5:2 F#5:6 E5:4 | D5:8 B4:4 G4:4 | E4:4 G4:4 B4:8 | C#5:6 B4:2 A4:8 |
-  F#4:4 B4:4 D5:8 | C#5:4 A4:4 F#4:8 | G4:4 B4:4 D5:4 B4:4 | A4:4 B4:4 C#5:8`, { v: 0.7 });
+  E4:3 G4:3 A4:2 B4:8 | C#5:4 B4:4 A4:4 r:4 | B4:6 A4:2 G4:4 F#4:4 | E4:12 r:4 |
+  r:2 D5:2 E5:2 F#5:6 E5:4 | D5:8 B4:8 | E4:4 G4:4 B4:8 | C#5:6 B4:2 A4:4 r:4 |
+  F#4:4 B4:4 D5:8 | C#5:4 A4:4 F#4:4 r:4 | G4:4 B4:4 D5:4 B4:4 | A4:4 B4:4 C#5:8`, { v: 0.7 });
 
 // 06–09 "Porchlight Morning" — D major, 100 bpm. HOME TOWN theme: opens with the Heartmark motif D F# A B.
 const H_MORNING = [
@@ -339,12 +376,12 @@ const TITLE = {
   motif: 'HEARTMARK D4 F#4 A4 B4, then an octave up', mood: 'warm, slow, a beam sweeping the bay',
   layers: {
     core:   { inst: 'pad',   gain: 0.55, default: true, role: 'core',   pattern: padLayer(H_TITLE) },
-    melody: { inst: 'flute', gain: 0.8,  default: true, role: 'melody', pattern: P(`
+    melody: { inst: 'flute', gain: 0.95, default: true, role: 'melody', pattern: P(`
       D4:4 F#4:4 A4:4 B4:4 | A4:12 r:4 | E4:4 F#4:4 A4:4 C#5:4 | D5:16 |
       D5:4 F#5:4 A5:4 B5:4 | A5:8 G5:4 F#5:4 | E5:8 D5:4 C#5:4 | E5:16 |
       A4:4 D5:4 F#5:4 A5:4 | C#5:8 A4:8 | B4:4 D5:4 G5:8 | F#5:12 r:4 |
       E5:4 G5:4 B5:8 | A5:8 E5:8 | F#5:4 D5:4 B4:4 A4:4 | D5:16`, { v: 0.7 }) },
-    bass:   { inst: 'bass',  gain: 0.7,  default: true, role: 'bass',   pattern: bassLayer(H_TITLE, { style: 'calm' }) },
+    bass:   { inst: 'bass',  gain: 0.6,  default: true, role: 'bass',   pattern: bassLayer(H_TITLE, { style: 'calm' }) },
     night:  { inst: 'glass', gain: 0.45, default: true, role: 'night',  pattern: nightLayer(H_TITLE, { steps: [0, 8], v: 0.28 }) },
     tide:   { inst: 'pad',   gain: 0.5,  default: true, role: 'tide',   pattern: tideLayer(H_TITLE, { every: 4, v: 0.5 }) },
     perc:   { inst: 'kit',   gain: 0.4,  default: false, role: 'perc',  pattern: percLayer('whisper', 16) },
@@ -373,7 +410,7 @@ function battle(id, { title, bpm, key, scale, bars, melody, counter, perc = 'dri
   const layers = {
     core:   { inst: 'pluck', gain: 0.5, default: true, role: 'core', pattern: pulseLayer(bars) },
     melody: { inst: 'pluck', gain: 0.8, default: true, role: 'melody', pattern: melody },
-    bass:   { inst: 'bass',  gain: 0.8, default: true, role: 'bass', pattern: bassLayer(bars, { style: bass, v: 0.8 }) },
+    bass:   { inst: 'bass',  gain: 0.7, default: true, role: 'bass', pattern: bassLayer(bars, { style: bass, v: 0.8 }) },
     perc:   { inst: 'kit',   gain: 0.8, default: true, role: 'perc', pattern: percLayer(perc, n) },
     tense:  { inst: 'glass', gain: 0.5, default: false, role: 'tense', pattern: tenseLayer(n) },
     ...extra,
@@ -427,15 +464,20 @@ const H_BATTLE_TRAINER = [
   'B: F#3 B3 D4', 'G: G3 B3 D4', 'D: F#3 A3 D4', 'A: E3 A3 C#4',
   'B: F#3 B3 D4', 'F#: F#3 A3 C#4', 'G: G3 B3 D4', 'A: A3 D4 E4 / A: A3 C#4 E4',
 ];
+// Centred on F# but built from the town's two-sharp pitch set (G natural, never G#): F# phrygian, which the
+// engine spells as B minor. The G-major bars (7, 15) are the Neapolitan lean that gives the rival his edge.
 const BATTLE_TRAINER = battle('battle_trainer', {
-  title: 'Across the Field', bpm: 132, key: 'F#', scale: 'minor', bars: H_BATTLE_TRAINER, motif: 'C#5 F#5 A5 — stacked ascent, answered by the Heartmark rhythm',
+  title: 'Across the Field', bpm: 132, key: 'B', scale: 'minor', bars: H_BATTLE_TRAINER, motif: 'C#5 F#5 A5 — stacked ascent, answered by the Heartmark rhythm',
   mood: 'trainer battle: a rival with a plan',
   melody: P(`
     C#5:2 F#5:2 A5:4 r:2 A5:2 F#5:4 | F#5:2 A5:2 D6:4 A5:4 F#5:4 | D5:2 F#5:2 B5:4 r:2 D6:2 B5:4 | C#6:4 A5:4 E5:4 r:4 |
     C#5:2 F#5:2 A5:4 r:2 A5:2 F#5:4 | A5:2 D6:2 F#6:4 D6:4 A5:4 | B5:4 D6:4 G5:8 | A5:2 C#6:2 E6:4 r:8 |
     F#5:3 B5:3 D6:2 F#6:8 | E6:4 D6:4 B5:8 | A5:3 D6:3 F#6:2 A6:8 | E6:4 C#6:4 A5:8 |
     D6:4 B5:4 F#5:8 | C#6:4 A5:4 F#5:8 | G5:4 B5:4 D6:8 | E6:8 C#6:4 A5:4`, { v: 0.8 }),
-  counter: rep(P('r:8 C#4:2 F#4:2 A4:2 r:2', { v: 0.5 }), 8, 16).concat(at(128, rep(P('r:4 D4:2 F#4:2 r:4 A4:2 D5:2', { v: 0.5 }), 8, 16))),
+  // marimba answers on beat 3 with the current chord (A half), then a four-note chord arpeggio (B half)
+  counter: cat(
+    counterLayer(H_BATTLE_TRAINER.slice(0, 8), [[8, 0], [10, 1], [12, 2]], { v: 0.5, oct: 12 }),
+    at(128, counterLayer(H_BATTLE_TRAINER.slice(8), [[4, 0], [6, 1], [12, 2], [14, 3]], { v: 0.5, oct: 12 }))),
 });
 
 // BATTLE_SPIRE — bigger: 120 bpm, 24 bars, low brass pad, quotes the Vagary motif (A G F# D).
@@ -457,7 +499,8 @@ const BATTLE_SPIRE = battle('battle_spire', {
     F#6:4 D6:4 A5:8 | B5:8 F#5:8 | E5:4 G5:4 B5:4 D6:4 | C#6:12 r:4 |
     G5:4 B5:4 D6:8 | E6:4 C#6:4 A5:8 | A5:4 G5:4 F#5:4 D5:4 | A5:4 G5:4 F#5:4 D5:4 |
     G5:4 B5:4 D6:4 G6:4 | E6:8 B5:8 | A5:4 G5:4 F#5:4 C#5:4 | F#5:16`, { v: 0.8 }),
-  counter: cat(rep(P('r:2 B3:2 r:2 D4:2 r:2 F#4:2 r:2 B3:2', { v: 0.45 }), 24, 16)),
+  // off-beat arpeggio of whatever the pad holds (B3 D4 F#4 B3 on the B bars; it bends with the G, E, F# and A bars)
+  counter: counterLayer(H_BATTLE_SPIRE, [[2, 0], [6, 1], [10, 2], [14, 0]], { v: 0.45 }),
   extra: {
     brass: { inst: 'bass', gain: 0.4, default: true, role: 'brass', pattern: padLayer(H_BATTLE_SPIRE, { v: 0.4 }).map(e => ({ ...e, n: e.n.map(x => x - 12) })) },
   },
@@ -486,7 +529,8 @@ const SUMMIT = battle('summit', {
     A5:4 G5:4 F#5:4 D5:4 | G5:4 B5:4 D6:8 | E5:4 G5:4 B5:8 | C#6:8 E6:8 |
     D6:2 F#6:2 A6:2 B6:2 A6:4 F#6:4 | G6:4 D6:4 B5:8 | F#6:4 D6:4 B5:8 | C#6:4 A5:4 F#5:8 |
     G5:4 B5:4 D6:4 G6:4 | E6:4 C#6:4 A5:4 E5:4 | D5:2 F#5:2 A5:2 B5:2 D6:8 | D6:16`, { v: 0.82 }),
-  counter: cat(rep(P('D4:2 r:2 A4:2 r:2 D4:2 r:2 A4:2 F#4:2', { v: 0.45 }), 16, 16), at(256, rep(P('B3:2 r:2 F#4:2 r:2 B3:2 r:2 F#4:2 D4:2', { v: 0.45 }), 16, 16))),
+  // root-fifth-root-fifth-third ostinato that moves with the chords (D4 A4 … F#4 on D; B3 F#4 … D4 on Bm)
+  counter: counterLayer(H_SUMMIT, [[0, 'r'], [4, '5'], [8, 'r'], [12, '5'], [14, '3']], { v: 0.45, lo: 57 }),
   extra: {
     bells: { inst: 'bell', gain: 0.4, default: true, role: 'bells', pattern: nightLayer(H_SUMMIT, { steps: [0, 8], v: 0.3 }) },
   },
@@ -499,22 +543,40 @@ const VICTORY = {
   motif: 'HEARTMARK D5 F#5 A5 B5 then a D major fanfare', mood: 'a 4-bar sting',
   layers: {
     melody: { inst: 'pluck', gain: 0.85, default: true, role: 'melody', pattern: P('D5:2 F#5:2 A5:2 B5:2 A5:4 D6:4 | r:2 D6:2 E6:2 F#6:10 | r:4 A5:2 B5:2 D6:8 | [D5,F#5,A5,D6]:16', { v: 0.85 }) },
-    core:   { inst: 'pad',   gain: 0.5,  default: true, role: 'core', pattern: P('[F#3,A3,D4]:8 [G3,B3,D4]:8 | [A3,C#4,E4]:16 | [G3,B3,D4]:8 [A3,C#4,E4]:8 | [F#3,A3,D4,F#4]:16', { v: 0.5 }) },
-    bass:   { inst: 'bass',  gain: 0.75, default: true, role: 'bass', pattern: P('D2:6 r:2 G2:6 r:2 | A2:12 r:4 | G2:8 A2:8 | D2:16', { v: 0.75 }) },
+    // bar 3 second half is Asus4 so the melody's held D6 is the suspension that resolves into bar 4, not a clash with C#
+    core:   { inst: 'pad',   gain: 0.5,  default: true, role: 'core', pattern: P('[F#3,A3,D4]:8 [G3,B3,D4]:8 | [A3,C#4,E4]:16 | [G3,B3,D4]:8 [A3,D4,E4]:8 | [F#3,A3,D4,F#4]:16', { v: 0.5 }) },
+    bass:   { inst: 'bass',  gain: 0.6,  default: true, role: 'bass', pattern: P('D2:6 r:2 G2:6 r:2 | A2:12 r:4 | G2:8 A2:8 | D2:16', { v: 0.75 }) },
     perc:   { inst: 'kit',   gain: 0.7,  default: true, role: 'perc', pattern: [{ t: 0, n: KICK, d: 1, v: 0.5 }, { t: 8, n: SNARE, d: 1, v: 0.4 }, { t: 16, n: KICK, d: 1, v: 0.5 }, { t: 24, n: SNARE, d: 1, v: 0.4 }, { t: 32, n: KICK, d: 1, v: 0.5 }, { t: 40, n: SNARE, d: 1, v: 0.45 }, { t: 44, n: SNARE, d: 1, v: 0.3 }, { t: 48, n: KICK, d: 1, v: 0.6 }] },
     bells:  { inst: 'glass', gain: 0.45, default: true, role: 'bells', pattern: P('r:48 D6:2 F#6:2 A6:2 B6:2 D7:8', { v: 0.35 }) },
   },
 };
 
-// Shift reveal: 2 bars. Aligned to the animation: rising charge (first bar), scramble (first half of bar 2), resolved chord (last half).
+// Shift reveal: locked to the Wildshift animation (16.4): rising charge 18 f, granular scramble 36 f, resolved chord 36 f
+// at 60 fps = 0.3 s + 0.6 s + 0.6 s. One bar of 32 steps at 150 bpm makes a step exactly 3 frames (0.05 s):
+// charge = steps 0–5, scramble = 6–17, chord = 18–31 (0.7 s, the extra 0.1 s is ring-out).
+const SHIFT_CHORD = ['D5', 'F#5', 'A5', 'B5', 'D6'].map(midi);
 const SHIFT_REVEAL = {
-  id: 'shift_reveal', title: 'Shift', bpm: 120, key: 'D', scale: 'major', bars: 2, stepsPerBar: 16, loop: false,
-  motif: 'rising run then HEARTMARK D F# A B as a chord', mood: 'a 2-bar rising sting',
+  id: 'shift_reveal', title: 'Shift', bpm: 150, key: 'D', scale: 'major', bars: 1, stepsPerBar: 32, loop: false,
+  motif: 'rising run (charge) → pentatonic scramble → HEARTMARK D F# A B as a chord (resolve)', mood: 'a 1.6 s rising sting; 0.3/0.6/0.7 s',
   layers: {
-    melody: { inst: 'glass', gain: 0.7, default: true, role: 'melody', pattern: P('D4:1 E4:1 F#4:1 A4:1 B4:1 D5:1 E5:1 F#5:1 A5:1 B5:1 D6:1 E6:1 F#6:1 A6:1 B6:1 D7:1 | A6:1 D6:1 F#6:1 B5:1 E6:1 A5:1 G6:1 C#6:1 [D5,F#5,A5,B5,D6]:8', { v: 0.55 }) },
-    core:   { inst: 'pad',   gain: 0.5, default: true, role: 'core', pattern: P('[D3,A3,E4]:16 | [E3,A3,D4]:8 [F#3,A3,D4,B4]:8', { v: 0.5 }) },
-    bass:   { inst: 'bass',  gain: 0.6, default: true, role: 'bass', pattern: P('D2:16 | r:8 D2:8', { v: 0.6 }) },
-    perc:   { inst: 'kit',   gain: 0.5, default: true, role: 'perc', pattern: [{ t: 0, n: KICK, d: 1, v: 0.35 }, { t: 24, n: KICK, d: 1, v: 0.55 }, { t: 24, n: SNARE, d: 1, v: 0.3 }] },
+    melody: { inst: 'glass', gain: 0.7, default: true, role: 'melody', pattern: P(
+      'D5:1 F#5:1 A5:1 B5:1 D6:1 F#6:1 ' +                                    // charge: Heartmark climbing, 6 steps
+      'A6:1 D6:1 F#6:1 B5:1 E6:1 A5:1 G6:1 C#6:1 E5:1 B6:1 F#5:1 D7:1 ' +      // scramble: 12 steps of scattered D major
+      '[D5,F#5,A5,B5,D6]:14', { v: 0.55 }) },                                 // resolve
+    core:   { inst: 'pad',   gain: 0.5, default: true, role: 'core', pattern: P('[D3,A3,E4]:6 [E3,A3,D4]:12 [F#3,A3,D4,B4]:14', { v: 0.5 }) },
+    bass:   { inst: 'bass',  gain: 0.6, default: true, role: 'bass', pattern: P('D2:18 D2:14', { v: 0.6 }) },
+    perc:   { inst: 'kit',   gain: 0.5, default: true, role: 'perc', pattern: [{ t: 0, n: KICK, d: 1, v: 0.35 }, { t: 18, n: KICK, d: 1, v: 0.55 }, { t: 18, n: SNARE, d: 1, v: 0.3 }] },
+  },
+};
+// "Anchor plays only the chord" (Wildshift 16.4): the resolve part alone, same length as the chord phase (0.7 s).
+const SHIFT_REVEAL_ANCHOR = {
+  id: 'shift_reveal_anchor', title: 'Shift (Anchor)', bpm: 150, key: 'D', scale: 'major', bars: 1, stepsPerBar: 16, loop: false,
+  motif: 'HEARTMARK chord only', mood: 'the resolved chord without the charge or scramble',
+  layers: {
+    melody: { inst: 'glass', gain: 0.7, default: true, role: 'melody', pattern: [{ t: 0, n: SHIFT_CHORD, d: 14, v: 0.55 }] },
+    core:   { inst: 'pad',   gain: 0.5, default: true, role: 'core', pattern: P('[F#3,A3,D4,B4]:14', { v: 0.5 }) },
+    bass:   { inst: 'bass',  gain: 0.6, default: true, role: 'bass', pattern: P('D2:14', { v: 0.6 }) },
+    perc:   { inst: 'kit',   gain: 0.5, default: true, role: 'perc', pattern: [{ t: 0, n: KICK, d: 1, v: 0.55 }, { t: 0, n: SNARE, d: 1, v: 0.3 }] },
   },
 };
 
@@ -551,11 +613,11 @@ const RELIGHTING = {
   motif: 'HEARTMARK sung long (D4 F#4 A4 B4 at 4 steps each) over the final build; bells cascade on the sustained D', mood: 'a 24-bar build to one held chord',
   layers: {
     core:   { inst: 'pad',   gain: 0.55, default: true, role: 'core', pattern: padLayer(H_RELIGHT, { v: 0.5 }).map((e, i) => ({ ...e, v: 0.35 + 0.25 * Math.min(1, e.t / 320) })) },
-    bass:   { inst: 'bass',  gain: 0.7,  default: true, role: 'bass', pattern: bassLayer(H_RELIGHT, { style: 'calm' }).filter(e => e.t >= 64) },
+    bass:   { inst: 'bass',  gain: 0.6,  default: true, role: 'bass', pattern: bassLayer(H_RELIGHT, { style: 'calm' }).filter(e => e.t >= 64) },
     bells:  { inst: 'glass', gain: 0.5,  default: true, role: 'bells', pattern: cat(
       nightLayer(H_RELIGHT.slice(8, 20), { steps: [0, 8], v: 0.3 }).map(e => ({ ...e, t: e.t + 128 })),
       at(320, rep(P('D5:2 F#5:2 A5:2 B5:2 D6:2 A5:2 F#5:2 B5:2 D6:2 F#6:2 A6:2 B5:2 D6:2 F#5:2 A5:2 D6:2', { v: 0.32 }), 2, 32))) },
-    melody: { inst: 'flute', gain: 0.8,  default: true, role: 'melody', pattern: at(192, P(`
+    melody: { inst: 'flute', gain: 0.95, default: true, role: 'melody', pattern: at(192, P(`
       D4:4 F#4:4 A4:4 B4:4 | A4:12 r:4 | E4:4 F#4:4 A4:4 C#5:4 | D5:16 |
       D5:4 F#5:4 A5:4 B5:4 | A5:8 E5:8 | F#5:4 D5:4 B4:4 A4:4 | B4:8 C#5:8 |
       D5:32 | F#5:32`, { v: 0.7 })) },
@@ -565,8 +627,8 @@ const RELIGHTING = {
 };
 
 // LANTERN MARKET — Saturday-night waltz. 3/4: 12 steps per bar, 16 bars, 138 bpm. G lydian / D.
-const H_WALTZ = [
-  'G: G3 B3 D4', 'G: G3 B3 D4', 'D: F#3 A3 D4', 'D: F#3 A3 D4',
+const H_WALTZ = [ // bar 2 is Bm so the lilt's held F#5 lands on a chord tone instead of a maj7 over the G downbeat
+  'G: G3 B3 D4', 'B: F#3 B3 D4', 'D: F#3 A3 D4', 'D: F#3 A3 D4',
   'E: E3 G3 B3', 'A: E3 A3 C#4', 'D: F#3 A3 D4', 'D: F#3 A3 D4',
   'G: G3 B3 D4', 'B: F#3 B3 D4', 'E: E3 G3 B3', 'A: A3 C#4 E4',
   'G: G3 B3 D4', 'D: F#3 A3 D4', 'A: A3 C#4 E4', 'G: G3 B3 D4',
@@ -576,12 +638,12 @@ const LANTERN_MARKET = {
   motif: 'B4 D5 G5 (lilt) then the Heartmark from G: G4 B4 D5 E5 in bar 9', mood: 'Saturday night waltz, lanterns and cider',
   layers: {
     core:   { inst: 'pad',     gain: 0.4, default: true, role: 'core', pattern: padLayer(H_WALTZ, { v: 0.45, spb: 12 }) },
-    melody: { inst: 'marimba', gain: 0.8, default: true, role: 'melody', pattern: P(`
+    melody: { inst: 'marimba', gain: 0.62, default: true, role: 'melody', pattern: P(`
       B4:4 D5:4 G5:4 | F#5:8 r:4 | A4:4 D5:4 F#5:4 | E5:8 D5:4 |
       B4:4 E5:4 G5:4 | A5:8 E5:4 | F#5:4 D5:4 A4:4 | D5:8 r:4 |
       G4:4 B4:4 D5:4 | E5:8 D5:4 | B4:4 D5:4 F#5:4 | E5:8 r:4 |
       D5:4 B4:4 G4:4 | A4:4 D5:4 F#5:4 | E5:4 C#5:4 A4:4 | G4:8 r:4`, { v: 0.75 }) },
-    bass:   { inst: 'bass',    gain: 0.7, default: true, role: 'bass', pattern: bassLayer(H_WALTZ, { style: 'waltz', spb: 12 }) },
+    bass:   { inst: 'bass',    gain: 0.6, default: true, role: 'bass', pattern: bassLayer(H_WALTZ, { style: 'waltz', spb: 12 }) },
     perc:   { inst: 'kit',     gain: 0.5, default: true, role: 'perc', pattern: percLayer('waltz', 16, 12) },
     night:  { inst: 'glass',   gain: 0.45, default: true, role: 'night', pattern: nightLayer(H_WALTZ, { spb: 12, steps: [0, 8], v: 0.26 }) },
     rain:   { inst: 'bell',    gain: 0.3, default: false, role: 'rain', pattern: rainLayer(H_WALTZ, { spb: 12, steps: [2, 6, 10] }) },
@@ -595,8 +657,8 @@ const CREDITS = {
   motif: 'Lighthouse melody into Porchlight Morning; both carry the Heartmark', mood: 'a slow walk home along the quay',
   layers: {
     core:   { inst: 'pad',   gain: 0.5, default: true, role: 'core', pattern: padLayer(H_CREDITS, { v: 0.5 }) },
-    melody: { inst: 'flute', gain: 0.8, default: true, role: 'melody', pattern: cat(TITLE.layers.melody.pattern, at(256, M_MORNING)) },
-    bass:   { inst: 'bass',  gain: 0.7, default: true, role: 'bass', pattern: bassLayer(H_CREDITS, { style: 'calm' }) },
+    melody: { inst: 'flute', gain: 0.95, default: true, role: 'melody', pattern: cat(TITLE.layers.melody.pattern, at(256, M_MORNING)) },
+    bass:   { inst: 'bass',  gain: 0.6, default: true, role: 'bass', pattern: bassLayer(H_CREDITS, { style: 'calm' }) },
     perc:   { inst: 'kit',   gain: 0.45, default: true, role: 'perc', pattern: at(256, percLayer('brush', 16)) },
     night:  { inst: 'glass', gain: 0.4, default: true, role: 'night', pattern: nightLayer(H_CREDITS, { steps: [0, 8], v: 0.26 }) },
     tide:   { inst: 'pad',   gain: 0.45, default: true, role: 'tide', pattern: tideLayer(H_CREDITS, { every: 4, v: 0.45 }) },
@@ -606,7 +668,7 @@ const CREDITS = {
 // ---------------------------------------------------------------------------
 export const TRACKS = Object.fromEntries([
   ...DAY_PARTS, TITLE, FORECAST, BATTLE_WILD, BATTLE_TRAINER, BATTLE_SPIRE, SUMMIT,
-  VICTORY, SHIFT_REVEAL, LETTER, RELIGHTING, LANTERN_MARKET, CREDITS,
+  VICTORY, SHIFT_REVEAL, SHIFT_REVEAL_ANCHOR, LETTER, RELIGHTING, LANTERN_MARKET, CREDITS,
 ].map(t => [t.id, t]));
 
 /** Hour (0-23) -> day-part theme id. */
@@ -653,7 +715,7 @@ export const CUES = {
     speed: 'tempo stays at 2x/4x battle speed; only SFX shorten',
   },
   victory:      { track: 'victory',      oneShot: true, thenResume: 'world' },
-  shift_reveal: { track: 'shift_reveal', oneShot: true, duckMusic: 0.3 },
+  shift_reveal: { track: 'shift_reveal', oneShot: true, duckMusic: 0.3, anchor: 'shift_reveal_anchor', phasesMs: [300, 600, 700] },
   letter:       { track: 'letter',       oneShot: true, duckMusic: 0.5 },
   relighting:   { track: 'relighting',   oneShot: true, fade: 2000, then: 'h_night' },
   lantern_market: { track: 'lantern_market', when: 'Saturday 18:00–24:00 in the market', stems: { night: true } },

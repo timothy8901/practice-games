@@ -826,7 +826,7 @@ describe('module hygiene', () => {
       'decodeSprite', 'drawSprite', 'paletteSwap', 'silhouette', 'outlineSprite', 'makePattern',
       'recolorHSL', 'lerpColor', 'hexToRgb', 'rgbToHex', 'buildAtlas',
       'drawAtlasFrame', 'rgbToHsl', 'hslToRgb', 'normalizeHex', 'isSprite', 'opaqueBounds',
-      'setCanvasFactory', 'clearSpriteCache', 'spriteCacheSize',
+      'setCanvasFactory', 'clearSpriteCache', 'spriteCacheSize', 'MAX_PIXELS',
     ].sort();
     assert.deepEqual(Object.keys(px).sort(), expected);
   });

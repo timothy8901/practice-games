@@ -19,7 +19,11 @@
  * Write protocol: serialize → checksum → write `<key>.tmp` → read back and compare → write `<key>` →
  * read back and compare → delete `<key>.tmp`. If the page dies between the two writes, the complete
  * `.tmp` record is promoted by `recover()` (run on construction) when it is newer than, or the only
- * valid alternative to, the real record.
+ * valid alternative to, the real record. Staging needs room for a second copy of the record; when the
+ * backend refuses that copy for lack of space, the record is written straight to the real key instead
+ * (still verified by read-back), so a save that fits on its own never fails over the staging copy.
+ * A record is only ever accepted when it can be loaded again: data that serializes to anything other
+ * than a JSON object or array (a `Date`, a boxed primitive, a `toJSON` returning a scalar) is refused.
  *
  * Ordering is by a persisted sequence number (`seq`, one higher than every record already stored), not
  * by wall-clock time, so autosave rotation and `latest()` behave identically under a frozen or
@@ -146,7 +150,7 @@ const UTF8_ENCODER = new TextEncoder();
 const UTF8_DECODER = new TextDecoder('utf-8', { fatal: true });
 
 const isObjectLike = (value) => typeof value === 'object' && value !== null;
-const isCount = (value) => Number.isInteger(value) && value >= 0;
+const isCount = (value) => Number.isSafeInteger(value) && value >= 0;
 
 /**
  * Builds a {@link SaveError}, keeping only the extra fields that are defined.
@@ -229,6 +233,10 @@ export function checksumHex(input) {
 // ---------------------------------------------------------------------------------------------------
 
 const B64_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+const B64_CODES = Uint8Array.from(B64_ALPHABET, (ch) => ch.charCodeAt(0));
+const B64_PAD = '='.charCodeAt(0);
+/** Longest run of char codes handed to `String.fromCharCode.apply` at once (well under argument limits). */
+const CHARCODE_CHUNK = 0x8000;
 
 /** @type {Int8Array|null} */
 let b64Lookup = null;
@@ -251,23 +259,35 @@ function getB64Lookup() {
  */
 export function toBase64(input) {
   const bytes = typeof input === 'string' ? UTF8_ENCODER.encode(input) : input;
-  const parts = [];
+  const codes = new Uint8Array(Math.ceil(bytes.length / 3) * 4);
+  let o = 0;
   let i = 0;
   for (; i + 2 < bytes.length; i += 3) {
     const n = (bytes[i] << 16) | (bytes[i + 1] << 8) | bytes[i + 2];
-    parts.push(
-      B64_ALPHABET[n >>> 18], B64_ALPHABET[(n >>> 12) & 63], B64_ALPHABET[(n >>> 6) & 63], B64_ALPHABET[n & 63],
-    );
+    codes[o++] = B64_CODES[n >>> 18];
+    codes[o++] = B64_CODES[(n >>> 12) & 63];
+    codes[o++] = B64_CODES[(n >>> 6) & 63];
+    codes[o++] = B64_CODES[n & 63];
   }
   const rest = bytes.length - i;
   if (rest === 1) {
     const n = bytes[i] << 16;
-    parts.push(B64_ALPHABET[n >>> 18], B64_ALPHABET[(n >>> 12) & 63], '==');
+    codes[o++] = B64_CODES[n >>> 18];
+    codes[o++] = B64_CODES[(n >>> 12) & 63];
+    codes[o++] = B64_PAD;
+    codes[o++] = B64_PAD;
   } else if (rest === 2) {
     const n = (bytes[i] << 16) | (bytes[i + 1] << 8);
-    parts.push(B64_ALPHABET[n >>> 18], B64_ALPHABET[(n >>> 12) & 63], B64_ALPHABET[(n >>> 6) & 63], '=');
+    codes[o++] = B64_CODES[n >>> 18];
+    codes[o++] = B64_CODES[(n >>> 12) & 63];
+    codes[o++] = B64_CODES[(n >>> 6) & 63];
+    codes[o++] = B64_PAD;
   }
-  return parts.join('');
+  let out = '';
+  for (let p = 0; p < codes.length; p += CHARCODE_CHUNK) {
+    out += String.fromCharCode.apply(null, codes.subarray(p, p + CHARCODE_CHUNK));
+  }
+  return out;
 }
 
 /**
@@ -346,7 +366,9 @@ function normalizeHeader(raw) {
  * @param {string} fields.slot
  * @param {any} [fields.summary]
  * @param {object} fields.data JSON-serializable payload. Values JSON cannot express (functions,
- *   `undefined`, symbols) are dropped as `JSON.stringify` does; cycles and BigInt are errors.
+ *   `undefined`, symbols) are dropped as `JSON.stringify` does; cycles and BigInt are errors, and so is
+ *   anything whose JSON form is not an object or array (`Date`, boxed primitives, scalar `toJSON`),
+ *   because such a record could never be loaded again.
  * @returns {{ok: true, record: string, size: number} | Failure}
  */
 export function encodeRecord({ version, time, seq, kind, slot, summary = null, data }) {
@@ -363,8 +385,8 @@ export function encodeRecord({ version, time, seq, kind, slot, summary = null, d
   } catch (cause) {
     return failure(ERROR_CODES.SERIALIZE, 'data is not JSON-serializable', { cause });
   }
-  if (typeof dataJson !== 'string') {
-    return failure(ERROR_CODES.SERIALIZE, 'data serialized to nothing');
+  if (typeof dataJson !== 'string' || (dataJson[0] !== '{' && dataJson[0] !== '[')) {
+    return failure(ERROR_CODES.SERIALIZE, 'data must serialize to a JSON object or array');
   }
   const headerJson = serializeHeader({ version, time, seq, kind, slot, summary: summary ?? null });
   const body = `${headerJson}\n${dataJson}`;
@@ -733,7 +755,8 @@ export function createSaveSystem(options = {}) {
     if (raw.value === null) return { ...base, state: 'empty', ...EMPTY_ENTRY_FIELDS };
     const decoded = decodeRecord(raw.value, { parseData: false });
     if (!decoded.ok) {
-      return { ...base, state: 'corrupt', ...EMPTY_ENTRY_FIELDS, size: raw.value.length, error: decoded.error };
+      const size = typeof raw.value === 'string' ? raw.value.length : null;
+      return { ...base, state: 'corrupt', ...EMPTY_ENTRY_FIELDS, size, error: decoded.error };
     }
     return okEntry(info, decoded.header, decoded.size);
   }
@@ -843,7 +866,28 @@ export function createSaveSystem(options = {}) {
   }
 
   /**
+   * Writes the real key and confirms the read-back. Used after staging, and on its own when the
+   * backend has no room for a staging copy (a `setItem` either replaces the old value or throws, so
+   * the previous record survives any failure here).
+   * @param {SlotInfo} info
+   * @param {string} record
+   * @returns {{ok: true} | Failure}
+   */
+  function writeReal(info, record) {
+    const written = writeRaw(info.key, record);
+    if (!written.ok) return withSlot(written, info.slot);
+    const back = readRaw(info.key);
+    if (!back.ok) return withSlot(back, info.slot);
+    if (back.value !== record) {
+      return failure(ERROR_CODES.VERIFY, 'record did not read back intact', { slot: info.slot });
+    }
+    return { ok: true };
+  }
+
+  /**
    * The verified write: stage under the temp key, read back, then write the real key and read back.
+   * A quota failure at either write drops the staging copy and writes the real key directly, since
+   * the copy is what needed the extra room.
    * @param {SlotInfo} info
    * @param {string} record
    * @returns {{ok: true} | Failure}
@@ -852,21 +896,21 @@ export function createSaveSystem(options = {}) {
     const staged = writeRaw(info.tmpKey, record);
     if (!staged.ok) {
       removeRaw(info.tmpKey);
-      return withSlot(staged, info.slot);
+      return staged.error.code === ERROR_CODES.QUOTA ? writeReal(info, record) : withSlot(staged, info.slot);
     }
     const stagedBack = readRaw(info.tmpKey);
     if (!stagedBack.ok) {
       removeRaw(info.tmpKey);
       return withSlot(stagedBack, info.slot);
     }
-    if (stagedBack.value !== record || !decodeRecord(stagedBack.value, { parseData: false }).ok) {
+    if (stagedBack.value !== record) {
       removeRaw(info.tmpKey);
       return failure(ERROR_CODES.VERIFY, 'staged record did not read back intact', { slot: info.slot });
     }
     const written = writeRaw(info.key, record);
     if (!written.ok) {
       removeRaw(info.tmpKey);
-      return withSlot(written, info.slot);
+      return written.error.code === ERROR_CODES.QUOTA ? writeReal(info, record) : withSlot(written, info.slot);
     }
     const writtenBack = readRaw(info.key);
     if (!writtenBack.ok) return withSlot(writtenBack, info.slot);
@@ -891,7 +935,12 @@ export function createSaveSystem(options = {}) {
     }
     const current = entries ?? allEntries();
     const seq = current.reduce((max, entry) => (entry.state === 'ok' && entry.seq > max ? entry.seq : max), 0) + 1;
-    const time = now();
+    let time;
+    try {
+      time = now();
+    } catch (cause) {
+      return failure(ERROR_CODES.SERIALIZE, 'the clock threw while stamping the record', { slot: info.slot, cause });
+    }
     const summary = summaryOverride === undefined ? safeSummarize(data) : summaryOverride;
     const encoded = encodeRecord({ version, time, seq, kind: info.kind, slot: info.slot, summary, data });
     if (!encoded.ok) return withSlot(encoded, info.slot);
@@ -984,8 +1033,8 @@ export function createSaveSystem(options = {}) {
   /**
    * Decodes, verifies and migrates an exported string. Nothing is written unless `slot` is given.
    * @param {string} text
-   * @param {{slot?: string|number}} [opts] With `slot`, the imported data is also saved there (keeping
-   *   the exported summary); the save result is returned as `saved`.
+   * @param {{slot?: string|number|null}} [opts] With a non-null `slot`, the imported data is also saved
+   *   there (keeping the exported summary); the save result is returned as `saved`.
    * @returns {{ok: true, data: object, meta: RecordHeader & {migratedFrom: number|null, size: number},
    *   slot?: string, saved?: object} | Failure}
    */
@@ -1007,7 +1056,7 @@ export function createSaveSystem(options = {}) {
       data: migrated.data,
       meta: { ...decoded.header, migratedFrom: migrated.migrated ? migrated.from : null, size: decoded.size },
     };
-    if (slot === undefined) return result;
+    if (slot === undefined || slot === null) return result;
     const saved = save(slot, migrated.data, { summary: decoded.header.summary });
     return saved.ok ? { ...result, slot: saved.slot, saved } : saved;
   }

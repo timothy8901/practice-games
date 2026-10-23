@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Harbor tileset demo</title>
+<link rel="icon" href="data:,">
+<style>
+  html, body { margin: 0; background: #141B33; height: 100%; overflow: hidden; }
+  body { display: flex; align-items: center; justify-content: center; }
+  canvas { image-rendering: pixelated; image-rendering: crisp-edges; }
+  #hud { position: fixed; left: 8px; top: 8px; color: #F4F1E6; font: 12px monospace; opacity: .85; pointer-events: none; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud"></div>
+<script type="module">
+  import { createTileset, drawMap, drawSheet, gradeFor } from './render.js';
+  import { HARBOR } from './map-harbor.js';
+
+  const q = new URLSearchParams(location.search);
+  const num = (k, d) => (q.has(k) ? parseFloat(q.get(k)) : d);
+  const state = {
+    hour: num('hour', 12),
+    tide: num('tide', 0),
+    weather: q.get('weather') || 'clear',
+    cam: q.get('cam') || 'harbor',
+    stage: num('stage', 3),
+    lit: q.has('lit') ? q.get('lit') !== '0' : null,
+    sheet: q.has('sheet'),
+    animate: q.get('animate') !== '0',
+    frame: num('frame', 0),
+    scale: num('scale', 2),
+  };
+  const cams = { harbor: [3 * 16, 0], town: [3 * 16, 9 * 16], flats: [10 * 16, 0], west: [0, 6 * 16] };
+  const canvas = document.getElementById('c');
+  const full = state.cam === 'full';
+  canvas.width = full ? HARBOR.w * 16 : 480;
+  canvas.height = full ? HARBOR.h * 16 + 40 : 270;
+  const scale = full ? 1 : state.scale;
+  canvas.style.width = canvas.width * scale + 'px';
+  canvas.style.height = canvas.height * scale + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  const tileset = createTileset();
+  const hud = document.getElementById('hud');
+
+  function render() {
+    const g = gradeFor(state.hour, state.weather);
+    const lit = state.lit === null ? g.night > 0.5 : state.lit;
+    if (state.sheet) { drawSheet(ctx, tileset, { hour: state.hour, frame: state.frame }); return; }
+    const [cx, cy] = full ? [0, 0] : (cams[state.cam] || cams.harbor);
+    ctx.fillStyle = '#141B33';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    drawMap(ctx, HARBOR, tileset, {
+      frame: state.frame, hour: state.hour, weather: state.weather, tide: state.tide,
+      camX: cx, camY: cy, lighthouseStage: state.stage, lighthouseLit: lit,
+    });
+    hud.textContent = `h${state.hour} tide${state.tide} ${state.weather} ${state.cam}`;
+    hud.style.display = q.has('hud') ? 'block' : 'none';
+  }
+  function loop() { state.frame++; render(); if (state.animate) requestAnimationFrame(loop); }
+  render();
+  if (state.animate) requestAnimationFrame(loop);
+  window.__demo = { state, render, tileset, map: HARBOR };
+</script>
+</body>
+</html>

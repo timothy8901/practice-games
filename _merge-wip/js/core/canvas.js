@@ -18,6 +18,10 @@
  * - *game px*: the 480x270 logical buffer.
  * - *CSS px*: what the DOM / pointer events use (`clientX`, `element.style.left`, ...).
  * - *device px*: the visible canvas's backing store (`canvas.width`), CSS px × devicePixelRatio.
+ *
+ * The parent must be a CSS-sized box with no padding (e.g. `position: fixed; inset: 0`); its
+ * `clientWidth/clientHeight` is what the canvas fills. A `<body>`/`<html>` parent is measured
+ * through `window.innerWidth/innerHeight` instead, so give such pages `overflow: hidden`.
  */
 
 /** Native buffer width in game pixels. */
@@ -37,7 +41,10 @@ export const MODES = Object.freeze(['integer', 'fit']);
  * @property {number} width          Native buffer width (game px).
  * @property {number} height         Native buffer height (game px).
  * @property {DisplayMode} mode      Mode that was requested.
- * @property {boolean} integer       True when an integer device-pixel upscale was achieved.
+ * @property {boolean} integer       True when the achieved device-pixel scale is a whole number
+ *                                   >= 1: always in `'integer'` mode when the box is at least
+ *                                   native size, and in `'fit'` mode only when the box happens
+ *                                   to be an exact multiple of the native size.
  * @property {number} dpr            Effective device pixels per CSS px used for the backing store.
  * @property {number} cssWidth       Visible canvas width in CSS px.
  * @property {number} cssHeight      Visible canvas height in CSS px.
@@ -76,7 +83,7 @@ export const MODES = Object.freeze(['integer', 'fit']);
  *                                           measured against (its `clientWidth/Height`; the
  *                                           window's inner size when it is `<body>`/`<html>`).
  * @property {DisplayMode} [mode='integer']  Initial scaling mode.
- * @property {string} [background='#000']    Letterbox bar colour (any CSS colour).
+ * @property {string} [background='#000']    Letterbox bar colour (any CSS colour string).
  * @property {boolean} [alpha=false]         Whether the offscreen buffer keeps an alpha channel.
  *                                           Opaque buffers composite faster; `clear(null)` then
  *                                           yields opaque black instead of transparency.
@@ -107,6 +114,7 @@ export const MODES = Object.freeze(['integer', 'fit']);
  * @property {number} dpr                      Effective device pixel ratio (live).
  * @property {Layout} layout                   Full current layout (live, frozen).
  * @property {string} background               Current letterbox colour (live).
+ * @property {boolean} destroyed               True once `destroy()` has run.
  * @property {() => void} present              Blit the buffer to the visible canvas.
  * @property {() => Layout} resize             Re-measure the parent now; returns the layout.
  * @property {(mode: DisplayMode) => Layout} setMode Switch scaling mode; returns the layout.
@@ -115,7 +123,8 @@ export const MODES = Object.freeze(['integer', 'fit']);
  * @property {(x: number, y: number) => {clientX: number, clientY: number}} toClient Inverse of
  *                                             `toGame`, for positioning DOM overlays.
  * @property {(fn: ResizeListener) => () => void} onResize Subscribe; returns an unsubscribe.
- * @property {(color?: string|null) => void} clear Fill the buffer (`null` → `clearRect`).
+ * @property {(color?: string|null) => void} clear Fill the buffer with `color` (defaults to the
+ *                                             letterbox colour; `null` → `clearRect`).
  * @property {() => void} destroy              Detach listeners/observers and remove the canvas.
  */
 
@@ -155,7 +164,18 @@ function assertMode(mode) {
  */
 function assertSize(width, height) {
   if (!Number.isInteger(width) || width <= 0 || !Number.isInteger(height) || height <= 0) {
-    throw new RangeError(`Native size must be positive integers, got ${width}x${height}`);
+    throw new RangeError(`Native size must be positive integers, got ${String(width)}x${String(height)}`);
+  }
+}
+
+/**
+ * @param {unknown} color
+ * @param {string} where  Name of the API for the error message.
+ * @throws {TypeError} when `color` is not a non-empty string.
+ */
+function assertColor(color, where) {
+  if (typeof color !== 'string' || color.length === 0) {
+    throw new TypeError(`${where} expects a CSS colour string`);
   }
 }
 
@@ -175,7 +195,9 @@ function toFinite(value, fallback) {
  * `dpr` device pixels per CSS px. Deterministic; never touches the DOM.
  *
  * Non-finite or non-positive CSS sizes are treated as 1 px (a hidden parent must not throw),
- * and an invalid `dpr` is treated as 1.
+ * and an invalid `dpr` is treated as 1. The axis that limits the uniform scale is filled
+ * exactly (no float-error sliver of background on a "full" axis); the other axis is derived
+ * from it and centred on whole device pixels.
  *
  * @param {object} [spec]
  * @param {number} [spec.width=480]
@@ -184,7 +206,8 @@ function toFinite(value, fallback) {
  * @param {number} [spec.cssHeight]  Visible box height in CSS px.
  * @param {number} [spec.dpr=1]      Device pixels per CSS px.
  * @param {DisplayMode} [spec.mode='integer']
- * @param {number} [spec.maxBackingPixels=Infinity] Cap on backing-store area (device px²).
+ * @param {number} [spec.maxBackingPixels=Infinity] Cap on backing-store area (device px²);
+ *                                   non-finite or non-positive values mean "no cap".
  * @returns {Layout}
  * @throws {RangeError} for a non-positive-integer native size.
  * @throws {TypeError} for an unknown mode.
@@ -205,22 +228,36 @@ export function computeLayout({
   const ch = Math.max(1, toFinite(cssHeight, 0));
 
   let ratio = normalizeDpr(dpr);
-  if (Number.isFinite(maxBackingPixels) && maxBackingPixels > 0) {
-    const limit = Math.sqrt(maxBackingPixels / (cw * ch));
+  const cap = toFinite(maxBackingPixels, Infinity);
+  if (Number.isFinite(cap) && cap > 0) {
+    const limit = Math.sqrt(cap / (cw * ch));
     if (limit < ratio) ratio = limit;
   }
 
   const backingWidth = Math.max(1, Math.round(cw * ratio));
   const backingHeight = Math.max(1, Math.round(ch * ratio));
 
-  const fitScale = Math.min(backingWidth / width, backingHeight / height);
+  const scaleX = backingWidth / width;
+  const scaleY = backingHeight / height;
+  const widthLimited = scaleX <= scaleY;
+  const fitScale = widthLimited ? scaleX : scaleY;
   const wholeScale = Math.floor(fitScale);
-  const integer = mode === 'integer' && wholeScale >= 1;
-  const pixelScale = integer ? wholeScale : fitScale;
+  const useWhole = mode === 'integer' && wholeScale >= 1;
+  const pixelScale = useWhole ? wholeScale : fitScale;
 
-  // `min` guards against the float error in width * (backingWidth / width) overshooting by 1ulp.
-  const destWidth = Math.min(backingWidth, width * pixelScale);
-  const destHeight = Math.min(backingHeight, height * pixelScale);
+  let destWidth;
+  let destHeight;
+  if (useWhole) {
+    destWidth = width * wholeScale;
+    destHeight = height * wholeScale;
+  } else if (widthLimited) {
+    // `min` guards against height * (backingWidth / width) overshooting by 1ulp.
+    destWidth = backingWidth;
+    destHeight = Math.min(backingHeight, height * fitScale);
+  } else {
+    destHeight = backingHeight;
+    destWidth = Math.min(backingWidth, width * fitScale);
+  }
   const deviceOffsetX = Math.floor((backingWidth - destWidth) / 2);
   const deviceOffsetY = Math.floor((backingHeight - destHeight) / 2);
 
@@ -228,7 +265,7 @@ export function computeLayout({
     width,
     height,
     mode,
-    integer,
+    integer: Number.isInteger(pixelScale) && pixelScale >= 1,
     dpr: ratio,
     cssWidth: cw,
     cssHeight: ch,
@@ -296,11 +333,13 @@ function sameLayout(a, b) {
 
 /**
  * Subscribe to a MediaQueryList across old (`addListener`) and new (`addEventListener`) APIs.
- * @param {MediaQueryList} query
+ * Tolerates hosts whose `matchMedia` hands back nothing usable (no DPR tracking then).
+ * @param {MediaQueryList|null|undefined} query
  * @param {() => void} fn
  * @param {boolean} on
  */
 function toggleMediaListener(query, fn, on) {
+  if (!query || typeof query !== 'object') return;
   if (typeof query.addEventListener === 'function') {
     if (on) query.addEventListener('change', fn);
     else query.removeEventListener('change', fn);
@@ -316,11 +355,15 @@ function toggleMediaListener(query, fn, on) {
  *
  * Draw into `display.ctx` each frame, then call `display.present()`.
  *
+ * If anything fails while wiring the display up (including the initial `onResize` call throwing)
+ * the canvas and every listener are released again before the error propagates.
+ *
  * @param {DisplayOptions} options
  * @returns {Display}
  * @throws {Error} when no DOM is available (Node without an injected `env`) or 2D canvas
  *                 contexts cannot be created.
- * @throws {TypeError} when `parent` is not an element or `mode` is unknown.
+ * @throws {TypeError} when `parent` is not an element, `mode` is unknown, or `background`,
+ *                 `dpr` or `onResize` have the wrong type.
  * @throws {RangeError} when `width`/`height` are not positive integers.
  */
 export function createDisplay(options = {}) {
@@ -339,7 +382,7 @@ export function createDisplay(options = {}) {
 
   const doc = env?.document ?? globalThis.document;
   const win = env?.window ?? globalThis.window;
-  if (!doc || typeof doc.createElement !== 'function' || !win) {
+  if (!doc || typeof doc.createElement !== 'function' || !win || typeof win.addEventListener !== 'function') {
     throw new Error('createDisplay() is browser-only: it needs a DOM (document and window)');
   }
   if (!parent || typeof parent.appendChild !== 'function') {
@@ -347,27 +390,35 @@ export function createDisplay(options = {}) {
   }
   assertSize(width, height);
   assertMode(initialMode);
+  assertColor(initialBackground, 'createDisplay({ background })');
+  if (dprOption !== 'auto' && !(Number.isFinite(dprOption) && dprOption > 0)) {
+    throw new TypeError(`createDisplay({ dpr }) expects 'auto' or a positive number, got ${String(dprOption)}`);
+  }
+  if (onResize != null && typeof onResize !== 'function') {
+    throw new TypeError('createDisplay({ onResize }) expects a function');
+  }
 
   const canvas = doc.createElement('canvas');
   Object.assign(canvas.style, {
     display: 'block',
-    imageRendering: 'pixelated',
+    imageRendering: 'crisp-edges', // older Firefox / Safari spelling; overridden where `pixelated` exists
     touchAction: 'none',
     userSelect: 'none',
     webkitUserSelect: 'none',
   });
+  canvas.style.imageRendering = 'pixelated';
   const visibleCtx = canvas.getContext('2d', { alpha: false });
 
   const buffer = doc.createElement('canvas');
   buffer.width = width;
   buffer.height = height;
-  const ctx = buffer.getContext('2d', { alpha });
+  const ctx = buffer.getContext('2d', { alpha: Boolean(alpha) });
   if (!visibleCtx || !ctx) throw new Error('Canvas 2D rendering context unavailable');
   ctx.imageSmoothingEnabled = false;
 
   /** @type {Set<ResizeListener>} */
   const listeners = new Set();
-  if (typeof onResize === 'function') listeners.add(onResize);
+  if (onResize) listeners.add(onResize);
 
   /** @type {DisplayMode} */
   let mode = initialMode;
@@ -377,6 +428,8 @@ export function createDisplay(options = {}) {
   /** @type {MediaQueryList|null} */
   let dprQuery = null;
   let watchedDpr = NaN;
+  /** @type {ResizeObserver|null} */
+  let observer = null;
   let destroyed = false;
 
   const handleChange = () => {
@@ -406,7 +459,7 @@ export function createDisplay(options = {}) {
     if (ratio === watchedDpr || dprOption !== 'auto' || typeof win.matchMedia !== 'function') return;
     if (dprQuery) toggleMediaListener(dprQuery, handleChange, false);
     watchedDpr = ratio;
-    dprQuery = win.matchMedia(`(resolution: ${ratio}dppx)`);
+    dprQuery = win.matchMedia(`(resolution: ${ratio}dppx)`) ?? null;
     toggleMediaListener(dprQuery, handleChange, true);
   }
 
@@ -428,6 +481,26 @@ export function createDisplay(options = {}) {
     visibleCtx.drawImage(buffer, 0, 0, width, height, deviceOffsetX, deviceOffsetY, destWidth, destHeight);
   }
 
+  /**
+   * Tell every subscriber about `next`. Each listener runs even if an earlier one throws (the
+   * first error is rethrown afterwards), and if a listener re-lays-out the display (e.g. calls
+   * `setMode`) the remaining subscribers have already been told about the newer layout by that
+   * nested call, so the stale one is not delivered after it.
+   * @param {Layout} next
+   */
+  function notify(next) {
+    let error = null;
+    for (const fn of listeners) {
+      if (layout !== next) break;
+      try {
+        fn(next, display);
+      } catch (err) {
+        error ??= err;
+      }
+    }
+    if (error) throw error;
+  }
+
   function resize() {
     if (destroyed) return layout;
     const { cssWidth, cssHeight } = measureParent();
@@ -446,7 +519,7 @@ export function createDisplay(options = {}) {
     visibleCtx.imageSmoothingEnabled = false;
 
     present(); // Re-show the last frame immediately so a resize never flashes a blank canvas.
-    for (const fn of listeners) fn(next, display);
+    notify(next);
     return next;
   }
 
@@ -460,6 +533,17 @@ export function createDisplay(options = {}) {
       kx: rect.width > 0 && layout.cssWidth > 0 ? layout.cssWidth / rect.width : 1,
       ky: rect.height > 0 && layout.cssHeight > 0 ? layout.cssHeight / rect.height : 1,
     };
+  }
+
+  function destroy() {
+    if (destroyed) return;
+    destroyed = true;
+    win.removeEventListener('resize', handleChange);
+    if (observer) observer.disconnect();
+    if (dprQuery) toggleMediaListener(dprQuery, handleChange, false);
+    dprQuery = null;
+    listeners.clear();
+    if (canvas.parentNode === parent) parent.removeChild(canvas);
   }
 
   /** @type {Display} */
@@ -493,20 +577,21 @@ export function createDisplay(options = {}) {
     get background() {
       return background;
     },
+    get destroyed() {
+      return destroyed;
+    },
     present,
     resize,
 
     setMode(nextMode) {
       assertMode(nextMode);
-      if (nextMode === mode) return layout;
+      if (nextMode === mode || destroyed) return layout;
       mode = nextMode;
       return resize();
     },
 
     setBackground(color) {
-      if (typeof color !== 'string' || color.length === 0) {
-        throw new TypeError('setBackground() expects a CSS colour string');
-      }
+      assertColor(color, 'setBackground()');
       background = color;
     },
 
@@ -540,23 +625,21 @@ export function createDisplay(options = {}) {
       ctx.fillRect(0, 0, width, height);
     },
 
-    destroy() {
-      if (destroyed) return;
-      destroyed = true;
-      win.removeEventListener('resize', handleChange);
-      if (observer) observer.disconnect();
-      if (dprQuery) toggleMediaListener(dprQuery, handleChange, false);
-      dprQuery = null;
-      listeners.clear();
-      if (canvas.parentNode === parent) parent.removeChild(canvas);
-    },
+    destroy,
   };
 
-  parent.appendChild(canvas);
-  win.addEventListener('resize', handleChange);
-  const observer = typeof win.ResizeObserver === 'function' ? new win.ResizeObserver(handleChange) : null;
-  if (observer) observer.observe(parent);
-  resize();
+  try {
+    parent.appendChild(canvas);
+    win.addEventListener('resize', handleChange);
+    if (typeof win.ResizeObserver === 'function') {
+      observer = new win.ResizeObserver(handleChange);
+      observer.observe(parent);
+    }
+    resize();
+  } catch (err) {
+    destroy();
+    throw err;
+  }
 
   return display;
 }

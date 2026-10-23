@@ -26,8 +26,9 @@ export const COLORS = {
   '!bio0': '#1F8F8A', '!bio1': '#3FF2E0', '!bio2': '#9FE8C8',
   // water
   deep0: '#173B5E', deep1: '#1F4F7A', deep2: '#2A6F8F', deep3: '#3FA7D6',
-  sh0: '#2A6F8F', sh1: '#3A8FA8', sh2: '#4FB3C9', sh3: '#7EC4CF', dapple: '#9FD3C0',
+  sh0: '#2A6F8F', sh1: '#357F9C', sh2: '#3F9BB8', sh3: '#6FBFCF', dapple: '#8CCBC8',
   riv0: '#2A6F8F', riv1: '#3A8FA8', riv2: '#4FB3C9', riv3: '#9FD3C0',
+  shm0: '#3E7A8C', shm1: '#4F93A4', shm2: '#79B8C2', shmud: '#7E9C92',
   foam: '#EAF2F8',
   // stone / cliff
   st0: '#2A2F44', st1: '#4F5A6B', st2: '#6E7A86', st3: '#8E9AA6', st4: '#B8CFE0',
@@ -47,7 +48,7 @@ export const COLORS = {
   moss0: '#2E5A48', moss1: '#3F6B44', moss2: '#5E8C5A', moss3: '#7FA86A',
   blue0: '#1E3350', blue1: '#2B466B', blue2: '#3B5F8C', blue3: '#5B82B0',
   straw0: '#7A5A36', straw1: '#B08A42', straw2: '#D9B46A', straw3: '#EBD08A',
-  dark0: '#1C1A28', dark1: '#2A2433', dark2: '#3B3A48', dark3: '#54526A',
+  dark0: '#2A2433', dark1: '#3B3A48', dark2: '#4E4C62', dark3: '#6A6882',
   // flora
   pine0: '#1F4A3C', pine1: '#2E5A48', pine2: '#3F7A5A', pine3: '#5E9E6A',
   ald0: '#3F7A5A', ald1: '#5E9E6A', ald2: '#7DB874', ald3: '#A8D5A2', aldbark0: '#5A4A3E', aldbark1: '#8C7A6E', aldbark2: '#B8A88A',
@@ -250,58 +251,26 @@ def('mud_wet', WMP, [
 ]);
 // Glowing night mud: three-frame cycle of bioluminescent specks. LUT-exempt glow chars.
 const GMP = { m: 'gmud1', d: 'gmud0', a: '!bio1', b: '!bio2', c: '!bio0' };
-def('mud_glow', GMP, [[
+const GLOW0 = [
   'mmmmmmmmmmmmmmmm',
-  'mmammmmmmmmbbmmm',
+  'mmmmmmmmmmmammmm',
+  'mmabmmmmmmmmmmmm',
   'mmmmmmmmmmmmmmmm',
-  'mmmmmmdmmmmmmmmm',
-  'mcammmmmmmmmmbmm',
   'mmmmmmmmmmmmmmmm',
-  'mmmmmmmmaammmmmm',
-  'mmmmmmmmmmmmmmdm',
-  'mmmmdmmmmmmmmmmm',
-  'mmmmmmmmmmmmccmm',
-  'mmbmmmmmmmmmmmmm',
-  'mmmmmmbammmmmmmm',
+  'mmmmmmmbmmmmmmmm',
   'mmmmmmmmmmmmmmmm',
-  'mmmmmmmmmmmmammm',
-  'mcbmmmmmdmmmmmmm',
   'mmmmmmmmmmmmmmmm',
-], [
+  'mmmmmmmmmmmmmmcm',
   'mmmmmmmmmmmmmmmm',
-  'mmbmmmmmmmmaammm',
+  'mmmcmmmmmmmmmmmm',
   'mmmmmmmmmmmmmmmm',
-  'mmmmmmdmmmmmmmmm',
-  'mabmmmmmmmmmmcmm',
+  'mmmmmmmmmmammmmm',
   'mmmmmmmmmmmmmmmm',
-  'mmmmmmmmbbmmmmmm',
-  'mmmmmmmmmmmmmmdm',
-  'mmmmdmmmmmmmmmmm',
-  'mmmmmmmmmmmmaamm',
-  'mmcmmmmmmmmmmmmm',
-  'mmmmmmabmmmmmmmm',
+  'mmmmmmbmmmmmmmmm',
   'mmmmmmmmmmmmmmmm',
-  'mmmmmmmmmmmmbmmm',
-  'mbammmmmdmmmmmmm',
-  'mmmmmmmmmmmmmmmm',
-], [
-  'mmmmmmmmmmmmmmmm',
-  'mmcmmmmmmmmccmmm',
-  'mmmmmmmmmmmmmmmm',
-  'mmmmmmdmmmmmmmmm',
-  'mbcmmmmmmmmmmamm',
-  'mmmmmmmmmmmmmmmm',
-  'mmmmmmmmccmmmmmm',
-  'mmmmmmmmmmmmmmdm',
-  'mmmmdmmmmmmmmmmm',
-  'mmmmmmmmmmmmbbmm',
-  'mmammmmmmmmmmmmm',
-  'mmmmmmcbmmmmmmmm',
-  'mmmmmmmmmmmmmmmm',
-  'mmmmmmmmmmmmcmmm',
-  'macmmmmmdmmmmmmm',
-  'mmmmmmmmmmmmmmmm',
-]]);
+];
+const cyc = (rows) => rows.map((r) => r.replace(/[abc]/g, (c) => ({ a: 'b', b: 'c', c: 'a' })[c]));
+def('mud_glow', GMP, [GLOW0, cyc(GLOW0), cyc(cyc(GLOW0))]);
 
 /* ------------------------------------------------------------- water */
 // One 4-frame wavelet set, three palettes (deep / shallow / river).
@@ -396,62 +365,36 @@ const RIVROWS = [
   'rrrrsrrrrrrrrrrr',
 ];
 const rot = (rows, n) => rows.map((_, i) => rows[(i - n + rows.length) % rows.length]);
-def('river', { r: 'riv1', s: 'riv3', d: 'riv0' }, [0, 4, 8, 12].map((n) => rot(RIVROWS, n)));
+const RIVER_FRAMES = WAVES.map((f, k) => {
+  const st = rot(RIVROWS, k * 4);
+  return f.map((row, y) => row.split('').map((c, x) => (st[y][x] === 's' ? 's' : c === 'p' ? 'w' : c)).join(''));
+});
+def('river', { w: 'riv1', h: 'riv2', k: 'riv0', s: 'riv3' }, RIVER_FRAMES);
+def('water_mud', { w: 'shm1', h: 'shm2', k: 'shm0', p: 'shmud' }, WAVES);
 
 // Foam edges where water meets land (3-frame palette cycle via shape change). N edge; others rotated in render.
 const FP = { f: 'foam', s: 'sh3' };
 def('foam_n', FP, [[
-  'ffffffffffffffff',
-  'sffsssffffsssffs',
-  '................',
-  '................',
-  '................',
-  '................',
-  '................',
-  '................',
-  '................',
-  '................',
-  '................',
-  '................',
-  '................',
-  '................',
-  '................',
-  '................',
+  'f.ff.fff.ff.fff.',
+  '.s..s....s..s...',
+  ...Array.from({ length: 14 }, () => '................'),
 ], [
-  'ffffffffffffffff',
-  'ffsssffssfffssff',
-  '.s....s....s....',
-  '................',
-  '................',
-  '................',
-  '................',
-  '................',
-  '................',
-  '................',
-  '................',
-  '................',
-  '................',
-  '................',
-  '................',
-  '................',
+  'ff.fff.ff.fff.ff',
+  '..s....s....s..s',
+  ...Array.from({ length: 14 }, () => '................'),
 ], [
-  'ffffffffffffffff',
-  'sssffsssfffsssff',
-  '....s.........s.',
-  '................',
-  '................',
-  '................',
-  '................',
-  '................',
-  '................',
-  '................',
-  '................',
-  '................',
-  '................',
-  '................',
-  '................',
-  '................',
+  '.ff.ff.fff.ff.ff',
+  's....s...s....s.',
+  ...Array.from({ length: 14 }, () => '................'),
 ]]);
+// Shelf: dithered transition from shallows into deep water (drawn on the deep tile, N edge).
+def('shelf_n', { s: 'sh1' }, [
+  's.s.s.s.s.s.s.s.',
+  '.s.s.s.s.s.s.s.s',
+  's...s...s...s...',
+  '..s...s...s...s.',
+  ...Array.from({ length: 12 }, () => '................'),
+]);
 
 // Tide pool: rock lip around still water with glints.
 def('tidepool', { r: 'st2', d: 'st1', l: 'st3', w: 'sh1', g: 'dapple', k: 'st0', s: 'wet1' }, [
@@ -632,43 +575,81 @@ def('cobbles', { c: 'co2', d: 'co1', g: 'co0', l: 'co3', h: 'co4' }, [
   'cgccccdccccdcccc',
   'dgdddgddddgddddg',
 ]);
-// Pier planks (running N-S) with gaps showing dark water; posts on the end tile.
-const PP = { p: 'wd2', d: 'wd1', l: 'wd3', k: 'wd0', w: 'deep0', g: 'wd1' };
+// Pier: one tile wide, cross planks with water showing through the gaps, posts on both sides.
+const PP = { p: 'wd2', d: 'wd1', l: 'wd3', k: 'wd0', w: 'deep0', h: 'wd4' };
+const PLANKS = [
+  'klllllllllllllkk',
+  'klppppppppppppdk',
+  'klpppdppppppppdk',
+  'kwwwwwwwwwwwwwwk',
+  'klllllllllllllkk',
+  'klppppppppppppdk',
+  'klppppppppdpppdk',
+  'kwwwwwwwwwwwwwwk',
+];
 def('pier', PP, [
-  'lppplppwlppplppw',
-  'pppppppwpppppppw',
-  'pppdpppwppppdppw',
-  'pppppppwpppppppw',
-  'ppppppdwpppppppw',
-  'pdpppppwpdpppppw',
-  'pppppppwpppppppw',
-  'ppppdppwppppdppw',
-  'pppppppwpppppppw',
-  'pppppppwppdppppw',
-  'pppdpppwpppppppw',
-  'pppppppwpppppppw',
-  'ppppppdwpppppppw',
-  'pdpppppwpdpppppw',
-  'pppppppwpppppppw',
-  'kkkkkkkwkkkkkkkw',
+  ...PLANKS,
+  'klllllllllllllkk',
+  'klppppppppppppdk',
+  'klpppppdppppppdk',
+  'kwwwwwwwwwwwwwwk',
+  'hklllllllllllkhk',
+  'kkppppppppppppkk',
+  'kkpppdppppppppkk',
+  'kwwwwwwwwwwwwwwk',
 ]);
 def('pier_end', PP, [
   'kkkkkkkkkkkkkkkk',
-  'lppplppwlppplppw',
-  'pppppppwpppppppw',
-  'pppdpppwppppdppw',
-  'pppppppwpppppppw',
-  'ppppppdwpppppppw',
-  'pdpppppwpdpppppw',
-  'pppppppwpppppppw',
-  'ppppdppwppppdppw',
-  'pppppppwpppppppw',
-  'pppppppwppdppppw',
-  'pppdpppwpppppppw',
-  'pppppppwpppppppw',
-  'kkkkkkkwkkkkkkkw',
-  'lkk...........kk'.replace(/\./g, 'w').slice(0, 16),
-  'dkkwwwwwwwwwwwkk',
+  'klllllllllllllkk',
+  'klppppppppppppdk',
+  'klpppppkkpppppdk',
+  'kwwwwwwhkwwwwwwk',
+  'klllllllllllllkk',
+  'klppppppppppppdk',
+  'klppdpppppppppdk',
+  ...PLANKS.slice(3, 7),
+  'hklllllllllllkhk',
+  'kkppppppppppppkk',
+  'kkppppppppdpppkk',
+  'kwwwwwwwwwwwwwwk',
+]);
+// Rowboat moored beside the pier (32x16, bobs 1px).
+def('boat', { k: 'wd0', d: 'wd1', w: 'wd3', p: 'wd2', s: 'deep0', l: 'wd4' }, [
+  '................................',
+  '................................',
+  '....kkkkkkkkkkkkkkkkkkkk........',
+  '...kdlllllllllllllllllkkk.......',
+  '...kdwwwwwwwwwwwwwwwwwwdlkk.....',
+  '...kdwwwwkkwwwwwwkkwwwwwwdlkk...',
+  '...kdwwwwkkwwwwwwkkwwwwwwwwdkk..',
+  '...kdwwwwkkwwwwwwkkwwwwwwwwwdkk.',
+  '...kdwwwwkkwwwwwwkkwwwwwwwwdkk..',
+  '...kdwwwwkkwwwwwwkkwwwwwwddkk...',
+  '...kpppppppppppppppppppdddkk....',
+  '...kppppppppppppppppppppkkk.....',
+  '...skkkkkkkkkkkkkkkkkkkks.......',
+  '....ssssssssssssssssssss........',
+  '................................',
+  '................................',
+], 32, 16);
+// Steps cut into a cliff face (the ramp down from the point).
+def('steps', { g: 'grass1', k: 'cl0', d: 'cl1', b: 'cl3', l: 'cl4' }, [
+  'gggggggggggggggg',
+  'kllllllllllllllk',
+  'kbbbbbbbbbbbbbbk',
+  'kddddddddddddddk',
+  'kllllllllllllllk',
+  'kbbbbbbbbbbbbbbk',
+  'kddddddddddddddk',
+  'kllllllllllllllk',
+  'kbbbbbbbbbbbbbbk',
+  'kddddddddddddddk',
+  'kllllllllllllllk',
+  'kbbbbbbbbbbbbbbk',
+  'kddddddddddddddk',
+  'kllllllllllllllk',
+  'kbbbbbbbbbbbbbbk',
+  'kkkkkkkkkkkkkkkk',
 ]);
 
 /* ------------------------------------------------------- buildings */
@@ -1132,38 +1113,38 @@ def('tree_fruit_bare', { ...FRUITPAL, f: 'fr2', g: 'fr3', e: 'fr1' }, FRUIT_ROWS
 
 /* ---------------------------------------------------------- landmarks */
 // Waystone: a dock marker; stone pillar, iron ring, glowing rune (exempt). 16x32, anchor bottom tile.
-def('waystone', { k: 'st0', d: 'st1', m: 'st2', l: 'st3', h: 'st4', i: 'iron', r: '!rune', w: '!runew', s: 'shadow', x: 'uiink' }, [
-  '......kkkk......',
-  '.....khhlmk.....',
-  '....khllmmdk....',
-  '....klllmmdk....',
-  '....klmmmmdk....',
-  '....klmmmmdk....',
-  '....klmrrmdk....',
-  '....klrwwrdk....',
-  '....klmrrmdk....',
-  '....klmmrmdk....',
-  '....klmmrmdk....',
-  '....klmrrmdk....',
-  '....klmmmmdk....',
-  '....klmmmmdk....',
-  '....iiiiiiiik...',
-  '...iklmmmmdkii..',
-  '...iklmmmmdkii..',
-  '....iiiiiiiik...',
-  '....klmmmmdk....',
-  '....klmmmmdk....',
-  '....klmmmmdk....',
-  '....klmmmmdk....',
-  '....klmmmmdk....',
-  '....klmmmmdk....',
-  '...kklmmmmddk...',
-  '..kklmmmmmdddk..',
-  '..khlmmmmmdddk..',
-  '..klmmmmmmdddk..',
-  '..kkkkkkkkkkkks.',
+def('waystone', { k: 'st0', d: 'st1', m: 'st2', l: 'st3', h: 'st4', i: 'iron', r: '!rune', w: '!runew', g: 'grass1', s: 'shadow', x: 'uiink' }, [
+  '.....kkkkk......',
+  '....khhllmk.....',
+  '...khhlllmmk....',
+  '...khllmmmmdk...',
+  '...kllmmmmmdk...',
+  '...klmmrrmmdk...',
+  '...klmrwwrmdk...',
+  '...klmmrrmmdk...',
+  '...klmmmrmmdk...',
+  '...klmmmrmmdk...',
+  '...klmrrrrmdk...',
+  '...klmmmrmmdk...',
+  '...klmmmrmmdk...',
+  '...klmmmmmmdk...',
+  '..iiiiiiiiiiii..',
+  '.iklmmmmmmmddki.',
+  '..iiiiiiiiiiii..',
+  '...klmmmmmmdk...',
+  '...klmmmmmmdk...',
+  '...klmmmmmmdk...',
+  '...klmmgmmmdk...',
+  '...klmggmmmdk...',
+  '...klmmmmmmdk...',
+  '...klmmmmmmddk..',
+  '..kklmmmmmmddk..',
+  '..klmmmmmmmdddk.',
+  '..klmmmmmmmdddk.',
+  '..kkkkkkkkkkkkks',
   '..xxxxxxxxxxxxss',
-  '.....ssssssssss.',
+  '....ssssssssss..',
+  '................',
   '................',
 ], 16, 32);
 // Skyglass node: irregular faceted shard (>= 5 sides, never a plus or 4-point star). 2 frames = 1 s pulse.
@@ -1298,15 +1279,15 @@ def('lighthouse_lit', { ...LHP, g: '!lhamber', G: '!lhamber', a: '!lhamber', A: 
 // Section n (0 = lowest) occupies rows [77 - 9*(n+1), 77 - 9*n). drawLighthouse clips to the stage.
 const SCP = { p: 'wd2', d: 'wd1', l: 'wd3', k: 'wd0', r: 'iron' };
 const SC_SECTION = [
-  '.........................lkk....',
-  '.........................ppk....',
-  '.........................ppk....',
-  '......................pppppppkk.',
-  '......................lllllllkk.',
-  '.........................ppk..r.',
-  '.........................ppk..r.',
-  '.........................ppk..r.',
-  '.........................ddk..r.',
+  '.......................lllllllll',
+  '.......................ddddddddd',
+  '..........................lk.dlk',
+  '..........................lkd.lk',
+  '..........................lk..lk',
+  '..........................lk..lk',
+  '..........................lk..lk',
+  '..........................lk..lk',
+  '..........................lk..lk',
 ];
 const SC_ROWS = [];
 for (let i = 0; i < 80; i++) SC_ROWS.push('................................');
@@ -1320,21 +1301,21 @@ export const SCAFFOLD_BASE_ROW = 77;
 
 // Cottage lamp light pool (drawn with screen compositing at night). 2-step dither.
 def('light_pool', { a: '!amber', b: '!amber' }, [
-  '..............a.a.a.a...........',
-  '..........a.a.aaaaaaa.a.a.......',
-  '........a.aaaaaaaaaaaaaaa.a.....',
-  '......a.aaaaaaaaaaaaaaaaaaa.a...',
-  '....a.aaaaaaaaaaaaaaaaaaaaaaa.a.',
-  '...a.aaaaaaaaaaaaaaaaaaaaaaaaa.a',
-  '..a.aaaaaaaaaaaaaaaaaaaaaaaaaaa.',
-  '.a.aaaaaaaaaaaaaaaaaaaaaaaaaaa.a',
-  '..a.aaaaaaaaaaaaaaaaaaaaaaaaaaa.',
-  '...a.aaaaaaaaaaaaaaaaaaaaaaaaa.a',
-  '....a.aaaaaaaaaaaaaaaaaaaaaaa.a.',
-  '......a.aaaaaaaaaaaaaaaaaaa.a...',
-  '........a.aaaaaaaaaaaaaaa.a.....',
-  '..........a.a.aaaaaaa.a.a.......',
-  '..............a.a.a.a...........',
+  '................................',
+  '..............b.b.b.b...........',
+  '...........b.b.b.b.b.b.b........',
+  '.........b.b.baaaaaab.b.b.......',
+  '.......b.b.baaaaaaaaaab.b.b.....',
+  '......b.b.aaaaaaaaaaaaaa.b.b....',
+  '.....b.b.aaaaaaaaaaaaaaaa.b.b...',
+  '.....b.b.aaaaaaaaaaaaaaaa.b.b...',
+  '......b.b.aaaaaaaaaaaaaa.b.b....',
+  '.......b.b.baaaaaaaaaab.b.b.....',
+  '.........b.b.baaaaaab.b.b.......',
+  '...........b.b.b.b.b.b.b........',
+  '..............b.b.b.b...........',
+  '................................',
+  '................................',
   '................................',
 ], 32, 16);
 

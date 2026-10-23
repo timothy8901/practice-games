@@ -169,6 +169,10 @@ try {
   expectPixel('paletteSwap by char', ax(8) + 2, rowA + 5, '#4a7bd0');
   expectPixel('paletteSwap by colour', ax(9) + 2, rowA + 5, '#4a7bd0');
   check('swap by char and colour share one cache entry', cells[8][1] === cells[9][1]);
+  // exchanging two colours must be simultaneous (orange <-> cream), not collapse to one
+  const exchanged = px.paletteSwap(fox, { [FOX_PAL.o]: FOX_PAL.w, [FOX_PAL.w]: FOX_PAL.o });
+  check('paletteSwap exchanges two colours', exchanged.palette.o === FOX_PAL.w && exchanged.palette.w === FOX_PAL.o,
+    JSON.stringify({ o: exchanged.palette.o, w: exchanged.palette.w }));
   expectPixel('silhouette body', ax(10) + 2, rowA + 5, '#1a1a2e');
   expectPixel('silhouette outline char too', ax(10) + 1, rowA + 5, '#1a1a2e');
   expectPixel('outlineSprite ring', ax(11) + 0, rowA + 5, '#f2c14e');

@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>Wildshift Creature Sheet</title>
+<style>
+  :root { --ink: #141b33; --deep: #2b3a67; --paper: #f4f1e6; --rule: #c9a77c; --v: #94b0c2; --m: #ff5bd6; }
+  html, body { margin: 0; background: var(--ink); color: var(--paper); font: 12px/1.4 ui-monospace, Menlo, Consolas, monospace; }
+  body { padding: 12px 16px 24px; }
+  h1 { font-size: 14px; letter-spacing: .12em; text-transform: uppercase; margin: 0 0 4px; color: var(--rule); }
+  p.sub { margin: 0 0 12px; color: var(--v); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(236px, 1fr)); gap: 10px; }
+  .card { background: var(--deep); border: 1px solid #3b4a6b; padding: 8px; border-radius: 2px; }
+  .card canvas { image-rendering: pixelated; image-rendering: crisp-edges; display: block; background: #3b4a6b; }
+  .card .art { display: flex; gap: 6px; align-items: flex-end; }
+  .card .name { font-weight: 700; margin-top: 6px; color: var(--paper); }
+  .card .type { color: var(--rule); }
+  .card .feat { color: var(--v); font-size: 11px; }
+  .row { margin-top: 18px; }
+  .row canvas { image-rendering: pixelated; display: block; background: #0e1326; border: 1px solid #3b4a6b; }
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 10px; color: var(--v); }
+  .legend i { display: inline-block; width: 10px; height: 10px; vertical-align: -1px; margin-right: 3px; border: 1px solid #0003; }
+  .caption { font-size: 10px; color: var(--v); margin-top: 2px; }
+  .ctl { margin: 8px 0 12px; color: var(--v); }
+  .ctl label { margin-right: 12px; }
+</style>
+</head>
+<body>
+<h1>Wildshift creature sheet</h1>
+<p class="sub">32x32 palette-indexed string art, left-front 3/4 view, drawn at 3x. Front (bonded: Heartmark drawn at runtime in comet magenta), second frame or back view, then the k-fill silhouette test. Scrapling and Vesperay's concept art is the unbonded look; the mark is shown here only to check the anchor.</p>
+<div class="ctl">
+  <label><input type="checkbox" id="anim" checked> animate idle</label>
+  <label><input type="checkbox" id="hm" checked> show Heartmark</label>
+  <label><input type="checkbox" id="outline"> battle outline (1px k)</label>
+</div>
+<div class="grid" id="grid"></div>
+<div class="row">
+  <div class="caption">Silhouette row: every front filled solid k (the "reads when filled" test) and, above it, the m-outlined Freefall unseen-form card look.</div>
+  <canvas id="sil"></canvas>
+</div>
+<div class="legend" id="legend"></div>
+<script type="module">
+  import { decodeSprite, drawSprite, silhouette } from '../../js/core/pixelart.js';
+  import { SPRITES, MASTER, ORDER } from './sprites.js';
+
+  const SCALE = 3;
+  const LIGHT = new Set('wcyila'.split(''));
+  const grid = document.getElementById('grid');
+  const animBox = document.getElementById('anim');
+  const hmBox = document.getElementById('hm');
+  const outBox = document.getElementById('outline');
+
+  function drawHeartmark(ctx, rows, anchor, x0, y0) {
+    if (!anchor) return;
+    const { x, y } = anchor;
+    const under = rows[y] && rows[y][x];
+    const light = LIGHT.has(under);
+    const put = (px, py, c) => { ctx.fillStyle = c; ctx.fillRect(x0 + px * SCALE, y0 + py * SCALE, SCALE, SCALE); };
+    if (light) {
+      // light-body variant: outline the plus in k
+      for (const [dx, dy] of [[-2, 0], [2, 0], [0, -2], [0, 2], [-1, -1], [1, -1], [-1, 1], [1, 1]]) put(x + dx, y + dy, MASTER.k);
+    }
+    for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) put(x + dx, y + dy, MASTER.m);
+    put(x, y, light ? MASTER.y : MASTER.w);
+  }
+
+  const cards = [];
+  for (const name of ORDER) {
+    const sp = SPRITES[name];
+    const card = document.createElement('div');
+    card.className = 'card';
+    const art = document.createElement('div');
+    art.className = 'art';
+    const c1 = document.createElement('canvas'); c1.width = 34 * SCALE; c1.height = 34 * SCALE;
+    const c2 = document.createElement('canvas'); c2.width = 34 * SCALE; c2.height = 34 * SCALE;
+    art.append(c1, c2);
+    const keys = new Set(sp.rows.join('').replace(/\./g, ''));
+    card.append(art);
+    card.insertAdjacentHTML('beforeend', `<div class="name">${name}</div><div class="type">${sp.type} · ${keys.size} keys · HM ${sp.heartmark.x},${sp.heartmark.y}</div><div class="feat">${sp.feature}</div><div class="caption">${sp.back ? 'right: back view' : sp.idle2 ? 'right: idle frame 2' : ''}</div>`);
+    grid.append(card);
+    cards.push({ name, sp, c1, c2 });
+  }
+
+  let frame = 0;
+  function render() {
+    const outline = outBox.checked ? MASTER.k : null;
+    for (const { sp, c1, c2 } of cards) {
+      const pal = { ...sp.palette };
+      const ctx1 = c1.getContext('2d'); ctx1.clearRect(0, 0, c1.width, c1.height);
+      const useIdle2 = frame % 2 === 1 && sp.idle2 && animBox.checked;
+      const rowsA = useIdle2 ? sp.idle2 : sp.rows;
+      const s1 = decodeSprite(rowsA, pal, { scale: SCALE, outline });
+      drawSprite(ctx1, s1, SCALE, SCALE);
+      if (hmBox.checked) {
+        drawHeartmark(ctx1, rowsA, useIdle2 && sp.heartmarkIdle2 ? sp.heartmarkIdle2 : sp.heartmark, SCALE, SCALE);
+      }
+      const ctx2 = c2.getContext('2d'); ctx2.clearRect(0, 0, c2.width, c2.height);
+      const second = sp.back || sp.idle2;
+      if (second) {
+        const s2 = decodeSprite(second, pal, { scale: SCALE, outline });
+        drawSprite(ctx2, s2, SCALE, SCALE);
+        if (hmBox.checked && sp.back && sp.heartmarkBack) drawHeartmark(ctx2, second, sp.heartmarkBack, SCALE, SCALE);
+      }
+    }
+  }
+  render();
+  setInterval(() => { frame++; if (animBox.checked) render(); }, 520);
+  for (const el of [animBox, hmBox, outBox]) el.addEventListener('change', render);
+
+  // Silhouette row (wraps to 11 per line so it fits a 960px viewport)
+  const sil = document.getElementById('sil');
+  const PER = 11, CW = 82, CH = 84;
+  const lines = Math.ceil(ORDER.length / PER);
+  sil.width = PER * CW + 8; sil.height = lines * 2 * CH + 8;
+  const sctx = sil.getContext('2d');
+  sctx.fillStyle = '#0e1326'; sctx.fillRect(0, 0, sil.width, sil.height);
+  sctx.font = '10px ui-monospace, Menlo, monospace';
+  ORDER.forEach((name, i) => {
+    const sp = SPRITES[name];
+    const base = decodeSprite(sp.rows, sp.palette);
+    const col = i % PER, line = Math.floor(i / PER);
+    const x = 4 + col * CW, y0 = 4 + line * 2 * CH;
+    // Freefall unseen-form card look: d fill with a 1px m outline
+    const ff = decodeSprite(silhouette(base, MASTER.d), null, { scale: 2, outline: MASTER.m });
+    drawSprite(sctx, ff, x + 2, y0 + 2);
+    // the k-fill test
+    const dark = decodeSprite(silhouette(base, MASTER.k), null, { scale: 2 });
+    drawSprite(sctx, dark, x + 2, y0 + CH + 2);
+    sctx.fillStyle = '#94b0c2';
+    sctx.fillText(name, x + 2, y0 + CH * 2 - 4);
+  });
+
+  // palette legend
+  const legend = document.getElementById('legend');
+  for (const [k, hex] of Object.entries(MASTER)) legend.insertAdjacentHTML('beforeend', `<span><i style="background:${hex}"></i>${k} ${hex}</span>`);
+  window.__sheet = { count: ORDER.length };
+</script>
+</body>
+</html>

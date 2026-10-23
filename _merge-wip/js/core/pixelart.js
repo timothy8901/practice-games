@@ -14,7 +14,12 @@
  * Decoded sprites are immutable and cached by content, so calling
  * {@link decodeSprite} every frame with the same art is cheap. `rows` arrays
  * and `palette` objects are treated as immutable once handed to this module;
- * if you mutate one, call {@link clearSpriteCache}.
+ * if you mutate one, call {@link clearSpriteCache}. The cache never evicts,
+ * so quantise continuously varying inputs (for example a tint `amount` driven
+ * by a timer) before decoding, or the cache grows without bound.
+ *
+ * One pixel is one UTF-16 code unit, so palette characters must be single
+ * code units (Latin-1 and most BMP symbols are fine; emoji are not).
  *
  * @module core/pixelart
  */
@@ -116,12 +121,19 @@ const FREE_CHARS = '@#%&*+=!?$^~|/\\<>{}[]()0123456789' +
 const HEX_RE = /^#?([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
 const TRANSPARENT_SIG = '--------';
 
+/**
+ * Upper bound on the pixel count of one sprite or atlas (4096 x 4096). Keeps a
+ * typo such as `scale: 1e6` from hanging the tab or exhausting memory; the
+ * largest canvas most browsers accept is not much bigger than this anyway.
+ */
+export const MAX_PIXELS = 1 << 24;
+
 /** @type {Map<string, Sprite>} content key -> sprite */
 const spriteCache = new Map();
 /** @type {WeakMap<object, Map<string, Sprite>>} rows identity -> option key -> sprite */
 let fastCache = new WeakMap();
 /** @type {WeakMap<object, NormalizedPalette>} */
-const paletteCache = new WeakMap();
+let paletteCache = new WeakMap();
 /** @type {WeakMap<object, HTMLCanvasElement|OffscreenCanvas>} */
 let canvasCache = new WeakMap();
 /** @type {WeakMap<Sprite, CanvasPattern>} */
@@ -153,10 +165,34 @@ function hex2(n) {
 }
 
 function requireNumber(v, what) {
-  if (typeof v !== 'number' || Number.isNaN(v)) {
-    throw new TypeError(`pixelart: ${what} must be a number (got ${String(v)})`);
+  if (typeof v !== 'number' || !Number.isFinite(v)) {
+    throw new TypeError(`pixelart: ${what} must be a finite number (got ${String(v)})`);
   }
   return v;
+}
+
+/** Throw a RangeError when a `w` x `h` raster would exceed {@link MAX_PIXELS}. */
+function checkPixelBudget(w, h, what) {
+  if (w * h > MAX_PIXELS) {
+    throw new RangeError(`pixelart: ${what} would be ${w}x${h} pixels, above the ${MAX_PIXELS} pixel limit`);
+  }
+}
+
+/** Control, format, surrogate and separator (except a plain space) code units. */
+const INVISIBLE_RE = /\p{C}|[^\P{Z} ]/u;
+
+/**
+ * Describe a character for an error message: invisible characters are shown
+ * as `\uXXXX` escapes and UTF-16 surrogates are flagged as parts of a
+ * multi-unit character.
+ */
+function describeChar(ch) {
+  const code = ch.charCodeAt(0);
+  const surrogate = code >= 0xd800 && code <= 0xdfff;
+  const shown = surrogate || INVISIBLE_RE.test(ch)
+    ? '"\\u' + code.toString(16).padStart(4, '0') + '"'
+    : JSON.stringify(ch);
+  return shown + (surrogate ? ' (part of a multi-unit character such as an emoji; one pixel is one UTF-16 code unit)' : '');
 }
 
 // ---------------------------------------------------------------------------
@@ -369,9 +405,10 @@ function normalizePalette(palette) {
   const source = palette instanceof Map ? palette : Object.entries(palette);
   for (const [ch, value] of source) {
     if (typeof ch !== 'string' || ch.length !== 1 || ch === '\n' || ch === '\r') {
-      throw new TypeError(`pixelart: palette key ${JSON.stringify(ch)} must be a single character`);
+      const hint = typeof ch === 'string' && ch.length > 1 ? ' (one UTF-16 code unit; emoji need two)' : '';
+      throw new TypeError(`pixelart: palette key ${JSON.stringify(ch)} must be a single character${hint}`);
     }
-    const rgba = value ? parseRgba(value) : null;
+    const rgba = value === null || value === undefined ? null : parseRgba(value);
     map.set(ch, rgba);
     entries[ch] = rgba ? rgbToHex(rgba[0], rgba[1], rgba[2], rgba[3]) : null;
   }
@@ -405,10 +442,11 @@ function normalizePalette(palette) {
 // ---------------------------------------------------------------------------
 
 /** Split a multi-line template string into rows, dropping the blank first/last
- *  lines and common indentation that template literals introduce. */
+ *  lines and common indentation that template literals introduce. Because of
+ *  the de-indent, use `'.'` (not `' '`) for transparent pixels at row starts. */
 function splitRows(text) {
   const lines = text.replace(/\r\n?/g, '\n').split('\n');
-  if (lines.length && lines[0] === '') lines.shift();
+  if (lines.length && lines[0].trim() === '') lines.shift();
   if (lines.length && lines[lines.length - 1].trim() === '') lines.pop();
   let indent = Infinity;
   for (const line of lines) {
@@ -438,12 +476,13 @@ function toGrid(rows, pal) {
     if (row.length > w) w = row.length;
   }
   if (h === 0 || w === 0) throw new RangeError('pixelart: a sprite needs at least one non-empty row');
+  checkPixelBudget(w, h, 'sprite');
   const grid = new Array(h);
   for (let y = 0; y < h; y++) {
     const row = rows[y];
     for (let x = 0; x < row.length; x++) {
       if (!pal.map.has(row[x])) {
-        throw new Error(`pixelart: unknown palette character ${JSON.stringify(row[x])} at row ${y}, column ${x}`);
+        throw new Error(`pixelart: unknown palette character ${describeChar(row[x])} at row ${y}, column ${x}`);
       }
     }
     grid[y] = row.length === w ? row : row + pal.transparent.repeat(w - row.length);
@@ -690,6 +729,7 @@ export function decodeSprite(rows, palette, opts) {
   }
 
   let { grid, w, h } = toGrid(rows, pal);
+  checkPixelBudget((w + (outline ? 2 : 0)) * scale, (h + (outline ? 2 : 0)) * scale, 'decoded sprite');
   if (flipX) grid = grid.map(reverseString);
   if (flipY) grid.reverse();
   let entries = pal.entries;
@@ -754,16 +794,22 @@ function blit(ctx, image, sx, sy, sw, sh, x, y, ox, oy, o) {
   if (ctx.imageSmoothingEnabled !== false) ctx.imageSmoothingEnabled = false;
   const prevAlpha = ctx.globalAlpha;
   if (alpha !== 1) ctx.globalAlpha = prevAlpha * alpha;
-  if (flipX || flipY) {
-    ctx.save();
-    ctx.translate(flipX ? dx + dw : dx, flipY ? dy + dh : dy);
-    ctx.scale(flipX ? -1 : 1, flipY ? -1 : 1);
-    ctx.drawImage(image, sx, sy, sw, sh, 0, 0, dw, dh);
-    ctx.restore();
-  } else {
-    ctx.drawImage(image, sx, sy, sw, sh, dx, dy, dw, dh);
+  try {
+    if (flipX || flipY) {
+      ctx.save();
+      try {
+        ctx.translate(flipX ? dx + dw : dx, flipY ? dy + dh : dy);
+        ctx.scale(flipX ? -1 : 1, flipY ? -1 : 1);
+        ctx.drawImage(image, sx, sy, sw, sh, 0, 0, dw, dh);
+      } finally {
+        ctx.restore();
+      }
+    } else {
+      ctx.drawImage(image, sx, sy, sw, sh, dx, dy, dw, dh);
+    }
+  } finally {
+    if (alpha !== 1) ctx.globalAlpha = prevAlpha;
   }
-  if (alpha !== 1) ctx.globalAlpha = prevAlpha;
 }
 
 /**
@@ -788,32 +834,36 @@ export function drawSprite(ctx, sprite, x, y, opts) {
 
 /**
  * Recolour a sprite. Keys that are a single character remap that palette
- * slot; longer keys are hex colours and remap every slot currently holding
- * that colour (colours that do not occur are ignored). Values are hex colours
- * or `null` for transparent. The input sprite is not modified.
+ * slot; longer keys are hex colours and remap every slot holding that colour
+ * in the *input* sprite (colours that do not occur are ignored). All entries
+ * apply simultaneously, so `{'#f00': '#0f0', '#0f0': '#f00'}` exchanges two
+ * colours; when several entries target one slot the last one wins. Values are
+ * hex colours or `null` for transparent. The input sprite is not modified.
  * @param {Sprite} sprite
  * @param {Record<string, string|null>|Map<string, string|null>} mapping
  * @returns {Sprite} Cached result; identical mappings return the same object.
- * @throws {TypeError} If a key is neither a character nor a valid colour.
+ * @throws {TypeError} If a key is neither a character nor a valid colour, or a
+ *   value is neither a valid colour nor `null`.
  */
 export function paletteSwap(sprite, mapping) {
   assertSprite(sprite);
   if (mapping === null || typeof mapping !== 'object') {
     throw new TypeError('pixelart: paletteSwap mapping must be an object or Map');
   }
-  const pal = { ...sprite.palette };
+  const original = sprite.palette;
+  const pal = { ...original };
   const source = mapping instanceof Map ? mapping : Object.entries(mapping);
   for (const [k, v] of source) {
     if (typeof k !== 'string' || k.length === 0) {
       throw new TypeError(`pixelart: paletteSwap key ${JSON.stringify(k)} must be a character or hex colour`);
     }
-    const next = v ? normalizeHex(v) : null;
+    const next = v === null || v === undefined ? null : normalizeHex(v);
     if (k.length === 1) {
       pal[k] = next;
       continue;
     }
     const from = normalizeHex(k);
-    for (const ch of Object.keys(pal)) if (pal[ch] === from) pal[ch] = next;
+    for (const ch of Object.keys(original)) if (original[ch] === from) pal[ch] = next;
   }
   return makeSprite(sprite.rows, sprite.w, sprite.h, pal, sprite.ox, sprite.oy);
 }
@@ -851,6 +901,7 @@ export function outlineSprite(sprite, color, opts) {
   assertSprite(sprite);
   const hex = normalizeHex(color);
   const corners = !!(opts && opts.corners);
+  checkPixelBudget(sprite.w + 2, sprite.h + 2, 'outlined sprite');
   const r = outlineGrid(sprite.rows, sprite.w, sprite.h, normalizePalette(sprite.palette), corners);
   return makeSprite(r.grid, r.w, r.h, { ...sprite.palette, [r.char]: hex }, sprite.ox - 1, sprite.oy - 1);
 }
@@ -975,6 +1026,7 @@ export function buildAtlas(sprites, opts) {
     if (s.h > shelfH) shelfH = s.h;
   }
   const H = cy + shelfH + padding;
+  checkPixelBudget(W, H, 'atlas');
 
   const pixels = new Uint8ClampedArray(W * H * 4);
   for (let i = 0; i < unique.length; i++) {
@@ -1037,12 +1089,14 @@ export function setCanvasFactory(factory) {
 }
 
 /**
- * Drop every cached sprite, canvas and pattern. Sprites already held by
- * callers stay valid and rebuild their canvas on next use.
+ * Drop every cached sprite, normalised palette, canvas and pattern, so later
+ * decodes re-read `rows`/`palette` objects that were mutated. Sprites already
+ * held by callers stay valid and rebuild their canvas on next use.
  */
 export function clearSpriteCache() {
   spriteCache.clear();
   fastCache = new WeakMap();
+  paletteCache = new WeakMap();
   canvasCache = new WeakMap();
   patternCache = new WeakMap();
 }
