@@ -118,7 +118,7 @@ describe('makeCreature', () => {
 });
 
 describe('Heartmark placement and the Unfixed loop (seeded)', () => {
-  it('is deterministic per seed, varies across seeds and stays inside MARK_SPREAD', () => {
+  it('is deterministic per seed and uses all four lifetime body anchors', () => {
     const a = C.makeCreature({ uid: 'c1', speciesId: 'sloshkin', rng: makeRng('s1') }, DATA);
     const b = C.makeCreature({ uid: 'c1', speciesId: 'sloshkin', rng: makeRng('s1') }, DATA);
     assert.deepEqual(a.mark, b.mark);
@@ -127,9 +127,9 @@ describe('Heartmark placement and the Unfixed loop (seeded)', () => {
       const c = C.makeCreature({ uid: `c${i}`, speciesId: 'sloshkin', rng: makeRng(`seed-${i}`) }, DATA);
       assert.ok(Math.abs(c.mark.x) <= 2 && Math.abs(c.mark.y) <= 2);
       assert.ok(!Object.is(c.mark.x, -0) && !Object.is(c.mark.y, -0));
-      marks.add(`${c.mark.x},${c.mark.y}`);
+      marks.add(c.mark.anchor);
     }
-    assert.ok(marks.size >= 15, `only ${marks.size} distinct marks`);
+    assert.equal(marks.size, 4, `only ${marks.size} distinct body anchors`);
   });
 
   it('draws from forks, so the caller\'s stream is not advanced', () => {
@@ -138,10 +138,12 @@ describe('Heartmark placement and the Unfixed loop (seeded)', () => {
     assert.equal(r1.next(), makeRng('caller').next());
   });
 
-  it('honours MARK_SPREAD tuning, an explicit mark, and gives {0,0} without an rng', () => {
+  it('keeps legacy explicit offsets and uses a stable body anchor without an rng', () => {
     const zero = C.makeCreature({ uid: 'c1', speciesId: 'sloshkin', rng: makeRng('x'), tuning: { MARK_SPREAD: { x: 0, y: 0 } } }, DATA);
-    assert.deepEqual(zero.mark, { x: 0, y: 0 });
-    assert.deepEqual(C.makeCreature({ uid: 'c2', speciesId: 'sloshkin' }, DATA).mark, { x: 0, y: 0 });
+    assert.equal(zero.mark.x, 0);
+    assert.equal(zero.mark.y, 0);
+    assert.ok(['head', 'chest', 'back', 'tail'].includes(zero.mark.anchor));
+    assert.deepEqual(C.makeCreature({ uid: 'c2', speciesId: 'sloshkin' }, DATA).mark, C.drawBodyMark('c2'));
     assert.deepEqual(C.makeCreature({ uid: 'c3', speciesId: 'sloshkin', mark: { x: -3, y: 4 } }, DATA).mark, { x: -3, y: 4 });
     for (let i = 0; i < 50; i++) {
       const m = C.drawMark(makeRng(`w${i}`), { tuning: { MARK_SPREAD: { x: 5, y: 1 } } });

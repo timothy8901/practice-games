@@ -35,7 +35,7 @@ import { createEntities, createEntity, DIR_INDEX, DX, DY, OPPOSITE, dirTo } from
 import { createPlayer, dirFromAxes } from '../world/player.js';
 import { createCamera } from '../world/camera.js';
 import { resolveFacing } from '../world/interact.js';
-import { resolveWarp, firesOnStep } from '../world/warps.js';
+import { resolveWarp, firesOnStep, markTrigger } from '../world/warps.js';
 import { nearestDry, TIDE_MASK } from '../world/tide.js';
 import { createNpcDriver, arrivalPoint } from '../world/npc.js';
 import { createPathCache } from '../world/pathing.js';
@@ -66,6 +66,7 @@ import { startBattle } from '../systems/flow/battleFlow.js';
 import { doInteraction, snapshotAction, laneCtx, ringHas } from '../systems/flow/interactFlow.js';
 import { createBoardScene, createCeremonyScene, createFerryScene, ROOF_ART } from './fieldOverlays.js';
 import { hasAliveParty, minuteOfDay, tideState as selTideState } from '../state/selectors.js';
+import { arrivalScriptOf } from './boot.js';
 
 // ---------------------------------------------------------------------------------------------
 // constants
@@ -212,8 +213,12 @@ export function createOverworldScene(G) {
   let baseRngSeed = null;
   let wadeCheckMs = 0;
   let entitiesDirty = false;
+  let toolsDirty = false;
   let enteredOnce = false;
   const offs = [];
+  // Cutscenes own these walks until they land; schedule drivers yield to them.
+  const scriptWalks = new Map();
+  const stageExtras = new Set();
 
   const ctx = () => laneCtx(G);
   const world = () => G.world;
@@ -296,6 +301,9 @@ export function createOverworldScene(G) {
     map = loadMap(def, tiles, { legend: DEFAULT_LEGEND });
     mapId = id;
     ents = createEntities(map);
+    scriptWalks.clear();
+    stageExtras.clear();
+    syncOwnedTools();
     const p = G.world.player;
     player = createPlayer({ x: p.x, y: p.y, facing: p.facing, tool: p.tool, lastTool: p.lastTool, artId: 'char-player' });
     ents.add(player.ent);
@@ -314,6 +322,7 @@ export function createOverworldScene(G) {
     refreshGates();
     rebuildEntities();
     placeNpcs(true);
+    placeTrainers();
     rollBugs(true);
     sense();
     syncCamTarget();
@@ -412,15 +421,43 @@ export function createOverworldScene(G) {
   }
 
   function tickNpcs(dt) {
+    if (G.scenes.top()?.name === 'cutscene' || G.world.cutscene) return;
     npcTimer += dt;
-    if (npcTimer >= NPC_REPLAN_MS) { npcTimer = 0; placeNpcs(false); }
+    if (npcTimer >= NPC_REPLAN_MS) { npcTimer = 0; placeNpcs(false); placeTrainers(); }
     for (const [id, rec] of npcs) {
+      if (scriptWalks.has(id) || G.scenes.top()?.name === 'cutscene' || G.world.cutscene) continue;
       const route = rec.placement && rec.placement.pathId ? schedule.routeFor(rec.placement, G.data) : null;
       const st = rec.driver.tick(dt, { map: { id: map.id, w: map.w, h: map.h, passable }, ents, tideState: baseTide, cache: pathCache, rng: rec.rng, route: route || undefined });
       const pose = rec.driver.pose;
       rec.ent.pose = pose === 'porch' || pose === 'sit' ? 'sit' : pose === 'fish' ? 'fish' : null;
       if (st === 'offmap') { ents.remove(rec.ent.id); npcs.delete(id); }
     }
+  }
+
+  /** Trainer rosters name authored map posts; story opponents keep their scripted entrances. */
+  function placeTrainers() {
+    const classes = ['route', 'leader', 'long-road', 'keeper', 'champion'];
+    const wanted = new Set();
+    let rows = [];
+    try { rows = G.data.list('trainers'); } catch { return; }
+    for (const t of rows) {
+      if (t.map !== mapId || !classes.includes(t.class)) continue;
+      if (t.available && !evalCond(G.world, t.available, { data: G.data, mapId })) continue;
+      const post = mapDef.markers?.[t.post] ?? mapDef.markers?.[`trainer-${t.id}`];
+      if (!post || !map.inBounds(post.x, post.y)) continue;
+      const scheduled = t.npc ? npcs.get(t.npc)?.ent : null;
+      if (scheduled) { scheduled.def = { ...scheduled.def, trainerId: t.id, name: t.name }; continue; }
+      const id = `trainer:${t.id}`;
+      wanted.add(id);
+      if (ents.find(id)) continue;
+      let at = { x: post.x, y: post.y };
+      if (!passable(at.x, at.y, null, 'npc') || ents.solidAt(at.x, at.y)) at = freeNear(at.x, at.y, 'npc');
+      if (!at) continue;
+      const artId = `char-${t.sprite || t.npc || 'trainerVest'}`;
+      ents.add(createEntity({ id, kind: 'npc', npcId: t.npc, ...at, facing: post.facing || 'down', artId,
+        def: { id, kind: 'npc', dynamic: true, trainerId: t.id, name: t.name } }));
+    }
+    for (const e of ents.list.slice()) if (e.id.startsWith('trainer:') && !wanted.has(e.id)) ents.remove(e.id);
   }
 
   // ---- bugs, the Glint, sparkles -----------------------------------------------------------------
@@ -519,6 +556,7 @@ export function createOverworldScene(G) {
     flashTool(id) { flashTool = { id, until: sceneMs + 900 }; },
     gait() { return player && player.isMoving() ? (player.ent.speedMs < 160 ? 'run' : 'walk') : 'still'; },
     overlays: { createBoardScene, createCeremonyScene, createFerryScene },
+    startBattle: (setup) => beginBattle(setup),
   };
 
   // ---- sitting -----------------------------------------------------------------------------------
@@ -601,15 +639,17 @@ export function createOverworldScene(G) {
       if (to.near) landNear(to.x, to.y);
       changing = false;
       G.bus.emit('map:enter', { mapId: to.mapId, from, kind: opts.kind || 'warp' });
+      enterTriggers();
       runPendingSoon();
     };
-    const ms = fadeMs(G);
+    const ms = opts.instant ? 0 : fadeMs(G);
     if (ms > 0 && G.scenes && typeof G.scenes.transition === 'function' && G.scenes.transition('fade', ms, swap)) return;
     swap();
   }
 
   function landNear(x, y) {
-    const spot = passable(x, y, null, 'walk') && !ents.solidAt(x, y) ? { x, y } : freeNear(x, y, 'walk');
+    const occupied = ents.near(x, y, 0).some((e) => e !== player.ent && e.solid);
+    const spot = passable(x, y, null, 'walk') && !occupied ? { x, y } : freeNear(x, y, 'walk');
     if (!spot) return;
     ents.teleport(player.ent, spot.x, spot.y);
     writePlayer();
@@ -626,7 +666,10 @@ export function createOverworldScene(G) {
   function beginBattle(setup) {
     busy++;
     const go = () => {
-      startBattle(G, setup).then((post) => { busy = Math.max(0, busy - 1); afterBattle(post); });
+      startBattle(G, setup).then((post) => { busy = Math.max(0, busy - 1); afterBattle(post); }, (e) => {
+        busy = Math.max(0, busy - 1);
+        toast(e?.message || 'Your companions need a rest before this reading.');
+      });
     };
     const ms = fadeMs(G);
     if (ms > 0 && G.scenes.transition('iris', ms, go)) return;
@@ -636,11 +679,7 @@ export function createOverworldScene(G) {
   function afterBattle(post) {
     if (!post) return;
     if (post.blackout) {
-      // you wake on your porch one game hour later, party healed (GDD-00 §6)
-      G.store.tx('blackout:wake', (w) => {
-        clockSys.setTime(w, G.clock, (minuteOfDay(w) + 60) % MINUTES_PER_DAY, { silent: true });
-        party.heal(w, { data: G.data, bus: G.bus });
-      });
+      // battleFlow already healed the party and advanced the blackout hour.
       toast('"You came home carried. I kept your place."'); // str
       if (mapId !== HOME.mapId || player.ent.x !== HOME.x || player.ent.y !== HOME.y) travel({ ...HOME }, { kind: 'blackout' });
     }
@@ -655,6 +694,8 @@ export function createOverworldScene(G) {
     const info = map.tileAt(x, y);
     G.store.tx('player:step', (ww) => { player.writeTo(ww.player); stats.inc(ww, 'steps', 1); });
     G.bus.emit('player:step', { x, y, facing: ev.dir, run: ev.run, mapId, sfx: info && info.sfx ? info.sfx : null, terrain: info && info.sfx === 'stepWater' ? 'wet' : (info && info.id) || null });
+    // Staged walks still make footsteps, but must not start encounters or take a door mid-scene.
+    if (G.scenes.top() !== scene) return;
     // bugs spook on approach
     for (const b of bugs) {
       if (b.fleeing) continue;
@@ -666,8 +707,7 @@ export function createOverworldScene(G) {
     // step triggers (story)
     for (const trg of map.triggersAt(x, y)) {
       if (trg.kind !== 'step' && trg.kind !== 'enter') continue;
-      if (trg.cond != null && !evalCond(w, trg.cond, { data: G.data, mapId, x, y })) continue;
-      if (trg.script && G.data.has('scripts', trg.script)) { G.store.tx('trigger:step', (ww) => eventScripts.queue(ww, trg.script)); runPendingSoon(); return; }
+      if (queueTrigger(trg, x, y)) { runPendingSoon(); return; }
     }
     // roamers touched
     const r = roamers.touchingAt(x, y);
@@ -686,6 +726,24 @@ export function createOverworldScene(G) {
     }
     const res = G.store.tx('encounter:step', (ww) => encounter.rollStep(ww, map, G.rngs.stream(encounter.streamLabel(mapId)), { x, y, data: G.data, tuning: TUNING, bus: G.bus, tideState: gateAt(x, y) }));
     if (res) beginBattle({ kind: 'wild', wild: { speciesId: res.speciesId, level: res.level, errant: res.errant, habitat: 'grass' }, source: 'route' });
+  }
+
+  function queueTrigger(trg, x, y) {
+    const w = G.world;
+    if (trg.once && w.maps[mapId]?.opened?.includes(trg.id)) return false;
+    if (trg.cond != null && !evalCond(w, trg.cond, { data: G.data, mapId, x, y })) return false;
+    if (!trg.script || !G.data.has('scripts', trg.script) || w.cutscene?.scriptId === trg.script) return false;
+    G.store.tx('trigger:queue', (ww) => {
+      eventScripts.queue(ww, trg.script);
+      if (trg.once) markTrigger(ww, mapId, trg.id);
+    });
+    return true;
+  }
+
+  function enterTriggers() {
+    for (const trg of map.triggersAt(player.ent.x, player.ent.y)) {
+      if (trg.kind === 'enter' && queueTrigger(trg, player.ent.x, player.ent.y)) break;
+    }
   }
 
   function onBump(ev) {
@@ -719,6 +777,15 @@ export function createOverworldScene(G) {
 
   function computeAction() {
     if (!player || player.isMoving() || changing) return null;
+    // Story staging often names the keeper's standing marker, rather than the board's tile.
+    // A use beat can therefore be read from that marker as well as from the facing tile.
+    for (const trg of map.triggersAt(player.ent.x, player.ent.y)) {
+      if (trg.kind !== 'use' || !trg.script || !G.data.has('scripts', trg.script)) continue;
+      if (trg.once && G.world.maps[mapId]?.opened?.includes(trg.id)) continue;
+      if (trg.cond != null && !evalCond(G.world, trg.cond, { data: G.data, mapId, x: player.ent.x, y: player.ent.y })) continue;
+      return { verb: 'use', label: 'Use', prompt: 'Use', icon: 'read', kind: 'trigger', targetKind: 'trigger', targetId: trg.id, target: trg, disabled: null,
+        payload: { x: player.ent.x, y: player.ent.y, script: trg.script } };
+    }
     const ft = player.facingTile();
     const b = bugAt(ft.x, ft.y);
     if (b) {
@@ -729,6 +796,10 @@ export function createOverworldScene(G) {
     const a = resolveFacing(player.ent, map, ents, G.world, G.data, { tideState: map.inBounds(ft.x, ft.y) ? gateAt(ft.x, ft.y) : baseTide });
     if (a) {
       const snap = snapshotAction(a);
+      if (snap.target?.def?.trainerId) {
+        snap.verb = 'challenge'; snap.label = 'Challenge'; snap.icon = 'strike';
+        snap.payload.trainerId = snap.target.def.trainerId;
+      }
       if (snap.verb === 'board' && snap.target && snap.target.def && snap.target.def.verb) {
         const v = snap.target.def.verb;
         snap.verb = v; snap.label = hasString(`verb.${v}`) ? t(`verb.${v}`) : v[0].toUpperCase() + v.slice(1);
@@ -802,7 +873,7 @@ export function createOverworldScene(G) {
 
   // ---- arrival -----------------------------------------------------------------------------------------
   function arrive() {
-    const hasArrival = G.data.has('scripts', ARRIVAL_SCRIPT);
+    const arrival = arrivalScriptOf(G.data);
     let start = { x: ARRIVAL.x, y: ARRIVAL.y, facing: ARRIVAL.facing };
     try {
       const m = G.data.get('maps', ARRIVAL.mapId).markers && G.data.get('maps', ARRIVAL.mapId).markers[ARRIVAL.marker];
@@ -810,10 +881,10 @@ export function createOverworldScene(G) {
     } catch { /* default */ }
     G.store.tx('arrival:place', (w) => {
       w.player.mapId = ARRIVAL.mapId; w.player.x = start.x; w.player.y = start.y; w.player.facing = start.facing;
-      if (hasArrival) eventScripts.queue(w, ARRIVAL_SCRIPT);
+      if (arrival) eventScripts.queue(w, arrival);
       else giveStarterKit(w);
     });
-    if (!hasArrival) { autoWalk = ARRIVAL.walk; autoDir = start.facing; }
+    if (!arrival) { autoWalk = ARRIVAL.walk; autoDir = start.facing; }
   }
 
   function giveStarterKit(w) {
@@ -825,11 +896,80 @@ export function createOverworldScene(G) {
     if (!w.player.tool) { w.player.tool = ring[0] || null; w.player.lastTool = ring[1] || null; }
   }
 
+  /** Story and shop grants enter the satchel first; owned tools are always ready on the ring. */
+  function syncOwnedTools() {
+    const owned = RING_ORDER.filter((id) => G.data.has('items', id) && bag.has(G.world, id, 1, undefined, ctx()));
+    const p = G.world.player;
+    const same = owned.length === p.toolRing.length && owned.every((id, i) => id === p.toolRing[i]);
+    if (!same || (!p.tool && owned.length)) {
+      G.store.tx('tools:ring', (w) => {
+        w.player.toolRing = owned;
+        if (!w.player.tool || !owned.includes(w.player.tool)) { w.player.tool = owned[0] ?? null; w.player.lastTool = owned[1] ?? null; }
+      });
+    }
+    toolsDirty = false;
+  }
+
   function runPendingSoon() {
     after(1, () => {
       if (G.scenes.top() !== scene || changing) return;
       try { eventScripts.runPending(G); } catch (e) { console.error('overworld: pending script failed', e); }
     });
+  }
+
+  /** The cutscene host's concrete stage: every story walk, spawn, pan and warp acts on the field. */
+  const stage = {
+    entity: (who) => ents?.find(who) ?? null,
+    get camera() { return camera; },
+    walk(who, dirs, opts = {}) {
+      const e = ents?.find(who);
+      if (!e) return false;
+      scriptWalks.set(who, { dirs: dirs.slice(), run: Boolean(opts.run) });
+      return true;
+    },
+    isMoving: (who) => Boolean(scriptWalks.has(who) || ents?.find(who)?.moving),
+    face(who, dir) {
+      const e = ents?.find(who);
+      if (e && Object.hasOwn(DIR_INDEX, dir)) { e.facing = dir; if (e === player.ent) writePlayer(); }
+    },
+    teleport(who, x, y, toMap = null) {
+      scriptWalks.delete(who);
+      if (who === 'player' && toMap && toMap !== mapId) {
+        changeMap({ mapId: toMap, x, y, facing: G.world.player.facing }, { kind: 'script', instant: true });
+        return;
+      }
+      let e = ents?.find(who);
+      if (!map.inBounds(x, y)) return;
+      if (!e && G.data.has('npcs', who)) {
+        stage.spawn(who, `char-${who}`, x, y);
+        e = ents.find(who);
+      }
+      if (!e) return;
+      ents.teleport(e, x, y);
+      if (e === player.ent) { player.intend(null); writePlayer(); syncCamTarget(); camera.follow(camTarget, { snap: true }); }
+    },
+    spawn(who, artId, x, y) {
+      if (!map?.inBounds(x, y)) return;
+      if (ents.find(who)) { stage.teleport(who, x, y); ents.find(who).artId = artId; return; }
+      ents.add(createEntity({ id: who, kind: 'npc', npcId: G.data.has('npcs', who) ? who : null, x, y, artId, def: { id: who, kind: 'npc', dynamic: true } }));
+      stageExtras.add(who);
+    },
+    despawn(who) { if (who !== 'player') { scriptWalks.delete(who); npcs.delete(who); ents?.remove(who); } },
+    warp: (toMap, x, y, facing = 'down') => changeMap({ mapId: toMap, x, y, facing }, { kind: 'script', instant: true }),
+  };
+
+  function advanceScriptWalks() {
+    for (const [who, walk] of scriptWalks) {
+      const e = ents.find(who);
+      if (!e) { scriptWalks.delete(who); continue; }
+      if (e.moving) continue;
+      if (!walk.dirs.length) { scriptWalks.delete(who); continue; }
+      const dir = walk.dirs.shift();
+      if (!ents.tryMove(e, dir, { passable, tideState: baseTide, run: walk.run })) {
+        // A blocked staged path ends here; the script's next line can still progress.
+        scriptWalks.delete(who);
+      }
+    }
   }
 
   // ---- camera --------------------------------------------------------------------------------------------
@@ -867,6 +1007,11 @@ export function createOverworldScene(G) {
     on('day:start', () => { entitiesDirty = true; flagsVersion++; });
     on('world:replaced', () => { loadedWorld = null; });
     on('gather:shake', () => { entitiesDirty = true; });
+    on('bag:changed', () => { toolsDirty = true; });
+    if (typeof globalThis.addEventListener === 'function') {
+      globalThis.addEventListener('keydown', vListener);
+      offs.push(() => globalThis.removeEventListener('keydown', vListener));
+    }
   }
 
   // ---- update -----------------------------------------------------------------------------------------------
@@ -880,6 +1025,7 @@ export function createOverworldScene(G) {
     if (!map || mapId !== w.player.mapId || loadedWorld !== w) {
       loadCurrent(w.player.mapId);
       G.bus.emit('map:enter', { mapId, kind: enteredOnce ? 'load' : 'enter' });
+      enterTriggers();
       enteredOnce = true;
       return true;
     }
@@ -930,9 +1076,16 @@ export function createOverworldScene(G) {
     resume(result) {
       if (G.input && typeof G.input.flush === 'function') G.input.flush();
       ensureMap();
+      if (!G.world.cutscene) {
+        for (const id of stageExtras) if (!npcs.has(id)) ents.remove(id);
+        stageExtras.clear(); scriptWalks.clear();
+      }
       rebuildEntities();
       sense();
+      syncOwnedTools();
+      player.readFrom(G.world.player, ents);
       if (toolRing) toolRing.setTools(ringTools());
+      camera.follow(camTarget);
       void result;
       runPendingSoon();
     },
@@ -945,19 +1098,22 @@ export function createOverworldScene(G) {
       }
       if (ensureMap()) return;
       if (G.scenes.top() === scene && !changing) tickClock(dt);
+      if (G.scenes.top() === scene && busy === 0 && !changing && eventScripts.peekPending(G.world)) {
+        if (eventScripts.runPending(G)) return;
+      }
       refreshGates();
+      if (toolsDirty && !player.isMoving()) { syncOwnedTools(); player.readFrom(G.world.player, ents); if (toolRing) toolRing.setTools(ringTools()); }
       if (entitiesDirty) { rebuildEntities(); sense(); }
       senseTimer += dt;
       if (senseTimer >= 500) { senseTimer = 0; sense(); rollBugs(false); }
       // player
       const locked = busy > 0 || changing || G.scenes.top() !== scene || (toolRing && toolRing.open);
       player.setLocked(locked && autoWalk <= 0);
+      advanceScriptWalks();
       if (autoWalk > 0 && !player.isMoving() && !changing) {
         const ok = ents.tryMove(player.ent, autoDir, { passable, tideState: baseTide, speedMs: 220 });
         if (ok) autoWalk--; else autoWalk = 0;
       }
-      const evs = autoWalk > 0 || player.ent.moving && !player.isLocked() ? null : null;
-      void evs;
       const events = player.update(dt, { ents, map, passable, tideState: baseTide });
       for (const ev of events) {
         if (ev.type === 'step') onStep(ev);
@@ -969,8 +1125,9 @@ export function createOverworldScene(G) {
       }
       if (!player.ent.moving && (G.world.player.x !== player.ent.x || G.world.player.y !== player.ent.y) && !changing) writePlayer();
       // other entities
-      const arrived = ents.tickAll(dt);
-      void arrived;
+      // The player controller already advanced its entity and produced the landing event.
+      // Advancing it here too can land between controller ticks, losing warps and encounters.
+      for (const e of ents.list) if (e !== player.ent && e.moving) ents.tickMovement(e, dt);
       tickNpcs(dt);
       tickRoamers(dt);
       tickBugs(dt);
@@ -1066,17 +1223,18 @@ export function createOverworldScene(G) {
       }
     },
     debugText: () => {
-      const a = action ? `${action.label}${action.disabled ? ` (${action.disabled})` : ''}` : '-';
+      const offered = relaxTool(action);
+      const a = offered ? `${offered.label}${offered.disabled ? ` (${offered.disabled})` : ''}` : '-';
       return `${mapId} ${player ? `${player.ent.x},${player.ent.y} ${player.ent.facing}` : ''} ${clockText(minuteOfDay(G.world))} tide ${baseTide} verb ${a}${captionText && sceneMs < captionUntil ? `\n${captionText}` : ''}`;
     },
     isBusy: () => busy > 0 || changing || autoWalk > 0 || Boolean(player && player.isMoving()),
+    stage,
     /** Test / debug view of the field. */
     field: () => ({ mapId, map, mapDef, ents, player, npcs, bugs, glint, sparkles, gates: { ...gates }, baseTide, action, sitting, readView, busy, host, gateAt, passable, camera }),
   };
 
   // ---- V latch (no input action exists for the Read view yet; GDD-09 §4.2 request) ---------------------
   const vListener = (ev) => { if (ev && ev.code === 'KeyV' && !ev.repeat) vLatch = true; };
-  if (typeof globalThis.addEventListener === 'function') globalThis.addEventListener('keydown', vListener);
   function takeV() { const v = vLatch; vLatch = false; return v; }
 
   // ---- roamers --------------------------------------------------------------------------------------------

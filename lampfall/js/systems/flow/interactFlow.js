@@ -34,6 +34,8 @@ import { isPorchLit, porchesOf } from '../townCommon.js';
 import * as dayFlow from './dayFlow.js';
 import { minuteOfDay, badgeCount, formatTime } from '../../state/selectors.js';
 import { formatMinute } from '../../core/time.js';
+import { hasAliveParty } from '../../state/selectors.js';
+import { markTrigger } from '../../world/warps.js';
 
 /** @typedef {import('../../world/interact.js').ContextAction} ContextAction */
 
@@ -203,6 +205,30 @@ function talk(G, action, host) {
   const pose = host && host.npcPose ? host.npcPose(npcId) : null;
   G.push('dialogue', { target: { kind: 'npc', id: npcId, pose: pose || undefined, mapId: host && host.mapId ? host.mapId : G.world.player.mapId } });
   return done('talk', { scene: 'dialogue', npcId });
+}
+
+async function challenge(G, action, host) {
+  const id = action.payload?.trainerId ?? def(action).trainerId;
+  const trainer = G.data.tryGet('trainers', id);
+  if (!trainer) return fail('challenge', 'unknown-trainer');
+  if (host.faceToward) host.faceToward(action.targetId);
+  if (G.world.flags[`sys.trainer.${id}`]) {
+    say(G, trainer.lines.win, trainer.npc ?? trainer.name);
+    return done('challenge', { scene: 'dialogue', defeated: true });
+  }
+  if (!hasAliveParty(G.world)) {
+    toast(G, host, 'Bring a rested companion. The Waystones heal your party.');
+    return fail('challenge', 'no-party');
+  }
+  const levels = trainer.party.map((c) => c.level);
+  const pick = await ask(G, host, { title: trainer.name, body: `${trainer.title}. ${trainer.party.length} creatures, up to Lv${Math.max(...levels)}. ${trainer.tacticTag}.`,
+    options: ['Come back later', 'Challenge'], defaultIndex: 0 });
+  if (pick !== 1) return fail('challenge', 'declined');
+  const setup = { kind: 'trainer', trainerId: id, source: trainer.expSource ?? (trainer.spire ? 'spire' : 'route') };
+  if (host.startBattle) {
+    G.push('dialogue', { who: trainer.npc ?? trainer.name, text: trainer.lines.intro, onDone: () => host.startBattle(setup) });
+  } else G.push('battle', { setup });
+  return done('challenge', { scene: 'battle', trainerId: id });
 }
 
 function read(G, action, host) {
@@ -606,6 +632,7 @@ function disabled(G, action, host) {
 /** verb -> handler. Map authors use these names; unknown verbs fall back to a look line. */
 export const VERB_HANDLERS = Object.freeze({
   talk,
+  challenge,
   read,
   look,
   inspect: look,
@@ -638,6 +665,9 @@ export const VERB_HANDLERS = Object.freeze({
   cellar: sceneVerb,
   tallyWall: sceneVerb,
   dossier,
+  memory: (G) => { G.push('archive', { mode: 'memory' }); return done('memory', { scene: 'archive' }); },
+  relearn: (G) => { G.push('archive', { mode: 'memory' }); return done('relearn', { scene: 'archive' }); },
+  recall: (G) => { G.push('archive', { mode: 'recall' }); return done('recall', { scene: 'archive' }); },
 });
 
 /**
@@ -649,6 +679,11 @@ export const VERB_HANDLERS = Object.freeze({
  */
 export function doInteraction(G, action, host) {
   if (!action || typeof action.verb !== 'string') return fail('none', 'no-action');
+  if (action.payload?.script && G.data.has('scripts', action.payload.script)) {
+    if (action.target?.once) G.store.tx('trigger:use', (w) => markTrigger(w, host?.mapId ?? w.player.mapId, action.targetId));
+    G.push('cutscene', { scriptId: action.payload.script });
+    return done(action.verb, { scene: 'cutscene', script: action.payload.script });
+  }
   if (action.disabled && action.verb !== 'dig' && action.verb !== 'fish') return disabled(G, action, host);
   const fn = VERB_HANDLERS[action.verb];
   if (fn) return fn(G, action, host || {});

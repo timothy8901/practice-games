@@ -1,0 +1,13 @@
+{
+  "name": "lampfall",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "check": "bash tools/check.sh",
+    "start": "python3 serve.py 8000"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

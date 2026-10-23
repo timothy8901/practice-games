@@ -194,7 +194,7 @@ export function labelsOf(ops) {
  * @returns {string|null}
  */
 function checkField(name, spec, v) {
-  if (v === undefined || v === null) return spec.req ? `missing required field '${name}'` : null;
+  if (v === undefined || (v === null && spec.t !== 'any')) return spec.req ? `missing required field '${name}'` : null;
   switch (spec.t) {
     case 'string': if (typeof v !== 'string') return `field '${name}' must be a string`; break;
     case 'number': if (typeof v !== 'number' || !Number.isFinite(v)) return `field '${name}' must be a finite number`; break;

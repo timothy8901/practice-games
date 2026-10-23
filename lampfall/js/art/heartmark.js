@@ -117,7 +117,8 @@ export function heartmarkPixels(scale, glint = false) {
 export function markAnchor(art, mark, opts = {}) {
   const w = opts.w ?? 32;
   const h = opts.h ?? 32;
-  const base = (opts.back ? art?.heartmarkBack : null) ?? art?.heartmark ?? { x: Math.floor(w / 2), y: Math.floor(h / 3) };
+  const anchored = ANCHOR_KEYS.includes(mark?.anchor) ? anchorPoint(art, mark.anchor, opts) : null;
+  const base = anchored ?? (opts.back ? art?.heartmarkBack : null) ?? art?.heartmark ?? { x: Math.floor(w / 2), y: Math.floor(h / 3) };
   const dx = mark && Number.isFinite(mark.x) ? mark.x : 0;
   const dy = mark && Number.isFinite(mark.y) ? mark.y : 0;
   return { x: Math.max(1, Math.min(w - 2, base.x + dx)), y: Math.max(1, Math.min(h - 2, base.y + dy)) };

@@ -15,7 +15,7 @@ describe('the contract', () => {
     for (const t of EVENT_TYPES) assert.ok(isEventType(t) && typeof EVENT_FIELDS[t] === 'object', t);
     assert.equal(isEventType('explode'), false);
     assert.equal(isEventType('toString'), false, 'no prototype leaks');
-    assert.deepEqual(OUTCOMES, ['win', 'loss', 'capture', 'run', 'holdout', 'draw']);
+    assert.deepEqual(OUTCOMES, ['win', 'loss', 'capture', 'run', 'holdout', 'reading', 'draw']);
     assert.ok(BLOCK_REASONS.includes('ward') && BLOCK_REASONS.includes('sodden'));
   });
 

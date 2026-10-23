@@ -107,7 +107,7 @@ export function playSetPiece(G, id, o = {}) {
 export function installEndingTrigger(G) {
   if (!G || !G.bus || typeof G.bus.on !== 'function') return () => {};
   if (G.__endingTrigger) return G.__endingTrigger;
-  let pending = false;
+  let pending = Boolean(G.world?.flags?.['lit.calls'] && !G.world?.flags?.['sp.credits-seen']);
   const seen = () => G.world?.flags?.['sp.credits-seen'] === true;
   const tryStart = () => {
     if (!pending || seen()) return;
@@ -115,12 +115,13 @@ export function installEndingTrigger(G) {
     if (!top || top.name !== 'overworld' || G.scenes.isTransitioning) return;
     if (G.scenes.find?.('ending') || G.scenes.find?.('credits')) return;
     pending = false;
-    G.scenes.transition('fade', flowFade(G, 600), () => G.push('ending', {}), { color: PALETTE.nightInk });
+    const start = () => G.push('ending', {});
+    if (!G.scenes.transition('fade', flowFade(G, 600), start, { color: PALETTE.nightInk })) start();
   };
   const offs = [
     G.bus.on('flag:set', (p) => { if (p && p.id === 'lit.calls' && p.value && !p.prev) { pending = true; Promise.resolve().then(tryStart); } }),
     G.bus.on('scene:change', () => { Promise.resolve().then(tryStart); }),
-    G.bus.on('world:replaced', () => { pending = false; }),
+    G.bus.on('world:replaced', () => { pending = Boolean(G.world?.flags?.['lit.calls'] && !seen()); Promise.resolve().then(tryStart); }),
   ];
   G.__endingTrigger = () => { for (const off of offs) { try { if (typeof off === 'function') off(); } catch { /* already gone */ } } G.__endingTrigger = null; };
   return G.__endingTrigger;
@@ -367,7 +368,8 @@ export function createEndingScene(G) {
       if (G.scenes.top() === scene) G.scenes.pop({ piece: single });
       return;
     }
-    G.scenes.transition('fade', flowFade(G, 800), () => G.replaceWith('credits', { fromEnding: true }), { color: PALETTE.nightInk });
+    const showCredits = () => G.replaceWith('credits', { fromEnding: true });
+    if (!G.scenes.transition('fade', flowFade(G, 800), showCredits, { color: PALETTE.nightInk })) showCredits();
   }
 
   function playHorn() {

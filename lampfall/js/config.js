@@ -8,7 +8,7 @@
  */
 
 /** Display title. [GDD] placeholder until the design panel names the game. */
-export const TITLE = 'GAME';
+export const TITLE = 'Lampfall';
 
 /** Semantic build version shown on the title screen and stamped into save summaries. */
 export const VERSION = '0.1.0-dev';
@@ -41,7 +41,7 @@ export const SLOW_FRAMES_TO_LOW_POWER = 90;
 export const LOW_POWER_FX_BUDGET = 0.5;
 
 /** localStorage key prefix for saves and the crash marker. [GDD] becomes `'<title>.'`. */
-export const SAVE_PREFIX = 'game.';
+export const SAVE_PREFIX = 'lampfall.';
 
 /** Default transition length in milliseconds (`?noanim=1` shortens every transition to 0). */
 export const TRANSITION_MS = 400;
@@ -54,7 +54,7 @@ export const TRANSITION_MS = 400;
  * @type {Readonly<{leaseCard: boolean, crashRecovery: boolean, debugOverlay: boolean}>}
  */
 export const FEATURES = Object.freeze({
-  leaseCard: false,
+  leaseCard: true,
   crashRecovery: true,
   debugOverlay: true,
 });

@@ -147,6 +147,17 @@ export const WORLDGEN_LABEL = 'worldgen';
  * @property {boolean} fps30
  * @property {Record<string, 'auto-anchor'|'auto-up'|null>} autoAnchor   per creature uid
  * @property {boolean} skipAnims
+ * @property {1|2|4} battleSpeed
+ * @property {'standard'|'gentle'|'patient'} fishingMode
+ * @property {boolean} largeText
+ * @property {boolean} highContrast
+ * @property {boolean} clearVisuals
+ * @property {'hold'|'toggle'} pathView
+ * @property {number} ambience
+ * @property {'two'|'one'} touchLayout
+ * @property {'porch'|'waystone'} wakePoint
+ * @property {boolean} autoAdvance
+ * @property {boolean} captions
  */
 
 /**
@@ -427,7 +438,8 @@ export const WORLDGEN_LABEL = 'worldgen';
  * @property {number} bond              0..5
  * @property {string|null} heartmark    pinned Heartmark technique id
  * @property {boolean} heartmarkStab
- * @property {{x: number, y: number}} mark   per-individual Heartmark pixel placement (front)
+ * @property {{x: number, y: number, anchor?: string}} mark   lifetime body anchor (legacy saves keep pixel offsets)
+ * @property {boolean} starTouched      palette variant of the current form
  * @property {string[]} shiftlog        every form held, in order
  * @property {number} shiftCount        draws consumed from the Shift stream (rerolls included)
  * @property {number[]} windowsUsed     curve points already resolved
@@ -519,6 +531,7 @@ export function creatureDefaults() {
     heartmark: null,
     heartmarkStab: false,
     mark: { x: 0, y: 0 },
+    starTouched: false,
     shiftlog: [],
     shiftCount: 0,
     windowsUsed: [],
@@ -592,6 +605,9 @@ export function settingsDefaults() {
     fps30: false,
     autoAnchor: {},
     skipAnims: false,
+    battleSpeed: 2, fishingMode: 'standard', largeText: false, highContrast: false,
+    clearVisuals: false, pathView: 'hold', ambience: 0.7, touchLayout: 'two',
+    wakePoint: 'porch', autoAdvance: false, captions: true,
   };
 }
 
@@ -844,7 +860,10 @@ const CREATURE_SPEC = {
   bond: [(v) => isInt(v) && v >= 0 && v <= 5, 'integer 0..5'],
   heartmark: [isNullOr(isStr), 'string|null'],
   heartmarkStab: [isBool, 'boolean'],
-  mark: { x: [isInt, 'integer'], y: [isInt, 'integer'] },
+  mark: [(v) => isPlainObject(v) && isInt(v.x) && isInt(v.y)
+    && (v.anchor === undefined || ['head', 'chest', 'back', 'tail'].includes(v.anchor))
+    && Object.keys(v).every((k) => ['x', 'y', 'anchor'].includes(k)), '{x, y, anchor?: head|chest|back|tail}'],
+  starTouched: [isBool, 'boolean'],
   shiftlog: [strArray, 'string[]'],
   shiftCount: [nonNegInt, 'non-negative integer'],
   windowsUsed: [intArray, 'integer[]'],
@@ -887,6 +906,12 @@ const WORLD_SPEC = {
     fps30: [isBool, 'boolean'],
     autoAnchor: { $record: [isNullOr(oneOf(AUTO_ANCHOR_MODES)), `${AUTO_ANCHOR_MODES.join('|')}|null`] },
     skipAnims: [isBool, 'boolean'],
+    battleSpeed: [oneOf([1, 2, 4]), '1|2|4'],
+    fishingMode: [oneOf(['standard', 'gentle', 'patient']), 'fishing mode'],
+    largeText: [isBool, 'boolean'], highContrast: [isBool, 'boolean'],
+    clearVisuals: [isBool, 'boolean'], autoAdvance: [isBool, 'boolean'], captions: [isBool, 'boolean'],
+    pathView: [oneOf(['hold', 'toggle']), 'hold|toggle'], ambience: [unit, '0..1'],
+    touchLayout: [oneOf(['two', 'one']), 'two|one'], wakePoint: [oneOf(['porch', 'waystone']), 'porch|waystone'],
   },
   clock: {
     version: [(v) => v === CLOCK_STATE_VERSION, `= ${CLOCK_STATE_VERSION}`],

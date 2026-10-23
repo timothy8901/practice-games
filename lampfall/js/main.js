@@ -25,12 +25,18 @@ import { MIGRATIONS } from './state/migrate.js';
 import { createRngs } from './state/rngs.js';
 import { DATA_CONTENT, CONTENT_STATUS } from './data/content.js';
 import { createRegistry } from './data/registry.js';
+import * as eventScripts from './systems/flow/eventScripts.js';
+import * as dayFlow from './systems/flow/dayFlow.js';
+import { installStoryHooks } from './systems/flow/storyHooks.js';
+import * as settingsSys from './systems/settings.js';
 import * as clockSys from './systems/clockSys.js';
 import { createMusicDirector } from './audio/director.js';
 import { createToasts } from './ui/toast.js';
+import { installFieldDebug } from './scenes/overworld.js';
 import { sceneFactories } from './scenes/index.js';
 import { createDebugOverlay } from './scenes/debugOverlay.js';
-import { signalOfWorld } from './scenes/flowKit.js';
+import { registerPlayerArt } from './art/chars/index.js';
+import { signalOfWorld, cardFromWorld } from './scenes/flowKit.js';
 
 /**
  * The one context object, created once here and handed to every scene factory. Never imported.
@@ -123,8 +129,10 @@ export function boot(env = {}) {
   const input = createInput({ canvas: display.canvas, display, touchParent: touchHost, touch: flags.touch });
 
   // 3. persistence (reads the crash marker; writes nothing until markBoot)
+  const deviceStorage = safeLocalStorage(win);
+  const deviceSettings = settingsSys.readMirror(deviceStorage);
   const persist = createPersist({
-    storage: safeLocalStorage(win),
+    storage: deviceStorage,
     prefix: config.SAVE_PREFIX,
     version: SCHEMA_VERSION,
     migrations: MIGRATIONS,
@@ -147,7 +155,7 @@ export function boot(env = {}) {
   // 5. store, rngs, clock
   setSeedToggles(DATA_CONTENT.toggleOrder);
   const seedCode = flags.seed ?? randomSeedCode(DEFAULT_DIAL.toUpperCase(), entropy) // [GDD] default dial;
-  const store = createStore(createNewWorld({ seedCode }), { strict: flags.strict });
+  const store = createStore(createNewWorld({ seedCode, settings: deviceSettings }), { strict: flags.strict });
   const rngs = createRngs(store);
   const clock = createClock(clockSys.optionsFrom(store.world));
   clockSys.restoreFrom(store.world, clock);
@@ -206,6 +214,23 @@ export function boot(env = {}) {
     if (typeof factory !== 'function') throw new Error(`main: no scene named '${name}' (have: ${Object.keys(sceneFactories).join(', ')})`);
     return factory(G);
   }
+  function applyDeviceSettings() {
+    const s = G.world.settings;
+    display.setMode?.(flags.scale ?? s.scale);
+    if (s.bindings) input.loadBindings?.({ version: 1, bindings: s.bindings });
+    else input.resetBindings?.();
+    settingsSys.writeMirror(deviceStorage, s);
+  }
+  const applyPlayerLook = () => registerPlayerArt(cardFromWorld(G.world));
+  G.bus.on('world:replaced', applyPlayerLook);
+  G.bus.on('tx', ({ label }) => { if (label === 'lease:mirror') applyPlayerLook(); });
+  applyPlayerLook();
+  G.bus.on('world:replaced', applyDeviceSettings);
+  G.bus.on('settings:changed', applyDeviceSettings);
+  applyDeviceSettings();
+  installStoryHooks(G);
+  eventScripts.install(G);
+  dayFlow.install(G);
   G.music = createMusicDirector(G, { signalOf: signalOfWorld });
   G.bus.on('toast', (payload) => {
     if (typeof payload === 'string') G.toasts.show(payload);
@@ -219,8 +244,11 @@ export function boot(env = {}) {
   persist.attach(G); // AUTOSAVE_TRIGGERS are bus events, never calls in scenes
 
   if (debug) {
-    if (config.FEATURES.debugOverlay) G.debugOverlay = createDebugOverlay(G);
+    if (config.FEATURES.debugOverlay && flags.debug) G.debugOverlay = createDebugOverlay(G);
     G.debugHook = installDebugHook(G, { target: win });
+    eventScripts.bindDebug(G);
+    dayFlow.bindDebug(G);
+    installFieldDebug(G);
     const ctx = display.ctx;
     const rawDrawImage = ctx.drawImage.bind(ctx);
     ctx.drawImage = (...args) => { perf.drawImages++; return rawDrawImage(...args); };
@@ -336,6 +364,28 @@ export function boot(env = {}) {
     perf.particles = G.fx.particleCount;
     watchBudget(dt);
   }
+
+  // Stable browser-testing surface, also useful to accessibility and playtest tools.
+  win.render_game_to_text = () => JSON.stringify({
+    coordinateSystem: 'tile coordinates; origin top left; x right, y down',
+    mode: G.scenes.top()?.name ?? 'boot',
+    stack: G.scenes.stack.map(s => s.name),
+    player: { mapId: G.world.player.mapId, x: G.world.player.x, y: G.world.player.y, facing: G.world.player.facing },
+    clock: { totalMinutes: G.world.clock.total },
+    wallet: G.world.wallet,
+    party: G.world.party.map(c => ({ uid: c.uid, species: c.speciesId, nickname: c.nickname, level: c.level, hp: c.hp, maxHp: c.stats?.hp })),
+    screen: G.scenes.stack.slice().reverse().map(s => s.debugText?.() ?? '').filter(Boolean).slice(0, 2),
+  });
+  win.advanceTime = (ms) => {
+    const steps = Math.max(1, Math.round(ms / TICK));
+    for (let i = 0; i < steps; i++) step(TICK);
+    draw(); display.present();
+  };
+  win.addEventListener('keydown', (event) => {
+    if (event.code !== 'KeyF' || event.repeat || event.ctrlKey || event.metaKey || event.altKey) return;
+    if (doc.fullscreenElement) doc.exitFullscreen?.().catch?.(() => {});
+    else stage.requestFullscreen?.().catch?.(() => {});
+  });
 
   // 12. go
   scenes.push(sceneFactories.boot(G));

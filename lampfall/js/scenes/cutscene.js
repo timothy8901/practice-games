@@ -409,6 +409,7 @@ export function createCutsceneScene(G) {
     resume(result) {
       if (state === 'sleep') return; // dayFlow's promise continues the script
       if (state !== 'child') return;
+      const pendingChild = childOp;
       const op = childOp ? childOp.op : '';
       childOp = null;
       state = 'run';
@@ -421,7 +422,20 @@ export function createCutsceneScene(G) {
         step();
         return;
       }
-      if (op === 'startBattle') { step(result?.result ?? result ?? null); return; }
+      if (op === 'startBattle') {
+        const post = result?.result ?? result ?? null;
+        // A scripted battle returns to this host rather than the overworld. Run its outcome
+        // script before advancing the waiting parent (the dock hold-out opens the first errands).
+        if (post?.script) {
+          state = 'child';
+          childOp = { op: 'battleAfter', result: post };
+          G.push('cutscene', { scriptId: post.script, skippable: false });
+          return;
+        }
+        step(post);
+        return;
+      }
+      if (op === 'battleAfter') { step(pendingChild?.result ?? null); return; }
       if (op === 'forecast') { step(result?.formId ?? (typeof result === 'string' ? result : null)); return; }
       step();
     },

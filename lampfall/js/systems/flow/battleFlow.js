@@ -130,8 +130,9 @@ export function dialRulesFor(dial, data, opts = {}) {
 export const GRADE_ITEMS = Object.freeze({ 1: 'tallow-wick', 2: 'brass-wick', 3: 'skyglass-wick', sure: 'isoldes-lantern' });
 /** Medicine the engine can apply in battle (heals the active creature). */
 const HEAL_ITEMS = Object.freeze(['salve', 'tonic', 'full-salve']);
-/** Medicine that needs a party screen (revive, PP, cures): shown in the battle Bag with a reason. */
-const FIELD_ONLY_MEDICINE = Object.freeze(['revive', 'ether', 'full-ether', 'poultice', 'warm-shawl']);
+const BATTLE_MEDICINE = Object.freeze([...HEAL_ITEMS, 'ether', 'full-ether', 'poultice', 'warm-shawl']);
+/** Revives target a fainted party member through the field Satchel. */
+const FIELD_ONLY_MEDICINE = Object.freeze(['revive']);
 /** Trainer classes whose losses never cost buttons (data/trainers mirrors this as `blackout: false`). */
 const NO_BLACKOUT_CLASSES = Object.freeze(['keeper', 'champion', 'porch', 'mentor', 'friend', 'faction']);
 
@@ -142,7 +143,9 @@ const NO_BLACKOUT_CLASSES = Object.freeze(['keeper', 'champion', 'porch', 'mento
 function row(data, table, id) {
   if (!data || typeof id !== 'string') return null;
   try {
-    if (typeof data.tryGet === 'function') return data.tryGet(table, id);
+    if (typeof data.tryGet === 'function') {
+      try { const found = data.tryGet(table, id); if (found) return found; } catch { /* extra table below */ }
+    }
     const t = data[table];
     if (Array.isArray(t)) return t.find((r) => r && r.id === id) ?? null;
     if (t && typeof t === 'object') return t[id] ?? null;
@@ -234,6 +237,7 @@ function medianLevel(world, scale) {
  * @returns {BattleSession}
  */
 export function buildBattle(G, setup, data) {
+  if (setup?.wild && !setup.wild.speciesId && setup.wild.species) setup = { ...setup, wild: { ...setup.wild, speciesId: setup.wild.species } };
   if (!setup || (setup.kind !== 'wild' && setup.kind !== 'trainer')) throw new TypeError(`battleFlow: setup.kind must be 'wild' or 'trainer', got ${String(setup && setup.kind)}`);
   const tuning = tuningFor(data);
   const world = G.world;
@@ -252,7 +256,8 @@ export function buildBattle(G, setup, data) {
     });
   }
 
-  const story = setup.source === 'story' || !!(trainer && trainer.story);
+  const reading = setup.source === 'reading';
+  const story = reading || setup.source === 'story' || !!(trainer && trainer.story);
   const source = setup.source ?? (trainer ? (trainer.expSource ?? 'route') : 'route');
   const summit = !!setup.summit || !!(trainer && (trainer.class === 'keeper' || trainer.class === 'champion'));
   const blackoutAllowed = !summit && !story && setup.onLose !== 'script' && !(trainer && (trainer.blackout === false || NO_BLACKOUT_CLASSES.includes(trainer.class)));
@@ -270,10 +275,11 @@ export function buildBattle(G, setup, data) {
   const playerName = (world.player && (world.player.name || world.player.lease?.name)) || 'You';
   /** @type {Array<{id: string, name: string, heal: number}>} */
   const medicine = [];
-  for (const id of HEAL_ITEMS) {
+  for (const id of BATTLE_MEDICINE) {
     const n = held(world, id, data);
     const it = row(data, 'items', id);
-    for (let i = 0; i < n; i++) medicine.push({ id, name: it ? it.name : id, heal: 0.25 });
+    for (let i = 0; i < n; i++) medicine.push({ id, name: it ? it.name : id,
+      ...(it?.use === 'cure' ? { cures: it.cures } : it?.use === 'pp' ? { pp: it.amount ?? Infinity } : { heal: 0.25, mends: true }) });
   }
 
   // --- foe side ------------------------------------------------------------------------------
@@ -283,10 +289,10 @@ export function buildBattle(G, setup, data) {
   if (trainer) {
     const rng = G.rngs.fresh(`trainerTeams:${trainer.id}`);
     foes = trainer.party.map((e, i) => {
-      const level = trainer.scale ? medianLevel(world, trainer.scale) : e.level;
-      const c = creature.makeCreature({ uid: `t${battleId}.${i}`, speciesId: e.species, level, moves: e.moves, rng, wild: false, tuning }, data);
+      const level = trainer.scale ? Math.max(1, medianLevel(world, trainer.scale) + (e.levelOffset ?? 0)) : e.level;
+      const c = creature.makeCreature({ uid: `t${battleId}.${i}`, speciesId: e.species, level, moves: e.moves, nickname: e.nick, heldItem: e.held, rng, wild: false, tuning }, data);
       c.wild = false;
-      return creature.serialize(c);
+      return { ...creature.serialize(c), ...(e.onEntry ? { onEntry: { ...e.onEntry } } : {}) };
     });
   } else {
     const rng = G.rngs.fresh(`wild:${battleId}`);
@@ -308,6 +314,14 @@ export function buildBattle(G, setup, data) {
     battle: /** @type {any} */ (null), setup, data, tuning, battleId, trainer, kind: setup.kind, source, summit, story, blackoutAllowed, dial,
     expModel: {}, pendingCapture: { grade: null }, applied: null, startPayload: {},
   });
+  // Night hooks belong to this encounter; the shared registry stays frozen and reusable by day.
+  const night = minuteOfDay(world) >= 18 * 60 || minuteOfDay(world) < 6 * 60;
+  const abilityAtTime = (a) => night && a.nightHook ? { ...a, ...a.nightHook } : a;
+  const engineData = night && typeof data.list === 'function' ? { ...data,
+    list: (table) => data.list(table).map((r) => table === 'abilities' ? abilityAtTime(r) : r),
+    get: (table, id) => table === 'abilities' ? abilityAtTime(data.get(table, id)) : data.get(table, id),
+  } : data;
+  const spire = trainer?.spire ? row(data, 'spires', trainer.spire) : null;
   const battle = createBattle({
     sides: [
       { party: mine, trainer: { name: playerName, items: medicine }, bag: { crackdust: held(world, 'crackdust', data), lanterns }, glint: world.wallet.main },
@@ -316,10 +330,13 @@ export function buildBattle(G, setup, data) {
         : { party: foes },
     ],
     kind: setup.kind,
-    data,
+    data: engineData,
     dial,
     rules: dialRulesFor(dial, data, { story }),
     holdOut: setup.holdOut ?? trainer?.holdOut ?? null,
+    readingPhases: reading ? setup.wild?.readingPhases : null,
+    weatherKinds: data.weatherKinds ?? null,
+    weatherCycle: spire?.theme?.kind === 'weather' ? spire.theme.rule : null,
     curveLevel: Number.isFinite(curve) ? curve : null,
     summit,
     source,
@@ -338,6 +355,7 @@ export function buildBattle(G, setup, data) {
         },
       };
     },
+    captureBlockReason: party.hasCaptureRoom(world, { tuning }) ? null : 'Party and storage are full. Make a space at the cottage before raising a Lantern.',
   }, G.rngs.fresh(`battle:${battleId}`));
   session.battle = battle;
 
@@ -467,12 +485,12 @@ export function bagMenu(session, world) {
   const legal = b.legal(0);
   /** @type {BagRow[]} */
   const out = [];
-  for (const id of HEAL_ITEMS) {
+  for (const id of BATTLE_MEDICINE) {
     const count = b.sides[0].items.filter((it) => it.id === id).length;
     if (!count) continue;
     const e = legal.items.find((it) => it.id === id);
     const it = row(session.data, 'items', id);
-    out.push({ id, name: it ? it.name : id, count, kind: 'heal', selectable: !!(e && e.selectable), reason: e && !e.selectable ? 'hp-full' : null });
+    out.push({ id, name: it ? it.name : id, count, kind: it?.use === 'heal' ? 'heal' : it?.use ?? 'heal', selectable: !!(e && e.selectable), reason: e && !e.selectable ? e.reason : null });
   }
   const dust = b.sides[0].bag.crackdust || 0;
   if (dust > 0) {

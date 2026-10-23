@@ -15,6 +15,7 @@ import { dataLookup } from '../systems/exp.js';
 import { t, has } from '../data/strings.js';
 import { TYPE_CHART as FALLBACK_CHART, ORDINARY_TYPES as FALLBACK_ORDINARY } from '../data/types.js';
 import { pickAnchor } from '../art/heartmark.js';
+import { boxCapacity as partyBoxCapacity } from '../systems/party.js';
 
 /** @typedef {import('../state/schema.js').World} World */
 /** @typedef {import('../state/schema.js').Creature} Creature */
@@ -384,12 +385,7 @@ export const BOX_CELLAR = 40;
  * @returns {number}
  */
 export function boxCapacity(world, tuning) {
-  const base = Number.isInteger(tuning?.BOX_CAPACITY) ? tuning.BOX_CAPACITY : BOX_BASE;
-  const cellar = Number.isInteger(tuning?.boxCapacityCellar) ? tuning.boxCapacityCellar : BOX_CELLAR;
-  const loans = world?.loans ?? {};
-  const built = [...(Array.isArray(loans.commissions) ? loans.commissions : []), ...(Array.isArray(loans.built) ? loans.built : [])];
-  const hasCellar = built.some((x) => (typeof x === 'string' ? x : x?.id) === 'cellar');
-  return Math.max(base, hasCellar ? cellar : base, (world?.box ?? []).length);
+  return partyBoxCapacity(world, { tuning });
 }
 
 // ---------------------------------------------------------------------------------------------

@@ -134,7 +134,8 @@ test('presets cycle ask -> auto-Anchor -> auto-accept Up -> ask', () => {
 
 test('box capacity: 20, 40 with the Cellar commission, never below what is stored', () => {
   assert.equal(M.boxCapacity({ loans: { commissions: [] }, box: [] }), 20);
-  assert.equal(M.boxCapacity({ loans: { commissions: ['cellar'] }, box: [] }), 40);
+  assert.equal(M.boxCapacity({ loans: { commissions: ['cellar'], builds: [{ id: 'cellar', done: false }] }, box: [] }), 20);
+  assert.equal(M.boxCapacity({ loans: { builds: [{ id: 'cellar', done: true }] }, box: [] }), 40);
   assert.equal(M.boxCapacity({ loans: { commissions: [] }, box: new Array(23).fill({}) }), 23);
   assert.equal(M.boxCapacity({ loans: { commissions: [] }, box: [] }, { BOX_CAPACITY: 20, boxCapacityCellar: 40 }), 20);
 });

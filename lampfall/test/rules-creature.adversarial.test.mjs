@@ -46,10 +46,10 @@ describe('determinism', () => {
     const loops = new Set();
     for (let i = 0; i < 60; i++) {
       const c = C.makeCreature({ uid: `c${i}`, speciesId: 'vagary', level: 30, rng }, DATA);
-      marks.add(`${c.mark.x},${c.mark.y}`);
+      marks.add(c.mark.anchor);
       loops.add(c.typeQueue.join());
     }
-    assert.ok(marks.size >= 10, `only ${marks.size} distinct marks from one rng`);
+    assert.equal(marks.size, 4, `only ${marks.size} distinct body anchors from one rng`);
     assert.ok(loops.size >= 10, `only ${loops.size} distinct loops from one rng`);
     // and the placement is a function of (rng seed, uid) only, never of how many creatures came first
     const lone = C.makeCreature({ uid: 'c42', speciesId: 'vagary', level: 30, rng: makeRng('shared') }, DATA);

@@ -20,6 +20,7 @@
  * @module art/props
  */
 
+import { EXTRA_PROP_ART } from './props-extra.js';
 import { ROOF_COLOURS } from './palette.js';
 import { createGroup, TILE } from './tiles/kit.js';
 import { blank, blit } from './spriteUtil.js';
@@ -537,7 +538,7 @@ P('summit-bell', { k: 'base', b: 'brass', o: 'brass0', h: 'yellow', d: 'st2', m:
   '................................',
 ].map((r) => r.padEnd(32, '.').slice(0, 32)), { w: 32, h: 32 });
 
-export const PROP_ART = Object.freeze(props);
+export const PROP_ART = Object.freeze({ ...props, ...EXTRA_PROP_ART });
 export default PROP_ART;
 
 /* ---------------------------------------------------------------- house recipe */

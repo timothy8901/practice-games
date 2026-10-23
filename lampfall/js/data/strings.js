@@ -643,6 +643,7 @@ export const STRINGS = Object.freeze({
   'battle.end.capture': 'Caught.',
   'battle.end.run': 'Got away.',
   'battle.end.holdout': 'You held. That was the point.',
+  'battle.end.reading': 'Every shape carries the same mark. The Reading is complete.',
   'battle.end.draw': 'Both sides are spent. A draw.',
   'battle.ward.held': '{ward} held.',
   'battle.ward.strongOnly': '{ward} held. Only Strong hits get through.',

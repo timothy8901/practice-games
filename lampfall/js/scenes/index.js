@@ -3,6 +3,7 @@
  * Scenes push by name through `G.push(name, params)`; nothing imports a scene module directly.
  * @module scenes/index
  */
+import { createArchiveScene } from './archive.js';
 import { createBagScene } from './bag.js';
 import { createBattleScene } from './battle.js';
 import { createBootScene } from './boot.js';
@@ -31,6 +32,7 @@ import { createTitleScene } from './title.js';
 
 /** @type {Readonly<Record<string, (G: object) => import('../core/scene.js').Scene>>} */
 export const sceneFactories = Object.freeze({
+  archive: createArchiveScene,
   bag: createBagScene,
   battle: createBattleScene,
   boot: createBootScene,

@@ -16,37 +16,18 @@ step() { # step <name> <command...>
   if "$@"; then echo "-- $name: ok"; else echo "-- $name: FAILED"; steps_failed+=("$name"); fi
 }
 
-step "validate-data" node tools/validate-data.mjs --quiet
-step "lint-owners" node tools/lint-owners.mjs --quiet
+step "validate-data" "${NODE:-node}" tools/validate-data.mjs --quiet
+step "lint-owners" "${NODE:-node}" tools/lint-owners.mjs --quiet
 # GDD-00 §14 art linter. char/portrait stay advisory until the ART-CHARS ramps are in art/palette.CAST_HEX.
-step "lint-art" node tools/lint-art.mjs --quiet --advisory=char,portrait
+step "lint-art" "${NODE:-node}" tools/lint-art.mjs --quiet --advisory=char,portrait
 if [ -f tools/smoke-import.mjs ]; then
-  step "smoke-import" node tools/smoke-import.mjs --quiet
+  step "smoke-import" "${NODE:-node}" tools/smoke-import.mjs --quiet
 else
   echo "== smoke-import: skipped (tools/smoke-import.mjs not present)"
 fi
 
 run_tests() {
-  local files f out p fl pass=0 fail=0 failed=()
-  mapfile -t files < <(find . -path ./node_modules -prune -o -path ./test/out -prune -o \( -name '*.test.mjs' -o -name '*.test.js' \) -print | sort)
-  if [ -n "$PATTERN" ]; then
-    mapfile -t files < <(printf '%s\n' "${files[@]}" | grep -- "$PATTERN")
-  fi
-  if [ "${#files[@]}" -eq 0 ] || [ -z "${files[0]}" ]; then echo "no test files found"; return 1; fi
-  for f in "${files[@]}"; do
-    # Per-file timeout: one hung test file (open handle, stuck timer) must not block the whole run.
-    out=$(timeout "${TEST_TIMEOUT:-180}" node --test --test-timeout=60000 "$f" 2>&1 | tr -d '\000')
-    if ! printf '%s\n' "$out" | grep -qE '^# pass'; then out="$out"$'\n'"not ok - no test summary (crashed or timed out after ${TEST_TIMEOUT:-180}s)"; fi
-    p=$(printf '%s\n' "$out" | grep -E '^# pass' | awk '{print $3}')
-    fl=$(printf '%s\n' "$out" | grep -E '^# fail' | awk '{print $3}')
-    p=${p:-0}; fl=${fl:-1}
-    pass=$((pass + p)); fail=$((fail + fl))
-    if [ "$fl" -ne 0 ]; then failed+=("$f"); printf '%s\n' "$out" | grep -E 'not ok|Error|error:|expected|actual' | head -20; fi
-    printf '%-60s pass %-4s fail %-4s\n' "$f" "$p" "$fl"
-  done
-  echo "TOTAL: pass $pass fail $fail (${#files[@]} files)"
-  if [ "${#failed[@]}" -ne 0 ]; then printf 'FAILED: %s\n' "${failed[@]}"; return 1; fi
-  return 0
+  "${NODE:-node}" tools/test-suite.mjs "$PATTERN"
 }
 step "unit tests" run_tests
 

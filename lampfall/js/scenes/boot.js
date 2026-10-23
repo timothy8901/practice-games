@@ -23,6 +23,7 @@ import { setFlag } from '../systems/flags.js';
 import * as weather from '../systems/weather.js';
 import { LEASE_FLAGS, marksToMask, DEFAULT_SIGNAL } from './flowKit.js';
 import { installEndingTrigger } from './ending.js';
+import * as eventScripts from '../systems/flow/eventScripts.js';
 
 /**
  * Lease card used when no lease-card scene ran (`?skipTitle=1`). GDD-00 §3 defaults.
@@ -116,7 +117,7 @@ export function buildRunWorld(G, opts) {
     try { weather.pinDay(world, G.data, L.weather); } catch { /* an unknown kind leaves the roll alone */ }
   }
   const arrival = arrivalScriptOf(G.data);
-  if (arrival) world.pendingScript = arrival;
+  if (arrival) eventScripts.queue(world, arrival);
   return world;
 }
 
@@ -179,7 +180,7 @@ export function createBootScene(G) {
       const direct = G.flags.scene && DIRECT_SCENES.includes(G.flags.scene) ? G.flags.scene : null;
       if (direct === 'ending' || direct === 'credits') {
         const world = buildRunWorld(G, { seedCode: G.world.run.seedCode });
-        world.pendingScript = null;
+        eventScripts.takePending(world);
         G.store.replace(world);
         G.replaceWith(direct, { debug: true });
         return;
