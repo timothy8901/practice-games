@@ -17,6 +17,7 @@
 
 import { DIR_INDEX, DX, DY } from './entities.js';
 import { tideState as tideStateOf } from '../state/selectors.js';
+import { tideMaskOf, tideVariant, gateOpen, TIDE_MASK, COLLISION } from './tide.js';
 
 /** @typedef {import('./entities.js').Entity} Entity */
 /** @typedef {import('./entities.js').EntityManager} EntityManager */
@@ -87,6 +88,24 @@ export function toolUse(world, data) {
   const tool = world && world.player ? world.player.tool : null;
   const row = lookup(data, 'items', tool);
   return row && typeof row.use === 'string' ? row.use : null;
+}
+
+/**
+ * Whether a tile reads as water to a walker at this tide: open sea, or a low-tide gate (causeway,
+ * flats, glow mud) while the tide is not out. Mirrors `world/tide.floodedAt` but works from a
+ * TileInfo alone, so it accepts both the real tilemap's numeric `tide` / `collision` codes and a
+ * tileset's string `tide` ('low' | 'high' | 'floods' | 'glow' | null).
+ * @param {{water?: boolean, solid?: boolean, tide?: string|number|null, collision?: number}} tile
+ * @param {string} tide   tide state or variant
+ * @returns {boolean}
+ */
+export function underWater(tile, tide) {
+  const c = typeof tile.collision === 'number' ? tile.collision : COLLISION.INHERIT;
+  if (c === COLLISION.SOLID || c === COLLISION.OPEN) return false;
+  if (c === COLLISION.INHERIT && tile.solid) return false;
+  const gate = c === COLLISION.LOW ? TIDE_MASK.LOW_ONLY : c === COLLISION.HIGH ? TIDE_MASK.HIGH_ONLY : tideMaskOf(tile.tide ?? null);
+  if (gate === TIDE_MASK.LOW_ONLY || gate === TIDE_MASK.GLOW) return !gateOpen(gate, tideVariant(tide));
+  return gate === TIDE_MASK.NONE && tile.water === true;
 }
 
 /** Reused result record; copy if you keep it across frames. */
@@ -196,7 +215,7 @@ export function resolveFacing(player, map, ents, world, data, opts) {
 
   // 4. Water (fish): open water, or a tide:'low' tile while the tide is in.
   const tile = map.tileAt(x, y);
-  if (tile && (tile.water || (tile.tide === 'low' && tide !== 'low'))) {
+  if (tile && underWater(tile, tide)) {
     return fill('water', 'fish', tile.id, tile, 'Fish here', use === 'fish' ? null : DISABLED.needsTool.fish);
   }
   // 5. Dig spots: a crack entity, or a tile whose verb is 'dig' (mud flats, dry now).

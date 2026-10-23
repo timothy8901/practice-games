@@ -1,7 +1,9 @@
 // Unit tests for js/world/interact.js. Run: node --test test/world.interact.test.mjs
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { resolveFacing, INTERACTION_PRIORITY, KIND_VERBS, VERB_LABELS, DISABLED, lookup, toolUse } from '../js/world/interact.js';
+import { resolveFacing, underWater, INTERACTION_PRIORITY, KIND_VERBS, VERB_LABELS, DISABLED, lookup, toolUse } from '../js/world/interact.js';
+import { loadMap } from '../js/world/tilemap.js';
+import { TILES, LEGEND } from './fixtures/worldEnt.mjs';
 import { createEntities, createEntity } from '../js/world/entities.js';
 import { buildRuntimeMap, createWorldStub, createDataStub, ITEMS, MAP_DEF } from './fixtures/worldEnt.mjs';
 
@@ -144,6 +146,32 @@ describe('resolveFacing', () => {
     assert.deepEqual(pick(resolveFacing(p, m, ents, world, data, { evalCond })), { verb: 'use', kind: 'trigger', targetId: 'shrine', disabled: null });
     world.flags = {};
     assert.equal(resolveFacing(p, m, ents, world, data).targetId, 'shrine', 'no evaluator: conds hold');
+  });
+
+  it('underWater reads string and numeric tide classes and collision overrides', () => {
+    assert.ok(underWater({ water: true, tide: null }, 'low'));
+    assert.ok(!underWater({ water: false, tide: 'low' }, 'low'));
+    assert.ok(underWater({ water: false, tide: 'low' }, 'rising'));
+    assert.ok(underWater({ water: false, tide: 1 }, 'high'), 'numeric LOW_ONLY code');
+    assert.ok(underWater({ water: false, tide: 'glow' }, 'falling'));
+    assert.ok(!underWater({ water: false, tide: 'floods' }, 'high'), 'wet sand stays walkable');
+    assert.ok(!underWater({ water: true, tide: null, collision: 2 }, 'high'), "'.' override is a ford");
+    assert.ok(underWater({ water: false, tide: null, collision: 3 }, 'high'), "'L' override floods at high");
+    assert.ok(!underWater({ water: false, solid: true, tide: 'low' }, 'high'), 'walls are never water');
+  });
+
+  it('resolves the same verbs on the real tilemap.loadMap runtime map', () => {
+    const real = loadMap({ ...MAP_DEF, legend: LEGEND }, TILES);
+    const ents = createEntities(real);
+    const p = ents.add(createEntity({ id: 'player', kind: 'player', x: 9, y: 7, facing: 'right' }));
+    const at = (tool, tide) => pick(resolveFacing(p, real, ents, createWorldStub({ tool }), data, { tideState: tide }));
+    assert.deepEqual(at('shovel', 'low'), { verb: 'dig', kind: 'mud', targetId: 'mud', disabled: null });
+    assert.deepEqual(at('rod', 'high'), { verb: 'fish', kind: 'water', targetId: 'mud', disabled: null }, 'flooded flats fish');
+    assert.deepEqual(at('rod', 'rising'), { verb: 'fish', kind: 'water', targetId: 'mud', disabled: null });
+    ents.teleport(p, 4, 5, 'right');
+    assert.deepEqual(at(null, 'low'), { verb: 'fish', kind: 'water', targetId: 'deep', disabled: DISABLED.needsTool.fish });
+    ents.teleport(p, 2, 3, 'up');
+    assert.equal(at(null, 'low').verb, 'enter');
   });
 
   it('accepts a tide override and reuses its result record', () => {
