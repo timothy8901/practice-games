@@ -32,6 +32,7 @@ import { createEntityRenderer } from './entityRenderer.js';
 import { createLightPass, createWeather, selectLights, fireflyZones, beamAngle } from './lightPass.js';
 import { drawSkyband, SKYBAND_H } from './sky.js';
 import { DRAW, resetDrawCounters, nowMs } from './surface.js';
+import { getSprite, artDef, resolveArtId } from '../art/atlas.js';
 import { UI } from '../art/palette.js';
 
 /** Native frame size. */
@@ -120,6 +121,53 @@ export function createMapRenderer(opts = {}) {
   const focusPt = { x: 0, y: 0 };
   const beamOrigin = { x: 0, y: 0 };
   const shownBuf = { tide: 'mid', grade: null };
+  let warmed = null;
+  /** sprite and light-disc warm-up for a grade before the switch: [art, variant|null, frames][] */
+  let warmList = null, warmFor = null, warmIdx = 0;
+  const warmLights = [];
+  const warmChosen = [];
+  const warmLightOpt = { minute: 0, weather: 'clear', tide: 'mid', indoor: false, out: warmLights };
+
+  function warmStep(grade, rect, camX, camY, ents, view, budget) {
+    const t0 = nowMs();
+    if (warmFor !== grade) {
+      warmFor = grade;
+      warmIdx = 0;
+      warmList = [];
+      const seen = new Set();
+      const add = (art, name, n) => { const k = art + '|' + name; if (!seen.has(k)) { seen.add(k); warmList.push([art, name, n]); } };
+      const x0 = camX - 48, x1 = camX + rect.w + 48, y0 = camY - 16, y1 = camY + rect.h + 96;
+      for (const o of tiles.objects) {
+        if (o.sortY < y0 || o.sortY - o.h > y1 || o.x * 16 + o.w < x0 || o.x * 16 > x1) continue;
+        const d = artDef(o.art);
+        add(o.art, null, d.frames.length);
+        if (o.litVariant) add(o.art, 'lit', d.variants.lit.length);
+        if (o.litArt) add(o.litArt, null, 1);
+      }
+      for (const e of ents) {
+        const id = e.artId && resolveArtId(e.artId);
+        if (!id) continue;
+        const d = artDef(id);
+        const f = e.facing && e.facing !== 'down' && d.variants && d.variants[e.facing] ? e.facing : null;
+        add(id, f, (f ? d.variants[f] : d.frames).length);
+      }
+    }
+    while (warmIdx < warmList.length) {
+      const [art, name, n] = warmList[warmIdx++];
+      for (let f = 0; f < n; f++) void getSprite(art, name ? { frame: f, name, grade } : { frame: f, grade }).canvas;
+      if (nowMs() - t0 > budget) return;
+    }
+    // light discs for the new grade
+    warmLightOpt.minute = view.minute; warmLightOpt.weather = view.weather || 'clear';
+    warmLightOpt.tide = tideVariant(view.tide ?? 'mid'); warmLightOpt.indoor = !!map.indoor;
+    lightSources(map, view.world || (view.flags ? FLAGS_WORLD(view.flags) : NO_WORLD), warmLightOpt);
+    viewRect.x = camX; viewRect.y = camY; viewRect.w = rect.w; viewRect.h = rect.h;
+    selectLights(warmLights, viewRect, { lowPower: !!view.lowPower, out: warmChosen });
+    lights.warmPools(warmChosen, grade, glowScaleAt);
+    warmed = grade;
+    warmList = null;
+  }
+
   const stats = { ms: 0, drawImages: 0, fills: 0, bakes: 0, chunks: 0, queued: 0, sprites: 0, lights: 0, particles: 0, grade: '', tide: '' };
   const lighthouseOpt = { stage: 0, lit: false };
   const entOpt = { grade: null, ms: 0, tide: 'mid', shadow: null, analysis: null, flags: null, lighthouse: lighthouseOpt, cond: null, onEnterCell: null };
@@ -186,17 +234,26 @@ export function createMapRenderer(opts = {}) {
       shown = null;
     }
 
-    // ---- choose the chunk set to show: the desired one when complete, else the last complete one
+    // ---- choose the chunk set to show: the desired one once its chunks are baked and its sprites
+    // and light discs are warm; until then the last complete set keeps showing (no patchwork frame)
     let dTide = tide, dGrade = grade;
-    if (tiles.missing(rect, camX, camY, tide, grade) > 0) {
-      if (shown && shown.grade && tiles.missing(rect, camX, camY, shown.tide, shown.grade) === 0) {
-        tiles.want([[tide, grade], [shown.tide, shown.grade]]);
-        tiles.request(rect, camX, camY, tide, grade);
+    const ents0 = !view.entities ? EMPTY : Array.isArray(view.entities) ? view.entities : view.entities.list || EMPTY;
+    const same = shown && shown.grade === grade && shown.tide === tide;
+    if (!same) {
+      const ready = tiles.missing(rect, camX, camY, tide, grade) === 0;
+      if (!shown || !shown.grade) {
+        if (!ready) tiles.bakeNow(rect, camX, camY, tide, grade);
+        warmed = grade;
+      } else if (ready && warmed === grade) {
+        // switch
+      } else if (tiles.missing(rect, camX, camY, shown.tide, shown.grade) === 0) {
         dTide = shown.tide; dGrade = shown.grade;
+        tiles.want([[tide, grade], [shown.tide, shown.grade]]);
+        if (!ready) tiles.request(rect, camX, camY, tide, grade);
+        else warmStep(grade, rect, camX, camY, ents0, view, budgetMs);
       } else {
         tiles.bakeNow(rect, camX, camY, tide, grade);
-        tiles.want([[tide, grade]]);
-        tiles.request(rect, camX, camY, tide, grade);
+        warmed = grade;
       }
     } else if (tiles.queueLength() === 0) {
       // idle: keep the ring warm, then pre-bake the next grade slot
@@ -224,7 +281,7 @@ export function createMapRenderer(opts = {}) {
     tiles.drawLayer(ctx, 1, rect, camX, camY, dTide, g);
     tiles.drawAnimated(ctx, 1, rect, camX, camY, dTide, g, ms);
 
-    const ents = !view.entities ? EMPTY : Array.isArray(view.entities) ? view.entities : view.entities.list || EMPTY;
+    const ents = ents0;
     const lhObj = lighthouseObject();
     const relit = !!(view.lighthouse && view.lighthouse.relit);
     lighthouseOpt.stage = view.lighthouse ? view.lighthouse.stage ?? 0 : 0;

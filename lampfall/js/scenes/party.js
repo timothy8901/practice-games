@@ -239,9 +239,9 @@ export function createPartyScene(G) {
   function layoutSummary(reset) {
     const c = party()[summaryIndex];
     if (!c) return;
-    const items = (c.moves ?? []).map((m, k) => ({ id: `move:${k}`, rect: { x: 280, y: 16 + k * 16, w: 192, h: 15 }, enabled: true }));
-    items.push({ id: 'preset', rect: { x: 280, y: 110, w: 192, h: 13 }, enabled: true });
-    items.push({ id: 'held', rect: { x: 96, y: 124, w: 176, h: 13 }, enabled: true });
+    const items = (c.moves ?? []).map((m, k) => ({ id: `move:${k}`, rect: { x: 286, y: 16 + k * 16, w: 186, h: 15 }, enabled: true }));
+    items.push({ id: 'preset', rect: { x: 286, y: 109, w: 186, h: 14 }, enabled: true });
+    items.push({ id: 'held', rect: { x: 104, y: 123, w: 168, h: 14 }, enabled: true });
     sumFocus.setItems(items, { keepId: !reset });
     if (reset) sumFocus.set(0, { force: true });
   }
@@ -501,7 +501,7 @@ export function createPartyScene(G) {
     // identity column
     const ix = 12;
     drawText(ctx, c.nickname, ix, 90, { color: COLORS.paper.light, maxWidth: 80 });
-    drawText(ctx, sp?.name ?? c.speciesId, ix, 101, { font: 'small', color: PALETTE.v, maxWidth: 80 });
+    drawText(ctx, sp?.name ?? c.speciesId, ix, 100, { color: PALETTE.v, maxWidth: 80 });
     let tx = ix;
     for (const ty of typesOf(c)) tx += drawTypeChip(ctx, chipId(ty), tx, 109, { dark: true }) + 2;
     drawText(ctx, t('common.level', { level: c.level }), ix, 125, { color: COLORS.paper.light });
@@ -512,12 +512,13 @@ export function createPartyScene(G) {
       lo = band[0]; hi = band[1];
     } catch { /* unknown form */ }
     drawBar(ctx, { x: ix + 26, y: 126, w: 54, h: 5, value: c.exp - lo, max: Math.max(1, hi - lo), kind: 'exp', dark: true });
-    drawText(ctx, `next ${toNext}`, ix, 135, { font: 'small', color: PALETTE.v }); // str
+    drawText(ctx, toNext > 0 ? `${toNext} to Lv${c.level + 1}` : 'Top of the curve', ix, 136, { color: PALETTE.v }); // str
     // stats
-    const st = { x: 96, y: 16, w: 176, h: 66 };
-    const sIn = drawSkinPanel(ctx, st, skin, 'ledger', { rulePitch: 10 });
+    const st = { x: 96, y: 14, w: 176, h: 70 };
+    const sIn = drawSkinPanel(ctx, st, skin, 'paper');
     STAT_ORDER.forEach((k, i) => {
-      const y = sIn.y + i * 10 + 1;
+      const y = st.y + 6 + i * 10;
+      if (i > 0) { ctx.fillStyle = skin.rule; for (let dx = 0; dx < sIn.w - 4; dx += 2) ctx.fillRect(sIn.x + 2 + dx, y - 2, 1, 1); }
       drawText(ctx, t(`summary.stat.${k}`), sIn.x + 2, y, { color: skin.soft, font: 'main' });
       const v = c.stats?.[k] ?? 0;
       const txt = k === 'hp' ? `${c.hp}/${v}` : String(v);
@@ -546,7 +547,7 @@ export function createPartyScene(G) {
       const y = 16 + k * 16;
       const row = L.moveOrNull(m.id);
       const focused = sumFocus.current()?.id === `move:${k}`;
-      if (focused) { ctx.fillStyle = skin.band; ctx.fillRect(281, y, 190, 15); }
+      if (focused) { ctx.fillStyle = skin.band; ctx.fillRect(282, y, 190, 15); }
       const isHm = c.heartmark === m.id;
       if (isHm) drawHeartmark(ctx, 287, y + 6, 1, {});
       drawText(ctx, row?.name ?? m.id, 292, y + 4, { color: skin.text, maxWidth: 78 });
@@ -555,16 +556,16 @@ export function createPartyScene(G) {
       drawText(ctx, empty ? t('common.empty') : `PP ${m.pp}/${m.maxPp}`, 468, y + 4, { font: 'small', color: empty ? skin.bad : skin.text, align: 'right' }); // str
     });
     // bond, preset, heartmark spot
-    drawText(ctx, t('summary.bond'), 280, 92, { color: COLORS.paper.light });
-    drawPips(ctx, { x: 312, y: 93, n: c.bond | 0, max: 5, size: 5, gap: 2, dark: true, color: PALETTE.springBlossom });
+    drawText(ctx, t('summary.bond'), 286, 93, { color: COLORS.paper.light });
+    drawPips(ctx, { x: 318, y: 94, n: c.bond | 0, max: 5, size: 5, gap: 2, dark: true, color: PALETTE.springBlossom });
     const presetFocused = sumFocus.current()?.id === 'preset';
     if (presetFocused) { ctx.fillStyle = PALETTE.deepBlue; ctx.fillRect(279, 109, 194, 14); }
     const preset = G.world?.settings?.autoAnchor?.[c.uid] ?? null;
-    drawText(ctx, `${t('summary.preset')}:`, 284, 112, { color: PALETTE.v });
+    drawText(ctx, `${t('summary.preset')}:`, 286, 112, { color: PALETTE.v });
     drawText(ctx, `◀ ${presetLabel(preset)} ▶`, 470, 112, { color: COLORS.paper.light, align: 'right' });
-    drawText(ctx, t('summary.heartmark', { spot: t(`summary.spot.${heartmarkSpot(c)}`) }), 284, 128, { font: 'small', color: PALETTE.v });
+    drawText(ctx, t('summary.heartmark', { spot: t(`summary.spot.${heartmarkSpot(c)}`) }), 286, 126, { color: PALETTE.v });
     const hmName = c.heartmark ? (L.moveOrNull(c.heartmark)?.name ?? c.heartmark) : null;
-    drawText(ctx, `${t('summary.heartmarkMove')}: ${hmName ?? (canPin(c) ? 'pick one now' : 'at the first Shift')}`, 284, 137, { font: 'small', color: hmName ? PALETTE.v : MAGENTA, maxWidth: 190 }); // str
+    drawText(ctx, `${t('summary.heartmarkMove')}: ${hmName ?? (canPin(c) ? 'pick one now' : 'at the first Shift')}`, 286, 136, { color: hmName ? PALETTE.v : MAGENTA, maxWidth: 188 }); // str
     // detail slip for the focused element
     const slip = { x: 96, y: 146, w: 376, h: 54 };
     drawSkinPanel(ctx, slip, skin, 'notice', { torn: 'top' });
@@ -574,9 +575,9 @@ export function createPartyScene(G) {
       const m = c.moves[Number(cur.slice(5))];
       const row = m ? L.moveOrNull(m.id) : null;
       if (row) {
-        const facts = row.category === 'status' ? 'Status' : `${row.category === 'physical' ? 'Physical' : 'Special'} · Power ${row.power}`; // str
+        const facts = row.category === 'status' ? 'Status' : `${row.category === 'physical' ? 'Physical' : 'Special'}  •  Power ${row.power}`; // str
         const acc = row.accuracy == null ? 'Sure hit' : `Accuracy ${row.accuracy}`; // str
-        drawText(ctx, `${row.name}  ·  ${facts}  ·  ${acc}`, slip.x + 8, slip.y + 8, { color: skin.text, maxWidth: slip.w - 16 });
+        drawText(ctx, `${row.name}  •  ${facts}  •  ${acc}`, slip.x + 8, slip.y + 8, { color: skin.text, maxWidth: slip.w - 16 });
         body = row.text ?? '';
         if (canPin(c)) body = `Z: pin as the Heartmark technique. ${body}`; // str
         else if (c.heartmark === m.id) body = `Heartmark technique: never forgotten, through every Shift. ${body}`; // str
@@ -596,8 +597,10 @@ export function createPartyScene(G) {
     // Shiftlog strip
     drawShiftlog(ctx, skin, c);
     if (mode === 'summary') {
-      const r = sumFocus.current()?.rect;
-      if (r) drawCursorAt(ctx, r.x - 7, r.y + Math.floor((r.h - 7) / 2), ms, skinOf({ contrast: true }));
+      const cur2 = sumFocus.current();
+      const r = cur2?.rect;
+      const onPaper = String(cur2?.id ?? '').startsWith('move:') && !skin.dark;
+      if (r) drawCursorAt(ctx, r.x - 7, r.y + Math.floor((r.h - 7) / 2), ms, onPaper ? skin : skinOf({ contrast: true }));
     }
     if (mode === 'held') drawHeldPicker(ctx, skin);
     drawHints(ctx, G.input, [['l', 'Prev'], ['r', 'Next'], ['confirm', 'Change'], ['cancel', 'Back']]); // str
@@ -605,7 +608,7 @@ export function createPartyScene(G) {
 
   function drawShiftlog(ctx, skin, c) {
     const box = { x: 8, y: 206, w: 464, h: 48 };
-    drawSkinPanel(ctx, box, skin, 'ledger', { title: t('summary.shiftlog'), rulePitch: 48, margin: 0 });
+    drawSkinPanel(ctx, box, skin, 'paper', { title: t('summary.shiftlog') });
     const log = Array.isArray(c.shiftlog) && c.shiftlog.length ? c.shiftlog : [c.speciesId];
     const L = look();
     const cell = 34, arrow = 12;
@@ -631,7 +634,7 @@ export function createPartyScene(G) {
     } catch { windowNote = ''; }
     const tx = Math.max(x + 4, box.x + 230);
     drawText(ctx, label, tx, box.y + 12, { color: skin.text, maxWidth: box.x + box.w - tx - 8 });
-    drawText(ctx, windowNote, tx, box.y + 32, { font: 'small', color: skin.soft, maxWidth: box.x + box.w - tx - 8 });
+    drawText(ctx, windowNote, tx, box.y + 28, { color: skin.soft, maxWidth: box.x + box.w - tx - 8 });
   }
 
   // ----------------------------------------------------------------------------------- scene --

@@ -307,6 +307,24 @@ export function createLightPass() {
       return n;
     },
 
+    /** Creates (without drawing) the discs `drawPools` would use for these lights at this grade. */
+    warmPools(lights, grade, scaleAt) {
+      const dark = Math.min(1, 0.5 + 0.5 * grade.night + (grade.weather !== 'clear' ? 0.1 : 0));
+      for (let i = 0; i < lights.length; i++) {
+        const L = lights[i];
+        const st = styleOf(L.kind);
+        const color = L.color || st.color;
+        const level = Math.round(Math.min(1, L.intensity) * 4) / 4;
+        if (level <= 0) continue;
+        const radius = L.radius * (scaleAt ? scaleAt(L) : 1);
+        const [sx, sy, , strength] = st.pool;
+        const k = strength * level * dark;
+        tintDisc(radius * sx, radius * sy, color, k);
+        ditherDisc(radius * sx, radius * sy, color, k);
+        if (st.halo) ditherDisc(st.halo[0], st.halo[0], color, st.halo[2] * level);
+      }
+    },
+
     drawBeam(ctx, origin, angle, rect, camX, camY, strength = 1) {
       const R = 320;
       ctx.save();

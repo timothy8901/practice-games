@@ -745,7 +745,7 @@ export function createTileRenderer(opts = {}) {
   const queued = new Set();
   /** combos wanted now (others are dropped from the queue when popped) */
   const wanted = new Set();
-  let baked = 0, bakeMs = 0;
+  let baked = 0, bakeMs = 0, bakeEma = 1, starved = 0;
   /** @type {Partial<BakeCtx>} */
   let bakeCtx = { flags: null, tier: undefined, roof: undefined, cond: null };
   let ctxSig = '';
@@ -1097,14 +1097,20 @@ export function createTileRenderer(opts = {}) {
       const t0 = nowMs();
       let n = 0;
       while (qHead < queue.length) {
+        // predictive budget: start a bake only if it should fit (an EMA of recent bake costs), but
+        // never starve: after two idle frames one bake always runs
+        const spent = nowMs() - t0;
+        if (spent + bakeEma > budgetMs && (n > 0 || starved < 2)) break;
         const k = queue[qHead++];
         queued.delete(k);
         if (cache.has(k)) continue;
         if (wanted.size && !wanted.has(comboOf(k))) continue;
+        const b0 = nowMs();
         cache.set(k, bake(k));
+        bakeEma = bakeEma * 0.8 + (nowMs() - b0) * 0.2;
         n++;
-        if (nowMs() - t0 >= budgetMs) break;
       }
+      starved = n === 0 && qHead < queue.length ? starved + 1 : 0;
       if (qHead >= queue.length) { queue.length = 0; qHead = 0; }
       else if (qHead > 256) { queue.splice(0, qHead); qHead = 0; }
       return n;
