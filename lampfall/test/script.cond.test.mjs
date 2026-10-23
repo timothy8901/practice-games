@@ -124,7 +124,7 @@ test('loan tier (number = at least, or range) and paid (looked up as tier-<n>)',
   assert.equal(ev(w, { loan: { tier: 2 } }), false);
   assert.equal(ev(w, { loan: { tier: { eq: 1 } } }), true);
   assert.equal(ev(w, { loan: { paid: false } }), true);
-  w.loans.paid = 500;
+  w.loans.paid = data.get('loans', 'tier-1').amount;   // the real ladder: tier 1 is paid at its full amount
   assert.equal(ev(w, { loan: { paid: true } }), true);
   assert.equal(evalCond(w, { loan: { paid: true } }, {}), false);   // no registry: unknown -> not paid
 });

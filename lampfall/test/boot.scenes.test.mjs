@@ -81,9 +81,9 @@ test('stub: pops on cancel with a result, or returns to the title when alone', (
   assert.equal(stub.debugText(), 'Bag (stub)');
 });
 
-test('menu: lists the draft order with Save last and pushes by scene name', () => {
+test('menu: lists the GDD-00 order with Save last and pushes by scene name', () => {
   assert.equal(MENU_ITEMS[MENU_ITEMS.length - 1].scene, 'saveLoad');
-  assert.deepEqual(MENU_ITEMS.map((m) => m.scene), ['party', 'bag', 'fieldLog', 'mapScreen', 'ledger', 'settings', 'saveLoad']);
+  assert.deepEqual(MENU_ITEMS.map((m) => m.scene), ['party', 'bag', 'ledger', 'mapScreen', 'fieldLog', 'letter', 'settings', 'saveLoad']);
   const G = fakeG();
   G.stackRef.push({ name: 'overworld' });
   G.push('menu');

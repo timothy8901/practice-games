@@ -201,7 +201,7 @@ test('strings: key families the engine and UI build dynamically all exist', () =
   for (const v of Object.keys(VERB_LABELS)) need.push(`verb.${v}`);
   for (const k of ['paid', 'none', 'day', 'days', 'long']) need.push(`loan.pace.${k}`);
   for (const c of CURRENCIES) need.push(`currency.${c}`);
-  for (const it of MENU_ITEMS) need.push(`menu.${it.scene === 'mapScreen' ? 'map' : it.scene === 'saveLoad' ? 'save' : it.scene}`);
+  for (const it of MENU_ITEMS) need.push(`menu.${it.id}`); // rows are keyed by id (the Journal row pushes 'letter')
   for (const k of Object.keys(THEME_STRINGS)) need.push(`ui.${k}`);
   for (const r of BLOCK_REASONS) need.push(`battle.blocked.${r}`);
   for (const o of OUTCOMES) need.push(`battle.end.${o}`);
