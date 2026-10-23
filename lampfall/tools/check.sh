@@ -34,7 +34,9 @@ run_tests() {
   fi
   if [ "${#files[@]}" -eq 0 ] || [ -z "${files[0]}" ]; then echo "no test files found"; return 1; fi
   for f in "${files[@]}"; do
-    out=$(node --test "$f" 2>&1 | tr -d '\000')
+    # Per-file timeout: one hung test file (open handle, stuck timer) must not block the whole run.
+    out=$(timeout "${TEST_TIMEOUT:-180}" node --test --test-timeout=60000 "$f" 2>&1 | tr -d '\000')
+    if ! printf '%s\n' "$out" | grep -qE '^# pass'; then out="$out"$'\n'"not ok - no test summary (crashed or timed out after ${TEST_TIMEOUT:-180}s)"; fi
     p=$(printf '%s\n' "$out" | grep -E '^# pass' | awk '{print $3}')
     fl=$(printf '%s\n' "$out" | grep -E '^# fail' | awk '{print $3}')
     p=${p:-0}; fl=${fl:-1}
