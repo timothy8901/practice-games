@@ -19,24 +19,21 @@ import { createClock } from './core/time.js';
 import { makeRng, randomSeedCode, setSeedToggles } from './core/rng.js';
 import { createStore } from './state/store.js';
 import { createPersist } from './state/persist.js';
-import { createNewWorld, SCHEMA_VERSION } from './state/schema.js';
+import { createNewWorld, SCHEMA_VERSION, DEFAULT_DIAL } from './state/schema.js';
 import { MIGRATIONS } from './state/migrate.js';
 import { createRngs } from './state/rngs.js';
-// ---- lanes not landed yet. INTEGRATOR: delete js/_shims and replace '/_shims/' with '/' here. ----
-import { DATA } from './_shims/data/index.js';
-import { createRegistry } from './_shims/data/registry.js';
-import { DIALS, TOGGLE_ORDER } from './_shims/data/dials.js';
-import * as clockSys from './_shims/systems/clockSys.js';
-import { createMusicDirector } from './_shims/audio/director.js';
-import { createToasts } from './_shims/ui/toast.js';
-// ---------------------------------------------------------------------------------------------------
+import { DATA, TOGGLE_ORDER } from './data/index.js';
+import { createRegistry } from './data/registry.js';
+import * as clockSys from './systems/clockSys.js';
+import { createMusicDirector } from './audio/director.js';
+import { createToasts } from './ui/toast.js';
 import { sceneFactories } from './scenes/index.js';
 import { createDebugOverlay } from './scenes/debugOverlay.js';
 
 /**
  * The one context object, created once here and handed to every scene factory. Never imported.
- * See ARCHITECTURE-DRAFT §2.2 for the shared fields; BOOT adds `perf`, `loop`, `persistView`,
- * `debugOverlay` and `debugHook` (debug builds only).
+ * See ARCHITECTURE-DRAFT §2.2 for the shared fields; BOOT adds `perf`, `loop`, `debugOverlay` and
+ * `debugHook` (debug builds only). `G` itself is the `PersistG` that every persist call takes (§10).
  * @typedef {Object} G
  * @property {import('./state/store.js').Store} store
  * @property {import('./state/schema.js').World} world   getter: store.world (re-pointed on load; read each frame, never cache)
@@ -45,15 +42,14 @@ import { createDebugOverlay } from './scenes/debugOverlay.js';
  * @property {import('./core/input.js').Input} input
  * @property {import('./core/scene.js').SceneStack} scenes
  * @property {import('./core/audio.js').AudioEngine} audio
- * @property {import('./_shims/audio/director.js').MusicDirector} music
- * @property {import('./_shims/data/registry.js').Registry} data
+ * @property {import('./audio/director.js').MusicDirector} music
+ * @property {import('./data/registry.js').Registry} data
  * @property {import('./state/rngs.js').Rngs} rngs
  * @property {import('./core/time.js').Clock} clock      bound to world.clock via systems/clockSys
  * @property {import('./core/tween.js').Tweens} tweens   screen-level (toasts, HUD); scenes create their own
  * @property {import('./core/fx.js').FX} fx              screen-level flash/shake; scenes create their own particle FX
  * @property {import('./state/persist.js').Persist} persist
- * @property {import('./state/persist.js').PersistG} persistView   the view of G that persist reads (§10); hand it to every persist call
- * @property {import('./_shims/ui/toast.js').Toasts} toasts
+ * @property {import('./ui/toast.js').Toasts} toasts
  * @property {import('./debug/flags.js').BootFlags} flags
  * @property {Record<string, (G: G) => import('./core/scene.js').Scene>} sceneFactories
  * @property {(name: string, params?: any) => void} push        sugar: scenes.push(sceneFactories[name](G), params)
@@ -94,28 +90,6 @@ function safeLocalStorage(win) {
   } catch {
     return null;
   }
-}
-
-/**
- * The view of `G` that `state/persist` reads (its `PersistG` typedef): the store, the bus, the data
- * registry and a scene-stack view whose `isTransitioning` is a function (core/scene exposes it as a
- * getter, `has` takes a scene object there and a name here).
- * @param {import('./state/store.js').Store} store
- * @param {import('./core/scene.js').SceneStack} scenes
- * @param {object} data
- * @returns {import('./state/persist.js').PersistG}
- */
-export function makePersistView(store, scenes, data) {
-  return Object.freeze({
-    store,
-    bus: store.bus,
-    data,
-    scenes: Object.freeze({
-      top: () => scenes.top(),
-      has: (name) => scenes.find(name) !== null,
-      isTransitioning: () => scenes.isTransitioning,
-    }),
-  });
 }
 
 /**
@@ -163,7 +137,7 @@ export function boot(env = {}) {
 
   // 5. store, rngs, clock
   setSeedToggles(TOGGLE_ORDER);
-  const seedCode = flags.seed ?? randomSeedCode(DIALS.default.toUpperCase(), entropy);
+  const seedCode = flags.seed ?? randomSeedCode(DEFAULT_DIAL.toUpperCase(), entropy) // [GDD] default dial;
   const store = createStore(createNewWorld({ seedCode }), { strict: flags.strict });
   const rngs = createRngs(store);
   const clock = createClock(clockSys.optionsFrom(store.world));
@@ -206,7 +180,6 @@ export function boot(env = {}) {
     tweens: createTweens(),
     fx: createFX({ width: config.NATIVE_W, height: config.NATIVE_H, rng: entropy.fork('fx') }),
     persist,
-    persistView: makePersistView(store, scenes, data),
     toasts: createToasts({ width: config.NATIVE_W, height: config.NATIVE_H }),
     flags,
     sceneFactories,
@@ -225,13 +198,16 @@ export function boot(env = {}) {
     return factory(G);
   }
   G.music = createMusicDirector(G);
-  G.bus.on('toast', (payload) => G.toasts.push(typeof payload === 'string' ? payload : payload?.text ?? ''));
+  G.bus.on('toast', (payload) => {
+    if (typeof payload === 'string') G.toasts.show(payload);
+    else G.toasts.show(payload?.text ?? '', { kind: payload?.kind, icon: payload?.icon, ms: payload?.ms });
+  });
   // A failure that persist will retry in 2 s is not shown; the banner appears when the retry fails too (§10).
   G.bus.on('save:fail', (res) => {
     if (res && res.willRetry) return;
-    G.toasts.push(`Save failed: ${res?.error?.code ?? 'unknown'}`, { color: '#ff9b9b' });
+    G.toasts.show(`Save failed: ${res?.error?.code ?? 'unknown'}`, { kind: 'danger' });
   });
-  persist.attach(G.persistView); // AUTOSAVE_TRIGGERS are bus events, never calls in scenes
+  persist.attach(G); // AUTOSAVE_TRIGGERS are bus events, never calls in scenes
 
   if (debug) {
     if (config.FEATURES.debugOverlay) G.debugOverlay = createDebugOverlay(G);
@@ -311,7 +287,7 @@ export function boot(env = {}) {
     G.toasts.update(ms);
     G.scenes.handleInput(G.input);        // the stack ignores input during transitions
     G.scenes.update(ms);                  // only overworld/fishing scenes call clockSys.tick
-    G.persist.tick(G.persistView, ms);    // route autosave timer + failure retry
+    G.persist.tick(G, ms);                // route autosave timer + failure retry
     if (G.debugOverlay) G.debugOverlay.update(ms);
   }
 
