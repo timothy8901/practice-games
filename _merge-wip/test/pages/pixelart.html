@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>pixelart.js demo</title>
+<link rel="icon" href="data:,">
+<style>
+  html, body { margin: 0; height: 100%; background: #0b0e14; overflow: hidden; }
+  canvas { display: block; width: 960px; height: 540px; image-rendering: pixelated; image-rendering: crisp-edges; }
+</style>
+</head>
+<body>
+<canvas id="screen" width="480" height="270"></canvas>
+<script type="module">
+import * as px from '../../js/core/pixelart.js';
+
+// ---------------------------------------------------------------------------
+// Test art
+// ---------------------------------------------------------------------------
+const FOX_PAL = { k: '#2a1a14', o: '#e8873a', d: '#b85c22', w: '#fff4e0', e: '#1c1c24', n: '#2a1a14' };
+const FOX = [
+  '................',
+  '..k..........k..',
+  '.kdk........kdk.',
+  '.kodk......kdok.',
+  '.koodkkkkkkdook.',
+  '.kooooooooooook.',
+  '.koowwooooowwok.',
+  '.kowewoooowewok.',
+  '.kowwwoooowwwok.',
+  '..kowwwwwwwwok..',
+  '..kowwwnnwwwok..',
+  '...kowwwwwwok...',
+  '....kkkoookkk...',
+  '..kooooooooook..',
+  '..kowwwwwwwwok..',
+  '...kkkkkkkkkk...',
+];
+const COIN_PAL = { k: '#2a1a14', y: '#f2c14e', Y: '#fff2b0', b: '#a8742a' };
+const COIN = [
+  '..kkkk..',
+  '.kyyyyk.',
+  'kyYyyyyk',
+  'kyYyybyk',
+  'kyyyybyk',
+  'kyyybbyk',
+  '.kbbbbk.',
+  '..kkkk..',
+];
+const GRASS_PAL = { g: '#3f7d3a', G: '#5a9b4a', d: '#2f5f2c' };
+const GRASS = [
+  'gggggggggggggggg',
+  'ggGgggggggggdggg',
+  'gGgggggdgggggggg',
+  'gggggggggggGgggg',
+  'ggggdggggggggggg',
+  'gggggggGgggggggg',
+  'gGgggggggggggdgg',
+  'ggggggggGggggggg',
+  'gggdgggggggggggg',
+  'ggggggggggggGggg',
+  'ggGggggdgggggggg',
+  'gggggggggggggggg',
+  'gggggGgggggdgggg',
+  'gdgggggggggggggg',
+  'ggggggggGggggggg',
+  'ggggggggggggggGg',
+];
+const HEART = `
+  .r.r.
+  rrrrr
+  .rrr.
+  ..r..
+`;
+
+// ---------------------------------------------------------------------------
+// Harness
+// ---------------------------------------------------------------------------
+const canvas = document.getElementById('screen');
+const ctx = canvas.getContext('2d', { willReadFrequently: true });
+ctx.imageSmoothingEnabled = false;
+const BG = '#1d2430';
+const results = [];
+function check(name, ok, detail = '') {
+  results.push(ok);
+  const line = `${ok ? 'PASS' : 'FAIL'} ${name}${detail ? ' -- ' + detail : ''}`;
+  if (ok) console.log(line); else console.error(line);
+}
+function pixel(x, y) {
+  const d = ctx.getImageData(x, y, 1, 1).data;
+  return [d[0], d[1], d[2], d[3]];
+}
+function hexPx(hex) { const c = px.hexToRgb(hex); return [c.r, c.g, c.b, c.a]; }
+function near(a, b, tol = 0) { return a.length === b.length && a.every((v, i) => Math.abs(v - b[i]) <= tol); }
+function expectPixel(name, x, y, hex, tol = 0) {
+  const got = pixel(x, y);
+  const want = hexPx(hex);
+  check(name, near(got, want, tol), `at (${x},${y}) got ${px.rgbToHex(got[0], got[1], got[2])} want ${hex}`);
+}
+function label(text, x, y) {
+  ctx.fillStyle = '#9aa7b8';
+  ctx.font = '7px monospace';
+  ctx.textBaseline = 'top';
+  ctx.fillText(text, x, y);
+}
+function title(text, x, y) {
+  ctx.fillStyle = '#e8edf4';
+  ctx.font = 'bold 9px monospace';
+  ctx.textBaseline = 'top';
+  ctx.fillText(text, x, y);
+}
+
+try {
+  ctx.fillStyle = BG;
+  ctx.fillRect(0, 0, 480, 270);
+  title('pixelart.js demo  (480x270 buffer, nearest-neighbour)', 6, 4);
+
+  check('art rows are uniform 16/8/16 wide',
+    FOX.every((r) => r.length === 16) && COIN.every((r) => r.length === 8) && GRASS.every((r) => r.length === 16));
+
+  // ---- Row A: decode-time transforms -------------------------------------
+  const fox = px.decodeSprite(FOX, FOX_PAL);
+  const coin = px.decodeSprite(COIN, COIN_PAL);
+  check('decodeSprite sizes', fox.w === 16 && fox.h === 16 && coin.w === 8 && coin.h === 8);
+  check('canvas is lazily created in the browser', fox.canvas instanceof HTMLCanvasElement && fox.canvas === fox.canvas);
+
+  const rowA = 26;
+  const cells = [
+    ['decode', fox],
+    ['flipX', px.decodeSprite(COIN, COIN_PAL, { flipX: true })],
+    ['flipY', px.decodeSprite(COIN, COIN_PAL, { flipY: true })],
+    ['scale 2', px.decodeSprite(COIN, COIN_PAL, { scale: 2 })],
+    ['outline', px.decodeSprite(FOX, FOX_PAL, { outline: '#ffffff' })],
+    ['corners', px.decodeSprite(FOX, FOX_PAL, { outline: '#ffffff', outlineCorners: true })],
+    ['tint 1.0', px.decodeSprite(FOX, FOX_PAL, { tint: '#ffffff' })],
+    ['tint 0.5', px.decodeSprite(FOX, FOX_PAL, { tint: { color: '#ffffff', amount: 0.5 } })],
+    ['swap ch', px.paletteSwap(fox, { o: '#4a7bd0', d: '#2f4f9a' })],
+    ['swap col', px.paletteSwap(fox, { '#E8873A': '#4a7bd0', '#b85c22': '#2f4f9a' })],
+    ['silhou.', px.silhouette(fox, '#1a1a2e')],
+    ['outlineS', px.outlineSprite(fox, '#f2c14e')],
+  ];
+  const cellW = 39;
+  cells.forEach(([name, sprite], i) => {
+    const x = 8 + i * cellW;
+    label(name, x, rowA - 9);
+    px.drawSprite(ctx, sprite, x, rowA);
+  });
+  const ax = (i) => 8 + i * cellW;
+
+  // decode: fox row 5 = '.kooooooooooook.' -> col 1 is 'k', col 2 is 'o'; (0,0) transparent
+  expectPixel('decode body pixel', ax(0) + 2, rowA + 5, FOX_PAL.o);
+  expectPixel('decode outline pixel', ax(0) + 1, rowA + 5, FOX_PAL.k);
+  expectPixel('decode transparent shows background', ax(0), rowA, BG);
+  // coin row 2 = 'kyYyyyyk' -> highlight at col 2, flipped -> col 5
+  expectPixel('flipX mirrors highlight', ax(1) + 5, rowA + 2, COIN_PAL.Y);
+  expectPixel('flipY mirrors row (row 2 -> row 5)', ax(2) + 2, rowA + 5, COIN_PAL.Y);
+  expectPixel('scale 2 block (4,4)', ax(3) + 4, rowA + 4, COIN_PAL.Y);
+  expectPixel('scale 2 block (5,5)', ax(3) + 5, rowA + 5, COIN_PAL.Y);
+  expectPixel('scale 2 block (6,4) is y', ax(3) + 6, rowA + 4, COIN_PAL.y);
+  // outlined fox: body stays aligned thanks to ox/oy; outline appears left of col 1 at row 5
+  expectPixel('outline keeps body aligned', ax(4) + 1, rowA + 5, FOX_PAL.k);
+  expectPixel('outline pixel left of body', ax(4) + 0, rowA + 5, '#ffffff');
+  expectPixel('outline above ear tip', ax(4) + 2, rowA + 0, '#ffffff');
+  expectPixel('4-connected outline leaves diagonal clear', ax(4) + 1, rowA + 0, BG);
+  expectPixel('corner outline fills diagonal', ax(5) + 1, rowA + 0, '#ffffff');
+  expectPixel('tint 1.0 is white', ax(6) + 2, rowA + 5, '#ffffff');
+  expectPixel('tint 0.5 matches lerpColor', ax(7) + 2, rowA + 5, px.lerpColor(FOX_PAL.o, '#ffffff', 0.5));
+  expectPixel('paletteSwap by char', ax(8) + 2, rowA + 5, '#4a7bd0');
+  expectPixel('paletteSwap by colour', ax(9) + 2, rowA + 5, '#4a7bd0');
+  check('swap by char and colour share one cache entry', cells[8][1] === cells[9][1]);
+  expectPixel('silhouette body', ax(10) + 2, rowA + 5, '#1a1a2e');
+  expectPixel('silhouette outline char too', ax(10) + 1, rowA + 5, '#1a1a2e');
+  expectPixel('outlineSprite ring', ax(11) + 0, rowA + 5, '#f2c14e');
+  expectPixel('outlineSprite body aligned', ax(11) + 2, rowA + 5, FOX_PAL.o);
+
+  // ---- Row B: draw-time options, strings, forecast look, colour math -----
+  const rowB = 72;
+  label('alpha .5', 8, rowB - 9);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(8, rowB, 16, 16);
+  px.drawSprite(ctx, px.silhouette(fox, '#000000'), 8, rowB, { alpha: 0.5 });
+  check('alpha 0.5 blends to mid grey', near(pixel(10, rowB + 5), [128, 128, 128, 255], 2), String(pixel(10, rowB + 5)));
+  expectPixel('alpha draw leaves transparent pixels alone', 8, rowB, '#ffffff');
+
+  label('d.flipX', 46, rowB - 9);
+  px.drawSprite(ctx, coin, 46, rowB, { flipX: true });
+  expectPixel('draw-time flipX mirrors highlight', 46 + 5, rowB + 2, COIN_PAL.Y);
+  label('d.flipY', 84, rowB - 9);
+  px.drawSprite(ctx, coin, 84, rowB, { flipY: true });
+  expectPixel('draw-time flipY mirrors row', 84 + 2, rowB + 5, COIN_PAL.Y);
+
+  label('d.x3', 122, rowB - 9);
+  px.drawSprite(ctx, coin, 122, rowB, { scale: 3 });
+  expectPixel('draw-time scale 3 (6,6)', 122 + 6, rowB + 6, COIN_PAL.Y);
+  expectPixel('draw-time scale 3 (8,8)', 122 + 8, rowB + 8, COIN_PAL.Y);
+  expectPixel('draw-time scale 3 (9,6) is y', 122 + 9, rowB + 6, COIN_PAL.y);
+
+  label('string', 160, rowB - 9);
+  const heart = px.decodeSprite(HEART, { r: '#e8506a' });
+  px.drawSprite(ctx, heart, 160, rowB, { scale: 2 });
+  check('string rows are de-indented to 5x4', heart.w === 5 && heart.h === 4);
+  expectPixel('heart pixel', 160 + 2, rowB + 2, '#e8506a');
+
+  label('forecast', 190, rowB - 9);
+  const unseen = px.outlineSprite(px.silhouette(fox, '#101a2b'), '#8fb3ff');
+  px.drawSprite(ctx, unseen, 190, rowB);
+  expectPixel('forecast silhouette body', 190 + 2, rowB + 5, '#101a2b');
+  expectPixel('forecast outline', 190 + 0, rowB + 5, '#8fb3ff');
+
+  label('snap', 228, rowB - 9);
+  px.drawSprite(ctx, coin, 228.6, rowB + 0.4);
+  expectPixel('fractional position snaps to (229, rowB)', 229 + 2, rowB + 2, COIN_PAL.Y);
+
+  label('recolorHSL hue', 262, rowB - 9);
+  for (let i = 0; i < 12; i++) {
+    ctx.fillStyle = px.recolorHSL(FOX_PAL.o, i * 30);
+    ctx.fillRect(262 + i * 9, rowB, 8, 8);
+  }
+  expectPixel('hue sweep step 0 is the source colour', 262, rowB, FOX_PAL.o);
+  check('recolorHSL rotates red to green', px.recolorHSL('#ff0000', 120) === '#00ff00');
+  label('lerpColor', 262, rowB + 10);
+  for (let i = 0; i < 54; i++) {
+    ctx.fillStyle = px.lerpColor('#1d2430', '#f2c14e', i / 53);
+    ctx.fillRect(262 + i * 2, rowB + 18, 2, 6);
+  }
+  expectPixel('lerpColor end', 262 + 53 * 2, rowB + 18, '#f2c14e');
+
+  label('lightness', 372, rowB - 9);
+  for (let i = 0; i < 9; i++) {
+    ctx.fillStyle = px.recolorHSL('#4a7bd0', 0, 0, (i - 4) * 0.1);
+    ctx.fillRect(372 + i * 9, rowB, 8, 8);
+  }
+  expectPixel('lightness centre is the source colour', 372 + 36, rowB, '#4a7bd0');
+
+  // ---- Row C: pattern fill, atlas ---------------------------------------
+  const rowC = 118;
+  label('makePattern (grass tile) + sprites on top', 16, rowC - 9);
+  ctx.fillStyle = px.makePattern(GRASS, GRASS_PAL);
+  ctx.fillRect(16, rowC, 176, 96);
+  // pattern space is anchored at the canvas origin, so tile coords are (x % 16, y % 16)
+  const grassAt = (sx, sy) => GRASS_PAL[GRASS[sy % 16][sx % 16]];
+  const lightX = 16 + ((2 - 16 % 16 + 16) % 16);
+  const lightY = rowC + ((1 - rowC % 16 + 16) % 16);
+  expectPixel('pattern places the light tile pixel', lightX, lightY, GRASS_PAL.G);
+  check('pattern light pixel is the art pixel (2,1)', grassAt(lightX, lightY) === GRASS_PAL.G);
+  expectPixel('pattern repeats horizontally', lightX + 16, lightY, GRASS_PAL.G);
+  expectPixel('pattern repeats vertically', lightX, lightY + 16, GRASS_PAL.G);
+  expectPixel('pattern base colour', lightX + 1, lightY, grassAt(lightX + 1, lightY));
+  let patternOk = true;
+  for (let y = 0; y < 32; y++) for (let x = 0; x < 32; x++) {
+    if (!near(pixel(16 + x, rowC + y), hexPx(grassAt(16 + x, rowC + y)))) patternOk = false;
+  }
+  check('pattern fill matches the tile art over a 32x32 block', patternOk);
+  check('makePattern is cached per tile', px.makePattern(GRASS, GRASS_PAL) === px.makePattern(px.decodeSprite(GRASS, GRASS_PAL)));
+  px.drawSprite(ctx, px.decodeSprite(FOX, FOX_PAL, { outline: '#1a1a2e' }), 40, rowC + 20, { scale: 2 });
+  px.drawSprite(ctx, px.decodeSprite(FOX, FOX_PAL, { outline: '#1a1a2e', flipX: true }), 100, rowC + 40);
+  px.drawSprite(ctx, coin, 130, rowC + 60);
+  expectPixel('coin highlight unflipped', 130 + 2, rowC + 60 + 2, COIN_PAL.Y);
+  px.drawSprite(ctx, coin, 150, rowC + 50, { alpha: 0.6 });
+  // sprite shadow via silhouette: decorated draw under a sprite
+  px.drawSprite(ctx, px.silhouette(coin, '#00000066'), 170, rowC + 72);
+  px.drawSprite(ctx, coin, 170, rowC + 68);
+
+  const night = px.decodeSprite(FOX, FOX_PAL, { tint: { color: '#223a6b', amount: 0.55 } });
+  const atlas = px.buildAtlas([fox, coin, night, heart, px.decodeSprite(COIN, COIN_PAL, { flipX: true }), unseen]);
+  label(`atlas ${atlas.w}x${atlas.h}`, 208, rowC - 9);
+  ctx.fillStyle = '#2a3342';
+  ctx.fillRect(208, rowC, atlas.w, atlas.h);
+  ctx.drawImage(atlas.canvas, 208, rowC);
+  check('atlas has one frame per input', atlas.frames.length === 6);
+  const f1 = atlas.frames[1];
+  expectPixel('atlas sheet holds coin frame', 208 + f1.x + 2, rowC + f1.y + 2, COIN_PAL.Y);
+
+  label('drawAtlasFrame', 300, rowC - 9);
+  atlas.frames.forEach((_, i) => px.drawAtlasFrame(ctx, atlas, i, 300 + i * 26, rowC + 8));
+  expectPixel('drawAtlasFrame coin highlight', 300 + 26 + 2, rowC + 8 + 2, COIN_PAL.Y);
+  expectPixel('drawAtlasFrame fox body', 300 + 2, rowC + 8 + 5, FOX_PAL.o);
+  expectPixel('drawAtlasFrame honours frame ox/oy', 300 + 26 * 5 + 0, rowC + 8 + 5, '#8fb3ff');
+  px.drawAtlasFrame(ctx, atlas, 1, 300, rowC + 40, { scale: 2, flipX: true });
+  expectPixel('drawAtlasFrame scale 2 + flipX', 300 + 11, rowC + 40 + 4, COIN_PAL.Y);
+  px.drawAtlasFrame(ctx, atlas, 2, 330, rowC + 36, { alpha: 0.8 });
+  px.drawAtlasFrame(ctx, atlas, 0, 360, rowC + 36, { flipY: true });
+  expectPixel('drawAtlasFrame flipY', 360 + 2, rowC + 36 + 10, FOX_PAL.o);
+
+  // bounds helper for hitboxes
+  const b = px.opaqueBounds(fox);
+  check('opaqueBounds trims the fox to 14x15', b.x === 1 && b.y === 1 && b.w === 14 && b.h === 15, JSON.stringify(b));
+
+  // cache stats
+  check('sprite cache populated', px.spriteCacheSize() > 10, `size=${px.spriteCacheSize()}`);
+  check('repeated decode hits the cache', px.decodeSprite(FOX, FOX_PAL) === fox);
+
+  // stress: decoding every frame must be cheap thanks to the identity fast path
+  const t0 = performance.now();
+  for (let i = 0; i < 20000; i++) px.decodeSprite(FOX, FOX_PAL, { flipX: (i & 1) === 1, outline: '#000' });
+  const perFrameMs = (performance.now() - t0) / 20000 * 300;
+  check('20k cached decodes are fast', perFrameMs < 4, `${perFrameMs.toFixed(3)} ms per 300 decodes`);
+} catch (err) {
+  check('demo ran without throwing', false, String(err && err.stack || err));
+}
+
+const passed = results.filter(Boolean).length;
+const failed = results.length - passed;
+label(`${passed}/${results.length} checks passed`, 380, 258);
+window.__pixelartDemo = { passed, failed, total: results.length };
+console.log(`PIXELART DEMO: ${passed}/${results.length} checks passed, ${failed} failed`);
+</script>
+</body>
+</html>

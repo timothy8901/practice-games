@@ -17,6 +17,14 @@
  *  - If a listener throws, the error propagates out of `emit()` and the remaining listeners are
  *    skipped, unless the bus was created with an `onError` handler; then the error is handed to it
  *    and dispatch continues. Either way the bus stays in a consistent state.
+ *  - Emits may nest (a listener may emit), but at most `maxDepth` emits can be in flight at once
+ *    (default {@link DEFAULT_MAX_DEPTH}). Going deeper means a listener feedback loop: the bus then
+ *    throws a `RangeError` (name `'EmitDepthError'`) that is never handed to `onError` and that
+ *    unwinds every emit in flight, so a loop fails fast with a readable error instead of a native
+ *    stack overflow or, with `onError`, a frozen game. Until the outermost emit has unwound, every
+ *    further `emit` on that bus throws the same error, even if a listener swallowed the first one.
+ *  - Listeners are expected to be synchronous. A returned promise is ignored and its rejection is
+ *    not routed to `onError`.
  */
 
 /**
@@ -24,6 +32,14 @@
  * @type {'*'}
  */
 export const WILDCARD = '*';
+
+/**
+ * Default for {@link BusOptions} `maxDepth`: how many emits may be in flight at once on one bus.
+ * Generous for any legitimate chain of game events, yet small enough that the guard always trips
+ * long before the JavaScript call stack would.
+ * @type {128}
+ */
+export const DEFAULT_MAX_DEPTH = 128;
 
 /**
  * A listener for a specific event.
@@ -66,7 +82,8 @@ export const WILDCARD = '*';
  *   Returns how many registrations were removed.
  * @property {(evt: string, ...args: any[]) => number} emit
  *   Synchronously calls the listeners of `evt`, then the wildcard listeners. Returns the number of
- *   listeners invoked (wildcards included).
+ *   listeners invoked (wildcards included). Throws a `RangeError` when emits nest deeper than
+ *   `maxDepth` (see the module notes).
  * @property {() => number} clear
  *   Removes every listener of every event. Returns how many registrations were removed.
  * @property {(evt: string) => number} listenerCount
@@ -77,8 +94,11 @@ export const WILDCARD = '*';
 
 /**
  * @typedef {Object} BusOptions
- * @property {ErrorHandler} [onError] When given, listener exceptions are routed here instead of
- *   aborting the emit.
+ * @property {ErrorHandler|null} [onError] When given, listener exceptions are routed here instead
+ *   of aborting the emit. `null` means "no handler", like omitting it.
+ * @property {number} [maxDepth] Maximum number of emits in flight at once on this bus (a positive
+ *   integer; `1` forbids nesting entirely). Defaults to {@link DEFAULT_MAX_DEPTH}. Keep it well
+ *   below the engine's call-stack limit so that the guard, not the engine, reports a feedback loop.
  */
 
 /**
@@ -93,14 +113,41 @@ export const WILDCARD = '*';
  */
 
 /**
+ * Thrown by `emit` when more than `maxDepth` emits are in flight. Module-private on purpose:
+ * `dispatch` must recognise it so that it is re-thrown instead of handed to `onError`. If it were
+ * treated as an ordinary listener error, every level of the loop would resume dispatch and re-enter
+ * the loop, which is exponential work and in practice never finishes.
+ */
+class EmitDepthError extends RangeError {
+  /**
+   * @param {string} evt The event whose emit exceeded the limit.
+   * @param {number} maxDepth The limit of the bus that tripped.
+   */
+  constructor(evt, maxDepth) {
+    super(
+      `events.emit: more than maxDepth (${maxDepth}) emits in flight while emitting ${JSON.stringify(evt)}; ` +
+        'a listener is probably re-emitting the event it handles',
+    );
+    this.name = 'EmitDepthError';
+  }
+}
+
+/**
  * Human-friendly description of a value for error messages.
  * @param {unknown} value
  * @returns {string}
  */
 function describe(value) {
   if (value === null) return 'null';
-  if (typeof value === 'string') return JSON.stringify(value);
-  return typeof value;
+  switch (typeof value) {
+    case 'string':
+      return JSON.stringify(value);
+    case 'number':
+    case 'boolean':
+      return String(value);
+    default:
+      return typeof value;
+  }
 }
 
 /**
@@ -128,12 +175,30 @@ function assertListener(fn, method) {
 }
 
 /**
+ * Validates and normalises {@link BusOptions}.
+ * @param {BusOptions|null|undefined} options
+ * @returns {{ onError: ErrorHandler|undefined, maxDepth: number }}
+ */
+function readOptions(options) {
+  const onError = options?.onError ?? undefined;
+  if (onError !== undefined && typeof onError !== 'function') {
+    throw new TypeError(`events.createBus: onError must be a function, got ${describe(onError)}`);
+  }
+  const maxDepth = options?.maxDepth ?? DEFAULT_MAX_DEPTH;
+  if (!Number.isInteger(maxDepth) || maxDepth < 1) {
+    throw new TypeError(`events.createBus: maxDepth must be a positive integer, got ${describe(maxDepth)}`);
+  }
+  return { onError, maxDepth };
+}
+
+/**
  * Creates an independent event bus.
  *
  * @param {BusOptions} [options]
  * @returns {EventBus} A frozen object; its methods are plain functions that may be detached
  *   (`const { on, emit } = createBus()`).
- * @throws {TypeError} If `options.onError` is provided but is not a function.
+ * @throws {TypeError} If `options.onError` is neither a function nor `null`/`undefined`, or if
+ *   `options.maxDepth` is not a positive integer.
  *
  * @example
  * const bus = createBus();
@@ -142,13 +207,14 @@ function assertListener(fn, method) {
  * off();
  */
 export function createBus(options) {
-  const onError = options?.onError;
-  if (onError !== undefined && typeof onError !== 'function') {
-    throw new TypeError(`events.createBus: onError must be a function, got ${describe(onError)}`);
-  }
+  const { onError, maxDepth } = readOptions(options);
 
   /** Live registrations per event name, in registration order. @type {Map<string, Entry[]>} */
   const lists = new Map();
+  /** Number of emits currently in flight on this bus. */
+  let depth = 0;
+  /** Set once the depth guard trips; cleared when the outermost emit has unwound. */
+  let tripped = false;
 
   /**
    * Registers an entry and returns its unsubscribe function.
@@ -214,6 +280,8 @@ export function createBus(options) {
         try {
           entry.fn(...callArgs);
         } catch (error) {
+          // A tripped depth guard (on this or any nested bus) must unwind the whole cascade.
+          if (error instanceof EmitDepthError) throw error;
           onError(error, evt, args);
         }
       } else {
@@ -254,16 +322,26 @@ export function createBus(options) {
     if (evt === WILDCARD) {
       throw new TypeError(`events.emit: '${WILDCARD}' is reserved for wildcard listeners and cannot be emitted`);
     }
-    // Both snapshots are taken before any listener runs, so a listener that registers new
-    // listeners (specific or wildcard) never affects the emit that is already in flight.
-    const specific = lists.get(evt);
-    const wild = lists.get(WILDCARD);
-    const specificSnapshot = specific ? specific.slice() : null;
-    const wildSnapshot = wild ? wild.slice() : null;
-    let invoked = 0;
-    if (specificSnapshot) invoked += dispatch(specificSnapshot, evt, args, args);
-    if (wildSnapshot) invoked += dispatch(wildSnapshot, evt, args, [evt, ...args]);
-    return invoked;
+    if (tripped || depth >= maxDepth) {
+      tripped = true;
+      throw new EmitDepthError(evt, maxDepth);
+    }
+    depth++;
+    try {
+      // Both snapshots are taken before any listener runs, so a listener that registers new
+      // listeners (specific or wildcard) never affects the emit that is already in flight.
+      const specific = lists.get(evt);
+      const wild = lists.get(WILDCARD);
+      const specificSnapshot = specific ? specific.slice() : null;
+      const wildSnapshot = wild ? wild.slice() : null;
+      let invoked = 0;
+      if (specificSnapshot) invoked += dispatch(specificSnapshot, evt, args, args);
+      if (wildSnapshot) invoked += dispatch(wildSnapshot, evt, args, [evt, ...args]);
+      return invoked;
+    } finally {
+      depth--;
+      if (depth === 0) tripped = false;
+    }
   }
 
   /** @type {EventBus['clear']} */

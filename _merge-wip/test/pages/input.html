@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>input.js demo</title>
+<link rel="icon" href="data:,">
+<style>
+  html, body { margin: 0; background: #0d1020; color: #dfe3ff; font: 13px/1.4 ui-monospace, Menlo, Consolas, monospace; }
+  #game { display: block; width: 960px; height: 540px; max-width: 100vw; image-rendering: pixelated; image-rendering: crisp-edges; background: #000; }
+  #log { margin: 0; padding: 8px 12px; white-space: pre-wrap; max-width: 936px; }
+  .pass { color: #7ee787; } .fail { color: #ff7b72; } .note { color: #8b949e; }
+</style>
+</head>
+<body>
+<canvas id="game" width="480" height="270"></canvas>
+<pre id="log"></pre>
+<script type="module">
+import { createInput, ACTIONS, ANY_KEY, tokenLabel } from '../../js/core/input.js';
+
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+ctx.imageSmoothingEnabled = false;
+const logEl = document.getElementById('log');
+const W = 480;
+const H = 270;
+
+// Minimal stand-in for canvas.js's Display: client -> game coordinates.
+const display = {
+  toGame(clientX, clientY) {
+    const r = canvas.getBoundingClientRect();
+    return { x: ((clientX - r.left) * W) / r.width, y: ((clientY - r.top) * H) / r.height };
+  },
+};
+
+const input = createInput({ canvas, display });
+
+// ---- self-test bookkeeping ---------------------------------------------------------------
+const results = { passed: 0, failed: 0, done: false };
+const appendLog = (text, cls) => {
+  const line = document.createElement('div');
+  line.className = cls;
+  line.textContent = text;
+  logEl.appendChild(line);
+};
+const pass = (msg) => { results.passed += 1; console.log(`PASS ${msg}`); appendLog(`PASS ${msg}`, 'pass'); };
+const fail = (msg) => { results.failed += 1; console.error(`FAIL ${msg}`); appendLog(`FAIL ${msg}`, 'fail'); };
+const check = (cond, msg) => (cond ? pass(msg) : fail(msg));
+
+const ALL = [...ACTIONS, ANY_KEY];
+const counts = { pressed: {}, released: {} };
+const flash = {};
+const recent = [];
+let repeatCount = 0;
+let repeatStart = 0;
+let repeatFramesLeft = 0;
+let skipTouch = false;
+
+const keyEv = (type, code, key = '') => {
+  const ev = new KeyboardEvent(type, { code, key, bubbles: true, cancelable: true });
+  window.dispatchEvent(ev);
+  return ev;
+};
+const ptrEv = (el, type, opts = {}) => {
+  const ev = new PointerEvent(type, { bubbles: true, cancelable: true, pointerId: 1, pointerType: 'mouse', isPrimary: true, ...opts });
+  el.dispatchEvent(ev);
+  return ev;
+};
+const dpadEl = () => document.querySelector('.wsp-touch__dpad');
+const aBtn = () => document.querySelector('.wsp-touch__btn--a');
+const canvasCenter = () => {
+  const r = canvas.getBoundingClientRect();
+  return { clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 };
+};
+
+// Each step runs on its own frame, right after input.update().
+const steps = [
+  () => { check(ALL.every((a) => !input.pressed(a) && !input.held(a)), 'idle: nothing pressed or held'); keyEv('keydown', 'KeyZ', 'z'); },
+  () => { check(input.pressed('confirm') && input.held('confirm'), 'KeyZ down -> confirm pressed + held'); check(input.pressed(ANY_KEY), 'anyKey pressed'); check(input.lastDevice === 'keyboard', 'lastDevice keyboard'); },
+  () => { check(!input.pressed('confirm') && input.held('confirm'), 'next frame: confirm held only'); keyEv('keyup', 'KeyZ', 'z'); },
+  () => { check(input.released('confirm') && !input.held('confirm'), 'KeyZ up -> confirm released'); },
+  () => { keyEv('keydown', 'ArrowRight'); keyEv('keydown', 'ArrowUp'); },
+  () => { const a = input.axis(); check(a.x === 1 && a.y === -1, `axis from arrows = (${a.x},${a.y})`); keyEv('keyup', 'ArrowRight'); keyEv('keyup', 'ArrowUp'); },
+  () => { keyEv('keydown', 'Escape'); },
+  () => { check(input.pressed('cancel') && input.pressed('menu'), 'Escape -> cancel + menu'); keyEv('keyup', 'Escape'); },
+  () => { keyEv('keydown', 'KeyX'); keyEv('keyup', 'KeyX'); },
+  () => { check(input.pressed('cancel') && input.released('cancel') && !input.held('cancel'), 'tap within one frame -> pressed + released'); },
+  () => { keyEv('keydown', 'Space'); input.flush(); },
+  () => { check(!input.pressed('confirm') && input.held('confirm'), 'flush: key held at scene entry is not a press'); keyEv('keyup', 'Space'); },
+  () => { const ev = keyEv('keydown', 'Tab'); check(ev.defaultPrevented, 'Tab default prevented (focus stays in game)'); check(!keyEv('keydown', 'KeyQ').defaultPrevented, 'unbound key not prevented'); keyEv('keyup', 'Tab'); keyEv('keyup', 'KeyQ'); },
+  () => { check(input.pressed('log'), 'Tab -> log pressed'); check(input.pressed(ANY_KEY), 'unbound KeyQ -> anyKey'); },
+  () => { ptrEv(canvas, 'pointerdown', { ...canvasCenter(), button: 0 }); },
+  () => { const p = input.pointer; check(p.justDown && p.down && Math.abs(p.x - 240) < 1 && Math.abs(p.y - 135) < 1 && p.inside, `pointer down at (${p.x.toFixed(1)},${p.y.toFixed(1)})`); ptrEv(window, 'pointerup', { clientX: 0, clientY: 0 }); },
+  () => { check(input.pointer.justUp && !input.pointer.down, 'pointer up -> justUp'); },
+  () => { input.rebind('confirm', 'KeyJ'); keyEv('keydown', 'KeyZ'); },
+  () => { check(!input.pressed('confirm'), 'after rebind KeyZ no longer confirms'); keyEv('keyup', 'KeyZ'); keyEv('keydown', 'KeyJ'); },
+  () => {
+    check(input.pressed('confirm'), 'KeyJ confirms after rebind');
+    keyEv('keyup', 'KeyJ');
+    const json = input.saveBindings();
+    input.resetBindings();
+    check(input.bindings().confirm.includes('KeyZ'), 'resetBindings restores defaults');
+    check(input.loadBindings(json) && input.bindings().confirm.includes('KeyJ') && !input.bindings().confirm.includes('KeyZ'), 'save/load round trip');
+    input.resetBindings();
+  },
+  () => { keyEv('keydown', 'ArrowDown'); repeatCount = 0; repeatStart = performance.now(); repeatFramesLeft = 30; },
+];
+const repeatStep = () => {
+  if (input.repeat('down', { delay: 120, rate: 40 })) repeatCount += 1;
+  repeatFramesLeft -= 1;
+  if (repeatFramesLeft === 0) {
+    const elapsed = performance.now() - repeatStart;
+    const expected = 1 + Math.floor(Math.max(0, elapsed - 120) / 40);
+    check(repeatCount >= 2 && repeatCount <= expected + 1, `repeat('down') fired ${repeatCount}x over ${elapsed.toFixed(0)}ms (<= ${expected + 1})`);
+    keyEv('keyup', 'ArrowDown');
+  }
+};
+const touchSteps = [
+  () => {
+    if (!dpadEl() || !input.touchVisible) { skipTouch = true; pass('touch overlay hidden (no coarse pointer, no ?touch=1)'); return; }
+    const r = dpadEl().getBoundingClientRect();
+    ptrEv(dpadEl(), 'pointerdown', { pointerId: 9, pointerType: 'touch', clientX: r.left + r.width * 0.9, clientY: r.top + r.height / 2 });
+  },
+  () => {
+    if (skipTouch) return;
+    check(input.pressed('right') && input.lastDevice === 'touch', 'd-pad touch -> right pressed, lastDevice touch');
+    check(getComputedStyle(document.querySelector('.wsp-touch')).position === 'fixed', 'overlay stylesheet applied');
+    check(getComputedStyle(dpadEl()).pointerEvents === 'auto' && getComputedStyle(document.querySelector('.wsp-touch')).pointerEvents === 'none', 'overlay passes pointer events through except on controls');
+    const r = dpadEl().getBoundingClientRect();
+    ptrEv(dpadEl(), 'pointermove', { pointerId: 9, pointerType: 'touch', clientX: r.left + r.width * 0.85, clientY: r.top + r.height * 0.85 });
+  },
+  () => { if (skipTouch) return; check(input.held('right') && input.pressed('down'), 'd-pad slide -> diagonal'); ptrEv(dpadEl(), 'pointerup', { pointerId: 9, pointerType: 'touch', clientX: 0, clientY: 0 }); },
+  () => {
+    if (skipTouch) return;
+    check(input.released('right') && input.released('down'), 'd-pad lift -> released');
+    const r = aBtn().getBoundingClientRect();
+    ptrEv(aBtn(), 'pointerdown', { pointerId: 10, pointerType: 'touch', clientX: r.left + 5, clientY: r.top + 5 });
+  },
+  () => { if (skipTouch) return; check(input.pressed('confirm') && aBtn().classList.contains('is-on'), 'A button -> confirm (+ pressed style)'); ptrEv(aBtn(), 'pointerup', { pointerId: 10, pointerType: 'touch' }); },
+  () => { if (skipTouch) return; check(input.released('confirm') && !aBtn().classList.contains('is-on'), 'A button release'); },
+];
+const finish = () => {
+  results.done = true;
+  const line = `SUMMARY ${results.passed} passed, ${results.failed} failed`;
+  (results.failed ? console.error : console.log)(line);
+  appendLog(line, results.failed ? 'fail' : 'pass');
+  appendLog('Now try the real keyboard / gamepad / touch controls; the panel above is live.', 'note');
+};
+
+let stepIndex = 0;
+const runStep = () => {
+  if (stepIndex < steps.length) { steps[stepIndex](); stepIndex += 1; return; }
+  if (repeatFramesLeft > 0) { repeatStep(); return; }
+  const t = stepIndex - steps.length;
+  if (t < touchSteps.length) { touchSteps[t](); stepIndex += 1; return; }
+  if (!results.done) finish();
+};
+
+// ---- live panel -----------------------------------------------------------------------------
+const sample = () => {
+  for (const a of ALL) {
+    if (input.pressed(a)) { counts.pressed[a] = (counts.pressed[a] || 0) + 1; flash[a] = 12; recent.push(`v ${a}`); }
+    if (input.released(a)) { counts.released[a] = (counts.released[a] || 0) + 1; recent.push(`^ ${a}`); }
+  }
+  while (recent.length > 9) recent.shift();
+};
+
+const text = (s, x, y, color = '#dfe3ff', align = 'left') => { ctx.fillStyle = color; ctx.textAlign = align; ctx.fillText(s, x, y); };
+
+const draw = () => {
+  ctx.fillStyle = '#0d1020';
+  ctx.fillRect(0, 0, W, H);
+  ctx.font = '10px ui-monospace, Menlo, Consolas, monospace';
+  ctx.textBaseline = 'alphabetic';
+  text('input.js  -  live state', 8, 14, '#ffd36a');
+  text(`device: ${input.lastDevice}   frame: ${input.frame}   gamepads: ${input.gamepads}   touch overlay: ${input.touchVisible ? 'on' : 'off'}`, 8, 28, '#9aa4d6');
+
+  ALL.forEach((a, i) => {
+    const x = 8 + (i % 8) * 58;
+    const y = 36 + Math.floor(i / 8) * 24;
+    const held = input.held(a);
+    const f = flash[a] || 0;
+    ctx.fillStyle = held ? '#2f9e68' : f > 0 ? `rgba(255,211,106,${f / 12})` : '#1c2140';
+    ctx.fillRect(x, y, 54, 20);
+    ctx.strokeStyle = held ? '#7ee787' : '#343b63';
+    ctx.strokeRect(x + 0.5, y + 0.5, 53, 19);
+    text(a, x + 27, y + 14, held ? '#ffffff' : '#c3c9f0', 'center');
+    if (f > 0) flash[a] = f - 1;
+  });
+
+  const ax = input.axis();
+  text('axis', 8, 100, '#9aa4d6');
+  for (let gy = -1; gy <= 1; gy++) for (let gx = -1; gx <= 1; gx++) {
+    const on = gx === ax.x && gy === ax.y;
+    ctx.fillStyle = on ? (gx === 0 && gy === 0 ? '#5c6390' : '#ffd36a') : '#1c2140';
+    ctx.fillRect(8 + (gx + 1) * 14, 106 + (gy + 1) * 14, 12, 12);
+  }
+  text(`(${ax.x}, ${ax.y})`, 54, 130, '#dfe3ff');
+
+  const p = input.pointer;
+  text('pointer', 8, 162, '#9aa4d6');
+  text(`x ${p.x.toFixed(0)}  y ${p.y.toFixed(0)}  ${p.down ? 'DOWN' : 'up'}${p.justDown ? ' justDown' : ''}${p.justUp ? ' justUp' : ''}`, 8, 174);
+  text(`inside ${p.inside}  type ${p.type || '-'}  button ${p.button}`, 8, 186, '#9aa4d6');
+  if (p.inside) {
+    ctx.strokeStyle = p.down ? '#ffd36a' : '#7ee787';
+    ctx.strokeRect(Math.floor(p.x) - 3.5, Math.floor(p.y) - 3.5, 7, 7);
+  }
+
+  // The bottom block starts at x=90 so the touch d-pad (bottom-left) and A/B (bottom-right) never cover it.
+  const bx = 90;
+  text(`repeat('down'): ${repeatCount}   heldFor(run): ${input.heldFor('run').toFixed(0)}ms`, bx, 204, '#dfe3ff');
+  const b = input.bindings();
+  const labels = (action) => b[action].map(tokenLabel).join(' ');
+  text(`confirm: ${labels('confirm')}`, bx, 216, '#9aa4d6');
+  text(`cancel: ${labels('cancel')}`, bx, 228, '#9aa4d6');
+  text(`menu: ${labels('menu')}`, bx, 240, '#9aa4d6');
+  text(`run: ${labels('run')}   log: ${labels('log')}`, bx, 252, '#9aa4d6');
+
+  text('events', 300, 100, '#9aa4d6');
+  recent.forEach((line, i) => text(line, 300, 112 + i * 12, line.startsWith('v') ? '#7ee787' : '#ff9d7a'));
+
+  const summary = results.done
+    ? `self-test: ${results.passed} passed, ${results.failed} failed`
+    : `self-test running... ${results.passed + results.failed} checks`;
+  text(summary, bx, 264, results.failed ? '#ff7b72' : '#7ee787');
+};
+
+const frame = () => {
+  input.update();
+  runStep();
+  sample();
+  draw();
+  requestAnimationFrame(frame);
+};
+requestAnimationFrame(frame);
+
+// Harness hook (test page only): plain-data snapshots for the Playwright script.
+window.__inputPage = {
+  summary: () => ({ ...results }),
+  counts: () => JSON.parse(JSON.stringify(counts)),
+  pointerLast: () => ({ ...input.pointer }),
+  state: () => ({ lastDevice: input.lastDevice, touchVisible: input.touchVisible, held: ALL.filter((a) => input.held(a)), axis: input.axis() }),
+};
+</script>
+</body>
+</html>

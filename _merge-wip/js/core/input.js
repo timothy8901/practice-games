@@ -95,7 +95,7 @@ const KEY_LABELS = {
   Escape: 'Esc', Backspace: 'Bksp', Delete: 'Del', Insert: 'Ins', PageUp: 'PgUp', PageDown: 'PgDn',
   ShiftLeft: 'Shift', ShiftRight: 'Shift', ControlLeft: 'Ctrl', ControlRight: 'Ctrl',
   AltLeft: 'Alt', AltRight: 'Alt', MetaLeft: 'Meta', MetaRight: 'Meta', CapsLock: 'Caps',
-  NumpadEnter: 'Enter', BracketLeft: '[', BracketRight: ']', Backquote: '`', Minus: '-', Equal: '=',
+  BracketLeft: '[', BracketRight: ']', Backquote: '`', Minus: '-', Equal: '=',
   Semicolon: ';', Quote: "'", Comma: ',', Period: '.', Slash: '/', Backslash: '\\',
 };
 
@@ -146,7 +146,7 @@ const OVERLAY_CSS = [
  * @property {boolean} down     Primary pointer currently held on the canvas.
  * @property {boolean} justDown Pointer went down since the previous `update()`.
  * @property {boolean} justUp   Pointer came up since the previous `update()`.
- * @property {boolean} inside   Last position lies inside the game area.
+ * @property {boolean} inside   Last position lies inside the game area (false until a pointer is seen).
  * @property {'mouse'|'pen'|'touch'|''} type  Pointer type of the last event.
  * @property {number} button    Button of the last pointer-down (0 = primary).
  */
@@ -324,9 +324,9 @@ export function dpadDirections(dx, dy, deadzone = 0) {
  * @returns {{visible: boolean, forced: boolean}} `forced` means auto show/hide is disabled.
  */
 export function detectTouchPreference({ touch = 'auto', search = '', nav = null, matchMedia = null } = {}) {
-  const query = /[?&]touch=([^&#]*)/.exec(typeof search === 'string' ? search : '');
+  const query = /[?&]touch(?:=([^&#]*))?(?=[&#]|$)/.exec(typeof search === 'string' ? search : '');
   if (query) {
-    const value = query[1].toLowerCase();
+    const value = (query[1] ?? '').toLowerCase();
     if (value === '1' || value === 'true' || value === '') return { visible: true, forced: true };
     if (value === '0' || value === 'false') return { visible: false, forced: true };
   }
@@ -341,7 +341,8 @@ export function detectTouchPreference({ touch = 'auto', search = '', nav = null,
 /**
  * Parse a bindings document (JSON string or object, either `{version, bindings}` or a bare
  * `{action: tokens}` table). Unknown actions and malformed tokens are dropped rather than
- * rejected so older or hand-edited saves still load.
+ * rejected so older or hand-edited saves still load. An explicitly empty list unbinds an
+ * action; a list whose tokens were all malformed is ignored.
  * @param {string|object} source
  * @returns {{bindings: Bindings, dropped: string[]}|null} null when `source` is not an object.
  */
@@ -374,6 +375,7 @@ export function parseBindings(source) {
       if (tokenDevice(token) && !clean.includes(token)) clean.push(token);
       else dropped.push(`${action}:${String(token)}`);
     }
+    if (clean.length === 0 && list.length > 0) continue; // every token was bad: keep the default, do not unbind
     bindings[action] = clean;
   }
   return { bindings, dropped };
@@ -449,7 +451,7 @@ export function createInput(options = {}) {
   const repeatState = new Map();
 
   // ---- pointer ---------------------------------------------------------------------------
-  const ptr = { x: 0, y: 0, down: false, type: '', button: 0 };
+  const ptr = { x: 0, y: 0, down: false, type: '', button: 0, seen: false };
   let ptrId = null;
   let ptrPendingDown = 0;
   let ptrPendingUp = 0;
@@ -478,7 +480,7 @@ export function createInput(options = {}) {
   const touchPref = detectTouchPreference({ touch, search, nav, matchMedia });
   let touchForced = touchPref.forced;
   const overlayParent = touchParent ?? (doc && doc.body) ?? null;
-  const overlay = touch !== false || touchPref.forced
+  const overlay = touch !== false || touchPref.visible
     ? createTouchOverlay({
       doc,
       parent: overlayParent,
@@ -523,11 +525,15 @@ export function createInput(options = {}) {
     state.release += 1;
   }
 
+  function isTokenDown(token) {
+    const state = tokens.get(token);
+    return Boolean(state && state.down);
+  }
+
   function releaseAll(device = null) {
     for (const [token, state] of tokens) {
       if (state.down && (device === null || state.device === device)) tokenUp(token);
     }
-    if (device === null || device === 'gamepad') gamepadDown = new Set();
     if (device === null && ptr.down) {
       ptr.down = false;
       ptrId = null;
@@ -573,15 +579,17 @@ export function createInput(options = {}) {
     const p = toGame(ev.clientX, ev.clientY);
     ptr.x = p.x;
     ptr.y = p.y;
+    ptr.seen = true;
     ptr.type = typeof ev.pointerType === 'string' ? ev.pointerType : '';
   }
 
   function onCanvasPointerDown(ev) {
     if (!enabled) return;
-    if (ptrId !== null && ev.pointerId !== ptrId) return; // ignore extra fingers
+    const id = pointerId(ev);
+    if (ptrId !== null && id !== ptrId) return; // ignore extra fingers
     updatePointerPos(ev);
     setDevice(ev.pointerType === 'touch' ? 'touch' : 'keyboard');
-    ptrId = ev.pointerId ?? 0;
+    ptrId = id;
     ptr.down = true;
     ptr.button = typeof ev.button === 'number' ? ev.button : 0;
     ptrPendingDown += 1;
@@ -596,13 +604,12 @@ export function createInput(options = {}) {
   }
 
   function onPointerMove(ev) {
-    if (ptrId !== null && ev.pointerId !== ptrId) return;
-    if (ptrId === null && ev.target !== canvas) return; // hover only counts over the canvas
+    if (ptrId !== null && pointerId(ev) !== ptrId) return; // only the captured finger drags
     updatePointerPos(ev);
   }
 
   function onPointerUp(ev) {
-    if (ptrId === null || ev.pointerId !== ptrId) return;
+    if (ptrId === null || pointerId(ev) !== ptrId) return;
     updatePointerPos(ev);
     ptr.down = false;
     ptrId = null;
@@ -614,7 +621,7 @@ export function createInput(options = {}) {
     if (gamepadBroken || !nav || typeof nav.getGamepads !== 'function') return [];
     try {
       const pads = nav.getGamepads();
-      return pads ? Array.from(pads, (pad) => pad).filter((pad) => pad && pad.connected !== false) : [];
+      return pads ? Array.from(pads).filter((pad) => pad && pad.connected !== false) : [];
     } catch {
       gamepadBroken = true; // e.g. SecurityError inside a sandboxed iframe
       return [];
@@ -624,7 +631,6 @@ export function createInput(options = {}) {
   function pollGamepads() {
     const pads = readGamepads();
     gamepadCount = pads.length;
-    if (!enabled) return;
     const nowDown = new Set();
     for (const pad of pads) {
       const buttons = pad.buttons || [];
@@ -644,9 +650,14 @@ export function createInput(options = {}) {
         }
       }
     }
-    for (const token of nowDown) if (!gamepadDown.has(token)) tokenDown(token, 'gamepad');
-    for (const token of gamepadDown) if (!nowDown.has(token)) tokenUp(token);
-    gamepadDown = nowDown;
+    if (enabled) {
+      for (const token of nowDown) {
+        if (!gamepadDown.has(token)) tokenDown(token, 'gamepad');
+        else if (!isTokenDown(token)) tokenHold(token, 'gamepad'); // held across a blur: no new press
+      }
+      for (const token of gamepadDown) if (!nowDown.has(token)) tokenUp(token);
+    }
+    gamepadDown = nowDown; // tracked while disabled too, so re-enabling never fabricates presses
   }
 
   // ---- frame latch --------------------------------------------------------------------------
@@ -701,7 +712,7 @@ export function createInput(options = {}) {
       down: ptr.down,
       justDown,
       justUp,
-      inside: ptr.x >= 0 && ptr.y >= 0 && ptr.x < width && ptr.y < height,
+      inside: ptr.seen && ptr.x >= 0 && ptr.y >= 0 && ptr.x < width && ptr.y < height,
       type: ptr.type,
       button: ptr.button,
     });
@@ -803,7 +814,7 @@ export function createInput(options = {}) {
       else if (index < mine.length) mine.splice(index, 1, ...keys);
       else mine.push(...keys);
     }
-    bindings[action] = dedupe([...others, ...mine]);
+    bindings[action] = orderTokens([...others, ...mine]);
     rebuildIndex();
     return [...bindings[action]];
   }
@@ -812,7 +823,7 @@ export function createInput(options = {}) {
     assertAction(action, false);
     if (!tokenDevice(key)) throw new TypeError(`addBinding: invalid token ${JSON.stringify(key)}`);
     if (!bindings[action].includes(key)) {
-      bindings[action] = [...bindings[action], key];
+      bindings[action] = orderTokens([...bindings[action], key]);
       rebuildIndex();
     }
     return [...bindings[action]];
@@ -911,7 +922,6 @@ export function createInput(options = {}) {
   listen(target, 'pointerup', onPointerUp);
   listen(target, 'pointercancel', onPointerUp);
   listen(canvas, 'pointerdown', onCanvasPointerDown);
-  listen(canvas, 'pointermove', onPointerMove);
   listen(canvas, 'contextmenu', (ev) => {
     if (preventDefault && typeof ev.preventDefault === 'function') ev.preventDefault();
   });
@@ -1038,19 +1048,19 @@ function createTouchOverlay({ doc, parent, fixed, onToken }) {
     applyDirs(dpadDirections(ev.clientX - cx, ev.clientY - cy, rect.width * 0.08));
   };
   const dpadEnd = (ev) => {
-    if (dpadPointer === null || ev.pointerId !== dpadPointer) return;
+    if (dpadPointer === null || pointerId(ev) !== dpadPointer) return;
     dpadPointer = null;
     applyDirs(NO_DIRS);
   };
   listen(dpad, 'pointerdown', (ev) => {
     if (dpadPointer !== null) return;
     ev.preventDefault();
-    dpadPointer = ev.pointerId ?? 0;
+    dpadPointer = pointerId(ev);
     capturePointer(dpad, dpadPointer);
     dpadMove(ev);
   });
   listen(dpad, 'pointermove', (ev) => {
-    if (dpadPointer === null || ev.pointerId !== dpadPointer) return;
+    if (dpadPointer === null || pointerId(ev) !== dpadPointer) return;
     dpadMove(ev);
   });
   listen(dpad, 'pointerup', dpadEnd);
@@ -1062,7 +1072,7 @@ function createTouchOverlay({ doc, parent, fixed, onToken }) {
     buttonPointers[name] = null;
     const token = `touch:${name}`;
     const end = (ev) => {
-      if (buttonPointers[name] === null || ev.pointerId !== buttonPointers[name]) return;
+      if (buttonPointers[name] === null || pointerId(ev) !== buttonPointers[name]) return;
       buttonPointers[name] = null;
       el.classList.remove('is-on');
       onToken(token, false);
@@ -1070,7 +1080,7 @@ function createTouchOverlay({ doc, parent, fixed, onToken }) {
     listen(el, 'pointerdown', (ev) => {
       if (buttonPointers[name] !== null) return;
       ev.preventDefault();
-      buttonPointers[name] = ev.pointerId ?? 0;
+      buttonPointers[name] = pointerId(ev);
       capturePointer(el, buttonPointers[name]);
       el.classList.add('is-on');
       onToken(token, true);
@@ -1116,6 +1126,10 @@ function ensureOverlayStyle(doc) {
   style.textContent = OVERLAY_CSS;
   const host = doc.head || doc.body || doc.documentElement;
   if (host) host.appendChild(style);
+}
+
+function pointerId(ev) {
+  return typeof ev.pointerId === 'number' ? ev.pointerId : 0;
 }
 
 function capturePointer(el, id) {
@@ -1195,8 +1209,10 @@ function freezeBindings(table) {
   return Object.freeze(table);
 }
 
-function dedupe(list) {
-  return list.filter((item, index) => list.indexOf(item) === index);
+/** De-duplicate and group tokens keyboard -> gamepad -> touch, keeping relative order. */
+function orderTokens(list) {
+  const unique = list.filter((item, index) => list.indexOf(item) === index);
+  return DEVICES.flatMap((device) => unique.filter((token) => tokenDevice(token) === device));
 }
 
 function clamp01(value) {

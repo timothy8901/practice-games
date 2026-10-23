@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>font.js demo</title>
+<style>
+  html, body { margin: 0; background: #14121c; color: #ddd; font: 12px monospace; }
+  canvas { display: block; width: 960px; height: 540px; image-rendering: pixelated; image-rendering: crisp-edges; }
+  #log { padding: 6px 8px; white-space: pre; }
+</style>
+</head>
+<body>
+<canvas id="c" width="480" height="270"></canvas>
+<div id="log"></div>
+<script type="module">
+import {
+  drawText, drawTextTyped, measureText, wrapText, rasterizeText, glyphCacheSize, FONT_NAMES,
+} from '../../js/core/font.js';
+
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+ctx.imageSmoothingEnabled = false;
+const results = [];
+const logEl = document.getElementById('log');
+function report(ok, name, detail = '') {
+  const line = `${ok ? 'PASS' : 'FAIL'} ${name}${detail ? ' - ' + detail : ''}`;
+  results.push({ ok, name, detail });
+  console.log(line);
+  logEl.textContent += line + '\n';
+}
+function check(name, fn) {
+  try {
+    const r = fn();
+    report(r === true, name, r === true ? '' : String(r));
+  } catch (e) {
+    report(false, name, String(e && e.stack || e));
+  }
+}
+
+const ASCII = Array.from({ length: 95 }, (_, i) => String.fromCharCode(32 + i)).join('');
+const PARA = 'Porchlight meets Wildshift: shift form at dusk, follow the tide, and bring the lantern home before the ✦ Heartmark fades…';
+const TYPED = '"Tide’s low at 12:30," said Mémé. "Fetch the ◉ coins — and don’t wake the ♥!"';
+let typedChars = 0;
+let frame = 0;
+
+function drawFrame() {
+  ctx.fillStyle = '#1b2838';
+  ctx.fillRect(0, 0, 480, 270);
+  // Title: big, outlined + shadowed, centred
+  drawText(ctx, 'FONT.JS', 240, 6, { scale: 3, align: 'center', color: '#ffd166', outline: '#3a1f0b', shadow: { color: '#000', dx: 1, dy: 2 } });
+  drawText(ctx, 'bitmap text ✦ atlas-cached ✦ tinted', 240, 30, { align: 'center', color: '#9ad1ff', shadow: true });
+  // ASCII table in 3 rows
+  drawText(ctx, ASCII.slice(0, 32), 8, 46, { color: '#e8e8e8' });
+  drawText(ctx, ASCII.slice(32, 64), 8, 57, { color: '#e8e8e8' });
+  drawText(ctx, ASCII.slice(64), 8, 68, { color: '#e8e8e8' });
+  // Symbols & accents
+  drawText(ctx, 'Symbols: ◉ ✦ ♥ ★ ☾ ☀ ▲ ▼ ◀ ▶ ↑ ↓ ← → … • × °', 8, 84, { color: '#ff9fd2' });
+  drawText(ctx, 'Accents: é è ê á à ü ö ñ  café  niño  über  Noël', 8, 95, { color: '#b5f28a' });
+  // Small font
+  drawText(ctx, 'SMALL 3x5: 0123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ ♥★✦◉ ↑↓←→ 12:30 +5% -3 (x2)', 8, 110, { font: 'small', color: '#ffe9a8' });
+  drawText(ctx, 'lowercase labels become CAPS: hp mp lvl 99', 8, 118, { font: 'small', color: '#c9c9c9' });
+  // Alignment column
+  drawText(ctx, 'left', 300, 128, { align: 'left', color: '#fff' });
+  drawText(ctx, 'center', 390, 128, { align: 'center', color: '#fff' });
+  drawText(ctx, 'right', 472, 128, { align: 'right', color: '#fff' });
+  ctx.fillStyle = '#ffffff33';
+  ctx.fillRect(300, 126, 1, 11); ctx.fillRect(390, 126, 1, 11); ctx.fillRect(472, 126, 1, 11);
+  // Wrapped paragraph in a box
+  const boxX = 8, boxY = 130, boxW = 280;
+  const lines = wrapText(PARA, boxW);
+  const m = measureText(PARA, { maxWidth: boxW });
+  ctx.fillStyle = '#0d141c';
+  ctx.fillRect(boxX - 3, boxY - 3, boxW + 6, m.h + 6);
+  ctx.strokeStyle = '#3a5068';
+  ctx.strokeRect(boxX - 2.5, boxY - 2.5, boxW + 5, m.h + 5);
+  drawText(ctx, PARA, boxX, boxY, { maxWidth: boxW, color: '#dfe7f1' });
+  // Scale 2 with letterSpacing + alpha ghost
+  drawText(ctx, 'LEVEL UP!', 300, 150, { scale: 2, color: '#ffffff', alpha: 0.25 });
+  drawText(ctx, 'LEVEL UP!', 302, 148, { scale: 2, color: '#7CFC9A', outline: true, letterSpacing: 1 });
+  // Typed dialogue box
+  const dX = 8, dY = 200, dW = 464;
+  ctx.fillStyle = '#0a0a12';
+  ctx.fillRect(dX - 4, dY - 4, dW + 8, 60);
+  ctx.strokeStyle = '#ffd166';
+  ctx.strokeRect(dX - 3.5, dY - 3.5, dW + 7, 59);
+  const t = drawTextTyped(ctx, TYPED, dX, dY, typedChars, { maxWidth: dW, color: '#fff7e0', shadow: true });
+  if (!t.done) drawText(ctx, '▼', 462, 244, { color: '#ffd166', alpha: (Math.sin(frame / 6) + 1) / 2 });
+  else drawText(ctx, '▼', 462, 244 + (frame % 20 < 10 ? 0 : 1), { color: '#ffd166' });
+  return { lines, m, t };
+}
+
+// --- Checks ---------------------------------------------------------------
+let first;
+check('draws a full frame without throwing', () => { first = drawFrame(); return true; });
+check('wrapText lines all fit the box', () => first.lines.every((l) => measureText(l).w <= 280) || first.lines.join('|'));
+check('measureText matches wrapped line count', () => first.m.lines === first.lines.length || `${first.m.lines} vs ${first.lines.length}`);
+check('typed text starts hidden', () => first.t.shown === 0 && first.t.done === false || JSON.stringify(first.t));
+check('atlas cache populated lazily for both fonts', () => FONT_NAMES.every((f) => glyphCacheSize(f) > 0) || FONT_NAMES.map((f) => glyphCacheSize(f)).join(','));
+check('pixel probe: ASCII row has ink where "I" of row 2 starts', () => {
+  // '@' at x=8 is col 0 of row 2 (ASCII.slice(32)) -> 'A' starts after '@'(5)+gap(1) = 14; 'A' row 1 has pixel at col 0
+  const p = ctx.getImageData(14, 58, 1, 1).data;
+  return p[3] === 255 && p[0] > 200 || `rgba(${p.join(',')})`;
+});
+check('pixel probe: background stays clear between glyphs', () => {
+  const p = ctx.getImageData(13, 58, 1, 1).data; // gap column between '@' and 'A'
+  return p[0] === 0x1b && p[1] === 0x28 && p[2] === 0x38 || `rgb(${p.join(',')})`;
+});
+check('pixel probe: tinted colour reaches the canvas', () => {
+  // 'S' of 'Symbols' at (8,84): row 0 of S is '.####' -> pixel at x=9,y=84 should be the pink tint
+  const p = ctx.getImageData(9, 84, 1, 1).data;
+  return p[0] === 0xff && p[1] === 0x9f && p[2] === 0xd2 || `rgb(${p.join(',')})`;
+});
+check('rasterizeText agrees with canvas pixels for a word', () => {
+  const r = rasterizeText('left');
+  // 'left' drawn at (300,128)
+  for (let y = 0; y < r.h; y++) {
+    for (let x = 0; x < r.w; x++) {
+      const on = r.rows[y][x] === '#';
+      const p = ctx.getImageData(300 + x, 128 + y, 1, 1).data;
+      const lit = p[0] === 255 && p[1] === 255 && p[2] === 255;
+      if (on !== lit) return `mismatch at ${x},${y} expected ${on}`;
+    }
+  }
+  return true;
+});
+
+// Animate the typewriter, then finish with a summary.
+let done = false;
+function loop() {
+  frame++;
+  if (frame % 2 === 0) typedChars++;
+  const { t } = drawFrame();
+  if (t.done && !done) {
+    done = true;
+    check('typed text completes with all characters', () => t.shown === t.total && t.total === [...TYPED].length - 2 || JSON.stringify(t));
+    const fails = results.filter((r) => !r.ok).length;
+    console.log(`FONT PAGE SUMMARY: ${results.length - fails} pass, ${fails} fail`);
+    window.__fontTest = { results, pass: results.length - fails, fail: fails };
+  }
+  requestAnimationFrame(loop);
+}
+window.__fontTest = { results, pass: results.filter((r) => r.ok).length, fail: results.filter((r) => !r.ok).length, pending: true };
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
