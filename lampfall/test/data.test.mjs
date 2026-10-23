@@ -70,11 +70,12 @@ test('CLI exits 1 on the broken fixture and prints `error table:id: message` lin
   assert.ok(lines.some((l) => l.includes("scripts:ph-trainer-loss[0]: unknown op 'dance'")));
 });
 
-test('CLI --strict fails on warnings', () => {
+test('CLI --strict fails on warnings', async () => {
   const r = spawnSync(process.execPath, [CLI, '--quiet', '--strict'], { cwd: ROOT, encoding: 'utf8' });
-  const { warnings } = run(DATA);
-  // the shipped data warns only about lanes that have not landed (sprites, bag handlers)
-  assert.equal(r.status, warnings.length ? 1 : 0);
+  // The CLI loads every lane that exists (sprites, hooks, bag handlers), so compare against the same options.
+  const { opts } = await loadOptions();
+  const { warnings } = run(DATA, opts);
+  assert.equal(r.status, warnings.length ? 1 : 0, r.stderr);
 });
 
 test('moves: evasion pp, Scrap-only null pp, signature learnset', () => {

@@ -367,7 +367,7 @@ export function createSaveLoadScene(G) {
     const rect = rowRect(i);
     const s = summaries.get(r.entry.slot) ?? slotSummary(r.entry);
     const focused = focus.index === i && panel === 'list' && !(banner && !banner.ok);
-    drawCard(ctx, rect, skin, { focused, dim: s.state !== 'ok' && tabs.active === 'load' });
+    drawCard(ctx, rect, skin, { focused, dim: (s.state !== 'ok' && tabs.active === 'load') || focus.items[i]?.enabled === false });
     if (r.kind === 'resume') {
       drawIcon(ctx, 'warn', rect.x + 8, rect.y + 9, { ink: skin.text, accent: COLORS.brass.fill });
       const n = s.savedAt ? Math.max(0, Math.round((Date.now() - s.savedAt) / 60000)) : 0;
@@ -528,9 +528,11 @@ export function createSaveLoadScene(G) {
         rows.forEach((r, i) => drawSlot(ctx, skin, r, i));
         if (!rows.length) drawBody(ctx, noRewind ? 'Under No Rewind the season saves itself at doors and Waystones; there is nothing to pick here.' : 'Nothing saved yet.', PANEL.x + 14, PANEL.y + 34, PANEL.w - 28, { color: skin.faint, large: prefs.large }); // str
       }
+      // the focus model's tooltip: a press on a disabled row (empty, damaged, No Rewind) says why
+      if (panel === 'list' && !(banner && !banner.ok)) focus.drawCursor(ctx, { style: skin.style, cursor: false, ring: false });
       drawBanner(ctx, skin);
       if (panel === 'export' || panel === 'import') placeText();
-      const hints = panel !== 'list' || (banner && !banner.ok) ? [['confirm', 'Choose'], ['cancel', 'Back']] : [['l', ''], ['r', 'Tab'], ['confirm', tabs.active === 'save' ? 'Save' : tabs.active === 'load' ? 'Load' : 'Choose'], ['cancel', 'Back']]; // str
+      const hints = panel !== 'list' || (banner && !banner.ok) ? [['confirm', 'Choose'], ['cancel', 'Back']] : [['l', ''], ['r', 'Tab'], ['confirm', tabs.active === 'save' ? 'Save' : tabs.active === 'load' ? (forwardOnly() ? 'Why not' : 'Load') : 'Choose'], ['cancel', 'Back']]; // str
       drawHints(ctx, G.input, hints);
     },
     debugText() {

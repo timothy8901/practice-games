@@ -37,6 +37,7 @@ import * as memory from '../systems/memory.js';
 import * as party from '../systems/party.js';
 import { createConfirmScene } from '../ui/confirm.js';
 import { createNameEntry } from './nameEntry.js';
+import { readExt } from './menuKit.js';
 import {
   DIALOGUE_OPS, TILDE_BEAT_MS, createSession, resolveTalk, recordSaid, canLinger, lingerSession,
   speakerOf, textLog, textCps, reducedMotion, skipAnims, stripBeats,
@@ -48,6 +49,21 @@ export const BUST = Object.freeze({ x: 16, y: 206, w: 48, h: 48 });
 export const TEXT = Object.freeze({ x: 72, y: 206, w: 384, lines: 4 });
 export const NARRATION = Object.freeze({ x: 22, y: 206, w: 430 });
 export const LINGER = Object.freeze({ x: 392, y: 247, w: 66, h: 13 });
+/**
+ * Large text (GDD-09 §6): text at 2×, three lines, a taller slip. Same anchors otherwise.
+ * @type {{slip: typeof SLIP, bust: typeof BUST, text: {x: number, y: number, w: number, lines: number}, narration: {x: number, y: number, w: number}, scale: number}}
+ */
+export const LARGE = Object.freeze({
+  slip: Object.freeze({ x: 8, y: 176, w: 464, h: 86 }),
+  bust: Object.freeze({ x: 16, y: 196, w: 48, h: 48 }),
+  text: Object.freeze({ x: 72, y: 184, w: 384, lines: 3 }),
+  narration: Object.freeze({ x: 22, y: 184, w: 430 }),
+  scale: 2,
+});
+const NORMAL = Object.freeze({ slip: SLIP, bust: BUST, text: TEXT, narration: NARRATION, scale: 1 });
+/** Auto-advance (GDD-09 §6): a finished line moves on after 90 f + 2 f per character. */
+export const AUTO_BASE_MS = 1500;
+export const AUTO_PER_CHAR_MS = 33;
 /** A say's `emote` -> the bust's expression (art/portraits; neutral where a bust has only one). */
 export const EMOTE_EXPR = Object.freeze({ '!': 'surprised', '?': 'worried', '♥': 'happy', '…': 'worried', zzz: 'neutral', happy: 'happy', worried: 'worried', surprised: 'surprised' });
 /** Hold cancel this long to skip a skippable cutscene. */
@@ -65,10 +81,11 @@ const SLIDE_PX = 12;
  * @param {boolean} narration
  * @returns {Array<{text: string, beats: number[]}>}
  */
-export function pagesFor(text, narration) {
-  const w = narration ? NARRATION.w : TEXT.w;
+export function pagesFor(text, narration, large = false) {
+  const L = large ? LARGE : NORMAL;
+  const w = Math.floor((narration ? L.narration.w : L.text.w) / L.scale);
   const raw = String(text ?? '').replace(/\|/g, '\f');
-  return paginate(raw, { maxWidth: w, maxLines: TEXT.lines }).map(stripBeats);
+  return paginate(raw, { maxWidth: w, maxLines: L.text.lines }).map(stripBeats);
 }
 
 /**
@@ -112,14 +129,19 @@ export function createDialogueScene(G) {
   // linger
   let lingerOffered = false, lingerFocus = false;
   let bob = 0;
+  let large = false;   // large text (re-read at every line, so the setting applies live)
+  let autoMs = 0;      // auto-advance countdown on a finished page
 
   const bus = () => G.bus;
+  const ext = () => { try { return readExt(G); } catch { return { largeText: false, autoAdvance: false }; } };
+  const L = () => (large ? LARGE : NORMAL);
   const sfx = (evt, payload) => { try { bus()?.emit(evt, payload ?? {}); } catch { /* audio must never break text */ } };
 
   // ------------------------------------------------------------------ text
   function showLine(text, who, opts = {}) {
     speaker = who === undefined ? speaker : who;
-    pages = pagesFor(text, !speaker.name);
+    large = ext().largeText === true;
+    pages = pagesFor(text, !speaker.name, large);
     page = 0;
     startPage(opts.instant === true);
   }
@@ -127,6 +149,7 @@ export function createDialogueScene(G) {
   function startPage(instant) {
     shown = instant || !Number.isFinite(textCps(G)) ? pageChars().length : 0;
     acc = 0; beat = 0; ticks = 0;
+    autoMs = 0;
   }
 
   function pageChars() { return Array.from(pages[page].text.replace(/\n/g, '')); }
@@ -262,7 +285,7 @@ export function createDialogueScene(G) {
     if (entry) { entry.detach(); entry = null; }
     state = 'closing';
     slide = { t: 0, ms: skipAnims(G) ? 0 : OUT_MS, dir: 'out' };
-    if (slide.ms === 0) finishClose();
+    // the pop happens on the next update, never inside enter() / a stack callback
   }
 
   function finishClose() {
@@ -280,7 +303,7 @@ export function createDialogueScene(G) {
     const labelW = list.reduce((m, c) => Math.max(m, measureText(c.label).w), 0);
     const w = Math.min(300, Math.max(152, labelW + 30));
     const h = list.length * CHOICE_ROW_H + 8;
-    choiceRect = { x: SLIP.x + SLIP.w - w, y: SLIP.y - 10 - h, w, h };
+    choiceRect = { x: L().slip.x + L().slip.w - w, y: L().slip.y - 10 - h, w, h };
     const items = list.map((c, i) => ({
       id: String(i), enabled: c.enabled !== false, reason: c.reason,
       rect: { x: choiceRect.x + 14, y: choiceRect.y + 4 + i * CHOICE_ROW_H, w: w - 20, h: CHOICE_ROW_H },
@@ -360,10 +383,14 @@ export function createDialogueScene(G) {
     entry.attach();
   }
 
-  const askRects = () => [
-    { x: SLIP.x + SLIP.w - 166, y: SLIP.y + SLIP.h - 20, w: 56, h: 13 },
-    { x: SLIP.x + SLIP.w - 86, y: SLIP.y + SLIP.h - 20, w: 76, h: 13 },
-  ];
+  const askRects = () => {
+    const S = L().slip;
+    return [
+      { x: S.x + S.w - 166, y: S.y + S.h - 20, w: 56, h: 13 },
+      { x: S.x + S.w - 86, y: S.y + S.h - 20, w: 76, h: 13 },
+    ];
+  };
+  const lingerRect = () => ({ ...LINGER, y: L().slip.y + L().slip.h - 15 });
 
   function handleNameAsk(input) {
     const a = /** @type {any} */ (nameAsk);
@@ -403,7 +430,8 @@ export function createDialogueScene(G) {
         if (params.session) session = params.session;
         else if (params.target) session = resolveTalk(G, params.target);
         else if (params.scriptId || params.ops) session = createSession(G, { scriptId: params.scriptId ?? null, ops: params.ops, npc: params.npc ?? null });
-        else session = createSession(G, { ops: [{ op: 'say', who: params.who ?? undefined, text: String(params.text ?? '') }] });
+        else if (String(params.text ?? '').trim()) session = createSession(G, { ops: [{ op: 'say', who: params.who ?? undefined, text: String(params.text) }] });
+        else session = null; // nothing to say: no empty slip
       } catch (e) {
         console.warn(`dialogue: ${e && e.message}`);
         session = null;
@@ -427,6 +455,7 @@ export function createDialogueScene(G) {
       } else if (state === 'closing') { finishClose(); return; }
       const fast = !!(G.input && G.input.held && G.input.held('confirm') && G.input.heldFor('confirm') >= 250);
       if (state === 'say' || state === 'choice' || state === 'nick') typeUpdate(dt, fast);
+      if (state === 'say' && pageDone() && !logOpen && ext().autoAdvance === true) autoMs += dt; else autoMs = 0;
       talkMs = pageDone() ? 0 : talkMs + dt;
       if (choiceFocus) {
         choiceFocus.update(dt);
@@ -469,7 +498,8 @@ export function createDialogueScene(G) {
       if (state === 'end') {
         if (input.repeat('left') || input.repeat('right')) { lingerFocus = !lingerFocus; sfx('ui:cursor'); }
         const p = input.pointer;
-        if (p && p.inside && p.justDown && p.x >= LINGER.x && p.x < LINGER.x + LINGER.w && p.y >= LINGER.y && p.y < LINGER.y + LINGER.h) {
+        const LR = lingerRect();
+        if (p && p.inside && p.justDown && p.x >= LR.x && p.x < LR.x + LR.w && p.y >= LR.y && p.y < LR.y + LR.h) {
           if (lingerFocus || p.type !== 'touch') { doLinger(); return; }
           lingerFocus = true; return;
         }
@@ -479,7 +509,9 @@ export function createDialogueScene(G) {
       }
       if (state === 'say') {
         const p = input.pointer;
-        const tap = p && p.inside && p.justDown && p.y >= SLIP.y - 14;
+        const tap = p && p.inside && p.justDown && p.y >= L().slip.y - 14;
+        const auto = autoMs >= AUTO_BASE_MS + AUTO_PER_CHAR_MS * pageChars().length;
+        if (auto && pageDone()) { autoMs = 0; if (!lastPage()) { page += 1; startPage(false); } else pull(); return; }
         if (input.pressed('confirm') || input.pressed('cancel') || tap) {
           if (input.pressed('cancel') && session?.skippable && params.fromCutscene && input.heldFor && input.heldFor('cancel') > 120) return;
           if (!pageDone()) { completePage(); return; }
@@ -516,9 +548,10 @@ export function createDialogueScene(G) {
 
   // ------------------------------------------------------------------ drawing
   function drawSlip(ctx, off) {
+    const { slip: SLIP, bust: BUST, scale } = L();
     const y = SLIP.y + off;
     const hasBust = !!speaker.name;
-    drawPanel(ctx, { x: SLIP.x, y, w: SLIP.w, h: SLIP.h }, 'ledger', { rulePitch: 10, ruleStart: 17, margin: 0 });
+    drawPanel(ctx, { x: SLIP.x, y, w: SLIP.w, h: SLIP.h }, 'ledger', { rulePitch: 10 * scale, ruleStart: scale === 2 ? 25 : 17, margin: 0 });
     // the margin line right of the bust
     if (hasBust) {
       ctx.fillStyle = COLORS.paper.margin;
@@ -535,7 +568,7 @@ export function createDialogueScene(G) {
       ctx.fillRect(bx, by + BUST.h, BUST.w, 1);
       // wax-seal name tab
       const tw = measureText(speaker.name).w + 18;
-      const tx = 16, ty = 189 + off;
+      const tx = 16, ty = SLIP.y - 9 + off;
       ctx.fillStyle = COLORS.shadow;
       ctx.fillRect(tx + 1, ty + 1, tw, 12);
       ctx.fillStyle = COLORS.wax.fill;
@@ -548,9 +581,9 @@ export function createDialogueScene(G) {
       drawSeal(ctx, tx - 5, ty, { emblem: 'none' });
     }
     // text
-    const T = hasBust ? TEXT : NARRATION;
+    const T = hasBust ? L().text : L().narration;
     const pg = pages[page] ?? { text: '' };
-    drawTextTyped(ctx, pg.text, T.x, T.y + off, shown, { color: COLORS.paper.ink, maxWidth: T.w + 4 });
+    drawTextTyped(ctx, pg.text, T.x, T.y + off, shown, { color: COLORS.paper.ink, maxWidth: T.w + 4, scale }); // maxWidth is in scaled px
     // more / end marks
     const ax = SLIP.x + SLIP.w - 12, ay = SLIP.y + SLIP.h - 11 + off;
     const lift = bob < TIMING.cursorBobMs / 2 ? 0 : 1;
@@ -561,18 +594,23 @@ export function createDialogueScene(G) {
     // skip hold gauge
     if (skipHeld > 0 && state === 'say') {
       const w = Math.round(60 * Math.min(1, skipHeld / SKIP_HOLD_MS));
-      drawText(ctx, 'Skipping…', SLIP.x + 12, SLIP.y - 9, { font: 'small', color: COLORS.paper.light, shadow: true }); // str
+      // top-right of the slip, clear of the name tab
+      const gx = SLIP.x + SLIP.w - 64;
+      drawText(ctx, 'Skipping…', gx - 4, SLIP.y - 9, { font: 'small', align: 'right', color: COLORS.paper.light, shadow: true }); // str
+      ctx.fillStyle = COLORS.shadow;
+      ctx.fillRect(gx, SLIP.y - 7, 60, 2);
       ctx.fillStyle = COLORS.wax.fill;
-      ctx.fillRect(SLIP.x + 56, SLIP.y - 7, w, 2);
+      ctx.fillRect(gx, SLIP.y - 7, w, 2);
     }
     // linger seal
     if (state === 'end' && lingerOffered) {
+      const LR = lingerRect();
       const closeW = measureText(t('common.close')).w;
-      const cx = LINGER.x - closeW - 18;
-      if (!lingerFocus) drawText(ctx, TYPE.cursor, cx - 8 + lift, LINGER.y + 3 + off, { color: COLORS.wax.fill });
-      drawText(ctx, t('common.close'), cx, LINGER.y + 3 + off, { color: lingerFocus ? COLORS.paper.inkFaint : COLORS.paper.ink });
-      drawSealButton(ctx, t('verb.linger'), LINGER.x, LINGER.y + off, { focused: lingerFocus, w: LINGER.w });
-      if (lingerFocus) drawText(ctx, TYPE.cursor, LINGER.x - 8 + lift, LINGER.y + 3 + off, { color: COLORS.wax.fill });
+      const cx = LR.x - closeW - 18;
+      if (!lingerFocus) drawText(ctx, TYPE.cursor, cx - 8 + lift, LR.y + 3 + off, { color: COLORS.wax.fill });
+      drawText(ctx, t('common.close'), cx, LR.y + 3 + off, { color: lingerFocus ? COLORS.paper.inkFaint : COLORS.paper.ink });
+      drawSealButton(ctx, t('verb.linger'), LR.x, LR.y + off, { focused: lingerFocus, w: LR.w });
+      if (lingerFocus) drawText(ctx, TYPE.cursor, LR.x - 8 + lift, LR.y + 3 + off, { color: COLORS.wax.fill });
     }
     // name confirm seals
     if (state === 'nameConfirm' && nameAsk) {

@@ -219,7 +219,7 @@ export function createDayPageScene(G) {
   let state = 'ink'; // tonight | ink | read | build | morning | closing | done
   let stateT = 0;
   /** @type {ReturnType<typeof pageLines>|null} */ let page = null;
-  let saveOk = true;
+  /** @type {boolean|null} */ let saveOk = null; // null: no save was attempted, so no stamp (never claim one)
   /** @type {any[]} */ let landed = [];
   let pick = 0; // tonight: 0 Not yet, 1 Sleep
   let lock = 0;
@@ -259,7 +259,7 @@ export function createDayPageScene(G) {
       params = p ?? {};
       result = {};
       landed = Array.isArray(params.landed) ? params.landed : [];
-      saveOk = params.save ? params.save.ok !== false : true;
+      saveOk = params.save ? params.save.ok !== false : null;
       const summary = params.summary ?? (params.mode !== 'build' ? dayPageSys.summarize(G.world, G.data, {}) : null);
       page = summary ? pageLines(summary, { data: G.data, world: G.world }) : null;
       pick = 0;
@@ -280,7 +280,7 @@ export function createDayPageScene(G) {
       if (lock > 0) lock = Math.max(0, lock - dt);
       if (state === 'ink' && stateT >= inkMs()) {
         go('read');
-        emit('sfx', { name: saveOk ? 'stamp' : 'error' });
+        if (saveOk !== null) emit('sfx', { name: saveOk ? 'stamp' : 'error' });
       }
       if (state === 'build' && stateT >= framesMs(G, BUILD_FRAMES) + framesMs(G, 50)) afterBuild();
       if (state === 'morning' && stateT >= (skipAnims(G) ? 0 : 900)) close({ done: true, morning: true });
@@ -301,7 +301,7 @@ export function createDayPageScene(G) {
         return;
       }
       if (state === 'ink') {
-        if (input.pressed('confirm') || input.pressed('cancel') || tap) { go('read'); emit('sfx', { name: saveOk ? 'stamp' : 'error' }); }
+        if (input.pressed('confirm') || input.pressed('cancel') || tap) { go('read'); if (saveOk !== null) emit('sfx', { name: saveOk ? 'stamp' : 'error' }); }
         return;
       }
       if (state === 'read') {
@@ -324,7 +324,7 @@ export function createDayPageScene(G) {
     debugText() {
       if (state === 'tonight') return [t('rest.nightHolds'), ...tonight.map((x) => tonightLine(x)), `${pick === 1 ? '>' : ' '} Sleep  ${pick === 0 ? '>' : ' '} Not yet`].join('\n');
       if (!page) return `dayPage ${state}`;
-      return [page.heading, ...page.lines.map((l) => l.text), t('day.tomorrow'), ...page.tomorrow.map((x) => `• ${x}`), saveOk ? t('day.saved') : t('day.notSaved'), `(${state})`].join('\n');
+      return [page.heading, ...page.lines.map((l) => l.text), t('day.tomorrow'), ...page.tomorrow.map((x) => `• ${x}`), saveOk === null ? '' : saveOk ? t('day.saved') : t('day.notSaved'), `(${state})`].join('\n');
     },
     isBusy: () => state === 'ink' || state === 'closing' || state === 'morning',
     get state() { return state; },
@@ -390,14 +390,14 @@ export function createDayPageScene(G) {
     ctx.restore();
     // the save check: a stamp, or the red banner
     if (state !== 'ink') {
-      if (saveOk) {
+      if (saveOk === true) {
         const S = STAMP;
         const ink = '#2E6B4F';
         ctx.fillStyle = ink;
         ctx.fillRect(S.x, S.y, S.w, 1); ctx.fillRect(S.x, S.y + S.h - 1, S.w, 1); ctx.fillRect(S.x, S.y, 1, S.h); ctx.fillRect(S.x + S.w - 1, S.y, 1, S.h);
         ctx.fillRect(S.x + 2, S.y + 2, S.w - 4, 1); ctx.fillRect(S.x + 2, S.y + S.h - 3, S.w - 4, 1);
         drawText(ctx, `+ ${t('day.saved')}`, S.x + S.w / 2, S.y + 7, { align: 'center', color: ink });
-      } else {
+      } else if (saveOk === false) {
         const B = { x: P.x + 8, y: P.y + P.h - 26, w: P.w - 16, h: 18 };
         ctx.fillStyle = COLORS.wax.fill;
         ctx.fillRect(B.x, B.y, B.w, B.h);

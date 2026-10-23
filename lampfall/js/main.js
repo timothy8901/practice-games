@@ -19,16 +19,18 @@ import { createClock } from './core/time.js';
 import { makeRng, randomSeedCode, setSeedToggles } from './core/rng.js';
 import { createStore } from './state/store.js';
 import { createPersist } from './state/persist.js';
-import { createNewWorld, SCHEMA_VERSION, DEFAULT_DIAL } from './state/schema.js';
+import { createNewWorld, SCHEMA_VERSION } from './state/schema.js';
+import { DEFAULT_DIAL } from './data/dials.js';
 import { MIGRATIONS } from './state/migrate.js';
 import { createRngs } from './state/rngs.js';
-import { DATA, TOGGLE_ORDER } from './data/index.js';
+import { DATA_CONTENT, CONTENT_STATUS } from './data/content.js';
 import { createRegistry } from './data/registry.js';
 import * as clockSys from './systems/clockSys.js';
 import { createMusicDirector } from './audio/director.js';
 import { createToasts } from './ui/toast.js';
 import { sceneFactories } from './scenes/index.js';
 import { createDebugOverlay } from './scenes/debugOverlay.js';
+import { signalOfWorld } from './scenes/flowKit.js';
 
 /**
  * The one context object, created once here and handed to every scene factory. Never imported.
@@ -129,14 +131,21 @@ export function boot(env = {}) {
   });
 
   // 4. data registry
-  const data = createRegistry(DATA);
+  // The real content chapters (js/data/content.js); tables still on placeholders are listed false
+  // in CONTENT_STATUS and only warn, as do non-row tables such as the seed toggle list.
+  const data = createRegistry(DATA_CONTENT);
   if (debug) {
+    const soft = new Set(['toggleOrder', ...Object.keys(CONTENT_STATUS).filter((k) => !CONTENT_STATUS[k])]);
+    const tableOf = (p) => String(p).split(/[[:]/)[0];
     const problems = data.verify();
-    if (problems.length) throw new Error(`data.verify failed:\n${problems.join('\n')}`);
+    const hard = problems.filter((p) => !soft.has(tableOf(p)));
+    const warn = problems.filter((p) => soft.has(tableOf(p)) && tableOf(p) !== 'toggleOrder');
+    if (warn.length) console.warn(`data.verify (placeholder tables):\n${warn.join('\n')}`);
+    if (hard.length) throw new Error(`data.verify failed:\n${hard.join('\n')}`);
   }
 
   // 5. store, rngs, clock
-  setSeedToggles(TOGGLE_ORDER);
+  setSeedToggles(DATA_CONTENT.toggleOrder);
   const seedCode = flags.seed ?? randomSeedCode(DEFAULT_DIAL.toUpperCase(), entropy) // [GDD] default dial;
   const store = createStore(createNewWorld({ seedCode }), { strict: flags.strict });
   const rngs = createRngs(store);
@@ -197,7 +206,7 @@ export function boot(env = {}) {
     if (typeof factory !== 'function') throw new Error(`main: no scene named '${name}' (have: ${Object.keys(sceneFactories).join(', ')})`);
     return factory(G);
   }
-  G.music = createMusicDirector(G);
+  G.music = createMusicDirector(G, { signalOf: signalOfWorld });
   G.bus.on('toast', (payload) => {
     if (typeof payload === 'string') G.toasts.show(payload);
     else G.toasts.show(payload?.text ?? '', { kind: payload?.kind, icon: payload?.icon, ms: payload?.ms });

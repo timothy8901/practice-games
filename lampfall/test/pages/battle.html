@@ -252,9 +252,10 @@
             for (let k = 0; k < Math.floor(mv / 2); k++) await debug().press('down', 2);
             await debug().press('confirm', 2);
           } else if (s.scene === 'battle' && s.overlay === 'naming') {
-            await debug().press('down', 2); await debug().press('down', 2); await debug().press('down', 2);
-            await debug().press('right', 2); await debug().press('right', 2); await debug().press('right', 2);
-            await debug().press('confirm', 2);
+            // keep the offered name: Done, then "Call it …?" (answered by the confirm branch)
+            const ov = top.overlayState;
+            if (ov && !ov.busy && ov.done) ov.done(); else await wait(40);
+            opts = { ...opts, confirmYes: true };
           } else if (s.scene === 'forecast') {
             await debug().press(top.mode === 'cards' ? 'cancel' : 'confirm', 2);
           } else if (s.scene === 'battle' && (s.mode === 'busy' || s.mode === 'intro' || s.mode === 'end' || s.mode === 'modal' || s.mode === 'party')) {
@@ -293,7 +294,7 @@
         if (s.mode !== 'menu') break;
         await press('right'); await press('right'); await press('confirm'); await wait(100); await press('confirm');
       }
-      await bt.autoplay('end');
+      await bt.autoplay('end', { confirmYes: true });
       await finished(p);
       let st = bt.state();
       check('capture: the catch joined the party', st.party.length === 2 && st.party[1].sp === 'tossup', JSON.stringify(st.party.map((c) => c.sp)));

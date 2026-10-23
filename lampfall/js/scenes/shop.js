@@ -422,7 +422,9 @@ export function createShopScene(G) {
     },
     debugText() {
       const sel = list?.selected();
-      const rows = (list?.items ?? []).map((r, i) => `${list.index === i ? '>' : ' '} ${r.label} ${r.data.price ?? ''}`).slice(0, 10);
+      const all = (list?.items ?? []).map((r, i) => `${list.index === i ? '>' : ' '} ${r.label} ${r.data.price ?? ''}`);
+      const from = Math.max(0, Math.min(all.length - 12, (list?.index ?? 0) - 5));
+      const rows = all.slice(from, from + 12); // a window around the cursor
       return [`${shop?.name ?? 'shop'} [${tabs?.active}]${open ? '' : ' CLOSED'}`, ...rows, sel ? `After: ${previewOf(sel.data, qty?.n ?? 1).after}` : '', message].filter(Boolean).join('\n');
     },
     isBusy: () => state === 'closing' || shownWallet !== G.world.wallet.main || (state === 'qty' && qtyLock > 0),

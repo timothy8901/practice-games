@@ -178,7 +178,7 @@ export function createNameEntry(o) {
     const arrows = { ArrowUp: 'U', ArrowDown: 'D', ArrowLeft: 'L', ArrowRight: 'R' };
     if (arrows[k]) { keyQueue.push(`\x00${arrows[k]}`); ev.preventDefault?.(); return; }
     // Enter finishes the name, unless the arrows were just used to walk the grid (then it presses the key)
-    if (k === 'Enter') { keyQueue.push(gridNav ? '\r' : '\n'); ev.preventDefault?.(); return; }
+    if (k === 'Enter') { keyQueue.push('\r'); ev.preventDefault?.(); return; }
     if (k === 'Backspace') { keyQueue.push('\b'); ev.preventDefault?.(); return; }
     if (k === 'Escape') { keyQueue.push('\x1b'); ev.preventDefault?.(); return; }
     if (typeof k === 'string' && Array.from(k).length === 1) { keyQueue.push(k); typing = true; ev.preventDefault?.(); }
@@ -202,8 +202,11 @@ export function createNameEntry(o) {
     while (keyQueue.length) {
       const k = /** @type {string} */ (keyQueue.shift());
       if (k.startsWith('\x00')) { typing = false; gridNav = true; moveDir(k.slice(1)); continue; }
-      if (k === '\n') { done(); return true; }
-      if (k === '\r') { if (row5 >= 0) pressSpecial(SPECIAL[row5].id); else pressKey(focus.index); continue; }
+      if (k === '\r') {
+        if (!gridNav) { done(); return true; }
+        if (row5 >= 0) pressSpecial(SPECIAL[row5].id); else pressKey(focus.index);
+        continue;
+      }
       if (k === '\b') { apply({ type: 'delete' }); sfx('ui:cancel'); continue; }
       // Escape backs out one level (Backspace is the keyboard's delete); never commits
       if (k === '\x1b') { typing = false; sfx('ui:cancel'); o.onCancel(); return true; }

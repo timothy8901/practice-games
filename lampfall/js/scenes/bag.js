@@ -32,7 +32,7 @@ import {
 } from './menuModel.js';
 import {
   prefsOf, skinOf, drawSkinPanel, drawCard, drawBackdrop, drawHints, drawCreatureIcon, drawGlyph, itemGlyph,
-  drawCursorAt, drawBody, fitText, sfx, toast, sysCtx,
+  drawCursorAt, drawBody, drawHeartmark, fitText, sfx, toast, sysCtx,
 } from './menuKit.js';
 
 /** Satchel tabs in display order (systems/bag.SATCHEL_TABS). */
@@ -435,6 +435,12 @@ export function createBagScene(G) {
       const focused = fgtFocus.index === k;
       if (focused) { ctx.fillStyle = skin.band; ctx.fillRect(r.x, r.y, r.w, r.h - 1); }
       drawText(ctx, it.enabled === false ? `– ${it.label}` : it.label, r.x + 9, r.y + 4, { color: it.enabled === false ? skin.faint : skin.text });
+      if (it.enabled === false) {
+        // the one move that can't go says why, by shape and word (never colour alone)
+        const tw = measureText('Heartmark: stays', { font: 'small' }).w; // str
+        drawHeartmark(ctx, r.x + r.w - tw - 8, r.y + 7, 1, {});
+        drawText(ctx, 'Heartmark: stays', r.x + r.w - 3, r.y + 5, { font: 'small', color: skin.soft, align: 'right' }); // str
+      }
       if (focused) drawCursorAt(ctx, r.x, r.y + 4, ms, skin);
     });
     fgtFocus.drawCursor(ctx, { style: skin.style, cursor: false, ring: false });

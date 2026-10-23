@@ -153,6 +153,7 @@ export function createCutsceneScene(G) {
     switch (r.op) {
       case 'say': case 'choice': case 'nickname': case 'take':
         state = 'child'; childOp = r;
+        emotes = []; // the slip is modal: a balloon would hang frozen over the speaker for the whole line
         G.push('dialogue', { session, pending: r, fromCutscene: true });
         return;
       case 'letter':

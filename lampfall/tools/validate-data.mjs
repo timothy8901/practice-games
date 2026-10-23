@@ -54,7 +54,7 @@ export const ENTITY_KINDS = Object.freeze(['npc', 'tree', 'rock', 'crack', 'sign
  * @property {readonly string[]} [aiProfiles]
  * @property {Record<string, any>|null} [sprites] creature sprites by form id; null = skip
  * @property {Record<string, string>|null} [master] master palette; null = skip
- * @property {((rows: string[]) => {x: number, y: number, w: number, h: number}|null)|null} [opaqueBounds]
+ * @property {((rows: string[], palette: object) => {x: number, y: number, w: number, h: number}|null)|null} [opaqueBounds]
  * @property {{TRACKS?: Record<string, any>, CUES?: Record<string|number, any>}|null} [tracks]
  * @property {Record<string, string>} [legend]   DEFAULT_LEGEND override (derived from tilesets otherwise)
  * @property {ReadonlyArray<any>} [spires]       Spire rows checked when DATA has no `spires` table (data/spires.SPIRES)
@@ -125,9 +125,15 @@ export function validateData(DATA, opts = {}) {
       else {
         if (!Array.isArray(s.back)) warn('species', id, 'no back sprite in art/creatures');
         if (opts.master && s.palette) for (const k of Object.keys(s.palette)) if (!(k in opts.master)) err('species', id, `sprite palette key '${k}' is not in MASTER`);
-        if (opts.opaqueBounds && s.heartmark && num(s.heartmark.x) && num(s.heartmark.y)) {
-          const b = opts.opaqueBounds(s.rows);
-          if (b && !(s.heartmark.x >= b.x && s.heartmark.x < b.x + b.w && s.heartmark.y >= b.y && s.heartmark.y < b.y + b.h)) err('species', id, 'heartmark mark lies outside the sprite\'s opaque bounds');
+        // Every Heartmark anchor (head/chest/back/tail, or a single legacy `heartmark`) must sit on the sprite.
+        const anchors = s.heartmarks && typeof s.heartmarks === 'object' ? Object.entries(s.heartmarks) : (s.heartmark ? [['mark', s.heartmark]] : []);
+        if (opts.opaqueBounds && anchors.length) {
+          let b = null;
+          try { b = opts.opaqueBounds(s.rows, s.palette); } catch (e) { err('species', id, `front sprite does not decode: ${e.message}`); }
+          for (const [name, a] of anchors) {
+            if (!a || !num(a.x) || !num(a.y)) { err('species', id, `heartmark anchor '${name}' needs numeric x and y`); continue; }
+            if (b && !(a.x >= b.x && a.x < b.x + b.w && a.y >= b.y && a.y < b.y + b.h)) err('species', id, `heartmark anchor '${name}' lies outside the sprite's opaque bounds`);
+          }
         }
       }
     }
@@ -805,7 +811,9 @@ export async function loadOptions() {
       aiProfiles: ai?.PROFILES ? Object.keys(ai.PROFILES) : DRAFT_AI_PROFILES,
       sprites: creatures?.CREATURE_SPRITES ?? null,
       master: palette?.MASTER ?? null,
-      opaqueBounds: typeof pixelart?.opaqueBounds === 'function' ? pixelart.opaqueBounds : null,
+      opaqueBounds: typeof pixelart?.opaqueBounds === 'function' && typeof pixelart?.decodeSprite === 'function'
+        ? (rows, pal) => pixelart.opaqueBounds(pixelart.decodeSprite(rows, pal))
+        : null,
       tracks: tracks ? { TRACKS: tracks.TRACKS, CUES: tracks.CUES } : null,
       manifest: manifest?.MANIFEST ?? null,
     },

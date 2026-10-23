@@ -3,9 +3,9 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { parsePath, stripBeats, tickPitch, textLog, speakerOf, LOG_MAX, createSession } from '../js/scenes/scriptHost.js';
-import { pagesFor, creatureUidOf } from '../js/scenes/dialogue.js';
+import { pagesFor, creatureUidOf, LARGE } from '../js/scenes/dialogue.js';
 import { walkEnd, faceToward, STOP_OPS } from '../js/scenes/cutscene.js';
-import { editName, finishName, gridChars, MAX_LEN } from '../js/scenes/nameEntry.js';
+import { editName, finishName, gridChars, MAX_LEN, createNameEntry } from '../js/scenes/nameEntry.js';
 import { bodyLines, doorName, sealOf } from '../js/scenes/letter.js';
 import { pageLines, tomorrowLine } from '../js/scenes/dayPage.js';
 import { learnerState, satchelStacks } from '../js/scenes/shop.js';
@@ -122,6 +122,29 @@ describe('name entry', () => {
     assert.equal(finishName("'-.").ok, false);
   });
 
+  it('a physical keyboard: letters type, Enter finishes, arrows then Enter press a key, Esc backs out', () => {
+    /** a tiny EventTarget */
+    const target = { fns: [], addEventListener(_e, f) { this.fns.push(f); }, removeEventListener(_e, f) { this.fns = this.fns.filter((x) => x !== f); } };
+    const key = (k) => target.fns.forEach((f) => f({ key: k, preventDefault() {} }));
+    const input = { lastDevice: 'keyboard', pressed: () => false, repeat: () => false, pointer: null };
+    let done = null, cancelled = 0;
+    const e = createNameEntry({ input, keyTarget: target, onDone: (n) => { done = n; }, onCancel: () => { cancelled++; } });
+    e.attach();
+    for (const k of ['M', 'u', 'd', 'z', 'x']) key(k); // z and x are letters here
+    e.handle(input);
+    assert.equal(e.name, 'Mudzx');
+    key('Enter'); e.handle(input);
+    assert.equal(done, 'Mudzx', 'Enter finishes when the grid was not being walked');
+    done = null;
+    key('ArrowRight'); key('Enter'); e.handle(input);
+    assert.equal(done, null, 'after an arrow, Enter presses the focused grid key');
+    assert.equal(e.name.length, 6);
+    key('Escape'); e.handle(input);
+    assert.equal(cancelled, 1, 'Esc backs out at once (Backspace is delete)');
+    e.detach();
+    assert.equal(target.fns.length, 0);
+  });
+
   it('the grid has 40 keys with a space; lower case keeps digits', () => {
     assert.equal(gridChars(true).length, 40);
     assert.ok(gridChars(true).includes(' '));
@@ -174,5 +197,16 @@ describe('shop', () => {
   it('satchelStacks merges stacks across pockets, skipping tools', () => {
     const w = { bag: { pockets: { wicks: [{ id: 'a', n: 2 }, { id: 'a', n: 3 }], finds: [{ id: 'b', n: 1 }], tools: [{ id: 'rod', n: 1 }] } } };
     assert.deepEqual(satchelStacks(w), [{ id: 'a', n: 5, pocket: 'wicks' }, { id: 'b', n: 1, pocket: 'finds' }]);
+  });
+});
+
+describe('dialogue large text', () => {
+  it('pages hold at most three lines at 2x and fit the slip', () => {
+    const long = 'You walked. Nobody walks. Not since the causeway went under, anyway. The sticks will wait. The tide will not, and neither will Wren.';
+    const pages = pagesFor(long, false, true);
+    assert.ok(pages.length >= 2);
+    for (const p of pages) assert.ok(p.text.split('\n').length <= LARGE.text.lines);
+    assert.ok(LARGE.text.y + LARGE.text.lines * 20 <= LARGE.slip.y + LARGE.slip.h, 'three 20-px lines fit the large slip');
+    assert.ok(pagesFor(long, false, false).every((p) => p.text.split('\n').length <= 4));
   });
 });
