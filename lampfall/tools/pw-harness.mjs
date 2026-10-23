@@ -1,11 +1,11 @@
 // Generic headless play-test harness for the browser game.
 // Usage: node playtest.mjs <url> <outdir> [script.json]
 //  script.json: [{"keys":["ArrowRight","Enter"],"holdMs":120,"waitMs":500,"shot":"name"}, {"eval":"window.__game && window.__game.state()"}, ...]
-import { chromium } from '/opt/node22/lib/node_modules/playwright/index.mjs';
+import { chromium } from 'playwright';
 import fs from 'node:fs';
 const [,, url, outdir = 'out', scriptPath] = process.argv;
 fs.mkdirSync(outdir, { recursive: true });
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--no-sandbox', '--autoplay-policy=no-user-gesture-required', '--use-gl=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist'] });
+const browser = await chromium.launch({ ...(process.env.PLAYWRIGHT_EXECUTABLE_PATH ? { executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH } : {}), args: ['--no-sandbox', '--autoplay-policy=no-user-gesture-required', '--use-gl=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist'] });
 const page = await browser.newPage({ viewport: { width: 960, height: 540 } });
 const log = [];
 page.on('console', m => log.push({ t: m.type(), text: m.text() }));

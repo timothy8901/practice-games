@@ -33,7 +33,7 @@ import { PALETTES, CHAR_GLOW_KEYS, CHAR_RAMPS, SW } from './palettes.js';
 import { CHARACTERS } from './cast.js';
 import { playerLook, DEFAULT_CARD } from './player.js';
 import { decodeSprite } from '../../core/pixelart.js';
-import { registerArt } from '../atlas.js';
+import { registerArt, registerAliases } from '../atlas.js';
 
 export { PALETTES, CHARACTERS, CHAR_GLOW_KEYS, CHAR_RAMPS, SW, HEADS, TORSOS, TAILS, EXTRAS };
 export {
@@ -178,6 +178,13 @@ export function charArtTable() {
   return Object.fromEntries(Object.values(CHAR_SPRITES).map((c) => [charArtId(c.id), artDefOf(c.body, c.palette)]));
 }
 registerArt(charArtTable(), { source: 'chars', kind: 'char', replace: true });
+// Narrative names and harbor residents share the established animal rigs.
+registerAliases({
+  'char-merrow': 'char-agathe', 'char-varga': 'char-teo', 'char-the-thatch': 'char-thatch',
+  'char-mabry': 'char-hesper', 'char-hobb-fallow': 'char-thessaly', 'char-wynn-cobble': 'char-pip',
+  'char-quill-hartsease': 'char-osric', 'char-mags-penny': 'char-maud', 'char-gorse-abernethy': 'char-bryony',
+  'char-teal-fenner': 'char-pip', 'char-rook-hayward': 'char-ada', 'char-brannoch-vey': 'char-wendel',
+});
 
 /** Point 'char-player' at a lease card's look (call after the lease card is confirmed or edited). */
 export function registerPlayerArt(card) {

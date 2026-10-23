@@ -333,6 +333,10 @@ test('storage: the Cellar commission doubles the capacity', () => {
   const G = makeG();
   G.store.tx('t', (w) => { w.loans.commissions.push('cellar'); });
   G.push('box');
+  assert.equal(top(G).capacity, 20);
+  G.scenes.pop();
+  G.store.tx('cellar-built', (w) => { w.loans.builds.push({ id: 'cellar', tier: 3, readyDay: 0, done: true, choice: null }); });
+  G.push('box');
   assert.equal(top(G).capacity, 40);
 });
 

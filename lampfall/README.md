@@ -1,64 +1,38 @@
-# GAME (working title) — merged WILDSHIFT × PORCHLIGHT
+# Lampfall — A Keeper’s Season on the Brindle Isles
 
-<!-- [GDD] title, folder name and save prefix come from the design panel; see config.js -->
+Read the odds. Pay what’s owed. Keep the light.
 
-A browser game: creature-collecting RPG with random, odds-visible form Shifts, inside a cozy harbor
-town with a tide, loans and morning letters. Vanilla JS ES modules, Canvas 2D, WebAudio, no build
-step, no dependencies. The authoritative design is `ARCHITECTURE-DRAFT.md` (scratchpad) and the core
-contract is `docs-core-contract.md`.
+A browser creature RPG and harbor life game combining the Wildshift and Porchlight pitches. Explore the Brindle Isles, catch and Shift creatures, challenge six Spires, fish the quay, repay seven interest-free loans, and uncover the old Keeper’s letters. The lighthouse finale leads through the Reading and credits to a continuing season in Pellwick.
 
-## Run
+## Play locally
 
-    python3 serve.py 8000        # then open http://127.0.0.1:8000/
+On macOS, double-click **Play Lampfall.command**. Keep its terminal window open while playing. The launcher starts a private local server and opens the game in your browser. Requires Python 3.
 
-Any static server works (ES modules need http://, not file://).
+Or run `python3 serve.py 8000` from this folder, then open <http://127.0.0.1:8000/>. The game needs a web server because it uses browser modules. It has no build step, external asset downloads, or runtime JavaScript dependencies.
 
 ## Controls
 
-| Action  | Keyboard                    | Gamepad | Touch  |
-| ------- | --------------------------- | ------- | ------ |
-| move    | Arrows / WASD               | d-pad / left stick | d-pad |
-| confirm | Z / Enter / Space           | A       | A      |
-| cancel  | X / Esc / Backspace         | B       | B      |
-| menu    | Esc / Enter (in the field)  | Start   | menu   |
-| run     | Shift                       | RT      |        |
-| tool    | C (hold opens the ring)     | X       |        |
-| map     | M                           | Y       |        |
-| log     | Tab                         | LT      |        |
+| Action | Keyboard |
+| --- | --- |
+| Move | Arrows or WASD |
+| Confirm / interact | Z, Enter, or Space |
+| Back | X or Escape |
+| Pause menu | Escape or P |
+| Run | Shift |
+| Tools | C; hold for the tool ring |
+| Map | M |
+| Field view / Read | V |
+| Full screen | F; Escape exits |
 
-The touch overlay appears on touch devices or with `?touch=1`.
+Controller and touch controls are supported. Settings includes key remapping, play speed, fishing assistance, reduced motion, larger text, contrast, sound and captions. Saves stay in this browser; the save screen exports and imports a save string. Keep the same local address/port to reuse browser saves.
 
-## Debug flags (URL query)
+## Development and verification
 
-`debug=1 seed=CODE skipTitle=1 speed=8 touch=1|0 scale=integer|fit slot=auto:1 mute=1 noanim=1
-strict=1 scene=<name>&trainer=<id>`
+Use Node 22 or later for the test tools. Run `bash tools/check.sh` for data validation, ownership and art checks, module imports, and the complete unit suite. `node tools/validate-content.mjs` checks the assembled game content; `node tools/map-reachability.mjs` proves the tide-dependent routes. Browser QA uses Playwright; set `PLAYWRIGHT_EXECUTABLE_PATH` if using an existing installed Chromium.
 
-With `?debug=1` (or on localhost) `window.__game` is installed (`js/debug/hook.js`, draft §11):
-`state() warp() give() earn() setTime() setTide() flag() flags() speed() skipAnims() press() tap()
-idle() scene() stack() text() save() load() step() pause() resume() marker() errors perf() validate()
-rng() push()`. Every mutating hook runs through `store.tx`, so events and autosave behave as in play.
-`give` and `earn` run a day-1 fallback until RULES-ECON rebinds them; the other lane hooks
-(`addCreature heal battle wild forceForecast deliverLetter sleep runScript`) throw a readable
-"not wired" error until that lane calls `__game.bind(name, fn)`. `setTide` needs
-`core/time.freezeTide` (draft §13.6, owner CORE). The perf overlay (top right) shows fps, update and
-draw ms, drawImage count, the scene stack and `validateWorld` problems.
+The game is not deployed. The repository’s Pages workflow publishes only when changes land on `main`.
 
-## Tests
-
-    tools/check.sh                    # validate-data + lint-owners + smoke-import + every unit test (per-file summary)
-    node --test test/*.test.mjs       # every unit test in one run (Node 22 does not accept a bare directory)
-    node tools/smoke-import.mjs       # imports every js/**/*.js under Node (rule 2 of the draft)
-
-Headless browser check (Playwright, not a dependency of the game):
-`node tools/pw-harness.mjs 'http://127.0.0.1:8777/_merge-wip/?debug=1&skipTitle=1' out/ script.json`
-(reports console errors and writes screenshots; `?strict=1` adds the store write guard).
-
-## Layout
-
-`index.html css/ js/main.js js/config.js js/core/ (frozen engine) js/state/ js/data/ js/systems/
-js/battle/ js/world/ js/render/ js/ui/ js/scenes/ js/art/ js/audio/ js/debug/ tools/ test/`.
-`proto/` holds the prototypes being adopted (draft §8.4). Checkpoint 0 status, how each Tier-1 lane
-plugs in, and open deviations: `docs-checkpoint0.md`.
+The authoritative design is `design/GDD-00-decisions.md`; extracted pitch documents and all chapter notes remain in `design/`. `progress.md` records this continuation and the verification boundary.
 
 ## Authoring guide (ARCHITECTURE-DRAFT §14, copied verbatim)
 

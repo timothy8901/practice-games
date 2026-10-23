@@ -9,6 +9,9 @@
  * @module data/content
  */
 
+import { NPCS, NPC_SCRIPTS } from './npcs/index.js';
+import { SCHEDULES } from './schedules.js';
+import { STORY_SCRIPTS, EVENT_SCRIPTS, STORY_TRIGGERS } from './scripts/index.js';
 import { deepFreeze } from './ids.js';
 import { DATA as PLACEHOLDER } from './index.js';
 // GDD-08 letters and life threads
@@ -42,7 +45,7 @@ export const CONTENT_STATUS = Object.freeze({
   items: true, loans: true, commissions: true, commons: true, shops: true, dials: true, challenges: true,
   collections: true, festivals: true, weather: true,
   types: true, moves: true, abilities: true, species: true, families: true, trainers: true, spires: true,
-  npcs: false, schedules: false, scripts: false, eventScripts: false,
+  npcs: true, schedules: true, scripts: true, eventScripts: true,
   maps: true, tilesets: true, regions: true, encounters: true,
 });
 
@@ -50,7 +53,10 @@ export const DATA_CONTENT = deepFreeze({
   ...PLACEHOLDER,
   letters: LETTERS,
   threads: THREADS,
-  scripts: { ...PLACEHOLDER.scripts, ...THREAD_SCRIPTS, ...TRAINER_SCRIPTS },
+  scripts: { ...STORY_SCRIPTS, ...NPC_SCRIPTS, ...THREAD_SCRIPTS, ...TRAINER_SCRIPTS },
+  npcs: NPCS,
+  schedules: SCHEDULES,
+  eventScripts: EVENT_SCRIPTS,
   credits: CREDITS,
   items: ITEMS,
   loans: LOANS,
@@ -71,7 +77,7 @@ export const DATA_CONTENT = deepFreeze({
   trainers: TRAINERS,
   spires: SPIRES,
   tilesets: TILESETS,
-  maps: MAPS,
+  maps: MAPS.map(map => ({ ...map, triggers: [...(map.triggers ?? []), ...(STORY_TRIGGERS[map.id] ?? [])] })),
   encounters: ENCOUNTERS,
   regions: REGIONS,
 });

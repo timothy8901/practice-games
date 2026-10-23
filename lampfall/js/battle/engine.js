@@ -349,6 +349,16 @@ export class Battle {
     this.curveLevel = opts.curveLevel ?? null;
     this.summit = !!opts.summit;
     this.source = opts.source || 'route';
+    this.captureBlockReason = opts.captureBlockReason ?? null;
+    this.readingPhases = this.source === 'reading' ? (opts.readingPhases || [{ id: 'star', name: 'The Passenger', types: ['Star'], turns: 2 }]).map((p) => ({ ...p,
+      types: Array.isArray(p.types) ? p.types.map((t) => typeof t === 'string' ? t.slice(0, 1).toUpperCase() + t.slice(1).toLowerCase() : t) : p.types })) : null;
+    if (this.readingPhases) {
+      if (!Array.isArray(this.readingPhases) || !this.readingPhases.length || this.readingPhases.some((p) => !Array.isArray(p.types) || !p.types.length || p.types.some((t) => !this.data.chart.has(t)))) {
+        throw new TypeError('createBattle: readingPhases needs named, valid type lists');
+      }
+      this.rules.runAllowed = false;
+      this.rules.holdOutTurns ??= this.readingPhases.reduce((n, p) => n + (p.turns || 2), 0);
+    }
     this.foeAi = opts.foeAi || null;
     this.yard = opts.yard || [];
     this.prism = !!opts.prism;
@@ -437,6 +447,7 @@ export class Battle {
     this._openingEntries = null;
     if (this.weather.kind !== null) this._announceWeather(this.weatherCycle && !this._timed ? 'cycle' : 'setup', null);
     for (const e of opening) this._setTimedWeather(e.kind, e.turns, 'entry', e.side);
+    if (this.readingPhases) this._setReadingPhase(0);
     /** @type {BattleEvent[]} events from the opening send-ins (switch-in abilities fire here) */
     this.intro = this._flush();
   }
@@ -586,6 +597,7 @@ export class Battle {
       winner: this.winner,
       captureStance: this.stance,
       weather: this._weatherView(),
+      reading: this.readingPhases ? this._readingView() : null,
       consumedItems: this.consumedItems.map((x) => ({ ...x })),
       sides: this.sides.map((s) => ({
         active: s.active,
@@ -658,7 +670,7 @@ export class Battle {
       : { available: false, usable: false, reason: 'Only the player may run.' };
     const readDone = s.readUsed.has(foe.uid);
     out.read = { available: !readDone, usable: !readDone, free: !this.rules.readCostsTurn, costsTurn: this.rules.readCostsTurn, reason: readDone ? `${foe.nickname} has already been Read.` : null };
-    if (side === 0 && this.kind === 'wild') {
+    if (side === 0 && this.kind === 'wild' && !this.readingPhases && !this.captureBlockReason) {
       const fails = this.captureFails.get(foe.uid) || 0;
       const exact = this.rules.captureDisplay === 'exact';
       const grades = Object.keys(t.lantern).filter((g) => t.lantern[g].mult !== Infinity).map((key) => {
@@ -672,7 +684,7 @@ export class Battle {
       out.lantern = { available: true, fails, grades, exactOdds: exact };
       out.captureStance = { on: this.stance, available: true, text: 'Party damage cannot drop the wild creature below 1 HP.' };
     } else {
-      out.lantern = { available: false, reason: side === 0 ? 'You cannot capture a trainer\'s creature.' : 'Only the player captures.' };
+      out.lantern = { available: false, reason: this.readingPhases ? 'The Passenger can be caught after the Reading.' : this.captureBlockReason || (side === 0 ? 'You cannot capture a trainer\'s creature.' : 'Only the player captures.') };
       out.captureStance = { on: false, available: false, reason: 'Capture Stance is only for wild battles.' };
     }
     if (s.bag.crackdust > 0) {
@@ -680,10 +692,8 @@ export class Battle {
       out.items.push({ id: CRACKDUST, name: 'Crackdust', count: s.bag.crackdust, selectable: !why, usable: !why, reason: why });
     }
     for (const it of s.items) {
-      if (it.heal) {
-        const can = c.hp < c.stats.hp;
-        out.items.push({ id: it.id, name: it.name || it.id, count: 1, selectable: can, usable: can, reason: can ? null : 'HP is full.' });
-      }
+      const reason = this._itemBlocked(side, it);
+      out.items.push({ id: it.id, name: it.name || it.id, count: 1, selectable: !reason, usable: !reason, reason });
     }
     return out;
   }
@@ -762,6 +772,7 @@ export class Battle {
    */
   setCaptureStance(on) {
     this._events = [];
+    if (this.readingPhases) throw new BattleError('NO_STANCE', 'The Reading has no capture stance.');
     if (this.kind !== 'wild') throw new BattleError('NO_STANCE', 'Capture Stance is only for wild battles.');
     if (this.phase === 'ended') throw new BattleError('ENDED', 'The battle is over.');
     this.stance = !!on;
@@ -836,6 +847,7 @@ export class Battle {
    * @param {number} side
    */
   cycleUnfixed(side) {
+    if (this.readingPhases && side === 1) return;
     const c = this.active(side);
     if (!Array.isArray(c.typeQueue) || !c.typeQueue.length) return;
     const q = c.typeQueue;
@@ -843,6 +855,26 @@ export class Battle {
     c.types = [q[c.typeIndex]];
     const next = [1, 2].map((k) => q[(c.typeIndex + k) % q.length]);
     this._emit({ type: 'type-shift', side, who: c.nickname, current: c.types[0], next, text: `${c.nickname} turns ${c.types[0]}. Next: ${next.join(', ')}.` });
+  }
+
+  /** Posted two-turn Reading phases. They are a protected reading, on the battle's normal controls. */
+  _readingView() {
+    let left = this.turn;
+    let index = 0;
+    while (index < this.readingPhases.length - 1 && left >= (this.readingPhases[index].turns || 2)) left -= this.readingPhases[index++].turns || 2;
+    const p = this.readingPhases[index];
+    const next = this.readingPhases[(index + 1) % this.readingPhases.length];
+    return { index, name: p.name || p.id, types: p.types.slice(), turnsLeft: Math.max(0, (p.turns || 2) - left), next: next.name || next.id, nextTypes: next.types.slice() };
+  }
+
+  _setReadingPhase(index) {
+    this._readingIndex = index;
+    const p = this.readingPhases[index];
+    const next = this.readingPhases[(index + 1) % this.readingPhases.length];
+    const c = this.active(1);
+    c.types = p.types.slice();
+    this._emit({ type: 'type-shift', side: 1, who: c.nickname, current: c.types.join('/'), types: c.types.slice(), next: next.types.slice(),
+      text: `Reading ${index + 1}/${this.readingPhases.length}: ${p.name || p.id} (${c.types.join('/')}) — ${p.turns || 2} turns. Next: ${next.name || next.id} (${next.types.join('/')}).` });
   }
 
 
@@ -1151,7 +1183,11 @@ export class Battle {
     }
     if (this.phase !== 'ended') this._endOfTurn();
     if (this.phase !== 'ended') this._resolveFaints();
-    if (this.phase !== 'ended' && this.rules.holdOutTurns != null && this.turn >= this.rules.holdOutTurns) this._finish('holdout', null);
+    if (this.phase !== 'ended' && this.rules.holdOutTurns != null && this.turn >= this.rules.holdOutTurns) this._finish(this.readingPhases ? 'reading' : 'holdout', null);
+    else if (this.phase !== 'ended' && this.readingPhases) {
+      const view = this._readingView();
+      if (view.index !== this._readingIndex) this._setReadingPhase(this._readingIndex = view.index);
+    }
     if (this.phase !== 'ended' && this.turn >= this.tuning.maxTurns) this._finish('draw', null);
     return this._flush();
   }
@@ -1200,6 +1236,8 @@ export class Battle {
         if (!this.rules.readCostsTurn) throw new BattleError('READ_FREE', 'On this dial Read is free: call battle.read(side) instead.');
         return;
       case 'lantern':
+        if (this.readingPhases) throw new BattleError('NO_LANTERN', 'The Passenger is here for a Reading. It can be caught afterwards.');
+        if (this.captureBlockReason) throw new BattleError('STORAGE_FULL', this.captureBlockReason);
         if (side !== 0 || this.kind !== 'wild') throw new BattleError('NO_LANTERN', 'Lanterns are for wild battles.');
         if (!t.lantern[a.grade]) throw new BattleError('BAD_LANTERN', `Unknown Lantern grade ${String(a.grade)}.`);
         if (s.bag.lanterns && !(s.bag.lanterns[a.grade] > 0)) throw new BattleError('NO_LANTERN', `No ${t.lantern[a.grade].name} left.`);
@@ -1212,7 +1250,10 @@ export class Battle {
           if (why) throw new BattleError('NO_WARD', `Crackdust would be wasted: ${why}`);
           return;
         }
-        if (!s.items.some((it) => it.id === itemId)) throw new BattleError('NO_ITEM', `No item ${String(itemId)}.`);
+        const it = s.items.find((it) => it.id === itemId);
+        if (!it) throw new BattleError('NO_ITEM', `No item ${String(itemId)}.`);
+        const why = this._itemBlocked(side, it);
+        if (why) throw new BattleError('ITEM_UNUSABLE', why);
         return;
       }
       default:
@@ -1284,6 +1325,20 @@ export class Battle {
 
   // ---- items, run, capture -------------------------------------------------------
 
+  _itemBlocked(side, it) {
+    const c = this.active(side);
+    if (it.heal) {
+      if (c.hp >= c.stats.hp) return 'HP is full.';
+      if (it.mends && c.mends <= 0) return 'No Mends left this battle.';
+      if (it.mends && this.sides[side].vol.pendingHeal) return 'A Mend is already on its way.';
+    } else if (it.cures) {
+      if (!c.status || !it.cures.includes(c.status.kind)) return 'No matching condition to cure.';
+    } else if (it.pp) {
+      if (!c.moves.some((m) => m.pp < m.maxPp)) return 'Every move has full PP.';
+    } else return 'This item cannot be used in battle.';
+    return null;
+  }
+
   /** @param {number} side @param {string} itemId */
   _useItem(side, itemId) {
     const s = this.sides[side];
@@ -1302,7 +1357,20 @@ export class Battle {
     const it = s.items[idx];
     s.items.splice(idx, 1);
     this._emit({ type: 'item', side, item: it.id, text: `${s.trainer ? s.trainer.name : 'The trainer'} uses ${it.name || it.id}.` });
-    if (it.heal) this._heal(side, Math.floor(c.stats.hp * it.heal), 'item');
+    if (it.heal) {
+      if (it.mends) {
+        c.mends--;
+        this._emit({ type: 'mend-spent', side, user: c.nickname, remaining: c.mends, text: `${c.nickname} has ${c.mends} Mends left.` });
+      }
+      this._heal(side, Math.floor(c.stats.hp * it.heal), 'item');
+    } else if (it.cures && c.status) {
+      const kind = c.status.kind;
+      c.status = null;
+      this._emit({ type: 'status', side, target: c.nickname, kind, action: 'cure', text: `${c.nickname}'s ${kind} is cured.` });
+    } else if (it.pp) {
+      for (const m of c.moves) m.pp = Math.min(m.maxPp, m.pp + it.pp);
+      this._emit({ type: 'message', text: `${c.nickname}'s techniques regain ${Number.isFinite(it.pp) ? `${it.pp} ` : 'all '}PP.` });
+    }
   }
 
   /** @param {number} side */
@@ -1667,7 +1735,7 @@ export class Battle {
     const c = this.active(side);
     const want = Math.max(0, Math.floor(amount));
     let dmg = want;
-    const floored = this.kind === 'wild' && side === 1 && this.stance && source !== 'self';
+    const floored = !!this.readingPhases || (this.kind === 'wild' && side === 1 && this.stance && source !== 'self');
     if (floored) dmg = Math.min(dmg, Math.max(0, c.hp - 1));
     dmg = Math.min(dmg, c.hp);
     const held = dmg > 0 && source !== 'self' ? this.heldOf(c) : null;
@@ -2082,6 +2150,7 @@ function outcomeText(outcome, b) {
     case 'capture': return `${b.caught ? b.caught.nickname : 'It'} joins you.`;
     case 'run': return 'You got away.';
     case 'holdout': return `You held out for ${b.turn} turns.`;
+    case 'reading': return 'The Passenger settles. Every shape carries the same mark. The Reading is complete.';
     default: return 'The battle ends in a draw.';
   }
 }

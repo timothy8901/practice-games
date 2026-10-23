@@ -155,7 +155,8 @@ export function createSettingsScene(G) {
       const v = row.id === 'ambience' ? value / 100 : value;
       writeExt({ [key]: v });
       // forward-compatible: lands in world.settings the day the schema carries the key
-      G.store.tx('settings:update-ext', (w) => settingsSys.update(w, key === 'ambience' ? { volumes: { ...w.settings.volumes, ambience: v } } : { [key]: v }, { bus: G.bus }));
+      G.store.tx('settings:update-ext', (w) => settingsSys.update(w, { [key]: v }, { bus: G.bus }));
+      persistMirror();
       try { G.bus?.emit?.('settings:changed', { changed: [key], ext: readExt(G), settings: G.world?.settings }); } catch { /* listeners never break settings */ }
     }
     if (row.kind === 'volume') sfx(G, 'cursor');

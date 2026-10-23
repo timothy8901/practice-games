@@ -392,7 +392,7 @@ export function createForecastScene(G) {
     const resolved = mode === 'result' && outcome && outcome.kind === 'accepted';
     const shownHeader = outcome && outcome.header ? (resolved ? { ...outcome.header, speciesId: c.speciesId, types: c.types } : outcome.header) : headerSnapshot();
     const glint = resolved ? Math.max(0, 1 - flipF / FLIP_FRAMES.glint) : 0;
-    drawCreature(ctx, shownHeader.speciesId, r.x + 6, r.y + 6, { scale: 1, types: shownHeader.types, mark: c.mark, lit: !c.wild, glint });
+    drawCreature(ctx, shownHeader.speciesId, r.x + 6, r.y + 6, { scale: 1, types: shownHeader.types, mark: c.mark, star: c.starTouched, lit: !c.wild, glint });
     drawText(ctx, c.nickname, r.x + 44, r.y + 7, { color: INK_D });
     drawText(ctx, `Lv${c.level}`, r.x + 46 + measureText(c.nickname).w + 6, r.y + 7, { color: SOFT_D });
     drawText(ctx, t('forecast.window', { n: shownHeader.n, total: shownHeader.total }), r.x + 44, r.y + 19, { color: SOFT_D, font: 'small' });
@@ -432,7 +432,7 @@ export function createForecastScene(G) {
       if (card.isWard && !card.abilityHidden) drawBadge(ctx, 'Ward', r.x + 8, r.y + 104, { style: 'ward', small: true }); // str
     } else {
       if (card.silhouette) drawCreature(ctx, card.formId, r.x + r.w / 2 - 32, r.y + 41, { scale: 2, silhouette: '#29366F', types: card.types });
-      else drawCreature(ctx, card.formId, r.x + r.w / 2 - 32, r.y + 41, { scale: 2, types: card.types, mark: creatureRec.mark, lit: true });
+      else drawCreature(ctx, card.formId, r.x + r.w / 2 - 32, r.y + 41, { scale: 2, types: card.types, mark: creatureRec.mark, star: card.isStarTouched, lit: true });
       if (card.silhouette) drawText(ctx, t('forecast.unseen'), r.x + r.w / 2, r.y + 72, { color: CREAM, align: 'center', font: 'small' });
     }
     drawText(ctx, name, r.x + 6, r.y + 107, { color: ink });
@@ -530,7 +530,7 @@ export function createForecastScene(G) {
     const sx = L.stage.x + Math.floor((L.stage.w - size) / 2);
     const sy = L.stage.y + 12;
     const oldSprite = creatureSprite(outcome.fromForm, { scale, types: creatureRec.types });
-    const newSprite = creatureSprite(outcome.toForm, { scale, types: creatureRec.types });
+    const newSprite = creatureSprite(outcome.toForm, { scale, types: creatureRec.types, star: creatureRec.starTouched });
     const art = creatureArt(outcome.toForm, { types: creatureRec.types });
     const mark = markAnchor(art, creatureRec.mark);
     const done = ph.phase === 'done';

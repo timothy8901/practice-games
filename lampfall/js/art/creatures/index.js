@@ -462,7 +462,7 @@ export function drawCreature(ctx, id, x, y, opts = {}) {
   const h = rec ? rec.h : CREATURE_SIZE;
   let at;
   if (rec) {
-    const k = opts.anchor && ANCHOR_KEYS.includes(opts.anchor) ? opts.anchor : rec.mark;
+    const k = opts.anchor && ANCHOR_KEYS.includes(opts.anchor) ? opts.anchor : ANCHOR_KEYS.includes(opts.mark?.anchor) ? opts.mark.anchor : rec.mark;
     const set = back ? rec.heartmarksBack : opts.frame === 1 ? rec.heartmarksIdle2 : rec.heartmarks;
     at = markAnchor({ heartmark: set[k] }, opts.mark, { w, h });
     if (opts.flipX) at = { x: w - 1 - at.x, y: at.y };

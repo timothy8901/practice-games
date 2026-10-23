@@ -14,7 +14,7 @@
  */
 
 /** Battle outcomes (`end.outcome` and `result().outcome`). */
-export const OUTCOMES = Object.freeze(['win', 'loss', 'capture', 'run', 'holdout', 'draw']);
+export const OUTCOMES = Object.freeze(['win', 'loss', 'capture', 'run', 'holdout', 'reading', 'draw']);
 /** `blocked.reason` values. */
 export const BLOCK_REASONS = Object.freeze(['ward', 'immune', 'guard', 'consecutive-guard', 'hp-full', 'no-mends', 'heal-pending', 'sodden']);
 /** `status.action` values. */

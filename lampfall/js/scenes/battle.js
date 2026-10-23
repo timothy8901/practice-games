@@ -325,6 +325,7 @@ export function createBattleScene(G) {
     m.types = c.types.slice();
     m.uid = c.uid;
     m.mark = real.mark ?? null;
+    m.starTouched = !!real.starTouched;
     m.lit = side === 0 ? true : !real.wild;
     if (side === 0) {
       const e = expDisplay(session, c.uid);
@@ -572,8 +573,14 @@ export function createBattleScene(G) {
     rootFocus.setItems(commandItems(), { keepId: false });
     rootFocus.set(0);
     const c = st().sides[0].party[st().sides[0].active];
+    for (const side of [0, 1]) {
+      const active = session.battle.active(side);
+      sides[side].types = active.types.slice();
+      sides[side].status = active.status?.kind ?? null;
+    }
     const hold = session.battle.rules.holdOutTurns;
-    promptLine = hold ? t('battle.msg.holdout', { n: Math.max(0, hold - session.battle.turn) }) : t('battle.chooseMove', { nick: c.name });
+    const reading = st().reading;
+    promptLine = reading ? `${reading.name}: ${reading.turnsLeft} turns. Next: ${reading.next}.` : hold ? t('battle.msg.holdout', { n: Math.max(0, hold - session.battle.turn) }) : t('battle.chooseMove', { nick: c.name });
     log = { text: promptLine, ms: 1e9, cps: Infinity };
   }
 
@@ -1237,8 +1244,8 @@ export function createBattleScene(G) {
       return;
     }
     if (mode === 'menu') {
-      if (session.kind === 'wild' && ptr && ptr.justDown && inRect(ptr, L.stance)) { toggleStance(); return; }
-      if (input.pressed('select') && session.kind === 'wild') { toggleStance(); return; }
+      if (session.kind === 'wild' && !st().reading && ptr && ptr.justDown && inRect(ptr, L.stance)) { toggleStance(); return; }
+      if (input.pressed('select') && session.kind === 'wild' && !st().reading) { toggleStance(); return; }
       rootFocus.handle(input);
       return;
     }
@@ -1338,7 +1345,7 @@ export function createBattleScene(G) {
       drawSprite(ctx, sprite, x, y, alpha < 1 ? { alpha } : undefined);
     } else {
       const glint = m.glintMs > 0 ? 1 - m.glintMs / frames(30) + 0.01 : 0;
-      drawCreature(ctx, m.speciesId, x, y, { view: view0, frame: side === 1 ? frame : 0, scale: 2, types: m.types, mark: m.mark, lit: m.lit, glint, alpha: alpha < 1 ? alpha : undefined });
+      drawCreature(ctx, m.speciesId, x, y, { view: view0, frame: side === 1 ? frame : 0, scale: 2, types: m.types, mark: m.mark, star: m.starTouched, lit: m.lit, glint, alpha: alpha < 1 ? alpha : undefined });
       // Ward lattice: a 48 f sweep every 4 s, a 6 f flare on a blocked hit; stilled under reduced motion
       if (side === 1 && st().sides[1].wardBadge) drawLattice(ctx, m, x, y, view0);
       else if (m.latticeMs > 0) drawLattice(ctx, m, x, y, view0);
@@ -1686,6 +1693,7 @@ export function createBattleScene(G) {
 
   function drawStanceSeal(ctx) {
     const lg = legal();
+    if (!lg.captureStance?.available) return;
     const on = !!(lg.captureStance && lg.captureStance.on);
     const r = L.stance;
     ctx.fillStyle = on ? COLORS.paper.light : COLORS.paper.shade;
@@ -1823,7 +1831,7 @@ export function createBattleScene(G) {
       ctx.fillRect(r.x, r.y, r.w, r.h);
       strokeRect(ctx, r, focused ? INK : COLORS.paper.rule);
       const real = session.battle.sides[0].party[row.index];
-      drawCreature(ctx, c.speciesId, r.x + 4, r.y + 8, { scale: 1, types: c.types, mark: real.mark, lit: true, alpha: c.fainted ? 0.5 : undefined });
+      drawCreature(ctx, c.speciesId, r.x + 4, r.y + 8, { scale: 1, types: c.types, mark: real.mark, star: real.starTouched, lit: true, alpha: c.fainted ? 0.5 : undefined });
       drawText(ctx, c.name, r.x + 40, r.y + 6, { color: row.enabled ? INK : FAINT });
       drawText(ctx, `Lv${c.level}`, r.x + r.w - 6, r.y + 6, { color: INK, align: 'right' });
       drawBar(ctx, { x: r.x + 40, y: r.y + 20, w: 100, h: 5, value: c.hp, max: c.maxHp, kind: 'hp', showNumber: true });

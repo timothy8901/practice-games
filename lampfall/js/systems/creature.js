@@ -237,7 +237,7 @@ export function learnableAt(sp, level) {
  * @returns {boolean}
  */
 export function canLearn(sp, moveId) {
-  return sp.learnset.some((e) => e.move === moveId);
+  return sp.learnset.some((e) => e.move === moveId) || (Array.isArray(sp.flags?.teachable) && sp.flags.teachable.includes(moveId));
 }
 
 /**
@@ -419,6 +419,15 @@ export function drawMark(rng, opts = {}) {
   return { x: x === 0 ? 0 : x, y: y === 0 ? 0 : y }; // never -0 (JSON round-trips must be equal)
 }
 
+/** A lifetime body-part choice; old saves can still carry a legacy x/y offset. */
+export function drawBodyMark(uid, rng) {
+  const anchors = ['head', 'chest', 'back', 'tail'];
+  let hash = 0x811c9dc5;
+  for (const ch of `heartmark:${uid}`) { hash ^= ch.charCodeAt(0); hash = Math.imul(hash, 0x01000193); }
+  const index = creatureStream(rng, 'mark', uid)?.int(0, anchors.length - 1) ?? ((hash >>> 0) % anchors.length);
+  return { x: 0, y: 0, anchor: anchors[index] };
+}
+
 /**
  * Whether an ability row is an Unfixed type loop (`unfixed: true`, or hook key `'unfixed'`).
  * @param {any} ability
@@ -512,9 +521,10 @@ export function makeCreature(opts, data) {
   }
 
   const rng = opts.rng || null;
+  const anchors = ['head', 'chest', 'back', 'tail'];
   const mark = opts.mark && Number.isInteger(opts.mark.x) && Number.isInteger(opts.mark.y)
-    ? { x: opts.mark.x, y: opts.mark.y }
-    : drawMark(creatureStream(rng, 'mark', opts.uid), opts);
+    ? { x: opts.mark.x, y: opts.mark.y, ...(anchors.includes(opts.mark.anchor) ? { anchor: opts.mark.anchor } : {}) }
+    : drawBodyMark(opts.uid, rng);
   const typeQueue = isUnfixedAbility(look.ability(sp.ability))
     ? buildTypeQueue(sp.types, look.typeNames(), creatureStream(rng, 'unfixed', opts.uid), opts)
     : null;
@@ -544,6 +554,7 @@ export function makeCreature(opts, data) {
     heartmark: heartmark || null,
     heartmarkStab: !!hmMove && sp.types.includes(hmMove.type),
     mark,
+    starTouched: opts.starTouched === true,
     shiftlog: [sp.id],
     shiftCount: 0,
     windowsUsed: [],
@@ -583,7 +594,7 @@ function clampInt(v, lo, hi) {
 function blocksShifts(look, itemId) {
   if (!itemId) return false;
   const row = look.itemOrNull(itemId);
-  return !!(row && row.blocksShifts === true);
+  return !!(row && (row.blocksShifts === true || row.held?.blocksShift === true));
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -668,6 +679,7 @@ export function shiftTo(c, formId, data, dial, opts = {}) {
   c.memory = c.memory.filter((id) => !moves.some((m) => m.id === id));
   c.base = newBase;
   c.speciesId = to.id;
+  c.starTouched = false;
   c.types = to.types.slice();
   c.ability = to.ability;
   if (isUnfixedAbility(look.ability(to.ability))) {
@@ -901,7 +913,7 @@ export function deserialize(rec, data, opts = {}) {
   const heldItem = typeof rec.heldItem === 'string' && rec.heldItem ? rec.heldItem : null;
   // a Still Knot is a held item: none held, no Knot; a known item row decides; else trust the record
   const itemRow = heldItem ? look.itemOrNull(heldItem) : null;
-  const stillKnot = !heldItem ? false : itemRow ? itemRow.blocksShifts === true : rec.stillKnot === true;
+  const stillKnot = !heldItem ? false : itemRow ? blocksShifts(look, heldItem) : rec.stillKnot === true;
   const windowsUsed = [...new Set((Array.isArray(rec.windowsUsed) ? rec.windowsUsed : []).filter(posInt))].sort((a, b) => a - b);
   const c = {
     uid: rec.uid,
@@ -924,7 +936,10 @@ export function deserialize(rec, data, opts = {}) {
     bond: clampInt(rec.bond ?? 0, 0, t.MAX_BOND),
     heartmark,
     heartmarkStab: rec.heartmarkStab === true,
-    mark: rec.mark && Number.isInteger(rec.mark.x) && Number.isInteger(rec.mark.y) ? { x: rec.mark.x, y: rec.mark.y } : { x: 0, y: 0 },
+    mark: rec.mark && Number.isInteger(rec.mark.x) && Number.isInteger(rec.mark.y)
+      ? { x: rec.mark.x, y: rec.mark.y, ...(['head', 'chest', 'back', 'tail'].includes(rec.mark.anchor) ? { anchor: rec.mark.anchor } : {}) }
+      : { x: 0, y: 0 },
+    starTouched: rec.starTouched === true,
     shiftlog: shiftlog.length ? shiftlog : [sp.id],
     shiftCount: nonNegInt(rec.shiftCount) ? rec.shiftCount : 0,
     windowsUsed,

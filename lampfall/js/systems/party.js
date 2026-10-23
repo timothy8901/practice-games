@@ -44,7 +44,7 @@ import { setAutoAnchor } from './settings.js';
  */
 export const DEFAULTS = Object.freeze({
   PARTY_MAX: 6,
-  BOX_CAPACITY: 120,
+  BOX_CAPACITY: 20,
   NICKNAME_MAX: 12,
   LIGHT_ON_CATCH: true,
 });
@@ -131,6 +131,19 @@ export function findCreature(world, uid) {
   return null;
 }
 
+/** Completed Cellar storage, shared with menus and capture checks (GDD-00 §7). */
+export function boxCapacity(world, opts = {}) {
+  const base = tuningOf(opts.tuning).BOX_CAPACITY;
+  const cellar = Number.isInteger(opts.tuning?.boxCapacityCellar) ? opts.tuning.boxCapacityCellar : 40;
+  const built = world?.loans?.builds?.some((b) => b.id === 'cellar' && b.done) || world?.loans?.built?.includes('cellar');
+  return Math.max(base, built ? cellar : base, world?.box?.length ?? 0);
+}
+
+/** A capture is offered only when it has a destination, before spending a wick. */
+export function hasCaptureRoom(world, opts = {}) {
+  return world.party.length < tuningOf(opts.tuning).PARTY_MAX || world.box.length < boxCapacity(world, opts);
+}
+
 /**
  * Allocates the next creature uid (`'c1'`, `'c2'`, ...) from the `sys.uid` counter
  * (systems/flags), skipping any uid already in the world (e.g. after an import).
@@ -179,7 +192,7 @@ export function addCreature(world, c, data, opts = {}) {
     throw new Error(`party.addCreature: uid ${JSON.stringify(c.uid)} is already in the world`);
   }
   const partyRoom = world.party.length < t.PARTY_MAX;
-  const boxRoom = world.box.length < t.BOX_CAPACITY;
+  const boxRoom = world.box.length < boxCapacity(world, opts);
   /** @type {'party'|'box'} */
   let where;
   if (opts.to === 'party') {
@@ -294,7 +307,7 @@ export function toBox(world, uid, data, opts = {}) {
   const aliveNow = world.party.some((c) => c.hp > 0);
   const aliveAfter = world.party.some((c, k) => k !== i && c.hp > 0);
   if (aliveNow && !aliveAfter) return { ok: false, reason: 'last-alive' };
-  if (world.box.length >= t.BOX_CAPACITY) return { ok: false, reason: 'box-full' };
+  if (world.box.length >= boxCapacity(world, opts)) return { ok: false, reason: 'box-full' };
   const [c] = world.party.splice(i, 1);
   world.box.push(c);
   exp.refreshPending(world, uid, data, opts);
@@ -670,7 +683,7 @@ export function applyOutcome(world, battleResult, data, rng = null, opts = {}) {
     if (!rec.uid || findCreature(world, rec.uid)) rec.uid = nextUid(world);
     const m = r.caught.mark;
     if (!(m && Number.isInteger(m.x) && Number.isInteger(m.y)) && rng) {
-      rec.mark = creature.drawMark(creature.creatureStream(rng, 'mark', rec.uid), opts);
+      rec.mark = creature.drawBodyMark(rec.uid, rng);
     }
     const res = addCreature(world, rec, data, { ...opts, caught: true });
     if (res.ok) caught = { uid: res.uid, where: res.where };

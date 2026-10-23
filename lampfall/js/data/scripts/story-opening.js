@@ -213,6 +213,7 @@ export default {
     'Wick: It used to be the Keeper\'s. The real one. Before. ~ Mum says she went away and the light went out on the same night. Nobody tells me the rest.',
     warpTo(P, 'porch-keepers-cottage-step', 'down'),
     'Wick: Someone\'s on your step already. ~ It\'s the owl. He sees better at night. He says he doesn\'t, but he does.',
+    call('corin-reading-glass'),
     END,
   ],
 

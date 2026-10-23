@@ -22,6 +22,14 @@
 import { tideState as tideStateOf } from '../state/selectors.js';
 import { evalCond as dslEvalCond } from '../script/cond.js';
 import { tideVariant, flooded } from './tide.js';
+import { mapStateDefaults } from '../state/schema.js';
+
+/** Records a once-only story trigger in the map's saved state. Call inside store.tx. */
+export function markTrigger(world, mapId, id) {
+  if (!world.maps[mapId]) world.maps[mapId] = mapStateDefaults();
+  const opened = world.maps[mapId].opened;
+  if (!opened.includes(id)) opened.push(id);
+}
 
 /** @typedef {import('../state/schema.js').World} World */
 /** @typedef {import('../core/time.js').TideState} TideState */

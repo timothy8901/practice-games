@@ -108,13 +108,13 @@ describe('migrateWorld', () => {
     assert.deepEqual(validateWorld(migrateWorld({ ...v3, letters: null }).world), []);
   });
 
-  it(`passes the current (v${SCHEMA_VERSION}) fixture through unchanged`, () => {
+  it(`hydrates new optional defaults in the current (v${SCHEMA_VERSION}) fixture`, () => {
     const current = fixture(`v${SCHEMA_VERSION}.json`);
     const res = migrateWorld(current);
     assert.equal(res.ok, true);
     assert.equal(res.migrated, false);
     assert.equal(res.from, SCHEMA_VERSION);
-    assert.deepEqual(res.world, current);
+    assert.deepEqual(res.world, fillDefaults(current));
     assert.deepEqual(validateWorld(res.world), []);
   });
 

@@ -21,6 +21,7 @@ import { TRAINERS } from '../data/trainers.js';
 import { ITEMS } from '../data/items.js';
 import { DIALS } from '../data/dials.js';
 import { TUNING } from '../data/tuning.js';
+import { SPIRES, WEATHER_KINDS } from '../data/spires.js';
 
 /** @type {any} */
 let cached = null;
@@ -31,7 +32,8 @@ let cached = null;
  * @returns {any}
  */
 function withExtras(reg) {
-  return { ...reg, typeChart: reg.typeChart ?? TYPE_TABLE, tuning: reg.tuning ?? TUNING };
+  return { ...reg, typeChart: reg.typeChart ?? TYPE_TABLE, tuning: reg.tuning ?? TUNING,
+    spires: reg.spires ?? SPIRES, weatherKinds: reg.weatherKinds ?? WEATHER_KINDS };
 }
 
 /**

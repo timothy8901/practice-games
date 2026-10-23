@@ -569,7 +569,7 @@ export function drawCreature(ctx, G, c, x, y, o = {}) {
   const yy = Math.round(y + (o.bobY ?? 0));
   if (formId && creatureArtLib.hasArt(formId)) {
     const r = creatureArtLib.drawCreature(ctx, formId, Math.round(x), yy, {
-      scale, frame: o.frame ?? 0, anchor: heartmarkSpot(c), mark: c?.mark ?? null, lit: c ? c.wild !== true : false,
+      scale, frame: o.frame ?? 0, anchor: heartmarkSpot(c), mark: c?.mark ?? null, star: c?.starTouched, lit: c ? c.wild !== true : false,
       glint: o.glint ? 1 : 0, showMark: o.mark !== false && !!c, silhouette: o.grey ? PALETTE.e : null, types: typesOf(c),
     });
     return { w: r.w, h: r.h };
@@ -600,7 +600,7 @@ export function drawCreatureIcon(ctx, G, c, x, y, o = {}) {
   const formId = o.form ?? c?.speciesId;
   const prev = ctx.globalAlpha;
   if (formId && creatureArtLib.hasArt(formId)) {
-    const icon = creatureArtLib.getCreatureIcon(formId, { silhouette: o.grey ? PALETTE.e : null });
+    const icon = creatureArtLib.getCreatureIcon(formId, { star: c?.starTouched, silhouette: o.grey ? PALETTE.e : null });
     if (!icon) return;
     if (o.dim) ctx.globalAlpha = prev * 0.45;
     drawSprite(ctx, icon, Math.round(x), Math.round(y));

@@ -583,7 +583,7 @@ function tiltOf(c, look, opts) {
   if (opts.tilt !== undefined) return typeof opts.tilt === 'string' && opts.tilt ? opts.tilt : null;
   if (!c.heldItem) return null;
   const row = look.itemOrNull(c.heldItem);
-  return row && typeof row.tilt === 'string' && row.tilt ? row.tilt : null;
+  return row && typeof row.tilt === 'string' && row.tilt ? row.tilt : row?.held?.forecastTypeMult && typeof row.held.type === 'string' ? row.held.type : null;
 }
 
 /**
@@ -686,7 +686,7 @@ export function rollForecast(world, creature, data, opts = {}) {
   const flat = flatOn(t, dial, opts);
   const pools = DIRS.map((d) => cardPool(row[d], dial, c, { tuning: opts.tuning, tilt, typesOf, flat, allow }));
 
-  const starForm = star && star !== c.speciesId && allow(star) && u[SLOT.star] < t.STAR_CHANCE ? star : null;
+  const starForm = star && allow(star) && u[SLOT.star] < t.STAR_CHANCE ? star : null;
   const starIdx = DIRS.indexOf(t.STAR_CARD);
   /** @type {(string|null)[]} */
   const forms = DIRS.map((d, i) => (starForm && i === starIdx ? starForm : pickForm(pools[i], u[SLOT[d]])));
@@ -731,7 +731,7 @@ export function rollForecast(world, creature, data, opts = {}) {
     return {
       ...base, formId, odds: odds[i], types: sp.types.slice(), statTotalDelta: pv.statDelta, ability,
       isWard: !!(abilityRow && abilityRow.ward), keepsMoves: pv.kept.length, toMemory: pv.toMemory.slice(),
-      isStarTouched: formId === starForm || !!sp.flags.starTouched,
+      isStarTouched: (i === starIdx && formId === starForm) || !!sp.flags.starTouched,
       silhouette: silhouetteDial && !seen, abilityHidden: silhouetteDial && !read, seen, read, empty: false,
     };
   }));
@@ -933,6 +933,7 @@ export function applyShift(world, uid, card, data, opts = {}) {
   const bus = opts.bus ?? null;
   const level = opts.consumeWindow === false ? null : resolveWindow(world, c.uid, data, { tuning: opts.tuning, bus });
   const res = shiftTo(c, formId, data, dial, shiftOpts);
+  c.starTouched = starTouched;
   c.ability = abilityFor(world, formId, look.species(formId));
   c.shiftCount += 1;
   refreshPending(world, c.uid, data, { tuning: opts.tuning });

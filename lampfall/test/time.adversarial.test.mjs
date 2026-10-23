@@ -713,7 +713,9 @@ describe('createClock: real-clock mode under attack', () => {
   });
 
   it('DST-style jumps: an hour forward replays 60 minutes, an hour back is silent and the next minute still fires', () => {
-    let ms = localMs(2026, 2, 8, 1, 30, 0);
+    // Simulate jumps away from an actual DST boundary: adding an epoch hour on
+    // March 8 can advance two local hours in America/Chicago.
+    let ms = localMs(2026, 0, 5, 1, 30, 0);
     const clock = createClock({ realClock: true, now: () => ms });
     const seen = [];
     clock.onMinute((e) => seen.push(e.minute));

@@ -11,6 +11,7 @@
  * @module systems/settings
  */
 
+import { SAVE_PREFIX } from '../config.js';
 import { settingsDefaults, TEXT_SPEEDS, SCALE_MODES, AUTO_ANCHOR_MODES, isPlainObject } from '../state/schema.js';
 
 /** @typedef {import('../state/schema.js').Settings} Settings */
@@ -44,10 +45,10 @@ export const TEXT_SPEED_CPS = Object.freeze({ slow: 20, normal: 45, fast: 90, in
 export const MINUTES_PER_DAY_RANGE = Object.freeze({ min: 6, max: 120 });
 
 /** localStorage key of the settings mirror. // [GDD: title prefix] */
-export const MIRROR_KEY = 'GAME.settings';
+export const MIRROR_KEY = `${SAVE_PREFIX}settings`;
 
 /** Keys the mirror carries (device-level preferences; nothing run-specific). */
-export const MIRRORED_KEYS = Object.freeze(['volumes', 'muted', 'textSpeed', 'scale', 'bindings', 'reducedMotion', 'fps30', 'skipAnims', 'minutesPerDay']);
+export const MIRRORED_KEYS = Object.freeze(['volumes', 'muted', 'textSpeed', 'scale', 'bindings', 'reducedMotion', 'fps30', 'skipAnims', 'minutesPerDay', 'battleSpeed', 'fishingMode', 'largeText', 'highContrast', 'clearVisuals', 'pathView', 'ambience', 'touchLayout', 'wakePoint', 'autoAdvance', 'captions']);
 
 /**
  * @param {unknown} v
@@ -88,6 +89,12 @@ export function normalize(partial, base = settingsDefaults()) {
       if (mode === null || AUTO_ANCHOR_MODES.includes(mode)) out.autoAnchor[uid] = mode;
     }
   }
+  for (const key of ['largeText', 'highContrast', 'clearVisuals', 'autoAdvance', 'captions']) {
+    if (typeof p[key] === 'boolean') out[key] = p[key];
+  }
+  const options = { battleSpeed: [1, 2, 4], fishingMode: ['standard', 'gentle', 'patient'], pathView: ['hold', 'toggle'], touchLayout: ['two', 'one'], wakePoint: ['porch', 'waystone'] };
+  for (const [key, values] of Object.entries(options)) if (values.includes(p[key])) out[key] = p[key];
+  out.ambience = unit(p.ambience ?? p.volumes?.ambience, base.ambience ?? 0.7);
   return out;
 }
 
