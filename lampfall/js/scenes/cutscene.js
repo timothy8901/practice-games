@@ -103,6 +103,8 @@ export function createCutsceneScene(G) {
   /** @type {any} */ let pan = null;
   let closeT = 0;
   let lastOp = '';
+  /** @type {null | {who: string, x: number, y: number, facing: string|null}} the walk being waited on (a skip lands it) */
+  let inflight = null;
 
   const stage = () => {
     const ow = G.scenes.find ? G.scenes.find('overworld') : null;
@@ -134,6 +136,15 @@ export function createCutsceneScene(G) {
   }
 
   function wait(fn) { state = 'wait'; waiter = fn; }
+
+  /** A skip lands the walk in progress where it ends (the stage's teleport drops its queued steps). */
+  function landInflight(S) {
+    const f = inflight;
+    inflight = null;
+    if (!f || !S || typeof S.teleport !== 'function') return;
+    S.teleport(f.who, f.x, f.y);
+    if (f.facing && typeof S.face === 'function') S.face(f.who, f.facing);
+  }
   function timer(ms) { let left = ms; wait((dt) => (left -= dt) <= 0); }
 
   function perform(r) {
@@ -156,7 +167,9 @@ export function createCutsceneScene(G) {
         const dirs = parsePath(r.path);
         const ms = dirs.length * (r.run ? RUN_MS : WALK_MS);
         let started = false;
+        const from = S?.entity?.(r.who);
         if (S && typeof S.walk === 'function') started = S.walk(r.who, dirs, { run: r.run === true }) !== false;
+        if (started && from) inflight = { who: r.who, ...walkEnd(from, dirs) };
         if (r.wait === false) { step(); return; }
         if (started && typeof S?.isMoving === 'function') {
           let guard = ms + 2000;
@@ -399,7 +412,7 @@ export function createCutsceneScene(G) {
       childOp = null;
       state = 'run';
       if (op && TEXT_OPS.includes(op)) {
-        if (result && result.skip) { skipAhead(); return; }
+        if (result && result.skip) { landInflight(stage()); skipAhead(); return; }
         if (result && result.pending) { bookmark(); perform(result.pending); return; }
         if (session && session.isDone()) { finish(); return; }
         // the dialogue closed without finishing (an error): carry on
@@ -430,7 +443,7 @@ export function createCutsceneScene(G) {
         if (k >= 1) pan = null;
       }
       if (state === 'wait' && waiter) {
-        if (waiter(dt)) { waiter = null; state = 'run'; step(); }
+        if (waiter(dt)) { waiter = null; inflight = null; state = 'run'; step(); }
       }
       if (state === 'closing') {
         closeT += dt;
@@ -446,6 +459,7 @@ export function createCutsceneScene(G) {
         if (skipHeld >= SKIP_HOLD_MS && (state === 'wait' || state === 'run')) {
           skipHeld = 0;
           waiter = null; pan = null; emotes = [];
+          landInflight(stage());
           skipAhead();
         }
       } else {
