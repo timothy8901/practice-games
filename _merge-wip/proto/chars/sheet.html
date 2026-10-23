@@ -8,31 +8,37 @@
 <style>
   :root { --ink: #141b33; --deep: #2b3a67; --paper: #f4f1e6; --rule: #c9a77c; --v: #94b0c2; }
   html, body { margin: 0; background: var(--ink); color: var(--paper); font: 12px/1.4 ui-monospace, Menlo, Consolas, monospace; }
-  body { padding: 10px 14px 24px; }
+  body { padding: 10px 16px 24px; }
   h1 { font-size: 13px; letter-spacing: .12em; text-transform: uppercase; margin: 0 0 2px; color: var(--rule); }
+  h2 { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; margin: 14px 0 6px; color: var(--rule); }
   p.sub { margin: 0 0 8px; color: var(--v); }
   .ctl { margin: 0 0 8px; color: var(--v); } .ctl label { margin-right: 12px; }
+  canvas { image-rendering: pixelated; image-rendering: crisp-edges; display: block; }
+  .portraits { display: flex; flex-wrap: wrap; gap: 10px; }
+  .portraits figure { margin: 0; text-align: center; color: var(--v); font-size: 10px; }
+  .portraits figcaption { margin-top: 3px; }
   .row { display: flex; align-items: flex-end; gap: 6px; margin-bottom: 4px; }
-  .row canvas { image-rendering: pixelated; image-rendering: crisp-edges; display: block; }
-  .row .name { width: 120px; color: var(--paper); font-weight: 700; font-size: 11px; line-height: 1.2; padding-bottom: 4px; }
+  .row .name { width: 118px; flex: none; color: var(--paper); font-weight: 700; font-size: 11px; line-height: 1.2; padding-bottom: 4px; }
   .row .name small { display: block; color: var(--v); font-weight: 400; }
   .strip { display: flex; gap: 2px; }
-  .cell { background: #4e6e5d; }
-  .cell.night { background: #2b3a67; }
-  .cell.sand { background: #c9b48a; }
-  .hdr { display: flex; gap: 6px; color: var(--v); font-size: 10px; margin: 6px 0 2px; }
+  .gap { width: 6px; }
+  .anim { outline: 1px solid var(--rule); }
+  .hdr { display: flex; gap: 2px; color: var(--v); font-size: 10px; margin: 0 0 2px 124px; }
   .hdr span { display: inline-block; text-align: center; }
-  .portrait { background: #f4f1e6; border: 1px solid var(--rule); }
 </style>
 </head>
 <body>
 <h1>Character sheet</h1>
-<p class="sub">16x24 palette-indexed string art at 3x. Per row: walk down (animated) · 4 frames down · up · left · right · sit · fish (24 wide, rod overhangs) · portrait 48x48. Add <code>?zoom=6&amp;only=wren,juniper</code> to inspect.</p>
+<p class="sub">16x24 palette-indexed string art. Per row: animated walk down / up / left / right (outlined), then 4 frames each of down, up, left (idle, step A, idle, step B), sit, fish (24 wide; draw at x + fishOx), hang. 48x48 portrait busts above. <code>?zoom=6&amp;only=wren,juniper</code> to inspect.</p>
 <div class="ctl">
-  <label><input type="checkbox" id="anim" checked> animate walk</label>
-  <label>backdrop <select id="bg"><option value="cell">grass</option><option value="cell night">night</option><option value="cell sand">sand</option></select></label>
-  <label><input type="checkbox" id="outline"> silhouette (k fill)</label>
+  <label><input type="checkbox" id="anim" checked> animate</label>
+  <label>backdrop <select id="bg"><option value="#4e6e5d">grass</option><option value="#c9b48a">sand</option><option value="#7a5a36">boards</option><option value="#2b3a67">night</option></select></label>
+  <label><input type="checkbox" id="outline"> silhouettes</label>
 </div>
+<h2>Portraits</h2>
+<div class="portraits" id="portraits"></div>
+<h2>Overworld</h2>
+<div class="hdr" id="hdr"></div>
 <div id="rows"></div>
 <script type="module">
   import { decodeSprite, drawSprite, silhouette } from '../../js/core/pixelart.js';
@@ -40,68 +46,76 @@
 
   const q = new URLSearchParams(location.search);
   const SCALE = Number(q.get('zoom') || 3);
+  const PSCALE = Number(q.get('pzoom') || Math.max(3, SCALE));
   const only = q.get('only') ? q.get('only').split(',') : null;
   const ids = Object.keys(CHARACTERS).filter((id) => !only || only.includes(id));
   const root = document.getElementById('rows');
   const animBox = document.getElementById('anim'), bgSel = document.getElementById('bg'), outBox = document.getElementById('outline');
 
+  // portraits
+  const pRoot = document.getElementById('portraits');
+  for (const [id, p] of Object.entries(PORTRAITS)) {
+    if (only && !only.includes(id)) continue;
+    const fig = document.createElement('figure');
+    const c = document.createElement('canvas'); c.width = 48 * PSCALE; c.height = 48 * PSCALE;
+    drawSprite(c.getContext('2d'), decodeSprite(p.rows, p.palette, { scale: PSCALE }), 0, 0);
+    fig.append(c); fig.insertAdjacentHTML('beforeend', `<figcaption>${CHARACTERS[id] ? CHARACTERS[id].name : id}</figcaption>`);
+    pRoot.append(fig);
+  }
+
   const COLS = [
-    { facing: 'down', step: 'anim', label: 'walk' },
-    ...[0, 1, 2, 3].map((s) => ({ facing: 'down', step: s, label: `D${s}` })),
-    ...[0, 1, 2, 3].map((s) => ({ facing: 'up', step: s, label: `U${s}` })),
-    ...[0, 1, 2, 3].map((s) => ({ facing: 'left', step: s, label: `L${s}` })),
-    ...[0, 1, 2, 3].map((s) => ({ facing: 'right', step: s, label: `R${s}` })),
+    ...['down', 'up', 'left', 'right'].map((f) => ({ facing: f, step: 'anim', label: f[0].toUpperCase() + '~', anim: true })),
+    { gap: true },
+    ...['down', 'up', 'left'].flatMap((f) => [0, 1, 2, 3].map((s) => ({ facing: f, step: s, label: f[0].toUpperCase() + s }))),
+    { gap: true },
     { facing: 'sit', label: 'sit' },
     { facing: 'fish', label: 'fish', w: 24 },
+    { facing: 'hang', label: 'hang', poseOnly: 'hang' },
   ];
+  const hdr = document.getElementById('hdr');
+  for (const col of COLS) {
+    const s = document.createElement('span');
+    s.style.width = col.gap ? '6px' : ((col.w || 16) * SCALE) + 'px';
+    s.textContent = col.label || '';
+    hdr.append(s);
+  }
   const cells = [];
   for (const id of ids) {
     const ch = CHARACTERS[id];
+    const body = BODIES[ch.body];
     const row = document.createElement('div'); row.className = 'row';
     row.insertAdjacentHTML('beforeend', `<div class="name">${ch.name}<small>${ch.species} · ${ch.body}</small></div>`);
     const strip = document.createElement('div'); strip.className = 'strip';
     for (const col of COLS) {
+      if (col.gap) { const d = document.createElement('div'); d.className = 'gap'; strip.append(d); continue; }
       const c = document.createElement('canvas');
-      c.width = (col.w || 16) * SCALE; c.height = 24 * SCALE; c.className = 'cell';
+      c.width = (col.w || 16) * SCALE; c.height = 24 * SCALE;
+      if (col.anim) c.className = 'anim';
       strip.append(c);
+      if (col.poseOnly && !(body.poses && body.poses[col.poseOnly])) { c.style.visibility = 'hidden'; continue; }
       cells.push({ id, ch, col, c });
-    }
-    if (BODIES[ch.body].poses) {
-      const c = document.createElement('canvas'); c.width = 16 * SCALE; c.height = 24 * SCALE; c.className = 'cell';
-      strip.append(c); cells.push({ id, ch, col: { facing: 'hang', label: 'hang' }, c });
-    }
-    const p = PORTRAITS[id];
-    if (p) {
-      const c = document.createElement('canvas'); c.width = 48 * SCALE; c.height = 48 * SCALE; c.className = 'portrait';
-      strip.append(c); cells.push({ id, ch, col: { portrait: true }, c });
     }
     row.append(strip);
     root.append(row);
   }
 
-  let t0 = performance.now();
+  const t0 = performance.now();
+  let frames = 0;
   function render(now) {
-    const step = walkStep(now - t0, 125);
-    const bgClass = bgSel.value;
+    const step = animBox.checked ? walkStep(now - t0, 125) : 0;
     for (const { ch, col, c } of cells) {
-      c.className = col.portrait ? 'portrait' : bgClass;
-      const ctx = c.getContext('2d'); ctx.clearRect(0, 0, c.width, c.height);
-      let sp;
-      if (col.portrait) {
-        const p = PORTRAITS[ch.name ? Object.keys(CHARACTERS).find((k) => CHARACTERS[k] === ch) : ''];
-        sp = decodeSprite(p.rows, p.palette, { scale: SCALE });
-      } else {
-        const rowsF = frame(ch.body, col.facing, col.step === 'anim' ? (animBox.checked ? step : 0) : col.step || 0);
-        sp = decodeSprite(rowsF, PALETTES[ch.palette], { scale: SCALE });
-        if (outBox.checked) sp = decodeSprite(silhouette(sp, '#1a1c2c'), null, {});
-      }
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = bgSel.value; ctx.fillRect(0, 0, c.width, c.height);
+      const rowsF = frame(ch.body, col.facing, col.step === 'anim' ? step : col.step || 0);
+      let sp = decodeSprite(rowsF, PALETTES[ch.palette], { scale: SCALE });
+      if (outBox.checked) sp = silhouette(sp, '#1a1c2c');
       drawSprite(ctx, sp, 0, 0);
     }
+    frames++;
   }
-  let frames = 0;
-  function loop(now) { render(now); frames++; requestAnimationFrame(loop); }
+  function loop(now) { render(now); requestAnimationFrame(loop); }
   requestAnimationFrame(loop);
-  window.__sheet = { count: ids.length, cells: cells.length, frames: () => frames };
+  window.__sheet = { count: ids.length, cells: cells.length, portraits: Object.keys(PORTRAITS).length, frames: () => frames };
 </script>
 </body>
 </html>

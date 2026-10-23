@@ -67,16 +67,19 @@ export function index(list, table = 'table') {
 }
 
 /**
- * Deep-freezes plain objects and arrays in place (content tables are frozen at import). Skips
- * functions and already-frozen values; cycles are not expected in content.
+ * Deep-freezes objects and arrays in place (content tables are frozen at import). An object that
+ * is already frozen is still descended into, because content files commonly `Object.freeze` only
+ * the outer array; functions are left alone and cycles are safe.
  * @template T
  * @param {T} v
+ * @param {WeakSet<object>} [seen]
  * @returns {T}
  */
-export function deepFreeze(v) {
-  if (v === null || typeof v !== 'object' || Object.isFrozen(v)) return v;
-  Object.freeze(v);
-  for (const k of Object.keys(v)) deepFreeze(/** @type {any} */ (v)[k]);
+export function deepFreeze(v, seen = new WeakSet()) {
+  if (v === null || typeof v !== 'object' || seen.has(v)) return v;
+  seen.add(v);
+  if (!Object.isFrozen(v)) Object.freeze(v);
+  for (const k of Object.keys(v)) deepFreeze(/** @type {any} */ (v)[k], seen);
   return v;
 }
 

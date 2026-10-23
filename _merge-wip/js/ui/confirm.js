@@ -41,14 +41,15 @@ export function layoutConfirm(o) {
   const bodyW = 200;
   const m = measureText(o.body || '', { maxWidth: bodyW });
   const btnWs = options.map((t) => measureText(t).w + 22);
-  const rowW = btnWs.reduce((a, b) => a + b, 0) + (options.length - 1) * SPACE.md;
+  const gap = SPACE.lg + SPACE.xs; // room for the ▶ cursor between seals
+  const rowW = btnWs.reduce((a, b) => a + b, 0) + (options.length - 1) * gap;
   const w = Math.max(bodyW + 24, rowW + 24, (o.title ? measureText(o.title).w + 40 : 0));
   const bodyH = Math.max(TYPE.lineH, m.h);
   const h = 12 + bodyH + 10 + 13 + 12;
   const x = Math.floor((W - w) / 2), y = Math.floor((H - h) / 2);
   const by = y + h - 12 - 13;
   let bx = x + Math.floor((w - rowW) / 2);
-  const buttons = btnWs.map((bw) => { const r = { x: bx, y: by, w: bw, h: 13 }; bx += bw + SPACE.md; return r; });
+  const buttons = btnWs.map((bw) => { const r = { x: bx, y: by, w: bw, h: 13 }; bx += bw + gap; return r; });
   return { panel: { x, y, w, h }, body: { x: x + 12, y: y + 12, w: w - 24, h: bodyH }, buttons, title: o.title ? { x: x + 6, y: y - 9 } : undefined };
 }
 

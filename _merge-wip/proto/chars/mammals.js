@@ -232,6 +232,39 @@ HEADS.beaver = {
   ],
 };
 
+// Ambrose: Wren's head grizzled and settled; no forehead spectacles but
+// bottle-bottom lenses (brass rims, magnified pupils) over his eyes and
+// bushy pale brows (M). Tiny ears, flat top.
+HEADS.beaverElder = {
+  down: [
+    '............',
+    '..KK....KK..',
+    '.KfKKKKKKfK.',
+    '.KLFFFFFFfK.',
+    '.KMMMFFMMMK.',
+    '.KAAAFFAAAK.',
+    '.KAEAAAAEAK.',
+    '.KAAAFFAAAK.',
+    '.KFMMNNMMfK.',
+    '.KMMMYYMMmK.',
+    '..KKmYYmKK..',
+  ],
+  left: [
+    '............',
+    '........KK..',
+    '....KKKKfFK.',
+    '...KLFFFFFfK',
+    '..KMMMFFFFfK',
+    '..KAAAAFFFfK',
+    '.KKAEGAFFffK',
+    'KMMAAAAFFffK',
+    'KNMMMMFFfffK',
+    'KmMYYMfffffK',
+    '.KKKKKKKKKK.',
+  ],
+};
+HEADS.beaverElder.up = null; // derived below without keeping the brass
+
 HEADS.badger = {
   down: [
     '............',
@@ -319,6 +352,7 @@ export function backHead(front, { keep = 'KAG', earRows = 2, earLetter = 'F' } =
     }).join('');
   });
 }
+HEADS.beaverElder.up = backHead(HEADS.beaverElder.down, { keep: 'K' });
 for (const h of Object.values(HEADS)) if (!h.up) h.up = backHead(h.down);
 
 // ---------------------------------------------------------------------------
@@ -409,7 +443,7 @@ export function makeTorso(fill, { hand = 'S', outline = 'k' } = {}) {
 export const TORSOS = {};
 // Lighthouse-stripe jumper (player). D navy at collar/hem, C cream between.
 TORSOS.jumper = makeTorso((r, c, { shadeCol }) => {
-  const navy = r % 2 === 0;
+  const navy = r === 0 || r === 3 || r === 6; // 2px cream bands, navy collar/hem
   const base = navy ? 'D' : 'C';
   return shadeCol ? base.toLowerCase() : base;
 });
@@ -551,20 +585,22 @@ export const BIRDLEGS = {
 // ---------------------------------------------------------------------------
 export const TAILS = {};
 TAILS.redpanda = {
-  // bushy ringed tail curling up beside the (viewer's) right hip to shoulder
-  // height; drawn over the arm so it reads chunky inside the 16px cell
-  down: { x: 10, y: 9, behind: false, part: [
-    '.KKK..',
-    'KSSSK.',
-    'KTTTK.',
-    '.KFFFK',
-    '.KTTTK',
-    '.KFFfK',
-    '.KTTtK',
-    '.KFFfK',
+  // bushy ringed tail curling UP behind the hip to shoulder height; drawn
+  // behind the body so only the ringed edge and the curled tip break the
+  // silhouette on the right (the cast's only high curled tail)
+  down: { x: 10, y: 7, behind: true, part: [
     '..KKK.',
+    '.KSSSK',
+    '.KTTtK',
+    'KFFFfK',
+    'KTTTtK',
+    'KFFFfK',
+    'KTTTtK',
+    'KFFFfK',
+    'KTTtK.',
+    '.KKK..',
   ] },
-  up: { x: 0, y: 9, behind: false, part: [
+  up: { x: 0, y: 8, behind: false, part: [
     '..KKK.',
     '.KSSSK',
     '.KTTTK',
@@ -575,16 +611,17 @@ TAILS.redpanda = {
     'KFFfK.',
     '.KKK..',
   ] },
-  left: { x: 10, y: 9, behind: false, part: [
-    '.KKK..',
-    'KSSSK.',
-    'KTTTK.',
-    '.KFFFK',
-    '.KTTTK',
-    '.KFFfK',
-    '.KTTtK',
-    '.KFFfK',
+  left: { x: 10, y: 7, behind: true, part: [
     '..KKK.',
+    '.KSSSK',
+    '.KTTtK',
+    'KFFFfK',
+    'KTTTtK',
+    'KFFFfK',
+    'KTTTtK',
+    'KFFFfK',
+    'KTTtK.',
+    '.KKK..',
   ] },
 };
 TAILS.otter = {
@@ -677,7 +714,7 @@ export const EXTRAS = {};
 // Linnet's ponytail: a tied tuft at the back of the head (H hair, Y band).
 EXTRAS.ponytail = {
   down: { x: 12, y: 5, part: ['.KK', 'KYK', 'KHK', 'KHK', '.KK'] },
-  up: { x: 6, y: 4, part: ['.KYK', 'KHHK', 'KHHK', '.KHK', '.KK.'] },
+  up: { x: 9, y: 3, part: ['KYK', 'KHK', 'KHK', 'KHK', '.K.'] },
   left: { x: 11, y: 4, part: ['KYK..', 'KHHK.', '.KHHK', '..KHK', '...KK'] },
 };
 // Ambrose's cane (wood 'a', brass head 'A') held in the viewer's right hand.

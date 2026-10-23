@@ -28,7 +28,7 @@ const playerSpecies = ['redpanda', 'otter', 'vole', 'opossum', 'ferret', 'mongoo
 export const BODIES = {
   ...Object.fromEntries(playerSpecies.map((s) => [s, buildMammal({ head: HEADS[s], torso: TORSOS.jumper, tail: TAILS[s] })])),
   wren: buildMammal({ head: HEADS.beaver, torso: TORSOS.overalls, tail: TAILS.beaver }),
-  ambrose: buildMammal({ head: HEADS.beaver, torso: TORSOS.overalls, tail: TAILS.beaver, extras: [EXTRAS.cane] }),
+  ambrose: buildMammal({ head: HEADS.beaverElder, torso: TORSOS.overalls, tail: TAILS.beaver, extras: [EXTRAS.cane] }),
   tamsin: buildMammal({ head: HEADS.badger, torso: TORSOS.jersey, tail: TAILS.badger, extras: [EXTRAS.cap] }),
   linnet: buildMammal({ head: HEADS.stoat, torso: TORSOS.jacket, tail: TAILS.stoat, extras: [EXTRAS.ponytail] }),
   linnetCut: buildMammal({ head: HEADS.stoat, torso: TORSOS.jacket, tail: TAILS.stoat }),

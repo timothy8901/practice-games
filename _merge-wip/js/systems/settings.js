@@ -4,7 +4,7 @@
  * world exists). Owner of `world.settings`.
  *
  * This module never touches the DOM: {@link apply} returns a list of effects and `main.js` /
- * `scenes/settings.js` perform them (`audio.setVolume`, `clock.setMinutesPerDay`, ...). The mirror
+ * `scenes/settings.js` perform them (`audio.setVolume`, `clockSys.applySettingsEffects`, ...). The mirror
  * helpers take a `StorageLike` so Node tests pass a Map-backed one.
  *
  * Pure. Lane: STATE.
@@ -142,7 +142,6 @@ export function update(world, patch, ctx) {
   const changed = Object.keys(merged).filter((k) => JSON.stringify(merged[k]) !== JSON.stringify(prev[k]));
   if (changed.length === 0) return { changed, effects: [], settings: world.settings };
   for (const k of changed) world.settings[k] = merged[k];
-  world.clock.realClock = merged.realClock;
   const effects = apply(merged, prev);
   ctx?.bus?.emit('settings:changed', { changed, settings: world.settings });
   return { changed, effects, settings: world.settings };

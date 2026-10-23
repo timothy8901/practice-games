@@ -124,7 +124,8 @@ const gradeCache = new Map();
 export function gradeFor(minute, weather, indoor) {
   if (indoor) return INDOOR_GRADE;
   if (!Number.isFinite(minute)) throw new TypeError(`gradeFor: minute must be finite, got ${minute}`);
-  const w = typeof weather === 'string' && weather in WEATHER_ADJUST ? weather : 'clear';
+  // own keys only: `'toString' in WEATHER_ADJUST` is true through the prototype
+  const w = typeof weather === 'string' && Object.hasOwn(WEATHER_ADJUST, weather) ? weather : 'clear';
   const slot = gradeSlot(minute);
   const key = `${slot}|${w}`;
   let g = gradeCache.get(key);

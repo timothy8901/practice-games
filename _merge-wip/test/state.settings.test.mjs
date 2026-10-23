@@ -67,7 +67,7 @@ describe('apply', () => {
 });
 
 describe('update', () => {
-  it('patches world.settings, mirrors realClock into the clock, returns effects and emits', () => {
+  it('patches world.settings (never world.clock: clockSys performs the clock effects), returns effects and emits', () => {
     const w = world();
     const bus = createBus();
     const events = [];
@@ -76,7 +76,7 @@ describe('update', () => {
     assert.deepEqual(res.changed.sort(), ['minutesPerDay', 'realClock', 'volumes']);
     assert.deepEqual(w.settings.volumes, { master: 0.8, music: 0.3, sfx: 0.9 });
     assert.equal(w.settings.realClock, true);
-    assert.equal(w.clock.realClock, true);
+    assert.equal(w.clock.realClock, false, 'world.clock belongs to systems/clockSys');
     assert.equal(w.settings.minutesPerDay, 48);
     assert.equal('junk' in w.settings, false);
     assert.deepEqual(res.effects.map((e) => e.kind).sort(), ['audio.volume', 'clock.minutesPerDay', 'clock.realClock']);

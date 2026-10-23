@@ -1,0 +1,591 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>UI kit sink</title>
+  <link rel="icon" href="data:,">
+  <style>
+    html, body { margin: 0; height: 100%; background: #141B33; display: grid; place-items: center; overflow: hidden; }
+    canvas { width: 960px; height: 540px; image-rendering: pixelated; image-rendering: crisp-edges; touch-action: none; }
+  </style>
+</head>
+<body>
+  <canvas id="game" width="480" height="270"></canvas>
+  <script type="module">
+    // Kitchen sink for js/ui/* [UI-KIT]. Every widget on fake data, one station at a time.
+    // Keys: PageDown / PageUp (or 1-9) switch station. Arrows/WASD, Z (confirm), X (cancel), [ ] (L/R),
+    // C (tool, hold for the ring) drive the station's widget through core/input. V cycles text speed,
+    // G cycles the HUD device glyphs, T adds a toast, M toggles reduced motion.
+    // `?station=n` opens a station directly. Pure checks log `PASS name` / `FAIL name` to the console.
+    // Harness hook: window.__ui = {station(), go(i), names, checks, text()}.
+    import { createInput } from '../../js/core/input.js';
+    import { drawText, measureText } from '../../js/core/font.js';
+    import { hasGlyph } from '../../js/core/font.js';
+    import { PALETTE, COLORS, TYPE, TYPE_CHIPS, TYPE_IDS, STRINGS, ROLE_GLYPH, ROLE_ICON, DEVICE_LABELS, allColors, isPureBlackOrWhite, SPACE } from '../../js/ui/theme.js';
+    import { createFocus, navigate } from '../../js/ui/focus.js';
+    import { drawPanel, drawRule, panelCacheSize, PANEL_STYLES, panelInner } from '../../js/ui/panel.js';
+    import { createList } from '../../js/ui/list.js';
+    import { createGrid } from '../../js/ui/grid.js';
+    import { createTabs, TAB_H } from '../../js/ui/tabs.js';
+    import { createConfirmScene } from '../../js/ui/confirm.js';
+    import { createToasts } from '../../js/ui/toast.js';
+    import { createTextbox, paginate } from '../../js/ui/textbox.js';
+    import { drawBar, drawPips, drawBadge, drawWardBadge, drawTypeChip, drawCurrency, drawTally, drawKeyGlyph, drawSealButton, drawCounter } from '../../js/ui/widgets.js';
+    import { ICON_NAMES, drawIcon, hasIcon } from '../../js/ui/icons.js';
+    import { drawHud } from '../../js/ui/hud.js';
+    import { createToolRing } from '../../js/ui/toolRing.js';
+
+    const W = 480, H = 270;
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
+    const input = createInput({ canvas, width: W, height: H, touch: false });
+    const toasts = createToasts({ width: W, height: H });
+    let reducedMotion = false;
+    let clockMs = 0;
+
+    // ------------------------------------------------------------------ checks
+    const checks = [];
+    function check(name, ok, detail = '') {
+      checks.push({ name, ok: !!ok, detail });
+      console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${detail ? ' — ' + detail : ''}`);
+    }
+
+    // ------------------------------------------------------------------ fake data
+    const LONG = 'The lamp on the Hearth porch has been dark since the storm. Wren says the wick is fine, the oil is fine, ' +
+      'and the glass is only a little sooty... Still, nobody has managed to light it, and the gulls have started roosting ' +
+      'on the rail as if they know something we do not.\fI would go myself, but my knees and that ladder have not been friends since spring. ' +
+      'If you find the lamp oil, the Commons jar will cover it. Will you take a look before the tide comes in?';
+    const FISH_A = ['Sand', 'Rock', 'Tide', 'Kelp', 'Salt', 'Moon', 'Glass', 'Ember'];
+    const FISH_B = ['dab', 'goby', 'eel', 'crab', 'perch'];
+    const ROWS = [];
+    for (let i = 0; i < 40; i++) {
+      const name = `${FISH_A[i % 8]} ${FISH_B[Math.floor(i / 8)]}`;
+      const unseen = i % 7 === 5;
+      ROWS.push({
+        id: `fish-${i}`,
+        label: unseen ? STRINGS.unknown : name,
+        value: unseen ? undefined : `◉ ${(i * 37 + 12) % 900 + 20}`,
+        marker: i % 9 === 0 ? '✦' : i % 11 === 3 ? '★' : undefined,
+        icon: unseen ? undefined : 'fish',
+        enabled: !unseen,
+        reason: unseen ? 'Not seen yet' : undefined,
+        data: { n: i + 1, held: i % 3 === 0, size: 8 + (i * 13) % 40 },
+      });
+    }
+    const TOOLS = [
+      { id: 'net', name: 'Bug Net', icon: 'shake' }, { id: 'rod', name: 'Fishing Rod', icon: 'fish' },
+      { id: 'spade', name: 'Spade', icon: 'dig' }, { id: 'lantern', name: 'Lantern', icon: 'lantern' },
+      { id: 'journal', name: 'Field Guide', icon: 'read' }, null,
+      { id: 'key', name: 'Porch Key', icon: 'door' }, { id: 'stool', name: 'Camp Stool', icon: 'sit' },
+    ];
+
+    // ------------------------------------------------------------------ backdrop (a dusk harbour, palette only)
+    function drawBackdrop(c, t) {
+      const bands = [PALETTE.deepBlue, '#3B4A6B', PALETTE.winterSlate, '#B8CFE0'];
+      const bh = [40, 30, 24, 14];
+      let y = 0;
+      for (let i = 0; i < bands.length; i++) { c.fillStyle = bands[i]; c.fillRect(0, y, W, bh[i]); y += bh[i]; }
+      // dithered band joins
+      y = 0;
+      for (let i = 0; i < bands.length - 1; i++) {
+        y += bh[i];
+        c.fillStyle = bands[i + 1];
+        for (let x = (i % 2); x < W; x += 2) c.fillRect(x, y - 1, 1, 1);
+      }
+      // lighthouse + headland
+      c.fillStyle = PALETTE.nightInk; c.fillRect(380, 92, 100, 16); c.fillRect(404, 84, 60, 8);
+      c.fillStyle = PALETTE.ledgerPaper; c.fillRect(424, 60, 8, 24);
+      c.fillStyle = PALETTE.waxRed; c.fillRect(424, 66, 8, 3); c.fillRect(424, 74, 8, 3);
+      c.fillStyle = PALETTE.nightInk; c.fillRect(423, 56, 10, 4);
+      c.fillStyle = Math.floor(t / 700) % 2 ? PALETTE.porchAmber : PALETTE.brass; c.fillRect(425, 57, 6, 2);
+      // sea
+      c.fillStyle = PALETTE.n; c.fillRect(0, 108, W, 162);
+      c.fillStyle = PALETTE.deepBlue;
+      for (let r = 0; r < 18; r++) {
+        const yy = 112 + r * 9, off = Math.floor((t / 90 + r * 13) % 24);
+        for (let x = -24 + off; x < W; x += 24) c.fillRect(x, yy, 10, 1);
+      }
+      // pier
+      c.fillStyle = PALETTE.tallyDark; c.fillRect(0, 196, 220, 10);
+      c.fillStyle = PALETTE.tallyLight; c.fillRect(0, 196, 220, 2);
+      c.fillStyle = PALETTE.tallyDark; for (let x = 8; x < 220; x += 28) c.fillRect(x, 206, 4, 40);
+      c.fillStyle = PALETTE.nightInk; for (let x = 8; x < 220; x += 28) c.fillRect(x + 3, 206, 1, 40);
+      // porch lamps along the pier
+      for (let x = 30; x < 220; x += 56) {
+        c.fillStyle = PALETTE.nightInk; c.fillRect(x, 180, 2, 16);
+        c.fillStyle = PALETTE.porchAmber; c.fillRect(x - 1, 177, 4, 3);
+      }
+    }
+    function drawDesk(c) {
+      // plain desk backdrop for the catalogue stations: night ink with a soft vignette rule
+      c.fillStyle = PALETTE.nightInk; c.fillRect(0, 0, W, H);
+      c.fillStyle = PALETTE.deepBlue;
+      for (let y = 0; y < H; y += 4) for (let x = (y / 4) % 2 ? 2 : 0; x < W; x += 4) c.fillRect(x, y, 1, 1);
+    }
+
+    // ------------------------------------------------------------------ station chrome
+    function stationLabel(c, name, i, n, hint) {
+      const label = `${i + 1}/${n}  ${name}`;
+      const w = measureText(label, { font: 'small' }).w + 10;
+      const x = W - 4 - w, y = H - 13;
+      c.fillStyle = COLORS.shadow; c.fillRect(x + 1, y + 1, w, 10);
+      c.fillStyle = PALETTE.deskInk; c.fillRect(x, y, w, 10);
+      drawText(c, label, x + 5, y + 3, { font: 'small', color: PALETTE.paperLightest });
+      if (hint) {
+        const hw = measureText(hint, { font: 'small' }).w + 8;
+        c.fillStyle = PALETTE.deskInk; c.fillRect(x - hw - 2, y, hw, 10);
+        drawText(c, hint, x - 6, y + 3, { font: 'small', color: PALETTE.ledgerRule, align: 'right' });
+      }
+    }
+
+    // ------------------------------------------------------------------ stations
+    const stations = [];
+
+    // 1. Dialogue -------------------------------------------------------
+    {
+      let restartAt = 0;
+      const box = createTextbox({
+        rect: { x: 16, y: 186, w: 448, h: 64 }, speed: 'normal', input,
+        onChoice: (i, c) => { toasts.show(`You chose: ${c.label}`, { kind: i === 0 ? 'safe' : 'info' }); restartAt = clockMs + 1400; },
+      });
+      const speeds = ['slow', 'normal', 'fast', 'instant'];
+      let si = 1;
+      const start = () => box.setText(LONG, {
+        who: 'Wren', portrait: null,
+        choices: [{ label: 'I will look' }, { label: 'After supper' }, { label: 'Fix it (no oil)', enabled: false, reason: 'Needs lamp oil' }],
+        cancelIndex: 1, defaultChoice: 1,
+      });
+      stations.push({
+        name: 'Dialogue', hint: 'Z advance  V speed',
+        enter: start,
+        key(code) { if (code === 'KeyV') { si = (si + 1) % speeds.length; box.setSpeed(speeds[si]); toasts.show(`Text speed: ${speeds[si]}`); } },
+        update(dt) { box.handle(input); box.update(dt); if (restartAt && clockMs > restartAt) { restartAt = 0; start(); } },
+        draw(c, t) {
+          drawBackdrop(c, t);
+          drawText(c, `speed ${speeds[si]}  page ${box.page + 1}/${box.pages}`, 20, 172, { font: 'small', color: PALETTE.paperLightest });
+          box.draw(c);
+        },
+        text: () => box.pageText,
+      });
+    }
+
+    // 2. List -----------------------------------------------------------
+    {
+      const panel = { x: 12, y: 30, w: 236, h: 216 };
+      const inner = panelInner(panel, 'ledger');
+      const listRect = { x: inner.x + 6, y: inner.y + 2, w: inner.w - 6, h: inner.h - 2 };
+      const ledgerOpts = { rulePitch: 12, ruleStart: listRect.y - panel.y + 11, margin: 10 };
+      let tabId = 'fish';
+      const tabs = createTabs({
+        tabs: [{ id: 'fish', label: 'Fish', icon: 'fish' }, { id: 'bugs', label: 'Bugs', icon: 'shake' }, { id: 'relics', label: 'Relics', icon: 'dig' }],
+        rect: { x: panel.x + 4, y: panel.y - TAB_H + 1, w: panel.w }, input,
+        onChange: (id) => { tabId = id; list.setItems(id === 'fish' ? ROWS : id === 'bugs' ? ROWS.slice(0, 12).map((r) => ({ ...r, icon: r.icon && 'shake' })) : []); },
+      });
+      const list = createList({ rect: listRect, rowH: 12, items: ROWS, input, rules: false,
+        onSelect: (it) => toasts.show(`${it.label} pinned to the log`, { kind: 'safe' }),
+        onCancel: () => toasts.show('Back (nothing changed)') });
+      stations.push({
+        name: 'List', hint: 'arrows  left/right page  [ ] tabs',
+        update(dt) { tabs.handle(input); list.handle(input); list.update(dt); },
+        draw(c, t) {
+          drawDesk(c);
+          drawPanel(c, panel, 'ledger', ledgerOpts);
+          tabs.draw(c);
+          list.draw(c);
+          // detail card
+          const card = { x: 260, y: 30, w: 208, h: 128 };
+          const ci = drawPanel(c, card, 'card', { title: 'Entry', seal: true });
+          const it = list.selected();
+          if (it) {
+            drawIcon(c, it.icon || 'blank', ci.x + 2, ci.y + 6, { scale: 3 });
+            drawText(c, it.label, ci.x + 32, ci.y + 6, { color: COLORS.paper.ink });
+            drawText(c, `No. ${String(it.data.n).padStart(3, '0')}`, ci.x + 32, ci.y + 18, { font: 'small', color: COLORS.paper.inkSoft });
+            drawBadge(c, it.data.held ? 'Held' : 'Seen', ci.x + 32, ci.y + 27, { style: it.data.held ? 'safe' : 'info', small: true });
+            drawRule(c, ci.x, ci.y + 44, ci.w);
+            drawText(c, 'Size', ci.x, ci.y + 50, { font: 'small', color: COLORS.paper.inkSoft });
+            drawBar(c, { x: ci.x + 30, y: ci.y + 49, w: 80, h: 6, value: it.data.size, max: 48, kind: 'exp', showNumber: true });
+            drawText(c, 'Price', ci.x, ci.y + 62, { font: 'small', color: COLORS.paper.inkSoft });
+            drawCurrency(c, (it.data.n * 37 + 12) % 900 + 20, ci.x + 30, ci.y + 60);
+            drawText(c, 'Caught', ci.x, ci.y + 76, { font: 'small', color: COLORS.paper.inkSoft });
+            drawTally(c, { x: ci.x + 30, y: ci.y + 75, notches: it.data.n % 13, total: 12 });
+          }
+          const help = { x: 260, y: 170, w: 208, h: 76 };
+          const hi = drawPanel(c, help, 'notice', { pin: true });
+          drawText(c, 'Rows marked – are locked and say why. ✦ new, ★ one of a kind.', hi.x + 2, hi.y + 4, { color: COLORS.paper.ink, maxWidth: hi.w - 4 });
+          drawText(c, `page ${list.page + 1} of ${list.pages}  ${tabId}`, hi.x + 2, hi.y + hi.h - 8, { font: 'small', color: COLORS.paper.inkSoft });
+        },
+        text: () => (list.selected() || {}).label || 'EMPTY',
+      });
+    }
+
+    // 3. Grid of type chips ---------------------------------------------
+    {
+      const items = TYPE_IDS.map((id) => ({ id, label: TYPE_CHIPS[id].word }));
+      for (let i = 0; i < 3; i++) items.push({ id: `unknown-${i}`, label: STRINGS.unknown, enabled: false, reason: 'Not Read yet' });
+      const panel = { x: 12, y: 24, w: 248, h: 222 };
+      const inner = panelInner(panel, 'paper');
+      const grid = createGrid({
+        rect: { x: inner.x + 10, y: inner.y + 14 }, cols: 3, rows: 4, cellW: 70, cellH: 40, gap: 4, items, input,
+        render(c, it, cell, focused) {
+          const chipW = drawTypeChipWidth(it.id);
+          drawTypeChip(c, it.id, cell.x + Math.floor((cell.w - chipW) / 2), cell.y + 6);
+          drawText(c, it.label, cell.x + Math.floor(cell.w / 2), cell.y + 22, { align: 'center', color: it.enabled === false ? COLORS.role.disabled : COLORS.paper.ink });
+          if (it.enabled === false) drawText(c, 'locked', cell.x + Math.floor(cell.w / 2), cell.y + 32, { align: 'center', font: 'small', color: COLORS.role.disabled });
+        },
+        onSelect: (it) => toasts.show(`${it.label}: chart opened`, { icon: TYPE_CHIPS[it.id] ? TYPE_CHIPS[it.id].icon : undefined }),
+      });
+      stations.push({
+        name: 'Type grid', hint: 'arrows  [ ] page  Z pick',
+        update(dt) { grid.handle(input); grid.update(dt); },
+        draw(c) {
+          drawDesk(c);
+          drawPanel(c, panel, 'paper', { title: 'Type chart' });
+          drawText(c, 'Icon + code + word. Never colour alone.', inner.x + 2, inner.y + 2, { font: 'small', color: COLORS.paper.inkSoft });
+          grid.draw(c);
+          const card = { x: 272, y: 24, w: 196, h: 222 };
+          const ci = drawPanel(c, card, 'ledger', { title: 'Matchups', rulePitch: 16, ruleStart: 6 + 22 + 13, margin: 0 });
+          const it = grid.selected();
+          if (it && TYPE_CHIPS[it.id]) {
+            drawTypeChip(c, it.id, ci.x + 10, ci.y + 4, { word: true });
+            const words = ['Strong', 'Neutral', 'Weak', 'No effect', 'Blocked by Ward', '?'];
+            TYPE_IDS.slice(0, 11).forEach((id, k) => {
+              const y = ci.y + 22 + k * 16;
+              drawTypeChip(c, id, ci.x + 10, y);
+              const word = words[(TYPE_IDS.indexOf(it.id) + k) % words.length];
+              const col = word === 'Strong' ? PALETTE.t : word === 'Weak' || word === 'No effect' ? PALETTE.r : COLORS.paper.ink;
+              drawText(c, word, ci.x + ci.w - 4, y + 2, { align: 'right', color: col });
+            });
+          } else {
+            drawText(c, STRINGS.unknown, ci.x + 10, ci.y + 8, { color: COLORS.role.disabled });
+          }
+        },
+        text: () => (grid.selected() || {}).label,
+      });
+    }
+    function drawTypeChipWidth(id) {
+      const chip = TYPE_CHIPS[id];
+      return 2 + 8 + 2 + measureText(chip ? chip.code : STRINGS.unknown, { font: 'small' }).w + 3;
+    }
+
+    // 4. Confirm --------------------------------------------------------
+    {
+      let scene = null;
+      let reopenAt = 0;
+      let lastChoice = '—';
+      const opts = { title: 'Satchel', body: 'Use the Old Porch Key? You have only one.', options: ['Use it', 'Keep it'], defaultIndex: 1, lockMs: 500 };
+      const open = () => {
+        scene = createConfirmScene({ ...opts, input, onDone: (i) => { lastChoice = opts.options[i]; toasts.show(`Chose: ${opts.options[i]}`, { kind: i === opts.defaultIndex ? 'safe' : 'warn' }); scene = null; reopenAt = clockMs + 1200; } });
+        scene.enter();
+      };
+      stations.push({
+        name: 'Confirm', hint: 'locked 0.5 s  Z choose  X = safe',
+        enter: open,
+        update(dt) {
+          if (scene) { scene.update(dt); scene.handleInput(input); }
+          else if (reopenAt && clockMs > reopenAt) { reopenAt = 0; open(); }
+        },
+        draw(c, t) {
+          drawBackdrop(c, t);
+          const sat = { x: 24, y: 24, w: 180, h: 140 };
+          const si = drawPanel(c, sat, 'paper', { title: 'Satchel' });
+          ['Old Porch Key', 'Lamp Oil', 'Starsalt', 'Anchor stone'].forEach((n, i) => {
+            const y = si.y + 4 + i * 14;
+            drawIcon(c, ['door', 'lantern', 'heartmark', 'lock'][i], si.x + 2, y);
+            drawText(c, n, si.x + 14, y + 1, { color: COLORS.paper.ink });
+            drawText(c, ['×1', '×3', '×12', '×0'][i], si.x + si.w - 2, y + 1, { align: 'right', color: i === 3 ? PALETTE.o : COLORS.paper.ink });
+          });
+          drawBadge(c, 'One of a kind', si.x + 2, si.y + 62, { style: 'unique' });
+          drawText(c, `last: ${lastChoice}`, si.x + 2, si.y + si.h - 9, { font: 'small', color: COLORS.paper.inkSoft });
+          if (scene) scene.draw(c);
+        },
+        text: () => (scene ? `${opts.body} [${opts.options[scene.index]}]${scene.locked ? ' locked' : ''}` : lastChoice),
+        get confirm() { return scene; },
+      });
+    }
+
+    // 5. HUD + toasts ---------------------------------------------------
+    const devices = ['keyboard', 'gamepad', 'touch'];
+    let devIndex = 0;
+    function hudState(extra) {
+      const minutes = 16 * 60 + 52 + Math.floor(clockMs / 1000);
+      const hh = Math.floor(minutes / 60) % 24, mm = minutes % 60;
+      return {
+        clockText: `${((hh + 11) % 12) + 1}:${String(mm).padStart(2, '0')} ${hh < 12 ? 'am' : 'pm'}`, night: hh >= 19 || hh < 6,
+        tide: 0.5 + 0.5 * Math.sin(clockMs / 4000), tideDir: Math.cos(clockMs / 4000) >= 0 ? 'rising' : 'falling',
+        tideHint: Math.cos(clockMs / 4000) >= 0 ? `high in ${12 + (Math.floor(clockMs / 1000) % 7)}m` : `low in ${30 - (Math.floor(clockMs / 1000) % 9)}m`,
+        wallet: 1240, tool: { id: 'rod', name: 'Fishing Rod', icon: 'fish' },
+        contextVerb: { verb: 'talk', label: 'Talk to Wren' }, pendingShift: 2, device: devices[devIndex], ...extra,
+      };
+    }
+    {
+      const seed = () => {
+        toasts.clear();
+        toasts.show('Saved 14:02, verified', { kind: 'save' });
+        toasts.show('3 oranges went in the basket', { icon: 'warn', kind: 'warn' });
+        toasts.show('Puddle kept its form (auto-Anchor)', { kind: 'shift' });
+      };
+      stations.push({
+        name: 'HUD + toasts', hint: 'G device  T toast',
+        enter: seed,
+        key(code) {
+          if (code === 'KeyG') devIndex = (devIndex + 1) % devices.length;
+          if (code === 'KeyT') toasts.show(['Not saved', 'Tuck left a request on the board', 'Lamp lit: Hearth porch'][Math.floor(Math.random() * 3)], { kind: ['danger', 'info', 'safe'][Math.floor(Math.random() * 3)] });
+        },
+        update() {},
+        draw(c, t) {
+          drawBackdrop(c, t);
+          const locked = Math.floor(t / 3000) % 2 === 1;
+          drawHud(c, hudState(locked ? { contextVerb: { verb: 'door', label: 'Enter', enabled: false, reason: 'Locked until 6:00 am' }, tool: null } : {}));
+          drawText(c, 'Toasts stack top-right, 3 s each, never take input.', 120, 132, { color: PALETTE.paperLightest });
+        },
+        text: () => toasts.texts().join(' | '),
+      });
+    }
+
+    // 6. Tool ring ------------------------------------------------------
+    {
+      let reopenAt = 0;
+      const ring = createToolRing({
+        tools: TOOLS, current: 'rod', last: 'net', input, center: { x: 240, y: 118 }, radius: 40,
+        onEquip: (id) => { toasts.show(`Equipped: ${TOOLS.find((t) => t && t.id === id).name}`, { kind: 'safe' }); reopenAt = clockMs + 900; },
+        onSwap: (c) => toasts.show(`Swapped to ${TOOLS.find((t) => t && t.id === c).name}`),
+        onCancel: () => { toasts.show('Ring closed (nothing changed)'); reopenAt = clockMs + 900; },
+      });
+      stations.push({
+        name: 'Tool ring', hint: 'aim  Z equip  X cancel',
+        enter: () => ring.openRing(),
+        update(dt) { ring.handle(input); ring.update(dt); if (reopenAt && clockMs > reopenAt) { reopenAt = 0; ring.openRing(); } },
+        draw(c, t) {
+          drawBackdrop(c, t);
+          const cur = TOOLS.find((x) => x && x.id === ring.current);
+          drawHud(c, hudState({ tool: cur, contextVerb: { verb: 'fish', label: 'Cast' } }));
+          ring.draw(c);
+        },
+        text: () => `${ring.open ? 'open' : 'closed'} ${(ring.selected() || { name: 'EMPTY' }).name}`,
+        ring,
+      });
+    }
+
+    // 7. Panels ---------------------------------------------------------
+    stations.push({
+      name: 'Panels', hint: '',
+      update() {},
+      draw(c) {
+        drawDesk(c);
+        const specs = [
+          ['paper', { title: 'Paper' }, 'Ledger paper, notched 1px edge, inner rule, grain.'],
+          ['ledger', { title: 'Ledger', seal: true }, 'Rules every 8px and a wax margin; seal on the corner.'],
+          ['notice', { pin: true }, 'Torn-paper notice with a brass pin. Requests and slips.'],
+          ['card', { title: 'Card' }, 'Small card with a brass edge, for entries and prices.'],
+          ['dark', { title: 'Battle' }, 'Wildshift chrome: n fill, 1px v border, inner d line.'],
+          ['notice', { title: 'Letter', torn: 'bottom' }, 'Notice torn on the bottom only, wax title tab.'],
+        ];
+        specs.forEach(([style, o, blurb], i) => {
+          const r = { x: 12 + (i % 3) * 156, y: 22 + Math.floor(i / 3) * 120, w: 144, h: 100 };
+          const inner = drawPanel(c, r, style, o);
+          const dark = style === 'dark';
+          drawText(c, blurb, inner.x + (style === 'ledger' ? 6 : 0), inner.y + 6, { color: dark ? COLORS.dark.text : COLORS.paper.ink, maxWidth: inner.w - 6, lineSpacing: style === 'ledger' ? -2 : 0 });
+          drawText(c, style, inner.x + inner.w, inner.y + inner.h - 6, { font: 'small', align: 'right', color: dark ? COLORS.dark.textSoft : COLORS.paper.inkSoft });
+        });
+      },
+      text: () => PANEL_STYLES.join(','),
+    });
+
+    // 8. Icons ----------------------------------------------------------
+    stations.push({
+      name: 'Icons', hint: `${ICON_NAMES.length} icons, 8x8`,
+      update() {},
+      draw(c) {
+        drawDesk(c);
+        const panel = { x: 6, y: 6, w: 468, h: 248 };
+        const inner = drawPanel(c, panel, 'paper', { grain: true });
+        const cols = 8, cw = 57, ch = 24;
+        ICON_NAMES.filter((n) => n !== 'blank').forEach((name, i) => {
+          const x = inner.x + (i % cols) * cw, y = inner.y + Math.floor(i / cols) * ch;
+          drawIcon(c, name, x + 2, y + 2);
+          drawText(c, name.replace(/^type-/, ''), x + 13, y + 4, { font: 'small', color: COLORS.paper.ink });
+          if (name.startsWith('type-')) drawText(c, 'type', x + 13, y + 11, { font: 'small', color: COLORS.paper.inkFaint });
+        });
+      },
+      text: () => ICON_NAMES.join(','),
+    });
+
+    // 9. Widgets (battle chrome) ----------------------------------------
+    {
+      const moves = [
+        { id: 'undertow', name: 'Undertow', type: 'brine', pp: 12, max: 15, eff: 'Strong' },
+        { id: 'gust-cut', name: 'Gust Cut', type: 'gust', pp: 3, max: 15, eff: 'Neutral' },
+        { id: 'rock-toss', name: 'Rock Toss', type: 'stone', pp: 0, max: 10, eff: 'Weak' },
+        { id: 'glass-hum', name: 'Glass Hum', type: 'glass', pp: 8, max: 10, eff: '?' },
+      ];
+      const items = moves.map((m) => ({ id: m.id, enabled: m.pp > 0, reason: 'EMPTY: no PP left', data: m }));
+      const menu = createGrid({
+        rect: { x: 168, y: 214 }, cols: 2, rows: 2, cellW: 150, cellH: 20, gap: 4, items, input, style: 'dark',
+        render(c, it, cell, focused) {
+          const m = it.data;
+          const empty = m.pp === 0;
+          const ink = empty ? COLORS.role.disabled : COLORS.dark.text;
+          drawText(c, m.name, cell.x + 12, cell.y + 3, { color: ink });
+          drawTypeChip(c, m.type, cell.x + cell.w - 32, cell.y + 1, { dark: true });
+          if (empty) { drawIcon(c, 'strike', cell.x + 12, cell.y + 11, { ink }); drawText(c, STRINGS.empty, cell.x + 22, cell.y + 12, { font: 'small', color: ink }); }
+          else {
+            const low = m.pp / m.max <= 0.25;
+            drawText(c, `PP ${m.pp}/${m.max}`, cell.x + 12, cell.y + 12, { font: 'small', color: low ? PALETTE.o : COLORS.dark.textSoft });
+            drawText(c, m.eff, cell.x + cell.w - 34, cell.y + 13, { font: 'small', align: 'right', color: COLORS.dark.textSoft });
+          }
+        },
+        onSelect: (it) => toasts.show(`${it.data.name}!`),
+      });
+      stations.push({
+        name: 'Widgets', hint: 'arrows: move menu skips EMPTY',
+        update(dt) { menu.handle(input); menu.update(dt); },
+        draw(c, t) {
+          drawBackdrop(c, t);
+          // foe info box (top-left)
+          const foe = drawPanel(c, { x: 8, y: 8, w: 160, h: 50 }, 'dark');
+          drawText(c, 'Skeinwing', foe.x, foe.y, { color: COLORS.dark.text });
+          drawText(c, '↑Lv31', foe.x + foe.w, foe.y, { align: 'right', color: PALETTE.o });
+          let x = foe.x;
+          x += drawTypeChip(c, 'gust', x, foe.y + 10, { dark: true }) + 2;
+          x += drawTypeChip(c, 'brine', x, foe.y + 10, { dark: true }) + 2;
+          drawWardBadge(c, x, foe.y + 10, { t: clockMs, reducedMotion });
+          drawBar(c, { x: foe.x, y: foe.y + 25, w: 110, h: 5, value: 22, max: 100, kind: 'hp', dark: true, label: '' });
+          drawText(c, '22%', foe.x + 114, foe.y + 24, { font: 'small', color: COLORS.dark.text });
+          drawPips(c, { x: foe.x, y: foe.y + 33, n: 0, max: 3, unknown: true, label: 'Mends', dark: true });
+          // player info box (right)
+          const me = drawPanel(c, { x: 312, y: 136, w: 160, h: 60 }, 'dark');
+          drawText(c, 'PUDDLE', me.x, me.y, { color: COLORS.dark.text });
+          drawText(c, 'Lv18', me.x + me.w, me.y, { align: 'right', color: COLORS.dark.text });
+          x = me.x;
+          x += drawTypeChip(c, 'brine', x, me.y + 10, { dark: true }) + 2;
+          drawBadge(c, 'Burn', x, me.y + 10, { style: 'status', icon: 'burn', small: true });
+          drawBadge(c, 'EVA +1', x + 34, me.y + 10, { style: 'eva', small: true });
+          drawBar(c, { x: me.x, y: me.y + 23, w: 96, h: 5, value: 9, max: 52, kind: 'hp', dark: true, showNumber: true });
+          drawBar(c, { x: me.x, y: me.y + 31, w: 96, h: 4, value: 340, max: 600, kind: 'exp', dark: true });
+          drawPips(c, { x: me.x, y: me.y + 39, n: 2, max: 3, label: 'Mends', dark: true });
+          // move menu
+          drawPanel(c, { x: 160, y: 206, w: 316, h: 54 }, 'dark');
+          menu.draw(c);
+          // paper widgets column
+          const pw = drawPanel(c, { x: 8, y: 70, w: 148, h: 186 }, 'paper', { title: 'Bars & bits' });
+          let y = pw.y + 2;
+          for (const [kind, v, m] of [['hp', 40, 52], ['hp', 20, 52], ['hp', 6, 52], ['exp', 340, 600], ['glow', 7, 10], ['bond', 3, 10]]) {
+            drawText(c, kind, pw.x, y, { font: 'small', color: COLORS.paper.inkSoft });
+            drawBar(c, { x: pw.x + 22, y: y - 1, w: 64, h: 6, value: v, max: m, kind, showNumber: true });
+            y += 10;
+          }
+          y += 2;
+          drawCurrency(c, 1240, pw.x, y); drawCurrency(c, 1200, pw.x + pw.w, y, { align: 'right', prefix: 'After: ' });
+          y += 12;
+          drawTally(c, { x: pw.x, y, notches: 7, total: 10 });
+          y += 11;
+          drawPips(c, { x: pw.x, y, n: 2, max: 5, label: 'Bond' });
+          y += 9;
+          let kx = pw.x;
+          for (const d of devices) { kx += drawKeyGlyph(c, d, DEVICE_LABELS[d].confirm, kx, y) + 3; }
+          drawKeyGlyph(c, 'keyboard', 'Esc', kx, y);
+          y += 13;
+          drawSealButton(c, 'Accept', pw.x, y, { role: 'neutral', focused: true });
+          drawSealButton(c, 'Keep', pw.x + 66, y, { role: 'safe' });
+          y += 16;
+          drawSealButton(c, 'Release', pw.x, y, { role: 'danger' });
+          drawBadge(c, 'Not saved', pw.x + 66, y + 1, { style: 'danger', small: true });
+          y += 16;
+          let bx = pw.x;
+          for (const [k, s] of ['burn', 'poison', 'chill', 'numb'].entries()) {
+            if (k === 2) { bx = pw.x; y += 11; }
+            bx += drawBadge(c, s[0].toUpperCase() + s.slice(1), bx, y, { style: 'status', icon: s, small: true }).w + 3;
+          }
+        },
+        text: () => (menu.selected() || { data: {} }).data.name,
+      });
+    }
+
+    // ------------------------------------------------------------------ station switching
+    const params = new URLSearchParams(location.search);
+    let current = Math.max(0, Math.min(stations.length - 1, (Number(params.get('station')) || 1) - 1));
+    function go(i) {
+      current = ((i % stations.length) + stations.length) % stations.length;
+      input.flush();
+      const s = stations[current];
+      if (s.enter) s.enter();
+    }
+    window.addEventListener('keydown', (ev) => {
+      if (ev.code === 'PageDown') { go(current + 1); ev.preventDefault(); return; }
+      if (ev.code === 'PageUp') { go(current - 1); ev.preventDefault(); return; }
+      const m = /^Digit([1-9])$/.exec(ev.code);
+      if (m && Number(m[1]) <= stations.length) { go(Number(m[1]) - 1); return; }
+      if (ev.code === 'KeyM') { reducedMotion = !reducedMotion; toasts.show(`Reduced motion ${reducedMotion ? 'on' : 'off'}`); return; }
+      const s = stations[current];
+      if (s.key) s.key(ev.code);
+    });
+
+    // ------------------------------------------------------------------ pure checks (browser)
+    check('theme: no pure #000/#fff token', allColors().every((c) => !isPureBlackOrWhite(c)));
+    check('theme: kit glyphs exist in the font', [TYPE.cursor, TYPE.more, TYPE.currency, ...Object.values(ROLE_GLYPH)].every((g) => [...g].every((ch) => hasGlyph(ch))));
+    check('theme: every role has an icon', Object.values(ROLE_ICON).every(hasIcon));
+    check('textbox: paginate fits 3 lines x 300px', paginate(LONG, { maxWidth: 300, maxLines: 3 }).every((p) => p.split('\n').length <= 3 && p.split('\n').every((l) => measureText(l).w <= 300)));
+    check('focus: up from the top wraps to the last item', navigate([{ id: 'a' }, { id: 'b' }, { id: 'c' }], 0, 0, -1).index === 2);
+    check('focus: disabled skipped', navigate([{ id: 'a' }, { id: 'b', enabled: false }, { id: 'c' }], 0, 0, 1).index === 2);
+    check('list: 40 rows, 5 pages', stations[1].text() && ROWS.length === 40);
+
+    /** Count pure black / pure white opaque pixels in the frame. */
+    function pureCount() {
+      const d = ctx.getImageData(0, 0, W, H).data;
+      let n = 0;
+      for (let i = 0; i < d.length; i += 4) {
+        if (d[i + 3] === 255 && ((d[i] === 0 && d[i + 1] === 0 && d[i + 2] === 0) || (d[i] === 255 && d[i + 1] === 255 && d[i + 2] === 255))) n++;
+      }
+      return n;
+    }
+
+    // ------------------------------------------------------------------ loop
+    let last = performance.now();
+    let frames = 0;
+    let errors = 0;
+    function frame(now) {
+      const dt = Math.min(50, now - last);
+      last = now;
+      clockMs += dt;
+      try {
+        input.update();
+        const s = stations[current];
+        s.update(dt);
+        toasts.update(dt);
+        ctx.globalAlpha = 1;
+        s.draw(ctx, clockMs);
+        toasts.draw(ctx);
+        stationLabel(ctx, s.name, current, stations.length, s.hint);
+        frames++;
+        if (frames === 30) {
+          // one-off frame audits per station visit happen through __ui.audit()
+          check('panel: edge cache populated', panelCacheSize() > 0);
+        }
+      } catch (e) {
+        errors++;
+        if (errors < 5) console.error(e);
+      }
+      requestAnimationFrame(frame);
+    }
+    go(current);
+    requestAnimationFrame(frame);
+
+    window.__ui = {
+      names: stations.map((s) => s.name),
+      station: () => stations[current].name,
+      go: (i) => go(i),
+      text: () => stations[current].text(),
+      checks,
+      audit() {
+        const n = pureCount();
+        check(`frame: no pure black/white pixels (${stations[current].name})`, n === 0, `${n} px`);
+        return n;
+      },
+      get errors() { return errors; },
+      get stations() { return stations; },
+    };
+  </script>
+</body>
+</html>

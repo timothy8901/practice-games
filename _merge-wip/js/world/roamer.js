@@ -18,6 +18,7 @@
  */
 
 import { createEntity, DIRS, DX, DY, STROLL_MS } from './entities.js';
+import { evalCond as dslEvalCond } from '../script/cond.js';
 
 /** @typedef {import('./entities.js').Dir} Dir */
 /** @typedef {import('./entities.js').Entity} Entity */
@@ -91,7 +92,8 @@ export function tuningValue(tuning, key) {
 
 /**
  * Local check of the condition keys an encounter row commonly uses (`phase`, `tide`, `weather`,
- * `lowTide`); any other key defers to `ctx.evalCond` (script/cond.evalCond) and fails closed if none.
+ * `lowTide`); any other key defers to `ctx.evalCond`, else to the condition DSL (`script/cond.evalCond`)
+ * when `ctx.world` is given, and fails closed when there is neither.
  * @param {object|undefined} cond
  * @param {{phase?: string, tideState?: TideState, weather?: string, world?: object, evalCond?: Function, data?: object}} ctx
  * @returns {boolean}
@@ -109,7 +111,8 @@ export function rowCondHolds(cond, ctx) {
   }
   if (!local) return false;
   if (!other) return true;
-  return typeof ctx.evalCond === 'function' ? Boolean(ctx.evalCond(ctx.world, cond, ctx)) : false;
+  if (typeof ctx.evalCond === 'function') return Boolean(ctx.evalCond(ctx.world, cond, ctx));
+  return ctx.world ? dslEvalCond(ctx.world, cond, ctx) : false;
 }
 
 /**

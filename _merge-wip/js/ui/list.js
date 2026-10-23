@@ -144,12 +144,14 @@ export function createList(o) {
   /** @param {number} dir -1 page up, +1 page down */
   function page(dir) {
     if (!items.length) return;
-    const target = Math.min(items.length - 1, Math.max(0, focus.index + dir * visible));
-    focus.set(target);
-    if (focus.index === target) return;
-    // landed on a disabled row: nudge in the page direction, then the other way
-    const r1 = focus.move(0, dir);
-    if (!r1) focus.move(0, -dir);
+    const step = dir < 0 ? -1 : 1;
+    const target = Math.min(items.length - 1, Math.max(0, focus.index + step * visible));
+    // Land on the target or the nearest enabled row past it in the paging direction, else back.
+    let pick = -1;
+    for (let i = target; i >= 0 && i < items.length; i += step) if (fitems[i].enabled) { pick = i; break; }
+    if (pick < 0) for (let i = target - step; i >= 0 && i < items.length; i -= step) if (fitems[i].enabled) { pick = i; break; }
+    if (pick >= 0 && pick !== focus.index) focus.set(pick);
+    keepInView();
   }
 
   /** @param {import('../core/input.js').Input} [input] */
@@ -196,7 +198,7 @@ export function createList(o) {
         }
         lx += 9;
       }
-      if (it.icon) { drawIcon(ctx, it.icon, lx, r.y + Math.floor((rowH - 8) / 2), { ink: enabled ? s.text : COLORS.role.disabled }); lx += 10; }
+      if (it.icon) { drawIcon(ctx, it.icon, lx, r.y + Math.floor((rowH - 8) / 2), { ink: enabled ? s.text : COLORS.role.disabled }); lx += 12; }
       const ink = enabled ? s.text : COLORS.role.disabled;
       const label = enabled ? String(it.label ?? it.id) : `${ROLE_GLYPH.disabled} ${it.label ?? it.id}`;
       const valueTxt = it.value === undefined || it.value === null ? '' : String(it.value);
@@ -206,9 +208,10 @@ export function createList(o) {
       if (valueTxt) drawText(ctx, valueTxt, r.x + r.w - SPACE.xs, ty, { align: 'right', color: ink });
       else if (!enabled && it.reason) drawText(ctx, it.reason, r.x + r.w - SPACE.xs, ty + 1, { align: 'right', font: 'small', color: COLORS.role.disabled });
     }
-    // scrollbar + more arrows
+    // scrollbar: a tally-wood thumb in a recessed track, with the more-arrows capping the column
     if (sb) {
-      const bx = rect.x + rect.w - SCROLLBAR_W, by = rect.y + 1, bh = visible * rowH - 2;
+      const bx = rect.x + rect.w - SCROLLBAR_W, listH = visible * rowH;
+      const by = rect.y + 7, bh = listH - 14;
       ctx.fillStyle = s.dark ? COLORS.dark.inner : COLORS.paper.shade;
       ctx.fillRect(bx + 1, by, SCROLLBAR_W - 2, bh);
       const thumbH = Math.max(4, Math.round((visible / items.length) * bh));
@@ -218,8 +221,9 @@ export function createList(o) {
       ctx.fillStyle = COLORS.tally.light;
       ctx.fillRect(bx + 1, thumbY + 1, SCROLLBAR_W - 2, Math.max(1, thumbH - 2));
       const lift = bob < 500 ? 0 : 1;
-      if (top > 0) drawText(ctx, '▲', bx - 7, rect.y - lift, { font: 'small', color: s.cursor });
-      if (end < items.length) drawText(ctx, '▼', bx - 7, rect.y + visible * rowH - 6 + lift, { font: 'small', color: s.cursor });
+      const on = s.cursor, off = s.dark ? COLORS.dark.inner : COLORS.paper.deep;
+      drawText(ctx, '▲', bx, rect.y + 1 - (top > 0 ? lift : 0), { font: 'small', color: top > 0 ? on : off });
+      drawText(ctx, '▼', bx, rect.y + listH - 6 + (end < items.length ? lift : 0), { font: 'small', color: end < items.length ? on : off });
     }
     if (pager && items.length > visible) {
       const txt = `${pageOf(focus.index, visible) + 1}/${pageCount(items.length, visible)}`;

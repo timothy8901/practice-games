@@ -25,7 +25,7 @@ import { tideVariant } from './tide.js';
 
 /**
  * @typedef {Object} PathOptions
- * @property {TideState} tideState
+ * @property {TideState|number} tideState        tide state, variant, or clock height 0..1 (anything `map.passable` takes)
  * @property {Mover} [mover='npc']
  * @property {number} [maxLen=DEFAULT_MAX_PATH]   longest path (in steps) to return; longer targets count as unreachable
  * @property {number} [maxNodes]                  search budget in expanded cells (default: the whole grid)
@@ -59,7 +59,10 @@ function ensureScratch(n) {
   cap = Math.max(n, cap * 2, 1024);
   gScore = new Int32Array(cap); fScore = new Int32Array(cap); hScore = new Int32Array(cap);
   parent = new Int32Array(cap); seen = new Int32Array(cap); closed = new Int32Array(cap);
-  heap = new Int32Array(cap + 1);
+  // Lazy deletion lets a cell sit in the heap more than once (re-pushed when its g improves). Each
+  // expansion pops one entry and pushes at most four, so live entries never exceed 3n + 1; size for
+  // 4n so an overflowing write (silently dropped by a typed array) is impossible.
+  heap = new Int32Array(cap * 4 + 1);
   gen = 0;
 }
 
@@ -112,7 +115,7 @@ function heapPop() {
  */
 export function findPath(grid, from, to, opts) {
   const w = grid.w | 0, h = grid.h | 0;
-  if (!opts || typeof opts.tideState !== 'string') throw new TypeError('findPath: opts.tideState is required');
+  if (!opts || !isTide(opts.tideState)) throw new TypeError('findPath: opts.tideState is required (a tide state, variant or height)');
   if (!Number.isInteger(from.x) || !Number.isInteger(from.y) || !Number.isInteger(to.x) || !Number.isInteger(to.y)) {
     throw new TypeError('findPath: from/to must be integer tiles');
   }
@@ -192,6 +195,14 @@ export function findPath(grid, from, to, opts) {
 }
 
 /**
+ * @param {unknown} t
+ * @returns {boolean} whether `t` is a usable tide argument (state / variant string or finite height)
+ */
+function isTide(t) {
+  return typeof t === 'string' || (typeof t === 'number' && Number.isFinite(t));
+}
+
+/**
  * Number of steps in a path.
  * @param {number[]|null} path
  * @returns {number}
@@ -208,10 +219,13 @@ export function pathLength(path) {
  * @param {string} variant
  * @param {string} mover
  * @param {boolean} [adjacent=false]
+ * @param {number} [maxLen=DEFAULT_MAX_PATH]   search limits change the answer, so non-default ones are part of the key
+ * @param {number} [maxNodes]                 (omitted = the whole grid)
  * @returns {string}
  */
-export function pathKey(mapId, fx, fy, tx, ty, variant, mover, adjacent = false) {
-  return `${mapId}|${fx},${fy}>${tx},${ty}|${variant}|${mover}${adjacent ? '|adj' : ''}`;
+export function pathKey(mapId, fx, fy, tx, ty, variant, mover, adjacent = false, maxLen = DEFAULT_MAX_PATH, maxNodes = undefined) {
+  const lim = (maxLen === DEFAULT_MAX_PATH ? '' : `|L${maxLen}`) + (maxNodes === undefined ? '' : `|N${maxNodes}`);
+  return `${mapId}|${fx},${fy}>${tx},${ty}|${variant}|${mover}${adjacent ? '|adj' : ''}${lim}`;
 }
 
 /**
@@ -279,7 +293,8 @@ export function createPathCache(opts = {}) {
  * Cached {@link findPath}. The key uses `opts.variant` (default: `world/tide.tideVariant(opts.tideState)`,
  * so `'rising'` and `'falling'` share the `'mid'` entries), and a tide change therefore misses the
  * cache and re-searches with the new passability; stale entries age out by LRU or go at once with
- * `cache.invalidateVariant(old)`. `opts.blocked` is NOT part of the key: pass dynamic obstacles only
+ * `cache.invalidateVariant(old)`. `maxLen` / `maxNodes` are part of the key (a short catch-up search
+ * must not poison the full search). `opts.blocked` is NOT part of the key: pass dynamic obstacles only
  * to uncached `findPath` calls.
  * @param {PathCache} cache
  * @param {PathGrid & {id: string}} map
@@ -289,10 +304,10 @@ export function createPathCache(opts = {}) {
  * @returns {readonly number[]|null}
  */
 export function findPathCached(cache, map, from, to, opts) {
+  if (!opts || !isTide(opts.tideState)) throw new TypeError('findPathCached: opts.tideState is required (a tide state, variant or height)');
   if (opts.blocked) throw new TypeError('findPathCached: opts.blocked is not cacheable; use findPath');
-  if (!opts || typeof opts.tideState !== 'string') throw new TypeError('findPathCached: opts.tideState is required');
   const variant = opts.variant ?? tideVariant(opts.tideState);
-  const key = pathKey(map.id, from.x, from.y, to.x, to.y, variant, opts.mover || 'npc', opts.adjacent === true);
+  const key = pathKey(map.id, from.x, from.y, to.x, to.y, variant, opts.mover || 'npc', opts.adjacent === true, opts.maxLen ?? DEFAULT_MAX_PATH, opts.maxNodes);
   const hit = cache.get(key);
   if (hit !== undefined) return hit;
   return cache.set(key, findPath(map, from, to, opts));

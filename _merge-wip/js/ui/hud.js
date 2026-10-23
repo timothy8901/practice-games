@@ -81,25 +81,33 @@ export function drawHud(ctx, s) {
     x += w + SPACE.sm;
   }
   if (s.tide !== undefined && s.tide !== null) {
+    // Tide: direction arrow + a water gauge (number of quarters readable from the ticks) + the word,
+    // then the relative hint in the small face ("low in 12m"). Shape + word, never colour alone.
     const t = Math.min(1, Math.max(0, Number(s.tide) || 0));
-    const word = tideWord(t, s.tideDir);
-    const hint = s.tideHint ? `  ${s.tideHint}` : '';
-    const label = `tide ${word}${hint}`;
-    const gaugeW = 22;
-    const tw = measureText(label, { font: 'small' }).w;
-    const w = 2 + 8 + 2 + gaugeW + 3 + tw + 4, h = 13;
+    const word = capitalize(tideWord(t, s.tideDir));
+    const hint = s.tideHint || '';
+    const gaugeW = 24;
+    const ww = measureText(word).w;
+    const hw = hint ? measureText(hint, { font: 'small' }).w + 5 : 0;
+    const w = 2 + 8 + 3 + gaugeW + 4 + ww + hw + 4, h = 13;
     chip(ctx, x, y, w, h);
     drawIcon(ctx, s.tideDir === 'falling' ? 'tideDown' : 'tideUp', x + 2, y + 2, { ink: PALETTE.t, light: COLORS.paper.light });
-    // five-step gauge with an arrow-shaped marker
-    const gx = x + 12, gy = y + 4;
+    const gx = x + 13, gy = y + 3;
+    ctx.fillStyle = ink;
+    ctx.fillRect(gx, gy, gaugeW, 7);
     ctx.fillStyle = COLORS.paper.shade;
-    ctx.fillRect(gx, gy, gaugeW, 5);
-    ctx.fillStyle = COLORS.paper.rule;
-    for (let i = 0; i <= 4; i++) ctx.fillRect(gx + Math.round((gaugeW - 1) * (i / 4)), gy, 1, 5);
-    ctx.fillStyle = PALETTE.t;
-    const mx = gx + Math.round((gaugeW - 1) * t);
-    ctx.fillRect(mx, gy, 1, 5); ctx.fillRect(mx - 1, gy + 1, 3, 3); ctx.fillRect(mx - 2, gy + 2, 5, 1);
-    drawText(ctx, label, gx + gaugeW + 3, y + 4, { font: 'small', color: ink });
+    ctx.fillRect(gx + 1, gy + 1, gaugeW - 2, 5);
+    const fw = Math.round((gaugeW - 2) * t);
+    if (fw > 0) {
+      ctx.fillStyle = PALETTE.t;
+      ctx.fillRect(gx + 1, gy + 2, fw, 4);
+      ctx.fillStyle = PALETTE.s; // wave crest: every other pixel on the top row
+      for (let i = 0; i < fw; i += 2) ctx.fillRect(gx + 1 + i, gy + 1, 1, 1);
+    }
+    ctx.fillStyle = ink;
+    for (let q = 1; q < 4; q++) ctx.fillRect(gx + Math.round((gaugeW * q) / 4), gy + 5, 1, 1);
+    drawText(ctx, word, gx + gaugeW + 4, y + 3, { color: ink });
+    if (hint) drawText(ctx, hint, gx + gaugeW + 4 + ww + 5, y + 4, { font: 'small', color: COLORS.paper.inkSoft });
     x += w + SPACE.sm;
   }
 
@@ -117,7 +125,7 @@ export function drawHud(ctx, s) {
     const text = pending > 1 ? `${pending} Shifts pending` : 'Shift pending';
     const tw = measureText(text).w;
     const w = 2 + 9 + tw + 4;
-    drawBadge(ctx, text, W - SPACE.sm - w, SPACE.sm + 16, { style: 'shift', iconAccent: PALETTE.m });
+    drawBadge(ctx, text, W - SPACE.sm - w, SPACE.sm + 16, { style: 'shift', icon: 'heartmark', iconAccent: PALETTE.m });
   }
 
   // ---- tool (bottom-left) ----
@@ -154,6 +162,11 @@ export function drawHud(ctx, s) {
     drawText(ctx, word, lx, cy + 3, { color: enabled ? ink : COLORS.role.disabled });
     if (reason) drawText(ctx, reason, lx + tw + 4, cy + 4, { font: 'small', color: COLORS.role.disabled });
   }
+}
+
+/** @param {string} w */
+function capitalize(w) {
+  return w ? w[0].toUpperCase() + w.slice(1) : w;
 }
 
 /** @param {number} n */

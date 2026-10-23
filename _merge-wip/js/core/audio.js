@@ -15,6 +15,11 @@
  * and `brass` presets, scale-name aliases (`majorPentatonic`), prefix stems (`setStem('perc', on)`
  * covers `perc.kick`, `perc.hat`, …; any layer can be toggled, not only ones flagged `stem: true`),
  * one-shot tracks (`loop: false`) and offline renders (`renderSfx`, `renderTrack`) for level checks.
+ *
+ * Defaults worth knowing: layers named `night`/`tide`/`rain`/`battle`/`tense`/`storm` (or `night.*` …)
+ * start muted unless the layer passes `stem` explicitly; stem state is global and carries across
+ * tracks; layer `humanize` defaults to 0.5; `v: 0` events are rests; note durations are capped at one
+ * loop. The analyser taps the final output, so visualizers read exactly what is heard.
  */
 
 // ───────────────────────────────────────────────────────────────────────────────────────────────
@@ -169,8 +174,10 @@ export function noteToMidi(name) {
  * MIDI number → note name with sharps (`60` → `"C4"`).
  * @param {number} midi Integer; fractional input is rounded.
  * @returns {string}
+ * @throws {RangeError} For non-finite input.
  */
 export function midiToNote(midi) {
+  if (typeof midi !== 'number' || !Number.isFinite(midi)) throw new RangeError(`midiToNote: expected a finite number, got ${String(midi)}`);
   const n = Math.round(midi);
   const octave = Math.floor(n / 12) - 1;
   return `${PITCH_CLASSES[((n % 12) + 12) % 12]}${octave}`;
@@ -392,7 +399,8 @@ export function resolveNotes(n) {
 /**
  * Expand and validate a layer pattern into sorted, normalized {@link NoteEvent}s. Events outside
  * `[0, loopSteps)`, rests and malformed entries are dropped; velocities are clamped to 0..1 and
- * durations forced positive.
+ * durations forced positive and capped at one loop (`loopSteps`). Zero-velocity events are kept here
+ * and treated as rests by the scheduler.
  * @param {PatternEvent[]} pattern
  * @param {{loopSteps: number, defaultNote?: number, defaultVel?: number, defaultDur?: number}} opts
  * @returns {NoteEvent[]}
@@ -412,7 +420,7 @@ export function expandPattern(pattern, { loopSteps, defaultNote = 60, defaultVel
     out.push({
       t,
       n,
-      d: Number.isFinite(d) && d > 0 ? d : defaultDur,
+      d: Math.min(Number.isFinite(d) && d > 0 ? d : defaultDur, loopSteps),
       v: Number.isFinite(v) ? clamp(v, 0, 1) : defaultVel,
     });
   }
@@ -1624,12 +1632,13 @@ Object.assign(SFX, {
     play(ctx, dest, t0, p) {
       burst(ctx, dest, t0, { gain: 0.55 * p.gain, dur: 0.18, type: 'highpass', freq: 300 * p.pitch, to: 120, q: 0.6, attack: 0.004, rand: p.rand });
       const g = mkGain(ctx, dest, 0);
+      const G = Math.max(p.gain, EPS);
       g.gain.setValueAtTime(EPS, t0);
-      g.gain.linearRampToValueAtTime(0.5 * p.gain, t0 + 0.08);
-      g.gain.exponentialRampToValueAtTime(0.22 * p.gain, t0 + 0.6);
-      g.gain.linearRampToValueAtTime(0.4 * p.gain, t0 + 1.0);
-      g.gain.exponentialRampToValueAtTime(0.15 * p.gain, t0 + 1.7);
-      g.gain.linearRampToValueAtTime(0.25 * p.gain, t0 + 2.0);
+      g.gain.linearRampToValueAtTime(0.5 * G, t0 + 0.08);
+      g.gain.exponentialRampToValueAtTime(0.22 * G, t0 + 0.6);
+      g.gain.linearRampToValueAtTime(0.4 * G, t0 + 1.0);
+      g.gain.exponentialRampToValueAtTime(0.15 * G, t0 + 1.7);
+      g.gain.linearRampToValueAtTime(0.25 * G, t0 + 2.0);
       g.gain.exponentialRampToValueAtTime(EPS, t0 + 2.9);
       const lp = mkFilter(ctx, g, 'lowpass', 140 * p.pitch, 1.1);
       sweep(lp.frequency, t0, 140 * p.pitch, t0 + 2.5, 55 * p.pitch);
@@ -1804,8 +1813,24 @@ const HIDDEN_LOOKAHEAD_SEC = 1.6;
 const TICK_MS = 60;
 const HIDDEN_TICK_MS = 500;
 const SFX_LATENCY = 0.005;
+/** Longest `delay` an sfx may ask for, in seconds (far-future nodes would pile up unreleased). */
+const MAX_SFX_DELAY = 10;
+/** Longest offline render, in seconds. */
+const MAX_RENDER_SEC = 600;
+/**
+ * Wall-clock grace (ms) after `unlock()` during which sfx are still queued on a context that is not
+ * running yet, so `unlock(); sfx('confirm')` in one click handler works. Outside it, sfx on a
+ * suspended/interrupted context are dropped instead of piling up and bursting out on resume.
+ */
+const UNLOCK_GRACE_MS = 1000;
 /** Most linear segments used to approximate an equal-power fade. */
 const FADE_SEGMENTS = 16;
+/** Notes that would start more than this far behind the audio clock (after a stall) are skipped. */
+const STALE_SEC = 0.02;
+/** How long a one-shot's nodes are kept after its last step, so long bell/pad tails ring out. */
+const ONE_SHOT_TAIL_SEC = 5;
+/** Fade used to retire players that were already fading out when yet another track starts. */
+const CHURN_FADE_SEC = 0.12;
 
 /**
  * Soft-clip transfer curve: identity below `knee`, tanh-shaped above, never exceeding ~0.905.
@@ -1861,27 +1886,28 @@ function mkCompressor(ctx, s) {
  * @property {BiquadFilterNode} musicFilter Music enters here (intensity low-pass).
  * @property {DynamicsCompressorNode} compressor
  * @property {DynamicsCompressorNode} limiter
- * @property {AnalyserNode} analyser
+ * @property {AnalyserNode} analyser Final output tap (after the soft clip and ceiling).
  */
 
 /**
- * Build the master chain: buses → master → mute → compressor → limiter → analyser → soft clip →
- * ceiling → destination.
+ * Build the master chain: buses → master → mute → compressor → limiter → soft clip → ceiling →
+ * analyser → destination. The analyser sits last so visualizers read exactly what is heard (the
+ * compressor's attack can overshoot 1.0 for a few samples; the soft clip catches that).
  * @param {BaseAudioContext} ctx
  * @returns {Graph}
  */
 function buildGraph(ctx) {
-  const ceiling = mkGain(ctx, ctx.destination, 0.95);
+  const analyser = ctx.createAnalyser();
+  analyser.fftSize = 512;
+  analyser.smoothingTimeConstant = 0.8;
+  analyser.connect(ctx.destination);
+  const ceiling = mkGain(ctx, analyser, 0.95);
   const shaper = ctx.createWaveShaper();
   shaper.curve = softClipCurve();
   shaper.oversample = '2x';
   shaper.connect(ceiling);
-  const analyser = ctx.createAnalyser();
-  analyser.fftSize = 512;
-  analyser.smoothingTimeConstant = 0.8;
-  analyser.connect(shaper);
   const limiter = mkCompressor(ctx, { threshold: -4, knee: 0, ratio: 20, attack: 0.001, release: 0.06 });
-  limiter.connect(analyser);
+  limiter.connect(shaper);
   const compressor = mkCompressor(ctx, { threshold: -14, knee: 10, ratio: 3, attack: 0.004, release: 0.18 });
   compressor.connect(limiter);
   const muteGain = mkGain(ctx, compressor, 1);
@@ -1941,7 +1967,8 @@ function scheduleFade(param, t0, sec, from, to) {
 /**
  * A playing instance of a track: its own output gain (for crossfades), per-layer gains (stems and
  * intensity gating) and a step clock. One-shot tracks (`loop: false`) stop scheduling after a
- * single pass and report `ended()`.
+ * single pass and report `ended()`. Muted layers keep scheduling through a zero gain so a stem that
+ * is switched on fades in mid-note instead of waiting for its next event.
  * @param {BaseAudioContext} ctx
  * @param {AudioNode} dest
  * @param {Track} track
@@ -1950,7 +1977,7 @@ function scheduleFade(param, t0, sec, from, to) {
  */
 function createPlayer(ctx, dest, track, startTime, { stems, intensity, offline = false }) {
   const out = mkGain(ctx, dest, offline ? 1 : 0);
-  const layers = track.layers.map((def) => ({ def, gain: mkGain(ctx, out, 0) }));
+  const layers = track.layers.map((def) => ({ def, gain: mkGain(ctx, out, 0), target: NaN }));
   const clock = createStepClock({
     bpm: track.bpm, loopSteps: track.loopSteps, stepsPerBeat: track.stepsPerBeat,
     stepsPerBar: track.stepsPerBar, startTime, maxCatchUpSteps: offline ? Infinity : track.stepsPerBar * 2,
@@ -1962,12 +1989,24 @@ function createPlayer(ctx, dest, track, startTime, { stems, intensity, offline =
 
   const layerTarget = (def, st, inten) => (resolveStem(def.name, st, !def.stem) && inten >= def.minIntensity ? def.gain : 0);
 
-  /** @param {Map<string, boolean>} st @param {number} inten @param {number} ramp @param {number} [at] */
+  /**
+   * Move each layer's gain to what the stems/intensity ask for. Only layers whose target changed are
+   * touched; before the track's first step the change lands exactly on the downbeat (no glide from
+   * silence), afterwards it glides over `ramp` seconds.
+   * @param {Map<string, boolean>} st @param {number} inten @param {number} ramp @param {number} [at]
+   */
   function applyMix(st, inten, ramp, at = ctx.currentTime) {
     for (const l of layers) {
       const target = layerTarget(l.def, st, inten);
-      if (ramp <= 0) l.gain.gain.setValueAtTime(target, at);
-      else glide(l.gain.gain, target, at, ramp);
+      if (target === l.target) continue;
+      l.target = target;
+      const param = l.gain.gain;
+      if (ramp <= 0 || at < startTime) {
+        param.cancelScheduledValues(at);
+        param.setValueAtTime(target, Math.max(at, startTime));
+      } else {
+        glide(param, target, at, ramp);
+      }
     }
   }
   applyMix(stems, intensity, 0, startTime);
@@ -1976,8 +2015,14 @@ function createPlayer(ctx, dest, track, startTime, { stems, intensity, offline =
     track,
     get stopping() { return stopping; },
     applyMix,
-    /** Schedule every step that starts before `horizon`. @param {number} horizon */
-    schedule(horizon) {
+    /**
+     * Schedule every step that starts before `horizon`. Steps that would start more than
+     * {@link STALE_SEC} behind `now` (the main thread stalled) are skipped rather than played late
+     * in a burst; the humanization stream still advances so renders stay deterministic.
+     * @param {number} horizon
+     * @param {number} [now=-Infinity] Current audio time (omit offline).
+     */
+    schedule(horizon, now = -Infinity) {
       for (const tick of clock.advance(Math.min(horizon, stopAt, endAt))) {
         for (const l of layers) {
           const evs = l.def.buckets.get(tick.step);
@@ -1988,6 +2033,7 @@ function createPlayer(ctx, dest, track, startTime, { stems, intensity, offline =
             const jitter = drum ? 0 : (rand() - 0.5) * 0.008 * h;
             const time = tick.time + (ev.t - tick.step) * clock.stepSec + swingOffset(tick.step % track.stepsPerBar, track.swing, clock.stepSec) + jitter;
             const vel = clamp(ev.v * (1 - 0.12 * h * rand()), 0.02, 1);
+            if (!(ev.v > 0) || time < now - STALE_SEC) continue;
             const dur = ev.d * clock.stepSec * 0.92;
             for (const n of ev.n) playNote(ctx, l.gain, l.def.inst, { freq: midiToFreq(n), midi: n, time, dur, vel });
           }
@@ -2000,11 +2046,16 @@ function createPlayer(ctx, dest, track, startTime, { stems, intensity, offline =
       if (sec < 0.01) out.gain.setValueAtTime(1, now);
       else scheduleFade(out.gain, now, sec, 0, 1);
     },
-    /** @param {number} now @param {number} sec */
+    /**
+     * Fade out and stop scheduling. Calling it again on a player that is already fading only ever
+     * shortens the fade (used to retire stale players when tracks are switched rapidly).
+     * @param {number} now @param {number} sec
+     */
     fadeOut(now, sec) {
-      if (stopping) return;
+      const end = now + Math.max(sec, 0.01);
+      if (stopping && end >= stopAt) return;
       stopping = true;
-      stopAt = now + Math.max(sec, 0.01);
+      stopAt = end;
       try {
         hold(out.gain, now);
         const from = clamp(out.gain.value, 0, 1);
@@ -2021,7 +2072,7 @@ function createPlayer(ctx, dest, track, startTime, { stems, intensity, offline =
     /** Seconds until a one-shot ends, `null` for looping tracks. @param {number} now */
     remaining(now) { return track.loop ? null : Math.max(0, endAt - now); },
     /** @param {number} now */
-    isDone(now) { return (stopping && now > stopAt + 3.0) || now > endAt + 3.0; },
+    isDone(now) { return (stopping && now > stopAt + 3.0) || now > endAt + ONE_SHOT_TAIL_SEC; },
     /** @param {number} now */
     position(now) { return clock.positionAt(now); },
     dispose() { out.disconnect(); },
@@ -2034,7 +2085,7 @@ function createPlayer(ctx, dest, track, startTime, { stems, intensity, offline =
  * @property {number} [semitones] Alternative to `pitch`.
  * @property {number} [volume=1] 0..2.
  * @property {number} [pan=0] -1..1.
- * @property {number} [delay=0] Seconds.
+ * @property {number} [delay=0] Seconds (0..10).
  */
 
 /**
@@ -2042,13 +2093,15 @@ function createPlayer(ctx, dest, track, startTime, { stems, intensity, offline =
  * @property {boolean} ready True once `unlock()` has created the audio graph.
  * @property {string} state AudioContext state (`'closed'` before unlock).
  * @property {BaseAudioContext|null} context
- * @property {AnalyserNode|null} analyser Post-limiter analyser for visualizers.
+ * @property {AnalyserNode|null} analyser Analyser on the final output, for visualizers.
  * @property {() => Promise<boolean>} unlock Create/resume the context (call from a user gesture).
  * @property {(v: {master?: number, music?: number, sfx?: number}) => {master: number, music: number, sfx: number}} setVolume
  * @property {() => {master: number, music: number, sfx: number}} getVolume
  * @property {(on?: boolean) => boolean} mute
  * @property {() => boolean} isMuted
  * @property {(name: string, opts?: SfxOptions) => {name: string, time: number, duration: number}|null} sfx
+ *   Play a sound effect; `null` when unknown, silent, rate-limited, before unlock, or while the context
+ *   is suspended (outside a short grace period right after `unlock()`).
  * @property {(id: string, def: object) => Track} defineTrack
  * @property {(id: string) => boolean} hasTrack
  * @property {() => string[]} trackIds
@@ -2063,7 +2116,8 @@ function createPlayer(ctx, dest, track, startTime, { stems, intensity, offline =
  *   pending: true}|null} nowPlaying
  * @property {(name: string, opts?: SfxOptions & {sampleRate?: number, seed?: number}) => Promise<AudioBuffer>} renderSfx
  * @property {(id: string, opts?: {bars?: number, sampleRate?: number, stems?: string[]|Record<string, boolean>,
- *   intensity?: number}) => Promise<AudioBuffer>} renderTrack
+ *   intensity?: number}) => Promise<AudioBuffer>} renderTrack Offline render (at most 10 minutes; stems as in
+ *   `setStem`, layers flagged `stem` stay muted unless listed).
  * @property {() => Promise<void>} dispose
  */
 
@@ -2125,6 +2179,7 @@ export function createAudio() {
   let pending = null;
   let timer = null;
   let onVisibility = null;
+  let unlockCalledAt = -Infinity;
 
   const warnOnce = (msg) => {
     if (warned.has(msg)) return;
@@ -2151,9 +2206,16 @@ export function createAudio() {
     timer = null;
     if (!graph || !ctx || players.length === 0) return;
     const hidden = typeof document !== 'undefined' && document.hidden === true;
-    const horizon = ctx.currentTime + (hidden ? HIDDEN_LOOKAHEAD_SEC : LOOKAHEAD_SEC);
-    for (const p of players) p.schedule(horizon);
     const now = ctx.currentTime;
+    const horizon = now + (hidden ? HIDDEN_LOOKAHEAD_SEC : LOOKAHEAD_SEC);
+    for (const p of players) {
+      try {
+        p.schedule(horizon, now);
+      } catch (err) {
+        // One bad note must never stop the scheduler loop for every track.
+        warnOnce(`audio: scheduling ${p.track.id} failed (${err && err.message})`);
+      }
+    }
     if (current && current.ended(now)) current = null;
     players = players.filter((p) => {
       if (!p.isDone(now)) return true;
@@ -2189,8 +2251,9 @@ export function createAudio() {
     get analyser() { return graph ? graph.analyser : null; },
 
     unlock() {
-      if (graph) return resume().then(() => ctx !== null && ctx.state === 'running');
+      unlockCalledAt = Date.now();
       if (unlocking) return unlocking;
+      if (graph) return resume().then(() => ctx !== null && ctx.state === 'running');
       const attempt = (async () => {
         const AC = globalThis.AudioContext || globalThis.webkitAudioContext;
         if (typeof AC !== 'function') return false;
@@ -2261,13 +2324,16 @@ export function createAudio() {
         return null;
       }
       if (!graph || !ctx) return null;
-      if (ctx.state !== 'running') resume();
+      if (ctx.state !== 'running') {
+        resume();
+        if (Date.now() - unlockCalledAt > UNLOCK_GRACE_MS) return null;
+      }
       const now = ctx.currentTime;
       if (!limiter.allow(key, now)) return null;
       const gain = clamp(num(o.volume, 1), 0, 2);
       if (!(gain > 0)) return null;
       const pan = clamp(num(o.pan, 0), -1, 1);
-      const t0 = now + SFX_LATENCY + Math.max(0, num(o.delay, 0));
+      const t0 = now + SFX_LATENCY + clamp(num(o.delay, 0), 0, MAX_SFX_DELAY);
       try {
         const dest = pan ? mkPan(ctx, graph.sfxBus, pan) : graph.sfxBus;
         def.play(ctx, dest, t0, { pitch: pitchMult(o), gain, rand: Math.random });
@@ -2299,10 +2365,14 @@ export function createAudio() {
         pending = { id, opts: { fade, restart } };
         return true;
       }
+      pending = null; // a live request supersedes one queued before unlock
       const now = ctx.currentTime;
       if (current && current.track === track && !current.stopping && !current.ended(now) && !restart) return true;
       const fadeSec = Math.max(0, fade) / 1000;
       const player = createPlayer(ctx, graph.musicFilter, track, now + 0.05, { stems, intensity });
+      // Rapid switching: players already fading out are retired quickly so at most one long crossfade
+      // runs at a time (otherwise every switch would add another fully scheduled track).
+      for (const p of players) if (p.stopping) p.fadeOut(now, CHURN_FADE_SEC);
       if (current) current.fadeOut(now, fadeSec);
       player.fadeIn(now, current ? fadeSec : Math.min(fadeSec, 0.25));
       current = player;
@@ -2370,10 +2440,11 @@ export function createAudio() {
       if (!track) throw new RangeError(`renderTrack: unknown track "${String(id)}"`);
       const OAC = globalThis.OfflineAudioContext || globalThis.webkitOfflineAudioContext;
       if (typeof OAC !== 'function') throw new Error('renderTrack: OfflineAudioContext is not available');
-      const nBars = Math.max(1, Math.trunc(num(o.bars, track.bars)));
+      const stepSec = stepSeconds(track.bpm, track.stepsPerBeat);
+      const maxBars = Math.max(1, Math.floor(MAX_RENDER_SEC / (stepSec * track.stepsPerBar)));
+      const nBars = clamp(Math.trunc(num(o.bars, track.bars)), 1, maxBars);
       const sampleRate = clamp(num(o.sampleRate, 44100), 8000, 96000);
       const inten = clamp(num(o.intensity, 1), 0, 1);
-      const stepSec = stepSeconds(track.bpm, track.stepsPerBeat);
       const steps = nBars * track.stepsPerBar;
       const start = 0.05;
       const oc = new OAC(2, Math.ceil((start + steps * stepSec + 2.5) * sampleRate), sampleRate);

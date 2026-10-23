@@ -18,6 +18,7 @@
 import { DIR_INDEX, DX, DY } from './entities.js';
 import { tideState as tideStateOf } from '../state/selectors.js';
 import { tideMaskOf, tideVariant, gateOpen, TIDE_MASK, COLLISION } from './tide.js';
+import { evalCond as dslEvalCond } from '../script/cond.js';
 
 /** @typedef {import('./entities.js').Entity} Entity */
 /** @typedef {import('./entities.js').EntityManager} EntityManager */
@@ -91,8 +92,9 @@ export function toolUse(world, data) {
 }
 
 /**
- * Whether a tile reads as water to a walker at this tide: open sea, or a low-tide gate (causeway,
- * flats, glow mud) while the tide is not out. Mirrors `world/tide.floodedAt` but works from a
+ * Whether a tile reads as water to a walker at this tide: open sea, or a closed tide gate (a causeway,
+ * flats or glow mud while the tide is not out; a high-only tile below high water). Mirrors
+ * `world/tide.floodedAt` exactly but works from a
  * TileInfo alone, so it accepts both the real tilemap's numeric `tide` / `collision` codes and a
  * tileset's string `tide` ('low' | 'high' | 'floods' | 'glow' | null).
  * @param {{water?: boolean, solid?: boolean, tide?: string|number|null, collision?: number}} tile
@@ -104,7 +106,7 @@ export function underWater(tile, tide) {
   if (c === COLLISION.SOLID || c === COLLISION.OPEN) return false;
   if (c === COLLISION.INHERIT && tile.solid) return false;
   const gate = c === COLLISION.LOW ? TIDE_MASK.LOW_ONLY : c === COLLISION.HIGH ? TIDE_MASK.HIGH_ONLY : tideMaskOf(tile.tide ?? null);
-  if (gate === TIDE_MASK.LOW_ONLY || gate === TIDE_MASK.GLOW) return !gateOpen(gate, tideVariant(tide));
+  if (!gateOpen(gate, tideVariant(tide))) return true;
   return gate === TIDE_MASK.NONE && tile.water === true;
 }
 
@@ -141,6 +143,26 @@ function nameOf(e, data) {
   return e.itemId || e.speciesId || e.npcId || e.id;
 }
 
+/**
+ * One-entry memo so an idle player facing the same entity does not rebuild its prompt string every
+ * frame. Keyed on the entity record itself, its name source and the registry, not on its id: roamer
+ * ids restart from 0 when a map's field is rebuilt, so `roamer:t:0` can be a different species.
+ */
+let memoPrefix = '', memoEnt = null, memoSrc = null, memoData = null, memoText = '';
+
+/**
+ * `prefix + display name`, memoized on (prefix, entity, species/item/npc id, data).
+ * @param {string} prefix @param {Entity} e @param {object} data
+ * @returns {string}
+ */
+function namedPrompt(prefix, e, data) {
+  const src = e.speciesId || e.itemId || e.npcId || e.id;
+  if (prefix !== memoPrefix || e !== memoEnt || src !== memoSrc || data !== memoData) {
+    memoPrefix = prefix; memoEnt = e; memoSrc = src; memoData = data; memoText = prefix + nameOf(e, data);
+  }
+  return memoText;
+}
+
 /** Reused condition context for trigger / warp conds. */
 const condCtx = { data: null, mapId: '', x: 0, y: 0 };
 
@@ -162,8 +184,9 @@ function condHolds(evalCond, world, cond, data, mapId, x, y) {
  * @param {object} world
  * @param {object} data
  * @param {{tideState?: string, evalCond?: (world: object, cond: object, ctx: object) => boolean}} [opts]
- *   `tideState` overrides the tide read from world.clock (state/selectors); `evalCond` is script/cond.evalCond,
- *   used for `cond` on use triggers and door warps (without it every cond holds, matching entities.rebuildFromDefs)
+ *   `tideState` overrides the tide read from world.clock (state/selectors); `evalCond` evaluates `cond` on
+ *   use triggers and door warps (default: the condition DSL, `script/cond.evalCond`, as in
+ *   entities.rebuildFromDefs, lighting and warps)
  * @returns {ContextAction|null}   a REUSED record, or null when nothing is there
  */
 export function resolveFacing(player, map, ents, world, data, opts) {
@@ -176,17 +199,17 @@ export function resolveFacing(player, map, ents, world, data, opts) {
   const p = action.payload;
   p.x = x; p.y = y; p.tool = world && world.player ? world.player.tool : null; p.tideState = tide;
   p.script = null; p.to = null; p.text = null;
-  const evalCond = (opts && opts.evalCond) || null;
+  const evalCond = (opts && opts.evalCond) || dslEvalCond;
 
   // 1. Entities that outrank triggers: npc, roamer, item, sign.
   const e = ents.at(x, y);
   if (e && e.id !== player.id) {
-    if (e.kind === 'npc') return fill('npc', 'talk', e.id, e, `Talk to ${nameOf(e, data)}`, null);
+    if (e.kind === 'npc') return fill('npc', 'talk', e.id, e, namedPrompt('Talk to ', e, data), null);
     if (e.kind === 'roamer') {
-      if (use === 'catch' && e.def && e.def.catchable) return fill('roamer', 'catch', e.id, e, `Catch ${nameOf(e, data)}`, null);
-      return fill('roamer', 'read', e.id, e, `Read ${nameOf(e, data)}`, null);
+      if (use === 'catch' && e.def && e.def.catchable) return fill('roamer', 'catch', e.id, e, namedPrompt('Catch ', e, data), null);
+      return fill('roamer', 'read', e.id, e, namedPrompt('Read ', e, data), null);
     }
-    if (e.kind === 'item') return fill('item', 'pickUp', e.id, e, `Pick up ${nameOf(e, data)}`, null);
+    if (e.kind === 'item') return fill('item', 'pickUp', e.id, e, namedPrompt('Pick up ', e, data), null);
     if (e.kind === 'sign') { p.text = e.def && e.def.text ? e.def.text : null; return fill('sign', 'read', e.id, e, 'Read the sign', null); }
   }
 
@@ -195,7 +218,7 @@ export function resolveFacing(player, map, ents, world, data, opts) {
   for (let i = 0; i < trigs.length; i++) {
     const t = trigs[i];
     if (t.kind !== 'use') continue;
-    if (t.cond != null && evalCond !== null && !condHolds(evalCond, world, t.cond, data, map.id, x, y)) continue;
+    if (t.cond != null && !condHolds(evalCond, world, t.cond, data, map.id, x, y)) continue;
     if (t.once && world && world.maps && world.maps[map.id] && world.maps[map.id].opened && world.maps[map.id].opened.indexOf(t.id) !== -1) continue;
     const verb = t.verb || 'use';
     p.script = t.script || null;
@@ -228,7 +251,7 @@ export function resolveFacing(player, map, ents, world, data, opts) {
     }
   }
   const warp = map.warpAt(x, y);
-  if (warp && warp.kind === 'door' && (warp.cond == null || evalCond === null || condHolds(evalCond, world, warp.cond, data, map.id, x, y))) {
+  if (warp && warp.kind === 'door' && (warp.cond == null || condHolds(evalCond, world, warp.cond, data, map.id, x, y))) {
     p.to = warp.to;
     return fill('door', 'enter', warp.to ? warp.to.mapId : null, warp, 'Enter', null);
   }

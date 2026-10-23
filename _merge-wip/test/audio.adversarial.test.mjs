@@ -288,6 +288,7 @@ test('unicode ids, note names and sfx names', () => {
   assert.equal(midiToNote(-1), 'B-2');
   assert.equal(midiToNote(127), 'G9');
   assert.equal(midiToNote(60.5), 'C#4');
+  for (const bad of [NaN, Infinity, undefined, null, '60', {}]) assert.throws(() => midiToNote(bad), RangeError, `midiToNote(${String(bad)})`);
   assert.equal(keyToMidi('f#'), 54);
   assert.equal(keyToMidi(' D '), 50);
   assert.equal(keyToMidi('D', 'x'), null);
@@ -335,6 +336,8 @@ test('expandPattern boundaries and numeric-string notes', () => {
   assert.deepEqual(by[10].n, [60, 62]);
   assert.deepEqual(by[11].n, [60.5]);
   assert.deepEqual(by[13].n, [40]);
+  const long = expandPattern([{ t: 0, n: 60, d: 1e9 }, { t: 1, n: 60, d: 16 }, { t: 2, n: 60, d: 15.5 }], { loopSteps: 16 });
+  assert.deepEqual(long.map((e) => e.d), [16, 16, 15.5], 'durations are capped at one loop');
   assert.deepEqual(resolveNotes('60'), [60]);
   assert.deepEqual(resolveNotes(['1e2', ' ', '']), [100]);
   assert.deepEqual(resolveNotes(Infinity), []);
@@ -368,7 +371,7 @@ test('normalizeTrack boundaries and malformed definitions', () => {
   assert.equal(ok({ bpm: 100, swing: 'x' }).swing, 0);
   assert.equal(ok({ bpm: 100, key: 'd' }).root, 50);
   assert.equal(ok({ bpm: 100, key: 'D4' }).root, 62);
-  assert.equal(ok({ bpm: 100, key: 'bb' }).root, 46);
+  assert.equal(ok({ bpm: 100, key: 'bb' }).root, 58, 'a bare key sits in octave 3 like D -> D3 (Bb3 = 58)');
   for (const key of ['', 'H', 'D#b', 5, null]) assert.throws(() => ok({ bpm: 100, key }), RangeError, `key ${key}`);
   const layer = (spec) => normalizeTrack('t', { bpm: 100, layers: { a: spec } }).layers[0];
   assert.equal(layer({ pattern: [], gain: -1 }).gain, 0);
@@ -406,9 +409,9 @@ test('step clock, rate limiter and timing helpers at the edges', () => {
   assert.deepEqual(c.advance(NaN), []);
   assert.deepEqual(c.advance(Infinity), [], 'a non-finite horizon never loops forever');
   assert.deepEqual(c.advance(-1), []);
-  assert.deepEqual(c.advance(0.5), [], 'horizon exactly at the next step is exclusive');
-  assert.equal(c.advance(0.5000001).length, 1);
-  assert.equal(c.advance(2).length, 3);
+  assert.deepEqual(c.advance(0.5).map((t) => t.abs), [0], 'horizon exactly at the next step is exclusive');
+  assert.deepEqual(c.advance(0.5000001).map((t) => t.abs), [1]);
+  assert.deepEqual(c.advance(2).map((t) => t.abs), [2, 3]);
   assert.equal(c.nextStep(), 4);
   assert.deepEqual(c.positionAt(-5), { abs: 0, step: 0, bar: 0, beat: 0, loop: 0, phase: 0 });
   assert.equal(c.nextBarTime(0.5), 0.5);

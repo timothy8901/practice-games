@@ -89,12 +89,16 @@
   $('play').onclick = () => audio.playMusic(DEMO_TRACK_ID, { fade: 800 });
   $('playFast').onclick = () => audio.playMusic(audio.nowPlaying()?.id === DEMO_TRACK_ID ? 'harbor-fast' : DEMO_TRACK_ID, { fade: 1500 });
   $('stop').onclick = () => audio.stopMusic({ fade: 800 });
+  // Stem buttons mirror the engine's stem state (it can also change from code, e.g. the auto-run).
   const stemBtn = (id, name) => {
-    let on = false;
-    $(id).onclick = () => { on = !on; audio.setStem(name, on); $(id).textContent = `${name[0].toUpperCase()}${name.slice(1)} stem: ${on ? 'on' : 'off'}`; };
+    const isOn = () => audio.getStems().includes(name);
+    $(id).onclick = () => audio.setStem(name, !isOn());
+    return () => {
+      const text = `${name[0].toUpperCase()}${name.slice(1)} stem: ${isOn() ? 'on' : 'off'}`;
+      if ($(id).textContent !== text) $(id).textContent = text;
+    };
   };
-  stemBtn('stemNight', 'night');
-  stemBtn('stemTide', 'tide');
+  const stemLabels = [stemBtn('stemNight', 'night'), stemBtn('stemTide', 'tide')];
   $('intensity').oninput = (e) => audio.setMusicParam({ intensity: Number(e.target.value) });
 
   for (const name of SFX_NAMES) {
@@ -111,6 +115,7 @@
   let buf = null;
   function draw() {
     requestAnimationFrame(draw);
+    for (const label of stemLabels) label();
     const np = audio.nowPlaying();
     $('np').textContent = np ? (np.pending ? `pending: ${np.id}` : `${np.id} · bar ${np.bar + 1} beat ${np.beat + 1} · loop ${np.loop} · stems [${np.stems.join(', ')}] · intensity ${np.intensity.toFixed(2)}`) : '— (stopped)';
     const an = audio.analyser;

@@ -2,8 +2,10 @@
 /**
  * Cross-reference validator for the content tables (ARCHITECTURE §8.2). [TOOLS]
  *
- * Usage: node tools/validate-data.mjs [--strict] [--quiet] [--world save.json]
- *   exit 1 on any error (or on warnings with --strict); every line is `table:id: message`.
+ * Usage: node tools/validate-data.mjs [--strict] [--quiet] [--world save.json] [--data module.mjs]
+ *   exit 1 on any error (or on warnings with --strict); every line is `table:id: message` (the table
+ *   names the content file: `scripts:ph-intro[3]` is in `js/data/scripts/*`). `--data` validates the
+ *   `DATA` export of another module instead of `js/data/index.js` (fixtures, tooling).
  *
  * `validateData(DATA, opts)` is the pure core (also run by `test/data.test.mjs`). Rules that need a
  * module from a lane that has not landed (battle effects, ability hooks, bag handlers, creature
@@ -265,7 +267,7 @@ export function validateData(DATA, opts = {}) {
       if (t.tide === 'high') return tide === 'high';
       return !t.water;
     };
-    passableFns.set(id, passable);
+    if (groundOk) passableFns.set(id, passable);   // a malformed ground layer already errored; skip derived passability checks
     const passableEver = (x, y) => passable(x, y, 'low') || passable(x, y, 'high');
     if (!map.entry || !inBounds(map, map.entry.x, map.entry.y)) err('maps', id, 'entry must be in bounds');
     else if (groundOk && !passableEver(map.entry.x, map.entry.y)) err('maps', id, `entry (${map.entry.x},${map.entry.y}) is never passable`);
@@ -709,9 +711,13 @@ export async function main(argv = process.argv.slice(2)) {
   const strict = argv.includes('--strict');
   const quiet = argv.includes('--quiet');
   const wi = argv.indexOf('--world');
-  const { DATA, DEFAULT_LEGEND } = await import('../js/data/index.js');
+  const di = argv.indexOf('--data');
+  if (di >= 0 && !argv[di + 1]) { console.error('error data: --data needs a module path'); return 1; }
+  const { DATA, DEFAULT_LEGEND } = di >= 0
+    ? await import(pathToFileURL(resolve(argv[di + 1])).href)
+    : await import('../js/data/index.js');
   const { opts, notes } = await loadOptions();
-  const { errors, warnings } = validateData(DATA, { ...opts, legend: DEFAULT_LEGEND });
+  const { errors, warnings } = validateData(DATA, { ...opts, ...(DEFAULT_LEGEND ? { legend: DEFAULT_LEGEND } : {}) });
   if (wi >= 0) {
     const file = argv[wi + 1];
     if (!file) errors.push('world: --world needs a file path');

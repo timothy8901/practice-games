@@ -34,6 +34,10 @@ export const PANEL_STYLES = Object.freeze(['paper', 'ledger', 'notice', 'card', 
  * @property {boolean} [seal]                 Wax seal on the top-right corner.
  * @property {'top'|'bottom'|'both'|'none'} [torn] Torn edges for `notice` (default both).
  * @property {boolean} [pin]                  Brass pin at the top centre (notice).
+ * @property {number} [rulePitch=10]       Ledger: distance between rules (match the row height).
+ * @property {number} [ruleStart]           Ledger: y of the first rule from the panel top (default 14,
+ *                                          under the first text line at the inner top).
+ * @property {number} [margin=10]           Ledger: x of the wax margin line from the panel left (0 = none).
  * @property {boolean} [shadow=true]
  * @property {boolean} [grain=true]
  * @property {number} [alpha]
@@ -132,7 +136,7 @@ export function drawNotchedFrame(c, x, y, w, h, color) {
  * @param {'top'|'bottom'|'both'|'none'} torn
  * @param {boolean} useGrain
  */
-function paintBody(c, w, h, style, torn, useGrain) {
+function paintBody(c, w, h, style, torn, useGrain, lg) {
   const P = COLORS.paper;
   if (style === 'dark') {
     c.fillStyle = COLORS.dark.fill;
@@ -184,22 +188,25 @@ function paintBody(c, w, h, style, torn, useGrain) {
     c.fillRect(2, 2, w - 4, 1); c.fillRect(2, h - 3, w - 4, 1); c.fillRect(2, 2, 1, h - 4); c.fillRect(w - 3, 2, 1, h - 4);
   }
   if (style === 'ledger') {
+    const pitch = Math.max(4, lg.pitch | 0);
     c.fillStyle = P.rule;
-    for (let y = 12; y < h - 4; y += 8) c.fillRect(3, y, w - 6, 1);
-    c.fillStyle = COLORS.wax.light;
-    c.fillRect(10, 3, 1, h - 6);
+    for (let y = lg.start; y < h - 4; y += pitch) c.fillRect(3, y, w - 6, 1);
+    if (lg.margin > 0) {
+      c.fillStyle = COLORS.wax.light;
+      c.fillRect(lg.margin, 3, 1, h - 6);
+    }
   }
 }
 
-function cached(ctx, w, h, style, torn, useGrain) {
-  const key = `${style}|${w}|${h}|${torn}|${useGrain ? 1 : 0}`;
+function cached(ctx, w, h, style, torn, useGrain, lg) {
+  const key = `${style}|${w}|${h}|${torn}|${useGrain ? 1 : 0}|${style === 'ledger' ? `${lg.pitch},${lg.start},${lg.margin}` : ''}`;
   let entry = cache.get(key);
   if (entry) return entry;
   const body = makeCanvas(w, h);
   if (!body) return null;
   const bc = body.getContext('2d');
   bc.imageSmoothingEnabled = false;
-  paintBody(bc, w, h, style, torn, useGrain);
+  paintBody(bc, w, h, style, torn, useGrain, lg);
   const shadow = makeCanvas(w, h);
   const sc = shadow.getContext('2d');
   sc.drawImage(body, 0, 0);
@@ -227,7 +234,8 @@ export function drawPanel(ctx, rect, style = 'paper', opts) {
   const w = Math.max(4, Math.round(rect.w)), h = Math.max(4, Math.round(rect.h));
   const torn = style === 'notice' ? (o.torn || 'both') : 'none';
   const useGrain = o.grain !== false;
-  const entry = cached(ctx, w, h, style, torn, useGrain);
+  const lg = { pitch: o.rulePitch || TYPE.lineH, start: o.ruleStart === undefined ? PADDING.ledger + 8 : o.ruleStart, margin: o.margin === undefined ? 10 : o.margin };
+  const entry = cached(ctx, w, h, style, torn, useGrain, lg);
   const prevAlpha = ctx.globalAlpha;
   if (o.alpha !== undefined) ctx.globalAlpha = prevAlpha * o.alpha;
   if (entry) {
@@ -235,7 +243,7 @@ export function drawPanel(ctx, rect, style = 'paper', opts) {
     ctx.drawImage(entry.body, x, y);
   } else {
     // No canvas factory (fake context): paint straight through, untranslated caches aside.
-    ctx.save(); ctx.translate(x, y); paintBody(ctx, w, h, style, torn, useGrain); ctx.restore();
+    ctx.save(); ctx.translate(x, y); paintBody(ctx, w, h, style, torn, useGrain, lg); ctx.restore();
   }
   if (o.pin) drawIcon(ctx, 'pin', x + Math.floor(w / 2) - 4, y - 3);
   if (o.title) drawTitleTab(ctx, x, y, w, style, o);

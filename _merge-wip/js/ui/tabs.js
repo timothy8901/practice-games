@@ -15,7 +15,7 @@ import { drawNotchedFrame } from './panel.js';
 import { drawKeyGlyph } from './widgets.js';
 
 /** Height of the strip (tab body + 1px merge row). */
-export const TAB_H = 13;
+export const TAB_H = 14;
 /** Space reserved at each end for the L/R hint. */
 const HINT_W = 14;
 
@@ -98,31 +98,36 @@ export function createTabs(o) {
   function draw(ctx) {
     const s = surfaceFor(style);
     const lay = tabLayout(tabs, rect, { hints });
-    const bodyH = TAB_H - 1;
+    // Active tab: full height, bottom opened into the panel. Inactive: 2px lower, its bottom edge
+    // sitting on the panel's top border, label clear of every frame line.
     for (let i = 0; i < tabs.length; i++) {
       const t = tabs[i], L = lay[i];
       const on = t.id === active;
-      const y = rect.y + (on ? 0 : 1);
-      const h = on ? TAB_H : bodyH - 1;
-      ctx.fillStyle = on ? (s.dark ? COLORS.dark.fill : COLORS.paper.fill) : (s.dark ? COLORS.dark.inner : COLORS.paper.shade);
+      const y = rect.y + (on ? 0 : 2);
+      const h = on ? TAB_H : TAB_H - 2;
+      const fill = on ? (s.dark ? COLORS.dark.fill : COLORS.paper.fill) : (s.dark ? COLORS.dark.inner : COLORS.paper.shade);
+      ctx.fillStyle = fill;
       ctx.fillRect(L.x + 1, y + 1, L.w - 2, h - 1);
-      drawNotchedFrame(ctx, L.x, y, L.w, on ? h + 1 : h, on ? (s.dark ? COLORS.dark.border : COLORS.paper.edge) : s.rule);
+      drawNotchedFrame(ctx, L.x, y, L.w, h + (on ? 1 : 0), on ? (s.dark ? COLORS.dark.border : COLORS.paper.edge) : s.rule);
       if (on) {
-        // open the bottom into the panel beneath
-        ctx.fillStyle = s.dark ? COLORS.dark.fill : COLORS.paper.fill;
+        ctx.fillStyle = fill;
         ctx.fillRect(L.x + 1, y + h - 1, L.w - 2, 2);
+      } else {
+        ctx.fillStyle = s.dark ? COLORS.dark.border : COLORS.paper.edge; // sits on the panel's top border
+        ctx.fillRect(L.x, y + h - 1, L.w, 1);
       }
       let tx = L.x + SPACE.sm;
       const ink = on ? s.text : s.soft;
-      if (t.icon && hasIcon(t.icon)) { drawIcon(ctx, t.icon, tx, y + 2, { ink }); tx += 10; }
-      drawText(ctx, t.label, tx, y + 3, { color: ink });
+      const ty = y + (on ? 3 : 2);
+      if (t.icon && hasIcon(t.icon)) { drawIcon(ctx, t.icon, tx, ty, { ink }); tx += 10; }
+      drawText(ctx, t.label, tx, ty, { color: ink });
     }
     if (hints && tabs.length > 1) {
       const dev = device === 'gamepad' ? 'gamepad' : device === 'touch' ? 'touch' : 'keyboard';
       const labels = DEVICE_LABELS[dev];
-      drawKeyGlyph(ctx, dev, labels.l, rect.x, rect.y + 2, { dark: s.dark });
+      drawKeyGlyph(ctx, dev, labels.l, rect.x, rect.y + 3, { dark: s.dark });
       const last = lay[lay.length - 1];
-      drawKeyGlyph(ctx, dev, labels.r, last.x + last.w + 3, rect.y + 2, { dark: s.dark });
+      drawKeyGlyph(ctx, dev, labels.r, last.x + last.w + 3, rect.y + 3, { dark: s.dark });
     }
   }
 

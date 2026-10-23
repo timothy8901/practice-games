@@ -1,7 +1,7 @@
 // Unit tests for js/world/warps.js. Run: node --test test/world.warps.test.mjs
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { resolveWarp, arrivalFacing, firesOn, firesOnStep, firesOnConfirm, evalBuiltinCond, WARP_MESSAGES, WARP_REASONS } from '../js/world/warps.js';
+import { resolveWarp, arrivalFacing, firesOn, firesOnStep, firesOnConfirm, evalWarpCond, WARP_MESSAGES, WARP_REASONS } from '../js/world/warps.js';
 import { loadMap } from '../js/world/tilemap.js';
 import { createNewWorld } from '../js/state/schema.js';
 import { tideState, tide as tideHeight } from '../js/state/selectors.js';
@@ -102,7 +102,8 @@ describe('resolveWarp: refusals', () => {
     assert.equal(resolveWarp(w, hourGate, data, 'low').ok, true);
     assert.equal(resolveWarp(world(), { ...door, cond: false }, data, 'low').reason, 'cond');
     assert.equal(resolveWarp(world(), { ...door, cond: true }, data, 'low').ok, true);
-    assert.deepEqual(WARP_REASONS, ['tide', 'locked', 'cond', 'unknown-map']);
+    assert.deepEqual(WARP_REASONS, ['tide', 'locked', 'cond', 'unknown-map', 'blocked']);
+    for (const r of WARP_REASONS) assert.equal(typeof WARP_MESSAGES[r], 'string', r);
   });
 
   it('an unknown destination map is refused when the registry knows maps', () => {
@@ -134,49 +135,88 @@ describe('resolveWarp: refusals', () => {
     assert.equal(resolveWarp(world({ flags: { 'th.test.done': true } }), threadGate, data, 'low', { evalCond }).ok, true);
   });
 
-  it('the built-in evaluator refuses DSL keys it does not implement, loudly', () => {
-    assert.throws(() => resolveWarp(world(), { ...door, cond: { thread: { id: 'x' } } }, data, 'low'), /cond key 'thread' is outside the built-in subset/);
-    assert.throws(() => evalBuiltinCond(world(), 'yes', { tide: 'low' }), TypeError);
+  it('the default evaluator speaks the whole condition DSL (script/cond) and rejects malformed conds', () => {
+    const threadGate = { ...door, cond: { thread: { id: 'boatwright', done: true } } };
+    assert.equal(resolveWarp(world(), threadGate, data, 'low').reason, 'locked', 'thread gates read as locked');
+    const w = world();
+    w.threads.boatwright = { beat: 3, done: true, startedDay: 0, lastAdvancedDay: 1 };
+    assert.equal(resolveWarp(w, threadGate, data, 'low').ok, true);
+    const counterGate = { ...door, cond: { counter: 'sys.bells', gte: 2 } };
+    assert.equal(resolveWarp(world(), counterGate, data, 'low').reason, 'cond');
+    const rung = world();
+    rung.counters['sys.bells'] = 2;
+    assert.equal(resolveWarp(rung, counterGate, data, 'low').ok, true);
+    // tide leaves still read the tide passed in, even nested beside DSL keys
+    const mixed = { ...door, cond: { any: [{ not: { lowTide: false } }, { counter: 'sys.bells', gte: 9 }] } };
+    assert.equal(resolveWarp(world(), mixed, data, 'low').ok, true);
+    assert.equal(resolveWarp(world(), mixed, data, 'high').reason, 'tide');
+    assert.throws(() => evalWarpCond(world(), 'yes', { tide: 'low' }), TypeError);
+    assert.throws(() => evalWarpCond(world(), [], { tide: 'low' }), TypeError);
+    assert.throws(() => evalWarpCond(world(), { lowTide: true, flag: 'sp.a' }, { tide: 'low' }), TypeError);
+    assert.throws(() => evalWarpCond(world(), { all: { flag: 'sp.a' } }, { tide: 'low' }), TypeError);
+    assert.throws(() => resolveWarp(world(), { ...door, cond: { nonsense: 1 } }, data, 'low'), TypeError);
+  });
+
+  it('with destMap, a landing tile under the sea refuses with tide and a wall refuses with blocked', () => {
+    // the harbor is its own destination here: causeway at 14,4; cliff at 13,6; grass at 6,7
+    const to = (x, y) => ({ ...door, to: { mapId: 'harbor', x, y } });
+    const opts = { destMap: map };
+    assert.equal(resolveWarp(world(), to(14, 4), data, 'low', opts).ok, true, 'causeway dry at low tide');
+    for (const t of ['rising', 'high', 0.5]) {
+      const r = resolveWarp(world(), to(14, 4), data, t, opts);
+      assert.equal(r.reason, 'tide', `causeway flooded at ${t}`);
+      assert.equal(r.messageKey, 'warp.tide');
+    }
+    assert.equal(resolveWarp(world(), to(0, 0), data, 'low', opts).reason, 'tide', 'open sea');
+    assert.equal(resolveWarp(world(), to(13, 6), data, 'low', opts).reason, 'blocked', 'cliff');
+    assert.equal(resolveWarp(world(), to(40, 2), data, 'low', opts).reason, 'blocked', 'outside the map');
+    assert.equal(resolveWarp(world(), to(6, 7), data, 'high', opts).ok, true);
+    assert.equal(resolveWarp(world(), to(0, 6), data, 'high', opts).ok, true, 'wet sand floods visually but stays walkable');
+    // the cond is checked first
+    assert.equal(resolveWarp(world(), { ...causewayEdge, to: { mapId: 'harbor', x: 14, y: 4 } }, data, 'high', opts).reason, 'tide');
+    assert.throws(() => resolveWarp(world(), door, data, 'low', opts), /destMap is 'harbor'/);
   });
 });
 
-describe('evalBuiltinCond', () => {
+describe('evalWarpCond', () => {
   const ctx = { tide: 'low', mapId: 'harbor' };
-  it('covers the warp subset of the DSL', () => {
+  it('evaluates the DSL with tide leaves read from ctx.tide', () => {
     const w = world({ flags: { 'sp.a': true, 'sp.n': 3, 'seen.intro': true } });
     w.badges.push('spire-1');
-    assert.equal(evalBuiltinCond(w, undefined, ctx), true);
-    assert.equal(evalBuiltinCond(w, null, ctx), true);
-    assert.equal(evalBuiltinCond(w, { flag: 'sp.a' }, ctx), true);
-    assert.equal(evalBuiltinCond(w, { flag: 'sp.b' }, ctx), false);
-    assert.equal(evalBuiltinCond(w, { flag: 'sp.n', is: 3 }, ctx), true);
-    assert.equal(evalBuiltinCond(w, { flag: 'sp.n', is: 4 }, ctx), false);
-    assert.equal(evalBuiltinCond(w, { not: { flag: 'sp.b' } }, ctx), true);
-    assert.equal(evalBuiltinCond(w, { all: [{ flag: 'sp.a' }, { lowTide: true }] }, ctx), true);
-    assert.equal(evalBuiltinCond(w, { any: [{ flag: 'sp.b' }, { lowTide: false }] }, ctx), false);
-    assert.equal(evalBuiltinCond(w, { tide: ['low', 'falling'] }, ctx), true);
-    assert.equal(evalBuiltinCond(w, { tide: ['high'] }, ctx), false);
-    assert.equal(evalBuiltinCond(w, { tide: ['rising'] }, { tide: 'rising' }), true);
-    assert.equal(evalBuiltinCond(w, { tide: ['rising'] }, { tide: 0.5 }), true, 'a bare mid height matches rising or falling');
-    assert.equal(evalBuiltinCond(w, { tide: ['rising'] }, { tide: 'falling' }), false);
-    assert.equal(evalBuiltinCond(w, { tide: ['low'] }, { tide: 0.05 }), true);
-    assert.equal(evalBuiltinCond(w, { tide: 'high' }, { tide: 0.95 }), true);
-    assert.equal(evalBuiltinCond(w, { lowTide: true }, { tide: 0.5 }), false);
-    assert.equal(evalBuiltinCond(w, { badge: 'spire-1' }, ctx), true);
-    assert.equal(evalBuiltinCond(w, { badge: 1 }, ctx), true);
-    assert.equal(evalBuiltinCond(w, { badge: 2 }, ctx), false);
-    assert.equal(evalBuiltinCond(w, { seen: 'intro' }, ctx), true);
-    assert.equal(evalBuiltinCond(w, { seen: 'outro' }, ctx), false);
-    assert.equal(evalBuiltinCond(w, { map: 'harbor' }, ctx), true);
-    assert.equal(evalBuiltinCond(w, { map: 'harbor' }, { tide: 'low' }), true, 'falls back to the player map');
-    assert.equal(evalBuiltinCond(w, { map: 'cottage' }, ctx), false);
+    assert.equal(evalWarpCond(w, undefined, ctx), true);
+    assert.equal(evalWarpCond(w, null, ctx), true);
+    assert.equal(evalWarpCond(w, { flag: 'sp.a' }, ctx), true);
+    assert.equal(evalWarpCond(w, { flag: 'sp.b' }, ctx), false);
+    assert.equal(evalWarpCond(w, { flag: 'sp.n', is: 3 }, ctx), true);
+    assert.equal(evalWarpCond(w, { flag: 'sp.n', is: 4 }, ctx), false);
+    assert.equal(evalWarpCond(w, { not: { flag: 'sp.b' } }, ctx), true);
+    assert.equal(evalWarpCond(w, { all: [{ flag: 'sp.a' }, { lowTide: true }] }, ctx), true);
+    assert.equal(evalWarpCond(w, { any: [{ flag: 'sp.b' }, { lowTide: false }] }, ctx), false);
+    assert.equal(evalWarpCond(w, { tide: ['low', 'falling'] }, ctx), true);
+    assert.equal(evalWarpCond(w, { tide: ['high'] }, ctx), false);
+    assert.equal(evalWarpCond(w, { tide: ['rising'] }, { tide: 'rising' }), true);
+    assert.equal(evalWarpCond(w, { tide: ['rising'] }, { tide: 0.5 }), true, 'a bare mid height matches rising or falling');
+    assert.equal(evalWarpCond(w, { tide: ['rising'] }, { tide: 'falling' }), false);
+    assert.equal(evalWarpCond(w, { tide: ['low'] }, { tide: 0.05 }), true);
+    assert.equal(evalWarpCond(w, { tide: 'high' }, { tide: 0.95 }), true);
+    assert.equal(evalWarpCond(w, { tide: ['falling'] }, { tide: 'mid' }), true, "the variant 'mid' is ambiguous too");
+    assert.equal(evalWarpCond(w, { tide: ['mid'] }, { tide: 'rising' }), true, 'a variant in the list matches its states');
+    assert.equal(evalWarpCond(w, { lowTide: true }, { tide: 0.5 }), false);
+    assert.equal(evalWarpCond(w, { badge: 'spire-1' }, ctx), true);
+    assert.equal(evalWarpCond(w, { badge: 1 }, ctx), true);
+    assert.equal(evalWarpCond(w, { badge: 2 }, ctx), false);
+    assert.equal(evalWarpCond(w, { seen: 'intro' }, ctx), true);
+    assert.equal(evalWarpCond(w, { seen: 'outro' }, ctx), false);
+    assert.equal(evalWarpCond(w, { map: 'harbor' }, ctx), true);
+    assert.equal(evalWarpCond(w, { map: 'harbor' }, { tide: 'low' }), true, 'falls back to the player map');
+    assert.equal(evalWarpCond(w, { map: 'cottage' }, ctx), false);
     w.clock.total = MINUTES_PER_DAY + 23 * 60;
-    assert.equal(evalBuiltinCond(w, { hour: [22, 2] }, ctx), true, 'hour range wrapping midnight');
-    assert.equal(evalBuiltinCond(w, { hour: [9, 17] }, ctx), false);
+    assert.equal(evalWarpCond(w, { hour: [22, 2] }, ctx), true, 'hour range wrapping midnight');
+    assert.equal(evalWarpCond(w, { hour: [9, 17] }, ctx), false);
     w.clock.total = 9 * 60;
-    assert.equal(evalBuiltinCond(w, { hour: [9, 17] }, ctx), true, 'start inclusive');
+    assert.equal(evalWarpCond(w, { hour: [9, 17] }, ctx), true, 'start inclusive');
     w.clock.total = 17 * 60;
-    assert.equal(evalBuiltinCond(w, { hour: [9, 17] }, ctx), false, 'end exclusive');
+    assert.equal(evalWarpCond(w, { hour: [9, 17] }, ctx), false, 'end exclusive');
   });
 });
 

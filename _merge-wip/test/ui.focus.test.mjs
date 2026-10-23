@@ -149,10 +149,20 @@ test('a d-pad move blocked by disabled items surfaces the reason', () => {
   assert.equal(f.tooltip.text, 'Not yet 1');
 });
 
+test('a pointer resting on the canvas when focus starts does not steal the default', () => {
+  const f = createFocus({ items: mk(4), cols: 4, index: 3 });
+  const input = fakeInput().move(5, 3); // resting over item 0
+  f.handle(input);
+  assert.equal(f.index, 3, 'first frame only records the pointer');
+  f.handle(input.move(25, 3));
+  assert.equal(f.index, 1, 'real movement hovers');
+});
+
 test('pointer hover moves focus (pointerActive) and a mouse click activates at once', () => {
   const acts = [];
   const f = createFocus({ items: mk(8), cols: 4, onActivate: (ev) => acts.push(ev.index) });
   const input = fakeInput();
+  f.handle(input.move(0, 40)); // prime: resting outside every item
   f.handle(input.move(45, 3)); // item 2
   assert.equal(f.index, 2);
   assert.equal(f.pointerActive, true);
@@ -168,7 +178,9 @@ test('pointer hover moves focus (pointerActive) and a mouse click activates at o
 
 test('hovering a disabled item does not move focus but shows its reason', () => {
   const f = createFocus({ items: mk(4, [2]), cols: 4 });
-  f.handle(fakeInput().move(45, 3));
+  const input = fakeInput().move(0, 40);
+  f.handle(input);
+  f.handle(input.move(45, 3));
   assert.equal(f.index, 0);
   assert.equal(f.tooltip.text, 'Not yet 2');
 });

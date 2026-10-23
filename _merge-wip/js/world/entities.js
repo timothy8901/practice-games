@@ -15,6 +15,7 @@
  */
 
 import { TILE } from '../config.js';
+import { evalCond as dslEvalCond } from '../script/cond.js';
 
 /** @typedef {'up'|'down'|'left'|'right'} Dir */
 /** @typedef {import('../core/time.js').TideState} TideState */
@@ -165,7 +166,8 @@ export function updatePixels(e) {
 
 /**
  * @typedef {Object} RebuildCtx
- * @property {(world: object, cond: object, ctx: object) => boolean} [evalCond]   script/cond.evalCond; defaults to "every cond holds"
+ * @property {(world: object, cond: object, ctx: object) => boolean} [evalCond]   condition evaluator; defaults to the
+ *   condition DSL (`script/cond.evalCond`), so a cond-gated neighbour stays away unless its cond holds
  * @property {(npcId: string) => ({x:number, y:number, facing?: Dir}|null)} [placeNpc]   schedule placement; null = not on this map; default = the def's tile
  */
 
@@ -274,6 +276,7 @@ export function createEntities(map, opts = {}) {
   /** @param {Entity} e @returns {Entity} */
   function add(e) {
     if (byId.has(e.id)) throw new Error(`entities: duplicate id '${e.id}'`);
+    if (!Number.isInteger(e.x) || !Number.isInteger(e.y)) throw new TypeError(`entities: '${e.id}' needs integer tile x, y (got ${e.x}, ${e.y})`);
     if (!inside(e.x, e.y)) throw new RangeError(`entities: '${e.id}' at ${e.x},${e.y} is outside ${w}x${h}`);
     if (e.slot !== -1) throw new Error(`entities: '${e.id}' is already managed`);
     if (freeTop === 0) throw new RangeError(`entities: table full (${capacity})`);
@@ -361,6 +364,7 @@ export function createEntities(map, opts = {}) {
 
   /** @param {Entity} e @param {number} x @param {number} y @param {Dir} [facing] */
   function teleport(e, x, y, facing) {
+    if (!Number.isInteger(x) || !Number.isInteger(y)) throw new TypeError(`teleport: x, y must be integer tiles (got ${x}, ${y})`);
     if (!inside(x, y)) throw new RangeError(`teleport: ${x},${y} is outside ${w}x${h}`);
     if (e.slot === -1 || slots[e.slot] !== e) throw new Error(`teleport: '${e.id}' is not managed here`);
     unlink(e, e.x, e.y);
@@ -414,7 +418,7 @@ export function createEntities(map, opts = {}) {
    * @param {RebuildCtx} [ctx]
    */
   function rebuildFromDefs(world, data, tideState, ctx = {}) {
-    const evalCond = ctx.evalCond || (() => true);
+    const evalCond = ctx.evalCond || dslEvalCond;
     const defs = (map.def && map.def.entities) || [];
     const defIds = new Set();
     for (let i = 0; i < defs.length; i++) defIds.add(defs[i].id);

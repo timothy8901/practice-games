@@ -340,9 +340,12 @@ export function createFocus(a, b) {
     const p = input.pointer;
     if (p && p.inside) {
       const isTouch = p.type === 'touch';
+      // A pointer already resting on the canvas when the model starts is not a hover: the first
+      // frame only records where it is, so a menu never opens with its safe default stolen.
+      const primed = !Number.isNaN(lastPtr.x);
       if (p.justDown) {
         ev = point(p.x, p.y, isTouch ? 'touch' : 'mouse') || ev;
-      } else if (!isTouch && (p.x !== lastPtr.x || p.y !== lastPtr.y)) {
+      } else if (primed && !isTouch && (p.x !== lastPtr.x || p.y !== lastPtr.y)) {
         ev = point(p.x, p.y, 'hover') || ev;
       }
       lastPtr = { x: p.x, y: p.y };

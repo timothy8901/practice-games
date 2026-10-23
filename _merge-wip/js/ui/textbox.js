@@ -8,6 +8,7 @@
  *    overflows; `\f` forces a break. `paginate()` is pure and unit-tested.
  *  - Beat pauses: a short hold after `,` `;` and a longer one after `.` `!` `?` `…` (scaled with
  *    speed; none when instant).
+ *  - Holding confirm (>= 250 ms) types four times faster.
  *  - Confirm while typing skips to the end of the page; confirm on a finished page advances; on the
  *    last page it reports `finished` (`onDone`). Cancel does the same unless choices are up.
  *  - Ledger-paper slip with the speaker name on a wax tab (in the speaker's key colour), a 32x32
@@ -116,6 +117,7 @@ export function createTextbox(o) {
   let cancelIndex = -1;
   let choiceFocus = null;
   let layoutCache = null;
+  let fastForward = false; // confirm held (wildshift §15.2: hold a button to fast-forward)
 
   function resolveSpeed(s) {
     if (typeof s === 'number' && s > 0) return s;
@@ -129,7 +131,7 @@ export function createTextbox(o) {
     if (layoutCache) return layoutCache;
     const inner = { x: rect.x + 6, y: rect.y + 6, w: rect.w - 12, h: rect.h - 12 };
     const px = inner.x;
-    const textX = hasPortrait() ? px + 32 + SPACE.md : inner.x;
+    const textX = hasPortrait() ? px + 32 + SPACE.lg : inner.x;
     let textW = inner.x + inner.w - textX - 8; // room for the more-arrow
     let choiceRect = null;
     if (choices.length) {
@@ -225,7 +227,7 @@ export function createTextbox(o) {
     if (!Number.isFinite(cps)) { skip(); return; }
     if (beat > 0) { beat -= dt; if (beat > 0) return; dt = -beat; beat = 0; }
     const chars = pageChars();
-    acc += (dt * cps) / 1000;
+    acc += (dt * cps * (fastForward ? 4 : 1)) / 1000;
     while (acc >= 1 && shown < chars.length) {
       acc -= 1;
       shown += 1;
@@ -237,6 +239,7 @@ export function createTextbox(o) {
   /** @param {import('../core/input.js').Input} [input] */
   function handle(input = o.input) {
     if (!input) return null;
+    fastForward = !!(input.held && input.held('confirm') && input.heldFor && input.heldFor('confirm') >= 250);
     if (choicesUp() && choiceFocus) return choiceFocus.handle(input);
     if (input.pressed('confirm') || (o.cancelAdvances !== false && input.pressed('cancel'))) {
       advance();
@@ -263,7 +266,7 @@ export function createTextbox(o) {
       if (isSprite(portrait)) drawSprite(ctx, portrait, P.x, P.y);
       else drawSprite(ctx, getPortraitPlaceholder(), P.x, P.y);
       ctx.fillStyle = COLORS.paper.rule;
-      ctx.fillRect(P.x + P.w + SPACE.sm, L.inner.y, 1, L.inner.h);
+      ctx.fillRect(P.x + P.w + 6, L.inner.y, 1, L.inner.h);
     }
     drawTextTyped(ctx, pages[pageIndex], L.text.x, L.text.y, shown, { font, color: COLORS.paper.ink, maxWidth: L.text.w });
     // more-arrow / end mark
@@ -304,6 +307,7 @@ export function createTextbox(o) {
     get speed() { return cps; },
     get done() { return pageDone(); },
     get finished() { return finished; },
+    get fastForward() { return fastForward; },
     get page() { return pageIndex; },
     get pages() { return pages.length; },
     get pageText() { return pages[pageIndex]; },

@@ -32,6 +32,8 @@ const SHAKE_WY = 0.053;
  * @typedef {Object} CameraOptions
  * @property {number} [viewW=480]   view width in game pixels (config.NATIVE_W)
  * @property {number} [viewH=270]   view height in game pixels (config.NATIVE_H)
+ * @property {number} [w]           alias of `viewW` (the §4.3 signature `createCamera({w: 480, h: 270})`)
+ * @property {number} [h]           alias of `viewH`
  * @property {number} [tile=16]     tile edge in pixels (config.TILE)
  */
 
@@ -73,8 +75,8 @@ const SHAKE_WY = 0.053;
  */
 export function createCamera(opts) {
   const o = opts || {};
-  const viewW = checkDim('viewW', o.viewW ?? 480);
-  const viewH = checkDim('viewH', o.viewH ?? 270);
+  const viewW = checkDim('viewW', o.viewW ?? o.w ?? 480);
+  const viewH = checkDim('viewH', o.viewH ?? o.h ?? 270);
   const tile = checkDim('tile', o.tile ?? 16);
 
   let rawX = 0;

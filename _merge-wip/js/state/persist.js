@@ -31,9 +31,35 @@ import { day as dayOf, formatTime, placeLabel, hasChallenge } from './selectors.
  * @typedef {Object} PersistG
  * @property {import('./store.js').Store} store
  * @property {import('../core/events.js').EventBus} [bus]
- * @property {{top?: () => {name?: string}|null, has?: (name: string) => boolean, isTransitioning?: () => boolean}} [scenes]
+ * @property {{top?: () => {name?: string}|null, find?: (name: string) => object|null, has?: (name: string) => boolean, isTransitioning?: boolean|(() => boolean)}} [scenes]
+ *   a `core/scene` SceneStack (`find(name)`, `isTransitioning` getter) or a test double that offers
+ *   `has(name)` / `isTransitioning()` as functions; see {@link sceneTransitioning} and {@link sceneOnStack}
  * @property {{has: Function}} [data]   registry for id validation
  */
+
+/**
+ * Whether the scene stack is mid-transition. Accepts the `core/scene` getter (a boolean) or a function.
+ * @param {PersistG['scenes']} scenes
+ * @returns {boolean}
+ */
+export function sceneTransitioning(scenes) {
+  if (!scenes) return false;
+  const t = scenes.isTransitioning;
+  return typeof t === 'function' ? t.call(scenes) === true : t === true;
+}
+
+/**
+ * Whether a scene with `name` is on the stack. Uses `core/scene`'s `find(name)` when present (its
+ * `has` takes a scene object, not a name), else a `has(name)` test double.
+ * @param {PersistG['scenes']} scenes
+ * @param {string} name
+ * @returns {boolean}
+ */
+export function sceneOnStack(scenes, name) {
+  if (!scenes) return false;
+  if (typeof scenes.find === 'function') return scenes.find(name) != null;
+  return typeof scenes.has === 'function' ? scenes.has(name) === true : false;
+}
 
 /**
  * @typedef {Object} SaveResult
@@ -251,10 +277,10 @@ export function createPersist(opts) {
         return fail(G, { ...base, error: err(PERSIST_ERRORS.NO_STORE, 'no store to save') }, kind, slot, isRetry);
       }
       const scenes = G.scenes;
-      if (scenes?.isTransitioning?.()) {
+      if (sceneTransitioning(scenes)) {
         return fail(G, { ...base, error: err(PERSIST_ERRORS.BUSY, 'cannot save during a transition') }, kind, slot, isRetry);
       }
-      if (scenes?.has?.('battle')) {
+      if (sceneOnStack(scenes, 'battle')) {
         return fail(G, { ...base, error: err(PERSIST_ERRORS.BUSY, 'cannot save while a battle is on the stack') }, kind, slot, isRetry);
       }
       const world = G.store.snapshot();
@@ -372,7 +398,7 @@ export function createPersist(opts) {
       const eligible = G.store.dirty?.() === true
         && topName === 'overworld'
         && !G.store.world?.cutscene
-        && !G.scenes?.isTransitioning?.();
+        && !sceneTransitioning(G.scenes);
       if (!eligible) return;
       routeAcc += ms;
       if (routeAcc >= routeAutosaveMs) {

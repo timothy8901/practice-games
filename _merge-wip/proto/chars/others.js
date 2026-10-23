@@ -92,8 +92,8 @@ MAGPIE.upBody = [
   '....KFFFFFFfK...',
   '....KFFFFFffK...',
   '.....KFFfffK....',
-  '....KKMMFMMKK...',
-  '...KFMMFFFMMFK..',
+  '....KKFFFFFKK...',
+  '...KMFFFFFFFMK..',
   '...KFFFFFFFFfK..',
   '...KFFFFFFFFfK..',
   '...KfFFFFFFffK..',
@@ -251,27 +251,29 @@ SNAIL.down = [
   '................',
   '................',
   '................',
-  '................',
-  '................',
-  '.KK........KK...',
-  'KEEK......KEEK..',
-  '.KFK......KFK...',
-  '.KXXK....KFK....',
-  '..KXKKMMKKFK....',
-  '...KFKMMKFK.....',
-  '..KKCFCCCFCKK...',
-  '.KCCCCCAACCCCK..',
-  '.KCCCCCAACCCcK..',
-  '.KccCCCCCCCccK..',
-  '.KFKcccccccKFK..',
-  '.KFFFKKKKKKFFfK.',
-  'KFFFFFFFFFFFffK.',
-  'KLFFFFFFFFFfffK.',
-  'KLLFFFFFFFffffK.',
+  '.KK..........KK.',
+  'KLFK........KFLK',
+  'KEWK..K.K.K.KWEK',
+  '.KFK.KMKMKMKKFK.',
+  '..KFKCCCCCCKFK..',
+  '.KCKFKCAACKFKcK.',
+  '.KCCKFKCCKFKccK.',
+  '.KCCCKFFFFKcccK.',
+  '.KCCKLFFFFfKccK.',
+  '.KCKLFFFFFFfKcK.',
+  '.KcKLFfFFfFfKcK.',
+  '.KcKFFFffFFfKcK.',
+  '.KKKFKxxYxKfKKK.',
+  '..KFFKxxxxKffK..',
+  '.KFFFFKKKKFfffK.',
+  'KLWFFFFFFFFFffK.',
+  'KLLFFFFFFFFfffK.',
   '.KKKKKKKKKKKKK..',
 ];
-SNAIL.downA = SNAIL.down.map((r, i) => (i >= 20 ? r.replace(/^(.)(.*)$/, (m, a, b) => '.' + a + b.slice(0, -1)) : i === 9 ? '.KEEK....KEEK...' : i === 8 ? '..KK......KK....' : r));
-SNAIL.downB = SNAIL.down.map((r, i) => (i >= 20 ? r.slice(1) + '.' : i === 9 ? 'KEEK........KEEK' : i === 8 ? '.KK..........KK.' : r));
+// walk: the eyestalks sway left / right while the foot glides
+const sway = (f, d) => f.map((r, i) => (i >= 6 && i <= 9 ? (d < 0 ? r.slice(1) + '.' : '.' + r.slice(0, 15)) : r));
+SNAIL.downA = sway(SNAIL.down, -1);
+SNAIL.downB = sway(SNAIL.down, 1);
 SNAIL.up = [
   '................',
   '................',
@@ -692,11 +694,20 @@ BAT.sideDown = [
   '................',
 ];
 const LANTERN = ['.k.', 'kXk', 'kXk', '.k.'];
+/** Wing membrane: fur outside the body column becomes the paler V / v ramp. */
+const membrane = (f, x0 = 5, x1 = 10) => f.map((r) => [...r].map((ch, x) => (x < x0 || x > x1) ? (ch === 'F' ? 'V' : ch === 'f' ? 'v' : ch) : ch).join(''));
+/** Soft ground shadow (z is a translucent ink) for anything airborne. */
+export function groundShadow(f, w = 6, cx = 8) {
+  const g = f.map((r) => [...r]);
+  const x0 = cx - (w >> 1);
+  under(g, ['.' + 'z'.repeat(w - 2) + '.', '..' + 'z'.repeat(Math.max(0, w - 4)) + '..'], x0, 22);
+  return rows(g);
+}
 export function buildBat() {
-  const lant = (f, x, y) => rows(stamp(f.map((r) => [...r]), LANTERN, x, y));
-  const down = [BAT.flyMid, BAT.flyUp, BAT.flyMid, BAT.flyDown].map((f) => lant(f, 12, 14));
-  const up = [BAT.flyMid, BAT.flyUp, BAT.flyMid, BAT.flyDown].map((f) => lant(back(f), 12, 14));
-  const left = [BAT.sideMid, BAT.sideUp, BAT.sideMid, BAT.sideDown].map((f) => lant(f, 2, 13));
+  const lant = (f, x, y) => groundShadow(rows(stamp(f.map((r) => [...r]), LANTERN, x, y)));
+  const down = [BAT.flyMid, BAT.flyUp, BAT.flyMid, BAT.flyDown].map((f) => lant(membrane(f), 12, 14));
+  const up = [BAT.flyMid, BAT.flyUp, BAT.flyMid, BAT.flyDown].map((f) => lant(membrane(back(f)), 12, 14));
+  const left = [BAT.sideMid, BAT.sideUp, BAT.sideMid, BAT.sideDown].map((f) => lant(membrane(f, 3, 9), 2, 13));
   const hang = lant(BAT.hang, 12, 15);
   const fish = withRod(hang, { rod: false, handX: 10, handY: 17 });
   return { w: 16, h: 24, down, up, left, right: left.map(flipH), sit: hang, fish, fishW: FISH_W, fishOx: FISH_OX, poses: { hang } };
@@ -786,11 +797,12 @@ MOTH.rest = [ // wings folded like a tent
   '................',
 ];
 export function buildMoth() {
-  const at = (p, y = 13) => frame([p, 0, y]);
-  const down = [at(MOTH.top), at(MOTH.topUp, 12), at(MOTH.top), at(MOTH.topDown, 14)];
+  // hovers about a tile off the ground with a soft shadow below
+  const at = (p, y = 9) => groundShadow(frame([p, 0, y]), 4, 7);
+  const down = [at(MOTH.top), at(MOTH.topUp, 8), at(MOTH.top), at(MOTH.topDown, 10)];
   const up = down.map((f) => f); // top view reads the same from behind
-  const left = [at(MOTH.side), at(MOTH.sideUp, 12), at(MOTH.side), at(MOTH.sideDown, 14)];
-  const sit = at(MOTH.rest, 15);
+  const left = [at(MOTH.side), at(MOTH.sideUp, 8), at(MOTH.side), at(MOTH.sideDown, 10)];
+  const sit = frame([MOTH.rest, 0, 15]);
   const fish = withRod(sit, { rod: false, handX: 6, handY: 19 });
   return { w: 16, h: 24, down, up, left, right: left.map(flipH), sit, fish, fishW: FISH_W, fishOx: FISH_OX };
 }

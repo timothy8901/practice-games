@@ -404,11 +404,17 @@ export function drawSealButton(ctx, text, x, y, o) {
   const h = 13;
   const role = opt.role || 'neutral';
   const ink = role === 'danger' ? PALETTE.r : COLORS.paper.ink;
+  // Focused: raised a pixel on a deeper shadow, light paper, ink frame. Resting: flat, shaded paper,
+  // a soft rule edge. (The focus model adds the cursor; the difference never rests on colour alone.)
+  const lift = opt.focused ? 1 : 0;
   ctx.fillStyle = COLORS.shadow;
   ctx.fillRect(x + 1, y + 1, w, h);
+  if (opt.focused) ctx.fillRect(x + 1, y + h, w, 1);
+  y -= lift;
   ctx.fillStyle = opt.focused ? COLORS.paper.light : COLORS.paper.shade;
   ctx.fillRect(x + 1, y + 1, w - 2, h - 2);
-  drawNotchedFrame(ctx, x, y, w, h, opt.focused ? COLORS.paper.ink : COLORS.paper.edge);
+  drawNotchedFrame(ctx, x, y, w, h, opt.focused ? COLORS.paper.ink : COLORS.paper.rule);
+  if (opt.focused) { ctx.fillStyle = COLORS.paper.shade; ctx.fillRect(x + 1, y + h - 2, w - 2, 1); }
   // The seal is stamped with the role's symbol (check = safe, cross = destructive), so the role
   // never rests on the seal's colour alone.
   const seal = role === 'safe' ? { fill: PALETTE.g, light: PALETTE.l, ink: PALETTE.t, emblem: 'check' }
@@ -416,7 +422,7 @@ export function drawSealButton(ctx, text, x, y, o) {
       : { fill: COLORS.brass.fill, light: COLORS.brass.light, ink: COLORS.brass.dark, emblem: 'plus' };
   drawSeal(ctx, x + 1, y + 1, seal);
   drawText(ctx, text, x + 15, y + 3, { color: ink });
-  return { x, y, w, h };
+  return { x, y: y + lift, w, h };
 }
 
 /** Ward shimmer timing (wildshift-visuals §13.3): 6 frames x 8 f = 800 ms, replayed every ~4 s. */

@@ -175,9 +175,11 @@ export function createToolRing(o) {
     if (s >= 0) focusIndex = s;
     const p = input.pointer;
     if (p && p.inside && (p.x !== lastPtr.x || p.y !== lastPtr.y)) {
+      // The first frame after opening only records the resting pointer; aiming needs real movement.
+      const primed = !Number.isNaN(lastPtr.x);
       lastPtr = { x: p.x, y: p.y };
       const dx = p.x - center.x, dy = p.y - center.y;
-      if (dx * dx + dy * dy >= 64) focusIndex = socketFromAngle(Math.atan2(dy, dx));
+      if (primed && dx * dx + dy * dy >= 64) focusIndex = socketFromAngle(Math.atan2(dy, dx));
     }
     if (input.pressed('cancel')) { close(); return; }
     if (input.released('tool') || input.pressed('confirm') || (p && p.inside && p.justDown)) {
@@ -209,19 +211,24 @@ export function createToolRing(o) {
       const p = socketPos(i, center.x, center.y, r);
       const t = tools[i];
       const focused = open && i === focusIndex;
-      const sx = p.x - 7, sy = p.y - 7 - (focused ? 1 : 0);
-      // socket: brass ring on tally wood
-      ctx.fillStyle = COLORS.shadow; ctx.fillRect(sx + 1, sy + 2, 14, 14);
-      ctx.fillStyle = COLORS.tally.dark; ctx.fillRect(sx + 1, sy, 12, 14); ctx.fillRect(sx, sy + 1, 14, 12);
-      ctx.fillStyle = t ? COLORS.tally.light : COLORS.paper.deep; ctx.fillRect(sx + 2, sy + 1, 10, 12); ctx.fillRect(sx + 1, sy + 2, 12, 10);
-      drawNotchedFrame(ctx, sx, sy, 14, 14, focused ? COLORS.brass.light : COLORS.brass.fill);
+      const S = 18;
+      const sx = p.x - 9, sy = p.y - 9 - (focused ? 1 : 0);
+      // socket: brass rim, recessed well (paper when filled, dark when empty)
+      ctx.fillStyle = COLORS.shadow; ctx.fillRect(sx + 1, sy + 2 + (focused ? 1 : 0), S, S);
+      ctx.fillStyle = focused ? COLORS.brass.light : COLORS.brass.fill;
+      ctx.fillRect(sx + 1, sy + 1, S - 2, S - 2);
+      drawNotchedFrame(ctx, sx, sy, S, S, COLORS.brass.dark);
+      ctx.fillStyle = COLORS.brass.dark;
+      ctx.fillRect(sx + 3, sy + 3, S - 6, 1); ctx.fillRect(sx + 3, sy + 3, 1, S - 6); // inner bevel (shadow side)
+      ctx.fillStyle = t ? COLORS.paper.light : COLORS.tally.dark;
+      ctx.fillRect(sx + 4, sy + 4, S - 7, S - 7);
       if (t) {
-        drawIcon(ctx, t.icon && hasIcon(t.icon) ? t.icon : 'strike', sx + 3, sy + 3, { ink: COLORS.paper.ink });
-        if (t.id === current) { ctx.fillStyle = COLORS.paper.light; ctx.fillRect(sx + 11, sy + 2, 1, 1); ctx.fillRect(sx + 10, sy + 1, 1, 1); }
+        drawIcon(ctx, t.icon && hasIcon(t.icon) ? t.icon : 'strike', sx + 5, sy + 5, { ink: COLORS.paper.ink });
+        if (t.id === current) { ctx.fillStyle = COLORS.wax.fill; ctx.fillRect(sx + S - 5, sy + 1, 3, 3); ctx.fillStyle = COLORS.wax.light; ctx.fillRect(sx + S - 5, sy + 1, 1, 1); }
       } else {
-        drawText(ctx, '–', sx + 5, sy + 3, { color: COLORS.paper.edge });
+        drawText(ctx, '–', sx + 7, sy + 5, { color: COLORS.tally.light });
       }
-      if (focused) drawDottedRect(ctx, sx - 2, sy - 2, 18, 18, COLORS.paper.light);
+      if (focused) drawDottedRect(ctx, sx - 2, sy - 2, S + 4, S + 4, COLORS.paper.light);
     }
     // name strip
     if (open) {
@@ -229,15 +236,15 @@ export function createToolRing(o) {
       const name = t ? t.name : STRINGS.empty;
       const tw = measureText(name).w;
       const w = tw + 12, h = 12;
-      const nx = center.x - Math.floor(w / 2), ny = center.y + r + 20;
+      const nx = center.x - Math.floor(w / 2), ny = center.y + r + 22;
       ctx.fillStyle = COLORS.shadow; ctx.fillRect(nx + 1, ny + 1, w, h);
       ctx.fillStyle = COLORS.paper.light; ctx.fillRect(nx + 1, ny + 1, w - 2, h - 2);
       drawNotchedFrame(ctx, nx, ny, w, h, COLORS.paper.edge);
       drawText(ctx, name, nx + 6, ny + 2, { color: t ? COLORS.paper.ink : COLORS.role.disabled });
       if (t && t.id === current) drawText(ctx, 'equipped', center.x, ny + h + 2, { font: 'small', align: 'center', color: COLORS.paper.light });
-      // centre: the current tool's icon
-      const cur = tools[indexOf(current)];
-      if (cur && current) drawIcon(ctx, cur.icon && hasIcon(cur.icon) ? cur.icon : 'strike', center.x - 4, center.y - 4, { ink: COLORS.paper.light, accent: PALETTE.y, light: COLORS.paper.light });
+      // centre: the focused tool, large, so the choice reads before release
+      if (t) drawIcon(ctx, t.icon && hasIcon(t.icon) ? t.icon : 'strike', center.x - 8, center.y - 8, { ink: COLORS.paper.light, accent: COLORS.brass.light, light: COLORS.paper.light, scale: 2 });
+      else drawText(ctx, STRINGS.empty, center.x, center.y - 3, { font: 'small', align: 'center', color: COLORS.paper.deep });
     }
     ctx.restore();
   }

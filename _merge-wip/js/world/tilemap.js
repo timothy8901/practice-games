@@ -365,21 +365,23 @@ export function loadMap(def, tiles, opts) {
     },
 
     layerTile(layer, x, y) {
-      if (x < 0 || y < 0 || x >= w || y >= h) return null;
+      if (x < 0 || y < 0 || x >= w || y >= h || (x | 0) !== x || (y | 0) !== y) return null;
       const arr = layers[layer];
       if (!arr) throw new RangeError(`layerTile: layer ${layer} is not 0..2`);
       return tileIds[arr[y * w + x]];
     },
 
     layerDef(layer, x, y) {
-      if (x < 0 || y < 0 || x >= w || y >= h) return null;
+      if (x < 0 || y < 0 || x >= w || y >= h || (x | 0) !== x || (y | 0) !== y) return null;
       const arr = layers[layer];
       if (!arr) throw new RangeError(`layerDef: layer ${layer} is not 0..2`);
       return tileDefs[arr[y * w + x]];
     },
 
     passable(x, y, tide, mover) {
-      if (x < 0 || y < 0 || x >= w || y >= h) return false;
+      // `(x | 0) !== x` rejects fractions and NaN without allocating (a fractional index would read
+      // `undefined` from the typed arrays and fall through as "open")
+      if (x < 0 || y < 0 || x >= w || y >= h || (x | 0) !== x || (y | 0) !== y) return false;
       const i = y * w + x;
       const c = collision[i];
       if (c === COLLISION.SOLID) return false;
@@ -435,18 +437,18 @@ export function loadMap(def, tiles, opts) {
     },
 
     triggersAt(x, y) {
-      if (x < 0 || y < 0 || x >= w || y >= h) return NO_TRIGGERS;
+      if (x < 0 || y < 0 || x >= w || y >= h || (x | 0) !== x || (y | 0) !== y) return NO_TRIGGERS;
       return triggerCells[y * w + x] || NO_TRIGGERS;
     },
 
     warpAt(x, y) {
-      if (x < 0 || y < 0 || x >= w || y >= h) return null;
+      if (x < 0 || y < 0 || x >= w || y >= h || (x | 0) !== x || (y | 0) !== y) return null;
       const k = warpCells[y * w + x];
       return k < 0 ? null : warps[k];
     },
 
     spawnAt(x, y) {
-      if (x < 0 || y < 0 || x >= w || y >= h) return null;
+      if (x < 0 || y < 0 || x >= w || y >= h || (x | 0) !== x || (y | 0) !== y) return null;
       const k = spawnCells[y * w + x];
       return k < 0 ? null : spawns[k];
     },

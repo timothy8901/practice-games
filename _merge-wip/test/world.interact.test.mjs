@@ -144,8 +144,9 @@ describe('resolveFacing', () => {
     assert.deepEqual(pick(resolveFacing(p, m, ents, world, data, { evalCond })), { verb: 'enter', kind: 'door', targetId: 'int-shrine', disabled: null });
     world.flags['sp.shrine'] = true;
     assert.deepEqual(pick(resolveFacing(p, m, ents, world, data, { evalCond })), { verb: 'use', kind: 'trigger', targetId: 'shrine', disabled: null });
+    assert.equal(resolveFacing(p, m, ents, world, data).targetId, 'shrine', 'no evaluator: the DSL reads the flags');
     world.flags = {};
-    assert.equal(resolveFacing(p, m, ents, world, data).targetId, 'shrine', 'no evaluator: conds hold');
+    assert.equal(resolveFacing(p, m, ents, world, data), null, 'no evaluator: DSL conds fail with the flags unset');
   });
 
   it('underWater reads string and numeric tide classes and collision overrides', () => {

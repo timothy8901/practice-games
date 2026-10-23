@@ -36,7 +36,7 @@ const KIND_ACCENT = Object.freeze({ safe: PALETTE.g, danger: PALETTE.r, warn: PA
 function easeOut(t) { return 1 - (1 - t) * (1 - t); }
 
 /**
- * @param {{width?: number, height?: number, ms?: number, max?: number, maxWidth?: number}} [opts]
+ * @param {{width?: number, height?: number, ms?: number, max?: number, maxWidth?: number, top?: number, display?: {width?: number}}} [opts]
  * @returns {Toasts}
  */
 export function createToasts(opts = {}) {
@@ -45,6 +45,8 @@ export function createToasts(opts = {}) {
   const defaultMs = opts.ms || TIMING.toastMs;
   const max = opts.max || 3;
   const maxTextW = opts.maxWidth || 176;
+  // First slip sits under the HUD's top-right column (wallet + pending-Shift badge end at y=32).
+  let top = opts.top === undefined ? 36 : opts.top;
   /** @type {Toast[]} live (visible) */
   const live = [];
   /** @type {Toast[]} waiting */
@@ -81,7 +83,7 @@ export function createToasts(opts = {}) {
   /** @param {CanvasRenderingContext2D} ctx */
   function draw(ctx) {
     if (!live.length) return;
-    let y = SPACE.sm + 2;
+    let y = top;
     for (const t of live) {
       const slide = easeOut(Math.min(1, t.age / TIMING.toastSlideMs));
       const fadeIn = Math.min(1, t.age / 120);
@@ -114,6 +116,9 @@ export function createToasts(opts = {}) {
     draw,
     get count() { return live.length + queue.length; },
     get visible() { return live.length; },
+    get top() { return top; },
+    /** Move the stack (e.g. 4 on screens without a HUD). @param {number} y */
+    setTop(y) { top = Math.max(0, y | 0); },
     texts: () => [...live, ...queue].map((t) => t.text),
     clear() { live.length = 0; queue.length = 0; },
     dismiss(id) {
@@ -135,6 +140,8 @@ export function createToasts(opts = {}) {
  * @property {(ctx: CanvasRenderingContext2D) => void} draw
  * @property {number} count
  * @property {number} visible
+ * @property {number} top
+ * @property {(y: number) => void} setTop
  * @property {() => string[]} texts
  * @property {() => void} clear
  * @property {(id: number) => boolean} dismiss

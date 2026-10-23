@@ -63,6 +63,15 @@ export const OWNERS = Object.freeze({
   log: ['systems/dayPage.js'],
 });
 
+/**
+ * Known cross-lane writes, each one an open issue for the named lane (not a permission). Matching
+ * writes are reported as "excepted" in the summary instead of failing; delete the entry with the fix.
+ * @type {ReadonlyArray<Readonly<{file: string, key: string, lane: string, reason: string}>>}
+ */
+export const EXCEPTIONS = Object.freeze([
+  Object.freeze({ file: 'debug/hook.js', key: 'wallet', lane: 'BOOT', reason: 'day-1 fallbackEarn until systems/wallet.earn lands; switch __game.earn to it' }),
+]);
+
 /** STATE modules that construct, fill or migrate whole worlds; they may write any key. */
 export const WORLD_BUILDERS = Object.freeze(['state/schema.js', 'state/migrate.js', 'state/persist.js', 'state/store.js']);
 /** Files (relative to `js/`) where `Math.random` is allowed besides `debug/`. */
@@ -190,9 +199,12 @@ function lineOf(src, offset) {
  * Lints one source file.
  * @param {string} rel     path relative to `js/` (forward slashes), e.g. `'systems/bag.js'`
  * @param {string} source  file contents
+ * @param {{exceptions?: ReadonlyArray<{file: string, key: string}>, excepted?: Array<{file: string, line: number, key: string}>}} [opts]
+ *   `exceptions` defaults to {@link EXCEPTIONS}; matching writes are pushed to `excepted` instead of the result
  * @returns {Array<{file: string, line: number, rule: 'owner'|'random'|'dom', message: string}>}
  */
-export function lintSource(rel, source) {
+export function lintSource(rel, source, opts = {}) {
+  const exceptions = opts.exceptions ?? EXCEPTIONS;
   const file = `js/${rel}`;
   const cls = classify(rel);
   const code = stripNonCode(source);
@@ -201,6 +213,10 @@ export function lintSource(rel, source) {
   const lines = source.split('\n');
   const ownerHit = (key, index) => {
     if (mayWrite(cls, key)) return;
+    if (exceptions.some((e) => e.file === cls && e.key === key)) {
+      opts.excepted?.push({ file, line: lineOf(code, index), key });
+      return;
+    }
     const owners = OWNERS[key];
     out.push({
       file, line: lineOf(code, index), rule: 'owner',
@@ -226,7 +242,7 @@ export function lintSource(rel, source) {
       out.push({ file, line: lineOf(code, m.index), rule: 'dom', message: `'${m[1]}' in a pure directory (rule 2): pass the dependency in from the shell` });
     }
   }
-  return out;
+  return out.sort((a, b) => a.line - b.line);
 }
 
 /**
@@ -246,14 +262,15 @@ function listJs(dir) {
 /**
  * Lints every module under `<root>/js`.
  * @param {string} [root]
+ * @param {Array<{file: string, line: number, key: string}>} [excepted] collects writes allowed by {@link EXCEPTIONS}
  * @returns {Array<{file: string, line: number, rule: string, message: string}>}
  */
-export function lintTree(root = ROOT) {
+export function lintTree(root = ROOT, excepted = []) {
   const js = join(root, 'js');
   const out = [];
   for (const abs of listJs(js)) {
     const rel = relative(js, abs).split(sep).join('/');
-    out.push(...lintSource(rel, readFileSync(abs, 'utf8')));
+    out.push(...lintSource(rel, readFileSync(abs, 'utf8'), { excepted }));
   }
   return out;
 }
@@ -265,9 +282,16 @@ export function lintTree(root = ROOT) {
  */
 export function main(argv = process.argv.slice(2)) {
   const quiet = argv.includes('--quiet');
-  const problems = lintTree();
+  const excepted = [];
+  const problems = lintTree(ROOT, excepted);
   for (const p of problems) console.error(`${p.file}:${p.line}: [${p.rule}] ${p.message}`);
-  if (!quiet || problems.length) console.log(`lint-owners: ${problems.length} problem${problems.length === 1 ? '' : 's'}`);
+  if (!quiet) {
+    for (const e of excepted) {
+      const ex = EXCEPTIONS.find((x) => `js/${x.file}` === e.file && x.key === e.key);
+      console.warn(`${e.file}:${e.line}: [excepted] writes world.${e.key} — open issue for ${ex?.lane}: ${ex?.reason}`);
+    }
+  }
+  if (!quiet || problems.length) console.log(`lint-owners: ${problems.length} problem${problems.length === 1 ? '' : 's'}, ${excepted.length} excepted`);
   return problems.length ? 1 : 0;
 }
 

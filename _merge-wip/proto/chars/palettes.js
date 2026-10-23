@@ -26,13 +26,13 @@ export const PALETTES = {
   },
   otter: {
     ...JUMPER, ...EYES,
-    K: '#2e1f17', F: '#6b4a32', f: '#4a3222', L: '#8a6646', M: '#d9c7a3', m: '#b89f78', N: '#2e1f17', P: '#f2a7b5',
-    S: '#4a3222', s: '#2e1f17', B: '#7a5a36', b: '#5c4028', T: '#6b4a32', t: '#4a3222',
+    K: '#241a1c', F: '#5a4030', f: '#3e2c2c', L: '#7a5c44', M: '#e6dcc4', m: '#b8aa94', N: '#241a1c', P: '#f2a7b5',
+    S: '#3e2c2c', s: '#241a1c', B: '#7a5a36', b: '#5c4028', T: '#5a4030', t: '#3e2c2c',
   },
   vole: {
     ...JUMPER, ...EYES,
-    K: '#2a1c12', F: '#7a5a3a', f: '#5a3f28', L: '#9a7a52', M: '#c9b48a', m: '#a8927c', N: '#2a1c12', P: '#f2a7b5',
-    S: '#5a3f28', s: '#2a1c12', B: '#5c4028', b: '#3e2618', T: '#7a5a3a', t: '#5a3f28',
+    K: '#3a2018', F: '#a8683a', f: '#7a4630', L: '#cc8e54', M: '#e3c08e', m: '#b8906c', N: '#3a2018', P: '#f2a7b5',
+    S: '#7a4630', s: '#3a2018', B: '#5c4028', b: '#3e2618', T: '#a8683a', t: '#7a4630',
   },
   opossum: {
     ...JUMPER, ...EYES,
@@ -72,16 +72,16 @@ export const PALETTES = {
 
   // --- Wildshift cast (master keys) ----------------------------------------------
   linnet: {
-    K: SW.k, k: SW.k, F: SW.u, f: '#5e3b24', L: SW.a, M: SW.w, m: SW.c, E: SW.k, W: SW.w, N: SW.k, P: SW.o,
-    H: SW.u, Y: SW.y, C: SW.o, c: SW.r, D: SW.v, d: SW.e, S: SW.u, s: '#5e3b24', B: SW.d, b: SW.k, A: SW.y, a: SW.u, G: SW.i,
+    K: SW.k, k: SW.k, F: SW.u, f: SW.d, L: SW.h, M: SW.w, m: SW.c, E: SW.k, W: SW.w, N: SW.k, P: SW.o,
+    H: SW.h, Y: SW.y, C: SW.o, c: SW.r, D: SW.v, d: SW.e, S: SW.u, s: SW.d, B: SW.d, b: SW.k, A: SW.y, a: SW.u, G: SW.i,
   },
   corin: {
     K: SW.k, k: SW.k, F: SW.a, f: SW.u, L: SW.y, M: SW.w, m: SW.v, E: SW.k, W: SW.w, N: SW.y, P: SW.o,
     C: SW.n, c: SW.d, D: SW.v, d: SW.e, Y: SW.y, A: SW.y, a: SW.u, G: SW.i, S: SW.e, s: SW.d, B: SW.a, b: SW.u,
   },
   idris: {
-    K: SW.k, k: SW.k, F: SW.e, f: SW.d, L: SW.v, M: SW.v, m: SW.e, E: SW.k, W: SW.w, N: SW.k, P: SW.o,
-    C: SW.n, c: SW.d, D: SW.v, d: SW.e, Y: SW.y, A: SW.y, a: SW.u, G: SW.i, S: SW.d, s: SW.k, B: SW.d, b: SW.k,
+    K: SW.k, k: SW.k, F: SW.e, f: SW.d, L: SW.v, M: SW.w, m: SW.v, E: SW.k, W: SW.w, N: SW.k, P: SW.d,
+    C: SW.n, c: SW.d, D: SW.w, d: SW.v, Y: SW.y, A: SW.y, a: SW.u, G: SW.i, S: SW.d, s: SW.k, B: SW.d, b: SW.k,
   },
   agathe: {
     K: SW.k, k: SW.k, F: SW.v, f: SW.e, L: SW.w, M: SW.w, m: SW.v, E: SW.k, W: SW.w, N: SW.k, P: SW.o,
@@ -93,7 +93,7 @@ export const PALETTES = {
   },
   routeTrainer: {
     K: SW.k, k: SW.k, F: SW.a, f: SW.u, L: SW.c, M: SW.w, m: SW.v, E: SW.k, W: SW.w, N: SW.k, P: SW.o,
-    C: SW.w, c: SW.v, D: SW.g, d: SW.t, Y: SW.y, A: SW.y, a: SW.u, G: SW.i, S: SW.u, s: '#5e3b24', B: SW.d, b: SW.k,
+    C: SW.w, c: SW.v, D: SW.g, d: SW.t, Y: SW.y, A: SW.y, a: SW.u, G: SW.i, S: SW.u, s: SW.d, B: SW.d, b: SW.k,
   },
 
   // --- non-rig bodies -------------------------------------------------------------
@@ -119,10 +119,10 @@ export const PALETTES = {
   },
   ludo: {
     K: '#2a1c22', F: '#6a4a52', f: '#4a3038', L: '#8a6a72', M: '#c9a090', m: '#a8807a', E: INK, W: PAPER,
-    N: '#3a1f1c', P: '#e3a0a8', S: '#3a2830', k: '#2a1c22', X: '#f9c46b', C: '#3b4a6b', c: '#2b3a67', Y: '#a8323a',
+    N: '#3a1f1c', P: '#e3a0a8', S: '#3a2830', k: '#2a1c22', V: '#a0727a', v: '#7e5260', z: '#141b3366', X: '#f9c46b', C: '#3b4a6b', c: '#2b3a67', Y: '#a8323a',
   },
   dimity: {
-    K: '#7a3b4e', k: '#7a3b4e', F: '#f2a7b5', f: '#d98a9c', L: '#f9d1d9', Y: '#ffe29a', y: '#f3c178', E: '#141b33', W: PAPER, M: '#fff3d6', m: '#f3c178', P: '#e07a9a',
+    z: '#141b3366', K: '#7a3b4e', k: '#7a3b4e', F: '#f2a7b5', f: '#d98a9c', L: '#f9d1d9', Y: '#ffe29a', y: '#f3c178', E: '#141b33', W: PAPER, M: '#fff3d6', m: '#f3c178', P: '#e07a9a',
   },
 };
 

@@ -214,9 +214,8 @@ export function nearestDry(map, x, y, tide, opts) {
   const v = tideVariant(tide);
   const maxDist = opts && Number.isFinite(opts.maxDist) ? opts.maxDist : Infinity;
   const { w, h } = map;
-  const n = w * h;
-  const dist = new Int32Array(n).fill(-1);
-  const queue = new Int32Array(n);
+  const { dist, queue } = scratchFor(map);
+  dist.fill(-1);
   let head = 0;
   let tail = 0;
   queue[tail++] = start;
@@ -240,6 +239,24 @@ export function nearestDry(map, x, y, tide, opts) {
     }
   }
   return null;
+}
+
+/** @type {WeakMap<object, {dist: Int32Array, queue: Int32Array}>} per-map BFS buffers, reused across calls */
+const SCRATCH = new WeakMap();
+
+/**
+ * BFS buffers sized for `map`, allocated once per map and reused (the search is synchronous).
+ * @param {RuntimeMap} map
+ * @returns {{dist: Int32Array, queue: Int32Array}}
+ */
+function scratchFor(map) {
+  const n = map.w * map.h;
+  let s = SCRATCH.get(map);
+  if (!s || s.dist.length !== n) {
+    s = { dist: new Int32Array(n), queue: new Int32Array(n) };
+    SCRATCH.set(map, s);
+  }
+  return s;
 }
 
 /**

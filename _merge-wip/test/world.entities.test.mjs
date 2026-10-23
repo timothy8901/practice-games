@@ -266,15 +266,19 @@ describe('rebuildFromDefs', () => {
     ents.add(createEntity({ id: 'roamer:test-grass:0', kind: 'roamer', x: 8, y: 2, def: { kind: 'roamer', id: 'roamer:test-grass:0', dynamic: true } }));
     ents.add(createEntity({ id: 'cutscene-gull', kind: 'prop', x: 7, y: 5, def: { kind: 'prop', id: 'cutscene-gull' } }));
     const world = createWorldStub();
-    ents.rebuildFromDefs(world, data, 'low');
+    ents.rebuildFromDefs(world, data, 'low', { evalCond: () => true });
     const r = ents.rebuildFromDefs(world, data, 'low', { evalCond: () => false });
     assert.deepEqual(r.removed, ['ghost']);
     for (const id of ['player', 'roamer:test-grass:0', 'cutscene-gull']) assert.ok(ents.find(id), `${id} kept`);
   });
 
-  it('defaults: every cond holds when no evaluator is given', () => {
+  it('defaults: conds go through the condition DSL (script/cond) when no evaluator is given', () => {
     const ents = createEntities(map);
-    const r = ents.rebuildFromDefs(createWorldStub(), data, 'low');
-    assert.ok(r.added.includes('ghost'));
+    const world = createWorldStub();
+    let r = ents.rebuildFromDefs(world, data, 'low');
+    assert.ok(!r.added.includes('ghost'), 'sp.ghost unset: the ghost stays away');
+    world.flags['sp.ghost'] = true;
+    r = ents.rebuildFromDefs(world, data, 'low');
+    assert.deepEqual(r.added, ['ghost']);
   });
 });
