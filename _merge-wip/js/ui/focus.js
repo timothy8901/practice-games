@@ -300,9 +300,10 @@ export function createFocus(a, b) {
     if (!isEnabled(items[i])) return showReason(items[i], i);
     if (kind === 'touch') {
       if (i === index && armed === i) return activate(i);
-      moveTo(i, true);
+      const ev = moveTo(i, true);
       armed = i;
-      return emit('move', { from: index });
+      // Already focused but not armed: arming is silent (no onChange), the next tap activates.
+      return ev || /** @type {FocusEvent} */ ({ type: 'hover', item: items[i], index: i, device });
     }
     return activate(i);
   }

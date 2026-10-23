@@ -6,28 +6,33 @@
  * `map:enter` autosave follows. A refusal carries a `reason` the HUD / toast can key copy on
  * (`'tide'` "the causeway is under water", `'locked'` "it's locked", `'cond'` anything else).
  *
- * Warp conditions use the shared condition DSL (§6.4). The real evaluator lives in
- * `script/cond.js` (SCRIPT lane) and is injected through `opts.evalCond`; without it a small
- * built-in subset (`true/false`, `flag`, `not/all/any`, `tide`, `lowTide`, `hour`, `badge`,
- * `seen`, `map`) is evaluated here, and any other key throws a readable error rather than
- * silently opening or sealing a door.
+ * Warp conditions use the shared condition DSL (§6.4, `script/cond.evalCond`). The only leaves
+ * evaluated here are `tide` and `lowTide`, so they read the tide the caller passes (the tide the
+ * player is actually standing in) instead of re-deriving it from the clock; every other key goes
+ * to the DSL. A caller may replace the whole evaluator with `opts.evalCond`.
+ *
+ * With `opts.destMap` (the destination's RuntimeMap) the landing tile is checked too: a warp
+ * whose arrival tile is under the sea at this tide refuses with `'tide'`, so a door onto the flats
+ * never drops the player into water.
  *
  * Lane: WORLD-MAP.
  * @module world/warps
  */
 
-import { tideState as tideStateOf, minuteOfDay, hasBadge, hasSeen } from '../state/selectors.js';
-import { tideVariant } from './tide.js';
+import { tideState as tideStateOf } from '../state/selectors.js';
+import { evalCond as dslEvalCond } from '../script/cond.js';
+import { tideVariant, flooded } from './tide.js';
 
 /** @typedef {import('../state/schema.js').World} World */
 /** @typedef {import('../core/time.js').TideState} TideState */
 /** @typedef {import('./tilemap.js').WarpDef} WarpDef */
+/** @typedef {import('./tilemap.js').RuntimeMap} RuntimeMap */
 
 /** Warp kinds and what fires them (§4.8: doors on confirm or step, edges on step). */
 export const WARP_FIRE = Object.freeze({ door: 'both', edge: 'step', stairs: 'step' });
 
 /** Reasons a warp can refuse. */
-export const WARP_REASONS = Object.freeze(['tide', 'locked', 'cond', 'unknown-map']);
+export const WARP_REASONS = Object.freeze(['tide', 'locked', 'cond', 'unknown-map', 'blocked']);
 
 /** Default copy per reason, keyed for `data/strings.js` (`warp.<reason>`); UI may override. */
 export const WARP_MESSAGES = Object.freeze({
@@ -35,13 +40,12 @@ export const WARP_MESSAGES = Object.freeze({
   locked: "It's locked.",
   cond: 'Not now.',
   'unknown-map': 'The way leads nowhere yet.',
+  blocked: 'Something is in the way.',
 });
 
 /** Arrival facing when the destination names none, by warp kind. */
 const DEFAULT_ARRIVAL_FACING = Object.freeze({ door: 'down', stairs: 'down' });
 
-/** Cond keys the built-in evaluator understands; everything else needs `opts.evalCond`. */
-const BUILTIN_COND_KEYS = Object.freeze(['flag', 'not', 'all', 'any', 'tide', 'lowTide', 'hour', 'badge', 'seen', 'map']);
 
 /**
  * @typedef {Object} WarpOk
@@ -57,16 +61,19 @@ const BUILTIN_COND_KEYS = Object.freeze(['flag', 'not', 'all', 'any', 'tide', 'l
 /**
  * @typedef {Object} WarpRefused
  * @property {false} ok
- * @property {'tide'|'locked'|'cond'|'unknown-map'} reason
+ * @property {'tide'|'locked'|'cond'|'unknown-map'|'blocked'} reason
  * @property {string} message      default copy (UI should prefer `strings.t(messageKey)`)
  * @property {string} messageKey   `warp.<reason>`
  */
 
 /**
  * @typedef {Object} WarpOptions
- * @property {(world: World, cond: any, ctx: {data: any, mapId?: string, x?: number, y?: number}) => boolean} [evalCond]   `script/cond.evalCond`
+ * @property {(world: World, cond: any, ctx: {data: any, mapId?: string, x?: number, y?: number, tide: TideState|number}) => boolean} [evalCond]
+ *   replaces {@link evalWarpCond} entirely (it then owns the tide leaves too)
  * @property {string} [mapId]   map the warp sits on (cond context)
  * @property {string} [facing]  the player's current facing, kept on edge warps when `to.facing` is absent
+ * @property {RuntimeMap|null} [destMap]   destination map: refuse `'tide'` if the landing tile is
+ *   flooded at this tide, `'blocked'` if it is outside the map or a wall
  */
 
 /**
@@ -85,7 +92,7 @@ export function resolveWarp(world, warp, data, tideState, opts) {
   const ctx = { data: data || null, mapId: o.mapId ?? world?.player?.mapId, x: warp.x, y: warp.y, tide };
 
   if (warp.cond !== undefined && warp.cond !== null) {
-    const pass = o.evalCond ? Boolean(o.evalCond(world, warp.cond, ctx)) : evalBuiltinCond(world, warp.cond, ctx);
+    const pass = o.evalCond ? Boolean(o.evalCond(world, warp.cond, ctx)) : evalWarpCond(world, warp.cond, ctx);
     if (!pass) {
       const reason = classifyRefusal(world, warp.cond, ctx, o.evalCond);
       return refuse(reason);
@@ -100,6 +107,15 @@ export function resolveWarp(world, warp, data, tideState, opts) {
       known = true; // a registry that throws on an unknown table does not know maps yet
     }
     if (!known) return refuse('unknown-map');
+  }
+
+  const dest = o.destMap;
+  if (dest) {
+    if (dest.id !== warp.to.mapId) throw new Error(`resolveWarp: destMap is '${dest.id}', warp goes to '${warp.to.mapId}'`);
+    const { x, y } = warp.to;
+    if (!dest.inBounds(x, y)) return refuse('blocked');
+    if (flooded(dest, x, y, tide)) return refuse('tide');
+    if (!dest.passable(x, y, tide, 'walk')) return refuse('blocked');
   }
 
   const facing = arrivalFacing(warp, o.facing ?? world?.player?.facing);
@@ -153,43 +169,55 @@ export function firesOnConfirm(warp) {
 }
 
 /**
- * Built-in evaluator for the warp-relevant subset of the condition DSL (§6.4).
+ * Evaluates a warp condition: the condition DSL (`script/cond.evalCond`) with the `tide` and
+ * `lowTide` leaves read from `ctx.tide` instead of the world clock, at any depth under
+ * `not` / `all` / `any`.
+ *
+ * `tide: TideState[]` matches the exact state when `ctx.tide` is a state; a bare height (or the
+ * variant `'mid'`) cannot tell rising from falling, so mid water matches either.
  * @param {World} world
  * @param {any} cond
- * @param {{tide: TideState|number, mapId?: string}} ctx
+ * @param {{tide: TideState|number|'mid', data?: any, mapId?: string, x?: number, y?: number}} ctx
  * @returns {boolean}
- * @throws {Error} on a key outside the subset (pass `opts.evalCond` from script/cond.js)
+ * @throws {TypeError} on a malformed condition (same contract as the DSL)
  */
-export function evalBuiltinCond(world, cond, ctx) {
+export function evalWarpCond(world, cond, ctx) {
   if (cond === true || cond === undefined || cond === null) return true;
   if (cond === false) return false;
-  if (typeof cond !== 'object') throw new TypeError(`warps: cond must be a boolean or an object, got ${JSON.stringify(cond)}`);
-  if ('not' in cond) return !evalBuiltinCond(world, cond.not, ctx);
-  if ('all' in cond) return cond.all.every((c) => evalBuiltinCond(world, c, ctx));
-  if ('any' in cond) return cond.any.some((c) => evalBuiltinCond(world, c, ctx));
-  if ('flag' in cond) {
-    const v = world?.flags?.[cond.flag];
-    if ('is' in cond) return v === cond.is;
-    return Boolean(v);
+  if (typeof cond !== 'object' || Array.isArray(cond)) throw new TypeError(`warps: cond must be a boolean or an object, got ${JSON.stringify(cond)}`);
+  if ('not' in cond || 'all' in cond || 'any' in cond || 'tide' in cond || 'lowTide' in cond) {
+    const keys = Object.keys(cond);
+    if (keys.length !== 1) throw new TypeError(`warps: malformed cond ${JSON.stringify(cond)} (one DSL key per object)`);
+    const v = cond[keys[0]];
+    switch (keys[0]) {
+      case 'not':
+        return !evalWarpCond(world, v, ctx);
+      case 'all':
+        if (!Array.isArray(v)) throw new TypeError('warps: cond.all must be an array');
+        return v.every((c) => evalWarpCond(world, c, ctx));
+      case 'any':
+        if (!Array.isArray(v)) throw new TypeError('warps: cond.any must be an array');
+        return v.some((c) => evalWarpCond(world, c, ctx));
+      case 'tide':
+        return tideMatches(Array.isArray(v) ? v : [v], ctx.tide);
+      default:
+        return (tideVariant(ctx.tide) === 'low') === Boolean(v);
+    }
   }
-  if ('tide' in cond) {
-    const list = Array.isArray(cond.tide) ? cond.tide : [cond.tide];
-    const v = tideVariant(ctx.tide);
-    if (typeof ctx.tide === 'string' && list.includes(ctx.tide)) return true;
-    // a bare height cannot tell rising from falling: 'mid' matches either
-    return list.includes(v) || (v === 'mid' && typeof ctx.tide === 'number' && (list.includes('rising') || list.includes('falling')));
-  }
-  if ('lowTide' in cond) return (tideVariant(ctx.tide) === 'low') === Boolean(cond.lowTide);
-  if ('hour' in cond) {
-    const [a, b] = cond.hour;
-    const hr = minuteOfDay(world) / 60;
-    return a <= b ? hr >= a && hr < b : hr >= a || hr < b; // wraps past midnight
-  }
-  if ('badge' in cond) return typeof cond.badge === 'number' ? (world?.badges?.length ?? 0) >= cond.badge : hasBadge(world, cond.badge);
-  if ('seen' in cond) return hasSeen(world, cond.seen);
-  if ('map' in cond) return (ctx.mapId ?? world?.player?.mapId) === cond.map;
-  const key = Object.keys(cond)[0];
-  throw new Error(`warps: cond key '${key}' is outside the built-in subset (${BUILTIN_COND_KEYS.join(', ')}); pass opts.evalCond from script/cond.js`);
+  return dslEvalCond(world, cond, ctx);
+}
+
+/**
+ * @param {readonly string[]} list   tide states / variants named by the cond
+ * @param {TideState|number|'mid'} tide
+ * @returns {boolean}
+ */
+function tideMatches(list, tide) {
+  if (typeof tide === 'string' && list.includes(tide)) return true;
+  const v = tideVariant(tide);
+  if (list.includes(v)) return true;
+  const ambiguous = typeof tide === 'number' || tide === 'mid';
+  return v === 'mid' && ambiguous && (list.includes('rising') || list.includes('falling'));
 }
 
 /**
@@ -205,7 +233,7 @@ export function evalBuiltinCond(world, cond, ctx) {
 function classifyRefusal(world, cond, ctx, evalCond) {
   const run = (c) => {
     try {
-      return evalCond ? Boolean(evalCond(world, c, ctx)) : evalBuiltinCond(world, c, ctx);
+      return evalCond ? Boolean(evalCond(world, c, ctx)) : evalWarpCond(world, c, ctx);
     } catch {
       return false;
     }
@@ -254,7 +282,7 @@ function isFacing(f) {
 }
 
 /**
- * @param {'tide'|'locked'|'cond'|'unknown-map'} reason
+ * @param {'tide'|'locked'|'cond'|'unknown-map'|'blocked'} reason
  * @returns {WarpRefused}
  */
 function refuse(reason) {

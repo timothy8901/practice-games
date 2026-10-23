@@ -236,8 +236,9 @@ test('setItems keeps the focused id and re-settles off disabled items', () => {
   assert.equal(f.current().id, 'i3');
   assert.equal(f.index, 1);
   f.setItems(mk(5, [1]));
-  assert.equal(f.index, 2, 'id i3 is at 3 now? no: i1 disabled, focus re-finds i3');
-  // (keepId wins: i3 lives at index 3 in a fresh list)
+  assert.equal(f.index, 3, 'keepId wins: i3 lives at index 3 in the fresh list');
+  f.setItems(mk(5, [3]));
+  assert.equal(f.index, 4, 'the kept item became disabled: settle on the next enabled one');
 });
 
 test('set() skips to the next enabled item unless forced', () => {
