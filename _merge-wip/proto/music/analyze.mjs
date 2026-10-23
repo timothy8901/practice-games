@@ -18,7 +18,7 @@ const keyPc = (k) => { const m = /^([A-G])(#|b)?$/.exec(k); return (PC[m[1]] + (
 const DRUMS = new Set(['kick', 'snare', 'hat']);
 // Playable range per preset, from the synth design in js/core/audio.js (glass is high-passed at 300 Hz, marimba partials
 // vanish above ~C7, bass filter clamps at 600 Hz, pad sub-osc sits an octave below).
-const RANGE = { pluck: [40, 96], pad: [36, 86], bass: [26, 62], bell: [48, 108], flute: [55, 98], marimba: [48, 96], glass: [60, 108] };
+const RANGE = { pluck: [40, 96], pad: [36, 86], bass: [26, 62], bell: [48, 108], flute: [55, 98], marimba: [48, 96], glass: [60, 108], rhodes: [40, 96], brass: [40, 84] };
 const LOW_INTERVAL_LIMIT = 48; // C3: seconds and thirds voiced below this turn to mud on small speakers
 const STRONG = (spb) => spb === 12 ? [0, 4, 8] : [0, spb / 2];
 const SECONDARY = (spb) => spb === 12 ? [] : [spb / 4, (3 * spb) / 4];
@@ -53,7 +53,7 @@ function analyze(id, t) {
     let cursor = 0; const holes = [], laps = [];
     for (const ch of chords) { if (ch.t > cursor) holes.push(`${cursor}..${ch.t}`); else if (ch.t < cursor) laps.push(`${ch.t}`); cursor = Math.max(cursor, ch.end); }
     if (cursor < total) holes.push(`${cursor}..${total}`);
-    if (holes.length) warn(`${harmName}: harmony has gaps at steps ${holes.join(' ')}`);
+    if (holes.length) (t.loop === false ? info : warn)(`${harmName}: harmony has gaps at steps ${holes.join(' ')}`);
     if (laps.length) warn(`${harmName}: overlapping chords at steps ${laps.join(' ')}`);
   }
 
@@ -128,7 +128,7 @@ function analyze(id, t) {
   const mel = Object.entries(t.layers).filter(([, L]) => L.role === 'melody' || L.role === 'counter');
   const others = Object.entries(t.layers).filter(([n, L]) => L !== harmL && L.role !== 'melody' && L.role !== 'counter' && !DRUMS.has(L.inst) && L.inst !== 'kit' && L.role !== 'tense');
   for (const [lname, L] of mel) {
-    const clashes = [], nct = [], voiceClash = [];
+    const clashes = [], nct = [], voiceClash = [], rubs = [];
     for (const e of L.pattern) {
       const inBar = e.t % spb;
       const strong = STRONG(spb).includes(inBar), secondary = SECONDARY(spb).includes(inBar);
@@ -143,12 +143,19 @@ function analyze(id, t) {
           else if (strong && e.d >= 4) nct.push(tag);
         }
         if (!strong || e.d < 2) continue;
-        // against every other pitched layer sounding at this onset (pads, counter-lines, bells, stems)
+        const where = `${name(n)}@bar${Math.floor(e.t / spb) + 1}.${inBar}`;
+        // a melody note a minor 2nd / minor 9th from a sounding pad voice is a real rub even when both are chord tones (G over Gmaj7's F#4)
+        if (ch && e.t < ch.end) for (const cn of ch.notes) { const iv = Math.abs(n - cn); if (iv === 1 || iv === 13) rubs.push(`${where} vs ${harmName} ${name(cn)}`); }
+        // against every other pitched layer sounding at this onset (counter-lines, bells, stems): m2/m9 = rub, same pitch class in another octave = note
         for (const [oname, O] of others) {
           if (O.role === 'melody' && oname === lname) continue;
           for (const oe of O.pattern) {
             if (!(oe.t <= e.t && e.t < oe.t + oe.d)) continue;
-            for (const on of notesOf(oe)) if (pcDist(on, pc) === 1) voiceClash.push(`${name(n)}@bar${Math.floor(e.t / spb) + 1}.${inBar} vs ${oname}${O.default === false ? '(stem)' : ''} ${name(on)}`);
+            for (const on of notesOf(oe)) {
+              if (pcDist(on, pc) !== 1) continue;
+              const iv = Math.abs(n - on);
+              (iv === 1 || iv === 13 ? rubs : voiceClash).push(`${where} vs ${oname}${O.default === false ? '(stem)' : ''} ${name(on)}`);
+            }
           }
         }
       }
@@ -159,14 +166,16 @@ function analyze(id, t) {
         if (!STRONG(spb).includes(e.t % spb)) continue;
         for (const me of t.layers.melody.pattern) {
           if (!(me.t <= e.t && e.t < me.t + me.d)) continue;
-          for (const mn of notesOf(me)) for (const n of notesOf(e)) if (pcDist(mn, n) === 1) voiceClash.push(`${name(n)}@bar${Math.floor(e.t / spb) + 1}.${e.t % spb} vs melody ${name(mn)}`);
+          for (const mn of notesOf(me)) for (const n of notesOf(e)) if (pcDist(mn, n) === 1) (Math.abs(mn - n) === 1 || Math.abs(mn - n) === 13 ? rubs : voiceClash).push(`${name(n)}@bar${Math.floor(e.t / spb) + 1}.${e.t % spb} vs melody ${name(mn)}`);
         }
       }
     }
     R.layers[lname].clashes = clashes;
+    R.layers[lname].rubs = rubs;
     R.layers[lname].voiceClashes = voiceClash;
     if (clashes.length) warn(`${lname}: ${clashes.length} minor-2nd/maj-7th on a strong beat vs the harmony: ${clashes.join('; ')}`);
-    if (voiceClash.length) warn(`${lname}: ${voiceClash.length} semitone(s) on a strong beat vs another layer: ${[...new Set(voiceClash)].slice(0, 6).join('; ')}`);
+    if (rubs.length) warn(`${lname}: ${rubs.length} minor-2nd/minor-9th rub(s) on a strong beat: ${[...new Set(rubs)].slice(0, 6).join('; ')}`);
+    if (voiceClash.length) info(`${lname}: ${voiceClash.length} strong-beat note(s) a semitone-class from another layer in a different octave: ${[...new Set(voiceClash)].slice(0, 4).join('; ')}`);
     if (nct.length) info(`${lname}: long non-chord tones on downbeats: ${nct.join('; ')}`);
   }
 
@@ -206,9 +215,9 @@ function analyze(id, t) {
   const all = Object.values(R.layers).reduce((a, l) => a + l.notes, 0);
   const onCount = onBar.reduce((a, b) => a + b, 0);
   R.density = { melodyPerBar: melody ? +(melody.notes / t.bars).toFixed(2) : 0, defaultOnPerBar: +(onCount / t.bars).toFixed(1), allPerBar: +(all / t.bars).toFixed(1), melodyRestPct: melody ? melody.restPct : undefined };
-  R.clashCount = Object.values(R.layers).reduce((a, l) => a + (l.clashes?.length || 0) + (l.voiceClashes?.length || 0), 0);
+  R.clashCount = Object.values(R.layers).reduce((a, l) => a + (l.clashes?.length || 0) + (l.rubs?.length || 0), 0);
   // rough loudness per layer: gain x mean velocity x preset peak (from the synth envelopes)
-  const PEAK = { pluck: 0.32, pad: 0.33, bass: 0.55, bell: 0.45, flute: 0.3, marimba: 0.45, glass: 0.34, kit: 0.5, kick: 0.75, snare: 0.5, hat: 0.22 };
+  const PEAK = { pluck: 0.32, pad: 0.33, bass: 0.55, bell: 0.45, flute: 0.3, marimba: 0.45, glass: 0.34, kit: 0.5, kick: 0.75, snare: 0.5, hat: 0.22, rhodes: 0.3, brass: 0.34 };
   R.balance = Object.fromEntries(Object.entries(t.layers).map(([n, L]) => {
     const vm = L.pattern.reduce((a, e) => a + e.v, 0) / L.pattern.length;
     return [n, +(L.gain * vm * (PEAK[L.inst] || 0.4)).toFixed(3)];

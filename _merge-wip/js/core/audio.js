@@ -10,6 +10,11 @@
  *
  * Pitch convention: `pitch` options are frequency multipliers (1 = as designed); `semitones` is the
  * alternative. Velocities and volumes are 0..1.
+ *
+ * Beyond the contract: a `kit` preset (one drum layer, GM-style notes pick kick/snare/hat), `rhodes`
+ * and `brass` presets, scale-name aliases (`majorPentatonic`), prefix stems (`setStem('perc', on)`
+ * covers `perc.kick`, `perc.hat`, …; any layer can be toggled, not only ones flagged `stem: true`),
+ * one-shot tracks (`loop: false`) and offline renders (`renderSfx`, `renderTrack`) for level checks.
  */
 
 // ───────────────────────────────────────────────────────────────────────────────────────────────
@@ -39,6 +44,37 @@ export const SCALES = Object.freeze({
   wholeTone: Object.freeze([0, 2, 4, 6, 8, 10]),
   chromatic: Object.freeze([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]),
 });
+
+/** Alternative scale names accepted wherever a scale is named (resolved by {@link resolveScale}). */
+export const SCALE_ALIASES = Object.freeze({
+  ionian: 'major', aeolian: 'minor', naturalMinor: 'minor', majorPentatonic: 'pentatonic',
+  'major-pentatonic': 'pentatonic', 'minor-pentatonic': 'minorPentatonic', 'harmonic-minor': 'harmonicMinor',
+  'whole-tone': 'wholeTone',
+});
+
+/**
+ * Canonical name of a scale given its name or an alias; `null` when unknown.
+ * @param {unknown} name
+ * @returns {string|null}
+ */
+export function resolveScale(name) {
+  if (typeof name !== 'string') return null;
+  if (Object.hasOwn(SCALES, name)) return name;
+  return lookup(SCALE_ALIASES, name) ?? null;
+}
+
+/**
+ * Semitone set of a scale (alias-aware).
+ * @param {string} scale
+ * @param {string} [caller='scaleIntervals'] Name used in the error message.
+ * @returns {readonly number[]}
+ * @throws {RangeError} For unknown scales.
+ */
+export function scaleIntervals(scale, caller = 'scaleIntervals') {
+  const canon = resolveScale(scale);
+  if (!canon) throw new RangeError(`${caller}: unknown scale "${String(scale)}"`);
+  return SCALES[canon];
+}
 
 /**
  * Chord shapes as semitone offsets from the chord root.
@@ -70,6 +106,29 @@ export const CHORDS = Object.freeze({
  */
 export function clamp(v, lo, hi) {
   return v < lo ? lo : v > hi ? hi : v;
+}
+
+/**
+ * Coerce to a finite number, falling back when the input is missing, blank, non-numeric or infinite.
+ * @param {unknown} v
+ * @param {number} fallback
+ * @returns {number}
+ */
+export function num(v, fallback) {
+  if (v === null || v === undefined) return fallback;
+  const n = typeof v === 'string' && v.trim() === '' ? NaN : Number(v);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+/**
+ * Own-property lookup that ignores prototype keys such as `"constructor"` or `"__proto__"`.
+ * @template T
+ * @param {Record<string, T>} table
+ * @param {unknown} key
+ * @returns {T|undefined}
+ */
+function lookup(table, key) {
+  return typeof key === 'string' && Object.hasOwn(table, key) ? table[key] : undefined;
 }
 
 /**
@@ -139,10 +198,10 @@ export function keyToMidi(key, octave = 3) {
  * @returns {number[]}
  */
 export function scaleNotes(root, scale, { octaves = 1 } = {}) {
-  const iv = SCALES[scale];
-  if (!iv) throw new RangeError(`scaleNotes: unknown scale "${scale}"`);
+  const iv = scaleIntervals(scale, 'scaleNotes');
   const out = [];
-  for (let o = 0; o < octaves; o++) for (const s of iv) out.push(root + 12 * o + s);
+  const n = Math.min(Math.max(0, Math.trunc(num(octaves, 1))), 64);
+  for (let o = 0; o < n; o++) for (const s of iv) out.push(root + 12 * o + s);
   return out;
 }
 
@@ -154,8 +213,7 @@ export function scaleNotes(root, scale, { octaves = 1 } = {}) {
  * @returns {number}
  */
 export function degreeToMidi(degree, root, scale) {
-  const iv = SCALES[scale];
-  if (!iv) throw new RangeError(`degreeToMidi: unknown scale "${scale}"`);
+  const iv = scaleIntervals(scale, 'degreeToMidi');
   const n = iv.length;
   const oct = Math.floor(degree / n);
   return root + 12 * oct + iv[((degree % n) + n) % n];
@@ -169,8 +227,7 @@ export function degreeToMidi(degree, root, scale) {
  * @returns {number}
  */
 export function quantizeToScale(midi, root, scale) {
-  const iv = SCALES[scale];
-  if (!iv) throw new RangeError(`quantizeToScale: unknown scale "${scale}"`);
+  const iv = scaleIntervals(scale, 'quantizeToScale');
   const rel = midi - root;
   const oct = Math.floor(rel / 12);
   const pc = rel - oct * 12;
@@ -195,10 +252,10 @@ export function quantizeToScale(midi, root, scale) {
  * @returns {number[]}
  */
 export function chord(root, type = 'maj', { inversion = 0, octave = 0 } = {}) {
-  const shape = CHORDS[type];
-  if (!shape) throw new RangeError(`chord: unknown chord type "${type}"`);
-  const notes = shape.map((s) => root + s + 12 * octave);
-  const inv = clamp(Math.trunc(inversion), 0, notes.length - 1);
+  const shape = lookup(CHORDS, type);
+  if (!shape) throw new RangeError(`chord: unknown chord type "${String(type)}"`);
+  const notes = shape.map((s) => root + s + 12 * num(octave, 0));
+  const inv = clamp(Math.trunc(num(inversion, 0)), 0, notes.length - 1);
   for (let i = 0; i < inv; i++) notes.push(notes.shift() + 12);
   return notes;
 }
@@ -240,7 +297,7 @@ export function volumeToGain(v) {
  * @returns {Float32Array}
  */
 export function fadeCurve(n, dir, scale = 1) {
-  const len = Math.max(2, Math.trunc(n));
+  const len = Math.max(2, Math.trunc(num(n, 2)));
   const out = new Float32Array(len);
   for (let i = 0; i < len; i++) {
     const x = (i / (len - 1)) * (Math.PI / 2);
@@ -305,7 +362,9 @@ export function hashString(str) {
  * @returns {number}
  */
 export function stepSeconds(bpm, stepsPerBeat = 4) {
-  if (!(bpm > 0) || !(stepsPerBeat > 0)) throw new RangeError('stepSeconds: bpm and stepsPerBeat must be > 0');
+  if (!(bpm > 0) || !(stepsPerBeat > 0) || !Number.isFinite(Number(bpm)) || !Number.isFinite(Number(stepsPerBeat))) {
+    throw new RangeError('stepSeconds: bpm and stepsPerBeat must be finite and > 0');
+  }
   return 60 / bpm / stepsPerBeat;
 }
 
@@ -324,6 +383,7 @@ export function resolveNotes(n) {
     else if (typeof x === 'string') {
       const m = noteToMidi(x);
       if (m !== null) out.push(m);
+      else if (x.trim() !== '' && Number.isFinite(Number(x))) out.push(Number(x));
     }
   }
   return out;
@@ -360,10 +420,14 @@ export function expandPattern(pattern, { loopSteps, defaultNote = 60, defaultVel
   return out;
 }
 
+/** Drum letters accepted by {@link parseStepString} (GM notes; upper case = accent). */
+const STEP_DRUMS = Object.freeze({ k: 36, s: 38, h: 42 });
+
 /**
  * Parse a drum-style step string into pattern events, one character per step: `x` hit, `X` accent,
- * `o` soft, `.`/`-`/space rest. Whitespace and `|` bar separators are ignored.
- * @param {string} str e.g. `"x...x...x...x..."`
+ * `o` soft, `k`/`s`/`h` kick/snare/hat (upper case accents; meant for `kit` layers), anything else
+ * (`.`, `-`, `_`) a rest. Whitespace and `|` bar separators are ignored.
+ * @param {string} str e.g. `"x...x...x...x..."` or `"k.h.s.h.k.h.s.h."`
  * @param {{note?: number, vel?: number}} [opts]
  * @returns {PatternEvent[]}
  */
@@ -372,10 +436,12 @@ export function parseStepString(str, { note = 60, vel = 0.8 } = {}) {
   const out = [];
   let step = 0;
   for (const ch of str) {
-    if (ch === '|' || ch === ' ' || ch === '\n' || ch === '\t') continue;
+    if (ch === '|' || ch === ' ' || ch === '\n' || ch === '\t' || ch === '\r') continue;
+    const drum = STEP_DRUMS[ch.toLowerCase()];
     if (ch === 'x') out.push({ t: step, n: note, d: 1, v: vel });
     else if (ch === 'X') out.push({ t: step, n: note, d: 1, v: 1 });
     else if (ch === 'o') out.push({ t: step, n: note, d: 1, v: vel * 0.55 });
+    else if (drum !== undefined) out.push({ t: step, n: drum, d: 1, v: ch === ch.toLowerCase() ? vel : 1 });
     step++;
   }
   return out;
@@ -459,7 +525,7 @@ export function createStepClock({ bpm, loopSteps, stepsPerBeat = 4, stepsPerBar 
     loopSteps,
     advance(horizon) {
       const out = [];
-      if (!(horizon > timeOf(next))) return out;
+      if (!Number.isFinite(horizon) || !(horizon > timeOf(next))) return out;
       const lastDue = Math.floor((horizon - startTime) / stepSec - 1e-9);
       if (lastDue - next > maxCatchUp) next = lastDue - maxCatchUp;
       while (timeOf(next) < horizon) out.push(tickOf(next++));
@@ -538,27 +604,92 @@ export function analyzeBuffer(channels) {
 // Track definitions (pure)
 // ───────────────────────────────────────────────────────────────────────────────────────────────
 
-/** Instrument preset names available to sequencer layers. */
-export const INSTRUMENT_NAMES = Object.freeze(['pluck', 'pad', 'bass', 'bell', 'flute', 'kick', 'hat', 'snare', 'marimba', 'glass']);
+/** Instrument preset names available to sequencer layers (the contract's ten plus `kit`, `rhodes`, `brass`). */
+export const INSTRUMENT_NAMES = Object.freeze(['pluck', 'pad', 'bass', 'bell', 'flute', 'kick', 'hat', 'snare', 'marimba', 'glass', 'kit', 'rhodes', 'brass']);
+
+/** Presets that are unpitched drums: no timing humanization, pitch picks the voice/tuning only. */
+const DRUM_INSTRUMENTS = new Set(['kick', 'hat', 'snare', 'kit']);
 
 /** Default MIDI note per instrument when a pattern event omits `n` (drums ignore pitch mostly). */
-const DEFAULT_NOTES = Object.freeze({ kick: 36, hat: 42, snare: 38 });
+const DEFAULT_NOTES = Object.freeze({ kick: 36, hat: 42, snare: 38, kit: 36 });
 
 /** Layer-name → instrument guesses for the shorthand `layers: {name: pattern}` form. */
 const LAYER_ALIASES = Object.freeze({
-  melody: 'marimba', lead: 'pluck', arp: 'pluck', chords: 'pad', drums: 'kick', shaker: 'hat',
-  hihat: 'hat', perc: 'snare', rim: 'snare', night: 'glass', tide: 'flute', rain: 'glass', battle: 'snare',
+  melody: 'marimba', lead: 'pluck', arp: 'pluck', chords: 'pad', drums: 'kit', perc: 'kit', shaker: 'hat',
+  hihat: 'hat', rim: 'snare', night: 'glass', tide: 'flute', rain: 'glass', battle: 'snare', tense: 'glass',
+  keys: 'rhodes', piano: 'rhodes', horns: 'brass',
 });
 
 /**
- * Infer an instrument for a layer from its name.
+ * Layer names that are stems (start muted, toggled with `setStem`) unless the layer says otherwise.
+ * Matches the contract's examples; a dotted suffix (`night.bells`) counts too.
+ */
+const DEFAULT_STEM_NAMES = Object.freeze(['night', 'tide', 'rain', 'battle', 'tense', 'storm']);
+
+/**
+ * Whether a layer name is a stem by default (see {@link DEFAULT_STEM_NAMES}).
+ * @param {string} name
+ * @returns {boolean}
+ */
+export function isDefaultStemName(name) {
+  const n = String(name).toLowerCase();
+  return DEFAULT_STEM_NAMES.some((s) => n === s || n.startsWith(`${s}.`));
+}
+
+/**
+ * Infer an instrument for a layer from its name: an exact preset name, a known alias, the last
+ * dotted segment (`perc.kick` → `kick`), else `pluck`.
  * @param {string} name
  * @returns {string} A member of {@link INSTRUMENT_NAMES}.
  */
 export function inferInstrument(name) {
   const n = String(name).toLowerCase();
   if (INSTRUMENT_NAMES.includes(n)) return n;
-  return LAYER_ALIASES[n] ?? 'pluck';
+  const alias = lookup(LAYER_ALIASES, n);
+  if (alias) return alias;
+  const dot = n.lastIndexOf('.');
+  if (dot >= 0) return inferInstrument(n.slice(dot + 1));
+  return 'pluck';
+}
+
+/**
+ * Map a General-MIDI-style drum note to a kit voice, so one `kit` layer can hold a whole drum part:
+ * ≤36 kick, 37 rim (quiet snare), 38–40 snare, 41–50 toms (kicks tuned by the note), 42/44 closed
+ * hat, everything else (46 open hat, cymbals) a long hat.
+ * @param {number} midi
+ * @returns {{inst: 'kick'|'snare'|'hat', vel: number, dur: number}} Preset plus velocity and
+ *   duration multipliers.
+ */
+export function kitVoice(midi) {
+  const n = Math.round(num(midi, 36));
+  if (n <= 36) return { inst: 'kick', vel: 1, dur: 1 };
+  if (n === 37) return { inst: 'snare', vel: 0.6, dur: 1 };
+  if (n <= 40) return { inst: 'snare', vel: 1, dur: 1 };
+  if (n === 42 || n === 44) return { inst: 'hat', vel: 1, dur: 1 };
+  if (n <= 50 && n !== 46 && n !== 49) return { inst: 'kick', vel: 0.9, dur: 1 };
+  return { inst: 'hat', vel: 0.9, dur: 3 };
+}
+
+/**
+ * Resolve whether a layer is on. `overrides` maps stem names to booleans (what `setStem` recorded);
+ * an exact layer-name entry wins, then the longest dotted prefix (`'perc'` covers `'perc.kick'`),
+ * then `defaultOn`.
+ * @param {string} layerName
+ * @param {Map<string, boolean>|Record<string, boolean>|null|undefined} overrides
+ * @param {boolean} defaultOn
+ * @returns {boolean}
+ */
+export function resolveStem(layerName, overrides, defaultOn) {
+  if (!overrides) return defaultOn;
+  const get = overrides instanceof Map ? (k) => overrides.get(k) : (k) => lookup(overrides, k);
+  const name = String(layerName);
+  let v = get(name);
+  if (v !== undefined) return Boolean(v);
+  for (let i = name.lastIndexOf('.'); i > 0; i = name.lastIndexOf('.', i - 1)) {
+    v = get(name.slice(0, i));
+    if (v !== undefined) return Boolean(v);
+  }
+  return defaultOn;
 }
 
 /**
@@ -587,16 +718,19 @@ export function inferInstrument(name) {
  * @property {number} stepsPerBeat
  * @property {number} loopSteps
  * @property {number} swing
+ * @property {boolean} loop False for one-shot tracks (stings) that play once and end.
  * @property {TrackLayer[]} layers
  */
 
 /**
  * Validate and normalize a track definition. Layers may be given as a bare pattern array
- * (instrument inferred from the layer name) or as `{inst, pattern, gain, stem, minIntensity, pan,
- * humanize}` where `pattern` is an event array or a drum step string.
+ * (instrument inferred from the layer name, and names like `night`/`tide`/`rain`/`battle` become
+ * stems) or as `{inst, pattern, gain, stem, minIntensity, pan, humanize}` where `pattern` is an
+ * event array or a drum step string. Scale names may be aliases (`majorPentatonic`).
  * @param {string} id
  * @param {{bpm: number, key?: string, scale?: string, bars?: number, beatsPerBar?: number,
- *   stepsPerBar?: number, swing?: number, layers: Record<string, PatternEvent[]|string|object>}} def
+ *   stepsPerBar?: number, swing?: number, loop?: boolean,
+ *   layers: Record<string, PatternEvent[]|string|object>}} def
  * @returns {Track}
  * @throws {TypeError|RangeError} On malformed definitions.
  */
@@ -615,9 +749,11 @@ export function normalizeTrack(id, def) {
   const key = def.key === undefined ? 'C' : String(def.key);
   const root = keyToMidi(key, 3);
   if (root === null) throw new RangeError(`normalizeTrack(${id}): unknown key "${key}"`);
-  const scale = def.scale === undefined ? 'major' : String(def.scale);
-  if (!SCALES[scale]) throw new RangeError(`normalizeTrack(${id}): unknown scale "${scale}"`);
+  const scaleName = def.scale === undefined ? 'major' : String(def.scale);
+  const scale = resolveScale(scaleName);
+  if (!scale) throw new RangeError(`normalizeTrack(${id}): unknown scale "${scaleName}"`);
   if (!def.layers || typeof def.layers !== 'object') throw new TypeError(`normalizeTrack(${id}): layers must be an object`);
+  const loop = def.loop === undefined ? true : Boolean(def.loop);
   const loopSteps = bars * stepsPerBar;
   const layers = [];
   for (const [name, raw] of Object.entries(def.layers)) {
@@ -625,18 +761,18 @@ export function normalizeTrack(id, def) {
     if (!spec || typeof spec !== 'object') throw new TypeError(`normalizeTrack(${id}): layer "${name}" is malformed`);
     const inst = spec.inst === undefined ? inferInstrument(name) : String(spec.inst);
     if (!INSTRUMENT_NAMES.includes(inst)) throw new RangeError(`normalizeTrack(${id}): layer "${name}" uses unknown instrument "${inst}"`);
-    const defaultNote = DEFAULT_NOTES[inst] ?? 60;
+    const defaultNote = lookup(DEFAULT_NOTES, inst) ?? 60;
     const pattern = typeof spec.pattern === 'string' ? parseStepString(spec.pattern, { note: defaultNote }) : spec.pattern;
     if (!Array.isArray(pattern)) throw new TypeError(`normalizeTrack(${id}): layer "${name}" needs a pattern array or step string`);
     const events = expandPattern(pattern, { loopSteps, defaultNote });
     layers.push({
       name,
       inst,
-      gain: clamp(spec.gain === undefined ? 1 : Number(spec.gain) || 0, 0, 2),
-      stem: Boolean(spec.stem),
-      minIntensity: clamp(Number(spec.minIntensity) || 0, 0, 1),
-      pan: clamp(Number(spec.pan) || 0, -1, 1),
-      humanize: clamp(spec.humanize === undefined ? 0.5 : Number(spec.humanize) || 0, 0, 1),
+      gain: clamp(num(spec.gain, 1), 0, 2),
+      stem: spec.stem === undefined ? isDefaultStemName(name) : Boolean(spec.stem),
+      minIntensity: clamp(num(spec.minIntensity, 0), 0, 1),
+      pan: clamp(num(spec.pan, 0), -1, 1),
+      humanize: clamp(num(spec.humanize, 0.5), 0, 1),
       events,
       buckets: bucketEvents(events),
     });
@@ -644,7 +780,7 @@ export function normalizeTrack(id, def) {
   return {
     id, bpm, key, root, scale, bars, beatsPerBar, stepsPerBar,
     stepsPerBeat: stepsPerBar / beatsPerBar, loopSteps,
-    swing: clamp(Number(def.swing) || 0, 0, 1), layers,
+    swing: clamp(num(def.swing, 0), 0, 1), loop, layers,
   };
 }
 
@@ -875,6 +1011,7 @@ function partials(ctx, dest, t0, freq, list, attack = 0.004) {
 /**
  * @typedef {object} NoteSpec
  * @property {number} freq Hz.
+ * @property {number} [midi] MIDI note (drum kits pick their voice from it).
  * @property {number} time Start time.
  * @property {number} dur Seconds the note is held.
  * @property {number} vel 0..1.
@@ -978,6 +1115,40 @@ const INSTRUMENTS = {
       [3.01, 0.045 * vel, len * 0.45], [4.16, 0.025 * vel, len * 0.3],
     ], 0.012);
   },
+  kit(ctx, dest, note) {
+    const voice = kitVoice(note.midi ?? freqToMidi(note.freq));
+    INSTRUMENTS[voice.inst](ctx, dest, { ...note, vel: note.vel * voice.vel, dur: note.dur * voice.dur });
+  },
+  rhodes(ctx, dest, { freq, time, dur, vel }) {
+    const len = clamp(dur * 1.5, 0.6, 2.5);
+    const amp = mkGain(ctx, dest, 0);
+    const end = adsr(amp.gain, time, { a: 0.004, d: len * 0.6, s: 0.22, r: 0.3, peak: 0.3 * vel, hold: dur });
+    const lp = mkFilter(ctx, amp, 'lowpass', clamp(freq * 3 + 2500 * vel * vel, 500, 7000), 0.6);
+    mkOsc(ctx, lp, 'sine', freq, time, end);
+    const body = mkGain(ctx, lp, 0.35);
+    mkOsc(ctx, body, 'triangle', freq, time, end, 3);
+    const tine = mkGain(ctx, lp, 0);
+    perc(tine.gain, time, 0.16 * vel * vel, clamp(len * 0.25, 0.12, 0.5), 0.002);
+    mkOsc(ctx, tine, 'sine', freq * 4, time, time + 0.6);
+    const bark = mkGain(ctx, lp, 0);
+    perc(bark.gain, time, 0.08 * vel, 0.05, 0.001);
+    mkOsc(ctx, bark, 'sine', freq * 2, time, time + 0.08);
+  },
+  brass(ctx, dest, { freq, time, dur, vel }) {
+    const amp = mkGain(ctx, dest, 0);
+    const end = adsr(amp.gain, time, { a: 0.05, d: 0.12, s: 0.75, r: 0.18, peak: 0.17 * vel, hold: dur });
+    const lp = mkFilter(ctx, amp, 'lowpass', clamp(freq * 2, 200, 4000), 1.2);
+    lp.frequency.setValueAtTime(clamp(freq * 1.2, 120, 2000), time);
+    lp.frequency.exponentialRampToValueAtTime(clamp(freq * (2.5 + 4 * vel), 300, 8000), time + 0.08);
+    lp.frequency.exponentialRampToValueAtTime(clamp(freq * 2.2, 250, 5000), time + 0.4);
+    const o1 = mkOsc(ctx, lp, 'sawtooth', freq, time, end, -5);
+    const o2 = mkOsc(ctx, lp, 'sawtooth', freq, time, end, 5);
+    const vib = mkGain(ctx, o1.detune, 0);
+    vib.connect(o2.detune);
+    vib.gain.setValueAtTime(0, time);
+    vib.gain.linearRampToValueAtTime(5, time + 0.3);
+    mkOsc(ctx, vib, 'sine', 5.5, time, end);
+  },
 };
 
 /**
@@ -988,8 +1159,8 @@ const INSTRUMENTS = {
  * @param {NoteSpec} note
  */
 function playNote(ctx, dest, inst, note) {
-  const fn = INSTRUMENTS[inst];
-  if (!fn) throw new RangeError(`playNote: unknown instrument "${inst}"`);
+  const fn = lookup(INSTRUMENTS, inst);
+  if (!fn) throw new RangeError(`playNote: unknown instrument "${String(inst)}"`);
   fn(ctx, dest, note);
 }
 
@@ -1190,8 +1361,9 @@ const SFX = {
         const t = t0 + 0.2 + i * 0.11 + p.rand() * 0.06;
         const d = mkGain(ctx, dest, 0);
         perc(d.gain, t, 0.08 * p.gain, 0.08);
-        const o = mkOsc(ctx, d, 'sine', (2200 + p.rand() * 1200) * p.pitch, t, t + 0.09);
-        sweep(o.frequency, t, o.frequency.value, t + 0.07, o.frequency.value * 1.5);
+        const f0 = (2200 + p.rand() * 1200) * p.pitch;
+        const o = mkOsc(ctx, d, 'sine', f0, t, t + 0.09);
+        sweep(o.frequency, t, f0, t + 0.07, f0 * 1.5);
       }
     },
   },
@@ -1551,7 +1723,7 @@ export const SFX_NAMES = Object.freeze(Object.keys(SFX));
  * @returns {number|null}
  */
 export function sfxDuration(name) {
-  const def = SFX[SFX_ALIASES[name] ?? name];
+  const def = lookup(SFX, lookup(SFX_ALIASES, name) ?? name);
   return def ? def.dur : null;
 }
 
@@ -1632,7 +1804,8 @@ const HIDDEN_LOOKAHEAD_SEC = 1.6;
 const TICK_MS = 60;
 const HIDDEN_TICK_MS = 500;
 const SFX_LATENCY = 0.005;
-const FADE_STEPS = 96;
+/** Most linear segments used to approximate an equal-power fade. */
+const FADE_SEGMENTS = 16;
 
 /**
  * Soft-clip transfer curve: identity below `knee`, tanh-shaped above, never exceeding ~0.905.
@@ -1641,12 +1814,14 @@ const FADE_STEPS = 96;
  * @returns {Float32Array}
  */
 export function softClipCurve(n = 2048, knee = 0.6) {
-  const out = new Float32Array(n);
-  const span = 1 - knee;
-  for (let i = 0; i < n; i++) {
-    const x = (i / (n - 1)) * 2 - 1;
+  const len = Math.max(2, Math.trunc(num(n, 2048)));
+  const k = clamp(num(knee, 0.6), 0, 0.99);
+  const out = new Float32Array(len);
+  const span = 1 - k;
+  for (let i = 0; i < len; i++) {
+    const x = (i / (len - 1)) * 2 - 1;
     const a = Math.abs(x);
-    const y = a <= knee ? a : knee + span * Math.tanh((a - knee) / span);
+    const y = a <= k ? a : k + span * Math.tanh((a - k) / span);
     out[i] = x < 0 ? -y : y;
   }
   return out;
@@ -1658,7 +1833,7 @@ export function softClipCurve(n = 2048, knee = 0.6) {
  * @returns {number}
  */
 export function intensityToCutoff(intensity) {
-  return 400 * 2 ** (clamp(intensity, 0, 1) * 5.64);
+  return 400 * 2 ** (clamp(num(intensity, 1), 0, 1) * 5.64);
 }
 
 /**
@@ -1745,13 +1920,33 @@ function hold(param, now) {
 }
 
 /**
+ * Schedule an equal-power fade on an AudioParam as chained linear ramps. Ramps never conflict with
+ * other automation (unlike `setValueCurveAtTime`, which throws when it overlaps anything).
+ * @param {AudioParam} param
+ * @param {number} t0
+ * @param {number} sec
+ * @param {number} from
+ * @param {number} to
+ */
+function scheduleFade(param, t0, sec, from, to) {
+  param.setValueAtTime(from, t0);
+  const n = Math.max(2, Math.min(FADE_SEGMENTS, Math.round(sec * 40)));
+  for (let i = 1; i <= n; i++) {
+    const x = (i / n) * (Math.PI / 2);
+    const v = to > from ? from + (to - from) * Math.sin(x) : to + (from - to) * Math.cos(x);
+    param.linearRampToValueAtTime(v, t0 + (i / n) * sec);
+  }
+}
+
+/**
  * A playing instance of a track: its own output gain (for crossfades), per-layer gains (stems and
- * intensity gating) and a step clock.
+ * intensity gating) and a step clock. One-shot tracks (`loop: false`) stop scheduling after a
+ * single pass and report `ended()`.
  * @param {BaseAudioContext} ctx
  * @param {AudioNode} dest
  * @param {Track} track
  * @param {number} startTime
- * @param {{stems: Set<string>, intensity: number, offline?: boolean}} opts
+ * @param {{stems: Map<string, boolean>, intensity: number, offline?: boolean}} opts
  */
 function createPlayer(ctx, dest, track, startTime, { stems, intensity, offline = false }) {
   const out = mkGain(ctx, dest, offline ? 1 : 0);
@@ -1761,12 +1956,13 @@ function createPlayer(ctx, dest, track, startTime, { stems, intensity, offline =
     stepsPerBar: track.stepsPerBar, startTime, maxCatchUpSteps: offline ? Infinity : track.stepsPerBar * 2,
   });
   const rand = makeLcg(hashString(track.id));
+  const endAt = track.loop ? Infinity : startTime + clock.loopSec;
   let stopAt = Infinity;
   let stopping = false;
 
-  const layerTarget = (def, st, inten) => (def.stem && !st.has(def.name)) || inten < def.minIntensity ? 0 : def.gain;
+  const layerTarget = (def, st, inten) => (resolveStem(def.name, st, !def.stem) && inten >= def.minIntensity ? def.gain : 0);
 
-  /** @param {Set<string>} st @param {number} inten @param {number} ramp @param {number} [at] */
+  /** @param {Map<string, boolean>} st @param {number} inten @param {number} ramp @param {number} [at] */
   function applyMix(st, inten, ramp, at = ctx.currentTime) {
     for (const l of layers) {
       const target = layerTarget(l.def, st, inten);
@@ -1782,18 +1978,18 @@ function createPlayer(ctx, dest, track, startTime, { stems, intensity, offline =
     applyMix,
     /** Schedule every step that starts before `horizon`. @param {number} horizon */
     schedule(horizon) {
-      for (const tick of clock.advance(Math.min(horizon, stopAt))) {
+      for (const tick of clock.advance(Math.min(horizon, stopAt, endAt))) {
         for (const l of layers) {
           const evs = l.def.buckets.get(tick.step);
           if (!evs) continue;
-          const drum = l.def.inst === 'kick' || l.def.inst === 'hat' || l.def.inst === 'snare';
+          const drum = DRUM_INSTRUMENTS.has(l.def.inst);
           for (const ev of evs) {
             const h = l.def.humanize;
             const jitter = drum ? 0 : (rand() - 0.5) * 0.008 * h;
             const time = tick.time + (ev.t - tick.step) * clock.stepSec + swingOffset(tick.step % track.stepsPerBar, track.swing, clock.stepSec) + jitter;
             const vel = clamp(ev.v * (1 - 0.12 * h * rand()), 0.02, 1);
             const dur = ev.d * clock.stepSec * 0.92;
-            for (const n of ev.n) playNote(ctx, l.gain, l.def.inst, { freq: midiToFreq(n), time, dur, vel });
+            for (const n of ev.n) playNote(ctx, l.gain, l.def.inst, { freq: midiToFreq(n), midi: n, time, dur, vel });
           }
         }
       }
@@ -1802,29 +1998,33 @@ function createPlayer(ctx, dest, track, startTime, { stems, intensity, offline =
     fadeIn(now, sec) {
       hold(out.gain, now);
       if (sec < 0.01) out.gain.setValueAtTime(1, now);
-      else out.gain.setValueCurveAtTime(fadeCurve(FADE_STEPS, 'in'), now, sec);
+      else scheduleFade(out.gain, now, sec, 0, 1);
     },
     /** @param {number} now @param {number} sec */
     fadeOut(now, sec) {
       if (stopping) return;
       stopping = true;
-      hold(out.gain, now);
-      const from = Math.max(out.gain.value, 0);
-      if (sec < 0.01 || from <= 0) out.gain.setValueAtTime(0, now);
-      else out.gain.setValueCurveAtTime(fadeCurve(FADE_STEPS, 'out', from), now, sec);
       stopAt = now + Math.max(sec, 0.01);
+      try {
+        hold(out.gain, now);
+        const from = clamp(out.gain.value, 0, 1);
+        if (sec < 0.01 || from <= 0) out.gain.setValueAtTime(0, now);
+        else scheduleFade(out.gain, now, sec, from, 0);
+      } catch {
+        // Automation conflicts must never leave a player audible forever.
+        out.gain.cancelScheduledValues(0);
+        out.gain.value = 0;
+      }
     },
+    /** True once a one-shot track has played through (its tail may still ring). @param {number} now */
+    ended(now) { return now >= endAt; },
+    /** Seconds until a one-shot ends, `null` for looping tracks. @param {number} now */
+    remaining(now) { return track.loop ? null : Math.max(0, endAt - now); },
     /** @param {number} now */
-    isDone(now) {
-      return stopping && now > stopAt + 3.0;
-    },
+    isDone(now) { return (stopping && now > stopAt + 3.0) || now > endAt + 3.0; },
     /** @param {number} now */
-    position(now) {
-      return clock.positionAt(now);
-    },
-    dispose() {
-      out.disconnect();
-    },
+    position(now) { return clock.positionAt(now); },
+    dispose() { out.disconnect(); },
   };
 }
 
@@ -1854,14 +2054,52 @@ function createPlayer(ctx, dest, track, startTime, { stems, intensity, offline =
  * @property {() => string[]} trackIds
  * @property {(id: string, opts?: {fade?: number, restart?: boolean}) => boolean} playMusic
  * @property {(opts?: {fade?: number}) => boolean} stopMusic
- * @property {(name: string, on: boolean) => string[]} setStem
+ * @property {(name: string, on: boolean) => string[]} setStem Turn a layer (or every `name.*`
+ *   layer) on or off across all tracks; returns the names currently forced on.
  * @property {() => string[]} getStems
  * @property {(p: {intensity?: number}) => {intensity: number}} setMusicParam
- * @property {() => object|null} nowPlaying
+ * @property {() => {id: string, bpm: number, bar: number, beat: number, step: number, loop: number,
+ *   oneShot: boolean, remaining: number|null, stems: string[], intensity: number}|{id: string,
+ *   pending: true}|null} nowPlaying
  * @property {(name: string, opts?: SfxOptions & {sampleRate?: number, seed?: number}) => Promise<AudioBuffer>} renderSfx
- * @property {(id: string, opts?: {bars?: number, sampleRate?: number, stems?: string[], intensity?: number}) => Promise<AudioBuffer>} renderTrack
+ * @property {(id: string, opts?: {bars?: number, sampleRate?: number, stems?: string[]|Record<string, boolean>,
+ *   intensity?: number}) => Promise<AudioBuffer>} renderTrack
  * @property {() => Promise<void>} dispose
  */
+
+/**
+ * Normalize a `stems` option (array of names that are on, `{name: bool}` object, or Map) into the
+ * override map {@link resolveStem} consumes.
+ * @param {unknown} stems
+ * @returns {Map<string, boolean>}
+ */
+function toStemMap(stems) {
+  const m = new Map();
+  if (stems instanceof Map) for (const [k, v] of stems) m.set(String(k), Boolean(v));
+  else if (Array.isArray(stems)) for (const k of stems) m.set(String(k), true);
+  else if (stems && typeof stems === 'object') for (const [k, v] of Object.entries(stems)) m.set(k, Boolean(v));
+  return m;
+}
+
+/**
+ * Combined frequency multiplier from `pitch` (multiplier) and `semitones`, clamped to 0.25..4.
+ * Junk (NaN, strings, 0) falls back to 1.
+ * @param {{pitch?: unknown, semitones?: unknown}} o
+ * @returns {number}
+ */
+function pitchMult(o) {
+  const p = num(o.pitch, 1);
+  return clamp(2 ** (num(o.semitones, 0) / 12) * (p > 0 ? p : 1), 0.25, 4);
+}
+
+/**
+ * Option bag or `{}` (so `null`/non-objects never throw).
+ * @param {unknown} o
+ * @returns {Record<string, any>}
+ */
+function opts(o) {
+  return o && typeof o === 'object' ? o : {};
+}
 
 /**
  * Create an independent audio engine. Nothing touches WebAudio until `unlock()`.
@@ -1869,7 +2107,8 @@ function createPlayer(ctx, dest, track, startTime, { stems, intensity, offline =
  */
 export function createAudio() {
   const tracks = new Map();
-  const stems = new Set();
+  /** Explicit stem overrides (name → on). Layers without an entry use their definition's default. */
+  const stems = new Map();
   const vol = { master: 1, music: 0.8, sfx: 1 };
   const limiter = createRateLimiter({ minInterval: 0.02, maxBurst: 20, window: 0.1 });
   const warned = new Set();
@@ -1885,6 +2124,7 @@ export function createAudio() {
   let current = null;
   let pending = null;
   let timer = null;
+  let onVisibility = null;
 
   const warnOnce = (msg) => {
     if (warned.has(msg)) return;
@@ -1892,8 +2132,14 @@ export function createAudio() {
     console.warn(msg);
   };
 
+  const getStems = () => {
+    const out = [];
+    for (const [k, v] of stems) if (v) out.push(k);
+    return out;
+  };
+
   function applyVolumes(ramp) {
-    if (!graph) return;
+    if (!graph || !ctx) return;
     const now = ctx.currentTime;
     glide(graph.master.gain, volumeToGain(vol.master), now, ramp);
     glide(graph.sfxBus.gain, volumeToGain(vol.sfx), now, ramp);
@@ -1903,11 +2149,12 @@ export function createAudio() {
 
   function tick() {
     timer = null;
-    if (!graph || players.length === 0) return;
+    if (!graph || !ctx || players.length === 0) return;
     const hidden = typeof document !== 'undefined' && document.hidden === true;
     const horizon = ctx.currentTime + (hidden ? HIDDEN_LOOKAHEAD_SEC : LOOKAHEAD_SEC);
     for (const p of players) p.schedule(horizon);
     const now = ctx.currentTime;
+    if (current && current.ended(now)) current = null;
     players = players.filter((p) => {
       if (!p.isDone(now)) return true;
       p.dispose();
@@ -1918,6 +2165,12 @@ export function createAudio() {
 
   function ensureTimer() {
     if (timer === null) tick();
+  }
+
+  function restartTimer() {
+    if (timer !== null) clearTimeout(timer);
+    timer = null;
+    tick();
   }
 
   async function resume() {
@@ -1936,55 +2189,57 @@ export function createAudio() {
     get analyser() { return graph ? graph.analyser : null; },
 
     unlock() {
-      if (graph) return resume().then(() => ctx.state === 'running');
+      if (graph) return resume().then(() => ctx !== null && ctx.state === 'running');
       if (unlocking) return unlocking;
-      unlocking = (async () => {
+      const attempt = (async () => {
         const AC = globalThis.AudioContext || globalThis.webkitAudioContext;
-        if (typeof AC !== 'function') {
-          unlocking = null;
-          return false;
-        }
+        if (typeof AC !== 'function') return false;
+        let c;
         try {
-          ctx = new AC({ latencyHint: 'interactive' });
+          c = new AC({ latencyHint: 'interactive' });
         } catch (err) {
           warnOnce(`audio.unlock: could not create AudioContext (${err && err.message})`);
-          ctx = null;
-          unlocking = null;
           return false;
         }
-        graph = buildGraph(ctx);
+        ctx = c;
+        graph = buildGraph(c);
+        graph.musicFilter.frequency.value = intensityToCutoff(intensity);
         applyVolumes(0);
         try {
-          const kick = ctx.createBufferSource();
-          kick.buffer = ctx.createBuffer(1, 1, ctx.sampleRate);
-          kick.connect(ctx.destination);
-          kick.start(0);
+          const nudge = c.createBufferSource();
+          nudge.buffer = c.createBuffer(1, 1, c.sampleRate);
+          nudge.connect(c.destination);
+          nudge.start(0);
         } catch {
           /* purely a mobile unlock nudge; ignore */
         }
         await resume();
-        if (typeof ctx.addEventListener === 'function') {
-          ctx.addEventListener('statechange', () => { if (ctx.state === 'running' && players.length) ensureTimer(); });
+        if (ctx !== c) return false; // disposed while resuming
+        if (typeof c.addEventListener === 'function') {
+          c.addEventListener('statechange', () => { if (ctx === c && c.state === 'running' && players.length) ensureTimer(); });
         }
         if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
-          document.addEventListener('visibilitychange', () => { if (!document.hidden && players.length) { if (timer !== null) clearTimeout(timer); timer = null; tick(); } });
+          onVisibility = () => { if (!document.hidden && players.length) restartTimer(); };
+          document.addEventListener('visibilitychange', onVisibility);
         }
         if (pending) {
-          const { id, opts } = pending;
+          const { id, opts: o } = pending;
           pending = null;
-          api.playMusic(id, opts);
+          api.playMusic(id, o);
         }
-        return ctx.state === 'running';
+        return c.state === 'running';
       })();
-      return unlocking;
+      unlocking = attempt;
+      const settle = () => { if (unlocking === attempt) unlocking = null; };
+      attempt.then(settle, settle);
+      return attempt;
     },
 
-    setVolume(v = {}) {
+    setVolume(v) {
+      const o = typeof v === 'number' ? { master: v } : opts(v);
       for (const k of ['master', 'music', 'sfx']) {
-        if (v[k] !== undefined) {
-          const n = Number(v[k]);
-          if (Number.isFinite(n)) vol[k] = clamp(n, 0, 1);
-        }
+        const n = num(o[k], NaN);
+        if (Number.isFinite(n)) vol[k] = clamp(n, 0, 1);
       }
       applyVolumes(0.03);
       return { ...vol };
@@ -1997,23 +2252,29 @@ export function createAudio() {
     },
     isMuted() { return muted; },
 
-    sfx(name, { pitch = 1, semitones, volume = 1, pan = 0, delay = 0 } = {}) {
-      const key = SFX_ALIASES[name] ?? name;
-      const def = SFX[key];
+    sfx(name, options) {
+      const o = opts(options);
+      const key = lookup(SFX_ALIASES, name) ?? name;
+      const def = lookup(SFX, key);
       if (!def) {
-        warnOnce(`audio.sfx: unknown sfx "${name}"`);
+        warnOnce(`audio.sfx: unknown sfx "${String(name)}"`);
         return null;
       }
-      if (!graph) return null;
+      if (!graph || !ctx) return null;
       if (ctx.state !== 'running') resume();
       const now = ctx.currentTime;
       if (!limiter.allow(key, now)) return null;
-      const mult = clamp((semitones !== undefined ? 2 ** (Number(semitones) / 12) : 1) * (Number(pitch) || 1), 0.25, 4);
-      const gain = clamp(Number(volume), 0, 2);
+      const gain = clamp(num(o.volume, 1), 0, 2);
       if (!(gain > 0)) return null;
-      const dest = pan ? mkPan(ctx, graph.sfxBus, pan) : graph.sfxBus;
-      const t0 = now + SFX_LATENCY + Math.max(0, Number(delay) || 0);
-      def.play(ctx, dest, t0, { pitch: mult, gain, rand: Math.random });
+      const pan = clamp(num(o.pan, 0), -1, 1);
+      const t0 = now + SFX_LATENCY + Math.max(0, num(o.delay, 0));
+      try {
+        const dest = pan ? mkPan(ctx, graph.sfxBus, pan) : graph.sfxBus;
+        def.play(ctx, dest, t0, { pitch: pitchMult(o), gain, rand: Math.random });
+      } catch (err) {
+        warnOnce(`audio.sfx(${key}): ${err && err.message}`);
+        return null;
+      }
       return { name: key, time: t0, duration: def.dur };
     },
 
@@ -2025,19 +2286,22 @@ export function createAudio() {
     hasTrack(id) { return tracks.has(id); },
     trackIds() { return [...tracks.keys()]; },
 
-    playMusic(id, { fade = 800, restart = false } = {}) {
+    playMusic(id, options) {
+      const o = opts(options);
+      const fade = num(o.fade, 800);
+      const restart = Boolean(o.restart);
       const track = tracks.get(id);
       if (!track) {
-        warnOnce(`audio.playMusic: unknown track "${id}"`);
+        warnOnce(`audio.playMusic: unknown track "${String(id)}"`);
         return false;
       }
-      if (!graph) {
+      if (!graph || !ctx) {
         pending = { id, opts: { fade, restart } };
         return true;
       }
-      if (current && current.track.id === id && !current.stopping && !restart) return true;
-      const fadeSec = Math.max(0, Number(fade) || 0) / 1000;
       const now = ctx.currentTime;
+      if (current && current.track === track && !current.stopping && !current.ended(now) && !restart) return true;
+      const fadeSec = Math.max(0, fade) / 1000;
       const player = createPlayer(ctx, graph.musicFilter, track, now + 0.05, { stems, intensity });
       if (current) current.fadeOut(now, fadeSec);
       player.fadeIn(now, current ? fadeSec : Math.min(fadeSec, 0.25));
@@ -2046,24 +2310,28 @@ export function createAudio() {
       ensureTimer();
       return true;
     },
-    stopMusic({ fade = 600 } = {}) {
+    stopMusic(options) {
+      const fade = num(opts(options).fade, 600);
       pending = null;
       if (!current) return false;
-      current.fadeOut(ctx.currentTime, Math.max(0, Number(fade) || 0) / 1000);
+      current.fadeOut(ctx.currentTime, Math.max(0, fade) / 1000);
       current = null;
       return true;
     },
     setStem(name, on) {
-      if (on) stems.add(String(name));
-      else stems.delete(String(name));
-      for (const p of players) p.applyMix(stems, intensity, 0.5);
-      return [...stems];
+      if (name === undefined || name === null) return getStems();
+      const key = String(name).trim();
+      if (!key) return getStems();
+      stems.set(key, Boolean(on));
+      if (ctx) for (const p of players) p.applyMix(stems, intensity, 0.5);
+      return getStems();
     },
-    getStems() { return [...stems]; },
-    setMusicParam({ intensity: i } = {}) {
-      if (i !== undefined && Number.isFinite(Number(i))) {
-        intensity = clamp(Number(i), 0, 1);
-        if (graph) {
+    getStems,
+    setMusicParam(params) {
+      const n = num(opts(params).intensity, NaN);
+      if (Number.isFinite(n)) {
+        intensity = clamp(n, 0, 1);
+        if (graph && ctx) {
           glide(graph.musicFilter.frequency, intensityToCutoff(intensity), ctx.currentTime, 0.4);
           for (const p of players) p.applyMix(stems, intensity, 0.5);
         }
@@ -2072,36 +2340,46 @@ export function createAudio() {
     },
     nowPlaying() {
       if (!current) return pending ? { id: pending.id, pending: true } : null;
-      const pos = current.position(ctx.currentTime);
-      return { id: current.track.id, bpm: current.track.bpm, bar: pos.bar, beat: pos.beat, step: pos.step, loop: pos.loop, stems: [...stems], intensity };
+      const now = ctx.currentTime;
+      if (current.ended(now)) return null;
+      const pos = current.position(now);
+      return {
+        id: current.track.id, bpm: current.track.bpm, bar: pos.bar, beat: pos.beat, step: pos.step, loop: pos.loop,
+        oneShot: !current.track.loop, remaining: current.remaining(now), stems: getStems(), intensity,
+      };
     },
 
-    async renderSfx(name, { pitch = 1, semitones, volume = 1, pan = 0, sampleRate = 44100, seed = 1 } = {}) {
-      const key = SFX_ALIASES[name] ?? name;
-      const def = SFX[key];
-      if (!def) throw new RangeError(`renderSfx: unknown sfx "${name}"`);
+    async renderSfx(name, options) {
+      const o = opts(options);
+      const key = lookup(SFX_ALIASES, name) ?? name;
+      const def = lookup(SFX, key);
+      if (!def) throw new RangeError(`renderSfx: unknown sfx "${String(name)}"`);
       const OAC = globalThis.OfflineAudioContext || globalThis.webkitOfflineAudioContext;
       if (typeof OAC !== 'function') throw new Error('renderSfx: OfflineAudioContext is not available');
+      const sampleRate = clamp(num(o.sampleRate, 44100), 8000, 96000);
       const oc = new OAC(2, Math.ceil((def.dur + 0.3) * sampleRate), sampleRate);
       const g = buildGraph(oc);
+      const pan = clamp(num(o.pan, 0), -1, 1);
       const dest = pan ? mkPan(oc, g.sfxBus, pan) : g.sfxBus;
-      const mult = clamp((semitones !== undefined ? 2 ** (Number(semitones) / 12) : 1) * (Number(pitch) || 1), 0.25, 4);
-      def.play(oc, dest, 0.02, { pitch: mult, gain: clamp(Number(volume), 0, 2), rand: makeLcg(seed) });
+      def.play(oc, dest, 0.02, { pitch: pitchMult(o), gain: clamp(num(o.volume, 1), 0, 2), rand: makeLcg(num(o.seed, 1)) });
       return oc.startRendering();
     },
-    async renderTrack(id, { bars, sampleRate = 44100, stems: stemList = [], intensity: inten = 1 } = {}) {
+    async renderTrack(id, options) {
+      const o = opts(options);
       const track = tracks.get(id);
-      if (!track) throw new RangeError(`renderTrack: unknown track "${id}"`);
+      if (!track) throw new RangeError(`renderTrack: unknown track "${String(id)}"`);
       const OAC = globalThis.OfflineAudioContext || globalThis.webkitOfflineAudioContext;
       if (typeof OAC !== 'function') throw new Error('renderTrack: OfflineAudioContext is not available');
-      const nBars = Math.max(1, Math.trunc(bars ?? track.bars));
+      const nBars = Math.max(1, Math.trunc(num(o.bars, track.bars)));
+      const sampleRate = clamp(num(o.sampleRate, 44100), 8000, 96000);
+      const inten = clamp(num(o.intensity, 1), 0, 1);
       const stepSec = stepSeconds(track.bpm, track.stepsPerBeat);
       const steps = nBars * track.stepsPerBar;
       const start = 0.05;
       const oc = new OAC(2, Math.ceil((start + steps * stepSec + 2.5) * sampleRate), sampleRate);
       const g = buildGraph(oc);
       g.musicFilter.frequency.value = intensityToCutoff(inten);
-      const player = createPlayer(oc, g.musicFilter, track, start, { stems: new Set(stemList), intensity: inten, offline: true });
+      const player = createPlayer(oc, g.musicFilter, track, start, { stems: toStemMap(o.stems ?? []), intensity: inten, offline: true });
       player.schedule(start + (steps - 0.5) * stepSec);
       return oc.startRendering();
     },
@@ -2109,10 +2387,15 @@ export function createAudio() {
     async dispose() {
       if (timer !== null) clearTimeout(timer);
       timer = null;
+      if (onVisibility && typeof document !== 'undefined' && typeof document.removeEventListener === 'function') {
+        document.removeEventListener('visibilitychange', onVisibility);
+      }
+      onVisibility = null;
       for (const p of players) p.dispose();
       players = [];
       current = null;
       pending = null;
+      limiter.reset();
       const c = ctx;
       ctx = null;
       graph = null;

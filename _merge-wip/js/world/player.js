@@ -119,14 +119,17 @@ export function createPlayer(init) {
   const pool = [];
   for (let i = 0; i < 4; i++) pool.push({ type: 'turn', dir: 'down', x: 0, y: 0, fromX: 0, fromY: 0, run: false });
 
-  /** @param {'turn'|'step'|'bump'} type @param {Dir} dir */
-  function emit(type, dir) {
+  /**
+   * @param {'turn'|'step'|'bump'} type @param {Dir} dir
+   * @param {number} [fromX] origin tile of a step (captured before tickMovement collapses it)
+   * @param {number} [fromY]
+   */
+  function emit(type, dir, fromX = ent.x, fromY = ent.y) {
     if (events.length >= pool.length) return;
     const ev = pool[events.length];
     ev.type = type; ev.dir = dir;
     ev.x = ent.x; ev.y = ent.y;
-    ev.fromX = type === 'step' ? ent.fromX : ent.x;
-    ev.fromY = type === 'step' ? ent.fromY : ent.y;
+    ev.fromX = fromX; ev.fromY = fromY;
     ev.run = ent.speedMs < WALK_MS;
     events.push(ev);
   }
@@ -169,7 +172,10 @@ export function createPlayer(init) {
       if (sinceBump >= BUMP_COOLDOWN_MS) { emit('bump', dir); sinceBump = 0; }
       return false;
     }
-    if (carryMs > 0 && ctx.ents.tickMovement(ent, carryMs) === 'arrived') { emit('step', dir); ent.spill = 0; }
+    if (carryMs > 0) {
+      const sx = ent.fromX, sy = ent.fromY;
+      if (ctx.ents.tickMovement(ent, carryMs) === 'arrived') { emit('step', dir, sx, sy); ent.spill = 0; }
+    }
     return true;
   }
 
@@ -179,8 +185,9 @@ export function createPlayer(init) {
     sinceBump += ms;
     let carry = 0;
     if (ent.moving) {
+      const sx = ent.fromX, sy = ent.fromY;
       if (ctx.ents.tickMovement(ent, ms) !== 'arrived') return events;
-      emit('step', ent.facing);
+      emit('step', ent.facing, sx, sy);
       carry = ent.spill;
       ent.spill = 0;
     }

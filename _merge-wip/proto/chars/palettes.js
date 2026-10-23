@@ -66,7 +66,7 @@ export const PALETTES = {
   tamsin: {
     K: '#1e1e28', k: '#2a3a33', F: '#8a8a96', f: '#5f5f70', L: '#a8a8b4', M: '#f1eee6', m: '#c8c4cc',
     E: INK, W: PAPER, N: '#1e1e28', R: '#2a2433', r: '#1e1e28',
-    C: '#4e6e5d', c: '#3a5246', D: '#c9b48a', d: '#a8927c', Y: BRASS,
+    C: '#4e6e5d', c: '#3a5246', D: '#c9b48a', d: '#a8927c', Y: BRASS, a: '#7a5a36',
     S: '#3a3440', s: '#2a2433', B: '#5c4028', b: '#3e2618',
   },
 
@@ -107,7 +107,7 @@ export const PALETTES = {
   },
   hesper: {
     K: '#2e3a2c', F: '#a9b8a0', f: '#7a8c74', L: '#c3d0ba', E: '#2e3a2c', W: '#e9f7f2',
-    C: '#c9b48a', c: '#8c7a5a', M: '#f4f1e6', A: BRASS, X: '#f9c46b', x: '#e8d3a0', Y: '#a8323a',
+    C: '#c9b48a', c: '#8c7a5a', M: '#f4f1e6', A: BRASS, a: '#7a5a36', k: '#2e3a2c', X: '#f9c46b', x: '#e8d3a0', Y: '#a8323a',
   },
   ansel: {
     K: '#2a3340', F: '#8ea0b0', f: '#607486', L: '#b8c8d4', M: '#e8edf0', m: '#c8d2da', E: '#141b33', W: PAPER,
@@ -115,14 +115,14 @@ export const PALETTES = {
   },
   wick: {
     K: '#1e1e28', F: '#2a2433', f: '#1e1e28', L: '#3a3848', M: '#f1eee6', m: '#c8c4cc', E: INK, W: PAPER,
-    N: '#f28c28', n: '#c96a1a', B: '#f28c28', b: '#c96a1a', C: '#a3283a', c: '#7a1e2c', D: '#f4e8c1', Y: '#f4e8c1', k: '#1e1e28',
+    N: '#f28c28', n: '#c96a1a', B: '#f28c28', b: '#c96a1a', C: '#a3283a', c: '#7a1e2c', D: '#f4e8c1', Y: '#f4e8c1', k: '#1e1e28', a: '#7a5a36',
   },
   ludo: {
     K: '#2a1c22', F: '#6a4a52', f: '#4a3038', L: '#8a6a72', M: '#c9a090', m: '#a8807a', E: INK, W: PAPER,
-    N: '#3a1f1c', P: '#e3a0a8', S: '#3a2830', k: '#2a1c22', X: '#f9c46b', C: '#3b4a6b', c: '#2b3a67',
+    N: '#3a1f1c', P: '#e3a0a8', S: '#3a2830', k: '#2a1c22', X: '#f9c46b', C: '#3b4a6b', c: '#2b3a67', Y: '#a8323a',
   },
   dimity: {
-    K: '#7a3b4e', F: '#f2a7b5', f: '#d98a9c', L: '#f9d1d9', Y: '#ffe29a', y: '#f3c178', E: '#141b33', W: PAPER, M: '#fff3d6', P: '#e07a9a',
+    K: '#7a3b4e', k: '#7a3b4e', F: '#f2a7b5', f: '#d98a9c', L: '#f9d1d9', Y: '#ffe29a', y: '#f3c178', E: '#141b33', W: PAPER, M: '#fff3d6', m: '#f3c178', P: '#e07a9a',
   },
 };
 

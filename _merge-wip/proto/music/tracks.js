@@ -130,30 +130,39 @@ function nightLayer(bars, { v = 0.32, spb = 16, steps = [0, 6, 10], oct = 12 } =
   return out;
 }
 
-/** Low pad swell that follows the root an octave or two below the pad (tide stem). */
+/**
+ * Low pad swell on root + fifth two octaves below the pad (tide stem). Re-voiced every bar so it never pedals a root
+ * against the next chord (a held G under the D bar put G against F# in the low mids); the pad's 0.35 s attack and 0.7 s
+ * release overlap bar to bar, and the velocity peaks every `every` bars so the swell still breathes slowly.
+ */
 function tideLayer(bars, { v = 0.42, spb = 16, oct = 2, every = 2 } = {}) {
   const out = [];
-  for (let i = 0; i < bars.length; i += every) {
-    const c = parseBar(bars[i])[0];
+  bars.forEach((bar, i) => {
+    const c = parseBar(bar)[0];
     const r = rootMidi(c.root, oct);
-    out.push({ t: i * spb, n: [r, r + 7], d: spb * Math.min(every, bars.length - i), v });
-  }
+    out.push({ t: i * spb, n: [r, r + 7], d: spb, v: i % every === 0 ? v : v * 0.72 });
+  });
   return out;
 }
 
-/** Softer rhodes-like broken chords on the off-beats (rain stem). */
+/**
+ * Soft rhodes comping on the off-beats (rain stem). An off-beat that runs into the next chord anticipates it
+ * (comping-style) instead of smearing the old chord's ring over the new downbeat.
+ */
 function rainLayer(bars, { v = 0.2, spb = 16, steps = [2, 6, 10, 14] } = {}) {
   const out = [];
   bars.forEach((bar, i) => {
     const chords = parseBar(bar);
     const slice = spb / chords.length;
     chords.forEach((c, j) => {
-      const tones = [...c.notes].sort((a, b) => a - b);
+      const next = j + 1 < chords.length ? chords[j + 1] : parseBar(bars[(i + 1) % bars.length])[0];
       steps.forEach((s, k) => {
         if (s >= slice) return;
+        const d = 3;
+        const tones = [...(s + d > slice ? next : c).notes].sort((a, b) => a - b);
         const n = k % 2 === 0 ? tones.slice(0, 2) : tones[(k + 1) % tones.length];
         const t = i * spb + j * slice + s;
-        out.push({ t, n, d: Math.min(3, bars.length * spb - t), v });
+        out.push({ t, n, d: Math.min(d, bars.length * spb - t), v });
       });
     });
   });
@@ -192,41 +201,44 @@ function counterLayer(bars, cells, { v = 0.45, spb = 16, oct = 0, lo = 57 } = {}
 
 /** Brushed drum kit patterns. One bar given; repeated. */
 const KICK = 36, SNARE = 38, HAT = 42, RIM = 37;
+// Hat velocities: the engine's hat preset peaks at only 0.22 (kick 0.75), so brushed hats below v 0.3 render around -30 dBFS and
+// vanish under the limiter; these sit the hour themes near -26 dB and the battles at the engine demo track's own hat level.
 const PERC = {
-  whisper: [ { t: 4, n: HAT, d: 1, v: 0.18 }, { t: 12, n: HAT, d: 1, v: 0.16 } ],
+  whisper: [ { t: 4, n: HAT, d: 1, v: 0.34 }, { t: 12, n: HAT, d: 1, v: 0.3 } ],
   brush: [
     { t: 0, n: KICK, d: 1, v: 0.32 }, { t: 10, n: KICK, d: 1, v: 0.22 },
-    { t: 4, n: SNARE, d: 1, v: 0.18 }, { t: 12, n: SNARE, d: 1, v: 0.2 },
-    { t: 2, n: HAT, d: 1, v: 0.16 }, { t: 6, n: HAT, d: 1, v: 0.16 }, { t: 10, n: HAT, d: 1, v: 0.14 }, { t: 14, n: HAT, d: 1, v: 0.18 },
+    { t: 4, n: SNARE, d: 1, v: 0.26 }, { t: 12, n: SNARE, d: 1, v: 0.28 },
+    { t: 2, n: HAT, d: 1, v: 0.3 }, { t: 6, n: HAT, d: 1, v: 0.3 }, { t: 10, n: HAT, d: 1, v: 0.26 }, { t: 14, n: HAT, d: 1, v: 0.34 },
   ],
   light: [
     { t: 0, n: KICK, d: 1, v: 0.38 }, { t: 10, n: KICK, d: 1, v: 0.26 },
-    { t: 4, n: SNARE, d: 1, v: 0.24 }, { t: 12, n: SNARE, d: 1, v: 0.26 }, { t: 15, n: SNARE, d: 1, v: 0.1 },
-    ...[0, 2, 4, 6, 8, 10, 12, 14].map(t => ({ t, n: HAT, d: 1, v: t % 4 === 0 ? 0.2 : 0.12 })),
+    { t: 4, n: SNARE, d: 1, v: 0.32 }, { t: 12, n: SNARE, d: 1, v: 0.34 }, { t: 15, n: SNARE, d: 1, v: 0.14 },
+    ...[0, 2, 4, 6, 8, 10, 12, 14].map(t => ({ t, n: HAT, d: 1, v: t % 4 === 0 ? 0.36 : 0.22 })),
   ],
   drive: [
     { t: 0, n: KICK, d: 1, v: 0.6 }, { t: 6, n: KICK, d: 1, v: 0.35 }, { t: 8, n: KICK, d: 1, v: 0.55 }, { t: 14, n: KICK, d: 1, v: 0.3 },
-    { t: 4, n: SNARE, d: 1, v: 0.5 }, { t: 12, n: SNARE, d: 1, v: 0.55 }, { t: 15, n: SNARE, d: 1, v: 0.18 },
-    ...Array.from({ length: 16 }, (_, t) => ({ t, n: HAT, d: 1, v: t % 4 === 2 ? 0.3 : 0.14 })),
+    { t: 4, n: SNARE, d: 1, v: 0.55 }, { t: 12, n: SNARE, d: 1, v: 0.6 }, { t: 15, n: SNARE, d: 1, v: 0.22 },
+    ...Array.from({ length: 16 }, (_, t) => ({ t, n: HAT, d: 1, v: t % 4 === 2 ? 0.5 : 0.26 })),
   ],
   heavy: [
     { t: 0, n: KICK, d: 1, v: 0.7 }, { t: 3, n: KICK, d: 1, v: 0.35 }, { t: 8, n: KICK, d: 1, v: 0.65 }, { t: 11, n: KICK, d: 1, v: 0.35 },
-    { t: 4, n: SNARE, d: 1, v: 0.6 }, { t: 12, n: SNARE, d: 1, v: 0.65 }, { t: 14, n: SNARE, d: 1, v: 0.25 },
-    ...Array.from({ length: 16 }, (_, t) => ({ t, n: HAT, d: 1, v: t % 4 === 2 ? 0.34 : 0.16 })),
+    { t: 4, n: SNARE, d: 1, v: 0.65 }, { t: 12, n: SNARE, d: 1, v: 0.7 }, { t: 14, n: SNARE, d: 1, v: 0.28 },
+    ...Array.from({ length: 16 }, (_, t) => ({ t, n: HAT, d: 1, v: t % 4 === 2 ? 0.55 : 0.28 })),
   ],
   waltz: [ // 12 steps
-    { t: 0, n: KICK, d: 1, v: 0.4 }, { t: 4, n: HAT, d: 1, v: 0.2 }, { t: 8, n: HAT, d: 1, v: 0.2 }, { t: 6, n: RIM, d: 1, v: 0.12 },
+    { t: 0, n: KICK, d: 1, v: 0.4 }, { t: 4, n: HAT, d: 1, v: 0.36 }, { t: 8, n: HAT, d: 1, v: 0.36 }, { t: 6, n: RIM, d: 1, v: 0.2 },
   ],
-  tick: Array.from({ length: 16 }, (_, t) => ({ t, n: HAT, d: 1, v: t % 4 === 0 ? 0.2 : 0.08 })),
+  tick: Array.from({ length: 16 }, (_, t) => ({ t, n: HAT, d: 1, v: t % 4 === 0 ? 0.34 : 0.15 })),
 };
 function percLayer(style, bars, spb = 16) { return rep(PERC[style], bars, spb); }
 
 /** Builds a day-part theme from hand-written harmony + melody. */
 /**
- * Melody gain per lead instrument so every hour's tune sits at about the same loudness: the engine's
- * flute peaks at 0.24, pluck 0.32, marimba 0.42, bell ~0.45 (see INSTRUMENTS in js/core/audio.js).
+ * Melody gain per lead instrument so every hour's tune sits at about the same loudness. The engine's flute peaks at 0.24,
+ * pluck 0.32, marimba 0.42, bell ~0.45 (see INSTRUMENTS in js/core/audio.js), but the flute sustains while the others decay,
+ * so equal peaks left the flute hours ~7 dB fuller in RMS; the flute is trimmed and the marimba lifted to narrow that.
  */
-const MELODY_GAIN = { flute: 0.95, pluck: 0.8, marimba: 0.62, bell: 0.58, glass: 0.7 };
+const MELODY_GAIN = { flute: 0.82, pluck: 0.8, marimba: 0.68, bell: 0.58, glass: 0.7 };
 
 function theme(id, { title, bpm, key, scale, bars, melody, melodyInst = 'flute', melodyGain, perc = 'brush', bass = 'calm',
   padGain = 0.5, nightSteps, motif, mood }) {
@@ -241,7 +253,7 @@ function theme(id, { title, bpm, key, scale, bars, melody, melodyInst = 'flute',
       perc:   { inst: 'kit',   gain: 0.6,  default: true,  role: 'perc',   pattern: percLayer(perc, n) },
       night:  { inst: 'glass', gain: 0.65, default: false, role: 'night',  pattern: nightLayer(bars, { steps: nightSteps }) },
       tide:   { inst: 'pad',   gain: 0.45, default: false, role: 'tide',   pattern: tideLayer(bars) },
-      rain:   { inst: 'bell',  gain: 0.45, default: false, role: 'rain',   pattern: rainLayer(bars) },
+      rain:   { inst: 'rhodes', gain: 0.5, default: false, role: 'rain',  pattern: rainLayer(bars, { v: 0.3 }) },
     },
   };
 }
@@ -267,7 +279,7 @@ const M_NIGHT_DEEP = P(`
 // 03–06 "Before the Gulls" — E dorian, 88 bpm. Plucked guitar, rising hopeful motif E G A B.
 const H_PREDAWN = [
   'E: E3 G3 B3 D4', 'A: E3 A3 C#4', 'D: F#3 A3 D4', 'B: F#3 B3 D4',
-  'E: E3 G3 B3 D4', 'A: E3 A3 C#4', 'G: G3 B3 D4 F#4', 'A: A3 D4 E4',
+  'E: E3 G3 B3 D4', 'A: E3 A3 C#4', 'G: G3 B3 D4', 'A: A3 D4 E4',
   'D: F#3 A3 D4', 'G: G3 B3 D4', 'E: E3 G3 B3', 'A: E3 A3 C#4',
   'B: F#3 B3 D4', 'F#: F#3 A3 C#4', 'G: G3 B3 D4', 'A: A3 C#4 E4',
 ];
@@ -282,7 +294,7 @@ const H_MORNING = [
   'D: F#3 A3 D4', 'G: G3 B3 D4', 'A: A3 C#4 E4', 'D: A3 D4 F#4',
   'B: B3 D4 F#4', 'G: G3 B3 D4', 'A: A3 C#4 E4', 'D: F#3 A3 D4',
   'E: E3 G3 B3 D4', 'A: E3 A3 C#4', 'F#: F#3 A3 C#4', 'B: F#3 B3 D4',
-  'G: G3 B3 D4', 'D: F#3 A3 D4', 'G: G3 B3 D4 F#4 / A: A3 C#4 E4', 'D: A3 D4 F#4',
+  'G: G3 B3 D4', 'D: F#3 A3 D4', 'G: G3 B3 D4 / A: A3 C#4 E4', 'D: A3 D4 F#4',
 ];
 const M_MORNING = P(`
   D4:3 F#4:3 A4:2 B4:8 | A4:4 G4:2 F#4:2 G4:8 | E4:3 F#4:3 G4:2 A4:4 C#5:4 | D5:12 r:4 |
@@ -292,8 +304,8 @@ const M_MORNING = P(`
 
 // 09–12 "Gull Market" — G lydian, 104 bpm. Marimba, syncopated, the II chord (A) gives the lydian lift.
 const H_LATE_MORNING = [
-  'G: G3 B3 D4 F#4', 'A: A3 C#4 E4', 'G: G3 B3 D4', 'D: A3 D4 F#4',
-  'G: G3 B3 D4 F#4', 'A: A3 C#4 E4', 'B: B3 D4 F#4', 'D: A3 D4 F#4',
+  'G: G3 B3 D4', 'A: A3 C#4 E4', 'G: G3 B3 D4', 'D: A3 D4 F#4',
+  'G: G3 B3 D4', 'A: A3 C#4 E4', 'B: B3 D4 F#4', 'D: A3 D4 F#4',
   'E: E3 G3 B3 D4', 'F#: F#3 A3 C#4', 'G: G3 B3 D4', 'A: A3 C#4 E4',
   'B: B3 D4 F#4', 'A: A3 C#4 E4', 'G: G3 B3 D4 F#4', 'D: A3 D4 F#4',
 ];
@@ -345,15 +357,15 @@ const M_DUSK = P(`
 // 21–24 "Porchlight" — B minor, 88 bpm. Bell melody like a music box; the night stem doubles it an octave up.
 const H_NIGHT = [
   'B: B3 D4 F#4', 'F#: A3 C#4 F#4', 'G: G3 B3 D4', 'D: A3 D4 F#4',
-  'B: B3 D4 F#4', 'G: G3 B3 D4 F#4', 'E: E3 G3 B3 D4', 'F#: F#3 A3 C#4',
+  'B: B3 D4 F#4', 'G: G3 B3 D4', 'E: E3 G3 B3 D4', 'F#: F#3 A3 C#4',
   'G: G3 B3 D4', 'A: A3 C#4 E4', 'B: B3 D4 F#4', 'D: A3 D4 F#4',
   'E: E3 G3 B3 D4', 'G: G3 B3 D4', 'A: A3 C#4 E4', 'B: B3 D4 F#4',
 ];
 const M_NIGHT = P(`
   B4:4 D5:4 F#5:4 E5:4 | C#5:8 A4:8 | B4:4 D5:4 G5:8 | F#5:8 D5:4 A4:4 |
   B4:4 D5:4 F#5:4 E5:4 | D5:4 B4:4 G4:8 | E4:4 G4:4 B4:8 | C#5:12 r:4 |
-  r:4 G4:4 B4:4 D5:4 | C#5:8 E5:8 | F#5:4 D5:4 B4:8 | A4:4 D5:4 F#5:8 |
-  E5:4 D5:4 B4:8 | D5:4 B4:4 G4:8 | A4:4 C#5:4 E5:8 | F#5:4 D5:4 B4:8`, { v: 0.62 });
+  r:4 G4:4 B4:4 D5:4 | C#5:8 E5:8 | F#5:4 D5:4 B4:8 | A4:4 D5:4 F#5:4 r:4 |
+  E5:4 D5:4 B4:8 | D5:4 B4:4 G4:8 | A4:4 C#5:4 E5:8 | F#5:4 D5:4 B4:4 r:4`, { v: 0.62 });
 
 export const DAY_PARTS = [
   theme('h_night_deep',   { title: 'Harbor Asleep',            bpm: 84,  key: 'B', scale: 'minor',      bars: H_NIGHT_DEEP,   melody: M_NIGHT_DEEP,   melodyInst: 'flute',   perc: 'whisper', bass: 'calm', padGain: 0.5, nightSteps: [0, 6, 10], motif: 'F#4 A4 B4 (rest) A4 — a sigh', mood: 'deep night, rigging creaks' }),
@@ -379,7 +391,7 @@ const TITLE = {
   motif: 'HEARTMARK D4 F#4 A4 B4, then an octave up', mood: 'warm, slow, a beam sweeping the bay',
   layers: {
     core:   { inst: 'pad',   gain: 0.55, default: true, role: 'core',   pattern: padLayer(H_TITLE) },
-    melody: { inst: 'flute', gain: 0.95, default: true, role: 'melody', pattern: P(`
+    melody: { inst: 'flute', gain: 0.82, default: true, role: 'melody', pattern: P(`
       D4:4 F#4:4 A4:4 B4:4 | A4:12 r:4 | E4:4 F#4:4 A4:4 C#5:4 | D5:16 |
       D5:4 F#5:4 A5:4 B5:4 | A5:8 G5:4 F#5:4 | E5:8 D5:4 C#5:4 | E5:16 |
       A4:4 D5:4 F#5:4 A5:4 | C#5:8 A4:8 | B4:4 D5:4 G5:8 | F#5:12 r:4 |
@@ -397,12 +409,12 @@ const FORECAST = {
   id: 'forecast', title: 'Shift Forecast', bpm: 96, key: 'E', scale: 'dorian', bars: 8, stepsPerBar: 16,
   motif: 'E5 B4 glass tick every beat; melody only touches the 2nd and 6th', mood: 'suspended, glassy, ticking',
   layers: {
-    core:   { inst: 'glass', gain: 0.5, default: true, role: 'core', pattern: rep(P('E5:2:0.4 r:2 B4:2:0.3 r:2 E5:2:0.35 r:2 B4:2:0.3 r:2'), 8, 16) },
+    core:   { inst: 'glass', gain: 0.6, default: true, role: 'core', pattern: rep(P('E5:2:0.4 r:2 B4:2:0.3 r:2 E5:2:0.35 r:2 B4:2:0.3 r:2'), 8, 16) },
     pad:    { inst: 'pad',   gain: 0.45, default: true, role: 'pad',  pattern: padLayer(H_FORECAST, { v: 0.5 }) },
     perc:   { inst: 'kit',   gain: 0.5, default: true, role: 'perc', pattern: percLayer('tick', 8) },
     melody: { inst: 'bell',  gain: 0.55, default: true, role: 'melody', pattern: P(`
       r:8 F#5:4 E5:4 | r:16 | A5:6 r:2 F#5:8 | r:16 | r:8 B5:4 C#6:4 | r:16 | F#5:4 E5:4 D5:8 | r:16`, { v: 0.5 }) },
-    bass:   { inst: 'bass',  gain: 0.6, default: true, role: 'bass', pattern: bassLayer(H_FORECAST, { style: 'calm', v: 0.5 }) },
+    bass:   { inst: 'bass',  gain: 0.4, default: true, role: 'bass', pattern: bassLayer(H_FORECAST, { style: 'calm', v: 0.5 }) },
   },
 };
 
@@ -436,16 +448,17 @@ function pulseLayer(bars, { v = 0.45, spb = 16 } = {}) {
   return out;
 }
 /**
- * Low "brass" pedal (Spire): open root–fifth dyads an octave above the bass line on the bass preset. The first draft dropped
- * the whole pad voicing an octave, which parked minor thirds at 80–100 Hz (E2 G2) under a driving 8th-note bass — below the
- * low-interval limit. Open fifths in octave 3 keep the weight and stay out of the bass's way.
+ * Low brass pedal (Spire): the fifth and octave above each chord root (A2–B3) held on the brass preset. The first draft
+ * dropped the whole pad voicing an octave, which parked minor thirds at 80–100 Hz (E2 G2) under a driving 8th-note bass —
+ * below the low-interval limit — and measured as the second-loudest layer in the track. An open fifth-and-octave above the
+ * bass root keeps the weight, never doubles the bass's own pitch, and leaves the thirds to the pad.
  */
-function brassLayer(bars, { v = 0.45, spb = 16, oct = 3 } = {}) {
+function brassLayer(bars, { v = 0.45, spb = 16, oct = 2 } = {}) {
   const out = [];
   bars.forEach((bar, i) => {
     const chords = parseBar(bar);
     const slice = spb / chords.length;
-    chords.forEach((c, j) => { const r = rootMidi(c.root, oct); out.push({ t: i * spb + j * slice, n: [r, r + 7], d: slice, v }); });
+    chords.forEach((c, j) => { const r = rootMidi(c.root, oct); out.push({ t: i * spb + j * slice, n: [r + 7, r + 12], d: slice, v }); });
   });
   return out;
 }
@@ -519,7 +532,7 @@ const BATTLE_SPIRE = battle('battle_spire', {
   // off-beat arpeggio of whatever the pad holds (B3 D4 F#4 B3 on the B bars; it bends with the G, E, F# and A bars)
   counter: counterLayer(H_BATTLE_SPIRE, [[2, 0], [6, 1], [10, 2], [14, 0]], { v: 0.45 }),
   extra: {
-    brass: { inst: 'bass', gain: 0.4, default: true, role: 'brass', pattern: brassLayer(H_BATTLE_SPIRE) },
+    brass: { inst: 'brass', gain: 0.4, default: true, role: 'brass', pattern: brassLayer(H_BATTLE_SPIRE) },
   },
 });
 
@@ -635,7 +648,7 @@ const RELIGHTING = {
     bells:  { inst: 'glass', gain: 0.5,  default: true, role: 'bells', pattern: cat(
       nightLayer(H_RELIGHT.slice(8, 20), { steps: [0, 8], v: 0.3 }).map(e => ({ ...e, t: e.t + 128 })),
       at(320, rep(P('D5:2 F#5:2 A5:2 B5:2 D6:2 A5:2 F#5:2 B5:2 D6:2 F#6:2 A6:2 B5:2 D6:2 F#5:2 A5:2 D6:2', { v: 0.32 }), 2, 32))) },
-    melody: { inst: 'flute', gain: 0.95, default: true, role: 'melody', pattern: at(192, P(`
+    melody: { inst: 'flute', gain: 0.82, default: true, role: 'melody', pattern: at(192, P(`
       D4:4 F#4:4 A4:4 B4:4 | A4:12 r:4 | E4:4 F#4:4 A4:4 C#5:4 | D5:16 |
       D5:4 F#5:4 A5:4 B5:4 | A5:8 E5:8 | F#5:4 D5:4 B4:4 A4:4 | B4:8 C#5:8 |
       D5:32 | F#5:32`, { v: 0.7 })) },
@@ -656,15 +669,15 @@ const LANTERN_MARKET = {
   motif: 'B4 D5 G5 (lilt) then the Heartmark from G: G4 B4 D5 E5 in bar 9', mood: 'Saturday night waltz, lanterns and cider',
   layers: {
     core:   { inst: 'pad',     gain: 0.4, default: true, role: 'core', pattern: padLayer(H_WALTZ, { v: 0.45, spb: 12 }) },
-    melody: { inst: 'marimba', gain: 0.62, default: true, role: 'melody', pattern: P(`
+    melody: { inst: 'marimba', gain: 0.72, default: true, role: 'melody', pattern: P(`
       B4:4 D5:4 G5:4 | F#5:8 r:4 | A4:4 D5:4 F#5:4 | E5:8 D5:4 |
       B4:4 E5:4 G5:4 | A5:8 E5:4 | F#5:4 D5:4 A4:4 | D5:8 r:4 |
       G4:4 B4:4 D5:4 | E5:8 D5:4 | B4:4 D5:4 G5:4 | E5:8 r:4 |
       D5:4 B4:4 G4:4 | A4:4 D5:4 F#5:4 | E5:4 C#5:4 A4:4 | G4:8 r:4`, { v: 0.75 }) },
-    bass:   { inst: 'bass',    gain: 0.6, default: true, role: 'bass', pattern: bassLayer(H_WALTZ, { style: 'waltz', spb: 12 }) },
+    bass:   { inst: 'bass',    gain: 0.5, default: true, role: 'bass', pattern: bassLayer(H_WALTZ, { style: 'waltz', spb: 12 }) },
     perc:   { inst: 'kit',     gain: 0.5, default: true, role: 'perc', pattern: percLayer('waltz', 16, 12) },
     night:  { inst: 'glass',   gain: 0.45, default: true, role: 'night', pattern: nightLayer(H_WALTZ, { spb: 12, steps: [0, 8], v: 0.26 }) },
-    rain:   { inst: 'bell',    gain: 0.3, default: false, role: 'rain', pattern: rainLayer(H_WALTZ, { spb: 12, steps: [2, 6, 10] }) },
+    rain:   { inst: 'rhodes',  gain: 0.4, default: false, role: 'rain', pattern: rainLayer(H_WALTZ, { spb: 12, steps: [2, 6, 10], v: 0.3 }) },
   },
 };
 
@@ -675,7 +688,7 @@ const CREDITS = {
   motif: 'Lighthouse melody into Porchlight Morning; both carry the Heartmark', mood: 'a slow walk home along the quay',
   layers: {
     core:   { inst: 'pad',   gain: 0.5, default: true, role: 'core', pattern: padLayer(H_CREDITS, { v: 0.5 }) },
-    melody: { inst: 'flute', gain: 0.95, default: true, role: 'melody', pattern: cat(TITLE.layers.melody.pattern, at(256, M_MORNING)) },
+    melody: { inst: 'flute', gain: 0.82, default: true, role: 'melody', pattern: cat(TITLE.layers.melody.pattern, at(256, M_MORNING)) },
     bass:   { inst: 'bass',  gain: 0.6, default: true, role: 'bass', pattern: bassLayer(H_CREDITS, { style: 'calm' }) },
     perc:   { inst: 'kit',   gain: 0.45, default: true, role: 'perc', pattern: at(256, percLayer('brush', 16)) },
     night:  { inst: 'glass', gain: 0.4, default: true, role: 'night', pattern: nightLayer(H_CREDITS, { steps: [0, 8], v: 0.26 }) },
@@ -750,6 +763,7 @@ const KIT_VOICES = { 36: 'kick', 38: 'snare', 42: 'hat', 37: 'snare' };
  *   `stemLayers(track, 'perc')` returns the full list of engine layer names a stem controls.
  * - `default:false` layers become `stem:true` (start muted, toggled with setStem).
  * - `rim` (37) hits are sent to the snare preset at low velocity.
+ * - `loop: false` (stings) is forwarded; the engine plays those once and reports `oneShot` / `remaining` in nowPlaying().
  */
 export function toEngine(track, { humanize = 0.35 } = {}) {
   const spb = track.stepsPerBar || 16;
@@ -769,7 +783,7 @@ export function toEngine(track, { humanize = 0.35 } = {}) {
       layers[name] = { ...base, inst: L.inst, pattern: L.pattern.map(e => ({ t: e.t, n: e.n, d: e.d, v: e.v })) };
     }
   }
-  return { bpm: track.bpm, key: track.key, scale: track.scale, bars: track.bars, beatsPerBar, stepsPerBar: spb, swing: track.swing ?? 0, layers };
+  return { bpm: track.bpm, key: track.key, scale: track.scale, bars: track.bars, beatsPerBar, stepsPerBar: spb, swing: track.swing ?? 0, loop: track.loop !== false, layers };
 }
 /** Roles the game toggles at runtime; they become engine stems even when on by default (engine stems are exact-name, global). */
 const TOGGLABLE = new Set(['perc', 'night', 'tide', 'rain', 'tense']);

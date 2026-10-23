@@ -1,0 +1,31 @@
+/** Fixture interior map: a 6x5 cottage with a candle and a door back to the harbor. */
+export default Object.freeze({
+  id: 'cottage',
+  name: "Wren's Cottage",
+  kind: 'interior',
+  region: 'town',
+  w: 6,
+  h: 5,
+  ground: [
+    'HHHHHH',
+    'HffffH',
+    'HffffH',
+    'HffffH',
+    'HHdHHH',
+  ],
+  detail: [
+    '......',
+    '.n....',
+    '......',
+    '......',
+    '......',
+  ],
+  legend: { n: 'candle' },
+  light: { indoor: true },
+  music: 'cottage-theme',
+  entities: [],
+  triggers: [{ x: 4, y: 1, kind: 'use', id: 'bed', verb: 'sleep' }],
+  warps: [{ x: 2, y: 4, to: { mapId: 'harbor', x: 3, y: 9, facing: 'down' }, kind: 'door', sfx: 'doorClose' }],
+  spawns: [],
+  entry: { x: 2, y: 3, facing: 'up' },
+});

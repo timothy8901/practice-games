@@ -53,8 +53,8 @@ Layers (stems) on every hour theme:
 | `bass` | bass, follows chord roots | on | always |
 | `perc` | kick/snare/hat, brushed | on | off 01:00–05:00 |
 | `night` | glass bells arpeggio on chord tones, +1 octave | off | on 20:00–05:00 |
-| `tide` | low pad, root + fifth two octaves down, 2-bar swells | off | on when tide > 0.7 |
-| `rain` | soft bell broken chords on the off-beats (rhodes stand-in) | off | on when weather is rain or storm |
+| `tide` | low pad, root + fifth two octaves down, re-voiced every bar (never pedals against a new chord), louder swell every 2 bars | off | on when tide > 0.7 |
+| `rain` | soft rhodes comping on the off-beats | off | on when weather is rain or storm |
 
 Season is a mix tilt rather than a stem (`CUES.world.intensity`: winter 0.9 … summer 1.1); the engine's
 `setMusicParam({intensity})` / per-layer `minIntensity` can hang extra parts off that later.
@@ -67,7 +67,7 @@ Season is a mix tilt rather than a stem (`CUES.world.intensity`: winter 0.9 … 
 | `forecast` | Shift Forecast | E dorian (sus chords) | 96 | 8 | glass E5/B4 tick every beat, hat tick every step, bell melody that touches only 2nd and 6th; nothing resolves |
 | `battle_wild` | Tall Grass | B minor | 126 | 16 | off-beat pluck stabs, driving 8th bass, riff F#5 · F#5 A5 B5 A5 F#5; B section lifts to D |
 | `battle_trainer` | Across the Field | F# minor | 132 | 16 | stacked C#5 F#5 A5 ascent, marimba counter-line |
-| `battle_spire` | The Spire | B minor | 120 | 24 | heavy kit, low brass pedal (bass preset on open fifths an octave above the bass), **Vagary** A5 G5 F#5 D5 |
+| `battle_spire` | The Spire | B minor | 120 | 24 | heavy kit, low brass pedal (open fifths an octave above the bass), **Vagary** A5 G5 F#5 D5 |
 | `summit` | Summit | D major → B minor | 128 | 32 | Heartmark in sixteenths, Vagary in the minor half, bells, counter ostinato |
 | `victory` | Caught the Light | D major | 120 | 4 | one-shot: Heartmark then D major fanfare + glass cascade |
 | `shift_reveal` | Shift | D major | 150 | 1 (32 steps) | one-shot on a 50 ms grid: rising glass run (charge, 0.3 s) → scramble (0.6 s) → Heartmark chord (resolve, 0.7 s); matches the 18f/36f/36f animation. `shift_reveal_anchor` is the chord alone on the same grid |
@@ -102,13 +102,13 @@ CUES.title / forecast / victory / shift_reveal / letter / relighting / credits
 
 Differences from the contract found while reading `js/core/audio.js`, and how the data copes:
 
-- **No kit preset.** Drums are separate `kick` / `snare` / `hat` instruments, so one `perc` layer in the
-  data becomes `perc.kick`, `perc.snare`, `perc.hat` in the engine. `stemLayers(track, 'perc')` returns the
-  engine names so a `setStem('perc', on)` call can fan out (or the engine can learn prefix matching).
+- **Kit.** The data keeps one `perc` layer per track; `toEngine` splits it into `perc.kick` / `perc.snare` / `perc.hat`
+  (the engine has since grown a `kit` preset and prefix stems, so either `setStem('perc', on)` or the fan-out from
+  `stemLayers(track, 'perc')` works; the split keeps per-voice velocities exactly as written).
 - **Muted-by-default layers are `stem: true`**, not a separate "optional" list. `default: false` maps to it.
 - **Scale names** are `pentatonic` (not `major-pentatonic`); `dorian`, `lydian`, `mixolydian` exist.
-- **No rhodes preset** — the `rain` layer uses `bell` at low velocity.
-- **No brass preset** — the Spire's "low brass" is the `bass` preset holding open root–fifth dyads in octave 3 (full voicings an octave down put thirds below C3, under the bass line).
+- The `rain` layer uses the engine's `rhodes` preset; the Spire's low brass is the `brass` preset holding open fifth-and-octave dyads above the bass root (A2–B3; full voicings an octave down put thirds below C3, under the bass line).
+- One-shots (`loop: false`: victory, shift_reveal, letter, relighting) are forwarded to the engine, which plays them once.
 - `humanize` defaults to 0.5 in the engine; the data asks for 0.35 (0.2 for drums) to keep the brushes tight.
 - Chord events pass `n` as an array; the engine resolves arrays natively.
 
@@ -119,4 +119,5 @@ Differences from the contract found while reading `js/core/audio.js`, and how th
   chord that leads back.
 - Pads use hand-written voicings that keep common tones (e.g. D: A3 D4 F#4 → Bm: B3 D4 F#4 → G: G3 B3 D4).
 - The bass plays roots (calm: root + fifth, walk: root–root–fifth–octave, drive: 8ths, waltz: oom-pah-pah).
-- Night = top chord voice up an octave on glass; tide = root/fifth two octaves below the pad; rain = thirds on off-beats.
+- Night = top chord voice up an octave on glass; tide = root/fifth two octaves below the pad; rain = thirds on off-beats, the last one of each bar anticipating the next chord.
+- Voicing hygiene (checked by `analyze.mjs`): no melody note a minor 2nd/9th from a sounding pad voice on a strong beat (so a bar whose tune lands on G drops the F# from Gmaj7), no seconds/thirds voiced below C3, every `|` in a melody on a bar line.

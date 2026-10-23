@@ -1,15 +1,107 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><link rel="icon" href="data:,"><title>Chars Sheet</title>
-<style>html,body{margin:0;background:#2b3a67;color:#f4f1e6;font:12px ui-monospace,monospace}body{padding:12px}canvas{image-rendering:pixelated;display:block}</style></head>
-<body><canvas id="c"></canvas>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>Character Sheet</title>
+<style>
+  :root { --ink: #141b33; --deep: #2b3a67; --paper: #f4f1e6; --rule: #c9a77c; --v: #94b0c2; }
+  html, body { margin: 0; background: var(--ink); color: var(--paper); font: 12px/1.4 ui-monospace, Menlo, Consolas, monospace; }
+  body { padding: 10px 14px 24px; }
+  h1 { font-size: 13px; letter-spacing: .12em; text-transform: uppercase; margin: 0 0 2px; color: var(--rule); }
+  p.sub { margin: 0 0 8px; color: var(--v); }
+  .ctl { margin: 0 0 8px; color: var(--v); } .ctl label { margin-right: 12px; }
+  .row { display: flex; align-items: flex-end; gap: 6px; margin-bottom: 4px; }
+  .row canvas { image-rendering: pixelated; image-rendering: crisp-edges; display: block; }
+  .row .name { width: 120px; color: var(--paper); font-weight: 700; font-size: 11px; line-height: 1.2; padding-bottom: 4px; }
+  .row .name small { display: block; color: var(--v); font-weight: 400; }
+  .strip { display: flex; gap: 2px; }
+  .cell { background: #4e6e5d; }
+  .cell.night { background: #2b3a67; }
+  .cell.sand { background: #c9b48a; }
+  .hdr { display: flex; gap: 6px; color: var(--v); font-size: 10px; margin: 6px 0 2px; }
+  .hdr span { display: inline-block; text-align: center; }
+  .portrait { background: #f4f1e6; border: 1px solid var(--rule); }
+</style>
+</head>
+<body>
+<h1>Character sheet</h1>
+<p class="sub">16x24 palette-indexed string art at 3x. Per row: walk down (animated) · 4 frames down · up · left · right · sit · fish (24 wide, rod overhangs) · portrait 48x48. Add <code>?zoom=6&amp;only=wren,juniper</code> to inspect.</p>
+<div class="ctl">
+  <label><input type="checkbox" id="anim" checked> animate walk</label>
+  <label>backdrop <select id="bg"><option value="cell">grass</option><option value="cell night">night</option><option value="cell sand">sand</option></select></label>
+  <label><input type="checkbox" id="outline"> silhouette (k fill)</label>
+</div>
+<div id="rows"></div>
 <script type="module">
-import { decodeSprite, drawSprite } from '../../js/core/pixelart.js';
-import { BODIES, PALETTES, CHARACTERS, frame } from './chars.js';
-const S=3, c=document.getElementById('c'); const ids=Object.keys(CHARACTERS);
-c.width=(4*4+2)*18*S; c.height=ids.length*28*S; const ctx=c.getContext('2d');
-let t=0; function render(){ ctx.fillStyle='#4e6e5d'; ctx.fillRect(0,0,c.width,c.height);
- ids.forEach((id,row)=>{ const ch=CHARACTERS[id], pal=PALETTES[ch.palette]; let col=0;
-  for(const f of ['down','up','left','right']) for(let s=0;s<4;s++){ const sp=decodeSprite(frame(ch.body,f,s),pal,{scale:S}); drawSprite(ctx,sp,col*18*S,row*28*S+2*S); col++; }
-  for(const f of ['sit','fish']){ const sp=decodeSprite(frame(ch.body,f),pal,{scale:S}); drawSprite(ctx,sp,col*18*S,row*28*S+2*S); col++; }
- }); }
-render(); window.__sheet={ok:true};
-</script></body></html>
+  import { decodeSprite, drawSprite, silhouette } from '../../js/core/pixelart.js';
+  import { BODIES, PALETTES, CHARACTERS, PORTRAITS, frame, walkStep } from './chars.js';
+
+  const q = new URLSearchParams(location.search);
+  const SCALE = Number(q.get('zoom') || 3);
+  const only = q.get('only') ? q.get('only').split(',') : null;
+  const ids = Object.keys(CHARACTERS).filter((id) => !only || only.includes(id));
+  const root = document.getElementById('rows');
+  const animBox = document.getElementById('anim'), bgSel = document.getElementById('bg'), outBox = document.getElementById('outline');
+
+  const COLS = [
+    { facing: 'down', step: 'anim', label: 'walk' },
+    ...[0, 1, 2, 3].map((s) => ({ facing: 'down', step: s, label: `D${s}` })),
+    ...[0, 1, 2, 3].map((s) => ({ facing: 'up', step: s, label: `U${s}` })),
+    ...[0, 1, 2, 3].map((s) => ({ facing: 'left', step: s, label: `L${s}` })),
+    ...[0, 1, 2, 3].map((s) => ({ facing: 'right', step: s, label: `R${s}` })),
+    { facing: 'sit', label: 'sit' },
+    { facing: 'fish', label: 'fish', w: 24 },
+  ];
+  const cells = [];
+  for (const id of ids) {
+    const ch = CHARACTERS[id];
+    const row = document.createElement('div'); row.className = 'row';
+    row.insertAdjacentHTML('beforeend', `<div class="name">${ch.name}<small>${ch.species} · ${ch.body}</small></div>`);
+    const strip = document.createElement('div'); strip.className = 'strip';
+    for (const col of COLS) {
+      const c = document.createElement('canvas');
+      c.width = (col.w || 16) * SCALE; c.height = 24 * SCALE; c.className = 'cell';
+      strip.append(c);
+      cells.push({ id, ch, col, c });
+    }
+    if (BODIES[ch.body].poses) {
+      const c = document.createElement('canvas'); c.width = 16 * SCALE; c.height = 24 * SCALE; c.className = 'cell';
+      strip.append(c); cells.push({ id, ch, col: { facing: 'hang', label: 'hang' }, c });
+    }
+    const p = PORTRAITS[id];
+    if (p) {
+      const c = document.createElement('canvas'); c.width = 48 * SCALE; c.height = 48 * SCALE; c.className = 'portrait';
+      strip.append(c); cells.push({ id, ch, col: { portrait: true }, c });
+    }
+    row.append(strip);
+    root.append(row);
+  }
+
+  let t0 = performance.now();
+  function render(now) {
+    const step = walkStep(now - t0, 125);
+    const bgClass = bgSel.value;
+    for (const { ch, col, c } of cells) {
+      c.className = col.portrait ? 'portrait' : bgClass;
+      const ctx = c.getContext('2d'); ctx.clearRect(0, 0, c.width, c.height);
+      let sp;
+      if (col.portrait) {
+        const p = PORTRAITS[ch.name ? Object.keys(CHARACTERS).find((k) => CHARACTERS[k] === ch) : ''];
+        sp = decodeSprite(p.rows, p.palette, { scale: SCALE });
+      } else {
+        const rowsF = frame(ch.body, col.facing, col.step === 'anim' ? (animBox.checked ? step : 0) : col.step || 0);
+        sp = decodeSprite(rowsF, PALETTES[ch.palette], { scale: SCALE });
+        if (outBox.checked) sp = decodeSprite(silhouette(sp, '#1a1c2c'), null, {});
+      }
+      drawSprite(ctx, sp, 0, 0);
+    }
+  }
+  let frames = 0;
+  function loop(now) { render(now); frames++; requestAnimationFrame(loop); }
+  requestAnimationFrame(loop);
+  window.__sheet = { count: ids.length, cells: cells.length, frames: () => frames };
+</script>
+</body>
+</html>

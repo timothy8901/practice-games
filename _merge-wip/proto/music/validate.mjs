@@ -3,7 +3,7 @@ import { TRACKS, CUES, themeForHour, toEngine, DAY_PARTS, signalSting, stemLayer
 
 let fails = 0;
 const ok = (cond, msg) => { console.log((cond ? 'PASS ' : 'FAIL ') + msg); if (!cond) fails++; };
-const PRESETS = new Set(['pluck', 'pad', 'bass', 'bell', 'flute', 'kick', 'hat', 'snare', 'marimba', 'glass', 'kit']);
+const PRESETS = new Set(['pluck', 'pad', 'bass', 'bell', 'flute', 'kick', 'hat', 'snare', 'marimba', 'glass', 'kit', 'rhodes', 'brass']);
 const DAY_IDS = DAY_PARTS.map(t => t.id);
 
 for (const [id, t] of Object.entries(TRACKS)) {
@@ -67,6 +67,7 @@ ok(TRACKS.victory.bars === 4 && TRACKS.shift_reveal.bars === 1 && TRACKS.shift_r
   ok(Object.values(TRACKS).filter(t => t.stepsPerBar === 12).every(t => toEngine(t).beatsPerBar === 3), '3/4 tracks reach the engine with beatsPerBar 3');
 }
 ok(signalSting([5, 4, 3, 2, 1, 0]).layers.melody.pattern.length === 7, 'signalSting builds a custom letter');
+ok(Object.values(TRACKS).every(t => toEngine(t).loop === (t.loop !== false)) && toEngine(TRACKS.victory).loop === false && toEngine(TRACKS.h_morning).loop === true, 'toEngine forwards loop:false for stings');
 {
   const c = worldCue({ hour: 22, weekday: 2, weather: 'rain', tide: 0.9, season: 'summer', place: 'town' });
   ok(c.track === 'h_night' && c.stems.night && c.stems.tide && c.stems.rain && c.stems.perc && c.fade === Math.round(2 * 4 * 60000 / 88), `worldCue 22:00 rain high tide -> ${JSON.stringify(c)}`);

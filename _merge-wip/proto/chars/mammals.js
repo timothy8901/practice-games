@@ -299,6 +299,7 @@ for (const [n, h] of Object.entries(HEADS)) { assertW(n + '.down', h.down, 12); 
  */
 export function backHead(front, { keep = 'KAG', earRows = 2, earLetter = 'F' } = {}) {
   const keepSet = new Set(keep);
+  const hasR = front.some((r) => r.includes('R'));
   return front.map((row, y) => {
     const chars = [...row];
     // find interior span for shading
@@ -306,7 +307,8 @@ export function backHead(front, { keep = 'KAG', earRows = 2, earLetter = 'F' } =
     chars.forEach((ch, x) => { if (ch !== '.') { if (first < 0) first = x; last = x; } });
     return chars.map((ch, x) => {
       if (ch === '.' || keepSet.has(ch)) return ch;
-      if (y < earRows && (ch === 'R' || ch === 'P')) return ch === 'P' ? 'R' : ch; // dark ear backs
+      if (y < earRows && ch === 'R') return 'R';
+      if (y < earRows && ch === 'P') return hasR ? 'R' : 'f'; // dark ear backs
       if (y < earRows) return earLetter;
       const bottom = y >= front.length - 2;
       const right = x >= last - 1;
@@ -416,7 +418,7 @@ TORSOS.overalls = makeTorso((r, c, { shadeCol, side }) => {
   if (!side) {
     if (r === 0) return c === 5 || c === 10 ? 'C' : 'F';        // straps on shoulders
     if (r === 1) return c === 5 || c === 10 ? 'C' : (c <= 4 || c >= 11 ? (shadeCol ? 'f' : 'F') : 'F');
-    if (r === 2) return c >= 5 && c <= 10 ? (c === 6 || c === 9 ? 'Y' : 'C') : (shadeCol ? 'f' : 'F'); // buttons
+    if (r === 2) return c >= 5 && c <= 10 ? (c === 6 || c === 9 ? 'A' : 'C') : (shadeCol ? 'f' : 'F'); // buttons
     if (c <= 4 || c >= 11) return r <= 3 ? (shadeCol ? 'f' : 'F') : (shadeCol ? 'c' : 'C');
     return shadeCol || c === 10 ? 'c' : 'C';
   }
@@ -549,44 +551,45 @@ export const BIRDLEGS = {
 // ---------------------------------------------------------------------------
 export const TAILS = {};
 TAILS.redpanda = {
-  // bushy ringed tail curling up behind the (viewer's) right hip to shoulder height
-  down: { x: 10, y: 9, behind: true, part: [
-    '..KKK.',
-    '.KSSSK',
-    '.KTTTK',
-    '..KFFFK',
-    '..KTTTK',
-    '..KFFfK',
-    '.KTTtK.',
-    'KFFfK..',
-    'KKKK...',
-  ] },
-  up: { x: 1, y: 9, behind: false, part: [
+  // bushy ringed tail curling up beside the (viewer's) right hip to shoulder
+  // height; drawn over the arm so it reads chunky inside the 16px cell
+  down: { x: 10, y: 9, behind: false, part: [
     '.KKK..',
     'KSSSK.',
     'KTTTK.',
-    'KFFFK.',
+    '.KFFFK',
     '.KTTTK',
     '.KFFfK',
     '.KTTtK',
-    '..KFfK',
-    '..KKKK',
+    '.KFFfK',
+    '..KKK.',
   ] },
-  left: { x: 10, y: 9, behind: false, part: [
+  up: { x: 0, y: 9, behind: false, part: [
     '..KKK.',
     '.KSSSK',
     '.KTTTK',
+    'KFFFK.',
+    'KTTTK.',
+    'KFFfK.',
+    'KTTtK.',
+    'KFFfK.',
+    '.KKK..',
+  ] },
+  left: { x: 10, y: 9, behind: false, part: [
+    '.KKK..',
+    'KSSSK.',
+    'KTTTK.',
     '.KFFFK',
-    '..KTTTK',
-    '..KFFfK',
-    '.KTTtK.',
-    'KFFfK..',
-    'KKKK...',
+    '.KTTTK',
+    '.KFFfK',
+    '.KTTtK',
+    '.KFFfK',
+    '..KKK.',
   ] },
 };
 TAILS.otter = {
   // thick tapered tail lying along the ground, out to the right
-  down: { x: 10, y: 18, behind: true, part: [
+  down: { x: 9, y: 18, behind: true, part: [
     'KK....',
     'KFFK..',
     '.KFFKK',
@@ -600,7 +603,7 @@ TAILS.otter = {
     'KffFK.',
     'KKKK..',
   ] },
-  left: { x: 10, y: 18, behind: true, part: [
+  left: { x: 9, y: 18, behind: true, part: [
     'KK....',
     'KFFK..',
     '.KFFKK',
@@ -627,9 +630,9 @@ TAILS.ferret = {
 };
 TAILS.mongoose = {
   // long tapering tail carried low and out, dark tip
-  down: { x: 10, y: 15, behind: true, part: ['KK....', 'KFFK..', '.KFFK.', '..KFFK', '...KSsK', '....KKK'] },
+  down: { x: 9, y: 15, behind: true, part: ['KK....', 'KFFK..', '.KFFK.', '..KFFK', '...KSsK', '....KKK'] },
   up: { x: 1, y: 15, behind: false, part: ['....KK', '..KFFK', '.KFFK.', 'KFFK..', 'KSsK..', 'KKK...'] },
-  left: { x: 10, y: 15, behind: true, part: ['KK....', 'KFFK..', '.KFFK.', '..KFFK', '...KSsK', '....KKK'] },
+  left: { x: 9, y: 15, behind: true, part: ['KK....', 'KFFK..', '.KFFK.', '..KFFK', '...KSsK', '....KKK'] },
 };
 TAILS.beaver = {
   // flat paddle tail lying on the ground, low-left, crosshatched

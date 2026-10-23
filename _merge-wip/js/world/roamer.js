@@ -276,16 +276,20 @@ export function shouldDespawn(r, ctx) {
  */
 function dirRelativeToPlayer(r, ctx, away) {
   const p = ctx.player;
-  let best = null, bestD = away ? -Infinity : Infinity;
+  // Away vector (or toward, when approaching); ties on distance go to the dominant axis.
+  const vx = away ? r.x - p.x : p.x - r.x, vy = away ? r.y - p.y : p.y - r.y;
+  let best = null, bestD = away ? -Infinity : Infinity, bestAlign = -Infinity;
   for (let d = 0; d < 4; d++) {
     const nx = r.x + DX[d], ny = r.y + DY[d];
     if (!ctx.passable(nx, ny, ctx.tideState, 'roamer')) continue;
     if (ctx.occupied && ctx.occupied(nx, ny)) continue;
     const dist = Math.abs(nx - p.x) + Math.abs(ny - p.y);
-    if (away ? dist > bestD : dist < bestD) { bestD = dist; best = DIRS[d]; }
+    const align = DX[d] * vx + DY[d] * vy;
+    const better = away ? dist > bestD : dist < bestD;
+    if (better || (dist === bestD && align > bestAlign)) { bestD = dist; bestAlign = align; best = DIRS[d]; }
   }
-  const now = Math.abs(r.x - p.x) + Math.abs(r.y - p.y);
   if (best === null) return null;
+  const now = Math.abs(r.x - p.x) + Math.abs(r.y - p.y);
   if (away && bestD <= now) return null;        // cornered: stay
   if (!away && bestD >= now) return null;       // cannot get closer
   return best;
