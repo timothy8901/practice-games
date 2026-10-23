@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>Audio Test Bench</title>
+<style>
+  :root { --bg: #14181f; --panel: #1d232d; --ink: #e8edf3; --dim: #8e9ab0; --accent: #f2b84b; --ok: #6fd18a; --bad: #ff6b6b; }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 16px; background: var(--bg); color: var(--ink); font: 14px/1.4 system-ui, sans-serif; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--dim); margin: 18px 0 8px; }
+  .row { display: flex; flex-wrap: wrap; gap: 6px; }
+  button { background: var(--panel); color: var(--ink); border: 1px solid #2f3846; border-radius: 6px; padding: 7px 10px; cursor: pointer; font: inherit; }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); color: #1a1408; border-color: var(--accent); font-weight: 600; }
+  label { display: inline-flex; align-items: center; gap: 6px; color: var(--dim); margin-right: 12px; }
+  canvas { display: block; width: 100%; height: 72px; background: #0d1015; border-radius: 6px; margin-top: 8px; }
+  pre { background: #0d1015; border-radius: 6px; padding: 10px; max-height: 280px; overflow: auto; font: 12px/1.45 ui-monospace, monospace; white-space: pre-wrap; }
+  .pass { color: var(--ok); } .fail { color: var(--bad); } .info { color: var(--dim); }
+  #status { color: var(--dim); }
+</style>
+</head>
+<body>
+<h1>core/audio test bench</h1>
+<div id="status">booting…</div>
+
+<h2>Engine</h2>
+<div class="row">
+  <button id="unlock" class="primary">Unlock audio</button>
+  <button id="mute">Mute</button>
+  <label>master <input id="vMaster" type="range" min="0" max="1" step="0.01" value="1"></label>
+  <label>music <input id="vMusic" type="range" min="0" max="1" step="0.01" value="0.8"></label>
+  <label>sfx <input id="vSfx" type="range" min="0" max="1" step="0.01" value="1"></label>
+</div>
+
+<h2>Music</h2>
+<div class="row">
+  <button id="play">Play demo track</button>
+  <button id="playFast">Crossfade to double-time variant</button>
+  <button id="stop">Stop (fade)</button>
+  <button id="stemNight">Night stem: off</button>
+  <button id="stemTide">Tide stem: off</button>
+  <label>intensity <input id="intensity" type="range" min="0" max="1" step="0.01" value="1"></label>
+</div>
+<div id="np" class="info" style="margin-top:6px">—</div>
+<canvas id="scope" width="960" height="72"></canvas>
+
+<h2>SFX bank</h2>
+<div class="row" id="sfx"></div>
+
+<h2>Checks</h2>
+<div class="row">
+  <button id="runChecks">Run offline level checks</button>
+  <button id="playAll">Audition every sfx</button>
+</div>
+<pre id="log"></pre>
+
+<script type="module">
+  import { audio, SFX_NAMES, DEMO_TRACK, DEMO_TRACK_ID, analyzeBuffer, sfxDuration } from '../../js/core/audio.js';
+
+  const $ = (id) => document.getElementById(id);
+  const logEl = $('log');
+  const summary = { pass: 0, fail: 0, lines: [] };
+
+  function report(kind, msg) {
+    const line = `${kind} ${msg}`;
+    summary.lines.push(line);
+    if (kind === 'PASS') { summary.pass++; console.log(line); }
+    else if (kind === 'FAIL') { summary.fail++; console.error(line); }
+    else console.log(line);
+    const span = document.createElement('div');
+    span.className = kind === 'PASS' ? 'pass' : kind === 'FAIL' ? 'fail' : 'info';
+    span.textContent = line;
+    logEl.appendChild(span);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+  const check = (ok, msg) => report(ok ? 'PASS' : 'FAIL', msg);
+
+  // ── controls ───────────────────────────────────────────────────────────────────────────────
+  $('unlock').onclick = () => audio.unlock().then((ok) => { $('status').textContent = `unlock → ${ok} (state ${audio.state})`; });
+  $('mute').onclick = () => { audio.mute(!audio.isMuted()); $('mute').textContent = audio.isMuted() ? 'Unmute' : 'Mute'; };
+  for (const [id, key] of [['vMaster', 'master'], ['vMusic', 'music'], ['vSfx', 'sfx']]) {
+    $(id).oninput = (e) => audio.setVolume({ [key]: Number(e.target.value) });
+  }
+  const fast = { ...DEMO_TRACK, bpm: 150, key: 'D' };
+  audio.defineTrack('harbor-fast', fast);
+  $('play').onclick = () => audio.playMusic(DEMO_TRACK_ID, { fade: 800 });
+  $('playFast').onclick = () => audio.playMusic(audio.nowPlaying()?.id === DEMO_TRACK_ID ? 'harbor-fast' : DEMO_TRACK_ID, { fade: 1500 });
+  $('stop').onclick = () => audio.stopMusic({ fade: 800 });
+  const stemBtn = (id, name) => {
+    let on = false;
+    $(id).onclick = () => { on = !on; audio.setStem(name, on); $(id).textContent = `${name[0].toUpperCase()}${name.slice(1)} stem: ${on ? 'on' : 'off'}`; };
+  };
+  stemBtn('stemNight', 'night');
+  stemBtn('stemTide', 'tide');
+  $('intensity').oninput = (e) => audio.setMusicParam({ intensity: Number(e.target.value) });
+
+  for (const name of SFX_NAMES) {
+    const b = document.createElement('button');
+    b.textContent = name;
+    b.title = `${sfxDuration(name)}s`;
+    b.onclick = () => audio.sfx(name, { pan: (Math.random() - 0.5) * 0.6 });
+    $('sfx').appendChild(b);
+  }
+
+  // ── visualizer + now playing ───────────────────────────────────────────────────────────────
+  const scope = $('scope');
+  const sctx = scope.getContext('2d');
+  let buf = null;
+  function draw() {
+    requestAnimationFrame(draw);
+    const np = audio.nowPlaying();
+    $('np').textContent = np ? (np.pending ? `pending: ${np.id}` : `${np.id} · bar ${np.bar + 1} beat ${np.beat + 1} · loop ${np.loop} · stems [${np.stems.join(', ')}] · intensity ${np.intensity.toFixed(2)}`) : '— (stopped)';
+    const an = audio.analyser;
+    sctx.fillStyle = '#0d1015';
+    sctx.fillRect(0, 0, scope.width, scope.height);
+    if (!an) return;
+    if (!buf || buf.length !== an.fftSize) buf = new Float32Array(an.fftSize);
+    an.getFloatTimeDomainData(buf);
+    sctx.strokeStyle = '#f2b84b';
+    sctx.lineWidth = 1.5;
+    sctx.beginPath();
+    for (let i = 0; i < buf.length; i++) {
+      const x = (i / (buf.length - 1)) * scope.width;
+      const y = scope.height / 2 - buf[i] * (scope.height / 2 - 2);
+      if (i === 0) sctx.moveTo(x, y); else sctx.lineTo(x, y);
+    }
+    sctx.stroke();
+  }
+  draw();
+
+  // ── checks ─────────────────────────────────────────────────────────────────────────────────
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  async function auditionAll() {
+    for (const name of SFX_NAMES) {
+      const h = audio.sfx(name);
+      check(h && h.name === name && h.duration > 0, `sfx(${name}) scheduled live`);
+      await sleep(Math.min(700, Math.max(120, sfxDuration(name) * 1000 * 0.6)));
+    }
+  }
+
+  async function offlineChecks() {
+    report('INFO', 'rendering sfx bank offline…');
+    let worst = { name: '', peak: 0 };
+    for (const name of SFX_NAMES) {
+      try {
+        const b = await audio.renderSfx(name, { seed: 7 });
+        const ch = [b.getChannelData(0), b.getChannelData(1)];
+        const { peak } = analyzeBuffer(ch);
+        // Peak over the whole render (tail included); RMS over the sound's nominal window.
+        const win = Math.min(ch[0].length, Math.ceil((0.02 + sfxDuration(name)) * b.sampleRate));
+        const { rms } = analyzeBuffer(ch.map((c) => c.subarray(0, win)));
+        if (peak > worst.peak) worst = { name, peak };
+        check(peak < 0.99, `offline sfx ${name} peak ${peak.toFixed(3)} < 0.99`);
+        check(rms > 0.01, `offline sfx ${name} rms ${rms.toFixed(4)} > 0.01 over ${(win / b.sampleRate).toFixed(2)}s`);
+      } catch (err) {
+        check(false, `offline sfx ${name} threw ${err && err.message}`);
+      }
+    }
+    report('INFO', `loudest sfx: ${worst.name} (peak ${worst.peak.toFixed(3)})`);
+    try {
+      const b = await audio.renderSfx('thwap', { pitch: 2, volume: 2, pan: -0.5 });
+      const { peak } = analyzeBuffer([b.getChannelData(0), b.getChannelData(1)]);
+      check(peak < 0.99, `offline sfx thwap at volume 2 still limited: peak ${peak.toFixed(3)}`);
+    } catch (err) {
+      check(false, `offline overdrive check threw ${err && err.message}`);
+    }
+    report('INFO', 'rendering 8 bars of the demo track offline (all stems on)…');
+    try {
+      const t0 = performance.now();
+      const b = await audio.renderTrack(DEMO_TRACK_ID, { bars: 8, stems: ['night', 'tide'] });
+      const ch = [b.getChannelData(0), b.getChannelData(1)];
+      const { peak, rms } = analyzeBuffer(ch);
+      check(peak < 0.99, `offline track peak ${peak.toFixed(3)} < 0.99`);
+      check(rms > 0.01, `offline track rms ${rms.toFixed(4)} > 0.01`);
+      const bars = 8;
+      const barSamples = Math.floor((60 / DEMO_TRACK.bpm) * 4 * b.sampleRate);
+      let silentBars = 0;
+      for (let i = 0; i < bars; i++) {
+        const start = Math.floor(0.05 * b.sampleRate) + i * barSamples;
+        const r = analyzeBuffer([ch[0].subarray(start, start + barSamples)]);
+        if (r.rms < 0.01) silentBars++;
+      }
+      check(silentBars === 0, `every bar of the demo loop has audio (${silentBars} silent bars)`);
+      report('INFO', `track render ${(b.duration).toFixed(1)}s took ${(performance.now() - t0).toFixed(0)}ms`);
+    } catch (err) {
+      check(false, `offline track render threw ${err && err.message}`);
+    }
+  }
+
+  $('runChecks').onclick = offlineChecks;
+  $('playAll').onclick = auditionAll;
+
+  // ── auto-run for the headless harness ──────────────────────────────────────────────────────
+  async function autoRun() {
+    check(SFX_NAMES.length >= 40, `sfx bank has ${SFX_NAMES.length} sounds`);
+    const ok = await audio.unlock();
+    $('status').textContent = `unlock → ${ok} (state ${audio.state})`;
+    check(audio.ready, `audio.ready after unlock (state ${audio.state})`);
+    check(audio.analyser !== null, 'analyser exposed');
+    if (!audio.ready) { summary.done = true; return; }
+    audio.setVolume({ master: 1, music: 0.8, sfx: 1 });
+    check(audio.playMusic(DEMO_TRACK_ID, { fade: 400 }), 'playMusic(demo) accepted');
+    await sleep(1200);
+    const np = audio.nowPlaying();
+    check(np && np.id === DEMO_TRACK_ID && !np.pending, `nowPlaying reports ${np && np.id}`);
+    audio.setStem('night', true);
+    check(audio.getStems().includes('night'), 'night stem toggled on');
+    audio.setMusicParam({ intensity: 0.6 });
+    const an = audio.analyser;
+    const data = new Float32Array(an.fftSize);
+    await sleep(600);
+    an.getFloatTimeDomainData(data);
+    const live = analyzeBuffer([data]);
+    check(live.peak > 0.001, `live analyser sees signal (peak ${live.peak.toFixed(3)})`);
+    for (const name of ['coin', 'thwap', 'shiftReveal', 'letter']) check(Boolean(audio.sfx(name)), `sfx(${name}) scheduled live`);
+    check(audio.sfx('textTick') !== null && audio.sfx('textTick') === null, 'textTick spam is rate limited');
+    check(audio.playMusic('harbor-fast', { fade: 1000 }), 'crossfade to second track accepted');
+    await sleep(300);
+    check(audio.nowPlaying().id === 'harbor-fast', 'nowPlaying switched during crossfade');
+    await offlineChecks();
+    audio.playMusic(DEMO_TRACK_ID, { fade: 1200 });
+    summary.done = true;
+    report('INFO', `done: ${summary.pass} passed, ${summary.fail} failed`);
+  }
+  window.__audioTest = { summary: () => ({ pass: summary.pass, fail: summary.fail, done: Boolean(summary.done), lines: summary.lines }), audio };
+  autoRun().catch((err) => { check(false, `autoRun threw ${err && err.stack}`); summary.done = true; });
+</script>
+</body>
+</html>

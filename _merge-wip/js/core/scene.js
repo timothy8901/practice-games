@@ -375,23 +375,24 @@ export function transitionFrame(elapsed, ms, hold = 0) {
  * @param {number} h
  * @param {TransitionFrame} frame
  * @param {WipeDirection} direction
- * @returns {void}
+ * @returns {boolean} Whether anything was painted.
  */
 function drawWipe(ctx, w, h, frame, direction) {
   if (frame.phase === 'hold') {
     ctx.fillRect(0, 0, w, h);
-    return;
+    return true;
   }
   const horizontal = direction === 'right' || direction === 'left';
   const span = horizontal ? w : h;
   const band = Math.round(span * frame.coverage);
-  if (band <= 0) return;
+  if (band <= 0) return false;
   // The band hugs the start edge while covering, and the far edge while uncovering.
   const startsAtOrigin = direction === 'right' || direction === 'down';
   const atOrigin = frame.phase === 'out' ? startsAtOrigin : !startsAtOrigin;
   const offset = atOrigin ? 0 : span - band;
   if (horizontal) ctx.fillRect(offset, 0, band, h);
   else ctx.fillRect(0, offset, w, band);
+  return true;
 }
 
 /**
@@ -402,7 +403,7 @@ function drawWipe(ctx, w, h, frame, direction) {
  * @param {number} w
  * @param {number} h
  * @param {number} coverage 0..1
- * @returns {void}
+ * @returns {boolean} Whether anything was painted.
  */
 function drawIris(ctx, w, h, coverage) {
   const cx = w / 2;
@@ -410,28 +411,42 @@ function drawIris(ctx, w, h, coverage) {
   const radius = Math.hypot(cx, cy) * (1 - coverage);
   if (radius <= 0) {
     ctx.fillRect(0, 0, w, h);
-    return;
+    return true;
   }
+  let drew = false;
   const top = Math.max(0, Math.floor(cy - radius));
   const bottom = Math.min(h, Math.ceil(cy + radius));
-  if (top > 0) ctx.fillRect(0, 0, w, top);
-  if (bottom < h) ctx.fillRect(0, bottom, w, h - bottom);
+  if (top > 0) {
+    ctx.fillRect(0, 0, w, top);
+    drew = true;
+  }
+  if (bottom < h) {
+    ctx.fillRect(0, bottom, w, h - bottom);
+    drew = true;
+  }
   const r2 = radius * radius;
   for (let y = top; y < bottom; y++) {
     const dy = y + 0.5 - cy;
     const halfWidth = Math.sqrt(Math.max(0, r2 - dy * dy));
     const left = Math.floor(cx - halfWidth);
     const right = Math.ceil(cx + halfWidth);
-    if (left > 0) ctx.fillRect(0, y, Math.min(left, w), 1);
-    if (right < w) ctx.fillRect(Math.max(right, 0), y, w - Math.max(right, 0), 1);
+    if (left > 0) {
+      ctx.fillRect(0, y, Math.min(left, w), 1);
+      drew = true;
+    }
+    if (right < w) {
+      ctx.fillRect(Math.max(right, 0), y, w - Math.max(right, 0), 1);
+      drew = true;
+    }
   }
+  return drew;
 }
 
 /**
  * Draws the overlay of a transition for the given frame, on top of whatever is already on `ctx`.
  * The context's transform, alpha and composite operation are reset for the overlay and restored
  * afterwards. Only `fillRect` is required of the context, so pixel-art buffers and test doubles both
- * work. Nothing is drawn for `'none'` or a coverage of 0.
+ * work. Nothing is drawn for `'none'`, a coverage of 0, or a band thinner than a pixel.
  * @param {CanvasRenderingContext2D} ctx
  * @param {TransitionKind} kind
  * @param {TransitionFrame} frame From {@link transitionFrame}.
@@ -462,6 +477,7 @@ export function drawTransition(ctx, kind, frame, options = {}) {
   const w = width ?? (canvas && canvas.width > 0 ? canvas.width : DEFAULT_WIDTH);
   const h = height ?? (canvas && canvas.height > 0 ? canvas.height : DEFAULT_HEIGHT);
   const phase = frame.phase === 'out' || frame.phase === 'in' ? frame.phase : 'hold';
+  let drew = false;
 
   withState(ctx, () => {
     if (typeof ctx.setTransform === 'function') ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -472,16 +488,17 @@ export function drawTransition(ctx, kind, frame, options = {}) {
       case 'fade':
         ctx.globalAlpha = coverage;
         ctx.fillRect(0, 0, w, h);
+        drew = true;
         break;
       case 'wipe':
-        drawWipe(ctx, w, h, { ...frame, phase, coverage }, direction);
+        drew = drawWipe(ctx, w, h, { ...frame, phase, coverage }, direction);
         break;
       default:
-        drawIris(ctx, w, h, coverage);
+        drew = drawIris(ctx, w, h, coverage);
         break;
     }
   });
-  return true;
+  return drew;
 }
 
 /**

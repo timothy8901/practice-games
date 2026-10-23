@@ -1406,11 +1406,12 @@ Object.assign(SFX, {
     },
   },
   textTick: {
-    dur: 0.04,
+    dur: 0.05,
     play(ctx, dest, t0, p) {
       const g = mkGain(ctx, dest, 0);
-      perc(g.gain, t0, 0.2 * p.gain, 0.028, 0.001);
-      mkOsc(ctx, g, 'triangle', 1250 * p.pitch, t0, t0 + 0.03);
+      perc(g.gain, t0, 0.3 * p.gain, 0.036, 0.001);
+      mkOsc(ctx, g, 'triangle', 1250 * p.pitch, t0, t0 + 0.04);
+      burst(ctx, dest, t0, { gain: 0.12 * p.gain, dur: 0.008, type: 'highpass', freq: 3000, attack: 0.0005, rand: p.rand });
     },
   },
   toast: {
@@ -1553,3 +1554,583 @@ export function sfxDuration(name) {
   const def = SFX[SFX_ALIASES[name] ?? name];
   return def ? def.dur : null;
 }
+
+// ───────────────────────────────────────────────────────────────────────────────────────────────
+// Demo track: "Harbor Lights" — 92 bpm, D major, 8 bars (I–V–vi–IV, two bars each).
+// ───────────────────────────────────────────────────────────────────────────────────────────────
+
+/** Id under which {@link DEMO_TRACK} is pre-registered by {@link createAudio}. */
+export const DEMO_TRACK_ID = 'harbor';
+
+/**
+ * Build the demo track definition (pure data; the composer's reference for the hourly themes).
+ * @returns {{bpm: number, key: string, scale: string, bars: number, swing: number,
+ *   layers: Record<string, object>}}
+ */
+export function buildDemoTrack() {
+  // Per two-bar block: [root, fifth, approach note] for the plucked bass.
+  const bassBlocks = [[38, 45, 43], [45, 40, 45], [47, 42, 45], [43, 38, 45]];
+  const bass = [];
+  bassBlocks.forEach(([r, f, ap], i) => {
+    const o = i * 32;
+    bass.push(
+      { t: o, n: r, d: 6, v: 0.9 }, { t: o + 6, n: r, d: 2, v: 0.55 }, { t: o + 8, n: f, d: 4, v: 0.7 },
+      { t: o + 14, n: r, d: 2, v: 0.5 }, { t: o + 16, n: r, d: 6, v: 0.85 }, { t: o + 22, n: r, d: 2, v: 0.5 },
+      { t: o + 24, n: f, d: 4, v: 0.7 }, { t: o + 28, n: ap, d: 4, v: 0.6 },
+    );
+  });
+  const melody = [
+    { t: 0, n: 'A4', d: 2, v: 0.8 }, { t: 4, n: 'F#4', d: 2, v: 0.7 }, { t: 6, n: 'D4', d: 2, v: 0.65 }, { t: 8, n: 'E4', d: 4, v: 0.75 }, { t: 14, n: 'F#4', d: 2, v: 0.6 },
+    { t: 16, n: 'A4', d: 4, v: 0.8 }, { t: 22, n: 'B4', d: 2, v: 0.7 }, { t: 24, n: 'A4', d: 2, v: 0.7 }, { t: 28, n: 'F#4', d: 4, v: 0.65 },
+    { t: 32, n: 'E4', d: 2, v: 0.75 }, { t: 36, n: 'C#5', d: 2, v: 0.7 }, { t: 38, n: 'A4', d: 2, v: 0.65 }, { t: 40, n: 'B4', d: 4, v: 0.75 }, { t: 46, n: 'A4', d: 2, v: 0.6 },
+    { t: 48, n: 'E5', d: 4, v: 0.85 }, { t: 54, n: 'D5', d: 2, v: 0.7 }, { t: 56, n: 'C#5', d: 2, v: 0.7 }, { t: 60, n: 'A4', d: 4, v: 0.65 },
+    { t: 64, n: 'F#4', d: 2, v: 0.75 }, { t: 68, n: 'D4', d: 2, v: 0.65 }, { t: 70, n: 'B4', d: 2, v: 0.7 }, { t: 72, n: 'F#4', d: 4, v: 0.7 }, { t: 78, n: 'E4', d: 2, v: 0.6 },
+    { t: 80, n: 'D4', d: 4, v: 0.75 }, { t: 86, n: 'F#4', d: 2, v: 0.65 }, { t: 88, n: 'B4', d: 2, v: 0.7 }, { t: 92, n: 'D5', d: 4, v: 0.8 },
+    { t: 96, n: 'B4', d: 2, v: 0.8 }, { t: 100, n: 'G4', d: 2, v: 0.7 }, { t: 102, n: 'D5', d: 2, v: 0.7 }, { t: 104, n: 'B4', d: 4, v: 0.75 }, { t: 110, n: 'A4', d: 2, v: 0.6 },
+    { t: 112, n: 'G4', d: 4, v: 0.75 }, { t: 118, n: 'F#4', d: 2, v: 0.65 }, { t: 120, n: 'E4', d: 2, v: 0.65 }, { t: 124, n: 'D4', d: 4, v: 0.7 },
+  ];
+  const padChords = [['D3', 'F#3', 'A3', 'E4'], ['A2', 'E3', 'A3', 'C#4'], ['B2', 'F#3', 'A3', 'D4'], ['G2', 'D3', 'F#3', 'B3']];
+  const pad = padChords.map((n, i) => ({ t: i * 32, n, d: 31.5, v: 0.75 }));
+  const arpTones = [[62, 66, 69, 74], [57, 61, 64, 69], [59, 62, 66, 71], [55, 59, 62, 67]];
+  const arp = [];
+  arpTones.forEach((tones, i) => {
+    for (let k = 0; k < 8; k++) arp.push({ t: i * 32 + 2 + k * 4, n: tones[k % 4], d: 2, v: k % 2 ? 0.4 : 0.5 });
+  });
+  const night = [
+    { t: 12, n: 'F#5', d: 4, v: 0.5 }, { t: 28, n: 'A5', d: 4, v: 0.45 }, { t: 44, n: 'E5', d: 4, v: 0.5 }, { t: 60, n: 'B5', d: 4, v: 0.45 },
+    { t: 76, n: 'D5', d: 4, v: 0.5 }, { t: 92, n: 'F#5', d: 4, v: 0.45 }, { t: 108, n: 'B5', d: 4, v: 0.5 }, { t: 124, n: 'G5', d: 4, v: 0.45 },
+  ];
+  const bar = (s) => s.repeat(8);
+  return {
+    bpm: 92,
+    key: 'D',
+    scale: 'major',
+    bars: 8,
+    swing: 0.12,
+    layers: {
+      bass: { inst: 'bass', pattern: bass, gain: 0.9, humanize: 0.3 },
+      melody: { inst: 'marimba', pattern: melody, gain: 0.8, pan: 0.15, humanize: 0.6 },
+      pad: { inst: 'pad', pattern: pad, gain: 0.7, humanize: 0 },
+      arp: { inst: 'pluck', pattern: arp, gain: 0.45, pan: -0.25, humanize: 0.5 },
+      kick: { inst: 'kick', pattern: bar('x.........o.....'), gain: 0.55, humanize: 0.2 },
+      hat: { inst: 'hat', pattern: bar('o.x.o.x.o.x.o.x.'), gain: 0.5, pan: 0.3, humanize: 0.6 },
+      night: { inst: 'glass', pattern: night, gain: 0.7, stem: true, pan: -0.1, humanize: 0.4 },
+      tide: { inst: 'flute', pattern: [{ t: 0, n: 'A4', d: 14, v: 0.45 }, { t: 32, n: 'E5', d: 14, v: 0.4 }, { t: 64, n: 'F#4', d: 14, v: 0.45 }, { t: 96, n: 'D5', d: 14, v: 0.4 }], gain: 0.45, stem: true, pan: 0.2, humanize: 0.2 },
+    },
+  };
+}
+
+/** The demo track definition (see {@link buildDemoTrack}). */
+export const DEMO_TRACK = Object.freeze(buildDemoTrack());
+
+// ───────────────────────────────────────────────────────────────────────────────────────────────
+// Engine
+// ───────────────────────────────────────────────────────────────────────────────────────────────
+
+const LOOKAHEAD_SEC = 0.3;
+const HIDDEN_LOOKAHEAD_SEC = 1.6;
+const TICK_MS = 60;
+const HIDDEN_TICK_MS = 500;
+const SFX_LATENCY = 0.005;
+const FADE_STEPS = 96;
+
+/**
+ * Soft-clip transfer curve: identity below `knee`, tanh-shaped above, never exceeding ~0.905.
+ * @param {number} [n=2048]
+ * @param {number} [knee=0.6]
+ * @returns {Float32Array}
+ */
+export function softClipCurve(n = 2048, knee = 0.6) {
+  const out = new Float32Array(n);
+  const span = 1 - knee;
+  for (let i = 0; i < n; i++) {
+    const x = (i / (n - 1)) * 2 - 1;
+    const a = Math.abs(x);
+    const y = a <= knee ? a : knee + span * Math.tanh((a - knee) / span);
+    out[i] = x < 0 ? -y : y;
+  }
+  return out;
+}
+
+/**
+ * Music-intensity (0..1) → low-pass cutoff in Hz (400 Hz closed … fully open).
+ * @param {number} intensity
+ * @returns {number}
+ */
+export function intensityToCutoff(intensity) {
+  return 400 * 2 ** (clamp(intensity, 0, 1) * 5.64);
+}
+
+/**
+ * Compressor with the given settings.
+ * @param {BaseAudioContext} ctx
+ * @param {{threshold: number, knee: number, ratio: number, attack: number, release: number}} s
+ * @returns {DynamicsCompressorNode}
+ */
+function mkCompressor(ctx, s) {
+  const c = ctx.createDynamicsCompressor();
+  c.threshold.value = s.threshold;
+  c.knee.value = s.knee;
+  c.ratio.value = s.ratio;
+  c.attack.value = s.attack;
+  c.release.value = s.release;
+  return c;
+}
+
+/**
+ * @typedef {object} Graph
+ * @property {GainNode} master
+ * @property {GainNode} muteGain
+ * @property {GainNode} sfxBus
+ * @property {GainNode} musicVol
+ * @property {BiquadFilterNode} musicFilter Music enters here (intensity low-pass).
+ * @property {DynamicsCompressorNode} compressor
+ * @property {DynamicsCompressorNode} limiter
+ * @property {AnalyserNode} analyser
+ */
+
+/**
+ * Build the master chain: buses → master → mute → compressor → limiter → analyser → soft clip →
+ * ceiling → destination.
+ * @param {BaseAudioContext} ctx
+ * @returns {Graph}
+ */
+function buildGraph(ctx) {
+  const ceiling = mkGain(ctx, ctx.destination, 0.95);
+  const shaper = ctx.createWaveShaper();
+  shaper.curve = softClipCurve();
+  shaper.oversample = '2x';
+  shaper.connect(ceiling);
+  const analyser = ctx.createAnalyser();
+  analyser.fftSize = 512;
+  analyser.smoothingTimeConstant = 0.8;
+  analyser.connect(shaper);
+  const limiter = mkCompressor(ctx, { threshold: -4, knee: 0, ratio: 20, attack: 0.001, release: 0.06 });
+  limiter.connect(analyser);
+  const compressor = mkCompressor(ctx, { threshold: -14, knee: 10, ratio: 3, attack: 0.004, release: 0.18 });
+  compressor.connect(limiter);
+  const muteGain = mkGain(ctx, compressor, 1);
+  const master = mkGain(ctx, muteGain, 1);
+  const sfxBus = mkGain(ctx, master, 1);
+  const musicVol = mkGain(ctx, master, 1);
+  const musicFilter = mkFilter(ctx, musicVol, 'lowpass', 20000, 0.5);
+  return { master, muteGain, sfxBus, musicVol, musicFilter, compressor, limiter, analyser };
+}
+
+/**
+ * Smoothly move a param to a value.
+ * @param {AudioParam} param
+ * @param {number} value
+ * @param {number} now
+ * @param {number} [ramp=0.03] Seconds (time constant ≈ ramp / 3).
+ */
+function glide(param, value, now, ramp = 0.03) {
+  param.cancelScheduledValues(now);
+  param.setTargetAtTime(value, now, Math.max(ramp / 3, 0.001));
+}
+
+/**
+ * Cancel pending automation but keep the current value (falls back for browsers without
+ * `cancelAndHoldAtTime`).
+ * @param {AudioParam} param
+ * @param {number} now
+ */
+function hold(param, now) {
+  if (typeof param.cancelAndHoldAtTime === 'function') param.cancelAndHoldAtTime(now);
+  else {
+    const v = param.value;
+    param.cancelScheduledValues(now);
+    param.setValueAtTime(v, now);
+  }
+}
+
+/**
+ * A playing instance of a track: its own output gain (for crossfades), per-layer gains (stems and
+ * intensity gating) and a step clock.
+ * @param {BaseAudioContext} ctx
+ * @param {AudioNode} dest
+ * @param {Track} track
+ * @param {number} startTime
+ * @param {{stems: Set<string>, intensity: number, offline?: boolean}} opts
+ */
+function createPlayer(ctx, dest, track, startTime, { stems, intensity, offline = false }) {
+  const out = mkGain(ctx, dest, offline ? 1 : 0);
+  const layers = track.layers.map((def) => ({ def, gain: mkGain(ctx, out, 0) }));
+  const clock = createStepClock({
+    bpm: track.bpm, loopSteps: track.loopSteps, stepsPerBeat: track.stepsPerBeat,
+    stepsPerBar: track.stepsPerBar, startTime, maxCatchUpSteps: offline ? Infinity : track.stepsPerBar * 2,
+  });
+  const rand = makeLcg(hashString(track.id));
+  let stopAt = Infinity;
+  let stopping = false;
+
+  const layerTarget = (def, st, inten) => (def.stem && !st.has(def.name)) || inten < def.minIntensity ? 0 : def.gain;
+
+  /** @param {Set<string>} st @param {number} inten @param {number} ramp @param {number} [at] */
+  function applyMix(st, inten, ramp, at = ctx.currentTime) {
+    for (const l of layers) {
+      const target = layerTarget(l.def, st, inten);
+      if (ramp <= 0) l.gain.gain.setValueAtTime(target, at);
+      else glide(l.gain.gain, target, at, ramp);
+    }
+  }
+  applyMix(stems, intensity, 0, startTime);
+
+  return {
+    track,
+    get stopping() { return stopping; },
+    applyMix,
+    /** Schedule every step that starts before `horizon`. @param {number} horizon */
+    schedule(horizon) {
+      for (const tick of clock.advance(Math.min(horizon, stopAt))) {
+        for (const l of layers) {
+          const evs = l.def.buckets.get(tick.step);
+          if (!evs) continue;
+          const drum = l.def.inst === 'kick' || l.def.inst === 'hat' || l.def.inst === 'snare';
+          for (const ev of evs) {
+            const h = l.def.humanize;
+            const jitter = drum ? 0 : (rand() - 0.5) * 0.008 * h;
+            const time = tick.time + (ev.t - tick.step) * clock.stepSec + swingOffset(tick.step % track.stepsPerBar, track.swing, clock.stepSec) + jitter;
+            const vel = clamp(ev.v * (1 - 0.12 * h * rand()), 0.02, 1);
+            const dur = ev.d * clock.stepSec * 0.92;
+            for (const n of ev.n) playNote(ctx, l.gain, l.def.inst, { freq: midiToFreq(n), time, dur, vel });
+          }
+        }
+      }
+    },
+    /** @param {number} now @param {number} sec */
+    fadeIn(now, sec) {
+      hold(out.gain, now);
+      if (sec < 0.01) out.gain.setValueAtTime(1, now);
+      else out.gain.setValueCurveAtTime(fadeCurve(FADE_STEPS, 'in'), now, sec);
+    },
+    /** @param {number} now @param {number} sec */
+    fadeOut(now, sec) {
+      if (stopping) return;
+      stopping = true;
+      hold(out.gain, now);
+      const from = Math.max(out.gain.value, 0);
+      if (sec < 0.01 || from <= 0) out.gain.setValueAtTime(0, now);
+      else out.gain.setValueCurveAtTime(fadeCurve(FADE_STEPS, 'out', from), now, sec);
+      stopAt = now + Math.max(sec, 0.01);
+    },
+    /** @param {number} now */
+    isDone(now) {
+      return stopping && now > stopAt + 3.0;
+    },
+    /** @param {number} now */
+    position(now) {
+      return clock.positionAt(now);
+    },
+    dispose() {
+      out.disconnect();
+    },
+  };
+}
+
+/**
+ * @typedef {object} SfxOptions
+ * @property {number} [pitch=1] Frequency multiplier (0.25..4).
+ * @property {number} [semitones] Alternative to `pitch`.
+ * @property {number} [volume=1] 0..2.
+ * @property {number} [pan=0] -1..1.
+ * @property {number} [delay=0] Seconds.
+ */
+
+/**
+ * @typedef {object} AudioEngine
+ * @property {boolean} ready True once `unlock()` has created the audio graph.
+ * @property {string} state AudioContext state (`'closed'` before unlock).
+ * @property {BaseAudioContext|null} context
+ * @property {AnalyserNode|null} analyser Post-limiter analyser for visualizers.
+ * @property {() => Promise<boolean>} unlock Create/resume the context (call from a user gesture).
+ * @property {(v: {master?: number, music?: number, sfx?: number}) => {master: number, music: number, sfx: number}} setVolume
+ * @property {() => {master: number, music: number, sfx: number}} getVolume
+ * @property {(on?: boolean) => boolean} mute
+ * @property {() => boolean} isMuted
+ * @property {(name: string, opts?: SfxOptions) => {name: string, time: number, duration: number}|null} sfx
+ * @property {(id: string, def: object) => Track} defineTrack
+ * @property {(id: string) => boolean} hasTrack
+ * @property {() => string[]} trackIds
+ * @property {(id: string, opts?: {fade?: number, restart?: boolean}) => boolean} playMusic
+ * @property {(opts?: {fade?: number}) => boolean} stopMusic
+ * @property {(name: string, on: boolean) => string[]} setStem
+ * @property {() => string[]} getStems
+ * @property {(p: {intensity?: number}) => {intensity: number}} setMusicParam
+ * @property {() => object|null} nowPlaying
+ * @property {(name: string, opts?: SfxOptions & {sampleRate?: number, seed?: number}) => Promise<AudioBuffer>} renderSfx
+ * @property {(id: string, opts?: {bars?: number, sampleRate?: number, stems?: string[], intensity?: number}) => Promise<AudioBuffer>} renderTrack
+ * @property {() => Promise<void>} dispose
+ */
+
+/**
+ * Create an independent audio engine. Nothing touches WebAudio until `unlock()`.
+ * @returns {AudioEngine}
+ */
+export function createAudio() {
+  const tracks = new Map();
+  const stems = new Set();
+  const vol = { master: 1, music: 0.8, sfx: 1 };
+  const limiter = createRateLimiter({ minInterval: 0.02, maxBurst: 20, window: 0.1 });
+  const warned = new Set();
+  let muted = false;
+  let intensity = 1;
+  /** @type {AudioContext|null} */
+  let ctx = null;
+  /** @type {Graph|null} */
+  let graph = null;
+  /** @type {Promise<boolean>|null} */
+  let unlocking = null;
+  let players = [];
+  let current = null;
+  let pending = null;
+  let timer = null;
+
+  const warnOnce = (msg) => {
+    if (warned.has(msg)) return;
+    warned.add(msg);
+    console.warn(msg);
+  };
+
+  function applyVolumes(ramp) {
+    if (!graph) return;
+    const now = ctx.currentTime;
+    glide(graph.master.gain, volumeToGain(vol.master), now, ramp);
+    glide(graph.sfxBus.gain, volumeToGain(vol.sfx), now, ramp);
+    glide(graph.musicVol.gain, volumeToGain(vol.music), now, ramp);
+    glide(graph.muteGain.gain, muted ? 0 : 1, now, ramp);
+  }
+
+  function tick() {
+    timer = null;
+    if (!graph || players.length === 0) return;
+    const hidden = typeof document !== 'undefined' && document.hidden === true;
+    const horizon = ctx.currentTime + (hidden ? HIDDEN_LOOKAHEAD_SEC : LOOKAHEAD_SEC);
+    for (const p of players) p.schedule(horizon);
+    const now = ctx.currentTime;
+    players = players.filter((p) => {
+      if (!p.isDone(now)) return true;
+      p.dispose();
+      return false;
+    });
+    if (players.length) timer = setTimeout(tick, hidden ? HIDDEN_TICK_MS : TICK_MS);
+  }
+
+  function ensureTimer() {
+    if (timer === null) tick();
+  }
+
+  async function resume() {
+    if (!ctx || ctx.state === 'running') return;
+    try {
+      await ctx.resume();
+    } catch {
+      /* resume can reject before a gesture; callers retry on the next gesture */
+    }
+  }
+
+  const api = {
+    get ready() { return graph !== null; },
+    get state() { return ctx ? ctx.state : 'closed'; },
+    get context() { return ctx; },
+    get analyser() { return graph ? graph.analyser : null; },
+
+    unlock() {
+      if (graph) return resume().then(() => ctx.state === 'running');
+      if (unlocking) return unlocking;
+      unlocking = (async () => {
+        const AC = globalThis.AudioContext || globalThis.webkitAudioContext;
+        if (typeof AC !== 'function') {
+          unlocking = null;
+          return false;
+        }
+        try {
+          ctx = new AC({ latencyHint: 'interactive' });
+        } catch (err) {
+          warnOnce(`audio.unlock: could not create AudioContext (${err && err.message})`);
+          ctx = null;
+          unlocking = null;
+          return false;
+        }
+        graph = buildGraph(ctx);
+        applyVolumes(0);
+        try {
+          const kick = ctx.createBufferSource();
+          kick.buffer = ctx.createBuffer(1, 1, ctx.sampleRate);
+          kick.connect(ctx.destination);
+          kick.start(0);
+        } catch {
+          /* purely a mobile unlock nudge; ignore */
+        }
+        await resume();
+        if (typeof ctx.addEventListener === 'function') {
+          ctx.addEventListener('statechange', () => { if (ctx.state === 'running' && players.length) ensureTimer(); });
+        }
+        if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+          document.addEventListener('visibilitychange', () => { if (!document.hidden && players.length) { if (timer !== null) clearTimeout(timer); timer = null; tick(); } });
+        }
+        if (pending) {
+          const { id, opts } = pending;
+          pending = null;
+          api.playMusic(id, opts);
+        }
+        return ctx.state === 'running';
+      })();
+      return unlocking;
+    },
+
+    setVolume(v = {}) {
+      for (const k of ['master', 'music', 'sfx']) {
+        if (v[k] !== undefined) {
+          const n = Number(v[k]);
+          if (Number.isFinite(n)) vol[k] = clamp(n, 0, 1);
+        }
+      }
+      applyVolumes(0.03);
+      return { ...vol };
+    },
+    getVolume() { return { ...vol }; },
+    mute(on = true) {
+      muted = Boolean(on);
+      applyVolumes(0.02);
+      return muted;
+    },
+    isMuted() { return muted; },
+
+    sfx(name, { pitch = 1, semitones, volume = 1, pan = 0, delay = 0 } = {}) {
+      const key = SFX_ALIASES[name] ?? name;
+      const def = SFX[key];
+      if (!def) {
+        warnOnce(`audio.sfx: unknown sfx "${name}"`);
+        return null;
+      }
+      if (!graph) return null;
+      if (ctx.state !== 'running') resume();
+      const now = ctx.currentTime;
+      if (!limiter.allow(key, now)) return null;
+      const mult = clamp((semitones !== undefined ? 2 ** (Number(semitones) / 12) : 1) * (Number(pitch) || 1), 0.25, 4);
+      const gain = clamp(Number(volume), 0, 2);
+      if (!(gain > 0)) return null;
+      const dest = pan ? mkPan(ctx, graph.sfxBus, pan) : graph.sfxBus;
+      const t0 = now + SFX_LATENCY + Math.max(0, Number(delay) || 0);
+      def.play(ctx, dest, t0, { pitch: mult, gain, rand: Math.random });
+      return { name: key, time: t0, duration: def.dur };
+    },
+
+    defineTrack(id, def) {
+      const track = normalizeTrack(id, def);
+      tracks.set(id, track);
+      return track;
+    },
+    hasTrack(id) { return tracks.has(id); },
+    trackIds() { return [...tracks.keys()]; },
+
+    playMusic(id, { fade = 800, restart = false } = {}) {
+      const track = tracks.get(id);
+      if (!track) {
+        warnOnce(`audio.playMusic: unknown track "${id}"`);
+        return false;
+      }
+      if (!graph) {
+        pending = { id, opts: { fade, restart } };
+        return true;
+      }
+      if (current && current.track.id === id && !current.stopping && !restart) return true;
+      const fadeSec = Math.max(0, Number(fade) || 0) / 1000;
+      const now = ctx.currentTime;
+      const player = createPlayer(ctx, graph.musicFilter, track, now + 0.05, { stems, intensity });
+      if (current) current.fadeOut(now, fadeSec);
+      player.fadeIn(now, current ? fadeSec : Math.min(fadeSec, 0.25));
+      current = player;
+      players.push(player);
+      ensureTimer();
+      return true;
+    },
+    stopMusic({ fade = 600 } = {}) {
+      pending = null;
+      if (!current) return false;
+      current.fadeOut(ctx.currentTime, Math.max(0, Number(fade) || 0) / 1000);
+      current = null;
+      return true;
+    },
+    setStem(name, on) {
+      if (on) stems.add(String(name));
+      else stems.delete(String(name));
+      for (const p of players) p.applyMix(stems, intensity, 0.5);
+      return [...stems];
+    },
+    getStems() { return [...stems]; },
+    setMusicParam({ intensity: i } = {}) {
+      if (i !== undefined && Number.isFinite(Number(i))) {
+        intensity = clamp(Number(i), 0, 1);
+        if (graph) {
+          glide(graph.musicFilter.frequency, intensityToCutoff(intensity), ctx.currentTime, 0.4);
+          for (const p of players) p.applyMix(stems, intensity, 0.5);
+        }
+      }
+      return { intensity };
+    },
+    nowPlaying() {
+      if (!current) return pending ? { id: pending.id, pending: true } : null;
+      const pos = current.position(ctx.currentTime);
+      return { id: current.track.id, bpm: current.track.bpm, bar: pos.bar, beat: pos.beat, step: pos.step, loop: pos.loop, stems: [...stems], intensity };
+    },
+
+    async renderSfx(name, { pitch = 1, semitones, volume = 1, pan = 0, sampleRate = 44100, seed = 1 } = {}) {
+      const key = SFX_ALIASES[name] ?? name;
+      const def = SFX[key];
+      if (!def) throw new RangeError(`renderSfx: unknown sfx "${name}"`);
+      const OAC = globalThis.OfflineAudioContext || globalThis.webkitOfflineAudioContext;
+      if (typeof OAC !== 'function') throw new Error('renderSfx: OfflineAudioContext is not available');
+      const oc = new OAC(2, Math.ceil((def.dur + 0.3) * sampleRate), sampleRate);
+      const g = buildGraph(oc);
+      const dest = pan ? mkPan(oc, g.sfxBus, pan) : g.sfxBus;
+      const mult = clamp((semitones !== undefined ? 2 ** (Number(semitones) / 12) : 1) * (Number(pitch) || 1), 0.25, 4);
+      def.play(oc, dest, 0.02, { pitch: mult, gain: clamp(Number(volume), 0, 2), rand: makeLcg(seed) });
+      return oc.startRendering();
+    },
+    async renderTrack(id, { bars, sampleRate = 44100, stems: stemList = [], intensity: inten = 1 } = {}) {
+      const track = tracks.get(id);
+      if (!track) throw new RangeError(`renderTrack: unknown track "${id}"`);
+      const OAC = globalThis.OfflineAudioContext || globalThis.webkitOfflineAudioContext;
+      if (typeof OAC !== 'function') throw new Error('renderTrack: OfflineAudioContext is not available');
+      const nBars = Math.max(1, Math.trunc(bars ?? track.bars));
+      const stepSec = stepSeconds(track.bpm, track.stepsPerBeat);
+      const steps = nBars * track.stepsPerBar;
+      const start = 0.05;
+      const oc = new OAC(2, Math.ceil((start + steps * stepSec + 2.5) * sampleRate), sampleRate);
+      const g = buildGraph(oc);
+      g.musicFilter.frequency.value = intensityToCutoff(inten);
+      const player = createPlayer(oc, g.musicFilter, track, start, { stems: new Set(stemList), intensity: inten, offline: true });
+      player.schedule(start + (steps - 0.5) * stepSec);
+      return oc.startRendering();
+    },
+
+    async dispose() {
+      if (timer !== null) clearTimeout(timer);
+      timer = null;
+      for (const p of players) p.dispose();
+      players = [];
+      current = null;
+      pending = null;
+      const c = ctx;
+      ctx = null;
+      graph = null;
+      unlocking = null;
+      if (c && typeof c.close === 'function') {
+        try {
+          await c.close();
+        } catch {
+          /* already closed */
+        }
+      }
+    },
+  };
+  api.defineTrack(DEMO_TRACK_ID, DEMO_TRACK);
+  return api;
+}
+
+/** The shared engine instance used by the game. */
+export const audio = createAudio();
+
+export default audio;

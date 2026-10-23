@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
 <title>font.js demo</title>
 <style>
   html, body { margin: 0; background: #14121c; color: #ddd; font: 12px monospace; }
@@ -19,7 +20,7 @@ import {
 } from '../../js/core/font.js';
 
 const canvas = document.getElementById('c');
-const ctx = canvas.getContext('2d');
+const ctx = canvas.getContext('2d', { willReadFrequently: true });
 ctx.imageSmoothingEnabled = false;
 const results = [];
 const logEl = document.getElementById('log');
@@ -40,7 +41,8 @@ function check(name, fn) {
 
 const ASCII = Array.from({ length: 95 }, (_, i) => String.fromCharCode(32 + i)).join('');
 const PARA = 'Porchlight meets Wildshift: shift form at dusk, follow the tide, and bring the lantern home before the ✦ Heartmark fades…';
-const TYPED = '"Tide’s low at 12:30," said Mémé. "Fetch the ◉ coins — and don’t wake the ♥!"';
+const TYPED = '"Tide\u2019s low at 12:30," said Mémé. "Fetch the ◉ coins — and don\u2019t wake the ♥!" The porchlight flickered ☾ and the fox-shape in the reeds turned its head…';
+const dW = 464; // dialogue box width (shared by the draw code and the final check)
 let typedChars = 0;
 let frame = 0;
 
@@ -79,7 +81,7 @@ function drawFrame() {
   drawText(ctx, 'LEVEL UP!', 300, 150, { scale: 2, color: '#ffffff', alpha: 0.25 });
   drawText(ctx, 'LEVEL UP!', 302, 148, { scale: 2, color: '#7CFC9A', outline: true, letterSpacing: 1 });
   // Typed dialogue box
-  const dX = 8, dY = 200, dW = 464;
+  const dX = 8, dY = 200;
   ctx.fillStyle = '#0a0a12';
   ctx.fillRect(dX - 4, dY - 4, dW + 8, 60);
   ctx.strokeStyle = '#ffd166';
@@ -133,7 +135,10 @@ function loop() {
   const { t } = drawFrame();
   if (t.done && !done) {
     done = true;
-    check('typed text completes with all characters', () => t.shown === t.total && t.total === [...TYPED].length - 2 || JSON.stringify(t));
+    // A soft wrap swallows the space it breaks on, so count the wrapped lines' characters.
+    const expected = [...wrapText(TYPED, dW).join('')].length;
+    check('typed text completes with all characters', () => t.shown === t.total && t.total === expected || `${JSON.stringify(t)} expected ${expected}`);
+    check('typed dialogue wrapped onto two lines', () => t.lines === 2 || JSON.stringify(t));
     const fails = results.filter((r) => !r.ok).length;
     console.log(`FONT PAGE SUMMARY: ${results.length - fails} pass, ${fails} fail`);
     window.__fontTest = { results, pass: results.length - fails, fail: fails };

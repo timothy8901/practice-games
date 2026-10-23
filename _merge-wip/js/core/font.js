@@ -658,13 +658,23 @@ export function layoutText(text, opts) {
 }
 
 /**
+ * @typedef {object} TextSize
+ * @property {number} w Width of the widest line (scaled px).
+ * @property {number} h Cap top of the first line to descender bottom of the last (scaled px).
+ * @property {number} lines Number of lines after wrapping.
+ * @property {number} lineHeight Distance between line tops (scaled px).
+ * @property {number} ascent Cap height (scaled px).
+ * @property {number} descent Descender depth (scaled px).
+ */
+
+/**
  * Measure text in scaled pixels. `h` spans from the cap top of the first line
  * to the descender bottom of the last (9px for one line of `main`, 6px for
  * `small`); use `ascent` (cap height) to centre labels on their letters.
  *
  * @param {unknown} text
  * @param {TextOptions} [opts]
- * @returns {{w: number, h: number, lines: number, lineHeight: number, ascent: number, descent: number}}
+ * @returns {TextSize}
  */
 export function measureText(text, opts) {
   return metricsOf(layoutText(text, opts));
@@ -844,10 +854,6 @@ export function glyphCacheSize(font = 'main') {
  */
 
 /**
- * @typedef {{w: number, h: number, lines: number, lineHeight: number, ascent: number, descent: number}} TextMetrics2
- */
-
-/**
  * Normalise the `shadow` option.
  * @param {DrawOptions['shadow']} v
  * @returns {{color: string, dx: number, dy: number}|null}
@@ -944,7 +950,7 @@ function paintLayout(ctx, layout, x, y, o, limit) {
 /**
  * Convert a layout to public metrics (scaled pixels).
  * @param {TextLayout} l
- * @returns {TextMetrics2}
+ * @returns {TextSize}
  */
 function metricsOf(l) {
   const s = l.scale;
@@ -969,7 +975,7 @@ function metricsOf(l) {
  * @param {number} x
  * @param {number} y
  * @param {DrawOptions} [opts]
- * @returns {TextMetrics2} The measured size of what was laid out.
+ * @returns {TextSize} The measured size of what was laid out.
  */
 export function drawText(ctx, text, x, y, opts = {}) {
   const layout = layoutText(text, opts);
@@ -989,7 +995,7 @@ export function drawText(ctx, text, x, y, opts = {}) {
  * @param {number} visibleChars Characters to show; clamped to 0..total
  *   (`Infinity` shows everything, NaN shows nothing).
  * @param {DrawOptions} [opts]
- * @returns {TextMetrics2 & {shown: number, total: number, done: boolean}}
+ * @returns {TextSize & {shown: number, total: number, done: boolean}}
  */
 export function drawTextTyped(ctx, text, x, y, visibleChars, opts = {}) {
   const layout = layoutText(text, opts);

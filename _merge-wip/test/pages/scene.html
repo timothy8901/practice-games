@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>scene.js demo</title>
+  <link rel="icon" href="data:,">
+  <style>
+    html, body { margin: 0; height: 100%; background: #111; display: grid; place-items: center; }
+    canvas { width: 960px; height: 540px; image-rendering: pixelated; image-rendering: crisp-edges; }
+  </style>
+</head>
+<body>
+  <canvas id="game" width="480" height="270"></canvas>
+  <script type="module">
+    import { createSceneStack } from '../../js/core/scene.js';
+
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
+
+    const log = [];
+    const stack = createSceneStack({ onChange: (e) => log.push(`${e.type}:${e.scene ? e.scene.name : '-'}`) });
+
+    /** Pixel-font-free label for the demo page. */
+    function label(text, x, y, color = '#fff') {
+      ctx.fillStyle = color;
+      ctx.font = '12px monospace';
+      ctx.textBaseline = 'top';
+      ctx.fillText(text, x, y);
+    }
+
+    const title = {
+      name: 'title',
+      t: 0,
+      enter() { this.t = 0; },
+      update(dt) { this.t += dt; },
+      draw(c) {
+        c.fillStyle = '#243b55';
+        c.fillRect(0, 0, 480, 270);
+        c.fillStyle = '#f2c14e';
+        const bob = Math.round(Math.sin(this.t / 300) * 3);
+        c.fillRect(200, 100 + bob, 80, 40);
+        label('TITLE SCENE', 196, 150 + bob);
+      },
+    };
+
+    const world = {
+      name: 'world',
+      x: 0,
+      enter() { this.x = 40; },
+      update(dt) { this.x = (this.x + dt * 0.06) % 480; },
+      draw(c) {
+        c.fillStyle = '#8fd3f4';
+        c.fillRect(0, 0, 480, 180);
+        c.fillStyle = '#5c9e3a';
+        c.fillRect(0, 180, 480, 90);
+        c.fillStyle = '#e76f51';
+        c.fillRect(Math.round(this.x), 160, 16, 16);
+        label('WORLD SCENE (keeps updating under the modal)', 8, 8, '#123');
+      },
+    };
+
+    const modal = {
+      name: 'modal',
+      opaque: false,
+      updateBelow: true,
+      draw(c) {
+        c.globalAlpha = 0.85;
+        c.fillStyle = '#1b1b2f';
+        c.fillRect(120, 70, 240, 130);
+        c.globalAlpha = 1;
+        c.fillStyle = '#f2c14e';
+        c.fillRect(120, 70, 240, 4);
+        label('MODAL (non-opaque, updateBelow)', 130, 90);
+      },
+    };
+
+    // Deterministic timeline in page-milliseconds.
+    const timeline = [
+      [0, () => stack.push(title)],
+      [600, () => stack.transition('iris', 1200, (s) => s.replace(world))],
+      [2400, () => stack.push(modal)],
+      [3200, () => stack.transition('wipe', 1000, (s) => s.pop(), { direction: 'up', color: '#2a9d8f' })],
+      [4800, () => stack.transition('fade', 1000, (s) => s.replace(title), { hold: 300, color: '#1a0f2e' })],
+    ];
+
+    let elapsed = 0;
+    let last = performance.now();
+    let nextStep = 0;
+
+    function frame(now) {
+      const dt = Math.min(100, now - last);
+      last = now;
+      elapsed += dt;
+      while (nextStep < timeline.length && timeline[nextStep][0] <= elapsed) {
+        timeline[nextStep][1]();
+        nextStep += 1;
+      }
+      stack.update(dt);
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, 480, 270);
+      stack.draw(ctx);
+      label(`t=${Math.round(elapsed)}ms top=${stack.top() ? stack.top().name : '-'} busy=${stack.isTransitioning}`, 8, 254, '#fff');
+      requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+
+    window.__scene = {
+      log,
+      state: () => ({
+        elapsed: Math.round(elapsed),
+        top: stack.top() ? stack.top().name : null,
+        size: stack.size,
+        transitioning: stack.isTransitioning,
+        transition: stack.transitionState(),
+        log: log.slice(),
+      }),
+    };
+  </script>
+</body>
+</html>

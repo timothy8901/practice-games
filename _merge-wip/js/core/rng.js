@@ -250,7 +250,9 @@ export class Rng {
    * @param {number} max upper bound (inclusive)
    * @returns {number} integer
    * @throws {TypeError} for non-finite bounds
-   * @throws {RangeError} when no integer lies in the range, or it spans more than 2^53
+   * @throws {RangeError} when no integer lies in the range, when a bound lies
+   *   outside the safe-integer range (results could not be exact), or when the
+   *   range spans more than 2^53 values
    */
   int(min, max) {
     assertFinite('int', 'min', min);
@@ -259,6 +261,9 @@ export class Rng {
     const hi = Math.floor(max);
     if (lo > hi) {
       throw new RangeError(`int: no integer in [${min}, ${max}]`);
+    }
+    if (!Number.isSafeInteger(lo) || !Number.isSafeInteger(hi)) {
+      throw new RangeError(`int: bounds [${min}, ${max}] must be safe integers (|n| < 2^53)`);
     }
     if (!Number.isSafeInteger(hi - lo)) {
       throw new RangeError(`int: range [${min}, ${max}] is wider than 2^53`);
@@ -294,17 +299,20 @@ export class Rng {
   }
 
   /**
-   * Fisher-Yates shuffled copy; the input is left untouched.
-   * `length - 1` draws (none for 0 or 1 elements).
+   * Fisher-Yates shuffled copy; the input is left untouched. Elements are
+   * read by index (so a string shuffles its UTF-16 code units, exactly the
+   * units {@link Rng#pick} chooses from). `length - 1` draws (none for 0 or
+   * 1 elements).
    * @template T
    * @param {ArrayLike<T>} arr
    * @returns {T[]} a new array
    * @throws {TypeError} when `arr` is not array-like
    */
   shuffle(arr) {
-    lengthOf('shuffle', arr);
-    const out = Array.from(arr);
-    for (let i = out.length - 1; i > 0; i--) {
+    const n = lengthOf('shuffle', arr);
+    const out = new Array(n);
+    for (let i = 0; i < n; i++) out[i] = arr[i];
+    for (let i = n - 1; i > 0; i--) {
       const j = this.#below(i + 1);
       const tmp = out[i];
       out[i] = out[j];
@@ -321,19 +329,24 @@ export class Rng {
    * @param {ArrayLike<{w: number, v: T}>} entries
    * @returns {T|undefined} the chosen entry's `v`
    * @throws {TypeError} for malformed entries or non-finite weights
+   * @throws {RangeError} when the weights sum past `Number.MAX_VALUE`
    */
   weighted(entries) {
     const n = lengthOf('weighted', entries);
     let total = 0;
     for (let i = 0; i < n; i++) total += weightOf(entries[i]);
     if (total <= 0) return undefined;
+    if (!Number.isFinite(total)) {
+      throw new RangeError('weighted: the weights sum to Infinity; scale them down');
+    }
 
     let r = this.next() * total;
     let last;
     for (let i = 0; i < n; i++) {
-      const w = weightOf(entries[i]);
-      if (w <= 0) continue;
-      last = entries[i];
+      const entry = entries[i]; // already validated above
+      const w = entry.w;
+      if (!(w > 0)) continue;
+      last = entry;
       r -= w;
       if (r < 0) return last.v;
     }
@@ -345,13 +358,17 @@ export class Rng {
    * not from its current position. Forking before or after any number of
    * draws therefore yields the identical stream, and forks nest
    * (`rng.fork('zone').fork(3)`). No draw is consumed.
-   * @param {string|number} label
+   *
+   * The fork's {@link Rng#seed} is `parentKey + '\u001f' + label`, so a label
+   * that itself contains U+001F aliases a nested fork; game labels should not
+   * use that control character.
+   * @param {string|number} label any string, or a finite number
    * @returns {Rng} a fresh generator
-   * @throws {TypeError} when `label` is not a string or number
+   * @throws {TypeError} when `label` is not a string or finite number
    */
   fork(label) {
-    if (typeof label !== 'string' && typeof label !== 'number') {
-      throw new TypeError(`fork: label must be a string or number, got ${describe(label)}`);
+    if (typeof label !== 'string' && !(typeof label === 'number' && Number.isFinite(label))) {
+      throw new TypeError(`fork: label must be a string or finite number, got ${describe(label)}`);
     }
     return new Rng(`${this.#key}${FORK_SEPARATOR}${label}`);
   }
@@ -395,6 +412,9 @@ export class Rng {
   /**
    * Normally distributed value via Box-Muller. Exactly two draws per call
    * (the second Box-Muller output is discarded so no hidden state exists).
+   * Note: unlike the integer methods, the result depends on `Math.log`/`Math.cos`,
+   * which may differ in the last bit between JS engines; it is reproducible
+   * within one engine (all V8 hosts agree), not necessarily across engines.
    * @param {number} [mean=0]
    * @param {number} [sd=1] standard deviation
    * @returns {number}
@@ -479,7 +499,12 @@ const MAX_SEED = 2 ** SEED_BITS - 1;
 const GROUP_LENGTH = 4;
 const PAYLOAD_LENGTH = (TOGGLE_BITS + SEED_BITS + CHECK_BITS) / 5;
 const DIAL_PATTERN = /^[A-Z][A-Z0-9]{0,15}$/;
-const CODE_PATTERN = /^([A-Z][A-Z0-9]{0,15})[-\s]+([0-9A-Z]{4})[-\s]*([0-9A-Z]{4})$/;
+/**
+ * Lenient code shape. Separators accept whitespace, the ASCII hyphen and the
+ * dash look-alikes word processors and phone keyboards substitute for it
+ * (U+2010..U+2015 hyphens/dashes, U+2212 minus); the second one is optional.
+ */
+const CODE_PATTERN = /^([A-Z][A-Z0-9]{0,15})[-‐-―−\s]+([0-9A-Z]{4})[-‐-―−\s]*([0-9A-Z]{4})$/;
 
 /** Base-32 digit values, plus forgiving aliases for commonly confused glyphs. */
 const DIGIT_VALUE = new Map(Array.from(ALPHABET, (ch, i) => [ch, i]));
@@ -626,15 +651,28 @@ function checksum(dial, toggleBits, seed) {
  */
 
 /**
+ * Resolves the toggle registry an options bag selects (`null`/`undefined`
+ * options mean "use the registry") and validates it.
+ * @param {string} method name used in error messages
+ * @param {SeedCodeOptions|null|undefined} options
+ * @returns {readonly string[]}
+ * @throws {TypeError|RangeError} for an invalid `toggleNames` list
+ */
+function toggleNamesFrom(method, options) {
+  const names = options == null || options.toggleNames === undefined ? toggleRegistry : options.toggleNames;
+  return validateToggleNames(method, names);
+}
+
+/**
  * Builds a shareable code such as `FLUX-K7Q2-MD7F` from its parts.
  *
  * @param {{dial: string, seed: number, toggles?: Iterable<string>}} parts
- * @param {SeedCodeOptions} [options]
+ * @param {SeedCodeOptions|null} [options]
  * @returns {string} `DIAL-XXXX-XXXX`
  * @throws {TypeError} for malformed input
  * @throws {RangeError} for an out-of-range seed, bad dial word or unknown toggle
  */
-export function encodeSeedCode(parts, { toggleNames = toggleRegistry } = {}) {
+export function encodeSeedCode(parts, options) {
   if (parts === null || typeof parts !== 'object') {
     throw new TypeError(`encodeSeedCode: expected {dial, seed, toggles}, got ${describe(parts)}`);
   }
@@ -643,7 +681,7 @@ export function encodeSeedCode(parts, { toggleNames = toggleRegistry } = {}) {
   if (!Number.isInteger(seed) || seed < 0 || seed > MAX_SEED) {
     throw new RangeError(`encodeSeedCode: seed must be an integer in [0, ${MAX_SEED}], got ${String(seed)}`);
   }
-  const names = validateToggleNames('encodeSeedCode', toggleNames);
+  const names = toggleNamesFrom('encodeSeedCode', options);
   const bits = toggleBitsFrom(parts.toggles, names);
 
   const field = bits ^ (seed & TOGGLE_MASK);
@@ -659,19 +697,23 @@ export function encodeSeedCode(parts, { toggleNames = toggleRegistry } = {}) {
 
 /**
  * Parses a code produced by {@link encodeSeedCode}. Forgiving about case,
- * surrounding whitespace, spaces instead of hyphens and the look-alikes
- * `I`/`L` (read as `1`) and `O` (read as `0`).
+ * surrounding whitespace, spaces or en/em dashes instead of hyphens, a
+ * missing second separator, full-width characters (NFKC-normalised) and the
+ * look-alikes `I`/`L` (read as `1`) and `O` (read as `0`).
  *
  * Returns `null` for anything that is not a well-formed code with a valid
- * checksum, or that uses a toggle bit the registry cannot name.
+ * checksum, or that uses a toggle bit the registry cannot name. Only an
+ * invalid `toggleNames` option throws.
  *
  * @param {string} code
- * @param {SeedCodeOptions} [options]
+ * @param {SeedCodeOptions|null} [options]
  * @returns {SeedCodeParts|null} toggles are listed in registry order
+ * @throws {TypeError|RangeError} for an invalid `toggleNames` option
  */
-export function decodeSeedCode(code, { toggleNames = toggleRegistry } = {}) {
+export function decodeSeedCode(code, options) {
+  const names = toggleNamesFrom('decodeSeedCode', options);
   if (typeof code !== 'string') return null;
-  const match = CODE_PATTERN.exec(code.trim().toUpperCase());
+  const match = CODE_PATTERN.exec(code.normalize('NFKC').trim().toUpperCase());
   if (!match) return null;
 
   const dial = match[1];
@@ -685,8 +727,6 @@ export function decodeSeedCode(code, { toggleNames = toggleRegistry } = {}) {
   const seed = Math.floor(payload / 2 ** CHECK_BITS) % 2 ** SEED_BITS;
   const bits = Math.floor(payload / 2 ** (SEED_BITS + CHECK_BITS)) ^ (seed & TOGGLE_MASK);
   if (check !== checksum(dial, bits, seed)) return null;
-
-  const names = validateToggleNames('decodeSeedCode', toggleNames);
   if (bits >= 2 ** names.length) return null;
   const toggles = [];
   for (let i = 0; i < names.length; i++) {
@@ -715,15 +755,15 @@ function entropySeed() {
  * @param {string} dial dial word for the code
  * @param {Rng|null} [entropyRng] generator to draw the seed from (one `int`
  *   call); when omitted the platform's crypto entropy is used
- * @param {SeedCodeOptions & {toggles?: Iterable<string>}} [options] toggles to
+ * @param {(SeedCodeOptions & {toggles?: Iterable<string>})|null} [options] toggles to
  *   include (none by default) and an optional toggle registry
  * @returns {string} `DIAL-XXXX-XXXX`
  * @throws {TypeError|RangeError} as {@link encodeSeedCode}, or when `entropyRng` is not an Rng
  */
-export function randomSeedCode(dial, entropyRng, { toggles = [], toggleNames } = {}) {
+export function randomSeedCode(dial, entropyRng, options) {
   if (entropyRng != null && typeof entropyRng.int !== 'function') {
     throw new TypeError(`randomSeedCode: entropyRng must be an Rng, got ${describe(entropyRng)}`);
   }
   const seed = entropyRng ? entropyRng.int(0, MAX_SEED) : entropySeed();
-  return encodeSeedCode({ dial, seed, toggles }, { toggleNames });
+  return encodeSeedCode({ dial, seed, toggles: options?.toggles }, options);
 }

@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Harbor Music Demo</title>
+<link rel="icon" href="data:,">
+<style>
+  :root { --bg: #14181f; --panel: #1d2430; --ink: #e8e2d3; --dim: #9aa3b2; --ok: #7fd18a; --bad: #ff7b72; --warn: #f2c66d; --acc: #f0a85a; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 ui-monospace, Menlo, Consolas, monospace; padding: 16px; }
+  h1 { font-size: 18px; margin: 0 0 4px; color: var(--acc); }
+  p { margin: 4px 0 10px; color: var(--dim); }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; align-items: center; }
+  button { background: var(--panel); color: var(--ink); border: 1px solid #39465a; border-radius: 6px; padding: 6px 10px; cursor: pointer; font: inherit; }
+  button:hover { border-color: var(--acc); }
+  button.on { background: #3a4a2f; border-color: var(--ok); }
+  button.playing { background: #4a3a1f; border-color: var(--acc); }
+  #now { color: var(--acc); min-height: 1.4em; }
+  #log { background: #0d1016; border: 1px solid #2a3340; border-radius: 6px; padding: 10px; max-height: 50vh; overflow: auto; white-space: pre-wrap; }
+  .PASS { color: var(--ok); } .FAIL { color: var(--bad); } .INFO { color: var(--dim); } .WARN { color: var(--warn); }
+  table { border-collapse: collapse; width: 100%; margin-top: 8px; }
+  td, th { text-align: left; padding: 2px 8px 2px 0; border-bottom: 1px solid #222a36; }
+  canvas { width: 100%; height: 48px; background: #0d1016; border-radius: 6px; display: block; }
+</style>
+</head>
+<body>
+<h1>Harbor music demo</h1>
+<p>Sequenced + synthesized through <code>js/core/audio.js</code>. Data in <code>tracks.js</code>. Add <code>?auto=1</code> to run the whole test on load (needs autoplay permission).</p>
+<div class="row">
+  <button id="run">Run full test (hour tour + offline render)</button>
+  <button id="stop">Stop</button>
+  <span id="now"></span>
+</div>
+<canvas id="scope" width="800" height="48"></canvas>
+<div class="row" id="tracks"></div>
+<div class="row" id="stems"></div>
+<div id="log"></div>
+<table id="table"><thead><tr><th>track</th><th>bpm</th><th>bars</th><th>layers</th><th>peak</th><th>rms</th><th>result</th></tr></thead><tbody></tbody></table>
+
+<script type="module">
+import { TRACKS, CUES, DAY_PARTS, toEngine, defaultStems, applyStems, stemLayers, worldCue, twoBarsMs } from './tracks.js';
+
+const $ = (s) => document.querySelector(s);
+const logEl = $('#log'), nowEl = $('#now'), tbody = $('#table tbody');
+const results = { defined: [], renders: [], lines: [], failures: 0, done: false, engine: null };
+window.__music = results;
+window.__music.summary = () => ({ failures: results.failures, done: results.done, engine: results.engine, defined: results.defined.length, renders: results.renders });
+
+function log(kind, msg) {
+  const line = `${kind} ${msg}`;
+  results.lines.push(line);
+  if (kind === 'FAIL') results.failures++;
+  console.log(line);
+  const d = document.createElement('div'); d.className = kind; d.textContent = line; logEl.appendChild(d); logEl.scrollTop = logEl.scrollHeight;
+}
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+// ── load the engine (may be absent while another engineer writes it) ─────────────────────────
+let audio = null, analyzeBuffer = null;
+try {
+  const mod = await import('../../js/core/audio.js');
+  audio = mod.audio || mod.default || (mod.createAudio && mod.createAudio());
+  analyzeBuffer = mod.analyzeBuffer || ((chs) => { let peak = 0, sum = 0, n = 0; for (const c of chs) for (let i = 0; i < c.length; i++) { const a = Math.abs(c[i]); if (a > peak) peak = a; sum += c[i] * c[i]; n++; } return { peak, rms: n ? Math.sqrt(sum / n) : 0 }; });
+  results.engine = 'js/core/audio.js';
+  log('PASS', `engine loaded: defineTrack=${typeof audio.defineTrack} playMusic=${typeof audio.playMusic} setStem=${typeof audio.setStem} renderTrack=${typeof audio.renderTrack}`);
+} catch (e) {
+  results.engine = null;
+  log('FAIL', `engine js/core/audio.js not available: ${e.message}`);
+}
+
+// ── define every track ───────────────────────────────────────────────────────────────────────
+const ORDER = [...DAY_PARTS.map(t => t.id), 'title', 'forecast', 'battle_wild', 'battle_trainer', 'battle_spire', 'summit', 'victory', 'shift_reveal', 'letter', 'relighting', 'lantern_market', 'credits'];
+if (audio) {
+  for (const id of ORDER) {
+    const t = TRACKS[id];
+    try {
+      const def = toEngine(t);
+      const norm = audio.defineTrack(id, def);
+      results.defined.push(id);
+      log('PASS', `defineTrack ${id} "${t.title}" ${t.bpm}bpm ${t.bars}x${t.stepsPerBar || 16} -> ${norm.layers.length} layers (${norm.layers.filter(l => l.stem).map(l => l.name).join(',') || 'no stems'})`);
+    } catch (e) {
+      log('FAIL', `defineTrack ${id}: ${e.message}`);
+    }
+  }
+}
+
+// ── UI ───────────────────────────────────────────────────────────────────────────────────────
+const trackBtns = {};
+for (const id of ORDER) {
+  const b = document.createElement('button'); b.textContent = id; b.title = TRACKS[id].title;
+  b.onclick = () => play(id, { fade: 800 });
+  $('#tracks').appendChild(b); trackBtns[id] = b;
+}
+const STEM_NAMES = ['perc', 'night', 'tide', 'rain', 'tense'];
+const stemBtns = {};
+const stemState = { perc: true, night: false, tide: false, rain: false, tense: false };
+for (const s of STEM_NAMES) {
+  const b = document.createElement('button'); b.textContent = `stem: ${s}`; b.className = stemState[s] ? 'on' : '';
+  b.onclick = () => setStem(s, !stemState[s]);
+  $('#stems').appendChild(b); stemBtns[s] = b;
+}
+let currentId = null;
+async function unlock() {
+  if (!audio) return false;
+  const ok = await audio.unlock();
+  if (!ok) log('WARN', `audio.unlock() returned false (state ${audio.state}); playback test may be silent`);
+  return ok;
+}
+function setStem(name, on) {
+  stemState[name] = on;
+  stemBtns[name].className = on ? 'on' : '';
+  if (!audio) return;
+  // apply to every defined track so the state survives crossfades (engine stems are exact layer names)
+  const touched = new Set();
+  for (const id of results.defined) for (const l of stemLayers(TRACKS[id], name)) touched.add(l);
+  for (const l of touched) audio.setStem(l, on);
+}
+async function play(id, { fade = 800 } = {}) {
+  if (!audio) return;
+  await unlock();
+  // make sure default-on stems of this track are on, then layer the world state over them
+  for (const l of defaultStems(TRACKS[id])) audio.setStem(l, true);
+  applyStems(audio, TRACKS[id], stemState);
+  audio.playMusic(id, { fade });
+  currentId = id;
+  for (const [k, b] of Object.entries(trackBtns)) b.className = k === id ? 'playing' : '';
+}
+$('#stop').onclick = () => { audio && audio.stopMusic({ fade: 600 }); currentId = null; for (const b of Object.values(trackBtns)) b.className = ''; };
+
+// scope + now-playing readout
+const scope = $('#scope'), sctx = scope.getContext('2d');
+function draw() {
+  requestAnimationFrame(draw);
+  const an = audio && audio.analyser;
+  sctx.fillStyle = '#0d1016'; sctx.fillRect(0, 0, scope.width, scope.height);
+  if (an) {
+    const buf = new Uint8Array(an.fftSize); an.getByteTimeDomainData(buf);
+    sctx.strokeStyle = '#f0a85a'; sctx.beginPath();
+    for (let i = 0; i < buf.length; i++) { const x = i / buf.length * scope.width, y = buf[i] / 255 * scope.height; i ? sctx.lineTo(x, y) : sctx.moveTo(x, y); }
+    sctx.stroke();
+  }
+  const np = audio && audio.nowPlaying && audio.nowPlaying();
+  nowEl.textContent = np ? `${np.id}  bar ${np.bar + 1}  beat ${np.beat + 1}  stems[${(np.stems || []).join(' ')}]` : (audio ? 'silent' : 'no engine');
+}
+draw();
+
+// ── the full test ────────────────────────────────────────────────────────────────────────────
+async function hourTour() {
+  if (!audio) { log('FAIL', 'hour tour skipped: no engine'); return; }
+  const ok = await unlock();
+  log(ok ? 'PASS' : 'WARN', `unlock -> state ${audio.state}`);
+  // 24 hours in 8 blocks; each block 6 s; stems follow a scripted world state so every toggle is exercised.
+  const script = [
+    { hour: 1,  weather: 'clear', tide: 0.2 }, { hour: 4,  weather: 'rain',  tide: 0.8 },
+    { hour: 7,  weather: 'clear', tide: 0.9 }, { hour: 10, weather: 'rain',  tide: 0.3 },
+    { hour: 13, weather: 'clear', tide: 0.1 }, { hour: 16, weather: 'storm', tide: 0.75 },
+    { hour: 19, weather: 'clear', tide: 0.5 }, { hour: 22, weather: 'rain',  tide: 0.95 },
+  ];
+  for (const st of script) {
+    const cue = worldCue({ ...st, weekday: 3, season: 'summer', place: 'town' });
+    const t = TRACKS[cue.track];
+    for (const l of defaultStems(t)) audio.setStem(l, true);
+    Object.assign(stemState, cue.stems); for (const s of STEM_NAMES) if (s in cue.stems) stemBtns[s].className = cue.stems[s] ? 'on' : '';
+    applyStems(audio, t, cue.stems);
+    const started = audio.playMusic(cue.track, { fade: Math.min(cue.fade, 2500) });
+    currentId = cue.track; for (const [k, b] of Object.entries(trackBtns)) b.className = k === cue.track ? 'playing' : '';
+    log(started ? 'PASS' : 'FAIL', `hour ${String(st.hour).padStart(2, '0')}:00 -> ${cue.track} (${t.title}) fade ${cue.fade}ms stems ${JSON.stringify(cue.stems)}`);
+    await sleep(3000);
+    // mid-block toggle so the stem ramps are audible: flip night + tide
+    const flip = { night: !cue.stems.night, tide: !cue.stems.tide };
+    applyStems(audio, t, flip);
+    const np = audio.nowPlaying();
+    const playing = np && np.id === cue.track;
+    log(playing ? 'PASS' : 'FAIL', `  nowPlaying ${np ? `${np.id} bar ${np.bar + 1} beat ${np.beat + 1}` : 'null'}; toggled ${JSON.stringify(flip)}; engine stems [${(np && np.stems || []).join(' ')}]`);
+    await sleep(3000);
+  }
+  // Saturday night market, then a battle with the tense stem, then two stings.
+  const sat = worldCue({ hour: 20, weekday: 6, weather: 'clear', tide: 0.5, season: 'autumn', place: 'market' });
+  log(sat.track === 'lantern_market' ? 'PASS' : 'FAIL', `Saturday 20:00 market -> ${sat.track}`);
+  audio.stopMusic({ fade: 400 });
+  currentId = null; for (const b of Object.values(trackBtns)) b.className = '';
+}
+
+async function renderAll() {
+  if (!audio || !audio.renderTrack) { log('FAIL', 'offline render skipped: no renderTrack'); return; }
+  for (const id of results.defined) {
+    const t = TRACKS[id];
+    const bars = Math.min(8, t.bars);
+    const stems = [...defaultStems(t), ...(t.layers.night ? ['night'] : []), ...(t.layers.tide ? ['tide'] : [])]; // render with the busiest common mix
+    const row = tbody.insertRow();
+    try {
+      const t0 = performance.now();
+      const buf = await audio.renderTrack(id, { bars, sampleRate: 22050, stems });
+      const chans = Array.from({ length: buf.numberOfChannels }, (_, i) => buf.getChannelData(i));
+      const { peak, rms } = analyzeBuffer(chans);
+      const okPeak = peak < 0.99, okRms = rms > 0.01;
+      const verdict = okPeak && okRms ? 'PASS' : 'FAIL';
+      results.renders.push({ id, bars, peak: +peak.toFixed(3), rms: +rms.toFixed(4), ok: verdict === 'PASS', ms: Math.round(performance.now() - t0) });
+      log(verdict, `render ${id} first ${bars} bars: peak ${peak.toFixed(3)} ${okPeak ? '<' : '>='} 0.99, rms ${rms.toFixed(4)} ${okRms ? '>' : '<='} 0.01 (${buf.duration.toFixed(1)}s, ${Math.round(performance.now() - t0)}ms)`);
+      row.innerHTML = `<td>${id}</td><td>${t.bpm}</td><td>${bars}/${t.bars}</td><td>${Object.keys(t.layers).join(' ')}</td><td>${peak.toFixed(3)}</td><td>${rms.toFixed(4)}</td><td class="${verdict}">${verdict}</td>`;
+    } catch (e) {
+      results.renders.push({ id, bars, ok: false, error: e.message });
+      log('FAIL', `render ${id}: ${e.message}`);
+      row.innerHTML = `<td>${id}</td><td colspan="5">${e.message}</td><td class="FAIL">FAIL</td>`;
+    }
+  }
+}
+
+async function runAll() {
+  results.done = false;
+  const tour = hourTour();          // live playback
+  await renderAll();                // offline renders can run while the tour plays
+  await tour;
+  log(results.failures ? 'FAIL' : 'PASS', `SUMMARY ${results.failures} failures, ${results.defined.length} tracks defined, ${results.renders.filter(r => r.ok).length}/${results.renders.length} renders within limits`);
+  results.done = true;
+}
+$('#run').onclick = runAll;
+if (new URLSearchParams(location.search).get('auto') === '1') runAll();
+</script>
+</body>
+</html>
