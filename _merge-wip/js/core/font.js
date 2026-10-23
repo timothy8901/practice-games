@@ -62,7 +62,7 @@ const MAIN_SRC = {
   $: '..#../.####/#.#../.###./..#.#/####./..#..',
   '%': '##..#/##.#./...#./..#../.#.../.#.##/#..##',
   '&': '.##../#..#./#..#./.##../#.#.#/#..#./.##.#',
-  "'": '#/#/./././././.',
+  "'": '#/#/././././.',
   '(': '.#/#./#./#./#./#./.#',
   ')': '#./.#/.#/.#/.#/.#/#.',
   '*': '...../#.#.#/.###./#####/.###./#.#.#/.....',
@@ -534,15 +534,27 @@ function wrapParagraph(font, para, max, letterSpacing) {
   /** @type {string[]} */
   const out = [];
   let line = '';
+  let open = false; // the current line has been started (may still be '' at paragraph start)
+  let swallow = false; // after a soft wrap, drop the spaces that caused it
   for (const word of para.split(' ')) {
-    const candidate = line.length ? `${line} ${word}` : word;
+    if (swallow && word === '') continue;
+    swallow = false;
+    const candidate = open ? `${line} ${word}` : word;
     if (fits(candidate)) {
       line = candidate;
+      open = true;
       continue;
     }
-    if (line.length) out.push(line.trimEnd());
+    if (open) out.push(line.trimEnd());
+    line = '';
+    open = false;
+    if (word === '') {
+      swallow = true;
+      continue;
+    }
     if (fits(word)) {
       line = word;
+      open = true;
       continue;
     }
     // A single word wider than the line: break it by characters.
@@ -555,8 +567,9 @@ function wrapParagraph(font, para, max, letterSpacing) {
       chunk += c;
     }
     line = chunk;
+    open = true;
   }
-  out.push(line);
+  if (open || out.length === 0) out.push(line);
   return out;
 }
 
@@ -973,13 +986,14 @@ export function drawText(ctx, text, x, y, opts = {}) {
  * @param {unknown} text
  * @param {number} x
  * @param {number} y
- * @param {number} visibleChars Characters to show; clamped to 0..total.
+ * @param {number} visibleChars Characters to show; clamped to 0..total
+ *   (`Infinity` shows everything, NaN shows nothing).
  * @param {DrawOptions} [opts]
  * @returns {TextMetrics2 & {shown: number, total: number, done: boolean}}
  */
 export function drawTextTyped(ctx, text, x, y, visibleChars, opts = {}) {
   const layout = layoutText(text, opts);
-  const n = Number.isFinite(visibleChars) ? Math.floor(visibleChars) : 0;
+  const n = visibleChars === Infinity ? layout.glyphCount : Number.isFinite(visibleChars) ? Math.floor(visibleChars) : 0;
   const shown = Math.min(Math.max(0, n), layout.glyphCount);
   paintLayout(ctx, layout, x, y, opts, shown);
   return { ...metricsOf(layout), shown, total: layout.glyphCount, done: shown >= layout.glyphCount };

@@ -491,10 +491,8 @@ export function createMemoryStorage({ quota = Infinity } = {}) {
  * @returns {candidate is StorageLike}
  */
 function isStorageLike(candidate) {
-  return isObjectLike(candidate) || typeof candidate === 'function'
-    ? typeof candidate.getItem === 'function' && typeof candidate.setItem === 'function'
-      && typeof candidate.removeItem === 'function'
-    : false;
+  return isObjectLike(candidate) && typeof candidate.getItem === 'function'
+    && typeof candidate.setItem === 'function' && typeof candidate.removeItem === 'function';
 }
 
 /**

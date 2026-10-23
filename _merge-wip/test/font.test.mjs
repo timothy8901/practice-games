@@ -40,7 +40,8 @@ describe('font data', () => {
     for (const font of Object.values(FONTS)) {
       const all = [...font.glyphs.values(), font.fallback];
       for (const g of all) {
-        assert.ok(g.w >= 1 && g.w <= font.cellW, `${font.name}: width ${g.w} out of range`);
+        // cellW is nominal; the ellipsis needs 5 columns in both fonts.
+        assert.ok(g.w >= 1 && g.w <= Math.max(font.cellW, 5), `${font.name}: width ${g.w} out of range`);
         assert.ok(g.h >= font.cellH && g.h <= font.cellH + font.descent, `${font.name}: height ${g.h} out of range`);
         assert.equal(g.rows.length, g.h);
         assert.equal(g.bits.length, g.h);
@@ -211,16 +212,19 @@ describe('wrapText', () => {
   test('maxWidth is in scaled pixels; letterSpacing is respected', () => {
     assert.deepEqual(wrapText(TEXT, 120, { scale: 2 }), wrapText(TEXT, 60));
     assert.deepEqual(wrapText('AA AA', 11), ['AA', 'AA']);
-    assert.deepEqual(wrapText('AA AA', 23), ['AA AA']);
-    assert.deepEqual(wrapText('AA AA', 23, { letterSpacing: 1 }), ['AA', 'AA']);
+    assert.deepEqual(wrapText('AA AA', 27), ['AA AA']); // 11 + 1 + 3 + 1 + 11
+    assert.deepEqual(wrapText('AA AA', 26), ['AA', 'AA']);
+    assert.deepEqual(wrapText('AA AA', 27, { letterSpacing: 1 }), ['AA', 'AA']);
+    assert.deepEqual(wrapText('AA AA', 31, { letterSpacing: 1 }), ['AA AA']);
     assert.deepEqual(wrapText('AB CD', 30, { font: 'small' }), ['AB CD']);
   });
 
   test('preserves inner spacing that fits, trims trailing spaces on wrapped lines', () => {
     assert.deepEqual(wrapText('a  b', 100), ['a  b']);
     assert.deepEqual(wrapText('  indented', 100), ['  indented']);
-    const lines = wrapText('AA  AA', 11);
-    assert.deepEqual(lines, ['AA', 'AA']);
+    assert.deepEqual(wrapText('AA  AA', 11), ['AA', 'AA']);
+    assert.deepEqual(wrapText('AA   ', 11), ['AA']);
+    assert.deepEqual(wrapText('AA AA\n', 11), ['AA', 'AA', '']);
   });
 
   test('every line of long generated text fits for many widths', () => {
@@ -233,7 +237,7 @@ describe('wrapText', () => {
         const single = l.length === 1 || [...l].length === 1;
         assert.ok(w <= maxW || single, `width ${w} > ${maxW} for '${l}'`);
       }
-      assert.equal(lines.join(' ').replace(/\s+/g, ' '), txt.replace(/\s+/g, ' '));
+      assert.equal(lines.join('').replace(/ /g, ''), txt.replace(/ /g, ''), 'no characters lost');
     }
   });
 });
@@ -416,7 +420,7 @@ describe('drawText with a mocked canvas environment', () => {
     assert.equal(ctx.calls[0][7], 10);
     const c = fakeCtx();
     drawText(c, 'AAA', 50, 0, { align: 'center' });
-    assert.equal(c.calls[0][5], 50 - 9); // -8.5 rounds to -8 => 42? Math.round(-8.5) = -8
+    assert.equal(c.calls[0][5], 42); // offset -8.5 rounds to -8
   });
 
   test('shadow and outline add passes in the right order and colours', () => {
@@ -428,7 +432,7 @@ describe('drawText with a mocked canvas environment', () => {
     assert.deepEqual(ctx.calls.slice(0, 2).map((c) => [c[5], c[6]]), [[1, 1], [7, 1]]);
     assert.deepEqual(ctx.calls.slice(2).map((c) => [c[5], c[6]]), [[0, 0], [6, 0]]);
     const o = fakeCtx();
-    drawText(o, 'A', 5, 5, { outline: '#123456', scale: 2 });
+    drawText(o, 'A', 5, 5, { color: '#fff', outline: '#123456', scale: 2 });
     assert.equal(o.calls.length, 9);
     const offsets = o.calls.slice(0, 8).map((c) => `${c[5] - 5},${c[6] - 5}`).sort();
     assert.deepEqual(offsets, ['-2,-2', '-2,0', '-2,2', '0,-2', '0,2', '2,-2', '2,0', '2,2'].sort());
