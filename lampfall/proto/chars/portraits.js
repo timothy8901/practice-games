@@ -235,12 +235,14 @@ function juniper() {
   const BLK = ['L', 'F', 'f', 'D'];
   const body = G();
   ball(body, 24, 57, 22, 19, BLK, { bias: 0.08 });
-  ball(body, 11, 44, 5, 3.4, ['M', 'M', 'm', 'n'], { bias: 0.1 });
-  ball(body, 37, 44, 5, 3.4, ['M', 'm', 'm', 'n'], { bias: 0.0 });
+  // the magpie tells: big white scapular patches on both shoulders
+  ball(body, 9, 42, 6.5, 4.6, ['M', 'M', 'm', 'n'], { bias: 0.12 });
+  ball(body, 39, 42, 6.5, 4.6, ['M', 'm', 'm', 'n'], { bias: 0.0 });
   // sheen along the wing edges
   tint(body, 'Ff', 'I', (x, y) => (x <= 3 || x >= 44) && y >= 40);
   tint(body, 'f', 'i', (x, y) => (x <= 4 || x >= 43) && y >= 44 && (x + y) % 2 === 0);
-  ball(body, 24, 50, 9, 11, ['M', 'M', 'm', 'n']);
+  // white belly rising between the apron straps (the black bib stays above)
+  ball(body, 24, 44, 8.5, 10, ['M', 'M', 'm', 'n']);
   const apron = G();
   poly(apron, [[15, 38], [33, 38], [36, 48], [12, 48]], 'C');
   tint(apron, 'C', 'Q', (x, y) => x <= 15 || y === 38);

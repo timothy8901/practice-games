@@ -29,7 +29,7 @@
 </head>
 <body>
 <h1>Character sheet</h1>
-<p class="sub">16x24 palette-indexed string art. Per row: animated walk down / up / left / right (outlined), then 4 frames each of down, up, left (idle, step A, idle, step B), sit, fish (24 wide; draw at x + fishOx), hang. 48x48 portrait busts above. <code>?zoom=6&amp;only=wren,juniper</code> to inspect.</p>
+<p class="sub">16x24 palette-indexed string art. Per row: animated walk down / up / left / right and run down / left (outlined), then 4 frames each of down, up, left (idle, step A, idle, step B), sit, the fishing cast loop (24 wide; draw at x + fishOx; phases hold / wind-up / cast / bite), hang. Juniper's sheen palette-cycles while animating. 48x48 portrait busts above. <code>?zoom=6&amp;only=wren,juniper</code> to inspect.</p>
 <div class="ctl">
   <label><input type="checkbox" id="anim" checked> animate</label>
   <label>backdrop <select id="bg"><option value="#4e6e5d">grass</option><option value="#c9b48a">sand</option><option value="#7a5a36">boards</option><option value="#2b3a67">night</option></select></label>
@@ -42,7 +42,7 @@
 <div id="rows"></div>
 <script type="module">
   import { decodeSprite, drawSprite, silhouette } from '../../js/core/pixelart.js';
-  import { BODIES, PALETTES, CHARACTERS, PORTRAITS, frame, walkStep } from './chars.js';
+  import { BODIES, PALETTES, CHARACTERS, PORTRAITS, frame, walkStep, animatedPalette } from './chars.js';
 
   const q = new URLSearchParams(location.search);
   const SCALE = Number(q.get('zoom') || 3);
@@ -66,10 +66,12 @@
   const COLS = [
     ...['down', 'up', 'left', 'right'].map((f) => ({ facing: f, step: 'anim', label: f[0].toUpperCase() + '~', anim: true })),
     { gap: true },
+    ...['down', 'left'].map((f) => ({ facing: f, step: 'run', label: 'run ' + f[0].toUpperCase(), anim: true, gait: 'run' })),
+    { gap: true },
     ...['down', 'up', 'left'].flatMap((f) => [0, 1, 2, 3].map((s) => ({ facing: f, step: s, label: f[0].toUpperCase() + s }))),
     { gap: true },
     { facing: 'sit', label: 'sit' },
-    { facing: 'fish', label: 'fish', w: 24 },
+    { facing: 'fish', label: 'fish~', w: 24, step: 'cast', anim: true },
     { facing: 'hang', label: 'hang', poseOnly: 'hang' },
   ];
   const hdr = document.getElementById('hdr');
@@ -102,12 +104,21 @@
   const t0 = performance.now();
   let frames = 0;
   function render(now) {
-    const step = animBox.checked ? walkStep(now - t0, 125) : 0;
+    const t = Math.max(0, now - t0), on = animBox.checked;
+    const step = on ? walkStep(t, 125) : 0;
+    const runStep = on ? walkStep(t, 85) : 0;
+    // cast loop: hold, wind-up, cast, hold..., bite (frame times in ms)
+    const castSeq = [[1, 260], [2, 200], [0, 1400], [3, 220], [0, 120], [3, 220], [0, 600]];
+    const castLen = castSeq.reduce((a, [, d]) => a + d, 0);
+    let ct = on ? t % castLen : 1e9, castStep = 0;
+    for (const [f, d] of castSeq) { if (ct < d) { castStep = f; break; } ct -= d; }
     for (const { ch, col, c } of cells) {
       const ctx = c.getContext('2d');
       ctx.fillStyle = bgSel.value; ctx.fillRect(0, 0, c.width, c.height);
-      const rowsF = frame(ch.body, col.facing, col.step === 'anim' ? step : col.step || 0);
-      let sp = decodeSprite(rowsF, PALETTES[ch.palette], { scale: SCALE });
+      const st = col.step === 'anim' ? step : col.step === 'run' ? runStep : col.step === 'cast' ? castStep : col.step || 0;
+      const rowsF = frame(ch.body, col.facing, st, col.gait);
+      const pal = on ? animatedPalette(ch.palette, t) : PALETTES[ch.palette];
+      let sp = decodeSprite(rowsF, pal, { scale: SCALE });
       if (outBox.checked) sp = silhouette(sp, '#1a1c2c');
       drawSprite(ctx, sp, 0, 0);
     }

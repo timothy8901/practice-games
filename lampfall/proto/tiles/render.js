@@ -86,8 +86,8 @@ const INK = hexToRgb01(COLORS.ink);
 const GRADES = [
   // Night keeps its blue mood but a low ambient floor: lifting the darks (screen) flattens the 1px
   // base lines that make blocking things read, so night brightness comes from the multiply instead.
-  { h: 0, mul: [0.58, 0.74, 0.95], scr: [0.02, 0.03, 0.07], sat: 0.72, lamp: 1, night: 1 },      // deep night
-  { h: 4.25, mul: [0.58, 0.74, 0.95], scr: [0.02, 0.03, 0.07], sat: 0.72, lamp: 1, night: 1 },
+  { h: 0, mul: [0.60, 0.76, 0.96], scr: [0.02, 0.03, 0.07], sat: 0.72, lamp: 1, night: 1 },      // deep night
+  { h: 4.25, mul: [0.60, 0.76, 0.96], scr: [0.02, 0.03, 0.07], sat: 0.72, lamp: 1, night: 1 },
   { h: 5.25, mul: [0.62, 0.77, 0.96], scr: [0.02, 0.03, 0.07], sat: 0.78, lamp: 1, night: 0.8 }, // night
   { h: 6.5, mul: [0.96, 0.84, 0.78], scr: [0.04, 0.03, 0.05], sat: 0.95, lamp: 0.6, night: 0.2 }, // dawn (peach over a cool floor)
   { h: 7.75, mul: [0.98, 0.97, 1.0], scr: [0.02, 0.02, 0.03], sat: 1.0, lamp: 0, night: 0 },    // morning
@@ -98,7 +98,7 @@ const GRADES = [
   { h: 19.25, mul: [0.70, 0.80, 0.96], scr: [0.02, 0.03, 0.07], sat: 0.85, lamp: 1, night: 0.6 }, // blue hour
   { h: 20.0, mul: [0.62, 0.77, 0.96], scr: [0.02, 0.03, 0.07], sat: 0.78, lamp: 1, night: 0.85 }, // night
   { h: 22.5, mul: [0.62, 0.77, 0.96], scr: [0.02, 0.03, 0.07], sat: 0.78, lamp: 1, night: 1 },
-  { h: 24, mul: [0.58, 0.74, 0.95], scr: [0.02, 0.03, 0.07], sat: 0.72, lamp: 1, night: 1 },
+  { h: 24, mul: [0.60, 0.76, 0.96], scr: [0.02, 0.03, 0.07], sat: 0.72, lamp: 1, night: 1 },
 ];
 
 /**
@@ -124,8 +124,9 @@ export function gradeFor(hour, weather = 'clear') {
     // up the low sun instead
     wmul: lerp3(a.wmul || a.mul, b.wmul || b.mul, t), glint: lerp(a.glint || 0, b.glint || 0, t),
   };
-  if (weather === 'rain') { const k = [0.95, 0.96, 0.99]; g.mul = g.mul.map((v, i) => v * k[i]); g.wmul = g.wmul.map((v, i) => v * k[i]); g.sat *= 0.92; g.lamp = Math.max(g.lamp, 0.35); g.glint *= 0.3; }
-  if (weather === 'fog') { const k = [0.92, 0.93, 0.96]; g.mul = g.mul.map((v, i) => v * k[i]); g.wmul = g.wmul.map((v, i) => v * k[i]); g.sat *= 0.9; g.glint *= 0.3; } // the drifting bands supply the haze
+  // light rain: cooler and a little greyer, not darker (storms take the extra remap step)
+  if (weather === 'rain') { const k = [0.98, 0.98, 1.0]; g.mul = g.mul.map((v, i) => v * k[i]); g.wmul = g.wmul.map((v, i) => v * k[i]); g.sat *= 0.92; g.lamp = Math.max(g.lamp, 0.35); g.glint *= 0.3; }
+  if (weather === 'fog') { g.sat *= 0.9; g.glint *= 0.3; } // the drifting bands supply the haze
   g.key = `${h}|${weather}`;
   return g;
 }
@@ -584,7 +585,8 @@ export function drawMap(ctx, map, tileset, opts = {}) {
   ctx.restore();
 
   // ---- weather (never above 35% opacity, never over the Skyband/UI)
-  drawWeather(ctx, tileset, view, weather, frame, g);
+  const focus = opts.focus ? { x: view.x + opts.focus.x - camX, y: view.y + opts.focus.y - camY } : null;
+  drawWeather(ctx, tileset, view, weather, frame, g, focus);
 
   // ---- Skyband (the strip directly above the view)
   if (skyH > 0) drawSkyband(ctx, tileset, { x: view.x, y: view.y - skyH, w: view.w, h: skyH, hour, frame, weather, grade: g });
@@ -672,13 +674,25 @@ function rainRipple(ctx, x, y, px, py, frame, g) {
   ctx.globalAlpha = 1;
 }
 
-function drawWeather(ctx, tileset, view, weather, frame, g) {
+const fogBuf = { canvas: null };
+function drawWeather(ctx, tileset, view, weather, frame, g, focus = null) {
   if (weather === 'clear') return;
   ctx.save();
   ctx.beginPath();
   ctx.rect(view.x, view.y, view.w, view.h);
   ctx.clip();
   if (weather === 'fog') {
+    // Bands go to a buffer first so the ground within 4 tiles of the player (`focus`) can be cleared
+    // with a 2-step dithered edge: fog never hides the walkable map where the player is.
+    if (!fogBuf.canvas || fogBuf.canvas.width !== ctx.canvas.width || fogBuf.canvas.height !== ctx.canvas.height) {
+      fogBuf.canvas = document.createElement('canvas');
+      fogBuf.canvas.width = ctx.canvas.width; fogBuf.canvas.height = ctx.canvas.height;
+    }
+    const target = ctx;
+    ctx = fogBuf.canvas.getContext('2d');
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, fogBuf.canvas.width, fogBuf.canvas.height);
+    ctx.imageSmoothingEnabled = false;
     const band = tileset.sprite('fog_band', 0, g);
     const layers = [
       { speed: 0.25, alpha: 0.18, yoff: 0, phase: 0 },
@@ -693,6 +707,24 @@ function drawWeather(ctx, tileset, view, weather, frame, g) {
         }
       }
     }
+    ctx.globalAlpha = 1;
+    if (focus) {
+      const R = 4 * TILE;
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.fillStyle = '#000';
+      ctx.beginPath(); ctx.ellipse(focus.x, focus.y, R, R * 0.8, 0, 0, Math.PI * 2); ctx.fill();
+      for (let yy = -R - 12; yy <= R + 12; yy++) {
+        for (let xx = -R - 14; xx <= R + 14; xx++) {
+          const d = Math.hypot(xx / (R + 14), yy / ((R + 12) * 0.8));
+          if (d > 1 || Math.hypot(xx / R, yy / (R * 0.8)) <= 1) continue;
+          const inner = Math.hypot(xx / (R + 7), yy / ((R + 6) * 0.8)) <= 1;
+          if (inner ? ((xx + yy) & 1) === 0 : (xx & 1) === 0 && (yy & 1) === 0) ctx.fillRect(focus.x + xx, focus.y + yy, 1, 1);
+        }
+      }
+      ctx.globalCompositeOperation = 'source-over';
+    }
+    target.drawImage(fogBuf.canvas, 0, 0);
+    ctx = target;
   } else if (weather === 'rain') {
     // 1px streaks angled by the wind (falling down-left), each drop moving continuously; well under
     // 20% coverage. Streak colours are graded so night rain never glows.

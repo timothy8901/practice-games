@@ -86,6 +86,8 @@
     drawMap(ctx, HARBOR, tileset, {
       frame: state.frame, hour: state.hour, weather: state.weather, tide: state.tide,
       camX: cx, camY: cy, lighthouseStage: state.stage, lighthouseLit: lit,
+      // stand-in for the player: fog clears around the middle of the view
+      focus: full ? null : { x: cx + 240, y: cy + 40 + 115 },
     });
     hud.textContent = `h${state.hour} tide${state.tide} ${state.weather} ${state.cam}`;
     hud.style.display = q.has('hud') ? 'block' : 'none';

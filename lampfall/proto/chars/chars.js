@@ -63,7 +63,7 @@ export function frame(body, facing = 'down', step = 0, gait = 'walk') {
 
 /** Walk-cycle step for a time in ms (idle, A, idle, B at `ms` per frame). */
 export function walkStep(t, ms = 125) {
-  return Math.floor(t / ms) % 4;
+  return ((Math.floor(t / ms) % 4) + 4) % 4;
 }
 
 /** Decoded sprite for a character id (cached by pixelart). opts.gait = 'run' | 'walk'; opts.t (ms) animates sheen. */
@@ -86,7 +86,7 @@ const sheenCache = new Map();
 export function animatedPalette(palId, t = 0, ms = 220) {
   const base = PALETTES[palId];
   if (!base || !('I' in base)) return base;
-  const k = Math.floor(t / ms) % SHEEN.length;
+  const n = SHEEN.length, k = ((Math.floor(t / ms) % n) + n) % n;
   const key = palId + k;
   if (!sheenCache.has(key)) sheenCache.set(key, { ...base, I: SHEEN[k][0], i: SHEEN[k][1] });
   return sheenCache.get(key);

@@ -20,7 +20,7 @@ export const COLORS = {
   grass0: '#2E5A48', grass1: '#3F7A5A', grass2: '#5E9E6A', grass3: '#7DB874', grass4: '#A8D5A2',
   // sand / wet sand
   sand0: '#A98B64', sand1: '#C9A77C', sand2: '#E8D3A0', sand3: '#F4E8C1',
-  wet0: '#6E5A44', wet1: '#8C7352', wet2: '#A98B64', bank: '#2A2228',
+  wet0: '#6E5A44', wet1: '#8C7352', wet2: '#A98B64', bank: '#272026',
   // mud
   mud0: '#5A4A3E', mud1: '#7D6A58', mud2: '#A8927C',
   wmud0: '#43392F', wmud1: '#5A4E44', wmud2: '#6E6456', skyref: '#6E8CA8', skyref2: '#B8CFE0',

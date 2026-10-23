@@ -57,3 +57,31 @@ export function fakeCtx(w = 480, h = 270) {
   };
   return ctx;
 }
+
+/**
+ * Give Node a do-nothing canvas so drawing code paths (font atlases, pixelart sprites, panel
+ * caches) can run headless: `globalThis.OffscreenCanvas` (core/font, ui/panel) and the pixelart
+ * canvas factory. Contexts accept every call and record nothing; pass a `fakeCtx()` as the
+ * target when a test wants to count calls. Idempotent.
+ * @param {{setCanvasFactory?: (f: Function|null) => void}} [pixelart]
+ */
+export function installFakeCanvas(pixelart) {
+  const makeCtx = (canvas) => new Proxy({ canvas, globalAlpha: 1, fillStyle: '#000', globalCompositeOperation: 'source-over', imageSmoothingEnabled: false }, {
+    get(t, k) {
+      if (k in t) return t[k];
+      if (k === 'createImageData') return (w, h) => ({ width: w, height: h, data: new Uint8ClampedArray(w * h * 4) });
+      if (k === 'getImageData') return (x, y, w, h) => ({ width: w, height: h, data: new Uint8ClampedArray(w * h * 4) });
+      if (k === 'createPattern') return () => ({ setTransform() {} });
+      if (k === 'measureText') return () => ({ width: 0 });
+      return () => {};
+    },
+    set(t, k, v) { t[k] = v; return true; },
+  });
+  class FakeCanvas {
+    constructor(w = 1, h = 1) { this.width = w; this.height = h; this._ctx = null; }
+    getContext() { return this._ctx || (this._ctx = makeCtx(this)); }
+  }
+  if (typeof globalThis.OffscreenCanvas !== 'function') globalThis.OffscreenCanvas = FakeCanvas;
+  if (pixelart && typeof pixelart.setCanvasFactory === 'function') pixelart.setCanvasFactory((w, h) => new FakeCanvas(w, h));
+  return FakeCanvas;
+}

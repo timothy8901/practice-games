@@ -351,6 +351,8 @@ export function createTextbox(o) {
     get choicesUp() { return choicesUp(); },
     get choiceLocked() { return choicesUp() && (!choiceSeen || choiceLock > 0); },
     get choiceRect() { return layout().choiceRect; },
+    /** Where page text is drawn: {x, y, w} plus the page's line budget. */
+    get textRect() { const L = layout(); return { ...L.text, maxLines: L.maxLines, lineH }; },
     get choiceFocus() { return choiceFocus; },
     get who() { return who; },
     get rect() { return rect; },
@@ -374,6 +376,9 @@ export function createTextbox(o) {
  * @property {boolean} finished    All pages shown and advanced past (or a choice made).
  * @property {number} page @property {number} pages @property {string} pageText @property {number} shown
  * @property {boolean} choicesUp
+ * @property {boolean} choiceLocked  Choices are up but still inside the mash-through guard.
+ * @property {{x: number, y: number, w: number, h: number}|null} choiceRect
+ * @property {{x: number, y: number, w: number, maxLines: number, lineH: number}} textRect
  * @property {import('./focus.js').Focus|null} choiceFocus
  * @property {string} who
  * @property {{x: number, y: number, w: number, h: number}} rect

@@ -40,8 +40,8 @@ HEADS.redpanda = {
     '.KFMMFFMMfK.',
     '.KFWEFFWEfK.',
     '.KFEEFFEEfK.',
-    '.KFMMMMMMfK.',
-    '.KfMMNNMMfK.',
+    '.KfMMMMMMfK.',
+    '.KffMNNMffK.',
     '..KKmMMmKK..',
   ],
   left: [

@@ -3,7 +3,11 @@
  * walkable tile and the blocking thing next to it must differ by at least 3:1. At 16px the eye reads
  * a boundary from its 1px cue (base line, bank, foam, coping), so each boundary lists the cue colours
  * actually drawn there; it passes when the best cue reaches 3:1 against the walkable colour (WCAG
- * relative-luminance ratio) after the hour's LUT and, in fog, after the fog bands' worst-case cover.
+ * relative-luminance ratio) after the hour's LUT.
+ *
+ * Fog (bible 7.3): ground within 4 tiles of the player stays clear, so the near field must reach 3:1
+ * with no fog cover; farther tiles may "drop one palette step and stay visible", checked at 1.5:1
+ * under the worst case where both drifting layers overlap.
  *
  * Run: node _merge-wip/proto/tiles/contrast-check.mjs   (exit 1 on any failure)
  */
@@ -50,23 +54,25 @@ const rows = [];
 for (const [label, hour] of STATES) {
   for (const w of WEATHER) {
     const g = gradeFor(hour, w);
-    const shade = (name) => {
-      let hex = name.startsWith('!') ? COLORS[name] : gradeHex(COLORS[name], g, name);
-      if (w === 'fog') hex = mix(hex, gradeHex(FOG, g), FOG_COVER);
-      return hex;
-    };
-    for (const B of BOUNDARIES) {
-      const walk = shade(B.walk);
-      const best = Math.max(...B.cues.map((c) => ratio(walk, shade(c))));
-      const ok = best >= 3;
-      if (!ok) fails++;
-      rows.push({ state: `${label}/${w}`, boundary: B.what, ratio: best.toFixed(2), ok });
+    const fields = w === 'fog' ? [['near', 0, 3], ['far', FOG_COVER, 1.5]] : [['', 0, 3]];
+    for (const [field, cover, need] of fields) {
+      const shade = (name) => {
+        const hex = name.startsWith('!') ? COLORS[name] : gradeHex(COLORS[name], g, name);
+        return cover ? mix(hex, gradeHex(FOG, g), cover) : hex;
+      };
+      for (const B of BOUNDARIES) {
+        const walk = shade(B.walk);
+        const best = Math.max(...B.cues.map((c) => ratio(walk, shade(c))));
+        const ok = best >= need;
+        if (!ok) fails++;
+        rows.push({ state: `${label}/${w}${field ? ' ' + field : ''}`, boundary: B.what, ratio: best.toFixed(2), need, ok });
+      }
     }
   }
 }
 const worst = {};
-for (const r of rows) if (!worst[r.boundary] || +r.ratio < +worst[r.boundary].ratio) worst[r.boundary] = r;
-console.log('worst case per boundary (need >= 3.00):');
+for (const r of rows) if (r.need === 3 && (!worst[r.boundary] || +r.ratio < +worst[r.boundary].ratio)) worst[r.boundary] = r;
+console.log('worst case per boundary, every hour x weather (need >= 3.00; fog far field checked separately at 1.5):');
 for (const r of Object.values(worst)) console.log(`  ${r.ok ? 'ok  ' : 'FAIL'} ${r.ratio.padStart(5)}  ${r.boundary}  [${r.state}]`);
 const failed = rows.filter((r) => !r.ok);
 if (failed.length) {
