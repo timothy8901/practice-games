@@ -189,6 +189,8 @@ export function createToasts(opts = {}) {
     },
     destroy() { if (typeof off === 'function') off(); },
     texts: () => [...live, ...queue].map((t) => t.text),
+    /** Snapshot of the visible slips (id, text, kind, age, left), top to bottom. */
+    items: () => live.map((t) => ({ id: t.id, text: t.text, kind: t.kind, age: t.age, left: t.left })),
     clear() { live.length = 0; queue.length = 0; },
     dismiss(id) {
       const li = live.findIndex((t) => t.id === id);
@@ -216,6 +218,7 @@ export function createToasts(opts = {}) {
  * @property {() => {x: number, y: number, w: number, h: number}[]} rects
  * @property {() => void} destroy
  * @property {() => string[]} texts
+ * @property {() => {id: number, text: string, kind: string, age: number, left: number}[]} items
  * @property {() => void} clear
  * @property {(id: number) => boolean} dismiss
  */

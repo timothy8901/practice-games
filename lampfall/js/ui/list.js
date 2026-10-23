@@ -192,9 +192,12 @@ export function createList(o) {
       let lx = r.x + SPACE.xs;
       const ty = r.y + Math.floor((rowH - TYPE.capH) / 2);
       if (markers) {
+        // Markers carry their meaning by shape (✦ new, ★ one of a kind); brass ink keeps them apart
+        // from the wax-red ▶ cursor that sits right beside them on the focused row.
+        const mk = s.dark ? COLORS.brass.light : COLORS.brass.dark;
         if (it.marker) {
-          if (hasIcon(it.marker)) drawIcon(ctx, it.marker, lx, r.y + Math.floor((rowH - 8) / 2), { ink: s.cursor });
-          else drawText(ctx, it.marker, lx, ty, { color: s.cursor });
+          if (hasIcon(it.marker)) drawIcon(ctx, it.marker, lx, r.y + Math.floor((rowH - 8) / 2), { ink: mk });
+          else drawText(ctx, it.marker, lx, ty, { color: mk });
         }
         lx += 9;
       }

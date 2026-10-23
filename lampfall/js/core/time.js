@@ -270,6 +270,22 @@ const DUSK_START = phaseStart('dusk');
 const DUSK_END = phaseStart('evening');
 
 /**
+ * In-game minutes per real millisecond for a day length, rejecting lengths so extreme that one real
+ * millisecond is not a finite, non-zero number of in-game minutes.
+ * @param {string} label caller name for the error message
+ * @param {number} minutesPerDay real minutes per in-game day, already checked `> 0`
+ * @returns {number}
+ * @throws {RangeError} outside the measurable range
+ */
+function minutesPerMsFor(label, minutesPerDay) {
+  const perMs = MINUTES_PER_DAY / (minutesPerDay * MINUTES_PER_HOUR * 1000);
+  if (!Number.isFinite(perMs) || perMs <= 0) {
+    throw new RangeError(`${label}: minutesPerDay ${minutesPerDay} is outside the measurable range`);
+  }
+  return perMs;
+}
+
+/**
  * Splits a total-minute count into a day number and a minute of day. `%` is exact
  * in IEEE arithmetic, so `minute` is always in `[0, 1440)` even for huge totals,
  * and `day * 1440 + minute` reproduces `total` whenever `total` is a safe integer
@@ -616,6 +632,15 @@ export function realCalendar(day) {
  * @property {(fn: (e: DayEvent) => void) => Unsubscribe} onDayStart
  * @property {(fn: (e: TideEvent) => void) => Unsubscribe} onTideChange
  * @property {() => void} clearListeners drop every listener (new game, teardown)
+ * @property {(n: number) => void} setMinutesPerDay change the day length (real minutes per in-game
+ *   day, validated like the `minutesPerDay` option) from the next `update()` on; `total` does not move,
+ *   nothing fires and nothing is serialized (the setting lives in the game's settings, not the clock state)
+ * @property {(x: number|null) => void} freezeTide DEBUG ONLY: pin the tide height to `x` in `[0, 1]`
+ *   (`null` releases it). While pinned, `tide`, `tideState`, `isLowTide`, `isHighTide` and the snapshot
+ *   report the pinned height (a height between the thresholds reads `'rising'`); the schedule getters
+ *   (`nextLowTide`, `nextHighTide`, `tidesToday`, `tidesForDay`) keep following the real tide. A state
+ *   change caused by pinning or releasing is reported by `onTideChange` at the next advance, not
+ *   synchronously. Never serialized: `serialize()` / `restore()` ignore it and a restore keeps the pin.
  * @property {() => ClockState} serialize
  * @property {(state: ClockState) => void} restore silently adopt a serialized state, including its seed;
  *   throws `TypeError`/`RangeError` on a malformed state and leaves the clock unchanged
@@ -648,11 +673,10 @@ export function createClock(options = {}) {
   const now = checkFunction('createClock: now', o.now ?? Date.now);
   seedKey('createClock: seed', o.seed);
   const thresholds = Object.freeze({ lowTide, highTide });
-  /** In-game minutes per real millisecond at speed 1. */
-  const minutesPerMs = MINUTES_PER_DAY / (minutesPerDay * MINUTES_PER_HOUR * 1000);
-  if (!Number.isFinite(minutesPerMs) || minutesPerMs <= 0) {
-    throw new RangeError(`createClock: minutesPerDay ${minutesPerDay} is outside the measurable range`);
-  }
+  /** In-game minutes per real millisecond at speed 1 (changed only by `setMinutesPerDay`). */
+  let minutesPerMs = minutesPerMsFor('createClock', minutesPerDay);
+  /** Pinned tide height from `freezeTide`, or `null` when the tide follows the schedule. Never serialized. */
+  let frozenTide = null;
 
   let realClock = checkBoolean('createClock: realClock', o.realClock ?? false);
   let seed = o.seed ?? null;
@@ -686,10 +710,11 @@ export function createClock(options = {}) {
    */
   function tideInfo() {
     const phase = tidePhaseAt(total, tideOffset);
-    const tide = 0.5 - 0.5 * Math.cos(TWO_PI * phase);
+    const tide = frozenTide ?? 0.5 - 0.5 * Math.cos(TWO_PI * phase);
     let state;
     if (tide < lowTide) state = 'low';
     else if (tide > highTide) state = 'high';
+    else if (frozenTide !== null) state = 'rising';
     else state = phase < 0.5 ? 'rising' : 'falling';
     return { phase, tide, state };
   }
@@ -837,7 +862,7 @@ export function createClock(options = {}) {
    */
   function jumpSilently(target) {
     total = target;
-    lastTideState = tideStateAt(total, tideOffset, thresholds);
+    lastTideState = tideInfo().state;
   }
 
   // -- public methods ------------------------------------------------------
@@ -857,6 +882,17 @@ export function createClock(options = {}) {
     const delta = Math.min(realDt, maxDt) * minutesPerMs * speed;
     const target = Math.min(total + delta, MAX_TOTAL_MINUTES);
     if (target > total) advanceTo(target, false);
+  }
+
+  /** @param {number} n real minutes per in-game day */
+  function setMinutesPerDay(n) {
+    minutesPerMs = minutesPerMsFor('clock.setMinutesPerDay', checkNumber('clock.setMinutesPerDay: n', n, { min: 0, exclusiveMin: true }));
+  }
+
+  /** @param {number|null} x pinned tide height in `[0, 1]`, or `null` to release */
+  function freezeTide(x) {
+    assertIdle('freezeTide');
+    frozenTide = x === null ? null : checkNumber('clock.freezeTide: x', x, { min: 0, max: 1 });
   }
 
   /** @param {number} mult */
@@ -1074,6 +1110,8 @@ export function createClock(options = {}) {
         list.length = 0;
       }
     },
+    setMinutesPerDay,
+    freezeTide,
     serialize,
     restore,
     formatTime: (options) => formatMinute(currentMinute(), options),
