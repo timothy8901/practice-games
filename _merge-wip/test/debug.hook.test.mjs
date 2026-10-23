@@ -50,7 +50,6 @@ function fakeG(world) {
     scenes: { top: () => ({ name: 'overworld' }), stack: [{ name: 'overworld', opaque: true, debugText: () => 'HUD' }], isTransitioning: false },
     loop: { paused: false, pause() { this.paused = true; }, resume() { this.paused = false; }, step() {} },
     persist: { autosave: (G, reason) => { saves.push({ G, reason }); return { ok: true, slot: 'auto:1', reason }; }, load: () => ({ ok: false }) },
-    persistView: { tag: 'view' },
     rngs: { fresh: (label) => ({ label }) },
     data: null,
     perf: { fps: 60 },
@@ -69,6 +68,7 @@ test('hook: mutating hooks go through store.tx and emit domain events', () => {
   G.bus.on('tx', ({ label }) => labels.push(label));
   G.bus.on('bag:changed', (p) => events.push(['bag', p.n]));
   G.bus.on('wallet:changed', (p) => events.push(['wallet', p.main]));
+  G.bus.on('flag:set', (p) => events.push(['flag', p.id]));
   const hook = installDebugHook(G, { target, expose: true });
   assert.equal(target.__game, hook);
 
@@ -77,7 +77,7 @@ test('hook: mutating hooks go through store.tx and emit domain events', () => {
   hook.warp('', 3, 4);
   hook.flag('sys.x', 7);
   assert.deepEqual(labels, ['debug:give', 'debug:earn', 'debug:warp', 'debug:flag']);
-  assert.deepEqual(events, [['bag', 2], ['wallet', 30]]);
+  assert.deepEqual(events, [['bag', 2], ['wallet', 30], ['flag', 'sys.x']], 'flag() goes through systems/flags and emits flag:set');
   assert.deepEqual([G.world.player.x, G.world.player.y, G.world.flags['sys.x']], [3, 4, 7]);
   assert.ok(G.store.dirty());
   assert.deepEqual(hook.validate(), []);
@@ -85,7 +85,7 @@ test('hook: mutating hooks go through store.tx and emit domain events', () => {
   assert.deepEqual(hook.state().wallet, G.world.wallet);
 
   assert.equal(hook.save('t').ok, true);
-  assert.equal(G.saves[0].G, G.persistView, 'persist receives the PersistG view');
+  assert.equal(G.saves[0].G, G, 'persist receives G itself (the PersistG, §10)');
   assert.equal(hook.scene(), 'overworld');
   assert.equal(hook.text(), 'HUD');
   assert.deepEqual(hook.rng('loot'), { label: 'loot' });

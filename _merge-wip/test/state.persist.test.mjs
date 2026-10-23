@@ -2,12 +2,13 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  createPersist, summarize, wantsNoRewind, AUTOSAVE_TRIGGERS, DEFAULT_ROUTE_AUTOSAVE_MS, RETRY_MS, PERSIST_ERRORS, CLEAN_EXIT_KEY,
+  createPersist, summarize, wantsNoRewind, sceneTransitioning, sceneOnStack, AUTOSAVE_TRIGGERS, DEFAULT_ROUTE_AUTOSAVE_MS, RETRY_MS, PERSIST_ERRORS, CLEAN_EXIT_KEY,
 } from '../js/state/persist.js';
 import { createStore } from '../js/state/store.js';
 import { createRngs } from '../js/state/rngs.js';
 import { createNewWorld, SCHEMA_VERSION } from '../js/state/schema.js';
 import { createMemoryStorage, ERROR_CODES } from '../js/core/save.js';
+import { createSceneStack } from '../js/core/scene.js';
 
 /** A game context with a store, bus and a fake scene stack. */
 function makeG({ seedCode = 'PERSIST-TEST', top = 'overworld', battle = false, transitioning = false, strict = false } = {}) {
@@ -125,6 +126,26 @@ describe('autosave / saveManual / load', () => {
     assert.equal(p.autosave(null, 't').error.code, PERSIST_ERRORS.NO_STORE);
     assert.equal(p.autosave({}, 't').error.code, PERSIST_ERRORS.NO_STORE);
     assert.equal(p.list().length, 0);
+  });
+
+  it('takes the real core/scene SceneStack as G.scenes (isTransitioning getter, find by name)', () => {
+    const G = makeG();
+    const stack = createSceneStack({ width: 480, height: 270 });
+    G.scenes = stack;
+    const p = make();
+    stack.push({ name: 'overworld' });
+    assert.equal(sceneTransitioning(stack), false);
+    assert.equal(sceneOnStack(stack, 'battle'), false);
+    assert.equal(p.autosave(G, 't').ok, true);
+    stack.push({ name: 'battle' });
+    assert.equal(sceneOnStack(stack, 'battle'), true, 'core has(scene) takes an object; persist must use find(name)');
+    assert.equal(p.autosave(G, 't').error.code, PERSIST_ERRORS.BUSY);
+    stack.pop();
+    stack.transition('fade', 400, () => {});
+    assert.equal(sceneTransitioning(stack), true);
+    assert.equal(p.autosave(G, 't').error.code, PERSIST_ERRORS.BUSY);
+    assert.equal(sceneTransitioning(null), false);
+    assert.equal(sceneOnStack({ has: (n) => n === 'x' }, 'x'), true, 'test doubles with has(name) still work');
   });
 
   it('works under the strict guard (snapshot hooks write rng without a tx)', () => {

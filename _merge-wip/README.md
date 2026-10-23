@@ -45,8 +45,8 @@ draw ms, drawImage count, the scene stack and `validateWorld` problems.
 
 ## Tests
 
-    node --test test/                 # every unit test (core, boot lane, shims)
-    tools/check.sh                    # the same, one file at a time with a summary
+    tools/check.sh                    # validate-data + lint-owners + smoke-import + every unit test (per-file summary)
+    node --test test/*.test.mjs       # every unit test in one run (Node 22 does not accept a bare directory)
     node tools/smoke-import.mjs       # imports every js/**/*.js under Node (rule 2 of the draft)
 
 Headless browser check (Playwright, not a dependency of the game):
@@ -57,8 +57,8 @@ Headless browser check (Playwright, not a dependency of the game):
 
 `index.html css/ js/main.js js/config.js js/core/ (frozen engine) js/state/ js/data/ js/systems/
 js/battle/ js/world/ js/render/ js/ui/ js/scenes/ js/art/ js/audio/ js/debug/ tools/ test/`.
-`js/_shims/` is temporary (see its README) and is deleted at integration. `proto/` holds the
-prototypes being adopted (draft §8.4).
+`proto/` holds the prototypes being adopted (draft §8.4). Checkpoint 0 status, how each Tier-1 lane
+plugs in, and open deviations: `docs-checkpoint0.md`.
 
 ## Authoring guide (ARCHITECTURE-DRAFT §14, copied verbatim)
 

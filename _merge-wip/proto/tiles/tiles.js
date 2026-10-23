@@ -35,7 +35,7 @@ export const COLORS = {
   cl0: '#2A2433', cl1: '#4A3E44', cl2: '#6E5A58', cl3: '#8C7A6E', cl4: '#A8927C',
   // ground
   pa0: '#8E6B45', pa1: '#B08A5E', pa2: '#C9A77C', pa3: '#D9C19A',
-  co0: '#4E4A5A', co1: '#6B6672', co2: '#8E8A86', co3: '#ABA6A0', co4: '#C4BFB6',
+  co0: '#4E4A5A', co1: '#6B6672', co2: '#8E8A86', co3: '#ABA6A0', co4: '#C4BFB6', cow1: '#7E7068', cow2: '#9C8E80',
   // wood / building
   wd0: '#4E3620', wd1: '#7A5A36', wd2: '#A5794B', wd3: '#C9A16B', wd4: '#E0BE86',
   pl0: '#B8A88A', pl1: '#D6C8A6', pl2: '#EADFC4', pl3: '#F4E8C1',
@@ -50,7 +50,7 @@ export const COLORS = {
   straw0: '#7A5A36', straw1: '#B08A42', straw2: '#D9B46A', straw3: '#EBD08A',
   dark0: '#2A2433', dark1: '#3B3A48', dark2: '#4E4C62', dark3: '#6A6882',
   // flora
-  pine0: '#1F4A3C', pine1: '#2E5A48', pine2: '#3F7A5A', pine3: '#5E9E6A',
+  pinek: '#16302E', pine0: '#1F4A3C', pine1: '#2E5A48', pine2: '#3F7A5A', pine3: '#5E9E6A', pine4: '#7FB08A',
   ald0: '#3F7A5A', ald1: '#5E9E6A', ald2: '#7DB874', ald3: '#A8D5A2', aldbark0: '#5A4A3E', aldbark1: '#8C7A6E', aldbark2: '#B8A88A',
   fr0: '#2E5A48', fr1: '#4F8A52', fr2: '#6BAA75', fr3: '#8FC27C', pear: '#F3C178', pear2: '#FFE29A', pear0: '#B08A42',
   blossom: '#F2A7B5', blossom2: '#E07A9A', marigold: '#F28C28', petal: '#F6F1E3', yellow: '#FFE29A',
@@ -547,24 +547,58 @@ def('path', { p: 'pa1', d: 'pa0', l: 'pa2', h: 'pa3' }, [
   'pplppppppppppppp',
   'pppppppppppppppp',
 ]);
-def('cobbles', { c: 'co2', d: 'co1', g: 'co0', l: 'co3', h: 'co4' }, [
-  'lcccdlcccdlcccdg',
-  'cccccccccccccccg',
-  'cccdcccccdcccccg',
-  'dddgddddgdddddgg',
-  'ldlcccdlcccdlccc',
-  'cgcccccccccccccc',
-  'cgccccdccccdcccc',
-  'dgdddgddddgddddg',
-  'lcccdlcccdlcccdg',
-  'cccccccccccchccg',
-  'cccdccccccdccccg',
-  'dddgddddgdddddgg',
-  'ldlcccdlcccdlccc',
-  'cgcccccccccccccc',
-  'cgccccdccccdcccc',
-  'dgdddgddddgddddg',
-]);
+// Quay cobbles: rounded setts in three staggered courses (sizes vary, setts wrap across the tile
+// edge so no mortar line runs on the grid). Each sett is lit top-left and shaded bottom-right, with
+// mortar showing at its rounded corners. Two variants share the geometry but tint the setts
+// differently (neutral / warm / dark), so a large quay never repeats visibly.
+const SETT_COURSES = [
+  { y: 0, h: 4, cuts: [4, 9, 14] },
+  { y: 5, h: 4, cuts: [1, 6, 11] },
+  { y: 10, h: 5, cuts: [3, 8, 13] },
+];
+const SETT_TINTS = { n: ['l', 'c', 'd'], w: ['l', 'w', 'u'], k: ['c', 'd', 'g'] };
+function cobbleTile(tints) {
+  const g = blank(16, 16, 'g').map((r) => r.split(''));
+  let si = 0;
+  for (const C of SETT_COURSES) {
+    for (let k = 0; k < C.cuts.length; k++) {
+      const a = C.cuts[k] + 1, b = C.cuts[(k + 1) % C.cuts.length] - 1; // sett spans a..b (may wrap)
+      const sw = ((b - a + 16) % 16) + 1;
+      const [hi, body, lo] = SETT_TINTS[tints[si % tints.length]];
+      for (let i = 0; i < sw; i++) {
+        for (let j = 0; j < C.h; j++) {
+          const x = (a + i) % 16, y = C.y + j;
+          const corner = (i === 0 || i === sw - 1) && (j === 0 || j === C.h - 1);
+          let c = body;
+          if (corner) c = i === 0 && j === 0 ? body : 'g';
+          else if (j === 0 || i === 0) c = hi;
+          else if (j === C.h - 1 || i === sw - 1) c = lo;
+          if (!corner && i === 1 && j === 1 && tints[si % tints.length] === 'n' && si % 3 === 0) c = 'h';
+          g[y][x] = c;
+        }
+      }
+      si++;
+    }
+  }
+  return g.map((r) => r.join(''));
+}
+const COBP = { g: 'co0', d: 'co1', c: 'co2', l: 'co3', h: 'co4', w: 'cow2', u: 'cow1' };
+def('cobbles', COBP, cobbleTile(['n', 'w', 'n', 'n', 'k', 'n', 'w', 'n', 'n']));
+def('cobbles_b', COBP, cobbleTile(['k', 'n', 'n', 'w', 'n', 'n', 'n', 'k', 'w']));
+// Quay coping: dressed granite blocks along the water edge (wet dark waterline, lit nosing, block
+// face with offset joints, a shadow line onto the cobbles). Variant b carries an iron bollard.
+const COPE = [
+  'kkkkkkkkkkkkkkkk',
+  'hhhhhhhlhhhhhhhh',
+  'mmmmmmmdlmmmmmmm',
+  'mmmmmmmdmmmmmmmm',
+  'mmmmmmmdmmmmmmmm',
+  'dddddddddddddddd',
+  'ssssssssssssssss',
+];
+def('quay_lip', { k: 'st1', h: 'st4', l: 'st3', m: 'st3', d: 'st2', s: 'co0' }, [...COPE, ...blank(16, 9)]);
+def('quay_lip_b', { k: 'st1', h: 'st4', l: 'st3', m: 'st3', d: 'st2', s: 'co0', i: 'iron', j: 'st1', e: 'pane1' },
+  blit([...COPE, ...blank(16, 9)], ['.jiij.', 'jieiij', 'jiiiij', '.jjjj.'], 9, 1));
 // Pier: one tile wide, cross planks with water showing through the gaps, posts on both sides.
 const PP = { p: 'wd2', d: 'wd1', l: 'wd3', k: 'wd0', w: 'deep0', h: 'wd4' };
 const PLANKS = [
@@ -603,25 +637,45 @@ def('pier_end', PP, [
   'kkppppppppdpppkk',
   'kwwwwwwwwwwwwwwk',
 ]);
-// Rowboat moored beside the pier (32x16, bobs 1px).
-def('boat', { k: 'wd0', d: 'wd1', w: 'wd3', p: 'wd2', s: 'deep0', l: 'wd4' }, [
-  '................................',
-  '................................',
-  '....kkkkkkkkkkkkkkkkkkkk........',
-  '...kdlllllllllllllllllkkk.......',
-  '...kdwwwwwwwwwwwwwwwwwwdlkk.....',
-  '...kdwwwwkkwwwwwwkkwwwwwwdlkk...',
-  '...kdwwwwkkwwwwwwkkwwwwwwwwdkk..',
-  '...kdwwwwkkwwwwwwkkwwwwwwwwwdkk.',
-  '...kdwwwwkkwwwwwwkkwwwwwwwwdkk..',
-  '...kdwwwwkkwwwwwwkkwwwwwwddkk...',
-  '...kpppppppppppppppppppdddkk....',
-  '...kppppppppppppppppppppkkk.....',
-  '...skkkkkkkkkkkkkkkkkkkks.......',
-  '....ssssssssssssssssssss........',
-  '................................',
-  '................................',
-], 32, 16);
+// Rowboat moored beside the pier (32x16, bobs 1px), seen from above in 3/4: square transom at the
+// stern (left), a pointed bow (right), a lit gunwale rim, the recessed hull floor in shade under the
+// near rim, two thwarts, the red-painted strake showing along the south side, and its shadow on
+// the water.
+function rowboat() {
+  const W = 32, H = 16, cy = 6, x0 = 3, xs = 19, xb = 29;
+  const half = (x) => (x < x0 || x > xb ? -1 : x <= xs ? 4.5 : 4.5 * Math.sqrt(Math.max(0, 1 - ((x - xs) / (xb - xs + 0.6)) ** 2)));
+  const inHull = (x, y) => { const hh = half(x); return hh > 0 && Math.abs(y + 0.5 - cy - 0.5) <= hh; };
+  const g = blank(W, H).map((r) => r.split(''));
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      if (!inHull(x, y)) continue;
+      const out = !inHull(x - 1, y) || !inHull(x + 1, y) || !inHull(x, y - 1) || !inHull(x, y + 1);
+      if (out) { g[y][x] = 'k'; continue; }
+      const rim = !inHull(x - 2, y) || !inHull(x + 2, y) || !inHull(x, y - 2) || !inHull(x, y + 2) || !inHull(x + 1, y + 1) || !inHull(x - 1, y - 1);
+      if (rim) { g[y][x] = y <= cy ? 'l' : 'w'; continue; }
+      const nearTop = !inHull(x, y - 3);
+      let c = nearTop ? 'd' : 'p';
+      if (y === cy + 1 && x % 5 !== 0) c = nearTop ? 'd' : 'q'; // plank seam
+      if (x === 9 || x === 17) c = 't';
+      if (x === 10 || x === 18) c = nearTop ? 'k' : 'd';
+      g[y][x] = c;
+    }
+  }
+  // painted strake under the south rim, then the hull's shadow on the water
+  for (let x = 0; x < W; x++) {
+    let yb = -1;
+    for (let y = H - 1; y >= 0; y--) if (g[y][x] === 'k' && inHull(x, y)) { yb = y; break; }
+    if (yb < 0) continue;
+    const bow = x > xb - 3;
+    if (!bow && yb + 1 < H) g[yb][x] = 'r';
+    if (!bow && yb + 1 < H) g[yb + 1][x] = x === x0 ? 'k' : 'e';
+    if (yb + 2 < H) g[yb + 2][x] = bow ? 's' : 'k';
+    if (yb + 3 < H && x > x0) g[yb + 3][x] = 's';
+    if (yb + 4 < H && x > x0 + 1 && x % 2 === 0) g[yb + 4][x] = 's';
+  }
+  return g.map((r) => r.join(''));
+}
+def('boat', { k: 'wd0', d: 'wd1', p: 'wd2', q: 'wd1', w: 'wd3', l: 'wd4', t: 'wd4', r: 'red2', e: 'red1', s: 'deep0' }, rowboat(), 32, 16);
 // Steps cut into a cliff face (the ramp down from the point): three treads, each a lit nosing,
 // two rows of riser and a shadow line, between dark side walls.
 def('steps', { g: 'grass1', k: 'cl0', d: 'cl1', b: 'cl3', l: 'cl4' }, [
@@ -756,27 +810,41 @@ for (const c of ROOF_COLOURS) {
   def(`roof_${c}_ridge`, pal, ROOF_RIDGE);
   def(`roof_${c}_body`, pal, ROOF_BODY);
   def(`roof_${c}_eave`, pal, ROOF_EAVE);
+  // verge ends: a dark outline plus a lit barge board on the west end, a shaded one on the east
+  for (const part of ['ridge', 'eave']) {
+    const rows = part === 'ridge' ? ROOF_RIDGE : ROOF_EAVE;
+    def(`roof_${c}_${part}_l`, pal, rows.map((r) => (r[0] === '.' ? r : 'kl' + r.slice(2))));
+    def(`roof_${c}_${part}_r`, pal, rows.map((r) => (r[0] === '.' ? r : r.slice(0, 14) + 'dk')));
+  }
 }
-// Chimney stub (sits on a ridge tile).
-def('chimney', { b: 'br2', d: 'br1', k: 'br0', l: 'br3', s: 'st2' }, [
+// Chimney (16x24, bottom aligned to the ridge tile): brick stack with mortar courses, lit left
+// face, a stone cap slab and a clay pot, rising clear of the roofline so the house silhouette breaks.
+def('chimney', { b: 'br2', d: 'br1', k: 'br0', l: 'br3', c: 'st3', m: 'st2', n: 'st1', p: 'red3', q: 'red1', o: 'uiink' }, [
+  '................',
+  '.......pq.......',
+  '......opqo......',
+  '.....nnnnnnn....',
+  '.....ccccccmn...',
+  '.....nnnnnnnn...',
+  '......lbbbdk....',
+  '......lbbbdk....',
+  '......kkkkkk....',
+  '......lbbbdk....',
+  '......lbbbdk....',
+  '......kkkkkk....',
+  '......lbbbdk....',
+  '......lbbbdk....',
+  '......kkkkkk....',
+  '......lbbbdk....',
+  '......lbbbdk....',
+  '.....kkkkkkkk...',
   '................',
   '................',
   '................',
   '................',
   '................',
   '................',
-  '................',
-  '................',
-  '......sssss.....',
-  '......lbbdk.....',
-  '......lbbdk.....',
-  '......lbbdk.....',
-  '......lbbdk.....',
-  '......kkkkk.....',
-  '................',
-  '................',
-]);
-
+], 16, 24);
 // Porch lamp on a post (unlit / lit); 16x24 so it rises above the ground tile.
 const LAMP = [
   '......kkkk......',

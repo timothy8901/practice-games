@@ -8,7 +8,6 @@
  */
 import { drawText } from '../core/font.js';
 import { encodeSeedCode, decodeSeedCode, randomSeedCode } from '../core/rng.js';
-import { DIALS, DIAL_IDS } from '../_shims/data/dials.js'; // INTEGRATOR: '../data/dials.js'
 import { TITLE, VERSION, FEATURES } from '../config.js';
 import { createLocalList, drawPaper, KIT } from './day1kit.js';
 import { newGame, continueGame, fadeMs } from './boot.js';
@@ -34,6 +33,9 @@ export function describeSave(entry, now = Date.now) {
  * @returns {import('../core/scene.js').Scene & {debugText: () => string}}
  */
 export function createTitleScene(G) {
+  /** Dial rows from the data registry (`DATA.dials`, display order). */
+  const dialRows = () => G.data.list('dials');
+  const dialName = (id) => dialRows().find((d) => d.id === id)?.name ?? id;
   let seedCode = G.world.run.seedCode;
   let dial = G.world.run.dial;
   let latest = null;
@@ -58,7 +60,7 @@ export function createTitleScene(G) {
     out.push({ label: 'Continue', value: 'continue', enabled: canContinue, hint: canContinue && !crashed ? describeSave(latest) : '' });
     out.push({ label: 'New Game', value: 'new' });
     out.push({ label: 'Seed', value: 'seed', hint: seedCode });
-    out.push({ label: 'Dial', value: 'dial', hint: `◀ ${DIALS[dial]?.name ?? dial} ▶` });
+    out.push({ label: 'Dial', value: 'dial', hint: `◀ ${dialName(dial)} ▶` });
     return out;
   }
   function refresh() { list.setItems(items()); }
@@ -94,8 +96,10 @@ export function createTitleScene(G) {
   function adjust(value, dir) {
     if (value === 'seed') { pick('seed'); return; }
     if (value !== 'dial') return;
-    const i = DIAL_IDS.indexOf(dial);
-    dial = DIAL_IDS[(i + dir + DIAL_IDS.length) % DIAL_IDS.length];
+    const ids = dialRows().map((d) => d.id);
+    if (ids.length === 0) return;
+    const i = ids.indexOf(dial);
+    dial = ids[(i + dir + ids.length) % ids.length];
     const parts = decodeSeedCode(seedCode);
     seedCode = encodeSeedCode({ dial: dial.toUpperCase(), seed: parts ? parts.seed : 0, toggles: parts ? parts.toggles : [] });
     refresh();

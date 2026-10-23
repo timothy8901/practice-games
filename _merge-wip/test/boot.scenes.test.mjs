@@ -6,7 +6,6 @@ import { buildTestMap, passable, cameraFor, MAP_W, MAP_H, TEST_TILES, SPAWN, STU
 import { describeSave } from '../js/scenes/title.js';
 import { lastSessionCrashed, fadeMs, DEFAULT_LEASE } from '../js/scenes/boot.js';
 import { MENU_ITEMS } from '../js/scenes/menu.js';
-import { makePersistView } from '../js/main.js';
 import { createNewWorld, validateWorld } from '../js/state/schema.js';
 import { createStore } from '../js/state/store.js';
 import { TILE, NATIVE_W, NATIVE_H } from '../js/config.js';
@@ -142,19 +141,4 @@ test('boot: crash detection tolerates both persist shapes; DEFAULT_LEASE builds 
   const w = createNewWorld({ seedCode: 'DRIFT-TEST-0000', lease: DEFAULT_LEASE });
   assert.equal(w.player.name, DEFAULT_LEASE.name);
   assert.deepEqual(validateWorld(w), []);
-});
-
-test('main: makePersistView exposes isTransitioning() and has(name) as functions', () => {
-  const store = createStore(createNewWorld({ seedCode: 'DRIFT-TEST-0000' }));
-  let transitioning = true;
-  const scenes = { top: () => ({ name: 'overworld' }), find: (n) => (n === 'battle' ? {} : null), get isTransitioning() { return transitioning; } };
-  const view = makePersistView(store, scenes, { has: () => true });
-  assert.equal(view.store, store);
-  assert.equal(view.bus, store.bus);
-  assert.equal(view.scenes.isTransitioning(), true);
-  transitioning = false;
-  assert.equal(view.scenes.isTransitioning(), false);
-  assert.equal(view.scenes.has('battle'), true);
-  assert.equal(view.scenes.has('menu'), false);
-  assert.equal(view.scenes.top().name, 'overworld');
 });

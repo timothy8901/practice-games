@@ -14,6 +14,8 @@
  */
 import { tokenDevice } from '../core/input.js';
 import { validateWorld } from '../state/schema.js';
+import * as clockSys from '../systems/clockSys.js';
+import { setFlag } from '../systems/flags.js';
 
 /** Hooks that belong to another lane, with the lane that owns the real implementation. */
 export const LANE_HOOKS = Object.freeze({
@@ -158,8 +160,6 @@ export function installDebugHook(G, opts = {}) {
     ? target.requestAnimationFrame.bind(target)
     : (fn) => setTimeout(() => fn(performance.now()), 16);
   const nextFrame = () => new Promise((resolve) => raf(() => resolve()));
-  /** The view persist reads (main.js builds it); a bare G works for tests. */
-  const persistG = () => G.persistView ?? G;
   /** The unproxied world (strict mode wraps `store.world` in a Proxy that structuredClone rejects). */
   const rawWorld = () => (typeof G.store.raw === 'function' ? G.store.raw() : G.world);
 
@@ -209,14 +209,13 @@ export function installDebugHook(G, opts = {}) {
       G.bus.emit('debug:warp', { mapId, x, y });
     },
     setTime(hour, minute = 0) {
-      G.clock.skipTo(((hour * 60 + minute) % 1440 + 1440) % 1440);
-      G.store.tx('debug:setTime', (w) => { w.clock = G.clock.serialize(); });
+      G.store.tx('debug:setTime', (w) => clockSys.setTime(w, G.clock, hour * 60 + minute));
     },
     setTide(x) {
       if (typeof G.clock.freezeTide !== 'function') throw new Error('__game.setTide: core/time.freezeTide is not available yet (owner: CORE, draft §13.6)');
       G.clock.freezeTide(x);
     },
-    flag(id, value = true) { G.store.tx('debug:flag', (w) => { w.flags[id] = value; }); },
+    flag(id, value = true) { G.store.tx('debug:flag', (w) => setFlag(w, id, value, { bus: G.bus })); },
     flags: () => ({ ...G.world.flags }),
     speed(mult) { G.speed = Math.min(64, Math.max(0.25, Number(mult) || 1)); },
     skipAnims(on) { G.flags.noanim = Boolean(on); },
@@ -260,7 +259,7 @@ export function installDebugHook(G, opts = {}) {
       G.bus.emit('debug:marker', { name });
     },
     perf: () => ({ ...(G.perf ?? {}) }),
-    save: (reason = 'debug') => G.persist.autosave(persistG(), reason),
+    save: (reason = 'debug') => G.persist.autosave(G, reason),   // G is the PersistG (§10)
     load(slot) {
       const res = G.persist.load(slot);
       if (!res.ok) return false;

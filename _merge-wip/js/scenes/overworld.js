@@ -10,7 +10,7 @@
  */
 import { drawText } from '../core/font.js';
 import { makeRng } from '../core/rng.js';
-import * as clockSys from '../_shims/systems/clockSys.js'; // INTEGRATOR: '../systems/clockSys.js'
+import * as clockSys from '../systems/clockSys.js';
 import * as stats from '../systems/stats.js';
 import { TILE, NATIVE_W, NATIVE_H } from '../config.js';
 import { drawStrip, KIT } from './day1kit.js';
@@ -150,7 +150,7 @@ export function createOverworldScene(G) {
     resume() { syncFromWorld(); },
     update(dt) {
       G.store.tx('clock:tick', (w) => {
-        clockSys.tick(w, G.clock, dt);   // the world clock advances only here and in fishing
+        clockSys.tick(w, G.clock, dt, { bus: G.bus }); // the world clock advances only here and in fishing
         stats.addPlayMs(w, dt);          // simulated step, so paused menus do not count
       });
       if (moveT < 1) moveT = Math.min(1, moveT + dt / moveMs);
