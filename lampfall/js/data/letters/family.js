@@ -123,7 +123,7 @@ const FAMILY = [
     door: 'porch-coop-yard',
     subject: 'An order for weir timber, cancelled.',
     reveal: [{ op: 'setFlag', id: 'np.wren.weir-order' }],
-    body: 'To the Hearthwright yard,|Further to my order of the 3rd, for oak to make good the sluice gate at the Stalk weir: cancel it. The mill is to be sold, my agent says, and a new owner will want to do things his own way.|The gate has been seized since my father\'s time. It can wait for whoever buys it. I am too old to stand in that river.|Settle what I owe for the drawing work. My grandson will collect the account.|Josiah Stalk',
+    body: 'To the Hearthwright yard,|Further to my order of the 3rd, for oak to make good the sluice gate at the Stalk weir: cancel it. The mill is to be sold, my agent says, and a new owner will want to do things his own way.|I built that weir when I was younger than my grandson is now, and the gate has been seized for twenty years of it. It can wait for whoever buys it. I am too old to stand in that river.|Settle what I owe for the drawing work. My grandson will collect the account.|Josiah Stalk',
   }),
   f(13, {
     from: 'Wynne, almanac-keeper, Windle', byline: 'A Thistlewind almanac-keeper', to: 'My sister at the harbor, with the almanac', addressee: 'thessaly',
@@ -132,7 +132,7 @@ const FAMILY = [
     creature: { species: 'wirewhisk', level: 19 },
     subject: 'An almanac with the comet\'s year circled.',
     reveal: [{ op: 'setFlag', id: 'th.second-chapter.almanac' }],
-    body: 'To my sister at the harbor, with the almanac,|You asked for the long tables, so here is the whole almanac, the one with the coffee ring. I\'ve circled this year. The wanderer comes back every thirty, the old pages say, and every time it does, the next chapter of somebody\'s life starts. Write yours down.|A whisker-spark has been sleeping in the binding since harvest and hums at the comet pages. It travels with the book. Feed it nothing; it eats static.|Your sister,|Wynne, Windle',
+    body: 'To my sister at the harbor, with the almanac,|You asked for the long tables, so here is the whole almanac, the one with the coffee ring. I\'ve circled this year, and on the long tables the year thirty on. The wanderer comes back every thirty, the old pages say, and every time it does, the next chapter of somebody\'s life starts. Write yours down.|A whisker-spark has been sleeping in the binding since harvest and hums at the comet pages. It travels with the book. Feed it nothing; it eats static.|Your sister,|Wynne, Windle',
   }),
   f(14, {
     author: 'isolde', from: 'Isolde Petrel', to: 'Agnes Pell, at the shop', addressee: 'juniper', seal: 'petrel',

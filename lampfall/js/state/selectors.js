@@ -60,12 +60,20 @@ export function hour(world) {
 }
 
 /**
- * Day of week, `0 = Monday`.
+ * Weekday of core day 0 (`0 = Monday`): GDD-00 §5 makes day 1, the arrival, a Sunday, so Saturdays
+ * are GDD days 7, 14, 21 (core days 6, 13, 20). Same calendar as systems/clockSys `weekday` and the
+ * town systems' `calendarFirstDow`.
+ */
+export const DAY0_WEEKDAY = 6;
+
+/**
+ * Day of week on the GDD calendar, `0 = Monday … 6 = Sunday` (core day 0 is a Sunday). The game
+ * clock's weekday; under Real Clock, systems/clockSys `weekday` gives the device's.
  * @param {World} world
  * @returns {number}
  */
 export function dayOfWeek(world) {
-  return day(world) % DAYS_PER_WEEK;
+  return (day(world) + DAY0_WEEKDAY) % DAYS_PER_WEEK;
 }
 
 /**

@@ -134,7 +134,7 @@ export default {
       when: 'An evening after K8, at his beached launch.', topic: 'He saw the lamp go out.',
       choices: [{ key: `th.${T}.storm`, options: ['asked', 'sat'] }] },
     { id: 4, cond: { all: [{ letter: { read: 9 } }, { hour: [17, 23] }] }, script: 'th-empty-creek-4', where: { mapId: 'pellwick', x: 30, y: 5 },
-      when: 'An evening after K9: the confession (`ansel-confession`).', topic: 'The wheel.',
+      when: 'An evening after K9: the confession (`ansel-confession`).', topic: 'The morning after.',
       choices: [{ key: `th.${T}.addendum`, options: ['post', 'tell'] }] },
     { id: 5, cond: { all: [{ flag: 'sp.ansel-confessed' }, { flag: 'sp.relighting' }] }, script: 'th-empty-creek-5', advance: { days: 1 },
       where: { mapId: 'pellwick', x: 20, y: 3 },

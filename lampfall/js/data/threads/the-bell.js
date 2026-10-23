@@ -84,7 +84,7 @@ export const scripts = {
 
   'th-the-bell-4': [
     '* The Archive is quiet. Barnaby\'s bell sits by the string wall with a rope hanging out of the top. He stands in front of the wall holding one last piece of red string.',
-    'Barnaby: The weir records came. Thirty years late, on the harbor office\'s own paper. Never sent. (Never SENT.)',
+    'Barnaby: The harbor office\'s letter came. Thirty years late. They asked the Archive for the weir records, and the asking never got here. (Never GOT here.) The records sat in my own drawers the whole time, four shelves from the answer.',
     'Barnaby: So. The weir, here. The bar, here. The night, here. Her letters, all along the top. And the lamp.',
     '* He ties the last string. It runs from the weir records, through every one of Isolde\'s letters, to a small painted card of the lighthouse. Then he steps back, and for once he says nothing in brackets.',
     'Barnaby: Oh. Oh, that poor keeper.',

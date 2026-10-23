@@ -18,7 +18,8 @@
  * Layers: `ground` is the base tile everywhere; `detail` holds props that stand on a ground tile
  * (trees '8' pine / '9' alder, rocks 'o', fences '|' and gates '/', hedges, crates 'c', barrels '(',
  * bollards ')', lamp posts 'L', bean rows '=', gorse 'y', glasswort 'i', seaweed 'l'). Map-only legend
- * chars: '?' the Keeper's roof (player colour), 'x' the Old Quay, 'd' Barnaby's porthole.
+ * chars: '?' the Keeper's roof (player colour), 'x' the Old Quay, 'd' Barnaby's porthole, 'n' net racks,
+ * 'j' creels (they override defaults Pellwick never paints: ice, drowned street, heather, tannin water).
  * Named fruit trees, purse and bee trees, porches (PORCH_IDS, lamp cell + step + door), boats, signs
  * and furniture are entities; `markers` name every NPC post and story staging point (GDD-01 §1).
  *
@@ -32,7 +33,7 @@ export default {
   region: 'pellwick',
   w: 64,
   h: 48,
-  legend: { '?': 'roof-keeper', x: 'old-quay', d: 'porthole' },
+  legend: { '?': 'roof-keeper', x: 'old-quay', d: 'porthole', n: 'net-rack', j: 'creel' },
   ground: [
     //0000000000111111111122222222223333333333444444444455555555556666
     //0123456789012345678901234567890123456789012345678901234567890123
@@ -127,8 +128,8 @@ export default {
     '..............o..............|..................................', // 36
     '................................................................', // 37
     '.............l..o...L.........L.............L........L..........', // 38
-    '.......l.........l......cc...(..............c(..........cc......', // 39
-    '................................................................', // 40
+    '.......l.........l...n..ccj..(.............jc(.nn.......ccj.....', // 39
+    '......................................................j.........', // 40
     '...........o..........)....)...)....).....)....).....)....).....', // 41
     '................................................................', // 42
     '................................................................', // 43
@@ -142,6 +143,16 @@ export default {
   props: [
     { art: 'lighthouse-dark', x: 4, y: 18 },
     { art: 'lighthouse-scaffold', x: 4, y: 18, cond: { loan: { tier: { gte: 2 } } } },
+    { art: 'string-lights', x: 35, y: 24, cond: { flag: 'sys.lantern-market' } },
+    { art: 'string-lights', x: 39, y: 24, cond: { flag: 'sys.lantern-market' } },
+    { art: 'string-lights', x: 35, y: 27, cond: { flag: 'sys.lantern-market' } },
+    { art: 'string-lights', x: 39, y: 27, cond: { flag: 'sys.lantern-market' } },
+    { art: 'lamp-post', x: 25, y: 41, cond: { flag: 'sys.commons.quay-lamps' } },
+    { art: 'lamp-post', x: 40, y: 41, cond: { flag: 'sys.commons.quay-lamps' } },
+    { art: 'lamp-post', x: 55, y: 41, cond: { flag: 'sys.commons.quay-lamps' } },
+    { art: 'signpost', x: 13, y: 35, cond: { flag: 'sys.commons.mudlark-mile-flags' } },
+    { art: 'signpost', x: 9, y: 40, cond: { flag: 'sys.commons.mudlark-mile-flags' } },
+    { art: 'signpost', x: 17, y: 41, cond: { flag: 'sys.commons.mudlark-mile-flags' } },
   ],
   entities: [
     // ---- named trees: 95 fruit (native fruit per seed), 6 purse, 4 bee ----
@@ -310,6 +321,11 @@ export default {
     { kind: 'sign', id: 'sign-river-stones', x: 32, y: 10, art: 'signpost', text: 'Stepping stones: low water only. The bridge is just upstream.' },
     { kind: 'sign', id: 'sign-north-creek', x: 34, y: 6, art: 'signpost', text: 'North Creek. Dry since the weir went in. Ask the heron.' },
     { kind: 'sign', id: 'sign-lighthouse', x: 8, y: 17, art: 'signpost', text: 'Pell Point Light. Unlit thirty years.' },
+    { kind: 'prop', id: 'market-stall-varga', x: 34, y: 27, art: 'market-stall-blue', verb: 'shop', shop: 'lantern-market', cond: { flag: 'sys.lantern-market' } },
+    { kind: 'prop', id: 'market-stall-ludo', x: 40, y: 27, art: 'market-stall-moss', verb: 'shop', shop: 'lantern-market', cond: { flag: 'sys.lantern-market' } },
+    { kind: 'prop', id: 'market-stall-third', x: 41, y: 26, art: 'market-stall-red', verb: 'shop', shop: 'lantern-market', cond: { all: [{ flag: 'sys.lantern-market' }, { flag: 'sys.commons.third-stall' }] }, commons: 'third-stall' },
+    { kind: 'prop', id: 'training-yard-green', x: 30, y: 30, art: 'signpost', verb: 'look', cond: { flag: 'sys.commons.training-yard-green' }, commons: 'training-yard-green', note: 'the chalked yard on the green\'s south lawn' },
+    { kind: 'prop', id: 'north-creek-footbridge', x: 37, y: 4, art: 'bridge-wood', cond: { flag: 'sys.commons.north-creek-footbridge' }, commons: 'north-creek-footbridge', solid: false },
   ],
   triggers: [
     { x: 10, y: 24, kind: 'use', id: 'mailbox', verb: 'mailbox' },
@@ -531,9 +547,9 @@ export default {
     'bar-head': { x: 6, y: 14, facing: 'up' },
     'raft-berth': { x: 51, y: 45, facing: 'down' },
     'market-green': { x: 39, y: 26, facing: 'down' },
-    'market-stall-1': { x: 43, y: 24, facing: 'down' },
-    'market-stall-2': { x: 44, y: 26, facing: 'down' },
-    'market-stall-3': { x: 46, y: 28, facing: 'down' },
+    'market-stall-1': { x: 34, y: 28, facing: 'up' },
+    'market-stall-2': { x: 40, y: 28, facing: 'up' },
+    'market-stall-3': { x: 42, y: 26, facing: 'left' },
     'shift-fair': { x: 40, y: 25, facing: 'down' },
     'linnet-ferry-leaves': { x: 34, y: 42, facing: 'down' },
     'point-skywatch': { x: 5, y: 20, facing: 'up' },
@@ -549,9 +565,9 @@ export default {
     'tamsin-boat': { x: 44, y: 5, facing: 'up' },
     'blackout-wake': { x: 9, y: 23, facing: 'down' },
     'party-green': { x: 30, y: 24, facing: 'down' },
-    'commons-training-yard': { x: 30, y: 28, facing: 'down' },
+    'commons-training-yard': { x: 31, y: 30, facing: 'left' },
     'commons-third-stall': { x: 44, y: 22, facing: 'down' },
-    'north-creek-footbridge': { x: 36, y: 6, facing: 'up' },
+    'north-creek-footbridge': { x: 37, y: 5, facing: 'up' },
     'mudlark-start': { x: 13, y: 34, facing: 'down', tide: 'low' },
     'mudlark-finish': { x: 17, y: 41, facing: 'down' },
     'weathervane-ansel': { x: 37, y: 26, facing: 'up' },
@@ -564,7 +580,7 @@ export default {
     { id: 'north-creek', kind: 'creek', area: { x: 36, y: 4, w: 15, h: 1 }, shadows: [0, 2], cond: { flag: 'sp.weir-turned' }, name: 'North Creek', note: 'empty until the weir turns (GDD-00 §9); then a few shadows a week' },
   ],
   town: true,
-  dig: { spots: [[40, 4], [45, 5], [49, 4], [15, 27], [6, 22], [30, 30], [46, 30], [57, 11], [61, 7], [25, 4], [15, 32], [58, 20], [33, 30], [11, 18], [44, 22], [24, 28]] },
+  dig: { spots: [[40, 4], [45, 5], [49, 4], [15, 27], [6, 22], [32, 30], [46, 30], [57, 11], [61, 7], [25, 4], [15, 32], [58, 20], [33, 30], [11, 18], [44, 22], [24, 28]] },
   flats: { spots: [[4, 34], [5, 34], [6, 34], [7, 34], [14, 34], [15, 34], [17, 34], [3, 35], [4, 35], [5, 35], [12, 35], [13, 35], [14, 35], [15, 35], [17, 35], [3, 36], [4, 36], [7, 36], [8, 36], [9, 36], [10, 36], [11, 36], [13, 36], [15, 36], [17, 36], [21, 36], [3, 37], [6, 37], [7, 37], [8, 37], [9, 37], [10, 37], [11, 37], [12, 37], [13, 37], [14, 37], [15, 37], [5, 38], [6, 38], [7, 38], [8, 38], [9, 38], [10, 38], [11, 38], [12, 38], [14, 38], [15, 38], [4, 39], [5, 39], [6, 39], [8, 39], [9, 39], [10, 39], [11, 39], [12, 39], [13, 39], [14, 39], [15, 39], [5, 40], [6, 40], [7, 40], [8, 40], [9, 40], [10, 40], [11, 40], [12, 40], [13, 40], [14, 40], [15, 40], [17, 40], [6, 41], [7, 41], [8, 41], [10, 41], [12, 41], [13, 41], [14, 41], [15, 41], [16, 41], [17, 41], [8, 42], [9, 42], [10, 42], [11, 42], [12, 42], [13, 42], [14, 42], [15, 42], [16, 42], [17, 42]], glint: true, skyglass: true, cockles: { item: 'cockle' } },
   bugSpots: [
     { x: 57, y: 3, habitat: 'orchard' },

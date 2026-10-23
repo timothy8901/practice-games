@@ -277,17 +277,17 @@ A 10×4 grid of 24×18 keys at 120,120 (A–Z, a–z by `entry.caps`, digits, `'
 
 | Verb (action) | Keyboard | Gamepad (standard mapping) | Touch (automatic on a coarse pointer) |
 |---|---|---|---|
-| Move (`up/down/left/right`) | arrows / WASD | d-pad / left stick | floating d-pad, left half |
-| Run (`run`) | hold Shift | hold RT (b7) | double-tap and hold the d-pad |
-| Confirm / context verb (`confirm`) | Z, Enter, Numpad Enter, Space | A (b0) | big A, right; tap the context chip |
-| Back (`cancel`, never drops an item) | X, Esc, Backspace | B (b1) | B, right |
-| Menu (`menu`) | Enter, Esc | Start (b9) | ≡ button |
-| Pause (`start`) | P | Start (b9) | ≡ button |
-| Tool ring / quick swap (`tool`) | hold C / tap C | hold X (b2) / tap X | ring button above B |
-| Map & Tide Table (`map`) | M | Y (b3) | swipe down from the Skyband |
-| Journal (`log`) | Tab | LT (b6) | pause tab |
+| Move (`up/down/left/right`) | arrows / WASD | d-pad / left stick | fixed 8-way d-pad, bottom-left |
+| Run (`run`) | hold Shift | hold RT (b7) | — (not shipped; see §4.2) |
+| Confirm / context verb (`confirm`) | Z, Enter, Numpad Enter, Space | A (b0) | A, bottom-right |
+| Back (`cancel`, never drops an item) | X, Esc, Backspace | B (b1) | B, bottom-right |
+| Menu (`menu`) | Enter, Esc | Start (b9) | MENU pill, top-right |
+| Pause (`start`) | P | Start (b9) | MENU pill (via `menu`) |
+| Tool ring / quick swap (`tool`) | hold C / tap C | hold X (b2) / tap X | — (not shipped; see §4.2) |
+| Map & Tide Table (`map`) | M | Y (b3) | — (not shipped; Pause → Map) |
+| Journal (`log`) | Tab | LT (b6) | — (Pause → Journal tab) |
 | Select (`select`) | ` (backquote) | Back (b8) | — |
-| Previous / next tab, Peek (`l` / `r`) | [ / ] | LB (b4) / RB (b5) | drag empty screen (Peek); tab strip taps |
+| Previous / next tab, Peek (`l` / `r`) | [ / ] | LB (b4) / RB (b5) | — (not shipped; see §4.2) |
 
 **Scene rules.** Overworld: `menu` or `start` opens Pause; `confirm` performs the context verb; `cancel` does nothing (never drops). Menus: `l`/`r` switch tabs or pages. Battle: `l` cycles battle speed 1× → 2× → 4×. Forecast: everything ignored for 30 f. Every menu is fully usable with a d-pad and two buttons; there is no hover; input flushes on every scene change.
 
@@ -302,6 +302,15 @@ A 10×4 grid of 24×18 keys at 120,120 (A–Z, a–z by `entry.caps`, digits, `'
 | Battle speed | 1 / 2 / 3, LB | none | add action `speed` (`Digit1`–`Digit3` set directly; LB cycles in battle via `l`) |
 | Mute | 0 | none | add action `mute`: `Digit0` |
 | Tool ring (gamepad) | X | X (b2) | matches |
+| Touch move | floating d-pad (left half) | fixed 8-way d-pad, bottom-left | make the d-pad float to the first touch on the left half |
+| Touch run | double-tap and hold | none | add run on double-tap-and-hold of the d-pad |
+| Touch confirm | big A; tap the context chip | A | let a tap on the HUD context chip emit `confirm` |
+| Touch pause | ≡ button | MENU pill | relabel the pill ≡ (needs a ≡ glyph in the 5×7 face) or keep MENU and change GDD-00 |
+| Touch tool ring | ring button above B | none | add `touch:tool` above B |
+| Touch map | swipe down from the Skyband | none | add a swipe gesture emitting `map` |
+| Touch Read | lens button | none | add `touch:lens` with the `read` action |
+| Touch Peek | drag empty screen | none | add a drag gesture as the `peek` vector |
+| Touch battle speed | speed chip | none | battle scene owns a tappable speed chip |
 
 ---
 

@@ -20,7 +20,9 @@ describe('time selectors', () => {
     assert.equal(sel.day(w), 9);
     assert.equal(sel.minuteOfDay(w), 787.5);
     assert.equal(sel.hour(w), 13);
-    assert.equal(sel.dayOfWeek(w), 2);
+    assert.equal(sel.dayOfWeek(w), 1, 'core day 9 = GDD day 10, a Tuesday (day 1 is a Sunday)');
+    assert.equal(sel.dayOfWeek(at(world(), 0, 0)), 6, 'the arrival day is a Sunday');
+    assert.equal(sel.dayOfWeek(at(world(), 6, 0)), 5, 'GDD day 7 is a Saturday');
     assert.equal(sel.phase(w), 'midday');
     assert.equal(sel.isNight(w), false);
     assert.equal(sel.formatTime(w), '13:07');

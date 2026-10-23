@@ -36,7 +36,7 @@ The one mystery: *why the light went out, and why creatures Shift.* Answer: the 
 | 7 | **K6** *(canon, Stalk)* | Oil for nine nights; the lamp or the wheel. | 5 | `np.augusta.nine-nights` |
 | 8 | **K7** | The oil boat failed; the fleet's bell "goes with the quay if the bar takes it"; dig at a big low. | 5 | `th.the-bell.located` + toast |
 | 9 | **K8** *(canon)* | The storm night: the comet broke at the wheel, skyglass fell into the river, the Siltback Shifted, the wheel needed two, the lamp ran dry. | 6 | `np.merrow.storm-letter` |
-| 10 | **K9** | The morning after: the fleet on the bar, every soul waded home; Stalk's notebook ("that is what a report is"); the winged creature on the rail with the same mark. | 7 | `th.empty-creek.morning-after` |
+| 10 | **K9** | The morning after (22 December, the same dawn K8 was written before): the draft creatures changed in harness and the fleet is on the bar; every soul waded home; Stalk writes down the hour and, under it, her name ("that is what a report is"); the winged creature on the rail with the same mark. | 7 | `th.empty-creek.morning-after` |
 | 11 | **K10** *(canon)* | "They were right to name me": the owners couldn't read the marks. A read Shift is a Shift survived. She leaves for the Isles. | 8 | `np.merrow.read-shift-letter` |
 | 12 | **K11** | The new lagoon and Shardcrown; a young salvage diver (Bastien) keeps a brazier lit "whoever's tower, whoever lights it". | 9 | `np.bastien.brazier-letter` |
 | 13 | **K12** | Merrow's rule answered: light doesn't call the change, it shows it. The lantern is on Pell's counter "for whoever comes". | 9 | `th.heirlooms-going-home.lantern-named` |
@@ -53,7 +53,7 @@ The one mystery: *why the light went out, and why creatures Shift.* Answer: the 
 
 **Story hooks other chapters use.** Merrow halts the Engine on K10, or on K8 if K10 hasn't come (GDD-07 reads `{letter: {read: 10}}` / `8`). K7 unlocks the bell dig. K9 opens Ansel's confession. K12 and F14 set up the lantern. K17 foretells the Shift Tide line.
 
-**Supporting voices.** The family letters fill in the night from below: Maren's Bilgebob (F1), the alder floor and young Wren's square lighthouse (F2), Agnes Pell's slate (F3, F14), the Bracks' creel creature *Kettle* and Isolde's knot (F4, the origin of the Still Knot), Augusta's three-in-ten gale odds against Isolde's eight (F6, F15), Tully's dad (F7), the weir records the Archive never sent (F8), Odile's grandmother (F9), the Rasks' rope that held (F10), Mabry's "order is a kindness" (F11, F17), Josiah Stalk cancelling the sluice-gate oak (F12), the almanac with this year circled (F13), the whale that isn't (F16) and the stove (F18). The town letters are the record: the bar soundings, the deferred inspection, the nine-nights notice, the roll of the fleet (eleven lost, *Tidy Sum* found in the north creek), Merrow's hour-by-hour log of the Night of Wrong Shapes and the founding of the Mooring, and Ansel's report in three parts plus the unsent addendum ("True.").
+**Supporting voices.** The family letters fill in the night from below: Maren's Bilgebob (F1), the alder floor and young Wren's square lighthouse (F2), Agnes Pell's slate (F3, F14), the Bracks' creel creature *Kettle* and Isolde's knot (F4, the origin of the Still Knot), Augusta's three-in-ten gale odds against Isolde's eight (F6, F15), Tully's dad (F7), the weir records the Archive never sent (F8), Odile's grandmother (F9), the Rasks' rope that held (F10), Mabry's "order is a kindness" (F11, F17), Josiah Stalk, who built the weir, cancelling the sluice-gate oak (F12), the almanac with the Ebb year and the year thirty on both circled (F13), the whale that isn't (F16) and the stove (F18). The town letters are the record: the bar soundings, the deferred inspection, the nine-nights notice, the roll of the fleet (eleven lost, *Tidy Sum* found in the north creek), Merrow's hour-by-hour log of the Night of Wrong Shapes and the founding of the Mooring, and Ansel's report in three parts plus the unsent addendum ("True.").
 
 ---
 
@@ -115,7 +115,18 @@ Every beat is a §14.7 row: `cond`, a `where` hint (GDD-01 may snap it to the ne
 
 ---
 
-## 6. Manifest requests and engine notes
+## 6. Continuity notes (editor pass)
+
+- **Dates.** The storm is the night of 21–22 December (K6's nine nights from 12 December). K8 is written before dawn on the 22nd; K9 and T13 are that morning (22 December); the fleet roll (T9) is the 23rd; Ansel's report (T11, T14, T16) the 27th. Isolde leaves about 8–9 January (F14, F18, T15) and crosses the lagoon in January (K11).
+- **Titles.** Ansel Stalk is Deputy Harbormaster in the spring before (T1) and Harbormaster through the Ebb winter (T7, T11, T15, T16). F8 is signed "For the Harbormaster" by the office clerk. Augusta Skerry was already Harbor Warden then (F6, F15); "Warden" still means Augusta only.
+- **The weir.** Josiah Stalk, Ansel's grandfather, built it (F12); K2's "two generations old" counts from Ansel. He wrote "True." on Isolde's drawing (T18) and still cancelled the gate repair (F12).
+- **The drawing.** Ansel collected it himself (T4); the Board sent it to the estate (T3, T18), so at the report he "didn't have the drawing" (the confession); he found it twenty years on (T18) and still has it (Empty Creek beat 4).
+- **Juniper's back room.** Agnes Pell (Gran) kept the shop open on the slate and bought what people pawned; Juniper kept it and gives it back (Heirlooms beats 1 and 4).
+- **The Bell, beat 4.** F8 is the harbor office's *request* for the weir records, never delivered; the records sat in the Archive the whole time. Barnaby's last string runs from them through Isolde's letters to the lamp.
+- **Thessaly's almanac.** Wynne circled the Ebb year and, on the long tables, the year thirty on (F13), which is why Thessaly can say "She circled NOW."
+- **Linnet, beat 4.** She does not Anchor or Reroll: the Sootling's window is left to land overnight on her step (the scene does not resolve the Shift on screen).
+
+## 7. Manifest requests and engine notes
 
 **Manifest requests** (no ids invented; nothing here blocks the content):
 1. Keepsake `odile-porch-canvas` (Odile's painting of your porch, promised in Twelve Lights beat 2). Today the gift exists only in dialogue.

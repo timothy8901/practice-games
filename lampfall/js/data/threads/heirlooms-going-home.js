@@ -23,10 +23,10 @@ const mem = (key, value, npc = 'juniper') => [
 export const scripts = {
   'th-heirlooms-going-home-1': [
     '* Juniper is behind the counter at Pell\'s, polishing a teaspoon that is already very shiny.',
-    'Juniper: The Dorrows\' porch is lit! I saw it from the shop step. And the kettle went home? Good. GOOD. That kettle sat on my third shelf for twenty-eight years and never once made tea.',
+    'Juniper: The Dorrows\' porch is lit! I saw it from the shop step. And the kettle went home? Good. GOOD. That kettle sat on my third shelf for thirty years and never once made tea.',
     'Juniper: Come here. Back room. Don\'t touch anything that sparkles; I\'ll know.',
     '* The back room is shelves to the ceiling, every shelf lined with things wrapped in brown paper and string, each with a label in Juniper\'s tidy hand. A clock. A child\'s boots. A ship in a bottle. A brass bell-pull.',
-    'Juniper: Everything people pawned when the harbor went dark. I bought it before the mainland dealers could. When a porch lights again and its letter comes home, its thing goes back. For nothing.',
+    'Juniper: Everything people pawned when the harbor went dark. Gran bought it before the mainland dealers could, and I kept it. When a porch lights again and its letter comes home, its thing goes back. For nothing.',
     { op: 'choice', options: [
       { text: 'Why for nothing?', then: [
         ...mem('first', 'why'),

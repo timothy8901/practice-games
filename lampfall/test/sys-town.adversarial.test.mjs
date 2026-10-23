@@ -22,6 +22,9 @@ import { createStore } from '../js/state/store.js';
 import { createRngs, forkFor } from '../js/state/rngs.js';
 import { makeRng } from '../js/core/rng.js';
 import { TUNING } from '../js/data/tuning.js';
+import { evalCond } from '../js/script/cond.js';
+import { dayOfWeek } from '../js/state/selectors.js';
+import { weekday } from '../js/systems/clockSys.js';
 import { makeWorld, makeData, at, recBus, MIN } from './fixtures/town.fixture.mjs';
 import { makeGame, runDays, digest, FLATS } from './fixtures/town.sim.mjs';
 
@@ -68,6 +71,18 @@ describe('townCommon: windows, calendar, porches, tuning', () => {
     const big = 10_000_000;
     assert.ok(Number.isInteger(C.dowOf(big, t)) && C.dowOf(big, t) >= 0 && C.dowOf(big, t) < 7);
     assert.equal(C.coreDayOfGame(C.gameDay(big, t), t), big);
+  });
+
+  it('one calendar everywhere: town systems, selectors, clockSys and the cond DSL agree on weekdays', () => {
+    const w = createNewWorld({ seedCode: 'CAL' });
+    for (let d = 0; d < 60; d++) {
+      at(w, d, 12 * MIN);
+      const dow = C.dowOf(d, C.CALENDAR_DEFAULTS);
+      assert.equal(dayOfWeek(w), dow, `selectors, core day ${d}`);
+      assert.equal(weekday(w, TUNING).index, dow, `clockSys, core day ${d}`);
+      assert.equal(evalCond(w, { day: { dow: [dow] } }, {}), true, `cond, core day ${d}`);
+      assert.equal(evalCond(w, { day: { dow: [5] } }, {}), (C.gameDay(d, C.CALENDAR_DEFAULTS)) % 7 === 0, 'Saturdays are GDD days 7, 14, 21 …');
+    }
   });
 
   it('minuteNow and coreDay read a damaged clock as 0 and fold any minute into the day', () => {

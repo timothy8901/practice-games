@@ -81,10 +81,10 @@ const KEEPER = [
     body: 'To whoever keeps the light after me.|The night of the storm I filled the lamp from the last can and took the Siltback up the valley. The wanderer came down while we were at the wheel. It broke. The sky went the colour of that mark on her forehead and the shards came down like sleet into the river. She Shifted under my hands into something that did not know me, and the wheel needed two of us.|I came back down to a dark tower and a harbor full of wrong shapes. I don\'t know yet what happened on the bar. I know what I\'d have seen from the gallery if I\'d stayed.|—I.',
   }),
   k(9, {
-    date: '23 December, the Ebb winter',
+    date: '22 December, morning',
     subject: 'The morning after.',
     reveal: [{ op: 'setFlag', id: 'th.empty-creek.morning-after' }],
-    body: 'To the Keeper,|Morning. Every boat is on the bar or under it. Every soul waded home across the flats, the children on shoulders, which is the only sentence in this letter I will read twice.|Young Stalk was on the quay before light with a notebook. He was kind about it. He asked what time the lamp went out and I told him: midnight. He wrote it down. That is what a report is.|At dawn something with grey wings came and sat on the gallery rail, facing south-east. There is a small four-point mark on its brow, in exactly the place hers was.|—I.',
+    body: 'To the Keeper,|Morning. Every boat is on the bar or under it. The draft creatures changed in their harness halfway in and towed the wrong way, or not at all. Every soul waded home across the flats, the children on shoulders, which is the only sentence in this letter I will read twice.|Young Stalk was on the quay before light with a notebook. He was kind about it. He asked what time the lamp went out and I told him: midnight. He wrote it down, and under it, my name. That is what a report is.|At dawn something with grey wings came and sat on the gallery rail, facing south-east. There is a small four-point mark on its brow, in exactly the place hers was.|—I.',
   }),
   k(10, {
     date: '6 January, the Ebb winter',
@@ -93,7 +93,7 @@ const KEEPER = [
     body: 'To the Keeper,|They were right to name me. Not for the reason in the report. I was the only one on the coast who could see the marks lean, and I went up a valley with that instead of standing in the harbor reading them home. Merrow\'s ward is full of creatures with lit marks and no owners who know them. If I had read them, they\'d have been Shifts, not accidents.|A read Shift is a Shift survived. I\'m going out to the Isles to learn how.|Keep the wick trimmed, whoever you are.|—I.',
   }),
   k(11, {
-    date: 'February, the lagoon crossing',
+    date: 'January, the lagoon crossing',
     subject: 'A fire on Shardcrown.',
     reveal: [{ op: 'setFlag', id: 'np.bastien.brazier-letter' }],
     body: 'To the Keeper,|The punt that took me out crossed water that was fields last year; the wanderer dug itself a lagoon. In the middle there is a new island of glass and rubble the fishers already call Shardcrown.|There is a fire on top of it. A salvage diver, a young mink, carried coal up in a sack because the tower was dark and the boats still need something to steer by. He says he and his cousins will keep it until the tower is lit, "whoever\'s tower, whoever lights it."|I gave him my spare oil. It isn\'t enough. Nothing is enough. It\'s still a fire.|—I.',

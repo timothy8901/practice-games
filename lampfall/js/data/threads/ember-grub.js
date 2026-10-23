@@ -80,7 +80,7 @@ export const scripts = {
     '* Linnet\'s porch is lit again. She sits on the step in white winter fur, with the Sootling asleep in her hood.',
     'Linnet: Don\'t say anything about the coat. It\'s winter. It happens. ~ You can say it looks good. Once.',
     '* The Sootling stirs. On its brow the mark is glowing, faint and pink, and leaning.',
-    'Linnet: It\'s going to Shift. Tonight, maybe. ~ I asked you on the ice. I\'m asking again here, on my own step, because that\'s harder. Read it for me. I\'m not asking Merrow.',
+    'Linnet: It\'s going to Shift. Tonight, maybe. ~ I could have asked you on the ice. I wanted to ask here, on my own step, because that\'s harder. Read it for me. I\'m not asking Merrow.',
     '* You raise the Reading Glass. Three ways, odds showing: one bigger, one the same size, one smaller still. None of them a stranger.',
     { op: 'choice', options: [
       { text: 'Tell her exactly what you see.', then: [
@@ -92,7 +92,7 @@ export const scripts = {
         'Linnet: Whichever. ~ Yeah. The mark\'s in the same place. Same as always.',
       ] },
     ] },
-    '* She doesn\'t reach for a stone. She doesn\'t reach for salt. She lets it land. ~ The Sootling is still small, still asleep, and still hers. The mark hasn\'t moved.',
+    '* She doesn\'t reach for a stone. She doesn\'t reach for salt. She tucks the Sootling back into her hood to let the window land in its own time, on her own step. ~ Whatever it wakes up as, the mark will be in the same place.',
     'Linnet: Not Merrow. Not Varga. My neighbor. ~ Thanks, neighbor.',
     { op: 'beat', thread: T, to: 4 },
     { op: 'end' },

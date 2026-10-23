@@ -73,7 +73,7 @@ const TOWN = [
     date: '12 December, the Ebb winter',
     subject: 'Notice to mariners: the light will burn nine more nights.',
     reveal: [{ op: 'setFlag', id: 'np.augusta.nine-more-nights' }],
-    body: 'HARBOR OFFICE — NOTICE TO MARINERS, 12 DECEMBER|The Keeper reports oil sufficient for nine nights\' burning at full flame. The oil vessel will attempt the bar at the full moon.|Should that attempt fail, masters are advised that the light may go out on or about the night of the 21st, and that the fleet should be in harbor and moored before dusk on that date, weather permitting.|Weather, as of writing, is not permitting anything.|A. Stalk, for the Harbormaster',
+    body: 'HARBOR OFFICE — NOTICE TO MARINERS, 12 DECEMBER|The Keeper reports oil sufficient for nine nights\' burning at full flame. The oil vessel will attempt the bar at the full moon.|Should that attempt fail, masters are advised that the light may go out on or about the night of the 21st, and that the fleet should be in harbor and moored before dusk on that date, weather permitting.|Weather, as of writing, is not permitting anything.|A. Stalk, Harbormaster',
   }),
   t(8, 'postmark-die', DAY_BOOK, {
     date: '28 February, the year after',
@@ -133,7 +133,7 @@ const TOWN = [
     date: 'The third year after the closing',
     subject: 'Letters to the Outer Isles returned, no forwarding.',
     reveal: [{ op: 'setFlag', id: 'np.hesper.day-book-returned' }],
-    body: 'POST OFFICE DAY BOOK — M. Coil (kept at home)|Third year since the closing. Wrote again to the keeper on the Outer Isles, care of the ring-line punt. Came back again: NOT KNOWN AT THIS ADDRESS, NO FORWARDING.|She moves about. Her letters still find me, though, by fishing boat, by whoever is going: three this year, all "To the Keeper", all for the sack.|I keep them in order under the stairs, with the key. Somebody will reopen. Somebody will light it. I would like them read in the right order.',
+    body: 'POST OFFICE DAY BOOK — M. Coil (kept at home)|Third year since the closing. Wrote again to the keeper on the Outer Isles, care of the island packet. Came back again: NOT KNOWN AT THIS ADDRESS, NO FORWARDING.|She moves about. Her letters still find me, though, by fishing boat, by whoever is going: three this year, all "To the Keeper", all for the sack.|I keep them in order under the stairs, with the key. Somebody will reopen. Somebody will light it. I would like them read in the right order.',
   }),
   t(18, 'whelk-shell', REPORT, {
     date: 'Twenty years on (never sent)',

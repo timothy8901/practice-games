@@ -17,7 +17,7 @@
  *
  * Player parties are the GDD-04 §Balance "on-curve parties": the starter line (three variants:
  * Sloshkin, Scrapling, Reedkit lines) plus forms commonly caught by that point, at the posted
- * curve (starter +1, one member at curve, the rest at curve -1), with sensible movesets picked
+ * curve (starter at curve +1, everyone else at the curve), with sensible movesets picked
  * from their learnsets and the discs a player can own by then.
  *
  * Usage: node tools/balance-sim.mjs [--n 200] [--json]
@@ -144,11 +144,12 @@ export function trainerParty(tr, scale = null) {
 // --- damage estimates for any pair (bench decisions) ----------------------------------------------
 
 /** Expected damage of one move from `att` to `def` at full stages (0 when it cannot land). */
-export function expectedDamage(att, def, moveId) {
+export function expectedDamage(att, def, moveId, wardDown = false) {
   const mv = VIEW.move(moveId);
   if (!isDamaging(mv)) return 0;
   const type = moveTypeFor(mv, att);
-  const ab = VIEW.ability(def.ability);
+  const ab0 = VIEW.ability(def.ability);
+  const ab = wardDown && ab0.ward ? { ...ab0, ward: null } : ab0;
   const check = wardCheck(ab, mv, def.types, type, VIEW.chart);
   if (!check.lands) return 0;
   const physical = mv.category === 'physical';
@@ -165,15 +166,15 @@ export function expectedDamage(att, def, moveId) {
 }
 
 /** Best expected damage of a creature's usable moves into a target. */
-export function bestDamage(att, def) {
+export function bestDamage(att, def, wardDown = false) {
   let best = 0;
-  for (const m of att.moves) if (m.pp > 0) best = Math.max(best, expectedDamage(att, def, m.id));
+  for (const m of att.moves) if (m.pp > 0) best = Math.max(best, expectedDamage(att, def, m.id, wardDown));
   return best;
 }
 
 /** Matchup score of `c` against `foe`: share of foe HP it takes per turn minus share it loses. */
-function matchup(c, foe) {
-  const give = bestDamage(c, foe) / Math.max(1, foe.hp);
+function matchup(c, foe, wardDown = false) {
+  const give = bestDamage(c, foe, wardDown) / Math.max(1, foe.hp);
   const take = bestDamage(foe, c) / Math.max(1, c.hp);
   const speed = c.stats.spe >= foe.stats.spe ? 0.1 : 0;
   return Math.min(1.2, give) - 0.8 * Math.min(1.2, take) + speed;
@@ -198,8 +199,9 @@ export function playerBrain(battle, memo) {
     const opts = acts.switches.filter((s) => s.selectable);
     let best = opts[0];
     let score = -Infinity;
+    const down = battle.sides[1].vol.wardSuppressed > 1;
     for (const o of opts) {
-      const sc = matchup(battle.sides[side].party[o.index], foe);
+      const sc = matchup(battle.sides[side].party[o.index], foe, down);
       if (sc > score) { score = sc; best = o; }
     }
     return { type: 'switch', to: best.index };
@@ -242,7 +244,27 @@ export function playerBrain(battle, memo) {
     return pick;
   };
 
-  // 2. Nothing lands (a Ward or an immunity): switch to an answer, else Crackdust.
+  // 2. A Ward up and little getting through: a bench creature that lands now and survives a hit,
+  //    else Crackdust, else (below) chip.
+  const foeAb = VIEW.ability(foe.ability);
+  const wardUp = !!foeAb.ward && !(theirs.vol.wardSuppressed > 0);
+  if (wardUp && best.exp < foe.hp * 0.5) {
+    if (canSwitch) {
+      let pick = null;
+      let sc = best.exp;
+      for (const o of acts.switches.filter((x) => x.selectable)) {
+        const c = mine.party[o.index];
+        const d = bestDamage(c, foe);
+        const hitsTaken = c.stats.spe > foe.stats.spe ? 1 : 2;
+        if (d > sc && d >= foe.hp * 0.5 && bestDamage(foe, c) * hitsTaken < c.hp * 0.9) { sc = d; pick = o; }
+      }
+      if (pick) { memo.lastSwitch = battle.turn; return { type: 'switch', to: pick.index }; }
+    }
+    const cd = acts.items.find((it) => it.id === 'crackdust' && it.selectable);
+    if (cd) return { type: 'item', item: 'crackdust' };
+  }
+
+  // 2b. Nothing lands (an immunity, or a Ward with no dust left): switch to an answer, else Crackdust.
   if (best.exp <= 0) {
     if (canSwitch) {
       const pick = benchPick(0);
@@ -265,7 +287,7 @@ export function playerBrain(battle, memo) {
   const now = matchup(me, foe);
   if (canSwitch && now < -0.25) {
     const pick = benchPick(now + 0.6);
-    if (pick && bestDamage(foe, mine.party[pick.index]) < mine.party[pick.index].hp * 0.5) {
+    if (pick && bestDamage(foe, mine.party[pick.index]) < mine.party[pick.index].hp * 0.75) {
       memo.lastSwitch = battle.turn;
       return { type: 'switch', to: pick.index };
     }
@@ -379,7 +401,7 @@ export function playBattle(playerParty, foeParty, o) {
 export const STARTER_LINES = Object.freeze({
   sloshkin: Object.freeze(['sloshkin', 'siltback', 'bogmonarch']),
   scrapling: Object.freeze(['scrapling', 'knuckleback', 'cragmitt']),
-  reedkit: Object.freeze(['reedkit', 'sedgehare', 'sedgehare']),
+  reedkit: Object.freeze(['reedkit', 'sedgehare', 'strandrunner']),
 });
 
 /**
@@ -389,13 +411,13 @@ export const STARTER_LINES = Object.freeze({
  * `crackdust` how many Crackdust.
  */
 export const PARTIES = Object.freeze({
-  turn: { curve: 7, starterStage: 0, members: ['tossup', 'wirewhisk', 'puddlepip'], discs: [], items: [['salve', 25], ['salve', 25]], crackdust: 0 },
-  ward: { curve: 13, starterStage: 1, members: ['chillnub', 'wirewhisk', 'mothling', 'mudfist'], discs: ['spore-drift'], items: [['salve', 25], ['salve', 25], ['salve', 25]], crackdust: 1 },
-  weather: { curve: 19, starterStage: 1, members: ['rimeplate', 'sootling', 'rayling', 'wirewhisk'], discs: ['spore-drift', 'gale-cut'], items: [['tonic', 70], ['salve', 25], ['salve', 25]], crackdust: 0 },
-  hollow: { curve: 26, starterStage: 2, members: ['emberjaw', 'sedgehare', 'coilcrest', 'rimeplate', 'gillwick'], discs: ['spore-drift', 'gale-cut', 'flashover'], items: [['tonic', 70], ['tonic', 70], ['salve', 25]], crackdust: 0 },
-  relay: { curve: 33, starterStage: 2, members: ['emberjaw', 'duskowl', 'coilcrest', 'rimeplate', 'gillwick'], discs: ['spore-drift', 'gale-cut', 'flashover', 'hoarfrost'], items: [['tonic', 70], ['tonic', 70]], crackdust: 0 },
-  mirror: { curve: 40, starterStage: 2, members: ['caldermaw', 'duskowl', 'coilcrest', 'floeback', 'strandrunner'], discs: ['spore-drift', 'gale-cut', 'flashover', 'hoarfrost', 'drowned-bell', 'live-wire'], items: [['tonic', 70], ['tonic', 70]], crackdust: 0 },
-  summit: { curve: 47, starterStage: 2, members: ['caldermaw', 'duskowl', 'coilcrest', 'floeback', 'strandrunner'], discs: ['spore-drift', 'gale-cut', 'flashover', 'hoarfrost', 'drowned-bell', 'live-wire', 'plumbline', 'cairn-crash'], items: [['tonic', 70], ['tonic', 70], ['tonic', 70], ['full-salve', 9999]], crackdust: 0 },
+  turn: { curve: 7, starterStage: 0, members: ['tossup', 'wirewhisk', 'mudfist'], discs: [], items: [['salve', 25], ['salve', 25]], crackdust: 0 },
+  ward: { curve: 13, starterStage: 1, members: ['tossup', 'wirewhisk', 'mudfist', 'chillnub'], discs: ['spore-drift'], items: [['salve', 25], ['salve', 25]], crackdust: 2 },
+  weather: { curve: 19, starterStage: 1, members: ['tossup', 'wirewhisk', 'mudfist', 'chillnub', 'sootling'], discs: ['spore-drift'], items: [['tonic', 70], ['salve', 25]], crackdust: 0 },
+  hollow: { curve: 26, starterStage: 2, members: ['coilcrest', 'rimeplate', 'sootling', 'rushling', 'bilgebob'], discs: ['spore-drift', 'flashover'], items: [['tonic', 70], ['tonic', 70]], crackdust: 0 },
+  relay: { curve: 33, starterStage: 2, members: ['coilcrest', 'rimeplate', 'emberjaw', 'rushling', 'duskwisp'], discs: ['spore-drift', 'flashover', 'gale-cut'], items: [['tonic', 70], ['tonic', 70]], crackdust: 0 },
+  mirror: { curve: 40, starterStage: 2, members: ['coilcrest', 'floeback', 'emberjaw', 'gillwick', 'duskowl'], discs: ['spore-drift', 'flashover', 'gale-cut', 'hoarfrost'], items: [['tonic', 70], ['tonic', 70]], crackdust: 0 },
+  summit: { curve: 47, starterStage: 2, members: ['coilcrest', 'floeback', 'caldermaw', 'strandrunner', 'duskowl'], discs: ['spore-drift', 'flashover', 'gale-cut', 'hoarfrost', 'drowned-bell', 'plumbline'], items: [['tonic', 70], ['tonic', 70], ['full-salve', 9999], ['full-salve', 9999]], crackdust: 0 },
 });
 
 /** Party for a fight, starter variant, optionally at another curve (route trainers). */
@@ -408,7 +430,7 @@ export function buildParty(key, starter, curveOverride = null) {
   // keep the party size constant when the starter's line overlaps a member
   while (forms.length < p.members.length + 1) forms.push(p.members[forms.length - 1]);
   return forms.map((f, i) => {
-    const level = Math.max(2, i === 0 ? curve + 1 : i === 1 ? curve : curve - 1);
+    const level = Math.max(2, i === 0 ? curve + 1 : curve);
     return mon(f, level, pickMoves(f, level, p.discs));
   });
 }
