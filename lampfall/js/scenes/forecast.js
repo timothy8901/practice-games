@@ -439,7 +439,7 @@ export function createForecastScene(G) {
     let cx = r.x + 6;
     for (const ty of card.types) cx += drawTypeChip(ctx, card.silhouette ? '???' : chipId(ty), cx, r.y + 117) + 2;
     const d = card.statTotalDelta;
-    const delta = d > 0 ? `▲ +${d}` : d < 0 ? `▼ ${d}` : '• ±0';
+    const delta = d > 0 ? `▲ +${d}` : d < 0 ? `▼ ${d}` : '• +0';
     drawText(ctx, `Stats ${delta}`, r.x + r.w - 6, r.y + 107, { color: d > 0 ? ink : soft, align: 'right', font: 'small' }); // str
     const ab = card.ability && data.tryGet ? data.tryGet('abilities', card.ability) : null;
     const abName = card.abilityHidden ? '?' : ab ? ab.name : (card.ability || '—');

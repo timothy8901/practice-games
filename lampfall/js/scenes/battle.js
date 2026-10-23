@@ -63,8 +63,8 @@ const L = Object.freeze({
   playerBox: { x: 288, y: 138, w: 184, h: 46 },
   panel: { x: 0, y: 198, w: 480, h: 72 },
   msg: { x: 14, y: 206, w: 418 },
-  cmdY: 229, cmdH: 30, cmdW: 74, cmdGap: 4, cmdX: 8,
-  moves: { x: 8, y: 202, w: 230, h: 30, gx: 4, gy: 3 },
+  cmdY: 229, cmdH: 30, cmdW: 72, cmdGap: 4, cmdX: 16,
+  moves: { x: 16, y: 202, w: 226, h: 30, gx: 4, gy: 3 },
   speed: { x: 436, y: 186, w: 40, h: 11 },
   log: { x: 14, y: 208, w: 452 },
   stance: { x: 432, y: 203, w: 44, h: 15 },
@@ -627,7 +627,7 @@ export function createBattleScene(G) {
     } else if (list.kind === 'bag') {
       list.rows.forEach((r, i) => { r.rect = { x: 248, y: 40 + i * 18, w: 216, h: 16 }; });
     } else {
-      list.rows.forEach((r, i) => { r.rect = { x: 12, y: 215 + i * 13, w: 200, h: 12 }; });
+      list.rows.forEach((r, i) => { r.rect = { x: 16, y: 215 + i * 13, w: 200, h: 12 }; });
     }
   }
 
@@ -1267,8 +1267,8 @@ export function createBattleScene(G) {
     drawPlayerBox(ctx);
     if (weatherState) drawWeather(ctx);
     if (lanternFx.show) drawMeter(ctx);
-    drawPanelArea(ctx);
     drawSpeedChip(ctx);
+    drawPanelArea(ctx);
     drawOverlays(ctx);
     if (curtain > 0) drawCurtain(ctx);
     if (amber > 0) drawAmber(ctx);
@@ -1704,7 +1704,7 @@ export function createBattleScene(G) {
       ctx.fillRect(r.x, r.y, r.w, r.h);
       strokeRect(ctx, r, INK);
       drawText(ctx, t('battle.scrap'), r.x + 12, r.y + 5, { color: INK });
-      drawText(ctx, '50 power · sure hit · 1/8 recoil', r.x + 12, r.y + 17, { color: SOFT, font: 'small' }); // str
+      drawText(ctx, '50 power, sure hit, 1/8 recoil', r.x + 12, r.y + 17, { color: SOFT, font: 'small' }); // str
       drawText(ctx, t('battle.scrapNote'), L.moves.x + 4, L.moves.y + L.moves.h + 8, { color: SOFT, maxWidth: 456 });
       moveFocus.drawCursor(ctx, { style: 'paper', ring: false });
       return;
@@ -1770,13 +1770,13 @@ export function createBattleScene(G) {
       if (menu.fails > 0 && !cur.sure) drawText(ctx, `+${Math.min(15, menu.fails * 3)}% from missed raises`, 232, 247, { color: SOFT, font: 'small' }); // str
     }
     drawStanceSeal(ctx);
-    drawText(ctx, 'Z raise · X back', W - 8, 258, { color: FAINT, font: 'small', align: 'right' }); // str
+    drawText(ctx, 'Z: raise   X: back', W - 8, 258, { color: FAINT, font: 'small', align: 'right' }); // str
   }
 
   /** The posted weather: name, turns left and the strip of what comes next (Weather Spire). */
   function drawWeather(ctx) {
     const w = weatherState;
-    const label = w.turnsLeft != null ? `${w.name} · ${w.turnsLeft} ${w.turnsLeft === 1 ? 'turn' : 'turns'}` : w.name; // str
+    const label = w.turnsLeft != null ? `${w.name}, ${w.turnsLeft} ${w.turnsLeft === 1 ? 'turn' : 'turns'}` : w.name; // str
     const tw = measureText(label).w;
     const x = 200;
     const y = 8;

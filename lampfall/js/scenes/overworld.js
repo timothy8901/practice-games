@@ -1,199 +1,1313 @@
 /**
- * Overworld. [SCN-WORLD] DAY-1 STUB
+ * The field. [SCN-WORLD] — GDD-00 §4, §5, §9, §12, §13, §14; GDD-09 §3.4; ARCHITECTURE §4.
  *
- * A flat 40x24 test map of coloured 16px tiles, a player square moving on the grid through
- * `core/input`, a camera clamped to the map, the HUD line (clock text and tide from `G.clock`) and
- * `menu` -> pause menu. The world clock advances only here (and in fishing) via `clockSys.tick`, so
- * time is frozen in every other scene by construction. The real scene replaces this file wholesale
- * (`world/tilemap`, `world/player`, `render/mapRenderer`, `ui/hud`).
+ * Loads the current map from data (`world/tilemap.loadMap`, layout variants resolved), draws it
+ * with `render/mapRenderer` (Skyband, the hour's grade, weather, light pools, porch lamps lit by
+ * world state, the lighthouse scaffold stage from the loans, the beam after `lit.calls`), places
+ * the map's entities (trees with fruit state, signs, props, porches, boats, today's dig cracks) and
+ * the neighbours `systems/schedule.whereIs` puts here (driven by `world/npc`), and runs the player
+ * (`world/player`: grid steps, run, turn-in-place, the tile's footstep sfx on `player:step`).
+ *
+ * Tide gates are per tile way: a `tide: 'low'` tile with `way: 'stones'` is walkable while
+ * `clockSys.gateTide(world, 'stones')` says the window is open (spring-only tiles also need a spring
+ * low; `openFlag` tiles open for good once the flag is set). Bumping a closed way says why and when
+ * it opens; a player the sea comes up under wades to `world/tide.nearestDry` ("The sea came up. You
+ * waded."). Warps resolve through `world/warps` with the same gate; map changes fade inside this
+ * scene and emit `map:enter` (an autosave trigger).
+ *
+ * The clock runs only here (and in fishing): `clockSys.tick` every update, `weather.update` after
+ * it. `day:start` / `clock:anchor` reach `systems/flow/dayFlow` on the bus.
+ *
+ * Interaction: `world/interact.resolveFacing` (plus the field's own bug and Glint probes) feeds the
+ * HUD context chip; confirm hands a copy to `systems/flow/interactFlow.doInteraction(G, action,
+ * host)`, the only place verbs push scenes. Wild encounters roll on reed steps
+ * (`systems/encounter.rollStep`) and open the battle through `systems/flow/battleFlow` behind an
+ * iris. Esc / P: pause menu; M: map screen; V (or Select): the Read / path view; hold C: tool ring,
+ * tap C: swap tools.
  * @module scenes/overworld
  */
-import { drawText } from '../core/font.js';
+import { drawText, measureText } from '../core/font.js';
+import { TILE, NATIVE_W, NATIVE_H, TRANSITION_MS } from '../config.js';
 import { makeRng } from '../core/rng.js';
+import { MINUTES_PER_DAY } from '../core/time.js';
+import { loadMap, LAYER } from '../world/tilemap.js';
+import { createEntities, createEntity, DIR_INDEX, DX, DY, OPPOSITE, dirTo } from '../world/entities.js';
+import { createPlayer, dirFromAxes } from '../world/player.js';
+import { createCamera } from '../world/camera.js';
+import { resolveFacing } from '../world/interact.js';
+import { resolveWarp, firesOnStep } from '../world/warps.js';
+import { nearestDry, TIDE_MASK } from '../world/tide.js';
+import { createNpcDriver, arrivalPoint } from '../world/npc.js';
+import { createPathCache } from '../world/pathing.js';
+import { createRoamerField, toEntity as roamerEntity, toEncounter as roamerEncounter } from '../world/roamer.js';
+import { gradeFor, lampsLit } from '../world/lighting.js';
+import { createMapRenderer, MAP_RECT, FULL_RECT } from '../render/mapRenderer.js';
+import { getSprite, artDef, resolveArtId } from '../art/atlas.js';
+import { drawHud } from '../ui/hud.js';
+import { createToolRing } from '../ui/toolRing.js';
+import { COLORS, PALETTE } from '../ui/theme.js';
+import { TILES, DEFAULT_LEGEND } from '../data/tilesets.js';
+import { TUNING } from '../data/tuning.js';
+import { t, has as hasString } from '../data/strings.js';
+import { evalCond } from '../script/cond.js';
 import * as clockSys from '../systems/clockSys.js';
+import * as weather from '../systems/weather.js';
 import * as stats from '../systems/stats.js';
-import { TILE, NATIVE_W, NATIVE_H } from '../config.js';
-import { drawStrip, KIT } from './day1kit.js';
+import * as encounter from '../systems/encounter.js';
+import * as gather from '../systems/gather.js';
+import * as schedule from '../systems/schedule.js';
+import * as bag from '../systems/bag.js';
+import * as party from '../systems/party.js';
+import * as letters from '../systems/letters.js';
+import { isPorchLit, porchFlag } from '../systems/townCommon.js';
+import * as eventScripts from '../systems/flow/eventScripts.js';
+import * as dayFlow from '../systems/flow/dayFlow.js';
+import { startBattle } from '../systems/flow/battleFlow.js';
+import { doInteraction, snapshotAction, laneCtx, ringHas } from '../systems/flow/interactFlow.js';
+import { createBoardScene, createCeremonyScene, createFerryScene, ROOF_ART } from './fieldOverlays.js';
+import { hasAliveParty, minuteOfDay, tideState as selTideState } from '../state/selectors.js';
 
-/** Test map size in tiles. */
-export const MAP_W = 40;
-export const MAP_H = 24;
+// ---------------------------------------------------------------------------------------------
+// constants
+// ---------------------------------------------------------------------------------------------
 
-/** Spawn tile of the test map (the crossroads of the two path bands). */
-export const SPAWN = Object.freeze({ x: 20, y: 12 });
+/** Map the arrival starts on, and the marker it starts at (GDD-00 §12: 17:40 on the causeway end). */
+export const ARRIVAL = Object.freeze({ mapId: 'pellwick', marker: 'arrival-start', x: 63, y: 30, facing: 'left', walk: 4 });
+/** Script the arrival plays when the story chapter has written it. */
+export const ARRIVAL_SCRIPT = 'arrival';
+/** Where a blackout wakes you (the porch step) when the lease card says porch. */
+export const HOME = Object.freeze({ mapId: 'pellwick', x: 9, y: 23, facing: 'down' });
+/** The starter kit Wren hands over when no arrival script exists yet (GDD-00 §3). */
+export const STARTER_KIT = Object.freeze({ tools: ['rod', 'net', 'shovel', 'reading-glass', 'keepers-lantern'], wicks: 5 });
+/** Tool ring socket order (GDD-09 §3.6, 12 o'clock clockwise). */
+export const RING_ORDER = Object.freeze(['rod', 'net', 'shovel', 'reading-glass', 'keepers-lantern', 'grafting-knife', 'string-lights', 'weatherglass']);
+/** Icon per tool (ui/icons). */
+export const TOOL_ICONS = Object.freeze({ rod: 'fish', net: 'wiggle', shovel: 'dig', 'reading-glass': 'read', 'keepers-lantern': 'lantern', 'grafting-knife': 'strike', 'string-lights': 'glint', weatherglass: 'wave' });
+/** Tide-way kinds clockSys knows. */
+export const WAYS = Object.freeze(['causeway', 'stones', 'flats', 'bar', 'spur', 'mainland']);
+/** Human names of the ways (for the bump toast). */
+export const WAY_NAMES = Object.freeze({ causeway: 'The causeway', stones: 'The stones', flats: 'The flats', bar: 'The Bar road', spur: 'The Bar road', mainland: 'The mainland causeway' }); // str
+/** Synthetic glow tile per porch (lit when `sys.porch.<id>` is truthy in the lit-world view). */
+const PORCH_GLOW = Object.freeze({ kind: 'porch', color: '#F9C46B', radius: 36, when: 'night', ox: 0, oy: 4 });
 
-/** Map id shown while the player has no map yet (`player.mapId === ''`). // [GDD: arrival map id] */
-export const STUB_MAP_ID = 'stub-map';
+const WALLET_SHOW_MS = 2000;
+const NPC_REPLAN_MS = 500;
+const BUG_REROLL_MIN = 60;
+const TOAST_GATE_MS = 2500;
 
-/** Tile kinds of the test map. `solid` blocks the player. */
-export const TEST_TILES = Object.freeze([
-  Object.freeze({ id: 'grass-a', color: '#4f8a4b', solid: false }),
-  Object.freeze({ id: 'grass-b', color: '#5a9a52', solid: false }),
-  Object.freeze({ id: 'path', color: '#b9a06a', solid: false }),
-  Object.freeze({ id: 'sand', color: '#d9c78a', solid: false }),
-  Object.freeze({ id: 'water', color: '#3a6ea8', solid: true }),
-  Object.freeze({ id: 'rock', color: '#6e6a66', solid: true }),
-]);
+/** Fade length honouring `?noanim=1`. */
+function fadeMs(G, ms = TRANSITION_MS) {
+  return G.flags && G.flags.noanim ? 0 : ms;
+}
 
-const DIRS = Object.freeze({ up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] });
-const WALK_MS = 140;
-const RUN_MS = 85;
+/** 12-hour clock text through strings (`hud.time.am/pm`). */
+export function clockText(minute) {
+  const m = ((Math.floor(minute) % MINUTES_PER_DAY) + MINUTES_PER_DAY) % MINUTES_PER_DAY;
+  const h = Math.floor(m / 60), mm = m % 60;
+  const hh = ((h + 11) % 12) + 1;
+  return t(h < 12 ? 'hud.time.am' : 'hud.time.pm', { time: `${hh}:${String(mm).padStart(2, '0')}` });
+}
 
 /**
- * Builds the deterministic test map for a seed: grass with a path band, a beach and water at the
- * bottom, a few rocks. Pure.
- * @param {number|string} seed
- * @returns {{w: number, h: number, tiles: Uint8Array}} tile kind indexes into {@link TEST_TILES}
+ * The MapDef with its layout variant applied (GDD-01 §1.14: the LAST variant whose cond holds
+ * replaces whole layers and lists).
+ * @param {any} base
+ * @param {any} world
+ * @param {any} data
+ * @returns {any}
  */
-export function buildTestMap(seed) {
-  const rng = makeRng(seed).fork('stub-map');
-  const tiles = new Uint8Array(MAP_W * MAP_H);
-  for (let y = 0; y < MAP_H; y++) {
-    for (let x = 0; x < MAP_W; x++) {
-      let k = rng.chance(0.3) ? 1 : 0;
-      if (y === 12 || x === 20) k = 2;
-      if (y >= MAP_H - 4) k = 3;
-      if (y >= MAP_H - 2 || (y === MAP_H - 3 && rng.chance(0.4))) k = 4;
-      if (k < 2 && rng.chance(0.04) && !(x === 20 && y === 12)) k = 5;
-      tiles[y * MAP_W + x] = k;
-    }
+export function resolveVariant(base, world, data) {
+  const vs = Array.isArray(base && base.variants) ? base.variants : [];
+  let pick = null;
+  for (const v of vs) {
+    let ok = false;
+    try { ok = v.cond == null ? true : Boolean(evalCond(world, v.cond, { data, mapId: base.id })); } catch { ok = false; }
+    if (ok) pick = v;
   }
-  return { w: MAP_W, h: MAP_H, tiles };
+  if (!pick) return base;
+  const { id: _id, cond: _cond, tier: _tier, ...over } = pick;
+  return { ...base, ...over, variantId: pick.id, artTier: pick.artTier ?? base.artTier };
 }
 
 /**
- * @param {{w: number, h: number, tiles: Uint8Array}} map
- * @param {number} x
- * @param {number} y
- * @returns {boolean}
+ * The tide state a tile's way reads now: `'low'` while its window is open, the closed state
+ * otherwise. Tiles without a way read the clock's own tide state.
+ * @param {any} tileDef
+ * @param {Record<string, string>} gates  way -> gate state for this tick
+ * @param {string} base    the clock's tide state
+ * @param {any} world
+ * @param {boolean} spring today is a spring tide
  */
-export function passable(map, x, y) {
-  if (x < 0 || y < 0 || x >= map.w || y >= map.h) return false;
-  return !TEST_TILES[map.tiles[y * map.w + x]].solid;
+export function gateOfTile(tileDef, gates, base, world, spring) {
+  if (!tileDef || !tileDef.way) return base;
+  if (tileDef.openFlag && world && world.flags && world.flags[tileDef.openFlag]) return 'low';
+  if (tileDef.spring && !spring) return 'high';
+  return gates[tileDef.way] || base;
 }
 
-/**
- * Camera top-left in pixels so the player stays centred, clamped to the map.
- * @param {number} px player pixel x
- * @param {number} py player pixel y
- * @param {{w: number, h: number}} map
- * @returns {{x: number, y: number}}
- */
-export function cameraFor(px, py, map) {
-  const maxX = Math.max(0, map.w * TILE - NATIVE_W);
-  const maxY = Math.max(0, map.h * TILE - NATIVE_H);
-  return {
-    x: Math.round(Math.min(maxX, Math.max(0, px + TILE / 2 - NATIVE_W / 2))),
-    y: Math.round(Math.min(maxY, Math.max(0, py + TILE / 2 - NATIVE_H / 2))),
-  };
-}
+// ---------------------------------------------------------------------------------------------
+// scene
+// ---------------------------------------------------------------------------------------------
 
 /**
- * @param {object} G
- * @returns {import('../core/scene.js').Scene & {debugText: () => string, isBusy: () => boolean}}
+ * @param {any} G
+ * @returns {import('../core/scene.js').Scene & {debugText: () => string, isBusy: () => boolean, field: () => any}}
  */
 export function createOverworldScene(G) {
-  let map = buildTestMap(0);
-  let from = { x: 0, y: 0 };
-  let to = { x: 0, y: 0 };
-  let moveT = 1;
-  let moveMs = WALK_MS;
-  let cam = { x: 0, y: 0 };
+  const renderer = createMapRenderer();
+  const pathCache = createPathCache();
+  let camera = createCamera({ w: MAP_RECT.w, h: MAP_RECT.h });
+  const camTarget = { px: 0, py: 0 };
 
-  function syncFromWorld() {
+  /** @type {any} */ let mapDef = null;
+  /** @type {any} */ let map = null;
+  /** @type {any} */ let ents = null;
+  /** @type {any} */ let player = null;
+  let mapId = '';
+  let loadedWorld = null;
+  let tiles = TILES;
+  let porchEnts = [];
+  /** npcId -> {ent, driver, placement, rng} */
+  const npcs = new Map();
+  let npcTimer = 0;
+  let roamers = createRoamerField();
+  let roamTimer = 0;
+  /** bugs: {key, bugId, x, y, phase, fleeing} */
+  let bugs = [];
+  let bugHour = -1;
+  let glint = null;       // {x, y} when shown
+  let sparkles = [];      // [{x, y, sky}]
+  let senseTimer = 0;
+  let gates = {};
+  let gatesAt = -1;
+  let spring = false;
+  let baseTide = 'mid';
+  let action = null;      // current context action (copy)
+  let actionKey = '';
+  let busy = 0;
+  let sceneMs = 0;
+  /** scene-time timers: [{at, fn}] */
+  let timers = [];
+  let floats = [];
+  const wobbles = new Map();
+  let sitting = null;     // {kind}
+  let autoWalk = 0;       // arrival steps left
+  let autoDir = 'left';
+  let changing = false;
+  let readView = false;
+  let vLatch = false;
+  let toolRing = null;
+  let flashTool = null;   // {id, until}
+  let captionText = '';
+  let captionUntil = 0;
+  let wallet = { shown: 0, target: 0, until: 0, slide: 0 };
+  let lastGateToast = { key: '', at: -1e9 };
+  let litWorld = null;
+  let litKey = '';
+  let flagsVersion = 0;
+  let litVersion = -1;
+  let relitAt = null;
+  let lastStep = { x: -1, y: -1 };
+  let baseRng = null;
+  let baseRngSeed = null;
+  let wadeCheckMs = 0;
+  let entitiesDirty = false;
+  let enteredOnce = false;
+  const offs = [];
+
+  const ctx = () => laneCtx(G);
+  const world = () => G.world;
+  const indoor = () => Boolean(map && map.indoor);
+  const rect = () => (indoor() ? FULL_RECT : MAP_RECT);
+
+  function planRng() {
+    const seed = G.world.run.seed;
+    if (!baseRng || baseRngSeed !== seed) { baseRng = gather.planRng(G.world); baseRngSeed = seed; }
+    return baseRng;
+  }
+
+  // ---- tide gates ------------------------------------------------------------------------------
+  function refreshGates() {
+    const w = G.world;
+    const total = w.clock && Number.isFinite(w.clock.total) ? Math.floor(w.clock.total) : 0;
+    const frozen = G.clock && typeof G.clock.isTideFrozen === 'function' ? G.clock.isTideFrozen() : false;
+    if (total === gatesAt && !frozen) return;
+    gatesAt = total;
+    const opts = { data: G.data, clock: G.clock };
+    for (const way of WAYS) {
+      try { gates[way] = clockSys.gateTide(w, way, opts); } catch { gates[way] = 'high'; }
+    }
+    spring = clockSys.isSpringTide(w, G.data);
+    baseTide = G.clock && G.clock.tideState ? G.clock.tideState : selTideState(w);
+  }
+
+  function tileDefAt(x, y) {
+    if (!map || !map.inBounds(x, y)) return null;
+    const d = map.layerDef(LAYER.DETAIL, x, y);
+    if (d && d.way) return d;
+    return map.layerDef(LAYER.GROUND, x, y);
+  }
+
+  /** Tide state for one tile (its way's gate). */
+  function gateAt(x, y) {
+    return gateOfTile(tileDefAt(x, y), gates, baseTide, G.world, spring);
+  }
+
+  /** Passability with per-tile gates (what every mover uses). */
+  function passable(x, y, _tide, mover) {
+    if (!map) return false;
+    return map.passable(x, y, gateAt(x, y), mover || 'walk');
+  }
+
+  /** Why a tile is closed by the tide, or null. */
+  function tideBlock(x, y) {
+    const d = tileDefAt(x, y);
+    if (!d || !d.way) return null;
+    if (map.passable(x, y, gateAt(x, y), 'walk')) return null;
+    if (!map.passable(x, y, 'low', 'walk')) return null; // a wall at any tide
+    return d;
+  }
+
+  // ---- map loading -----------------------------------------------------------------------------
+  function porchProps(def) {
+    const out = [];
+    for (const e of def.entities || []) {
+      if (!e || !e.porch) continue;
+      out.push({ art: `porch-glow:${e.id}`, x: e.x, y: e.y });
+    }
+    return out;
+  }
+
+  function tilesFor(def) {
+    const extra = {};
+    for (const p of porchProps(def)) {
+      const id = p.art.slice('porch-glow:'.length);
+      extra[p.art] = { id: p.art, art: null, glow: { ...PORCH_GLOW, flag: porchFlag(id) } };
+    }
+    return Object.keys(extra).length ? { ...TILES, ...extra } : TILES;
+  }
+
+  function loadCurrent(id) {
+    const base = G.data.get('maps', id);
+    mapDef = resolveVariant(base, G.world, G.data);
+    const extraProps = porchProps(mapDef);
+    const def = extraProps.length ? { ...mapDef, props: [...(mapDef.props || []), ...extraProps] } : mapDef;
+    tiles = tilesFor(mapDef);
+    map = loadMap(def, tiles, { legend: DEFAULT_LEGEND });
+    mapId = id;
+    ents = createEntities(map);
     const p = G.world.player;
-    from = { x: p.x, y: p.y };
-    to = { x: p.x, y: p.y };
-    moveT = 1;
+    player = createPlayer({ x: p.x, y: p.y, facing: p.facing, tool: p.tool, lastTool: p.lastTool, artId: 'char-player' });
+    ents.add(player.ent);
+    npcs.clear();
+    roamers.clear();
+    roamers = createRoamerField();
+    bugs = [];
+    bugHour = -1;
+    glint = null;
+    sparkles = [];
+    pathCache.clear && pathCache.clear();
+    const R = rect();
+    camera = createCamera({ w: R.w, h: R.h });
+    camera.bounds(map);
+    gatesAt = -1;
+    refreshGates();
+    rebuildEntities();
+    placeNpcs(true);
+    rollBugs(true);
+    sense();
+    syncCamTarget();
+    camera.follow(camTarget, { snap: true });
+    loadedWorld = G.world;
+    litVersion = -1;
+    action = null;
   }
 
-  function tryStep(dir, run) {
-    const [dx, dy] = DIRS[dir];
-    const nx = to.x + dx;
-    const ny = to.y + dy;
-    G.store.tx('player:face', (w) => { w.player.facing = dir; });
-    if (!passable(map, nx, ny)) return false;
-    from = { x: to.x, y: to.y };
-    to = { x: nx, y: ny };
-    moveT = 0;
-    moveMs = run ? RUN_MS : WALK_MS;
-    G.store.tx('player:step', (w) => {
-      w.player.x = nx;
-      w.player.y = ny;
-      w.stats.steps += 1;
+  function rebuildEntities() {
+    if (!ents) return;
+    ents.rebuildFromDefs(G.world, G.data, baseTide, { placeNpc: () => null });
+    porchEnts = ents.list.filter((e) => e.def && e.def.porch);
+    // trees: bare art when stripped
+    for (const e of ents.list) {
+      if (e.kind === 'tree' && e.def) treeArt(e);
+      if (e.kind === 'prop' && e.def && e.def.waystone) e.artId = waystoneVisited(e.def.id) ? 'waystone-lit' : 'waystone';
+    }
+    // today's cracks (dynamic)
+    for (const e of ents.list.slice()) if (e.def && e.def.crackKey) ents.remove(e.id);
+    if (mapDef.dig) {
+      let list = [];
+      try { list = gather.cracksFor(G.world, mapDef, planRng(), ctx()); } catch { list = []; }
+      for (const c of list) {
+        if (c.opened || !map.inBounds(c.x, c.y) || ents.solidAt(c.x, c.y)) continue;
+        const id = `crack:${c.key}`;
+        if (ents.find(id)) continue;
+        ents.add(createEntity({ id, kind: 'crack', x: c.x, y: c.y, artId: 'dig-crack', solid: false, def: { kind: 'crack', id, x: c.x, y: c.y, dynamic: true, crackKey: c.key } }));
+      }
+    }
+    entitiesDirty = false;
+  }
+
+  function treeArt(e) {
+    const d = e.def;
+    if (!d.fruitFrom && !d.fruit) return;
+    let st = null;
+    try { st = gather.treeState(G.world, mapDef, d, ctx()); } catch { st = null; }
+    const art = d.art || 'tree-fruit';
+    e.artId = st && st.fruitLeft === 0 && /^tree-fruit/.test(art) ? 'tree-fruit-bare' : art;
+  }
+
+  function waystoneVisited(id) {
+    return G.world.flags && G.world.flags[`sys.waystone.${id}`] != null;
+  }
+
+  // ---- NPCs ------------------------------------------------------------------------------------
+  function npcIds() {
+    try { return G.data.ids('npcs'); } catch { return []; }
+  }
+
+  function placeNpcs(entering) {
+    if (!ents) return;
+    const minute = minuteOfDay(G.world);
+    const seen = new Set();
+    for (const id of npcIds()) {
+      let pl = null;
+      try { pl = schedule.whereIs(id, G.world, G.data, { tuning: TUNING }); } catch { pl = null; }
+      const here = pl && pl.mapId === mapId && map.inBounds(pl.x, pl.y);
+      const rec = npcs.get(id);
+      if (!here) {
+        if (rec) { ents.remove(rec.ent.id); npcs.delete(id); }
+        continue;
+      }
+      seen.add(id);
+      if (!rec) {
+        const ap = arrivalPoint(pl, map, entering ? minute : minute, {});
+        if (!ap) continue;
+        let x = ap.x, y = ap.y;
+        if (ents.solidAt(x, y) || !passable(x, y, null, 'npc')) {
+          const free = freeNear(x, y, 'npc');
+          if (!free) continue;
+          x = free.x; y = free.y;
+        }
+        const ent = createEntity({ id, kind: 'npc', x, y, facing: ap.facing, npcId: id, artId: `char-${id}`, def: { kind: 'npc', id, dynamic: true } });
+        ents.add(ent);
+        const driver = createNpcDriver(ent, { tuning: { catchUpTiles: TUNING.npcCatchUpTiles ?? 12 } });
+        driver.setPlacement(pl);
+        npcs.set(id, { ent, driver, placement: pl, rng: makeRng(`npc:${id}:${G.world.run.seed}`) });
+      } else {
+        rec.placement = pl;
+        rec.driver.setPlacement(pl);
+      }
+    }
+  }
+
+  function freeNear(x, y, mover) {
+    for (let r = 1; r <= 3; r++) {
+      for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+        const nx = x + dx, ny = y + dy;
+        if (map.inBounds(nx, ny) && passable(nx, ny, null, mover) && !ents.solidAt(nx, ny)) return { x: nx, y: ny };
+      }
+    }
+    return null;
+  }
+
+  function tickNpcs(dt) {
+    npcTimer += dt;
+    if (npcTimer >= NPC_REPLAN_MS) { npcTimer = 0; placeNpcs(false); }
+    for (const [id, rec] of npcs) {
+      const route = rec.placement && rec.placement.pathId ? schedule.routeFor(rec.placement, G.data) : null;
+      const st = rec.driver.tick(dt, { map: { id: map.id, w: map.w, h: map.h, passable }, ents, tideState: baseTide, cache: pathCache, rng: rec.rng, route: route || undefined });
+      const pose = rec.driver.pose;
+      rec.ent.pose = pose === 'porch' || pose === 'sit' ? 'sit' : pose === 'fish' ? 'fish' : null;
+      if (st === 'offmap') { ents.remove(rec.ent.id); npcs.delete(id); }
+    }
+  }
+
+  // ---- bugs, the Glint, sparkles -----------------------------------------------------------------
+  function rollBugs(force) {
+    const spots = Array.isArray(mapDef && mapDef.bugSpots) ? mapDef.bugSpots : [];
+    const hour = Math.floor(minuteOfDay(G.world) / BUG_REROLL_MIN);
+    if (!force && hour === bugHour) return;
+    bugHour = hour;
+    if (!spots.length) { bugs = []; return; }
+    const night = lampsLit(gradeFor(minuteOfDay(G.world), weatherKind(), indoor()));
+    const withLight = spots.map((s) => ({ ...s, lit: Boolean(s.porch && night && isPorchLit(G.world, G.data, s.porch, { tuning: TUNING })) }));
+    let list = [];
+    try { list = gather.rollBugs(G.world, mapDef, withLight, G.rngs.fresh(`bugs:${mapId}:${clockSys.gameDay(G.world)}:${hour}`), ctx()); } catch { list = []; }
+    bugs = list.slice(0, 10).map((b, i) => ({ key: `bug:${i}`, bugId: b.id, x: b.x, y: b.y, phase: (b.x * 7 + b.y * 3) % 10, fleeing: 0, fx: 0, fy: 0 }));
+  }
+
+  function sense() {
+    glint = null;
+    sparkles = [];
+    if (!mapDef || !mapDef.flats || !player) return;
+    try {
+      const s = gather.senses(G.world, mapDef, { x: player.ent.x, y: player.ent.y }, planRng(), ctx());
+      if (s && s.glint) glint = { x: s.glint.x, y: s.glint.y };
+      if (s && Array.isArray(s.skyglass)) for (const k of s.skyglass) sparkles.push({ x: k.x, y: k.y, sky: true, dim: k.dim });
+      const low = gather.lowInfo(G.world, ctx());
+      if (low.inWindow) {
+        for (const sp of gather.sparklesFor(G.world, mapDef, planRng(), low.lowIndex, ctx())) if (!sp.taken) sparkles.push({ x: sp.x, y: sp.y, sky: false });
+      }
+    } catch { /* the flats keep their secrets */ }
+  }
+
+  // ---- lit world (porches) -------------------------------------------------------------------------
+  function litView() {
+    const w = G.world;
+    if (litWorld && litVersion === flagsVersion && Object.getPrototypeOf(litWorld) === w && (sceneMs % 1000) > 17) return litWorld;
+    const lit = [];
+    for (const e of porchEnts) if (isPorchLit(w, G.data, e.def.id, { tuning: TUNING })) lit.push(e.def.id);
+    const key = lit.join(',') + '|' + Object.keys(w.flags).length;
+    if (!litWorld || key !== litKey || Object.getPrototypeOf(litWorld) !== w || litVersion !== flagsVersion) {
+      const flags = { ...w.flags };
+      for (const id of lit) flags[porchFlag(id)] = true;
+      litWorld = Object.create(w);
+      Object.defineProperty(litWorld, 'flags', { value: flags, enumerable: true });
+      litKey = key;
+    }
+    litVersion = flagsVersion;
+    return litWorld;
+  }
+
+  // ---- field helpers lent to interactFlow ---------------------------------------------------------
+  function toast(text, opts) {
+    if (!text) return;
+    if (G.toasts && typeof G.toasts.show === 'function') G.toasts.show(String(text), opts || {});
+  }
+  function after(ms, fn) { timers.push({ at: sceneMs + ms, fn }); }
+  function wait(ms) {
+    busy++;
+    return new Promise((resolve) => after(ms, () => { busy = Math.max(0, busy - 1); resolve(); }));
+  }
+  function caption(key, vars) {
+    captionText = hasString(key) ? t(key, vars) : key;
+    captionUntil = sceneMs + 1800;
+  }
+  function sfx(name, opts) {
+    try { if (G.audio && typeof G.audio.sfx === 'function') G.audio.sfx(name, opts || {}); } catch { /* audio is optional */ }
+  }
+
+  const host = {
+    get mapId() { return mapId; },
+    get mapDef() { return mapDef; },
+    get map() { return map; },
+    get ents() { return ents; },
+    get player() { return player; },
+    toast,
+    wait,
+    caption,
+    sfx,
+    wobble(id, ms, amp = 1) { wobbles.set(id, { until: sceneMs + ms, amp }); },
+    float(text, x, y, opts = {}) { floats.push({ text, x: x * TILE + 8, y: y * TILE, t0: sceneMs, color: opts.color === 'brass' ? PALETTE.porchAmber : COLORS.paper.light }); },
+    warp: (w) => takeWarp(w, { confirm: true }),
+    travel: (to, opts) => travel(to, opts),
+    sit: (kind, at) => sit(kind, at),
+    refresh: () => { rebuildEntities(); sense(); },
+    removeEntity(id) {
+      if (ents && ents.find(id)) ents.remove(id);
+      const bi = bugs.findIndex((b) => b.key === id);
+      if (bi >= 0) bugs.splice(bi, 1);
+    },
+    faceToward(id) {
+      const e = ents && ents.find(id);
+      if (!e || !player) return;
+      const d = dirTo(player.ent.x - e.x, player.ent.y - e.y);
+      if (d) e.facing = d;
+    },
+    npcPose(id) { const r = npcs.get(id); return r && r.placement ? r.placement.pose || null : null; },
+    flashTool(id) { flashTool = { id, until: sceneMs + 900 }; },
+    gait() { return player && player.isMoving() ? (player.ent.speedMs < 160 ? 'run' : 'walk') : 'still'; },
+    overlays: { createBoardScene, createCeremonyScene, createFerryScene },
+  };
+
+  // ---- sitting -----------------------------------------------------------------------------------
+  function sit(kind, at) {
+    sitting = { kind };
+    if (player) player.ent.pose = kind === 'bed' ? null : 'sit';
+    void at;
+  }
+  function standUp() {
+    if (!sitting) return;
+    if (sitting.kind === 'porch') dayFlow.stand(G);
+    sitting = null;
+    if (player) player.ent.pose = null;
+  }
+
+  // ---- warps and travel ------------------------------------------------------------------------------
+  function warpGate(warp) {
+    if (warp.openFlag && G.world.flags[warp.openFlag]) return 'low';
+    if (warp.way) return gates[warp.way] || baseTide;
+    return gateAt(warp.x, warp.y);
+  }
+
+  function takeWarp(warp, { confirm = false } = {}) {
+    if (!warp || changing) return { ok: false, reason: 'busy' };
+    const tide = warpGate(warp);
+    let destMap = null;
+    if (warp.way && tide !== 'low') return refuseWarp({ ok: false, reason: 'tide', message: t('warp.tide') }, warp);
+    let res;
+    try {
+      res = resolveWarp(G.world, warp, G.data, tide, { mapId, facing: player.ent.facing, destMap });
+    } catch (e) {
+      res = { ok: false, reason: 'blocked', message: String(e && e.message) };
+    }
+    if (!res.ok) return refuseWarp(res, warp);
+    sfx(warp.kind === 'door' ? 'doorOpen' : 'step');
+    G.bus.emit('warp', { from: mapId, to: res.mapId, kind: res.kind, sfx: res.sfx });
+    changeMap({ mapId: res.mapId, x: res.x, y: res.y, facing: res.facing }, { kind: warp.kind, confirm });
+    return res;
+  }
+
+  function refuseWarp(res, warp) {
+    const msg = res.reason === 'tide' ? tideMessage(warp.way) : (hasString(`warp.${res.reason}`) ? t(`warp.${res.reason}`) : res.message);
+    gateToast(`warp:${warp.x},${warp.y}`, msg);
+    G.bus.emit('player:bump', { reason: res.reason });
+    return res;
+  }
+
+  function tideMessage(way) {
+    if (!way) return t('warp.tide');
+    let win = null;
+    try { win = clockSys.tideWindow(G.world, way, { data: G.data, clock: G.clock }); } catch { win = null; }
+    const name = WAY_NAMES[way] || 'The way'; // str
+    if (win && !win.open && Number.isFinite(win.minutesUntilChange)) {
+      const at = clockText(minuteOfDay(G.world) + Math.ceil(win.minutesUntilChange));
+      return `${name} ${way === 'stones' ? 'are' : 'is'} under. Dry again at ${at}.`; // str
+    }
+    return `${name} ${way === 'stones' ? 'are' : 'is'} under water. ${t('warp.tide')}`; // str
+  }
+
+  function gateToast(key, msg) {
+    if (lastGateToast.key === key && sceneMs - lastGateToast.at < TOAST_GATE_MS) return;
+    lastGateToast = { key, at: sceneMs };
+    toast(msg);
+  }
+
+  function travel(to, opts = {}) {
+    changeMap({ mapId: to.mapId, x: to.x, y: to.y, facing: to.facing || 'down', near: Boolean(to.near) }, opts);
+  }
+
+  /** Changes map inside this scene under a fade, then emits `map:enter` (autosave trigger). */
+  function changeMap(to, opts = {}) {
+    if (changing) return;
+    changing = true;
+    standUp();
+    const swap = () => {
+      const from = mapId;
+      G.bus.emit('map:exit', { mapId: from });
+      G.store.tx('player:warp', (w) => { w.player.mapId = to.mapId; w.player.x = to.x; w.player.y = to.y; w.player.facing = to.facing || w.player.facing; });
+      loadCurrent(to.mapId);
+      if (to.near) landNear(to.x, to.y);
+      changing = false;
+      G.bus.emit('map:enter', { mapId: to.mapId, from, kind: opts.kind || 'warp' });
+      runPendingSoon();
+    };
+    const ms = fadeMs(G);
+    if (ms > 0 && G.scenes && typeof G.scenes.transition === 'function' && G.scenes.transition('fade', ms, swap)) return;
+    swap();
+  }
+
+  function landNear(x, y) {
+    const spot = passable(x, y, null, 'walk') && !ents.solidAt(x, y) ? { x, y } : freeNear(x, y, 'walk');
+    if (!spot) return;
+    ents.teleport(player.ent, spot.x, spot.y);
+    writePlayer();
+    syncCamTarget();
+    camera.follow(camTarget, { snap: true });
+  }
+
+  function writePlayer() {
+    if (!player) return;
+    G.store.tx('player:sync', (w) => { player.writeTo(w.player); });
+  }
+
+  // ---- encounters ---------------------------------------------------------------------------------
+  function beginBattle(setup) {
+    busy++;
+    const go = () => {
+      startBattle(G, setup).then((post) => { busy = Math.max(0, busy - 1); afterBattle(post); });
+    };
+    const ms = fadeMs(G);
+    if (ms > 0 && G.scenes.transition('iris', ms, go)) return;
+    go();
+  }
+
+  function afterBattle(post) {
+    if (!post) return;
+    if (post.blackout) {
+      // you wake on your porch one game hour later, party healed (GDD-00 §6)
+      G.store.tx('blackout:wake', (w) => {
+        clockSys.setTime(w, G.clock, (minuteOfDay(w) + 60) % MINUTES_PER_DAY, { silent: true });
+        party.heal(w, { data: G.data, bus: G.bus });
+      });
+      toast('"You came home carried. I kept your place."'); // str
+      if (mapId !== HOME.mapId || player.ent.x !== HOME.x || player.ent.y !== HOME.y) travel({ ...HOME }, { kind: 'blackout' });
+    }
+    if (post.script) G.store.tx('battle:script', (w) => eventScripts.queue(w, post.script));
+    runPendingSoon();
+  }
+
+  function onStep(ev) {
+    const w = G.world;
+    const x = ev.x, y = ev.y;
+    lastStep = { x, y };
+    const info = map.tileAt(x, y);
+    G.store.tx('player:step', (ww) => { player.writeTo(ww.player); stats.inc(ww, 'steps', 1); });
+    G.bus.emit('player:step', { x, y, facing: ev.dir, run: ev.run, mapId, sfx: info && info.sfx ? info.sfx : null, terrain: info && info.sfx === 'stepWater' ? 'wet' : (info && info.id) || null });
+    // bugs spook on approach
+    for (const b of bugs) {
+      if (b.fleeing) continue;
+      try { if (gather.isSpooked(b.bugId ? { id: b.bugId, x: b.x, y: b.y } : b, { x, y, gait: ev.run ? 'run' : 'walk' }, ctx())) b.fleeing = 1; } catch { /* row missing */ }
+    }
+    // warps on step
+    const warp = map.warpAt(x, y);
+    if (warp && firesOnStep(warp)) { takeWarp(warp); return; }
+    // step triggers (story)
+    for (const trg of map.triggersAt(x, y)) {
+      if (trg.kind !== 'step' && trg.kind !== 'enter') continue;
+      if (trg.cond != null && !evalCond(w, trg.cond, { data: G.data, mapId, x, y })) continue;
+      if (trg.script && G.data.has('scripts', trg.script)) { G.store.tx('trigger:step', (ww) => eventScripts.queue(ww, trg.script)); runPendingSoon(); return; }
+    }
+    // roamers touched
+    const r = roamers.touchingAt(x, y);
+    if (r && hasAliveParty(w)) {
+      const enc = roamerEncounter(r);
+      roamers.remove(r.id, 'caught');
+      if (ents.find(r.id)) ents.remove(r.id);
+      G.store.tx('encounter:roamer', (ww) => encounter.noteEncounter(ww, { ...enc, mapId }, ctx()));
+      beginBattle({ kind: 'wild', wild: { speciesId: enc.speciesId, level: enc.level, errant: enc.errant, habitat: 'grass' }, source: 'route' });
+      return;
+    }
+    // wild encounter roll on encounter tiles
+    if (!hasAliveParty(w)) {
+      G.store.tx('encounter:count', (ww) => { if (ww.encounter) ww.encounter.steps = Math.min(encounter.STEPS_CAP, (ww.encounter.steps || 0) + 1); });
+      return;
+    }
+    const res = G.store.tx('encounter:step', (ww) => encounter.rollStep(ww, map, G.rngs.stream(encounter.streamLabel(mapId)), { x, y, data: G.data, tuning: TUNING, bus: G.bus, tideState: gateAt(x, y) }));
+    if (res) beginBattle({ kind: 'wild', wild: { speciesId: res.speciesId, level: res.level, errant: res.errant, habitat: 'grass' }, source: 'route' });
+  }
+
+  function onBump(ev) {
+    const fx = ev.x + DX[DIR_INDEX[ev.dir]], fy = ev.y + DY[DIR_INDEX[ev.dir]];
+    G.bus.emit('player:bump', { x: fx, y: fy, dir: ev.dir });
+    const d = map && map.inBounds(fx, fy) ? tideBlock(fx, fy) : null;
+    if (d) gateToast(`way:${d.way}`, tideMessage(d.way));
+  }
+
+  /** The sea came up under you: wade to the nearest dry tile. */
+  function wadeCheck() {
+    if (!player || player.isMoving() || changing || autoWalk > 0) return;
+    const { x, y } = player.ent;
+    if (passable(x, y, null, 'walk')) return;
+    const g = gateAt(x, y);
+    let spot = null;
+    try { spot = nearestDry(map, x, y, g === 'low' ? 'high' : g, { maxDist: 64 }); } catch { spot = null; }
+    if (!spot || !passable(spot.x, spot.y, null, 'walk') || ents.solidAt(spot.x, spot.y)) spot = freeNear(x, y, 'walk');
+    if (!spot) return;
+    ents.teleport(player.ent, spot.x, spot.y);
+    writePlayer();
+    sfx('splash');
+    toast(t('tide.wade'));
+    G.bus.emit('player:wade', { from: { x, y }, to: { x: spot.x, y: spot.y } });
+  }
+
+  // ---- context action -----------------------------------------------------------------------------
+  function bugAt(x, y) {
+    return bugs.find((b) => !b.fleeing && b.x === x && b.y === y) || null;
+  }
+
+  function computeAction() {
+    if (!player || player.isMoving() || changing) return null;
+    const ft = player.facingTile();
+    const b = bugAt(ft.x, ft.y);
+    if (b) {
+      const canNet = ringHas(G.world, 'net');
+      const row = G.data.has('collections', b.bugId) ? G.data.get('collections', b.bugId) : null;
+      return { verb: canNet ? 'catch' : 'read', label: canNet ? t('verb.net') : t('verb.read'), prompt: row ? row.name : 'Bug', icon: canNet ? 'wiggle' : 'read', kind: 'roamer', targetKind: 'roamer', targetId: b.key, target: { id: b.key, x: b.x, y: b.y, kind: 'roamer', def: { bug: true, bugId: b.bugId, catchable: true } }, disabled: null, payload: { x: ft.x, y: ft.y } };
+    }
+    const a = resolveFacing(player.ent, map, ents, G.world, G.data, { tideState: map.inBounds(ft.x, ft.y) ? gateAt(ft.x, ft.y) : baseTide });
+    if (a) {
+      const snap = snapshotAction(a);
+      if (snap.verb === 'board' && snap.target && snap.target.def && snap.target.def.verb) {
+        const v = snap.target.def.verb;
+        snap.verb = v; snap.label = hasString(`verb.${v}`) ? t(`verb.${v}`) : v[0].toUpperCase() + v.slice(1);
+      }
+      if (snap.verb === 'enter') snap.icon = 'door';
+      return snap;
+    }
+    if (glint && glint.x === ft.x && glint.y === ft.y) {
+      const canDig = ringHas(G.world, 'shovel') || toolUse() === 'dig';
+      return { verb: 'dig', label: t('verb.dig'), prompt: 'The Glint', icon: 'dig', kind: 'mud', targetKind: 'mud', targetId: 'glint', target: null, disabled: canDig ? null : t('verb.needsTool', { tool: 'shovel' }), payload: { x: ft.x, y: ft.y } }; // str
+    }
+    return null;
+  }
+
+  function toolUse() {
+    const id = G.world.player.tool;
+    const row = id && G.data.has('items', id) ? G.data.get('items', id) : null;
+    return row && row.use ? row.use : null;
+  }
+
+  /** Whether a dig/fish/catch verb is allowed because its tool is on the ring (the ring auto-offers it). */
+  function relaxTool(a) {
+    if (!a || !a.disabled) return a;
+    const need = { fish: 'rod', dig: 'shovel', catch: 'net' }[a.verb];
+    if (need && ringHas(G.world, need)) return { ...a, disabled: null };
+    return a;
+  }
+
+  function perform(a) {
+    if (!a || busy > 0) return;
+    const act = relaxTool(a);
+    let res;
+    try {
+      res = doInteraction(G, act, host);
+    } catch (e) {
+      console.error('overworld: interaction failed', e);
+      return;
+    }
+    if (res && typeof res.then === 'function') {
+      busy++;
+      res.then(() => { busy = Math.max(0, busy - 1); }, (e) => { busy = Math.max(0, busy - 1); console.error('overworld: interaction failed', e); });
+    }
+  }
+
+  // ---- tool ring --------------------------------------------------------------------------------------
+  function ringTools() {
+    const owned = Array.isArray(G.world.player.toolRing) ? G.world.player.toolRing : [];
+    return RING_ORDER.map((id) => (owned.includes(id) ? { id, name: itemName(id), icon: TOOL_ICONS[id] || 'strike' } : null));
+  }
+  function itemName(id) {
+    return id && G.data.has('items', id) ? G.data.get('items', id).name : id;
+  }
+  function ensureRing() {
+    if (toolRing) return toolRing;
+    toolRing = createToolRing({
+      tools: ringTools(),
+      current: G.world.player.tool,
+      last: G.world.player.lastTool,
+      center: { x: 240, y: 135 },
+      onEquip: (id) => equip(id),
+      onSwap: (cur) => equip(cur, true),
     });
-    G.bus.emit('player:step', { x: nx, y: ny, facing: dir });
-    return true;
+    return toolRing;
+  }
+  function equip(id, swapped) {
+    if (!player) return;
+    if (swapped) player.swapTool(); else player.setTool(id);
+    writePlayer();
+    if (id) toast(t('toolRing.swapped', { tool: itemName(player.tool) }));
   }
 
-  function hudLine() {
-    const c = G.clock;
-    const tidePct = Math.round(c.tide * 100);
-    return `${c.formatTime()}  ${c.dateLabel()}  tide ${tidePct}% ${c.tideState}`;
+  // ---- arrival -----------------------------------------------------------------------------------------
+  function arrive() {
+    const hasArrival = G.data.has('scripts', ARRIVAL_SCRIPT);
+    let start = { x: ARRIVAL.x, y: ARRIVAL.y, facing: ARRIVAL.facing };
+    try {
+      const m = G.data.get('maps', ARRIVAL.mapId).markers && G.data.get('maps', ARRIVAL.mapId).markers[ARRIVAL.marker];
+      if (m) start = { x: m.x, y: m.y, facing: m.facing || ARRIVAL.facing };
+    } catch { /* default */ }
+    G.store.tx('arrival:place', (w) => {
+      w.player.mapId = ARRIVAL.mapId; w.player.x = start.x; w.player.y = start.y; w.player.facing = start.facing;
+      if (hasArrival) eventScripts.queue(w, ARRIVAL_SCRIPT);
+      else giveStarterKit(w);
+    });
+    if (!hasArrival) { autoWalk = ARRIVAL.walk; autoDir = start.facing; }
   }
 
-  return {
+  function giveStarterKit(w) {
+    const c = laneCtx(G, { source: 'starter-kit' });
+    for (const id of STARTER_KIT.tools) if (G.data.has('items', id) && !bag.has(w, id, 1, undefined, c)) bag.give(w, id, 1, c);
+    if (G.data.has('items', 'tallow-wick')) bag.give(w, 'tallow-wick', STARTER_KIT.wicks, c);
+    const ring = RING_ORDER.filter((id) => STARTER_KIT.tools.includes(id) && G.data.has('items', id));
+    w.player.toolRing = ring;
+    if (!w.player.tool) { w.player.tool = ring[0] || null; w.player.lastTool = ring[1] || null; }
+  }
+
+  function runPendingSoon() {
+    after(1, () => {
+      if (G.scenes.top() !== scene || changing) return;
+      try { eventScripts.runPending(G); } catch (e) { console.error('overworld: pending script failed', e); }
+    });
+  }
+
+  // ---- camera --------------------------------------------------------------------------------------------
+  function syncCamTarget() {
+    if (!player) return;
+    const e = player.ent;
+    const di = DIR_INDEX[e.facing];
+    const look = e.moving ? 10 : 0;
+    camTarget.px = e.px + DX[di] * look;
+    camTarget.py = e.py + DY[di] * look + shoreEase();
+  }
+
+  /** At the shore the camera eases down toward the horizon (GDD-00 §14). */
+  let shore = 0;
+  function shoreEase() {
+    if (!map || indoor()) return 0;
+    const { x, y } = player.ent;
+    let water = 0;
+    for (let k = 1; k <= 4; k++) {
+      const info = map.tileAt(x, y + k);
+      if (info && info.water) { water = 5 - k; break; }
+    }
+    const want = Math.min(24, water * 6);
+    shore += (want - shore) * 0.05;
+    return Math.round(shore);
+  }
+
+  // ---- bus ------------------------------------------------------------------------------------------------
+  function listen() {
+    if (offs.length) return;
+    const on = (evt, fn) => offs.push(G.bus.on(evt, fn));
+    on('flag:set', () => { flagsVersion++; entitiesDirty = true; });
+    on('loan:built', () => { flagsVersion++; entitiesDirty = true; });
+    on('loan:paid', () => { flagsVersion++; });
+    on('day:start', () => { entitiesDirty = true; flagsVersion++; });
+    on('world:replaced', () => { loadedWorld = null; });
+    on('gather:shake', () => { entitiesDirty = true; });
+  }
+
+  // ---- update -----------------------------------------------------------------------------------------------
+  function ensureMap() {
+    const w = G.world;
+    if (!w.player.mapId) arrive();
+    if (!G.data.has('maps', w.player.mapId)) {
+      console.warn(`overworld: unknown map '${w.player.mapId}', going to ${ARRIVAL.mapId}`);
+      G.store.tx('player:rescue', (ww) => { ww.player.mapId = ARRIVAL.mapId; ww.player.x = ARRIVAL.x; ww.player.y = ARRIVAL.y; });
+    }
+    if (!map || mapId !== w.player.mapId || loadedWorld !== w) {
+      loadCurrent(w.player.mapId);
+      G.bus.emit('map:enter', { mapId, kind: enteredOnce ? 'load' : 'enter' });
+      enteredOnce = true;
+      return true;
+    }
+    // a debug warp on the same map
+    if (!player.isMoving() && (player.ent.x !== w.player.x || player.ent.y !== w.player.y)) {
+      if (map.inBounds(w.player.x, w.player.y)) {
+        ents.teleport(player.ent, w.player.x, w.player.y, w.player.facing);
+        syncCamTarget();
+        camera.follow(camTarget, { snap: true });
+      }
+    }
+    return false;
+  }
+
+  function tickClock(dt) {
+    G.store.tx('clock:tick', (w) => {
+      clockSys.tick(w, G.clock, dt, { bus: G.bus, data: G.data }); // the world clock advances only here and in fishing
+      stats.addPlayMs(w, dt);
+      weather.update(w, G.data, planRng(), { bus: G.bus });
+    });
+  }
+
+  function weatherKind() {
+    try { return weather.current(G.world, G.data).kind || 'clear'; } catch { return 'clear'; }
+  }
+
+  const scene = {
     name: 'overworld',
     opaque: true,
-    enter() {
-      map = buildTestMap(G.world.run.seed);
-      // No map yet (fresh lease) or standing in a wall: spawn at the crossroads. // [GDD: arrival tile]
-      const p0 = G.world.player;
-      if (p0.mapId === '' && p0.x === 0 && p0.y === 0 || !passable(map, p0.x, p0.y)) {
-        G.store.tx('player:spawn', (w) => { w.player.x = SPAWN.x; w.player.y = SPAWN.y; });
+    enter(params) {
+      listen();
+      sceneMs = 0;
+      timers = [];
+      busy = 0;
+      changing = false;
+      const fresh = params && params.fresh;
+      if (fresh || !G.world.player.mapId) {
+        if (!G.world.player.mapId) arrive();
       }
-      syncFromWorld();
-      G.bus.emit('map:enter', { mapId: G.world.player.mapId });
+      ensureMap();
+      runPendingSoon();
     },
-    exit() { G.bus.emit('map:exit', { mapId: G.world.player.mapId }); },
-    pause() {},
-    resume() { syncFromWorld(); },
+    exit() {
+      for (const off of offs.splice(0)) { try { off(); } catch { /* gone */ } }
+      standUp();
+    },
+    pause() { if (player) player.intend(null, false); },
+    resume(result) {
+      if (G.input && typeof G.input.flush === 'function') G.input.flush();
+      ensureMap();
+      rebuildEntities();
+      sense();
+      if (toolRing) toolRing.setTools(ringTools());
+      void result;
+      runPendingSoon();
+    },
     update(dt) {
-      G.store.tx('clock:tick', (w) => {
-        clockSys.tick(w, G.clock, dt, { bus: G.bus }); // the world clock advances only here and in fishing
-        stats.addPlayMs(w, dt);          // simulated step, so paused menus do not count
-      });
-      if (moveT < 1) moveT = Math.min(1, moveT + dt / moveMs);
-      const p = G.world.player;
-      if (moveT >= 1 && (p.x !== to.x || p.y !== to.y)) syncFromWorld(); // moved by a debug warp
+      sceneMs += dt;
+      // timers
+      if (timers.length) {
+        const due = timers.filter((tm) => tm.at <= sceneMs);
+        if (due.length) { timers = timers.filter((tm) => tm.at > sceneMs); for (const tm of due) tm.fn(); }
+      }
+      if (ensureMap()) return;
+      if (G.scenes.top() === scene && !changing) tickClock(dt);
+      refreshGates();
+      if (entitiesDirty) { rebuildEntities(); sense(); }
+      senseTimer += dt;
+      if (senseTimer >= 500) { senseTimer = 0; sense(); rollBugs(false); }
+      // player
+      const locked = busy > 0 || changing || G.scenes.top() !== scene || (toolRing && toolRing.open);
+      player.setLocked(locked && autoWalk <= 0);
+      if (autoWalk > 0 && !player.isMoving() && !changing) {
+        const ok = ents.tryMove(player.ent, autoDir, { passable, tideState: baseTide, speedMs: 220 });
+        if (ok) autoWalk--; else autoWalk = 0;
+      }
+      const evs = autoWalk > 0 || player.ent.moving && !player.isLocked() ? null : null;
+      void evs;
+      const events = player.update(dt, { ents, map, passable, tideState: baseTide });
+      for (const ev of events) {
+        if (ev.type === 'step') onStep(ev);
+        else if (ev.type === 'bump') onBump(ev);
+        if (changing) break;
+      }
+      if (player.ent.moving && autoWalk >= 0) {
+        // the auto-walk arrival writes position when it lands (no encounters)
+      }
+      if (!player.ent.moving && (G.world.player.x !== player.ent.x || G.world.player.y !== player.ent.y) && !changing) writePlayer();
+      // other entities
+      const arrived = ents.tickAll(dt);
+      void arrived;
+      tickNpcs(dt);
+      tickRoamers(dt);
+      tickBugs(dt);
+      // the sea came up
+      wadeCheckMs += dt;
+      if (wadeCheckMs >= 250) { wadeCheckMs = 0; wadeCheck(); }
+      // context action
+      action = locked ? null : computeAction();
+      // camera
+      syncCamTarget();
+      camera.update(dt);
+      // wallet slide
+      const main = G.world.wallet ? G.world.wallet.main : 0;
+      if (main !== wallet.target) { wallet.target = main; wallet.until = sceneMs + WALLET_SHOW_MS; if (!wallet.shown) wallet.shown = main; }
+      if (wallet.shown !== wallet.target) {
+        const d = wallet.target - wallet.shown;
+        wallet.shown += Math.sign(d) * Math.max(1, Math.ceil(Math.abs(d) / 8));
+      }
+      const showing = sceneMs < wallet.until;
+      wallet.slide += ((showing ? 1 : 0) - wallet.slide) * (showing ? 0.3 : 0.2);
+      if (toolRing) toolRing.update(dt);
+      floats = floats.filter((f) => sceneMs - f.t0 < 1200);
+      if (G.flags && G.flags.debug && G.debugOverlay == null) { /* nothing */ }
+      // lighthouse relit moment
+      if (G.world.flags['lit.calls'] && relitAt === null) relitAt = sceneMs;
     },
     handleInput(input) {
-      if (input.pressed('menu')) { G.push('menu'); return; }
-      if (moveT < 1) return;
-      const axis = input.axis();
-      const dir = axis.y < 0 ? 'up' : axis.y > 0 ? 'down' : axis.x < 0 ? 'left' : axis.x > 0 ? 'right' : null;
-      if (dir) tryStep(dir, input.held('run'));
-    },
-    draw(ctx) {
-      const px = (from.x + (to.x - from.x) * moveT) * TILE;
-      const py = (from.y + (to.y - from.y) * moveT) * TILE;
-      cam = cameraFor(px, py, map);
-      ctx.fillStyle = KIT.night;
-      ctx.fillRect(0, 0, NATIVE_W, NATIVE_H);
-      const x0 = Math.floor(cam.x / TILE);
-      const y0 = Math.floor(cam.y / TILE);
-      const x1 = Math.min(map.w - 1, x0 + Math.ceil(NATIVE_W / TILE));
-      const y1 = Math.min(map.h - 1, y0 + Math.ceil(NATIVE_H / TILE));
-      for (let ty = y0; ty <= y1; ty++) {
-        for (let tx = x0; tx <= x1; tx++) {
-          ctx.fillStyle = TEST_TILES[map.tiles[ty * map.w + tx]].color;
-          ctx.fillRect(tx * TILE - cam.x, ty * TILE - cam.y, TILE, TILE);
-        }
+      if (!player || changing) return;
+      // the tool ring owns input while held / open
+      const ring = ensureRing();
+      if (busy === 0) {
+        ring.handle(input);
+        if (ring.open) { player.intend(null, false); return; }
       }
-      const sx = Math.round(px - cam.x);
-      const sy = Math.round(py - cam.y);
-      ctx.fillStyle = 'rgba(0,0,0,0.3)';
-      ctx.fillRect(sx + 2, sy + 12, 12, 4);
-      ctx.fillStyle = KIT.wax;
-      ctx.fillRect(sx + 3, sy + 1, 10, 13);
-      ctx.fillStyle = KIT.paper;
-      const [fx, fy] = DIRS[G.world.player.facing] ?? DIRS.down;
-      ctx.fillRect(sx + 7 + fx * 4, sy + 6 + fy * 4, 2, 2);
-      drawStrip(ctx, hudLine(), 2, 2);
-      drawStrip(ctx, `${G.world.run.seedCode}  ${G.world.player.mapId || STUB_MAP_ID} ${to.x},${to.y}`, 2, 16, { font: 'small' });
-      drawText(ctx, 'arrows: move  shift: run  esc: menu', 478, 260, { color: KIT.paper, align: 'right', font: 'small', shadow: true });
+      if (busy > 0) return;
+      if (input.pressed('map')) {
+        if (G.sceneFactories && G.sceneFactories.mapScreen) { G.push('mapScreen', { from: 'field', mapId }); return; }
+      }
+      if (input.pressed('select') || takeV()) { readView = !readView; sfx('blip'); }
+      const axis = input.axis();
+      const dir = dirFromAxes(axis.x, axis.y, player.ent.facing);
+      if (sitting && (dir || input.pressed('cancel') || input.pressed('confirm'))) {
+        standUp();
+        toast(t('rest.stand'));
+        player.intend(null, false);
+        return;
+      }
+      if (input.pressed('confirm') && action && !player.isMoving()) {
+        player.intend(null, false);
+        perform(action);
+        return;
+      }
+      if (input.pressed('menu') || input.pressed('start')) { player.intend(null, false); G.push('menu'); return; }
+      if (input.pressed('cancel') && readView) { readView = false; return; }
+      player.intend(dir, input.held('run'));
     },
-    debugText: () => hudLine(),
-    isBusy: () => moveT < 1,
+    draw(c) {
+      if (!map) {
+        c.fillStyle = PALETTE.nightInk; c.fillRect(0, 0, NATIVE_W, NATIVE_H);
+        return;
+      }
+      const w = G.world;
+      const minute = minuteOfDay(w);
+      const R = rect();
+      const lit = litView();
+      const relit = Boolean(w.flags['lit.calls']);
+      const shakeE = applyWobbles();
+      const stats0 = renderer.drawFrame(G, {
+        ctx: c, map, entities: ents, camera, minute, weather: weatherKind(), tide: G.clock ? G.clock.tide : 0.5,
+        time: sceneMs, day: clockSys.gameDay(w), flags: lit.flags, world: lit,
+        lighthouse: { stage: (w.loans && w.loans.scaffold) || 0, relit, relitAt: relitAt ?? -Infinity },
+        player: player.ent, lantern: ringHas(w, 'keepers-lantern') && !indoor(), skyband: !indoor(), rect: R,
+        comet: Math.min(1, clockSys.gameDay(w) / 14), tier: mapDef.artTier ?? (w.loans ? Math.max(0, w.loans.tier - 1) : 0), roof: roofColour(),
+        cond: (cd) => { try { return Boolean(evalCond(w, cd, { data: G.data, mapId })); } catch { return false; } },
+        reducedMotion: Boolean(w.settings && w.settings.reducedMotion), lowPower: G.lowPower, tideDial: false,
+      });
+      restoreWobbles(shakeE);
+      if (G.perf) { G.perf.chunks = stats0.chunks; G.perf.entities = stats0.sprites; }
+      c.save();
+      c.beginPath(); c.rect(R.x, R.y, R.w, R.h); c.clip();
+      drawPorchLamps(c, R, minute);
+      drawGlintAndSparkles(c, R);
+      drawBugs(c, R);
+      if (readView) drawReadView(c, R);
+      drawFloats(c, R);
+      c.restore();
+      drawHudLayer(c, minute);
+      if (toolRing) {
+        const sx = player.ent.px + 8 - camera.x + R.x, sy = player.ent.py + 8 - camera.y + R.y;
+        toolRing.center.x = Math.max(60, Math.min(420, sx));
+        toolRing.center.y = Math.max(70, Math.min(200, sy));
+        toolRing.draw(c);
+      }
+    },
+    debugText: () => {
+      const a = action ? `${action.label}${action.disabled ? ` (${action.disabled})` : ''}` : '-';
+      return `${mapId} ${player ? `${player.ent.x},${player.ent.y} ${player.ent.facing}` : ''} ${clockText(minuteOfDay(G.world))} tide ${baseTide} verb ${a}${captionText && sceneMs < captionUntil ? `\n${captionText}` : ''}`;
+    },
+    isBusy: () => busy > 0 || changing || autoWalk > 0 || Boolean(player && player.isMoving()),
+    /** Test / debug view of the field. */
+    field: () => ({ mapId, map, mapDef, ents, player, npcs, bugs, glint, sparkles, gates: { ...gates }, baseTide, action, sitting, readView, busy, host, gateAt, passable, camera }),
   };
+
+  // ---- V latch (no input action exists for the Read view yet; GDD-09 §4.2 request) ---------------------
+  const vListener = (ev) => { if (ev && ev.code === 'KeyV' && !ev.repeat) vLatch = true; };
+  if (typeof globalThis.addEventListener === 'function') globalThis.addEventListener('keydown', vListener);
+  function takeV() { const v = vLatch; vLatch = false; return v; }
+
+  // ---- roamers --------------------------------------------------------------------------------------------
+  function tickRoamers(dt) {
+    const spawns = (mapDef.spawns || []).filter((s) => s && s.roamers);
+    if (!spawns.length && !roamers.list.length) return;
+    roamTimer += dt;
+    const rng = G.rngs.stream(encounter.streamLabel(mapId));
+    const occupied = (x, y) => ents.solidAt(x, y);
+    if (spawns.length && roamers.spawnDue(dt)) {
+      const sp = spawns[0];
+      const table = G.data.has('encounters', sp.table) ? G.data.get('encounters', sp.table) : null;
+      if (table) {
+        const r = roamers.spawn(rng, table, { id: map.id, w: map.w, h: map.h, passable, spawnAt: map.spawnAt }, baseTide, { tableId: sp.table, spawnDef: sp, player: { x: player.ent.x, y: player.ent.y }, occupied, world: G.world, data: G.data });
+        if (r && !ents.find(r.id)) { try { ents.add(roamerEntity(r)); } catch { roamers.remove(r.id); } }
+      }
+    }
+    const res = roamers.tick(rng, dt, {
+      player: { x: player.ent.x, y: player.ent.y }, passable, tideState: baseTide, occupied,
+      tryStep: (r, d) => { const e = ents.find(r.id); return e ? ents.tryMove(e, d, { passable, tideState: baseTide }) : false; },
+    });
+    for (const r of res.despawned) if (ents.find(r.id)) ents.remove(r.id);
+  }
+
+  // ---- bugs -------------------------------------------------------------------------------------------------
+  function tickBugs(dt) {
+    for (const b of bugs) {
+      if (b.fleeing) {
+        b.fleeing += dt;
+        b.fy -= dt * 0.03; b.fx += dt * 0.02;
+      }
+    }
+    bugs = bugs.filter((b) => !b.fleeing || b.fleeing < 900);
+  }
+
+  // ---- wobble ------------------------------------------------------------------------------------------------
+  function applyWobbles() {
+    const moved = [];
+    for (const [id, wb] of wobbles) {
+      if (sceneMs > wb.until) { wobbles.delete(id); continue; }
+      const e = ents.find(id);
+      if (!e) continue;
+      const off = ((Math.floor(sceneMs / 50) & 1) ? 1 : -1) * wb.amp;
+      e.px += off;
+      moved.push([e, off]);
+    }
+    return moved;
+  }
+  function restoreWobbles(moved) {
+    for (const [e, off] of moved) e.px -= off;
+  }
+
+  // ---- draw helpers --------------------------------------------------------------------------------------------
+  function roofColour() {
+    const b = (G.world.loans && Array.isArray(G.world.loans.builds) ? G.world.loans.builds : []).filter((x) => x.done && x.roof);
+    const c = b.length ? b[b.length - 1].roof : null;
+    return c ? (ROOF_ART[c] || c) : 'slate';
+  }
+
+  function drawPorchLamps(c, R, minute) {
+    const grade = gradeFor(minute, weatherKind(), indoor());
+    if (!lampsLit(grade)) return;
+    let art = null;
+    try { art = resolveArtId('porch-lamp'); } catch { art = null; }
+    if (!art) return;
+    const def = artDef(art);
+    for (const e of porchEnts) {
+      if (!isPorchLit(G.world, G.data, e.def.id, { tuning: TUNING })) continue;
+      const sx = R.x + e.px - camera.x, sy = R.y + e.py + 16 - def.h - camera.y;
+      if (sx < -16 || sy < -32 || sx > R.x + R.w || sy > R.y + R.h) continue;
+      const img = getSprite(art, { name: 'lit', grade });
+      c.drawImage(img.canvas, sx, sy);
+    }
+  }
+
+  function drawGlintAndSparkles(c, R) {
+    const twinkle = (x, y, color, phase) => {
+      const sx = R.x + x * TILE + 8 - camera.x, sy = R.y + y * TILE + 8 - camera.y;
+      const k = ((sceneMs + phase * 137) % 900) / 900;
+      const s = k < 0.5 ? 1 : 2;
+      c.fillStyle = color;
+      c.fillRect(sx - s, sy, s * 2 + 1, 1);
+      c.fillRect(sx, sy - s, 1, s * 2 + 1);
+    };
+    if (glint) twinkle(glint.x, glint.y, PALETTE.porchAmber, 0);
+    for (const s of sparkles) twinkle(s.x, s.y, s.sky ? (s.dim ? '#8A5A9E' : '#FF5BD6') : '#F6F1E3', s.x + s.y);
+  }
+
+  function drawBugs(c, R) {
+    for (const b of bugs) {
+      const bob = Math.sin((sceneMs / 180) + b.phase) * 3;
+      const sx = Math.round(R.x + b.x * TILE + 8 - camera.x + b.fx + Math.cos(sceneMs / 300 + b.phase) * 3);
+      const sy = Math.round(R.y + b.y * TILE + 4 - camera.y + b.fy + bob);
+      const flap = (Math.floor(sceneMs / 90) + b.phase) & 1;
+      c.fillStyle = '#141B33';
+      c.fillRect(sx, sy, 1, 2);
+      c.fillStyle = b.fleeing ? '#F6F1E3' : '#F9C46B';
+      if (flap) { c.fillRect(sx - 2, sy - 1, 2, 1); c.fillRect(sx + 1, sy - 1, 2, 1); }
+      else { c.fillRect(sx - 1, sy, 1, 1); c.fillRect(sx + 1, sy, 1, 1); }
+    }
+  }
+
+  function drawFloats(c, R) {
+    for (const f of floats) {
+      const k = (sceneMs - f.t0) / 1200;
+      const sx = R.x + f.x - camera.x, sy = R.y + f.y - camera.y - 4 - Math.round(k * 14);
+      drawText(c, f.text, sx, sy, { align: 'center', color: f.color, shadow: true, font: 'small' });
+    }
+  }
+
+  /** Read / path view: tide-gated ways open (dotted) or under (crossed) with when they change. */
+  function drawReadView(c, R) {
+    c.fillStyle = 'rgba(20, 27, 51, 0.35)';
+    c.fillRect(R.x, R.y, R.w, R.h);
+    const x0 = Math.max(0, Math.floor(camera.x / TILE)), y0 = Math.max(0, Math.floor(camera.y / TILE));
+    const x1 = Math.min(map.w - 1, x0 + Math.ceil(R.w / TILE) + 1), y1 = Math.min(map.h - 1, y0 + Math.ceil(R.h / TILE) + 1);
+    const labels = new Map();
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+      const d = tileDefAt(x, y);
+      if (!d || !d.way) continue;
+      const open = map.passable(x, y, gateAt(x, y), 'walk');
+      const sx = R.x + x * TILE - camera.x, sy = R.y + y * TILE - camera.y;
+      c.fillStyle = open ? '#3FF2E0' : '#A8323A';
+      if (open) { for (let i = 0; i < 16; i += 4) { c.fillRect(sx + i, sy + 7, 2, 2); } }
+      else { for (let i = 2; i < 14; i++) { c.fillRect(sx + i, sy + i, 1, 1); c.fillRect(sx + 15 - i, sy + i, 1, 1); } }
+      if (!labels.has(d.way)) labels.set(d.way, { x: sx, y: sy, open });
+    }
+    for (const [way, l] of labels) {
+      let win = null;
+      try { win = clockSys.tideWindow(G.world, way, { data: G.data, clock: G.clock }); } catch { win = null; }
+      const mins = win && Number.isFinite(win.minutesUntilChange) ? Math.round(win.minutesUntilChange) : null;
+      const txt = `${WAY_NAMES[way] || way}: ${l.open ? 'open' : 'under'}${mins != null ? `, ${l.open ? 'closes' : 'opens'} ${clockText(minuteOfDay(G.world) + mins)}` : ''}`; // str
+      const tw = measureText(txt, { font: 'small' }).w;
+      const lx = Math.max(R.x + 4, Math.min(R.x + R.w - tw - 8, l.x - tw / 2));
+      const ly = Math.max(R.y + 4, l.y - 12);
+      c.fillStyle = 'rgba(20, 27, 51, 0.8)'; c.fillRect(lx - 2, ly - 2, tw + 4, 9);
+      drawText(c, txt, lx, ly, { font: 'small', color: l.open ? '#3FF2E0' : '#F6F1E3' });
+    }
+    // interactables
+    for (const e of ents.list) {
+      if (e === player.ent || !(e.kind === 'npc' || e.kind === 'sign' || (e.def && e.def.verb))) continue;
+      const sx = R.x + e.px + 6 - camera.x, sy = R.y + e.py - 6 - camera.y;
+      c.fillStyle = '#F9C46B'; c.fillRect(sx, sy, 3, 3);
+    }
+    drawText(c, 'Read view (V)', R.x + R.w - 6, R.y + R.h - 20, { align: 'right', font: 'small', color: '#F6F1E3', shadow: true }); // str
+  }
+
+  function drawHudLayer(c, minute) {
+    const w = G.world;
+    const device = G.input && G.input.lastDevice ? G.input.lastDevice : 'keyboard';
+    const tool = player.tool ? { id: player.tool, name: itemName(player.tool), icon: TOOL_ICONS[player.tool] || 'strike' } : null;
+    const flash = flashTool && sceneMs < flashTool.until ? { id: flashTool.id, name: itemName(flashTool.id), icon: TOOL_ICONS[flashTool.id] || 'strike' } : null;
+    const a = action ? relaxTool(action) : null;
+    const verb = a ? { verb: a.verb, label: hasString(`verb.${a.verb}`) ? t(`verb.${a.verb}`) : a.label, icon: a.icon, enabled: !a.disabled, reason: a.disabled || '' } : null;
+    const night = clockSys.isNight(w, G.data);
+    const tideDir = baseTide === 'falling' || baseTide === 'low' ? 'falling' : 'rising';
+    drawHud(c, {
+      clockText: clockText(minute), night, showClock: true,
+      tide: G.clock ? G.clock.tide : 0.5, tideDir, tideHint: tideHint(),
+      tool: flash || tool, contextVerb: busy > 0 ? null : verb,
+      pendingShift: (w.pendingShifts || []).length, device,
+    });
+    if (wallet.slide > 0.02) {
+      c.save();
+      c.translate(Math.round((1 - wallet.slide) * 90), 0);
+      drawHud(c, { wallet: wallet.shown });
+      c.restore();
+    }
+    if (sitting && sitting.kind === 'porch') drawText(c, t('rest.sitting'), 240, 236, { align: 'center', font: 'small', color: '#F6F1E3', shadow: true });
+    if (captionText && sceneMs < captionUntil) {
+      const tw = measureText(captionText, { font: 'small' }).w;
+      c.fillStyle = 'rgba(20, 27, 51, 0.85)'; c.fillRect(240 - tw / 2 - 4, 224, tw + 8, 11);
+      drawText(c, captionText, 240, 226, { align: 'center', font: 'small', color: '#F6F1E3' });
+    }
+  }
+
+  function tideHint() {
+    try {
+      const now = G.world.clock.total;
+      const day = clockSys.gameDay(G.world);
+      const ext = [...clockSys.tidesForDay(day, G.data), ...clockSys.tidesForDay(day + 1, G.data)].filter((e) => e.total > now).sort((a, b) => a.total - b.total)[0];
+      if (!ext) return '';
+      const n = Math.max(1, Math.round(ext.total - now));
+      const span = n >= 60 ? `${Math.floor(n / 60)}h${n % 60 ? ` ${n % 60}` : ''}` : `${n}`;
+      return ext.kind === 'low' ? t('tide.lowIn', { n: span }) : t('tide.highIn', { n: span });
+    } catch { return ''; }
+  }
+
+  return scene;
 }
+
+/**
+ * Debug hook bindings that live with the field (draft §11): `deliverLetter`, `addCreature`,
+ * `heal`, and wrappers that refresh the music after `setTime` / `setTide`. `warp` writes the
+ * player record and the overworld follows it on its next update; `sleep`, `battle`, `wild` and
+ * `runScript` are bound by their flow modules. Idempotent; a no-op without a hook.
+ * @param {any} G
+ */
+export function installFieldDebug(G) {
+  const hook = G && G.debugHook;
+  if (!hook || hook.__fieldDebug) return false;
+  hook.__fieldDebug = true;
+  hook.bind('deliverLetter', (n = 1) => G.store.tx('debug:deliverLetter', (w) => {
+    const out = [];
+    const base = Math.floor(w.clock.total / MINUTES_PER_DAY);
+    for (let i = 0; i < Math.max(1, Math.floor(Number(n) || 1)); i++) out.push(letters.deliverMorning(w, G.data, { bus: G.bus, tuning: TUNING, day: base + i }));
+    return out;
+  }));
+  if (!hook.isBound('addCreature')) {
+    hook.bind('addCreature', (speciesId, level = 5, opts = {}) => G.store.tx('debug:addCreature', (w) => party.giveCreature(w, { speciesId, level, ...opts }, G.data, G.rngs.fresh(`debug:creature:${speciesId}:${w.party.length}`), { bus: G.bus, tuning: TUNING })));
+  }
+  if (!hook.isBound('heal')) hook.bind('heal', () => G.store.tx('debug:heal', (w) => party.heal(w, { data: G.data, bus: G.bus })));
+  const setTime = hook.setTime;
+  hook.setTime = (h, m = 0) => {
+    const r = setTime(h, m);
+    G.store.tx('debug:weather', (w) => weather.update(w, G.data, gather.planRng(w), { bus: G.bus }));
+    if (G.music && typeof G.music.refresh === 'function') G.music.refresh();
+    return r;
+  };
+  const setTide = hook.setTide;
+  hook.setTide = (x) => {
+    const r = setTide(x);
+    if (G.music && typeof G.music.refresh === 'function') G.music.refresh();
+    return r;
+  };
+  hook.field = () => {
+    const s = G.scenes.find ? G.scenes.find('overworld') : null;
+    return s && typeof s.field === 'function' ? s.field() : null;
+  };
+  return true;
+}
+
+// re-exported for tests
+export { OPPOSITE, TIDE_MASK };
