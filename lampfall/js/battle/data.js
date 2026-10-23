@@ -15,6 +15,10 @@
  * - `statusImmunity`: `{burn: 'TypeName', ...}` a creature of that type cannot get that status
  * - `cures`: `[{type, status}]` a damaging hit of `type` cures `status` on the target
  *
+ * Optional tables: `items` (rows with a `held` object drive held items, see `battle/heldItems.js`;
+ * without an items table every held item is inert) and `weatherKinds` (arena weather rows, see
+ * `battle/weather.js`; also accepted as `WEATHER_KINDS`, or a Registry table `weatherKinds`).
+ *
  * Species rows follow ARCHITECTURE §14.1 (`learnset: [[level, moveId]]`,
  * `familyId`); the prototype shape (`learnset: [{level, move}]`, `family`) is
  * accepted too. The Scrap move is the first move row whose effect has
@@ -29,6 +33,8 @@
 import { createTypeChart, moveProblems, mergeTuning } from './effects.js';
 import { getAbilityRuntime, abilityProblems, DEFAULTS as ABILITY_DEFAULTS } from './abilityHooks.js';
 import { expForLevel as defaultExpForLevel, levelFromExp as defaultLevelFromExp, DEFAULTS as CREATURE_DEFAULTS } from './creatureOps.js';
+import { getHeldRuntime, heldProblems } from './heldItems.js';
+import { indexWeatherKinds, weatherKindProblems } from './weather.js';
 
 /**
  * Data-view tunables.
@@ -64,6 +70,10 @@ export const TUNING_KEYS = Object.freeze(Object.keys(DEFAULTS));
  * @property {import('./effects.js').TypeChart} chart
  * @property {(kind: string, types: readonly string[]) => boolean} typeBlocksStatus
  * @property {(moveType: string|null, status: string) => boolean} cures
+ * @property {(itemId: string|null|undefined) => import('./heldItems.js').HeldRuntime|null} held   held-item runtime;
+ *   null for no item, a bag item, or any item when no items table was injected; throws for an id unknown to an injected table
+ * @property {boolean} hasItems                                    an items table was injected
+ * @property {() => ReadonlyMap<string, import('./weather.js').WeatherKind>} weatherKinds   arena weather kinds (empty when none injected)
  * @property {(growth: string, level: number) => number} expForLevel
  * @property {(growth: string, exp: number) => number} levelFromExp
  * @property {() => string[]} problems                             contract problems of the injected tables; empty = ok
@@ -142,6 +152,18 @@ function build(data, tuning) {
     return m;
   };
 
+  const optionalRows = (table, ...alts) => {
+    if (isRegistry) return data.tables.includes(table) ? data.list(table) : null;
+    for (const k of [table, ...alts]) {
+      const t = data[k];
+      if (t == null) continue;
+      if (t instanceof Map) return [...t.values()];
+      if (Array.isArray(t)) return t.slice();
+      if (typeof t === 'object') return Object.values(t);
+    }
+    return null;
+  };
+
   const speciesRows = indexOf('species', rowsOf('species'));
   const moveRows = indexOf('moves', rowsOf('moves'));
   const abilityRows = indexOf('abilities', rowsOf('abilities'));
@@ -150,6 +172,21 @@ function build(data, tuning) {
   const scrapPower = (tuning && tuning.scrapPower) ?? DEFAULTS.scrapPower;
   const abilityTuning = pickKeys(tuning, ABILITY_DEFAULTS);
   const maxLevel = (tuning && tuning.maxLevel) ?? CREATURE_DEFAULTS.maxLevel;
+
+  const itemList = optionalRows('items');
+  const itemRows = itemList ? indexOf('items', itemList) : null;
+  const weatherKinds = indexWeatherKinds(optionalRows('weatherKinds', 'WEATHER_KINDS'));
+  /** @type {Map<string, any>} */
+  const heldCache = new Map();
+  const held = (itemId) => {
+    if (itemId == null || itemId === '' || !itemRows) return null;
+    if (heldCache.has(itemId)) return heldCache.get(itemId);
+    const row = itemRows.get(itemId);
+    if (!row) throw missing('item', itemId, itemRows);
+    const rt = getHeldRuntime(row);
+    heldCache.set(itemId, rt);
+    return rt;
+  };
 
   /** @type {Map<string, SpeciesView>} */
   const speciesCache = new Map();
@@ -218,6 +255,8 @@ function build(data, tuning) {
     }
     for (const [kind, t] of Object.entries(immunity)) if (!chart.has(t)) out.push(`types: statusImmunity.${kind} names unknown type ${String(t)}`);
     for (const c of cures) if (!chart.has(c.type)) out.push(`types: cure names unknown type ${String(c.type)}`);
+    if (itemRows) for (const it of itemRows.values()) out.push(...heldProblems(it, chart));
+    for (const w of weatherKinds.values()) out.push(...weatherKindProblems(w, chart));
     return out;
   };
 
@@ -234,6 +273,9 @@ function build(data, tuning) {
     chart,
     typeBlocksStatus: (kind, types) => !!immunity[kind] && types.includes(immunity[kind]),
     cures: (moveType, status) => moveType !== null && cures.some((c) => c.type === moveType && c.status === status),
+    held,
+    hasItems: !!itemRows,
+    weatherKinds: () => weatherKinds,
     expForLevel,
     levelFromExp,
     problems,

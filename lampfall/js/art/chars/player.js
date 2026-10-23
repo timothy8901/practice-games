@@ -48,7 +48,7 @@ const FUR = {
   'pine-marten': [
     ['Pine', '#6a4228', '#e8c486', '#3a2418'], ['Walnut', '#5a3a26', '#e6cc96', '#2e1c14'],
     ['Amber', '#8a5a30', '#f0d08e', '#4a2e1a'], ['Umber', '#7a4b2e', '#e2be88', '#3e2616'],
-    ['Sable', '#4a3226', '#dcc08e', '#261810'], ['Russet', '#8a4a2a', '#ecc890', '#43231a'],
+    ['Sable', '#4a3226', '#dcc08e', '#281911'], ['Russet', '#8a4a2a', '#ecc890', '#43231a'],
     ['Dusk', '#5a4a42', '#e0d0b0', '#2e2622'], ['Golden', '#a8763e', '#f4dca0', '#5a3e22'],
   ],
   'water-vole': [
@@ -65,7 +65,7 @@ const FUR = {
   ],
   ferret: [
     ['Sable', '#6b4a32', '#eadcb8', '#3a2818'], ['Champagne', '#b89a78', '#f2e8d4', '#7a5e46'],
-    ['Cinnamon', '#9a5e3a', '#f0dcc0', '#5a3422'], ['Dark sable', '#3e2e24', '#e6dcc8', '#1e1610'],
+    ['Cinnamon', '#9a5e3a', '#f0dcc0', '#5a3422'], ['Dark sable', '#3e2e24', '#e6dcc8', '#241b13'],
     ['Silver', '#8a8890', '#ece8e4', '#4a4650'], ['Chocolate', '#5a3a2c', '#e8d4bc', '#2e1e16'],
     ['Cream', '#e0d4b8', '#f6f1e3', '#b09a78'], ['Butterscotch', '#c08a4a', '#f4e4c4', '#7a522a'],
   ],
@@ -77,7 +77,7 @@ const FUR = {
   ],
 };
 const PINK = '#f2a7b5';
-const FLOOR = '#1a1210'; // nothing in a fur ramp goes darker than this (never pure black)
+const FLOOR = '#251a17'; // nothing in a fur ramp goes darker than this (never pure black)
 const lum = (h) => { const n = parseInt(h.slice(1, 7), 16); return 0.2126 * (n >> 16) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255); };
 const CEIL = '#f6f1e3'; // ... and nothing lighter than cream (never pure white)
 const sh = (hex, dH, dS, dL) => { const v = recolorHSL(hex, dH, dS, dL); return lum(v) < lum(FLOOR) ? FLOOR : lum(v) > lum(CEIL) ? CEIL : v; };

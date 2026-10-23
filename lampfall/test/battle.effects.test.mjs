@@ -14,9 +14,9 @@ import { getMove } from './fixtures/battle/helpers.mjs';
 const chart = createTypeChart(TYPE_DATA.chart, TYPE_DATA.ordinary);
 
 describe('vocabulary', () => {
-  it('EFFECT_KEYS is exactly the 21 keys the architecture names, and covers every fixture move', () => {
+  it('EFFECT_KEYS is exactly the 21 keys the architecture names plus `weather` (arena weather), and covers every fixture move', () => {
     assert.deepEqual(EFFECT_KEYS.slice().sort(), ['chance', 'charge', 'clearRaised', 'contact', 'drain', 'evasion', 'flinch', 'guard', 'highCrit', 'multiHit', 'plumbline',
-      'popsDecoy', 'queuedType', 'recovery', 'revealMoves', 'scrap', 'selfKo', 'spread', 'stat', 'status', 'sureHit'].sort());
+      'popsDecoy', 'queuedType', 'recovery', 'revealMoves', 'scrap', 'selfKo', 'spread', 'stat', 'status', 'sureHit', 'weather'].sort());
     assert.ok(Object.isFrozen(EFFECT_KEYS));
     const used = new Set(MOVES.flatMap((m) => Object.keys(m.effect)));
     for (const k of used) assert.ok(EFFECT_KEYS.includes(k), k);

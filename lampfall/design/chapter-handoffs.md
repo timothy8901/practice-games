@@ -15,3 +15,11 @@
 - Keepsake id `odile-porch-canvas` (Odile's painting of your porch, Twelve Lights beat 2) exists only in dialogue; add an item row if it should be held.
 - No cond can check for a fish in the satchel (Tully's grey mullet is asked for, never checked); no {town} text token (letters avoid the town name); `take` with ask:true does not ask, so one-of-a-kind hand-overs use an explicit two-option choice.
 - Content fix: threads/mudlark-mile beat 2 advance.days should be 2.
+
+## From GDD-01 world -> threads, cast, story, overworld
+- Markers: Pellwick has 153 named markers (every resident post, porch step and door, every first-30-minutes staging point); every manifest trainer now has a trainer-<id> post marker. Story and cast place people BY MARKER NAME (see design/GDD-01-world.md).
+- 10 thread beats have a `where` cell on a tree, roof, river or the spring-only Old Quay (oyster-boat 2/4, empty-creek 1-5, twelve-lights 5, water-pack 4, the-bell 3). GDD-01 §17.3 lists the markers to snap them to.
+- Story step triggers are NOT on the maps yet: GDD-07 lays them over Pellwick's 41 named regions.
+- Overworld runtime must open tide tiles by clockSys.gateTide(world, tile.way) (tideWindow 150/120/90/60, lowerLow for the Bar road, openFlag lit.bar, spring for the Old Quay); today tilemap opens every tide:'low' tile at tide < 0.2.
+- Town wilds are rows [2,3] at night to stay within Lv2-5 after the +2 night bonus (decide whether town maps should be exempt from the bonus instead).
+- SYS-TOWN must set sys.commons.<projectId> when a project is funded and sys.lantern-market on market nights (props are conditional on them); RENDER draws porch lamps from porch entities, autotiles roofs, and draws roof-keeper in the player's roof colour.

@@ -17,10 +17,14 @@
  *   one-chunk ring; {@link TileRenderer.pump} bakes within a time budget per frame. `mapRenderer`
  *   keeps showing the previous complete set until the new one is ready, so a grade change never
  *   shows a patchwork.
+ * - **Pixel composition**: a bake composes the chunk in a JS pixel buffer from the atlas's graded
+ *   pixels and uploads it with one `putImageData`; no per-tile canvas is created, so a new grade costs
+ *   one texture upload per chunk.
  * - **Animated pass**: water frames, surf / ripple / swell edges, glowing mud, skyglass, string
  *   lights and the wind gusts through tall grass are drawn per cell over the baked frame 0 from
- *   per-chunk entry lists whose frame canvases were resolved at bake time (one array index and one
- *   `drawImage` per visible animated cell). Grass, reeds and heather rustle when walked through.
+ *   per-chunk entry lists whose frames were packed at bake time into one atlas canvas per grade (one
+ *   array index and one 9-argument `drawImage` per visible animated cell). Grass, reeds and heather
+ *   rustle when walked through. A tide flip dissolves the old waterline over 1 s through a dither mask.
  *
  * Cell art is resolved per `(tide, grade)`: tide tiles draw their `-sub` (or water) art when awash,
  * glowing mud shows only at night, windows and lamps use their lit art after dusk (a `glow.flag`
@@ -453,7 +457,7 @@ export function analyzeMap(map) {
   for (let i = 0; i < n; i++) {
     const g = slots[map.layers[0][i]];
     const d = slots[map.layers[1][i]];
-    if ((g && g.mask) || (d && d.mask)) tideCell[i] = 1;
+    if ((g && (g.mask || g.art === 'tidepool')) || (d && d.mask)) tideCell[i] = 1;
   }
   for (let cy = 0; cy < chunksY; cy++) {
     for (let cx = 0; cx < chunksX; cx++) {
@@ -487,7 +491,9 @@ export function analyzeMap(map) {
     if (RAIN_WALK_RE.test(g.art) && !g.building) rainCells.push(i);
   }
 
-  return { map, w, h, slots, chunksX, chunksY, layerUsed, tideSensitive, propCells, objects, rainCells: Int32Array.from(rainCells), states: [null, null, null] };
+  let propBuildings = false;
+  for (const list of propCells.values()) if (list.some((q) => q.building)) { propBuildings = true; break; }
+  return { map, w, h, slots, chunksX, chunksY, layerUsed, tideSensitive, propCells, propBuildings, objects, rainCells: Int32Array.from(rainCells), states: [null, null, null] };
 }
 
 function addProp(propCells, i, rec) {
@@ -566,6 +572,8 @@ export function resolveCell(A, layer, i, bc) {
     return { art: info.sub, variant: null, flip: 0 };
   }
   if (GLOW_DAY_ART[art] && bc.grade.night < BIO_ON) art = GLOW_DAY_ART[art];
+  // tide pools sit on the flats: the high tide covers them (the prototype's rule)
+  if (layer === 0 && art === 'tidepool' && bc.tide === 'high') return { art: 'water-mud', variant: null, flip: 0 };
   const same = (dx, dy) => {
     const nx = x + dx, ny = y + dy;
     if (nx < 0 || ny < 0 || nx >= w || ny >= h) return false;
@@ -698,11 +706,12 @@ export function cellEdges(A, i, tide) {
  * One animated cell of a baked chunk (frame canvases resolved at bake time for that chunk's grade).
  * @typedef {Object} AnimEntry
  * @property {number} px  @property {number} py   world pixels
- * @property {any[]|null} base       frame canvases of an animated base (null = static base)
+ * @property {Int32Array|null} base  atlas slots (`sx | sy << 16`) of an animated base's frames (null = static base)
  * @property {number} fps
  * @property {number} phase          frame offset
  * @property {number} mode           0 loop, 1 wind gust (cover: draws only while a gust passes)
- * @property {Array<{frames: any[], fps: number}>} edges   overlays redrawn after the base
+ * @property {number} gust           per-cell offset of the wind gust (ms)
+ * @property {Array<{frames: Int32Array, fps: number}>} edges   overlays redrawn after the base (atlas slots)
  */
 
 /**
@@ -719,6 +728,9 @@ export function cellEdges(A, i, tide) {
  * @property {(ctx: any, layer: number, rect: object, camX: number, camY: number, tide: string, grade: object, ms: number) => number} drawAnimated
  * @property {(x: number, y: number, ms: number) => void} rustle   start a cover rustle at a cell
  * @property {(ctx: any, rect: object, camX: number, camY: number, grade: object, ms: number) => void} drawRain   rain ripples on walkable ground
+ * @property {(ctx: any, layer: number, rect: object, camX: number, camY: number, fromTide: string, grade: object, density: number) => number} drawDissolve
+ *   the previous tide's chunks through a dither mask (the 1 s shoreline dissolve)
+ * @property {() => number} queueLength
  * @property {MapObject[]} objects
  * @property {() => void} invalidate   drop every bake (flags / tier / roof changed)
  * @property {(bc: Partial<BakeCtx>) => void} setBakeContext   flags, tier, roof, cond (invalidates when they change)
@@ -726,7 +738,7 @@ export function cellEdges(A, i, tide) {
  */
 
 /**
- * @param {{maxChunks?: number, maxCombos?: number, budgetMs?: number}} [opts]
+ * @param {{maxChunks?: number, maxCombos?: number, budgetMs?: number, atlasH?: number}} [opts]   `atlasH`: animated-frame atlas height (tests)
  * @returns {TileRenderer}
  */
 export function createTileRenderer(opts = {}) {
@@ -774,32 +786,132 @@ export function createTileRenderer(opts = {}) {
 
   function takeCanvas() {
     const c = pool.pop();
-    if (c) {
-      const g = c.getContext('2d');
-      g.setTransform(1, 0, 0, 1, 0, 0);
-      g.globalAlpha = 1;
-      g.globalCompositeOperation = 'source-over';
-      g.clearRect(0, 0, CHUNK_PX, CHUNK_PX);
-      return c;
-    }
-    return makeCanvas(CHUNK_PX, CHUNK_PX);
+    return c || makeCanvas(CHUNK_PX, CHUNK_PX);
   }
 
-  function framesOf(art, grade, flip, variant) {
+  /* -------------------------------------------------------- pixel composition */
+  // A chunk is composed in a JS pixel buffer and uploaded with ONE putImageData: no per-tile canvas
+  // is ever created for baking, so a new grade costs one texture upload per chunk instead of one per
+  // distinct tile frame (the frame-time spike a grade change used to cause).
+  const buf = new Uint8ClampedArray(CHUNK_PX * CHUNK_PX * 4);
+  let bufImage = null;
+
+  /** Straight-alpha source-over of `src` pixels at (dx, dy) into the chunk buffer, times `alpha`. */
+  function blit(src, sw, sh, dx, dy, alpha) {
+    const x0 = Math.max(0, -dx), y0 = Math.max(0, -dy);
+    const x1 = Math.min(sw, CHUNK_PX - dx), y1 = Math.min(sh, CHUNK_PX - dy);
+    for (let y = y0; y < y1; y++) {
+      let si = (y * sw + x0) * 4;
+      let di = ((dy + y) * CHUNK_PX + dx + x0) * 4;
+      for (let x = x0; x < x1; x++, si += 4, di += 4) {
+        const a = src[si + 3];
+        if (a === 0) continue;
+        if (a === 255 && alpha === 1) {
+          buf[di] = src[si]; buf[di + 1] = src[si + 1]; buf[di + 2] = src[si + 2]; buf[di + 3] = 255;
+          continue;
+        }
+        blend(di, src[si], src[si + 1], src[si + 2], (a / 255) * alpha);
+      }
+    }
+  }
+
+  /** Blends one colour into the buffer at byte index `di` with coverage `sa` (0..1). */
+  function blend(di, r, g, b, sa) {
+    const da = buf[di + 3] / 255;
+    const oa = sa + da * (1 - sa);
+    if (oa <= 0) return;
+    const k = da * (1 - sa);
+    buf[di] = (r * sa + buf[di] * k) / oa;
+    buf[di + 1] = (g * sa + buf[di + 1] * k) / oa;
+    buf[di + 2] = (b * sa + buf[di + 2] * k) / oa;
+    buf[di + 3] = oa * 255;
+  }
+
+  /** Fills a rect of the buffer with a colour at coverage `sa`; `checker` keeps only (x+y) even pixels. */
+  function shadeRect(x, y, w, h, rgb, sa, checker) {
+    const xa = Math.max(0, x), ya = Math.max(0, y), xb = Math.min(CHUNK_PX, x + w), yb = Math.min(CHUNK_PX, y + h);
+    for (let yy = ya; yy < yb; yy++) {
+      for (let xx = xa; xx < xb; xx++) {
+        if (checker && ((xx + yy) & 1)) continue;
+        const di = (yy * CHUNK_PX + xx) * 4;
+        if (mark[yy * CHUNK_PX + xx] === markStamp) continue; // union: never shade a pixel twice
+        mark[yy * CHUNK_PX + xx] = markStamp;
+        blend(di, rgb[0], rgb[1], rgb[2], sa);
+      }
+    }
+  }
+  const mark = new Uint32Array(CHUNK_PX * CHUNK_PX);
+  let markStamp = 0;
+
+  function upload(canvas) {
+    const g = ctx2d(canvas);
+    if (!bufImage) bufImage = typeof g.createImageData === 'function' ? g.createImageData(CHUNK_PX, CHUNK_PX) : null;
+    if (bufImage) {
+      bufImage.data.set(buf);
+      g.putImageData(bufImage, 0, 0);
+    }
+  }
+
+  /* -------------------------------------------------------- the animated-frame atlas */
+  // Animated cells draw their frames from one atlas canvas per grade (9-argument drawImage), so the
+  // animated pass touches a handful of textures instead of hundreds of tiny canvases.
+  const ATLAS_W = 512, ATLAS_H = Math.max(TILE_PX, opts.atlasH ?? 256), SLOTS_X = ATLAS_W / TILE_PX, SLOTS = SLOTS_X * Math.floor(ATLAS_H / TILE_PX);
+  /** headroom a bake may need: an atlas with fewer free slots rolls over before the bake starts */
+  const ROLL = Math.min(160, SLOTS >> 1);
+  /** @type {Map<number, {canvas: any, ctx: any, slots: Map<object, number>, n: number, img: any}>} grade index -> atlas */
+  const atlases = new Map();
+  const ATLAS_MAX = 6;
+
+  function atlasFor(gi) {
+    let a = atlases.get(gi);
+    // a nearly full (or overflowed) atlas rolls over to a fresh canvas: chunks already baked keep
+    // their own atlas object, so their slots stay valid
+    if (a && !a.full && a.n <= SLOTS - ROLL) return a;
+    if (a) atlases.delete(gi);
+    if (atlases.size >= ATLAS_MAX) atlases.delete(atlases.keys().next().value);
+    const canvas = makeCanvas(ATLAS_W, ATLAS_H);
+    const ctx = ctx2d(canvas);
+    a = { canvas, ctx, slots: new Map(), n: 0, full: false, img: typeof ctx.createImageData === 'function' ? ctx.createImageData(TILE_PX, TILE_PX) : null };
+    atlases.set(gi, a);
+    return a;
+  }
+
+  /** Atlas slot (packed sx | sy << 16) of a 16x16 image at a grade; written on first use. */
+  function slotOf(a, img) {
+    let s = a.slots.get(img);
+    if (s !== undefined) return s;
+    // never clear a live atlas (baked chunks point into it): mark it full; the caller rolls over
+    if (a.n >= SLOTS) { a.full = true; return 0; }
+    const k = a.n++;
+    const sx = (k % SLOTS_X) * TILE_PX, sy = Math.floor(k / SLOTS_X) * TILE_PX;
+    if (a.img) {
+      a.img.data.set(img.pixels.length === TILE_PX * TILE_PX * 4 ? img.pixels : img.pixels.subarray(0, TILE_PX * TILE_PX * 4));
+      a.ctx.putImageData(a.img, sx, sy);
+    }
+    s = sx | (sy << 16);
+    a.slots.set(img, s);
+    return s;
+  }
+
+  /** Atlas slots of every frame of an art at a grade (16x16 art only). */
+  function frameSlots(a, art, grade, flip, variant) {
     const d = artDef(art);
     const nf = (variant && d.variants && d.variants[variant] ? d.variants[variant] : d.frames).length;
-    const out = new Array(nf);
+    const out = new Int32Array(nf);
     for (let f = 0; f < nf; f++) {
-      out[f] = variant ? getSprite(art, { frame: f, name: variant, grade, flipX: !!(flip & 1), flipY: !!(flip & 2) }).canvas : getTile(art, f, grade, flip).canvas;
+      const img = variant ? getSprite(art, { frame: f, name: variant, grade, flipX: !!(flip & 1), flipY: !!(flip & 2) }) : getTile(art, f, grade, flip);
+      out[f] = slotOf(a, img);
     }
     return out;
   }
 
+  /* -------------------------------------------------------- bake */
+
   /**
    * Bakes one chunk layer.
-   * @returns {{canvas: any, anim: AnimEntry[], key: number}}
+   * @returns {{canvas: any, anim: AnimEntry[], key: number, ox: number, oy: number, atlas: object}}
    */
-  function bake(key) {
+  function bake(key, retried = false) {
     const t0 = nowMs();
     const { chunk: c, layer, tide: ti, grade: gi } = decodeChunkKey(key);
     const grade = gradeAt(gi);
@@ -807,9 +919,9 @@ export function createTileRenderer(opts = {}) {
     const bc = { tide, grade, flags: bakeCtx.flags, tier: bakeCtx.tier, roof: bakeCtx.roof, cond: bakeCtx.cond };
     const cx = c % A.chunksX, cy = (c - cx) / A.chunksX;
     const ox = cx * CHUNK_PX, oy = cy * CHUNK_PX;
-    const { w, h, map } = A;
-    const canvas = takeCanvas();
-    const g = ctx2d(canvas);
+    const { w, h } = A;
+    buf.fill(0);
+    const atlas = atlasFor(gi);
     const anim = [];
     const sh = shadowFor(grade.minute < 0 ? 720 : grade.minute, grade);
     const tx0 = cx * CHUNK_TILES, ty0 = cy * CHUNK_TILES;
@@ -825,11 +937,11 @@ export function createTileRenderer(opts = {}) {
           const nf = (cell.variant && d.variants && d.variants[cell.variant] ? d.variants[cell.variant] : d.frames).length;
           const animated = nf > 1 && d.fps > 0;
           const cover = layer === 0 && COVER_ART.has(cell.art);
-          if (layer === 1) drawCellShadow(g, cell.art, px, py, sh);
+          if (layer === 1) cellShadow(cell.art, px, py, sh);
           const img = cell.variant ? getSprite(cell.art, { frame: 0, name: cell.variant, grade, flipX: !!(cell.flip & 1), flipY: !!(cell.flip & 2) }) : getTile(cell.art, 0, grade, cell.flip);
-          g.drawImage(img.canvas, px, py);
+          blit(img.pixels, img.w, img.h, px, py, 1);
           if (animated) {
-            entry = { px: x * TILE_PX, py: y * TILE_PX, base: framesOf(cell.art, grade, cell.flip, cell.variant), fps: d.fps, phase: cover ? 0 : (x * 3 + y * 5) & 3, mode: cover ? 1 : 0, edges: [], gust: cover ? (hash2(x, y) % 400) : 0 };
+            entry = { px: x * TILE_PX, py: y * TILE_PX, base: frameSlots(atlas, cell.art, grade, cell.flip, cell.variant), fps: d.fps, phase: cover ? 0 : (x * 3 + y * 5) & 3, mode: cover ? 1 : 0, edges: [], gust: cover ? (hash2(x, y) % 400) : 0 };
           }
         }
         if (layer === 0) {
@@ -841,58 +953,58 @@ export function createTileRenderer(opts = {}) {
             const eAnim = ed.frames.length > 1 && ed.fps > 0;
             if (eAnim) {
               if (!entry) entry = { px: x * TILE_PX, py: y * TILE_PX, base: null, fps: 0, phase: (x * 3 + y * 5) & 3, mode: 0, edges: [], gust: 0 };
-              entry.edges.push({ frames: framesOf(eid, grade, flip, null), fps: ed.fps });
+              entry.edges.push({ frames: frameSlots(atlas, eid, grade, flip, null), fps: ed.fps });
             } else {
-              g.drawImage(getTile(eid, 0, grade, flip).canvas, px, py);
-              if (entry && entry.base && entry.mode === 0) entry.edges.push({ frames: [getTile(eid, 0, grade, flip).canvas], fps: 0 });
+              const eimg = getTile(eid, 0, grade, flip);
+              blit(eimg.pixels, eimg.w, eimg.h, px, py, 1);
+              if (entry && entry.base && entry.mode === 0) entry.edges.push({ frames: Int32Array.of(slotOf(atlas, eimg)), fps: 0 });
             }
           }
         }
         if (layer === 1) {
           const props = A.propCells.get(i);
           if (props) {
+            const lit = isLit({ glowFlag: null }, grade, bc.flags);
             for (const p of props) {
               if (p.cond !== undefined && p.cond !== null && bc.cond && !bc.cond(p.cond)) continue;
-              const lit = isLit({ glowFlag: null }, grade, bc.flags);
-              drawCellShadow(g, p.art, px, py, sh);
+              cellShadow(p.art, px, py, sh);
               const art = p.lit && lit ? p.lit : p.art;
               const img = p.litVariant && lit ? getSprite(art, { name: 'lit', grade }) : getTile(art, 0, grade, 0);
-              g.drawImage(img.canvas, px, py);
+              blit(img.pixels, img.w, img.h, px, py, 1);
             }
           }
         }
         if (entry && (entry.base || entry.edges.length)) anim.push(entry);
       }
     }
-    if (layer === 0) bakeBuildingShade(g, tx0, ty0, tx1, ty1, grade, sh, bc);
-    if (layer === 1) bakePropBuildingShade(g, tx0, ty0, tx1, ty1, grade, sh);
+    // the atlas overflowed mid-bake: retire it and bake this chunk again into a fresh one
+    if (atlas.full) {
+      if (atlases.get(gi) === atlas) atlases.delete(gi);
+      if (!retried) return bake(key, true);
+    }
+    if (layer === 0) shade(tx0, ty0, tx1, ty1, grade, sh, groundBuilding);
+    if (layer === 1 && A.propBuildings) shade(tx0, ty0, tx1, ty1, grade, sh, propBuilding);
+    // an all-transparent layer needs no canvas
+    let empty = true;
+    for (let k = 3; k < buf.length; k += 4) if (buf[k] !== 0) { empty = false; break; }
+    let canvas = null;
+    if (!empty) {
+      canvas = takeCanvas();
+      upload(canvas);
+    }
     baked++;
     DRAW.bakes++;
     bakeMs += nowMs() - t0;
-    return { canvas, anim, key, ox, oy };
+    return { canvas, anim, key, ox, oy, atlas };
   }
 
-  function drawCellShadow(g, art, px, py, sh) {
+  function cellShadow(art, px, py, sh) {
     if (sh.alpha < 0.01) return;
     const s = getShadow(art, 0);
     if (!s) return;
-    g.globalAlpha = sh.alpha;
-    g.drawImage(s.canvas, px + sh.dx, py + sh.dy);
-    g.globalAlpha = 1;
+    blit(s.pixels, s.w, s.h, px + sh.dx, py + sh.dy, sh.alpha);
   }
 
-  /** Whether a cell holds building art (ground, detail or a house-recipe prop). */
-  function buildingAt(x, y) {
-    if (x < 0 || y < 0 || x >= A.w || y >= A.h) return false;
-    const i = y * A.w + x;
-    const g = A.slots[A.map.layers[0][i]];
-    if (g && g.building) return true;
-    const d = A.slots[A.map.layers[1][i]];
-    if (d && d.building) return true;
-    const props = A.propCells.get(i);
-    if (props) for (const p of props) if (p.building) return true;
-    return false;
-  }
   function roofAt(x, y) {
     if (x < 0 || y < 0 || x >= A.w || y >= A.h) return false;
     const i = y * A.w + x;
@@ -902,82 +1014,63 @@ export function createTileRenderer(opts = {}) {
     if (props) for (const p of props) if (p.art.startsWith('roof-')) return true;
     return false;
   }
+  function groundBuilding(x, y) {
+    if (x < 0 || y < 0 || x >= A.w || y >= A.h) return false;
+    const s = A.slots[A.map.layers[0][y * A.w + x]];
+    return !!(s && s.building);
+  }
+  function propBuilding(x, y) {
+    if (x < 0 || y < 0 || x >= A.w || y >= A.h) return false;
+    const p = A.propCells.get(y * A.w + x);
+    return !!(p && p.some((q) => q.building));
+  }
 
   /**
-   * House cast shadows (bottom-right, by the sun) and eave shade, drawn as one dithered union so
-   * overlapping strips never double-darken. Considers a one-tile margin so shadows cross chunk edges.
+   * House cast shadows (bottom-right, by the sun; a 50% dither of the graded shadow colour, as a
+   * union so overlapping strips never double-darken) and eave shade on the wall under a roof. A
+   * one-tile margin lets shadows cross chunk edges.
    */
-  function shadeInto(g, tx0, ty0, tx1, ty1, grade, sh, pred) {
+  function shade(tx0, ty0, tx1, ty1, grade, sh, pred) {
     const ox = tx0 * TILE_PX, oy = ty0 * TILE_PX;
-    let any = false;
-    g.save();
-    g.beginPath();
-    g.rect(0, 0, CHUNK_PX, CHUNK_PX);
-    g.clip();
-    g.beginPath();
+    const rgb = shadeRgb(grade);
+    markStamp++;
     if (sh.alpha >= 0.01) {
+      const a = Math.min(0.5, sh.alpha * 1.4);
       for (let y = ty0 - 1; y < ty1; y++) {
         for (let x = tx0 - 1; x < tx1; x++) {
           if (!pred(x, y)) continue;
           const px = x * TILE_PX - ox, py = y * TILE_PX - oy;
-          if (!pred(x, y + 1)) { g.rect(px + sh.dx, py + TILE_PX, TILE_PX, sh.dy + 2); any = true; }
+          if (!pred(x, y + 1)) shadeRect(px + sh.dx, py + TILE_PX, TILE_PX, sh.dy + 2, rgb, a, true);
           if (!pred(x + 1, y)) {
             const top = roofAt(x, y) && !roofAt(x, y - 1) ? 6 : 0;
-            g.rect(px + TILE_PX, py + top + sh.dy, sh.dx + 1, TILE_PX - top + (pred(x, y + 1) ? 0 : 2));
-            any = true;
+            shadeRect(px + TILE_PX, py + top + sh.dy, sh.dx + 1, TILE_PX - top + (pred(x, y + 1) ? 0 : 2), rgb, a, true);
           }
         }
       }
     }
-    if (any) {
-      g.fillStyle = checkerPattern(g, gradeColour('shadow', grade));
-      g.globalAlpha = Math.min(0.5, sh.alpha * 1.4);
-      g.fill();
-      g.globalAlpha = 1;
-    }
-    // eave shade on the wall row under a roof: two solid rows then a dithered row
-    g.beginPath();
-    let eave = false;
+    markStamp++;
     for (let y = ty0; y < ty1; y++) {
       for (let x = tx0; x < tx1; x++) {
         if (!pred(x, y) || roofAt(x, y) || !roofAt(x, y - 1)) continue;
         const px = x * TILE_PX - ox, py = y * TILE_PX - oy;
-        g.rect(px, py, TILE_PX, 2);
-        for (let k = (py & 1); k < TILE_PX; k += 2) g.rect(px + k, py + 2, 1, 1);
-        eave = true;
+        shadeRect(px, py, TILE_PX, 2, rgb, 0.42, false);
+        shadeRect(px, py + 2, TILE_PX, 1, rgb, 0.42, true);
       }
     }
-    if (eave) {
-      g.fillStyle = gradeColour('shadow', grade);
-      g.globalAlpha = 0.42;
-      g.fill();
-      g.globalAlpha = 1;
-    }
-    g.restore();
-    if (any || eave) DRAW.fills++;
   }
-
-  function bakeBuildingShade(g, tx0, ty0, tx1, ty1, grade, sh) {
-    shadeInto(g, tx0, ty0, tx1, ty1, grade, sh, (x, y) => {
-      if (x < 0 || y < 0 || x >= A.w || y >= A.h) return false;
-      const i = y * A.w + x;
-      const s = A.slots[A.map.layers[0][i]];
-      return !!(s && s.building);
-    });
+  /** @type {WeakMap<object, string>} grade -> rain ripple colour */
+  const rainCache = new WeakMap();
+  function rainColour(grade) {
+    let c = rainCache.get(grade);
+    if (!c) { c = gradeColour('snow2', grade); rainCache.set(grade, c); }
+    return c;
   }
-  function bakePropBuildingShade(g, tx0, ty0, tx1, ty1, grade, sh) {
-    let has = false;
-    for (let y = ty0 - 1; y < ty1 && !has; y++) for (let x = tx0 - 1; x < tx1; x++) {
-      if (x < 0 || y < 0 || x >= A.w || y >= A.h) continue;
-      const p = A.propCells.get(y * A.w + x);
-      if (p && p.some((q) => q.building)) { has = true; break; }
-    }
-    if (!has) return;
-    shadeInto(g, tx0, ty0, tx1, ty1, grade, sh, (x, y) => {
-      if (x < 0 || y < 0 || x >= A.w || y >= A.h) return false;
-      const p = A.propCells.get(y * A.w + x);
-      return !!(p && p.some((q) => q.building));
-    });
+  /** @type {WeakMap<object, number[]>} */
+  const shadeCache = new WeakMap();
+  function shadeRgb(grade) {
+    let c = shadeCache.get(grade);
+    if (!c) { const hx = gradeColour('shadow', grade); c = [parseInt(hx.slice(1, 3), 16), parseInt(hx.slice(3, 5), 16), parseInt(hx.slice(5, 7), 16)]; shadeCache.set(grade, c); }
+    return c;
   }
 
   function keyFor(cx, cy, layer, tide, grade) {
@@ -1136,6 +1229,36 @@ export function createTileRenderer(opts = {}) {
       return n;
     },
 
+    /**
+     * The tide dissolve (§12: "a 1 s shoreline dissolve"): the previous tide's chunks of the
+     * tide-sensitive area drawn through an ordered-dither mask of `density` (1 -> 0 over the second),
+     * so the waterline crumbles into the new one instead of jumping. Chunks that look the same at
+     * every tide are skipped; nothing is drawn if the old bake was evicted.
+     */
+    drawDissolve(ctx, layer, rect, camX, camY, fromTide, grade, density) {
+      if (!A || density <= 0) return 0;
+      const level = Math.min(15, Math.max(1, Math.round(density * 16)));
+      const R = visibleRange(rect, camX, camY, false);
+      const gi = gradeIndex(grade);
+      let n = 0;
+      for (let cy = R.y0; cy <= R.y1; cy++) for (let cx = R.x0; cx <= R.x1; cx++) {
+        const c = chunkIndex(cx, cy);
+        if (!A.tideSensitive[c] || !layerUsed(cx, cy, layer)) continue;
+        const ch = cache.peek(chunkKey(c, layer, TIDE_INDEX[fromTide], gi));
+        if (!ch || !ch.canvas) continue;
+        const sg = ctx2d(scratch());
+        sg.globalCompositeOperation = 'copy';
+        sg.drawImage(ditherMask(level), 0, 0);
+        sg.globalCompositeOperation = 'source-in';
+        sg.drawImage(ch.canvas, 0, 0);
+        sg.globalCompositeOperation = 'source-over';
+        ctx.drawImage(scratchCanvas, rect.x + ch.ox - camX, rect.y + ch.oy - camY);
+        n += 3;
+      }
+      DRAW.images += n;
+      return n;
+    },
+
     drawAnimated(ctx, layer, rect, camX, camY, tide, grade, ms) {
       if (!A) return 0;
       const R = visibleRange(rect, camX, camY, false);
@@ -1147,6 +1270,7 @@ export function createTileRenderer(opts = {}) {
         const ch = cache.peek(keyFor(cx, cy, layer, tide, grade));
         if (!ch) continue;
         const list = ch.anim;
+        const ac = ch.atlas.canvas;
         for (let k = 0; k < list.length; k++) {
           const e = list[k];
           if (e.px < vx0 || e.py < vy0 || e.px > vx1 || e.py > vy1) continue;
@@ -1156,20 +1280,21 @@ export function createTileRenderer(opts = {}) {
             if (t < 0) t += 6000;
             const f = t < 70 ? 1 : t < 140 ? 2 : t < 210 ? 1 : 0;
             if (f === 0 || !e.base) continue;
-            ctx.drawImage(e.base[f % e.base.length], e.px + dx, e.py + dy);
+            const s = e.base[f % e.base.length];
+            ctx.drawImage(ac, s & 0xffff, s >>> 16, TILE_PX, TILE_PX, e.px + dx, e.py + dy, TILE_PX, TILE_PX);
             n++;
             continue;
           }
           if (e.base) {
-            const f = Math.floor((ms * e.fps) / 1000 + e.phase) % e.base.length;
-            ctx.drawImage(e.base[f], e.px + dx, e.py + dy);
+            const s = e.base[Math.floor((ms * e.fps) / 1000 + e.phase) % e.base.length];
+            ctx.drawImage(ac, s & 0xffff, s >>> 16, TILE_PX, TILE_PX, e.px + dx, e.py + dy, TILE_PX, TILE_PX);
             n++;
           }
           for (let j = 0; j < e.edges.length; j++) {
             const ed = e.edges[j];
             const fr = ed.frames;
-            const f = fr.length > 1 ? Math.floor((ms * ed.fps) / 1000 + e.phase) % fr.length : 0;
-            ctx.drawImage(fr[f], e.px + dx, e.py + dy);
+            const s = fr[fr.length > 1 ? Math.floor((ms * ed.fps) / 1000 + e.phase) % fr.length : 0];
+            ctx.drawImage(ac, s & 0xffff, s >>> 16, TILE_PX, TILE_PX, e.px + dx, e.py + dy, TILE_PX, TILE_PX);
             n++;
           }
         }
@@ -1191,8 +1316,7 @@ export function createTileRenderer(opts = {}) {
 
     drawRain(ctx, rect, camX, camY, grade, ms) {
       if (!A) return;
-      const color = gradeColour('snow2', grade);
-      ctx.fillStyle = color;
+      ctx.fillStyle = rainColour(grade);
       const tx0 = Math.max(0, Math.floor(camX / TILE_PX)), ty0 = Math.max(0, Math.floor(camY / TILE_PX));
       const tx1 = Math.min(A.w - 1, Math.floor((camX + rect.w) / TILE_PX)), ty1 = Math.min(A.h - 1, Math.floor((camY + rect.h) / TILE_PX));
       const dx = rect.x - camX, dy = rect.y - camY;
@@ -1220,7 +1344,9 @@ export function createTileRenderer(opts = {}) {
     },
 
     stats() {
-      return { ...cache.stats(), baked, bakeMs: Math.round(bakeMs * 100) / 100, queued: queue.length - qHead, pooled: pool.length };
+      let atlasSlots = 0;
+      for (const a of atlases.values()) atlasSlots = Math.max(atlasSlots, a.n);
+      return { ...cache.stats(), baked, bakeMs: Math.round(bakeMs * 100) / 100, queued: queue.length - qHead, pooled: pool.length, atlases: atlases.size, atlasSlots };
     },
     cache,
   };
@@ -1238,7 +1364,9 @@ export function createTileRenderer(opts = {}) {
       const px = x * TILE_PX, py = y * TILE_PX;
       if (px < camX - TILE_PX || py < camY - TILE_PX || px > camX + rect.w || py > camY + rect.h) continue;
       const art = A.slots[A.map.layers[0][i]].art;
-      ctx.drawImage(getTile(art, f, grade, 0).canvas, px + dx, py + dy);
+      const a = atlasFor(gradeIndex(grade));
+      const s = slotOf(a, getTile(art, f, grade, 0));
+      ctx.drawImage(a.canvas, s & 0xffff, s >>> 16, TILE_PX, TILE_PX, px + dx, py + dy, TILE_PX, TILE_PX);
       n++;
     }
     return n;
@@ -1255,29 +1383,28 @@ const RIPPLE = [
   [2, 0, 1, 5, 0, 1, 0, 1, 1, 7, 1, 1, 2, 2, 1, 5, 2, 1],
 ];
 
-/** @type {WeakMap<object, Map<string, any>>} per-context checker patterns by colour */
-const PATTERNS = new WeakMap();
-
-/**
- * A 2x2 checker pattern (50% dither) in one colour, cached per context and colour.
- * @param {any} g context
- * @param {string} color
- * @returns {any}
- */
-function checkerPattern(g, color) {
-  let m = PATTERNS.get(g);
-  if (!m) { m = new Map(); PATTERNS.set(g, m); }
-  let p = m.get(color);
-  if (!p) {
-    const c = makeCanvas(2, 2);
-    const cg = ctx2d(c);
-    cg.fillStyle = color;
-    cg.fillRect(0, 0, 1, 1);
-    cg.fillRect(1, 1, 1, 1);
-    p = g.createPattern(c, 'repeat');
-    m.set(color, p);
+/** Ordered-dither masks (128x128, opaque where the Bayer threshold is under the level), cached. */
+const masks = new Array(17).fill(null);
+function ditherMask(level) {
+  let m = masks[level];
+  if (m) return m;
+  m = makeCanvas(CHUNK_PX, CHUNK_PX);
+  const g = ctx2d(m);
+  if (typeof g.createImageData === 'function') {
+    const img = g.createImageData(CHUNK_PX, CHUNK_PX);
+    for (let y = 0; y < CHUNK_PX; y++) for (let x = 0; x < CHUNK_PX; x++) {
+      if (BAYER_4[((y & 3) << 2) | (x & 3)] < level) img.data[(y * CHUNK_PX + x) * 4 + 3] = 255;
+    }
+    g.putImageData(img, 0, 0);
   }
-  return p;
+  masks[level] = m;
+  return m;
+}
+const BAYER_4 = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+let scratchCanvas = null;
+function scratch() {
+  if (!scratchCanvas) scratchCanvas = makeCanvas(CHUNK_PX, CHUNK_PX);
+  return scratchCanvas;
 }
 
 /**

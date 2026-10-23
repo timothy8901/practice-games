@@ -451,7 +451,7 @@ export function captureMenu(session) {
  * @typedef {Object} BagRow
  * @property {string} id  @property {string} name  @property {number} count
  * @property {boolean} selectable  @property {string|null} reason   'hp-full' | 'no-ward' | 'field-only' | engine text
- * @property {'heal'|'crackdust'|'field'} kind
+ * @property {'heal'|'crackdust'|'wick'|'field'} kind  @property {string|number} [grade]   a wick's Lantern grade
  */
 
 /**
@@ -478,6 +478,14 @@ export function bagMenu(session, world) {
   if (dust > 0) {
     const e = legal.items.find((it) => it.id === 'crackdust');
     out.push({ id: 'crackdust', name: row(session.data, 'items', 'crackdust')?.name ?? 'Crackdust', count: dust, kind: 'crackdust', selectable: !!(e && e.selectable), reason: e && !e.selectable ? (e.reason || 'no-ward') : null });
+  }
+  // wicks burn from the Lantern; listed here so the satchel reads whole (wild battles open the Lantern)
+  const lanternOk = !!(legal.lantern && legal.lantern.available);
+  for (const [grade, id] of Object.entries(GRADE_ITEMS)) {
+    const n = b.sides[0].bag.lanterns ? (b.sides[0].bag.lanterns[/^\d+$/.test(grade) ? Number(grade) : grade] || 0) : held(world, id, session.data);
+    if (!n) continue;
+    const it = row(session.data, 'items', id);
+    out.push({ id, name: it ? it.name : id, count: n, kind: 'wick', grade: /^\d+$/.test(grade) ? Number(grade) : grade, selectable: lanternOk, reason: lanternOk ? null : 'not-wild' });
   }
   for (const id of FIELD_ONLY_MEDICINE) {
     const n = held(world, id, session.data);

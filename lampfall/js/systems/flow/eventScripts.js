@@ -272,3 +272,16 @@ export function runPending(G) {
   G.push('cutscene', { scriptId: id });
   return true;
 }
+
+/**
+ * Registers the debug hook's `runScript` (draft §11): plays a script as a cutscene and resolves when
+ * it ends.
+ * @param {any} G
+ */
+export function bindDebug(G) {
+  const hook = G?.debugHook;
+  if (!hook || typeof hook.bind !== 'function') return;
+  hook.bind('runScript', (scriptId) => new Promise((resolve) => {
+    G.push('cutscene', { scriptId, onDone: () => resolve() });
+  }));
+}

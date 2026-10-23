@@ -459,6 +459,8 @@ export const TUNING = freeze({
   runAutoThreshold: 256,
   maxTurns: 200,
   actionPriority: { run: 7, switch: 6, item: 6, lantern: 6, read: 5, scrap: 0 },
+  weatherMoveTurns: 5,                 // a move's arena weather lasts 5 turns unless it names its own (battle/weather)
+  weatherPostedTurns: 3,               // the weather strip posts the next 3 turns (the Weather Spire's own rule agrees) [fixed]
 
   // ===== World feel (world/npc, world/roamer take these as their per-call opts.tuning) ===========
   npcCatchUpTiles: 12,                 // a schedule path longer than this jumps (world/npc catchUpTiles)

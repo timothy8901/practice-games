@@ -361,8 +361,9 @@ export function createCutsceneScene(G) {
   function popNow() {
     state = 'done';
     const result = { done: true, vars: session ? { ...session.vars } : {} };
-    if (typeof params.onDone === 'function') { try { params.onDone(result); } catch (e) { console.warn(e); } }
+    // pop first: a callback that opens the next screen must not bury this one under it
     if (G.scenes.top() === scene) G.scenes.pop(result);
+    if (typeof params.onDone === 'function') { try { params.onDone(result); } catch (e) { console.warn(e); } }
   }
 
   // ------------------------------------------------------------------ the scene

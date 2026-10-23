@@ -31,6 +31,7 @@ import { beatFor, paginate } from '../ui/textbox.js';
 import { COLORS, PALETTE, TIMING, TYPE } from '../ui/theme.js';
 import { portraitSprite } from '../art/portraits.js';
 import { t } from '../data/strings.js';
+import { parseShorthand } from '../script/ops.js';
 import { itemOf } from '../systems/econ.js';
 import * as memory from '../systems/memory.js';
 import * as party from '../systems/party.js';
@@ -46,7 +47,9 @@ export const SLIP = Object.freeze({ x: 8, y: 198, w: 464, h: 64 });
 export const BUST = Object.freeze({ x: 16, y: 206, w: 48, h: 48 });
 export const TEXT = Object.freeze({ x: 72, y: 206, w: 384, lines: 4 });
 export const NARRATION = Object.freeze({ x: 22, y: 206, w: 430 });
-export const LINGER = Object.freeze({ x: 404, y: 247, w: 52, h: 13 });
+export const LINGER = Object.freeze({ x: 392, y: 247, w: 66, h: 13 });
+/** A say's `emote` -> the bust's expression (art/portraits; neutral where a bust has only one). */
+export const EMOTE_EXPR = Object.freeze({ '!': 'surprised', '?': 'worried', '♥': 'happy', '…': 'worried', zzz: 'neutral', happy: 'happy', worried: 'worried', surprised: 'surprised' });
 /** Hold cancel this long to skip a skippable cutscene. */
 export const SKIP_HOLD_MS = 700;
 /** Choice row height (≥ 15 native px touch target at 3×). */
@@ -171,14 +174,18 @@ export function createDialogueScene(G) {
       case 'say': {
         state = 'say';
         const sp = speakerOf(G, r);
+        sp.expr = EMOTE_EXPR[r.emote] ?? (typeof r.expr === 'string' ? r.expr : 'neutral');
         textLog(G).push(sp.name, r.text);
         showLine(r.text, sp);
         return;
       }
       case 'choice': {
         if (typeof r.prompt === 'string' && r.prompt) {
-          textLog(G).push(speaker.name, r.prompt);
-          showLine(r.prompt, speaker);
+          // a prompt may name its speaker like a say line ("Wren: Will you?")
+          const said = parseShorthand(r.prompt, (id) => !!(G.data && G.data.has('npcs', id)));
+          const sp = said.who ? speakerOf(G, { who: said.who, name: G.data?.has?.('npcs', said.who) ? undefined : said.who }) : speaker;
+          textLog(G).push(sp.name, said.text);
+          showLine(said.text, sp);
         } else if (!pages[0].text) {
           showLine('', speaker, { instant: true });
         } else {
@@ -261,8 +268,9 @@ export function createDialogueScene(G) {
   function finishClose() {
     state = 'done';
     const r = closeResult ?? { done: true };
-    if (typeof params.onDone === 'function') { try { params.onDone(r); } catch (e) { console.warn(e); } }
+    // pop first: a callback that opens the next screen must not bury this one under it
     if (G.scenes.top() === scene) G.scenes.pop(r);
+    if (typeof params.onDone === 'function') { try { params.onDone(r); } catch (e) { console.warn(e); } }
   }
 
   // ------------------------------------------------------------------ choices
@@ -301,8 +309,7 @@ export function createDialogueScene(G) {
       state = 'nick';
       const line = `${sp.name} wants to call you “${offer}”.`; // str
       textLog(G).push(sp.name, line);
-      showLine(line, { ...sp, name: '' });
-      speaker = sp;
+      showLine(line, sp);
       openChoices([
         { label: `“${offer}” is fine.`, value: 'accept' }, // str
         { label: `Just ${world.player.name}.`, value: 'decline' }, // str
@@ -323,7 +330,7 @@ export function createDialogueScene(G) {
       if (uid) G.store.tx('creature:nickname', (w) => party.nickname(w, uid, name, { bus: G.bus }));
       textLog(G).push('', `Named it ${name}.`); // str
       pull(name);
-    }, () => pull(null));
+    }, () => pull(null), true);
   }
 
   function applyNpcNick(npcId, choice, counter, offer) {
@@ -333,7 +340,7 @@ export function createDialogueScene(G) {
     pull(nick);
   }
 
-  function openEntry(prompt, suggest, initial, onDone, onCancel) {
+  function openEntry(prompt, suggest, initial, onDone, onCancel, narrateConfirm = false) {
     state = 'entry';
     choices = []; choiceFocus = null;
     entry = createNameEntry({
@@ -345,8 +352,8 @@ export function createDialogueScene(G) {
       onDone: (name) => {
         entry?.detach(); entry = null;
         state = 'nameConfirm';
-        showLine(`“${name}”. Is that right?`, { ...speaker, name: speaker.name }, { instant: true }); // str
-        nameAsk = { name, lock: skipAnims(G) ? 0 : TIMING.inputLockMs, index: 1, onYes: onDone, onEdit: () => openEntry(prompt, suggest, name, onDone, onCancel) };
+        showLine(`“${name}”. Is that right?`, narrateConfirm ? speakerOf(G, {}) : speaker, { instant: true }); // str
+        nameAsk = { name, lock: skipAnims(G) ? 0 : TIMING.inputLockMs, index: 1, onYes: onDone, onEdit: () => openEntry(prompt, suggest, name, onDone, onCancel, narrateConfirm) };
       },
       onCancel: () => { entry?.detach(); entry = null; onCancel(); },
     });
@@ -354,7 +361,7 @@ export function createDialogueScene(G) {
   }
 
   const askRects = () => [
-    { x: SLIP.x + SLIP.w - 150, y: SLIP.y + SLIP.h - 20, w: 56, h: 13 },
+    { x: SLIP.x + SLIP.w - 166, y: SLIP.y + SLIP.h - 20, w: 56, h: 13 },
     { x: SLIP.x + SLIP.w - 86, y: SLIP.y + SLIP.h - 20, w: 76, h: 13 },
   ];
 
@@ -405,8 +412,10 @@ export function createDialogueScene(G) {
       else pull();
     },
     exit() { if (entry) { entry.detach(); entry = null; } },
-    pause() {},
+    // the name entry reads physical keys only while this slip is on top
+    pause() { if (entry) entry.detach(); },
     resume(result) {
+      if (entry && state === 'entry') entry.attach();
       if (state === 'take') { pull(result === 1); return; }
       if (state === 'child') { pull(result ?? undefined); }
     },
@@ -501,7 +510,7 @@ export function createDialogueScene(G) {
       if (lingerOffered) lines.push(`[${t('verb.linger')}]`);
       return lines.join('\n');
     },
-    isBusy: () => state !== 'say' || !pageDone() || slide.t < slide.ms,
+    isBusy: () => state === 'closing' || state === 'idle' || !pageDone() || slide.t < slide.ms || (!!choiceFocus && choiceLock > 0) || (!!nameAsk && nameAsk.lock > 0),
     get state() { return state; },
   };
 
@@ -519,7 +528,7 @@ export function createDialogueScene(G) {
       ctx.fillStyle = COLORS.paper.shade;
       ctx.fillRect(bx, by, BUST.w, BUST.h);
       const talking = !pageDone() && Math.floor(talkMs / 100) % 2 === 1 && !reducedMotion(G);
-      const spr = speaker.portrait ? portraitSprite(speaker.portrait) : null;
+      const spr = speaker.portrait ? portraitSprite(speaker.portrait, /** @type {any} */ (speaker).expr ?? 'neutral') : null;
       if (spr && isSprite(spr)) drawSprite(ctx, spr, bx, by + (talking ? 1 : 0));
       else drawSprite(ctx, getPortraitPlaceholder(), bx + 8, by + 8 + (talking ? 1 : 0));
       ctx.fillStyle = COLORS.paper.edge;
@@ -558,10 +567,12 @@ export function createDialogueScene(G) {
     }
     // linger seal
     if (state === 'end' && lingerOffered) {
-      drawText(ctx, TYPE.cursor, ax - 70, ay, { color: lingerFocus ? COLORS.paper.inkFaint : COLORS.wax.fill });
-      drawText(ctx, t('common.close'), ax - 62, ay, { color: lingerFocus ? COLORS.paper.inkFaint : COLORS.paper.ink });
-      drawSealButton(ctx, t('verb.linger'), LINGER.x + 6, LINGER.y + off, { focused: lingerFocus, w: LINGER.w - 6 });
-      if (lingerFocus) drawText(ctx, TYPE.cursor, LINGER.x - 2 + lift, LINGER.y + 3 + off, { color: COLORS.wax.fill });
+      const closeW = measureText(t('common.close')).w;
+      const cx = LINGER.x - closeW - 18;
+      if (!lingerFocus) drawText(ctx, TYPE.cursor, cx - 8 + lift, LINGER.y + 3 + off, { color: COLORS.wax.fill });
+      drawText(ctx, t('common.close'), cx, LINGER.y + 3 + off, { color: lingerFocus ? COLORS.paper.inkFaint : COLORS.paper.ink });
+      drawSealButton(ctx, t('verb.linger'), LINGER.x, LINGER.y + off, { focused: lingerFocus, w: LINGER.w });
+      if (lingerFocus) drawText(ctx, TYPE.cursor, LINGER.x - 8 + lift, LINGER.y + 3 + off, { color: COLORS.wax.fill });
     }
     // name confirm seals
     if (state === 'nameConfirm' && nameAsk) {
@@ -604,7 +615,7 @@ export function createDialogueScene(G) {
     drawPanel(ctx, R, 'ledger', { title: t('journal.log'), titleStyle: 'wax', rulePitch: 10, margin: 0 });
     const lines = [];
     for (const l of textLog(G).lines()) {
-      const prefix = l.who ? `${l.who}: ` : '';
+      const prefix = l.who === '>' ? '▶ ' : l.who ? `${l.who}: ` : '';
       const wrapped = paginate(prefix + l.text, { maxWidth: R.w - 24, maxLines: 99 })[0].split('\n');
       wrapped.forEach((w, i) => lines.push({ text: w, who: i === 0 && !!l.who, choice: l.who === '>' }));
     }

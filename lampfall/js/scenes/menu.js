@@ -20,7 +20,7 @@ import { drawCurrency } from '../ui/widgets.js';
 import { t } from '../data/strings.js';
 import { formatTime, day as dayOf } from '../state/selectors.js';
 import { MENU_ITEMS as MODEL_ITEMS, pauseRows, placeName, isNoRewind } from './menuModel.js';
-import { prefsOf, skinOf, drawSkinPanel, createSlide, drawGlyph, drawCursorAt, drawHints, sfx, toast } from './menuKit.js';
+import { prefsOf, skinOf, drawSkinPanel, createSlide, drawGlyph, drawCursorAt, drawHints, fitText, sfx, toast } from './menuKit.js';
 
 /** Menu entries in order (`{label, scene}`); Save is always last. */
 export const MENU_ITEMS = Object.freeze(MODEL_ITEMS.map((it) => Object.freeze({ id: it.id, label: it.label, scene: it.scene })));
@@ -40,8 +40,16 @@ export function createMenuScene(G) {
   let ms = 0;
   const focus = createFocus({ cols: 1, wrap: true, index: 0, items: [] });
 
+  let layoutKey = '';
+  /**
+   * Lays the rows out at the slide offset. Only re-feeds the focus model when something changed:
+   * `setItems` disarms the touch two-step, so calling it every frame would eat every second tap.
+   */
   function layout(off = 0) {
     rows = pauseRows(G.world);
+    const key = `${off}|${rows.map((r) => `${r.id}:${r.locked ? 1 : 0}`).join(',')}`;
+    if (key === layoutKey) return;
+    layoutKey = key;
     focus.setItems(rows.map((r, i) => ({
       id: r.id,
       rect: { x: MENU_RECT.x + 6 + off, y: MENU_RECT.y + HEAD_H + i * ROW_H, w: MENU_RECT.w - 12, h: ROW_H },
@@ -75,6 +83,7 @@ export function createMenuScene(G) {
     opaque: false,
     enter() {
       G.input?.flush?.();
+      layoutKey = '';
       layout();
       focus.set(0, { force: true });
       ms = 0;
@@ -140,8 +149,8 @@ export function createMenuScene(G) {
       ctx.fillRect(x + 6, fy, MENU_RECT.w - 12, 1);
       const w = G.world;
       const place = placeName(w?.player?.mapId, G.data);
-      drawText(ctx, `Day ${dayOf(w) + 1}`, x + 8, fy + 5, { color: skin.soft }); // str
-      drawText(ctx, place, x + MENU_RECT.w - 8, fy + 5, { color: skin.soft, align: 'right', maxWidth: 84 });
+      const dayW = drawText(ctx, `Day ${dayOf(w) + 1}`, x + 8, fy + 5, { color: skin.soft }).w; // str
+      drawText(ctx, fitText(place, MENU_RECT.w - 24 - dayW), x + MENU_RECT.w - 8, fy + 5, { color: skin.soft, align: 'right' });
       drawCurrency(ctx, w?.wallet?.main ?? 0, x + 8, fy + 17, { dark: skin.dark });
       const cur = rows[focus.index];
       if (cur && cur.locked) {

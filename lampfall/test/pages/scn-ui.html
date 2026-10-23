@@ -1,0 +1,367 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SCN-UI story and town hosts</title>
+  <link rel="icon" href="data:,">
+  <style>
+    html, body { margin: 0; height: 100%; background: #141B33; display: grid; place-items: center; overflow: hidden; }
+    canvas { width: 960px; height: 540px; image-rendering: pixelated; image-rendering: crisp-edges; touch-action: none; }
+  </style>
+</head>
+<body>
+  <canvas id="game" width="480" height="270"></canvas>
+  <script type="module">
+    // Test bench for the SCN-UI lane: dialogue (choices, nickname accept/decline/counter, creature
+    // naming, Linger, the log), cutscene (camera pans, walks, emotes, skip, resume), shop (buy, sell,
+    // Wanted Today, discs + learner strip, Starsalt cap, closed hours, the Crate), letters (seal,
+    // typewriter, family "Carry to door", Barnaby's string wall) and Sleep -> Day Page -> dawn build ->
+    // 06:00. A real G (store, clock, rngs, persist in memory, music director muted, toasts) and a small
+    // stand-in overworld that implements the cutscene Stage. Harness: window.__t (see bottom).
+    // Keys on the bench (when the stage is on top): 1 talk  2 cutscene  3 shop  4 sell  5 crate
+    // 6 sleep  7 letter  8 family letter  9 string wall  0 linger talk  L closed shop.
+    import { createInput } from '../../js/core/input.js';
+    import { createSceneStack } from '../../js/core/scene.js';
+    import { createClock } from '../../js/core/time.js';
+    import { createTweens } from '../../js/core/tween.js';
+    import { createFX } from '../../js/core/fx.js';
+    import { audio } from '../../js/core/audio.js';
+    import { drawText } from '../../js/core/font.js';
+    import { drawSprite } from '../../js/core/pixelart.js';
+    import { createStore } from '../../js/state/store.js';
+    import { createNewWorld, SCHEMA_VERSION } from '../../js/state/schema.js';
+    import { MIGRATIONS } from '../../js/state/migrate.js';
+    import { createPersist } from '../../js/state/persist.js';
+    import { createRngs } from '../../js/state/rngs.js';
+    import { DATA } from '../../js/data/index.js';
+    import { createRegistry } from '../../js/data/registry.js';
+    import { SPECIES, FAMILIES } from '../../js/data/species/index.js';
+    import { MOVES } from '../../js/data/moves/index.js';
+    import { ABILITIES } from '../../js/data/abilities.js';
+    import { TYPES } from '../../js/data/types.js';
+    import { ITEMS } from '../../js/data/items.js';
+    import { COLLECTIONS } from '../../js/data/collections.js';
+    import { SHOPS } from '../../js/data/shops.js';
+    import { LETTERS } from '../../js/data/letters/index.js';
+    import { LOANS } from '../../js/data/loans.js';
+    import * as clockSys from '../../js/systems/clockSys.js';
+    import * as party from '../../js/systems/party.js';
+    import * as bag from '../../js/systems/bag.js';
+    import * as wallet from '../../js/systems/wallet.js';
+    import * as letters from '../../js/systems/letters.js';
+    import * as flagsSys from '../../js/systems/flags.js';
+    import * as dayFlow from '../../js/systems/flow/dayFlow.js';
+    import * as eventScripts from '../../js/systems/flow/eventScripts.js';
+    import { createMusicDirector } from '../../js/audio/director.js';
+    import { createToasts } from '../../js/ui/toast.js';
+    import { createCamera } from '../../js/world/camera.js';
+    import { charSprite } from '../../js/art/chars/index.js';
+    import { PALETTE } from '../../js/ui/theme.js';
+    import { sceneFactories } from '../../js/scenes/index.js';
+    import { textLog } from '../../js/scenes/scriptHost.js';
+
+    const W = 480, H = 270, TILE = 16;
+    const q = new URLSearchParams(location.search);
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
+    const errors = [];
+    window.addEventListener('error', (e) => errors.push(String(e.message)));
+    window.addEventListener('unhandledrejection', (e) => errors.push(String(e.reason)));
+
+    // ------------------------------------------------------------------ data
+    const NPCS = [
+      { id: 'wren', name: 'Wren', portrait: 'wren', topics: [], lines: { generic: [{ id: 'g1', text: 'Tally sticks never lie.' }, { id: 'g2', text: 'Alder. Notch it wide, Ambrose says.' }, { id: 'g3', text: 'Pay it when you can. The roof will wait.' }] } },
+      { id: 'tully', name: 'Tully', portrait: 'tully', lines: { generic: [{ id: 'g1', text: 'Never the slowest.' }] } },
+      { id: 'juniper', name: 'Juniper', portrait: 'juniper', lines: { generic: [{ id: 'g1', text: 'Staples never change.' }] } },
+      { id: 'ludo', name: 'Ludo', portrait: 'ludo', lines: { generic: [] } },
+      { id: 'hesper', name: 'Hesper', portrait: 'hesper', lines: { generic: [] } },
+    ];
+    const SCRIPTS = {
+      ...DATA.scripts,
+      'test-talk': [
+        'Wren: You walked. Nobody walks.~ Not since the causeway went under, anyway.',
+        'Wren: Six thousand buttons, no interest.|Pay it when you can. We build while you sleep.',
+        { op: 'choice', prompt: 'Wren: So. Will you take the lease?', options: [
+          { text: 'Show me the ledger.', goto: 'ledger' },
+          { text: 'Later.', goto: 'later' },
+        ], defaultIndex: 0 },
+        { op: 'label', id: 'ledger' },
+        { op: 'give', item: 'tallow-wick', n: 5 },
+        'Wren: Five tallow wicks. Keep them dry, and keep them lit.',
+        { op: 'goto', id: 'tully' },
+        { op: 'label', id: 'later' },
+        "Wren: The sticks will wait. The tide won't.",
+        { op: 'label', id: 'tully' },
+        "Tully: Oi! New keeper! I name everyone on this harbor. You're Mudlark now.",
+        { op: 'nickname', who: 'tully', offer: 'Mudlark' },
+        { op: 'say', who: 'tully', emote: '!', text: 'Right. And your little one? It needs a proper name.' },
+        { op: 'nickname', who: 'player:c1', offer: 'PUDDLE' },
+        'Wren: {nick:c1}. It suits it.',
+        { op: 'end' },
+      ],
+      'test-cutscene': [
+        { op: 'music', track: 'h_dusk' },
+        { op: 'camera', to: [21, 5], ms: 900 },
+        { op: 'emote', who: 'wren', kind: '!' },
+        { op: 'move', who: 'wren', path: 'LLD' },
+        { op: 'face', who: 'wren', dir: 'player' },
+        'Wren: There you are. The lamp is dark, but the porch is yours.',
+        { op: 'camera', to: 'player', ms: 700 },
+        { op: 'move', who: 'tully', path: 'U2R', run: true },
+        { op: 'emote', who: 'tully', kind: '♥' },
+        'Tully: Race you to the quay! Last one there buys the chips.',
+        { op: 'wait', ms: 250 },
+        { op: 'playSfx', name: 'bell' },
+        { op: 'toast', text: 'The porchlight comes on.' },
+        { op: 'end' },
+      ],
+      'test-shop-talk': [
+        "Juniper: Pell's! Everything you need and three things you didn't know you did.",
+        { op: 'openShop', shop: 'pells-sundries' },
+        'Juniper: Come back when the wicks run low.',
+        { op: 'end' },
+      ],
+      'test-event': ['Wren: Tier two! The porch light is yours now.', { op: 'end' }],
+    };
+    const data = createRegistry({
+      ...DATA, species: SPECIES, families: FAMILIES, moves: MOVES, abilities: ABILITIES, types: TYPES,
+      items: ITEMS, collections: COLLECTIONS, shops: SHOPS, letters: LETTERS, loans: LOANS, npcs: NPCS,
+      scripts: SCRIPTS, eventScripts: [{ id: 'ev-tier-2', event: 'loan:tier:2', script: 'test-event' }],
+    });
+
+    // ------------------------------------------------------------------ the game context
+    const input = createInput({ canvas, width: W, height: H, touch: q.get('touch') === '1' });
+    const scenes = createSceneStack({ input, width: W, height: H });
+    const world0 = createNewWorld({ seedCode: 'SCNUI-TEST', lease: { name: 'Sorrel', species: 'red-panda', pronouns: 'they' } });
+    const store = createStore(world0);
+    const rngs = createRngs(store);
+    const clock = createClock(clockSys.optionsFrom(store.world));
+    clockSys.restoreFrom(store.world, clock);
+    store.onSnapshot((w) => clockSys.serializeInto(w, clock));
+    const persist = createPersist({ storage: null, prefix: 'scnui-test.', version: SCHEMA_VERSION, migrations: MIGRATIONS });
+    const toasts = createToasts({ width: W, height: H });
+    const G = {
+      store, get world() { return store.world; }, bus: store.bus,
+      display: { canvas, ctx, width: W, height: H },
+      input, scenes, audio, music: null, data, rngs, clock,
+      tweens: createTweens(), fx: createFX({ width: W, height: H }), persist, toasts,
+      flags: { debug: true, noanim: q.get('noanim') === '1' },
+      sceneFactories: { ...sceneFactories, overworld: createStage },
+      push(name, params) { scenes.push(G.sceneFactories[name](G), params); },
+      replaceWith(name, params) { scenes.replace(G.sceneFactories[name](G), params); },
+      speed: 1,
+    };
+    audio.mute(true);
+    G.music = createMusicDirector(G);
+    G.bus.on('toast', (p) => toasts.show(typeof p === 'string' ? p : p?.text ?? '', { icon: p?.icon }));
+    const cues = [];
+    G.bus.on('music:cue', (p) => cues.push(p));
+    const offFlow = dayFlow.install(G);
+    const offEvents = eventScripts.install(G);
+
+    // a starting world: 18:20 on day 2 (core 1), porch lit (tier 2), a creature, some wares
+    function seed() {
+      store.tx('seed', (w) => {
+        clockSys.setTime(w, clock, 18 * 60 + 20);
+        w.loans.tier = 2;
+        party.giveCreature(w, { species: 'puddlepip', level: 7, nick: 'Puddlepip' }, data, null, { bus: G.bus });
+        party.giveCreature(w, { species: 'scrapling', level: 6, nick: 'Peg' }, data, null, { bus: G.bus });
+        wallet.earn(w, 3200, { data, bus: G.bus });
+        for (const [id, n] of [['perch', 3], ['grey-mullet', 2], ['pear', 6], ['cockle', 4], ['ammonite', 1]]) bag.give(w, id, n, { data, bus: G.bus });
+      });
+      // day 1 -> day 2 clock: core day 1
+      store.tx('seed:day', (w) => { w.clock = { ...w.clock }; });
+    }
+
+    // ------------------------------------------------------------------ the stand-in overworld (Stage)
+    function createStage(G) {
+      const MW = 34, MH = 20;
+      const tiles = [];
+      for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++) {
+        let k = ((x * 7 + y * 13) % 5 === 0) ? 1 : 0;
+        if (y === 9 || x === 16) k = 2;
+        if (y >= MH - 4) k = 3;
+        if (y >= MH - 2) k = 4;
+        tiles.push(k);
+      }
+      const COLORS = ['#4f7f4a', '#5c8c52', '#c9ae78', '#d9c78a', '#3a6ea8'];
+      const ents = new Map();
+      const add = (id, art, x, y, facing = 'down') => ents.set(id, { id, art, x, y, px: x * TILE, py: y * TILE, fromX: x, fromY: y, t: 1, facing, queue: [], run: false, step: 0 });
+      add('player', 'player', 16, 10, 'up');
+      add('wren', 'wren', 21, 6, 'left');
+      add('tully', 'tully', 13, 13, 'up');
+      const camera = createCamera({ w: W, h: H });
+      camera.bounds({ w: MW, h: MH });
+      camera.follow(ents.get('player'), { snap: true });
+      const blocked = (x, y) => x < 0 || y < 0 || x >= MW || y >= MH - 2 || [...ents.values()].some((e) => e.x === x && e.y === y);
+      const D = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
+      const stage = {
+        entity: (who) => ents.get(who) ?? null,
+        walk(who, dirs, o) { const e = ents.get(who); if (!e) return false; e.queue.push(...dirs); e.run = !!o?.run; return true; },
+        isMoving: (who) => { const e = ents.get(who); return !!e && (e.t < 1 || e.queue.length > 0); },
+        face(who, dir) { const e = ents.get(who); if (e) e.facing = dir; },
+        teleport(who, x, y) { const e = ents.get(who); if (e) { e.x = e.fromX = x; e.y = e.fromY = y; e.t = 1; e.queue = []; e.px = x * TILE; e.py = y * TILE; } },
+        spawn(who, art, x, y) { add(who, art, x, y); },
+        despawn(who) { ents.delete(who); },
+        warp() {},
+        camera,
+      };
+      function tickEnt(e, dt) {
+        if (e.t >= 1 && e.queue.length) {
+          const dir = e.queue.shift();
+          e.facing = dir;
+          const nx = e.x + D[dir][0], ny = e.y + D[dir][1];
+          if (!blocked(nx, ny)) { e.fromX = e.x; e.fromY = e.y; e.x = nx; e.y = ny; e.t = 0; }
+        }
+        if (e.t < 1) {
+          e.t = Math.min(1, e.t + dt / (e.run ? 100 : 160));
+          e.step = Math.floor(e.t * 2) % 2 + 1;
+          if (e.t >= 1) e.step = 0;
+        }
+        e.px = Math.round((e.fromX + (e.x - e.fromX) * e.t) * TILE);
+        e.py = Math.round((e.fromY + (e.y - e.fromY) * e.t) * TILE);
+      }
+      return {
+        name: 'overworld', opaque: true, stage,
+        enter() { eventScripts.runPending(G); },
+        resume() { eventScripts.runPending(G); },
+        update(dt) {
+          const top = G.scenes.top();
+          if (top === this || !top?.freezesClock) {
+            if (top === this) G.store.tx('clock:tick', (w) => clockSys.tick(w, G.clock, dt, { bus: G.bus, data: G.data }));
+          }
+          for (const e of ents.values()) tickEnt(e, dt);
+          camera.update(dt);
+        },
+        handleInput(input) {
+          const p = ents.get('player');
+          if (p.t >= 1 && !p.queue.length) {
+            for (const d of ['up', 'down', 'left', 'right']) if (input.held(d)) { p.queue.push(d); p.run = input.held('run'); break; }
+          }
+        },
+        draw(c) {
+          c.fillStyle = PALETTE.nightInk;
+          c.fillRect(0, 0, W, H);
+          const cx = camera.x, cy = camera.y;
+          for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++) {
+            const sx = x * TILE - cx, sy = y * TILE - cy;
+            if (sx < -TILE || sy < -TILE || sx > W || sy > H) continue;
+            const k = tiles[y * MW + x];
+            c.fillStyle = COLORS[k];
+            c.fillRect(sx, sy, TILE, TILE);
+            if (k === 0 || k === 1) { c.fillStyle = '#467243'; c.fillRect(sx + 4, sy + 9, 1, 2); c.fillRect(sx + 10, sy + 5, 1, 2); }
+            if (k === 4) { c.fillStyle = '#5b8fc7'; c.fillRect(sx + ((x * 5) % 12), sy + 6, 4, 1); }
+          }
+          // the cottage
+          c.fillStyle = '#e8dcc0'; c.fillRect(22 * TILE - cx, 2 * TILE - cy, 64, 40);
+          c.fillStyle = '#6E8CA8'; c.fillRect(21.5 * TILE - cx, 1 * TILE - cy, 72, 16);
+          c.fillStyle = '#F9C46B'; c.fillRect(23 * TILE - cx, 3.5 * TILE - cy, 8, 8); c.fillRect(25.5 * TILE - cx, 3.5 * TILE - cy, 8, 8);
+          const list = [...ents.values()].sort((a, b) => a.py - b.py);
+          for (const e of list) {
+            const sx = e.px - cx, sy = e.py - cy;
+            c.fillStyle = 'rgba(20,27,51,0.35)';
+            c.fillRect(sx + 3, sy + 12, 10, 3);
+            drawSprite(c, charSprite(e.art, e.facing, e.step), sx, sy - 9);
+          }
+          const tm = clockSys.snapshot(G.world, G.data);
+          drawText(c, `Day ${tm.gameDay}  ${tm.time}  ◉${G.world.wallet.main}`, 6, 4, { color: '#F6F1E3', shadow: true });
+          if (G.scenes.top() === this) drawText(c, '1 talk 2 cutscene 3 shop 4 sell 5 crate 6 sleep 7 letter 8 family 9 wall 0 linger L closed', 6, 260, { font: 'small', color: '#F6F1E3', shadow: true });
+        },
+        debugText: () => 'stage',
+      };
+    }
+
+    // ------------------------------------------------------------------ helpers (also the harness API)
+    function setMinute(m) { store.tx('t:setTime', (w) => clockSys.setTime(w, clock, m, { silent: true })); }
+    const T = {
+      G, errors, cues, textLog: () => textLog(G).lines(),
+      stack: () => scenes.stack.map((s) => s.name ?? '?'),
+      top: () => scenes.top()?.name ?? '',
+      text: () => { const out = []; for (const s of scenes.stack.slice().reverse()) { if (typeof s.debugText === 'function') out.push(s.debugText()); if (s.opaque !== false) break; } return out.join('\n'); },
+      state: () => scenes.top()?.state ?? '',
+      idle: () => { const s = scenes.top(); return !scenes.isTransitioning && !(s && typeof s.isBusy === 'function' && s.isBusy()); },
+      world: () => store.world,
+      talk: () => G.push('dialogue', { scriptId: 'test-talk' }),
+      linger: () => G.push('dialogue', { target: { kind: 'npc', id: 'wren' } }),
+      cutscene: () => G.push('cutscene', { scriptId: 'test-cutscene' }),
+      shop: (id = 'pells-sundries', mode) => { setMinute(10 * 60); G.push('shop', { shop: id, mode }); },
+      shopTalk: () => { setMinute(10 * 60); G.push('dialogue', { scriptId: 'test-shop-talk' }); },
+      closedShop: () => { setMinute(23 * 60); G.push('shop', { shop: 'pells-sundries' }); },
+      ludo: () => { setMinute(23 * 60); G.push('shop', { shop: 'ludo-eave' }); },
+      crate: () => G.push('shop', { mode: 'crate' }),
+      sleep: () => { setMinute(22 * 60 + 30); return dayFlow.askSleep(G); },
+      sleepNow: () => { setMinute(22 * 60 + 30); return dayFlow.rest(G, 'sleep'); },
+      queueBuild: () => store.tx('t:build', (w) => { const day = Math.floor(w.clock.total / 1440); w.loans.builds.push({ id: 'cottage', tier: 2, startedDay: day, readyDay: day + 1, choice: 'harbor-red', done: false }); }),
+      letter: (n) => G.push('letter', { n, from: 'mailbox' }),
+      deliverK1: () => store.tx('t:k1', (w) => letters.deliverMorning(w, data, { bus: G.bus, day: Math.max(1, Math.floor(w.clock.total / 1440)) })),
+      family: () => {
+        if (Math.floor(store.world.clock.total / 1440) < 1) setMinute(17 * 60); // family letters come from day 2
+        setMinute(18 * 60 + 30);
+        store.tx('t:fam', (w) => letters.deliverEvening(w, data, { bus: G.bus }));
+        const n = store.world.letters.counter;
+        G.push('letter', { n, from: 'counter' });
+        return n;
+      },
+      wall: () => {
+        const town = LETTERS.find((l) => l.channel === 'town');
+        store.tx('t:pin', (w) => { letters.pinFind(w, data, 'ammonite', { bus: G.bus }); letters.pinFind(w, data, town.find, { bus: G.bus }); });
+        G.push('letter', { n: town.n, from: 'wall' });
+        return town.n;
+      },
+      tierEvent: () => G.bus.emit('loan:tier', { tier: 2, prev: 1 }),
+      save: () => persist.autosave(G, 'test'),
+      reload: () => {
+        // save mid-scene, load the slot into a fresh stack (as a page reload would)
+        const res = persist.autosave(G, 'reload-test');
+        if (!res.ok) return { error: res.error };
+        const loaded = persist.load(res.slot);
+        if (!loaded.ok) return { error: loaded.error };
+        scenes.clear();
+        store.replace(loaded.world);
+        clockSys.restoreFrom(store.world, clock);
+        scenes.push(createStage(G));
+        return { slot: res.slot, cutscene: store.world.cutscene };
+      },
+      setSpeed: (s) => store.tx('t:speed', (w) => { w.settings.textSpeed = s; }),
+      setMinute,
+    };
+    window.__t = T;
+
+    // keyboard shortcuts on the bench
+    window.addEventListener('keydown', (e) => {
+      if (scenes.top()?.name !== 'overworld') return;
+      const map = { Digit1: T.talk, Digit2: T.cutscene, Digit3: () => T.shop(), Digit4: () => T.shop('pells-sundries', 'sell'), Digit5: T.crate, Digit6: T.sleep, Digit7: () => { T.deliverK1(); T.letter(); }, Digit8: T.family, Digit9: T.wall, Digit0: T.linger, KeyL: T.closedShop };
+      if (map[e.code]) { e.preventDefault(); map[e.code](); }
+    });
+
+    // ------------------------------------------------------------------ boot + loop
+    seed();
+    scenes.push(createStage(G));
+    let last = performance.now(), acc = 0, frames = 0, simMs = 0, drawMs = 0;
+    T.perf = () => ({ frames, simMs: Math.round(simMs), drawMs: Math.round(drawMs), now: Math.round(performance.now()) });
+    function frame(now) {
+      requestAnimationFrame(frame);
+      frames++;
+      const t0 = performance.now();
+      const dt = Math.min(250, now - last); last = now; acc += dt;
+      let steps = 0;
+      while (acc >= 1000 / 60 && steps < 4) {
+        input.update(); G.tweens.update(1000 / 60); toasts.update(1000 / 60);
+        scenes.handleInput(input); scenes.update(1000 / 60); persist.tick(G, 1000 / 60);
+        acc -= 1000 / 60; steps++;
+      }
+      if (steps === 4) acc = 0;
+      const t1 = performance.now();
+      ctx.fillStyle = '#141B33'; ctx.fillRect(0, 0, W, H);
+      scenes.draw(ctx);
+      toasts.draw(ctx);
+      simMs += t1 - t0; drawMs += performance.now() - t1;
+    }
+    requestAnimationFrame(frame);
+    const auto = q.get('run');
+    if (auto && T[auto]) setTimeout(() => T[auto](), 50);
+  </script>
+</body>
+</html>

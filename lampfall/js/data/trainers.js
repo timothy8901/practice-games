@@ -261,7 +261,7 @@ export const TRAINERS = Object.freeze([
 
   // ===== Emberstep (curve 19; day 15-20, night 17-22). =====
   trainer({
-    id: 'emberstep-asha', name: 'Asha', title: 'Spa Bather', class: 'route', sprite: 'trainerVest', kind: 'otter shrew',
+    id: 'emberstep-asha', name: 'Asha', title: 'Spa Bather', class: 'route', sprite: 'trainerVest', kind: 'water shrew',
     map: 'emberstep', post: 'emberstep-lower-terrace', postName: 'the lower spa terrace', region: 'emberstep', band: 'day',
     party: [mon('puddlepip', 17, ['salt-spray', 'settle', 'shell-rattle', 'tap']), mon('rayling', 18, ['salt-spray', 'breaker', 'tap'])],
     tacticTag: 'two Brine; Breaker hits hard',
@@ -601,10 +601,10 @@ export const TRAINERS = Object.freeze([
     id: 'seraphine-spire', name: 'Seraphine Locke', title: 'Spire Leader', class: 'leader', npc: 'seraphine',
     map: 'spire-mirror', post: 'spire-mirror-dais', postName: 'the Mirror Spire dais, in the ice gallery', region: 'rimeholt', spire: 'mirror',
     party: [
-      mon('gillwick', 42, ['mire-bloom', 'tidal-mend', 'riptide', 'spore-drift']),
+      mon('gillwick', 40, ['mire-bloom', 'tidal-mend', 'riptide', 'spore-drift']),
       mon('rimeplate', 42, ['plate-toss', 'hoarfrost', 'shard-fling', 'rime-lock']),
-      mon('floeback', 42, ['floe-ram', 'rime-lock', 'stand-firm', 'hoarfrost']),
-      mon('strandrunner', 42, ['gale-cut', 'breaker', 'skein-sweep', 'floe-ram']),
+      mon('floeback', 41, ['floe-ram', 'rime-lock', 'stand-firm', 'hoarfrost']),
+      mon('strandrunner', 40, ['gale-cut', 'breaker', 'skein-sweep', 'floe-ram']),
       mon('skeinwing', 42, ['mirror-step', 'skein-sweep', 'riptide', 'hoarfrost']),
       mon('lumenveil', 43, ['shardlight', 'mirror-step', 'echo-drain', 'lens-focus'], { held: 'ballast-stone' }),
     ],
@@ -620,7 +620,7 @@ export const TRAINERS = Object.freeze([
 
   // ===== The Long Road on the Bar (Lv40-44; highest x50). =====
   trainer({
-    id: 'bar-corwen', name: 'Corwen', title: 'Wreck Diver', class: 'long-road', sprite: 'trainerCoat', kind: 'otter shrew',
+    id: 'bar-corwen', name: 'Corwen', title: 'Wreck Diver', class: 'long-road', sprite: 'trainerCoat', kind: 'water shrew',
     map: 'the-bar', post: 'bar-wreck-ribs', postName: 'the ribs of the lost fleet', region: 'the-bar', stage: 1,
     party: [mon('bilgebob', 40, ['gnash', 'riptide', 'tidal-mend', 'shellguard']), mon('rustcreel', 40, ['rust-bite', 'iron-pin', 'corrode', 'tap']), mon('creelwight', 41, ['snuff', 'echo-drain', 'iron-pin', 'stand-firm']), mon('hulkwight', 41, ['snuff', 'drowned-bell', 'iron-pin', 'stand-firm'])],
     items: heal('tonic'),

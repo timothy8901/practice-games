@@ -123,7 +123,9 @@ export function speakerOf(G, req) {
   if (!who) return { id: null, name: '', portrait: null, tick: 0 };
   const data = G?.data;
   const row = data && typeof data.has === 'function' && data.has('npcs', who) ? data.get('npcs', who) : null;
-  const name = typeof req.name === 'string' && req.name ? req.name : row?.name ?? who;
+  // a neighbour's own name always comes from their row: `world.npcs[id].nickname` is what they call
+  // the PLAYER (systems/memory), not a name for them
+  const name = row?.name ?? (typeof req.name === 'string' && req.name ? req.name : who);
   const candidates = [req.portrait, row?.portrait, who, typeof row?.id === 'string' ? row.id : null];
   const portrait = candidates.find((p) => typeof p === 'string' && PORTRAIT_IDS.includes(p)) ?? null;
   return { id: who, name, portrait, tick: tickPitch(who) };

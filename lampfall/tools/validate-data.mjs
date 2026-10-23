@@ -26,7 +26,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 /** Effect vocabulary from §5.1, used until `js/battle/effects.js` exports `EFFECT_KEYS`. */
 export const DRAFT_EFFECT_KEYS = Object.freeze([
   'stat', 'status', 'recovery', 'guard', 'evasion', 'sureHit', 'plumbline', 'scrap', 'clearRaised', 'flinch',
-  'popsDecoy', 'highCrit', 'revealMoves', 'charge', 'spread', 'queuedType', 'multiHit', 'drain', 'selfKo', 'contact', 'chance',
+  'popsDecoy', 'highCrit', 'revealMoves', 'charge', 'spread', 'queuedType', 'multiHit', 'drain', 'selfKo', 'contact', 'chance', 'weather',
 ]);
 /** AI profiles from the manifest, used until `js/battle/ai.js` exports `PROFILES`. */
 export const DRAFT_AI_PROFILES = Object.freeze(['wild', 'trainer', 'spire', 'summit']);
@@ -46,6 +46,9 @@ export const ENTITY_KINDS = Object.freeze(['npc', 'tree', 'rock', 'crack', 'sign
  * @typedef {Object} ValidateOptions
  * @property {Record<string, any>} [tuning]
  * @property {readonly string[]} [effectKeys]
+ * @property {readonly string[]|null} [heldKeys]   keys an item row's `held` object may carry (battle/heldItems.HELD_KEYS); null = skip
+ * @property {ReadonlyArray<{id: string}>|null} [weatherKinds]   arena weather kinds (data/spires.WEATHER_KINDS) that move
+ *   `weather` effects, trainer `onEntry` and Spire weather cycles must name; null = skip
  * @property {Set<string>|null} [hooks]          ability hook keys; null = unknown (skip with a warning)
  * @property {Set<string>|null} [useHandlers]    item use keys; null = skip
  * @property {readonly string[]} [aiProfiles]
@@ -54,6 +57,7 @@ export const ENTITY_KINDS = Object.freeze(['npc', 'tree', 'rock', 'crack', 'sign
  * @property {((rows: string[]) => {x: number, y: number, w: number, h: number}|null)|null} [opaqueBounds]
  * @property {{TRACKS?: Record<string, any>, CUES?: Record<string|number, any>}|null} [tracks]
  * @property {Record<string, string>} [legend]   DEFAULT_LEGEND override (derived from tilesets otherwise)
+ * @property {ReadonlyArray<any>} [spires]       Spire rows checked when DATA has no `spires` table (data/spires.SPIRES)
  * @property {Record<string, {ids: readonly string[], optional?: readonly string[], extras?: 'warn'|'allow', kind?: readonly string[]}>|null} [manifest]
  *   `ids.manifest.MANIFEST`; when set, authored tables are compared with it (warnings only)
  */
@@ -71,6 +75,8 @@ export function validateData(DATA, opts = {}) {
   const warn = (table, id, msg) => warnings.push(`${table}:${id}: ${msg}`);
   const tuning = opts.tuning ?? {};
   const effectKeys = new Set(opts.effectKeys ?? DRAFT_EFFECT_KEYS);
+  const heldKeys = opts.heldKeys ? new Set(opts.heldKeys) : null;
+  const weatherIds = opts.weatherKinds ? new Set(opts.weatherKinds.map((w) => w.id)) : null;
   const aiProfiles = new Set(opts.aiProfiles ?? DRAFT_AI_PROFILES);
 
   const reg = createRegistry(DATA);
@@ -182,6 +188,13 @@ export function validateData(DATA, opts = {}) {
     if (!effect) err('moves', id, 'effect must be an object (may be empty)');
     else {
       for (const k of Object.keys(effect)) if (!effectKeys.has(k)) err('moves', id, `effect key '${k}' is not in EFFECT_KEYS`);
+      if (effect.weather !== undefined) {
+        const wk = typeof effect.weather === 'string' ? effect.weather : effect.weather?.kind;
+        if (typeof wk !== 'string') err('moves', id, 'effect.weather must be a weather kind id or {kind, turns?}');
+        else if (weatherIds && !weatherIds.has(wk)) err('moves', id, `effect.weather '${wk}' is not in WEATHER_KINDS`);
+        const wt = typeof effect.weather === 'object' ? effect.weather?.turns : undefined;
+        if (wt !== undefined && wt !== null && (!int(wt) || wt < 1)) err('moves', id, 'effect.weather.turns must be a positive integer');
+      }
       if (effect.status && !STATUS_KINDS.includes(effect.status.kind)) err('moves', id, `status kind '${effect.status?.kind}' unknown (${STATUS_KINDS.join(' ')})`);
       if (effect.evasion && (mv.pp === null || mv.pp > 5)) err('moves', id, 'evasion moves must have pp <= 5');
       if (mv.pp === null && !effect.scrap) err('moves', id, 'pp may be null only for Scrap');
@@ -216,6 +229,10 @@ export function validateData(DATA, opts = {}) {
     else if (num(it.price) && it.sell > it.price) warn('items', id, 'sell price above buy price');
     if (!int(it.stack) || it.stack < 1) err('items', id, 'stack must be a positive integer');
     if (it.oneOfAKind && it.pocket !== 'keepsakes') err('items', id, 'oneOfAKind items belong in the keepsakes pocket');
+    if (it.held !== undefined && it.held !== null) {
+      if (typeof it.held !== 'object' || Array.isArray(it.held)) err('items', id, 'held must be an object of held-item keys');
+      else if (heldKeys) for (const k of Object.keys(it.held)) if (!heldKeys.has(k)) err('items', id, `held key '${k}' is not in battle/heldItems.HELD_KEYS`);
+    }
     if (it.use !== null && it.use !== undefined) {
       if (typeof it.use !== 'string') err('items', id, 'use must be a handler key or null');
       else if (opts.useHandlers && !opts.useHandlers.has(it.use)) err('items', id, `use handler '${it.use}' is not in systems/bag.USE_HANDLERS`);
@@ -517,6 +534,19 @@ export function validateData(DATA, opts = {}) {
           }
         }
       }
+      if (c.held !== undefined && c.held !== null) {
+        if (!has('items', c.held)) err('trainers', id, `party '${c.species}' held item '${c.held}' is not in items`);
+        else {
+          const row = reg.get('items', c.held);
+          if (heldKeys && !row.held && row.pocket && row.pocket !== 'held') err('trainers', id, `party '${c.species}' holds '${c.held}', a ${row.pocket} item with no held effect`);
+        }
+      }
+      if (c.onEntry !== undefined) {
+        const e = c.onEntry;
+        if (!e || typeof e.weather !== 'string') err('trainers', id, `party '${c.species}' onEntry must be {weather, turns?}`);
+        else if (weatherIds && !weatherIds.has(e.weather)) err('trainers', id, `party '${c.species}' onEntry weather '${e.weather}' is not in WEATHER_KINDS`);
+        if (e && e.turns !== undefined && e.turns !== null && (!int(e.turns) || e.turns < 1)) err('trainers', id, `party '${c.species}' onEntry turns must be a positive integer`);
+      }
     }
     for (const it of tr.items ?? []) if (!has('items', it.id)) err('trainers', id, `item '${it.id}' is not in items`);
     if (!num(tr.payout) || tr.payout < 0) err('trainers', id, 'payout must be >= 0');
@@ -525,6 +555,17 @@ export function validateData(DATA, opts = {}) {
       if (!['before', 'afterWin', 'afterLoss'].includes(k)) err('trainers', id, `scripts.${k} is not before|afterWin|afterLoss`);
       if (!has('scripts', sid)) err('trainers', id, `scripts.${k} '${sid}' is not in scripts`);
     }
+  }
+
+  // ---- spires (weather cycles) ----------------------------------------------------------------------
+  const spireRows = list('spires').length ? list('spires') : (opts.spires ?? []);
+  for (const sp of spireRows) {
+    const rule = sp?.theme?.rule;
+    if (sp?.theme?.kind !== 'weather' || !rule) continue;
+    if (!Array.isArray(rule.cycle) || !rule.cycle.length) err('spires', sp.id, 'weather theme needs rule.cycle');
+    else if (weatherIds) for (const k of rule.cycle) if (!weatherIds.has(k)) err('spires', sp.id, `weather cycle kind '${k}' is not in WEATHER_KINDS`);
+    if (!int(rule.turnsEach) || rule.turnsEach < 1) err('spires', sp.id, 'weather rule.turnsEach must be a positive integer');
+    if (rule.startsWith !== undefined && !(rule.cycle ?? []).includes(rule.startsWith)) err('spires', sp.id, `weather rule.startsWith '${rule.startsWith}' is not in the cycle`);
   }
 
   // ---- shops -------------------------------------------------------------------------------------
@@ -741,6 +782,8 @@ export async function loadOptions() {
   const notes = [];
   const tuning = (await import('../js/data/tuning.js')).TUNING;
   const effects = await optional('js/battle/effects.js', notes);
+  const heldItems = await optional('js/battle/heldItems.js', notes);
+  const spires = await optional('js/data/spires.js', notes);
   const hooks = await optional('js/battle/abilityHooks.js', notes);
   const bag = await optional('js/systems/bag.js', notes);
   const ai = await optional('js/battle/ai.js', notes);
@@ -754,6 +797,9 @@ export async function loadOptions() {
     opts: {
       tuning,
       effectKeys: effects?.EFFECT_KEYS ?? DRAFT_EFFECT_KEYS,
+      heldKeys: heldItems?.HELD_KEYS ?? null,
+      weatherKinds: spires?.WEATHER_KINDS ?? null,
+      spires: spires?.SPIRES ?? [],
       hooks: hooks?.HOOKS ? new Set(Object.keys(hooks.HOOKS)) : null,
       useHandlers: bag?.USE_HANDLERS ? new Set(Object.keys(bag.USE_HANDLERS)) : null,
       aiProfiles: ai?.PROFILES ? Object.keys(ai.PROFILES) : DRAFT_AI_PROFILES,

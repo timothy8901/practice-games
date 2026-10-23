@@ -110,7 +110,7 @@ export function lineMs(text, cps) {
   const n = String(text || '').length;
   if (!n) return 0;
   const typing = cps === Infinity || !(cps > 0) ? 0 : (n * 1000) / cps;
-  return typing + Math.min(900, 320 + n * 9);
+  return typing + Math.min(1100, 400 + n * 14);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -303,7 +303,8 @@ export function createAnimQueue(opts = {}) {
 
 /**
  * @typedef {Object} BattleView
- * @property {{mult: number|null, crit: boolean, effEv: any|null, critEv: any|null}} hit   per-hit scratch shared by consecutive anims
+ * @property {{mult: number|null, crit: boolean, effEv: any|null, critEv: any|null, moveType?: string|null}} hit   per-hit scratch shared by consecutive anims
+ * @property {(side: number, type: string|null, mult: number) => void} [impact]   spark burst on the target at the moment of impact
  * @property {(ev: any) => void} sfx                 emit `battle:event` (sound + music) now
  * @property {(text: string|null) => number} say     put a line in the log; returns its hold time (ms at 1×)
  * @property {(side: number, hp: number, maxHp: number) => number} hpTo   start the HP drain/fill; returns its length
@@ -333,8 +334,9 @@ export function createAnimQueue(opts = {}) {
  * @property {(ev: any) => void} payout
  * @property {(ev: any) => void} release             release the deferred domain events this event stands for
  * @property {(ev: any) => void} stance
- * @property {(ev: any) => void} ended               the engine's `end` event reached the screen
+ * @property {(ev: any) => string|null|void} ended   the engine's `end` event reached the screen; may return the line to say (a trainer's parting words)
  * @property {(side: number) => void} runAway
+ * @property {(ev: any|null) => void} weather        the posted battle weather (null = clear)
  * @property {boolean} [reducedMotion]
  */
 
@@ -371,6 +373,7 @@ export const BATTLE_ANIMS = Object.freeze({
   message: speak,
   turn: (ev, v) => anim('turn', function* run() { v.hit.mult = null; v.hit.crit = false; }),
   move: (ev, v) => anim('move', function* run() {
+    v.hit.moveType = ev.moveType ?? null;
     v.sfx(ev);
     const ms = v.say(lineFor(ev));
     yield frames(4);
@@ -406,6 +409,7 @@ export const BATTLE_ANIMS = Object.freeze({
       const crit = v.hit.crit;
       const stop = hitStopFrames(mult, crit);
       v.flash(ev.side, crit ? 4 : 2);
+      if (typeof v.impact === 'function') v.impact(ev.side, v.hit.moveType ?? null, mult);
       if (stop > 0) {
         v.hitStop(stop);
         v.nudge(ev.side, 2, stop + 4);
@@ -495,9 +499,11 @@ export const BATTLE_ANIMS = Object.freeze({
   read: (ev, v) => anim('read', function* run() {
     v.sfx(ev);
     v.readCard(ev);
-    v.say(lineFor(ev));
+    const ms = v.say(lineFor(ev));
     yield frames(6);
-    if (ev.side === 0) yield GATE;
+    // a Read the player asked for waits for them; an ability's free Read holds, then folds away
+    if (ev.side === 0 && ev.source === 'Read') yield GATE;
+    else yield Math.max(ms, frames(90));
     v.closeOverlay();
   }, false),
   'capture-shake': (ev, v) => anim('capture-shake', function* run() {
@@ -538,6 +544,55 @@ export const BATTLE_ANIMS = Object.freeze({
     yield v.say(lineFor(ev));
   }),
   'ward-suppressed': speak,
+  decoy: (ev, v) => anim('decoy', function* run() {
+    v.sfx(ev);
+    v.sparkle(ev.side);
+    yield v.say(lineFor(ev));
+  }),
+  'decoy-pop': (ev, v) => anim('decoy-pop', function* run() {
+    v.sfx(ev);
+    v.puff(ev.side, 'flinch');
+    yield v.say(lineFor(ev));
+  }),
+  guard: (ev, v) => anim('guard', function* run() {
+    v.sfx(ev);
+    v.flash(ev.side, 6);
+    yield v.say(lineFor(ev));
+  }),
+  'mend-spent': (ev, v) => anim('mend-spent', function* run() {
+    v.sfx(ev);
+    v.sparkle(ev.side);
+    yield v.say(lineFor(ev));
+  }),
+  'mend-pending': speak,
+  'mend-cancelled': speak,
+  'scrap-cost': speak,
+  reveal: speak,
+  'type-shift': (ev, v) => anim('type-shift', function* run() {
+    v.sfx(ev);
+    v.glint(ev.side);
+    yield v.say(lineFor(ev));
+  }),
+  'weather-start': (ev, v) => anim('weather-start', function* run() {
+    v.sfx(ev);
+    v.weather(ev);
+    yield v.say(lineFor(ev));
+  }),
+  'weather-tick': (ev, v) => anim('weather-tick', function* run() {
+    v.weather(ev);
+    const ms = v.say(lineFor(ev));
+    if (ms > 0) yield ms;
+  }),
+  'weather-end': (ev, v) => anim('weather-end', function* run() {
+    v.sfx(ev);
+    v.weather(null);
+    yield v.say(lineFor(ev));
+  }),
+  'held-item': (ev, v) => anim('held-item', function* run() {
+    v.sfx(ev);
+    v.banner(ev.side, ev.itemName);
+    yield v.say(lineFor(ev));
+  }),
   exp: (ev, v) => anim('exp', function* run() {
     v.sfx(ev);
     const say = v.say(lineFor(ev));
@@ -575,9 +630,10 @@ export const BATTLE_ANIMS = Object.freeze({
     if (ev.side === 1) yield v.say(ev.text);
   }),
   end: (ev, v) => anim('end', function* run() {
-    v.ended(ev);
-    const line = lineFor(ev);
+    const extra = v.ended(ev);
+    const line = (typeof extra === 'string' && extra) || lineFor(ev);
     if (line) yield v.say(line);
+    if (extra) yield 400;
   }),
 });
 

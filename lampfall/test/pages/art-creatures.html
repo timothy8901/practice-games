@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>Creature Contact Sheet</title>
+<style>
+  :root { --ink: #141b33; --deep: #2b3a67; --paper: #f4f1e6; --rule: #c9a77c; --v: #94b0c2; --m: #ff5bd6; }
+  html, body { margin: 0; background: var(--ink); color: var(--paper); font: 12px/1.4 ui-monospace, Menlo, Consolas, monospace; }
+  body { padding: 10px 16px 24px; }
+  h1 { font-size: 13px; letter-spacing: .12em; text-transform: uppercase; margin: 0 0 2px; color: var(--rule); }
+  h2 { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; margin: 14px 0 6px; color: var(--rule); }
+  p.sub { margin: 0 0 8px; color: var(--v); max-width: 1200px; }
+  .ctl { margin: 0 0 8px; color: var(--v); } .ctl label { margin-right: 12px; }
+  canvas { image-rendering: pixelated; image-rendering: crisp-edges; display: block; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(318px, 1fr)); gap: 6px; }
+  .card { background: var(--deep); border: 1px solid #3b4a6b; padding: 5px; }
+  .card .art { display: flex; gap: 3px; }
+  .card .name { font-weight: 700; margin-top: 3px; }
+  .card .name small { font-weight: 400; color: var(--rule); margin-left: 6px; }
+  .card .new { color: var(--m); font-weight: 400; margin-left: 6px; }
+  .strip { display: flex; flex-wrap: wrap; gap: 4px; }
+  .strip figure { margin: 0; text-align: center; color: var(--v); font-size: 10px; }
+  #err { color: #ff8a8a; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<h1>Creature contact sheet · LAMPFALL</h1>
+<p class="sub">ART-CREATURES lane (js/art/creatures/*, js/art/heartmark.js). Each card: front, idle2, back at <b id="zl">3</b>x, with the four Heartmark anchors marked (head <span style="color:#ff5bd6">plus</span> drawn by art/heartmark at the form's mark; the other three as dots). Magenta tag = drawn from a GDD-03 brief. <code>?zoom=4</code>, <code>?only=rillfin,gillwick</code>, <code>?new=1</code> (briefs only).</p>
+<div class="ctl">
+  <label><input type="checkbox" id="anim"> animate idle (front ↔ idle2)</label>
+  <label>backdrop <select id="bg"><option value="#3b4a6b">slate</option><option value="#4e6e5d">grass</option><option value="#c9b48a">sand</option><option value="#94b0c2">light</option></select></label>
+</div>
+<div id="err"></div>
+<h2>Forms (42)</h2>
+<div class="grid" id="grid"></div>
+<h2>Star-touched (palette remaps)</h2>
+<div class="strip" id="star"></div>
+<h2>Silhouettes (front filled solid k) and icons (16×16 head crops)</h2>
+<canvas id="sil"></canvas>
+<div style="height:6px"></div>
+<canvas id="icons"></canvas>
+<h2>The Vagary (96×96: front, idle2, back)</h2>
+<div class="strip" id="vagary"></div>
+<script type="module">
+  import { drawSprite } from '../../js/core/pixelart.js';
+  import { CREATURE_SPRITES, STAR_SPRITES, CREATURE_IDS, getCreatureSprite, getCreatureIcon } from '../../js/art/creatures/index.js';
+  import { drawHeartmark, ANCHOR_KEYS } from '../../js/art/heartmark.js';
+  import { SPECIES_BY_ID } from '../../js/data/species/index.js';
+
+  const q = new URLSearchParams(location.search);
+  const Z = Math.max(1, Math.min(8, Number(q.get('zoom')) || 3));
+  document.getElementById('zl').textContent = String(Z);
+  document.getElementById('grid').style.gridTemplateColumns = `repeat(auto-fill, minmax(${32 * Z * 3 + 22}px, 1fr))`;
+  const only = q.get('only') ? q.get('only').split(',') : null;
+  const newOnly = q.get('new') === '1';
+  const err = document.getElementById('err');
+  const DOT = { head: '#ff5bd6', chest: '#ffcd75', back: '#73eff7', tail: '#a7f070' };
+  let bg = '#3b4a6b';
+  const frames = [];
+
+  function cell(rec, view, frame) {
+    const c = document.createElement('canvas');
+    c.width = rec.w * Z; c.height = rec.h * Z;
+    frames.push({ c, rec, view, frame });
+    return c;
+  }
+  function paint({ c, rec, view, frame }, animFrame) {
+    const ctx = c.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, c.width, c.height);
+    const fr = animFrame ?? frame;
+    const back = view === 'back';
+    drawSprite(ctx, getCreatureSprite(rec.id, { back, frame: fr, scale: Z, star: !!rec.star }), 0, 0);
+    if (rec.star) return;
+    const set = back ? rec.heartmarksBack : fr === 1 ? rec.heartmarksIdle2 : rec.heartmarks;
+    for (const k of ANCHOR_KEYS) {
+      if (k === rec.mark) continue;
+      const p = set[k];
+      ctx.fillStyle = '#1a1c2c'; ctx.fillRect(p.x * Z - 1, p.y * Z - 1, Z + 2, Z + 2);
+      ctx.fillStyle = DOT[k]; ctx.fillRect(p.x * Z, p.y * Z, Z, Z);
+    }
+    drawHeartmark(ctx, rec, rec.mark, { x: 0, y: 0, scale: Z, back, frame: fr, lit: true });
+  }
+  try {
+    const grid = document.getElementById('grid');
+    for (const id of CREATURE_IDS) {
+      const rec = CREATURE_SPRITES[id];
+      if (rec.w !== 32) continue;
+      if (only && !only.includes(id)) continue;
+      if (newOnly && rec.source !== 'brief') continue;
+      const sp = SPECIES_BY_ID[id];
+      const card = document.createElement('div'); card.className = 'card';
+      const art = document.createElement('div'); art.className = 'art';
+      art.append(cell(rec, 'front', 0), cell(rec, 'front', 1), cell(rec, 'back', 0));
+      const name = document.createElement('div'); name.className = 'name';
+      name.innerHTML = `${sp?.name ?? id}<small>${(sp?.types ?? []).join('/')} · ${new Set(rec.rows.join('').replace(/\./g, '')).size} keys · mark ${rec.mark}</small>${rec.source === 'brief' ? '<span class="new">brief</span>' : ''}`;
+      card.append(art, name); grid.append(card);
+    }
+    const star = document.getElementById('star');
+    for (const [sid, rec] of Object.entries(STAR_SPRITES)) {
+      if (only && !only.includes(rec.starOf)) continue;
+      const f = document.createElement('figure');
+      const wrap = document.createElement('div'); wrap.style.display = 'flex'; wrap.style.gap = '2px';
+      wrap.append(cell(rec, 'front', 0), cell(rec, 'back', 0));
+      const cap = document.createElement('figcaption'); cap.textContent = SPECIES_BY_ID[rec.starOf]?.name ?? sid;
+      f.append(wrap, cap); star.append(f);
+    }
+    // silhouettes + icons
+    const ids = CREATURE_IDS.filter((id) => CREATURE_SPRITES[id].w === 32 && (!only || only.includes(id)));
+    const perRow = 21, S = 2;
+    const sil = document.getElementById('sil');
+    sil.width = perRow * 34 * S; sil.height = Math.ceil(ids.length / perRow) * 34 * S;
+    const sctx = sil.getContext('2d'); sctx.imageSmoothingEnabled = false;
+    sctx.fillStyle = '#94b0c2'; sctx.fillRect(0, 0, sil.width, sil.height);
+    ids.forEach((id, i) => drawSprite(sctx, getCreatureSprite(id, { silhouette: true, scale: S }), (i % perRow) * 34 * S + S, Math.floor(i / perRow) * 34 * S + S));
+    const icons = document.getElementById('icons');
+    const all = CREATURE_IDS.filter((id) => !only || only.includes(id));
+    icons.width = all.length * 18 * 3; icons.height = 18 * 3;
+    const ictx = icons.getContext('2d'); ictx.imageSmoothingEnabled = false;
+    ictx.fillStyle = '#2b3a67'; ictx.fillRect(0, 0, icons.width, icons.height);
+    all.forEach((id, i) => {
+      ictx.fillStyle = '#3b4a6b'; ictx.fillRect(i * 54 + 3, 3, 48, 48);
+      ictx.drawImage(getCreatureIcon(id).canvas, i * 54 + 3, 3, 48, 48);
+    });
+    // the Vagary
+    const vg = document.getElementById('vagary');
+    const vr = CREATURE_SPRITES.vagary;
+    if (vr && (!only || only.includes('vagary'))) for (const [view, fr, label] of [['front', 0, 'front'], ['front', 1, 'idle2'], ['back', 0, 'back']]) {
+      const f = document.createElement('figure');
+      const c = cell(vr, view, fr);
+      const cap = document.createElement('figcaption'); cap.textContent = label;
+      f.append(c, cap); vg.append(f);
+    }
+    const redraw = (t) => { for (const fr of frames) paint(fr, document.getElementById('anim').checked && fr.view === 'front' ? (Math.floor(t / 500) % 2) : undefined); };
+    redraw(0);
+    document.getElementById('bg').onchange = (e) => { bg = e.target.value; redraw(performance.now()); };
+    const loop = (t) => { if (document.getElementById('anim').checked) redraw(t); requestAnimationFrame(loop); };
+    requestAnimationFrame(loop);
+    window.__sheetReady = { forms: CREATURE_IDS.length, stars: Object.keys(STAR_SPRITES).length };
+  } catch (e) {
+    err.textContent = String(e && e.stack || e);
+    throw e;
+  }
+</script>
+</body>
+</html>

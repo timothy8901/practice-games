@@ -14,6 +14,7 @@
 import { dataLookup } from '../systems/exp.js';
 import { t, has } from '../data/strings.js';
 import { TYPE_CHART as FALLBACK_CHART, ORDINARY_TYPES as FALLBACK_ORDINARY } from '../data/types.js';
+import { pickAnchor } from '../art/heartmark.js';
 
 /** @typedef {import('../state/schema.js').World} World */
 /** @typedef {import('../state/schema.js').Creature} Creature */
@@ -275,6 +276,17 @@ export function listWords(words) {
   return `${w.slice(0, -1).join(', ')} and ${w[w.length - 1]}`;
 }
 
+/**
+ * An item or place name after "the": `the Salve`, but `the Bracks' Still Knot` for a name that
+ * already starts with "The " (never "the The ...").
+ * @param {string} name
+ * @returns {string}
+ */
+export function theName(name) {
+  const n = String(name ?? '');
+  return /^the\s/i.test(n) ? `the ${n.slice(4)}` : `the ${n}`;
+}
+
 // ---------------------------------------------------------------------------------------------
 // Heartmark placement
 // ---------------------------------------------------------------------------------------------
@@ -296,8 +308,8 @@ export function hash32(s) {
 
 /**
  * Which of the four anchors this individual's mark sits on. A stored `mark.spot` / `mark.anchor`
- * (name or index, the reconcile-notes recommendation) wins; otherwise the spot is derived from the
- * uid so it is stable for life and identical in every form.
+ * (name or index, the reconcile-notes recommendation) wins; otherwise `art/heartmark.pickAnchor(uid)`
+ * (the stable uid hash every lane falls back to), so it is the same for life and in every form.
  * @param {Pick<Creature, 'uid'|'mark'>} c
  * @returns {'head'|'chest'|'back'|'tail'}
  */
@@ -306,7 +318,7 @@ export function heartmarkSpot(c) {
   const raw = m && (m.spot ?? m.anchor);
   if (typeof raw === 'string' && MARK_SPOTS.includes(raw)) return /** @type {any} */ (raw);
   if (Number.isInteger(raw) && raw >= 0 && raw < 4) return /** @type {any} */ (MARK_SPOTS[raw]);
-  return /** @type {any} */ (MARK_SPOTS[hash32(`heartmark:${c?.uid ?? ''}`) % 4]);
+  return pickAnchor(c?.uid ?? '');
 }
 
 /**
@@ -519,7 +531,7 @@ export function slotLabel(entry) {
  */
 export function ageText(time, now) {
   if (!Number.isFinite(time) || !Number.isFinite(now)) return '';
-  const mins = Math.max(0, Math.round((now - time) / 60000));
+  const mins = Math.max(0, Math.floor((now - time) / 60000));
   if (mins < 1) return 'just now'; // str
   if (mins < 60) return `${mins} ${mins === 1 ? 'minute' : 'minutes'} ago`; // str
   const h = Math.round(mins / 60);
@@ -678,6 +690,8 @@ export function settingRows() {
     { id: 'wakePoint', section: 'play', label: t('settings.wakePoint'), kind: 'choice', target: 'ext',
       options: [{ value: 'porch', label: 'Your porch' }, { value: 'waystone', label: 'Last Waystone' }], // str
       note: 'Where Dimity carries you after a blackout. Nothing is lost but a few buttons.' }, // str
+    { id: 'skipAnims', section: 'play', label: t('settings.skipAnims'), kind: 'toggle', target: 'world', options: ON_OFF(),
+      note: 'Payment beads jump to the strike and the credits run at double speed.' }, // str
     { id: 'reducedMotion', section: 'sight', label: t('settings.reducedMotion'), kind: 'toggle', target: 'world', options: ON_OFF(),
       note: t('settings.reducedMotionNote') },
     { id: 'largeText', section: 'sight', label: t('settings.largeText'), kind: 'toggle', target: 'ext', options: ON_OFF(),
@@ -686,10 +700,17 @@ export function settingRows() {
       note: 'Menus become cream on night ink with heavier edges.' }, // str
     { id: 'clearVisuals', section: 'sight', label: t('settings.clearVisuals'), kind: 'toggle', target: 'ext', options: ON_OFF(),
       note: t('settings.clearVisualsNote') },
+    { id: 'scale', section: 'sight', label: t('settings.scale'), kind: 'choice', target: 'world',
+      options: ['integer', 'fit'].map((v) => ({ value: v, label: t(`settings.scale.${v}`) })),
+      note: 'Pixel-perfect keeps every pixel square; Fill the window uses all of the screen.' }, // str
+    { id: 'fps30', section: 'sight', label: t('settings.fps30'), kind: 'toggle', target: 'world', options: ON_OFF(),
+      note: 'The world draws at 30 frames a second; characters move the same. Takes hold at the next start.' }, // str
     { id: 'music', section: 'sound', label: t('settings.volume.music'), kind: 'volume', target: 'world', note: 'Left and right in steps of ten.' }, // str
     { id: 'sfx', section: 'sound', label: t('settings.volume.sfx'), kind: 'volume', target: 'world', note: 'Left and right in steps of ten.' }, // str
     { id: 'ambience', section: 'sound', label: t('settings.volume.ambience'), kind: 'volume', target: 'ext', note: 'Waves, wind, rain and the night bells.' }, // str
     { id: 'muted', section: 'sound', label: t('settings.mute'), kind: 'toggle', target: 'world', options: ON_OFF(), note: 'The 0 key toggles this anywhere.' }, // str
+    { id: 'captions', section: 'sound', label: t('settings.captions'), kind: 'toggle', target: 'ext', options: ON_OFF(),
+      note: 'Small chips name the bite, the bee hum, the mail, the hour and other sounds.' }, // str
     { id: 'pathView', section: 'controls', label: t('settings.pathView'), kind: 'choice', target: 'ext',
       options: ['hold', 'toggle'].map((v) => ({ value: v, label: t(`settings.pathView.${v}`) })),
       note: 'How the Read / Path view button behaves in the field.' }, // str
@@ -875,4 +896,110 @@ export function remapped(bindings, action, token, opts = {}) {
     else mine.push(token);
   }
   return next;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Field item effects
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * Whether a field effect (systems/bag.use) would do anything for a creature, and why not.
+ * @param {Creature} c
+ * @param {{kind: string, amount?: number|null, fraction?: number, statuses?: string[]}} effect
+ * @returns {{ok: boolean, reason?: string}}
+ */
+export function effectFits(c, effect) {
+  if (!c || !effect) return { ok: false, reason: 'nothing' };
+  const max = c.stats?.hp ?? 0;
+  const alive = (c.hp | 0) > 0;
+  switch (effect.kind) {
+    case 'heal': return !alive ? { ok: false, reason: 'resting' } : c.hp >= max ? { ok: false, reason: 'full' } : { ok: true };
+    case 'revive': return alive ? { ok: false, reason: 'awake' } : { ok: true };
+    case 'pp': return (c.moves ?? []).some((m) => m.pp < m.maxPp) ? { ok: true } : { ok: false, reason: 'full' };
+    case 'cure': return c.status && (effect.statuses ?? []).includes(c.status.kind) ? { ok: true } : { ok: false, reason: 'no-status' };
+    default: return { ok: false, reason: 'no-use' };
+  }
+}
+
+/**
+ * Applies a field effect to a creature (call inside a store tx). Returns what changed, or
+ * `{ok: false}` with nothing touched when it would do nothing (so systems/bag.use spends nothing).
+ * @param {Creature} c
+ * @param {{kind: string, amount?: number|null, fraction?: number, statuses?: string[]}} effect
+ * @returns {{ok: boolean, healed?: number, pp?: number, cured?: string|null, revived?: boolean}}
+ */
+export function applyFieldEffect(c, effect) {
+  if (!effectFits(c, effect).ok) return { ok: false };
+  const max = c.stats?.hp ?? 0;
+  switch (effect.kind) {
+    case 'heal': {
+      const before = c.hp;
+      c.hp = Math.min(max, c.hp + (Number.isInteger(effect.amount) ? effect.amount : max));
+      return { ok: true, healed: c.hp - before };
+    }
+    case 'revive': {
+      c.hp = Math.max(1, Math.floor(max * (typeof effect.fraction === 'number' ? effect.fraction : 0.5)));
+      c.status = null;
+      return { ok: true, revived: true, healed: c.hp };
+    }
+    case 'pp': {
+      let n = 0;
+      for (const m of c.moves) {
+        const add = Math.min(m.maxPp - m.pp, Number.isInteger(effect.amount) ? effect.amount : m.maxPp);
+        if (add > 0) { m.pp += add; n += add; }
+      }
+      return { ok: true, pp: n };
+    }
+    case 'cure': {
+      const kind = c.status?.kind ?? null;
+      c.status = null;
+      return { ok: true, cured: kind };
+    }
+    default: return { ok: false };
+  }
+}
+
+/**
+ * The rows the save screen lists for a tab. Save: the three manual slots (none under No Rewind).
+ * Load: a crash-resume row first when the last session did not exit cleanly and an autosave
+ * exists, then the manual slots (none under No Rewind), then the autosaves (only the first under No
+ * Rewind). Entries keep their `core/save` order (manual first, index order).
+ * @param {import('../core/save.js').SlotEntry[]} entries   `persist.list({all: true})`
+ * @param {{tab: 'save'|'load', noRewind?: boolean, crashed?: boolean}} opts
+ * @returns {Array<{kind: 'resume'|'slot', entry: import('../core/save.js').SlotEntry, latest: boolean}>}
+ */
+export function slotRows(entries, opts) {
+  const list = Array.isArray(entries) ? entries : [];
+  const newest = list.filter((e) => e?.state === 'ok').reduce((b, e) => (!b || (e.seq ?? 0) > (b.seq ?? 0) ? e : b), null);
+  const row = (e) => ({ kind: /** @type {'slot'} */ ('slot'), entry: e, latest: !!newest && e.slot === newest.slot });
+  const manual = list.filter((e) => e?.kind === 'manual');
+  const auto = list.filter((e) => e?.kind === 'auto' && (!opts.noRewind || e.index === 1));
+  if (opts.tab === 'save') return opts.noRewind ? [] : manual.map(row);
+  const out = [];
+  const resume = opts.crashed ? newestAuto(auto) : null;
+  if (resume) out.push({ kind: 'resume', entry: resume, latest: false });
+  if (!opts.noRewind) out.push(...manual.map(row));
+  out.push(...auto.map(row));
+  return out;
+}
+
+/**
+ * Words for a save / load error code (core/save ERROR_CODES + persist's).
+ * @param {{code?: string, message?: string}|null|undefined} error
+ * @returns {string}
+ */
+export function saveErrorText(error) {
+  const code = error?.code ?? 'unknown';
+  switch (code) {
+    case 'quota': return t('error.storageFull');
+    case 'storage': return t('banner.offline');
+    case 'corrupt': return t('save.corrupt');
+    case 'version': return t('save.newer');
+    case 'empty': return 'That slot is empty.'; // str
+    case 'busy': return 'Not now: try again in a moment.'; // str
+    case 'invalid-world': return 'Something in this season would not check out, so nothing was written.'; // str
+    case 'format': return 'That is not a save string.'; // str
+    case 'verify': return 'The write did not read back the same. Nothing was lost.'; // str
+    default: return t('save.fail', { code });
+  }
 }

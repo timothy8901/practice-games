@@ -154,8 +154,8 @@ HEADS.waterRat = {
     '.KFWEFFWEfK.',
     '.KFEEFFEEfK.',
     '..KFFFFFfK..',
-    '..KFMMMMfK..',
-    '...KMNNmK...',
+    '..KFFMMFfK..',
+    '...KMNNMK...',
     '....KKKK....',
   ],
   left: [
@@ -490,8 +490,8 @@ HEADS.tawnyOwl = {
 };
 
 // Idris Fenwake, great northern diver: glossy black-green head (F/L), the
-// red eye (R with a W glint), a dagger bill (N) and the white-barred necklace
-// (M) at the throat.
+// red eye (R with a W glint), a slate dagger bill (N); the white-barred necklace
+// is left to the 48x48 bust (at 16 px the bars read as teeth under the bill).
 HEADS.diver = {
   down: [
     '............',
@@ -516,7 +516,7 @@ HEADS.diver = {
     'KKFFFFFFFffK',
     'NNNNFFFFfffK',
     '.KKKFFFFfffK',
-    '....KMFMffK.',
+    '....KFFFffK.',
     '.....KKKKK..',
   ],
 };

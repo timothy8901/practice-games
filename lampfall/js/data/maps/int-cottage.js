@@ -1,5 +1,5 @@
 /**
- * THE KEEPER'S COTTAGE (int-cottage) — the house that grows (GDD-00 §3, §7; GDD-01 §10.1). [DATA-MAPS]
+ * THE KEEPER'S COTTAGE (int-cottage) — the house that grows (GDD-00 §3, §7; GDD-01 §11.1). [DATA-MAPS]
  * 16x12 interior. Door (8,11), arrival (8,10); the door returns to the porch step (9,23) in Pellwick.
  *
  * One layout per house tier (GDD-01 §1.14 `variants`). The top-level layers are tier 0, the BEDSIT you
@@ -51,10 +51,10 @@ const ROOMS_ENTITIES = [
   // slot seals: Wren's chalk plan across the doorway of a room not built yet
   ...SLOTS.map((s) => ({ kind: 'prop', id: `plan-${s.room}`, x: s.x, y: s.y, art: 'chalk-plan', verb: 'look', cond: notBuilt(s.room), text: `Chalk on the boards, Wren's hand: ${s.name}? Pick it at the yard.` })),
   // greenhouse (A)
-  { kind: 'prop', id: 'graft-bench', x: 2, y: 2, art: 'table', verb: 'graft', cond: built('greenhouse'), note: 'grafting bench: foreign fruit; a creature left overnight with its favourite fruit gains +1 Bond' },
-  { kind: 'prop', id: 'greenhouse-bed-1', x: 1, y: 3, art: 'bean-rows', verb: 'look', cond: built('greenhouse') },
-  { kind: 'prop', id: 'greenhouse-bed-2', x: 1, y: 4, art: 'bean-rows', verb: 'look', cond: built('greenhouse') },
-  { kind: 'prop', id: 'greenhouse-pot', x: 4, y: 2, art: 'bush', verb: 'shake', cond: built('greenhouse'), note: 'the indoor fruit tree, potted' },
+  { kind: 'prop', id: 'graft-bench', x: 3, y: 2, art: 'table', verb: 'graft', cond: built('greenhouse'), note: 'grafting bench: foreign fruit; a creature left overnight with its favourite fruit gains +1 Bond' },
+  { kind: 'prop', id: 'greenhouse-bed-1', x: 1, y: 2, art: 'bean-rows', verb: 'look', cond: built('greenhouse') },
+  { kind: 'prop', id: 'greenhouse-bed-2', x: 1, y: 3, art: 'bean-rows', verb: 'look', cond: built('greenhouse') },
+  { kind: 'prop', id: 'greenhouse-pot', x: 1, y: 4, art: 'bush', verb: 'shake', cond: built('greenhouse'), note: 'the indoor fruit tree, potted' },
   // gallery (B)
   { kind: 'prop', id: 'gallery-bench', x: 9, y: 3, art: 'bench', verb: 'sit', cond: built('gallery') },
   // training yard (C)
@@ -83,7 +83,7 @@ const ROOMS_TRIGGERS = [
   { x: 2, y: 5, kind: 'use', id: 'mirror', verb: 'mirror' },
   { x: 5, y: 5, kind: 'use', id: 'hearth', verb: 'look' },
   { x: 6, y: 8, kind: 'use', id: 'season-book', verb: 'seasonBook' },
-  { x: 2, y: 2, kind: 'use', id: 'graft-bench', verb: 'graft', cond: built('greenhouse') },
+  { x: 3, y: 2, kind: 'use', id: 'graft-bench', verb: 'graft', cond: built('greenhouse') },
   { x: 8, y: 1, kind: 'use', id: 'gallery-wall', verb: 'gallery', cond: built('gallery') },
   { x: 14, y: 7, kind: 'use', id: 'fossil-bench', verb: 'workshop', cond: built('workshop') },
   { x: 14, y: 9, kind: 'use', id: 'relic-polisher', verb: 'polish', cond: built('workshop') },
@@ -105,7 +105,7 @@ const ROOMS_MARKERS = {
   'loft-ladder-front': { x: 1, y: 7, facing: 'up' },
   'cellar-hatch-front': { x: 7, y: 10, facing: 'left' },
   'greenhouse-door': { x: 4, y: 4, facing: 'up', room: 'greenhouse' },
-  'graft-bench-front': { x: 2, y: 3, facing: 'up', room: 'greenhouse' },
+  'graft-bench-front': { x: 3, y: 3, facing: 'up', room: 'greenhouse' },
   'gallery-door': { x: 8, y: 4, facing: 'up', room: 'gallery' },
   'gallery-wall': { x: 8, y: 2, facing: 'up', room: 'gallery' },
   'training-yard-door': { x: 11, y: 4, facing: 'up', room: 'training-yard' },

@@ -26,7 +26,7 @@
 
 import { getSprite, artDef, gradeColour } from '../art/atlas.js';
 import { decodeSprite } from '../core/pixelart.js';
-import { UI, COLORS } from '../art/palette.js';
+import { UI } from '../art/palette.js';
 import { gradeFor } from '../world/lighting.js';
 import { makeCanvas, ctx2d, DRAW, BAYER4, hash2, rgbOf } from './surface.js';
 import { beamAngle, ditherDisc } from './lightPass.js';
@@ -59,28 +59,30 @@ export function skyLayout(rect) {
  * Sun centre on its arc: rises at {@link SUNRISE} at the left, sets at {@link SUNSET} at the right.
  * @param {number} minute
  * @param {{x: number, y: number, w: number, h: number}} rect   the sky area (above the horizon)
+ * @param {object} [out]  record to fill instead of allocating one
  * @returns {{x: number, y: number, visible: boolean, low: boolean, t: number}}
  */
-export function sunPos(minute, rect) {
+export function sunPos(minute, rect, out) {
   const m = wrap(minute);
   const t = (m - SUNRISE) / (SUNSET - SUNRISE);
-  return arc(t, rect, 4, false);
+  return arc(t, rect, 4, false, out);
 }
 
 /**
  * Moon centre on the night arc (19:00 -> 06:00, right to left).
  * @param {number} minute
  * @param {{x: number, y: number, w: number, h: number}} rect
+ * @param {object} [out]  record to fill instead of allocating one
  * @returns {{x: number, y: number, visible: boolean, low: boolean, t: number}}
  */
-export function moonPos(minute, rect) {
+export function moonPos(minute, rect, out) {
   const m = wrap(minute);
   const span = 1440 - (SUNSET - SUNRISE);
   const t = m >= SUNSET ? (m - SUNSET) / span : m < SUNRISE ? (m + 1440 - SUNSET) / span : -1;
-  return arc(t, rect, 6, true);
+  return arc(t, rect, 6, true, out);
 }
 
-function arc(t, rect, lift, reverse) {
+function arc(t, rect, lift, reverse, out) {
   const visible = t > -0.02 && t < 1.02;
   const tc = Math.max(0, Math.min(1, t));
   const s = Math.sin(tc * Math.PI);
@@ -88,6 +90,7 @@ function arc(t, rect, lift, reverse) {
   const span = Math.min(rect.w - 48, Math.round(rect.w * (TIDE_DIAL_RECT.x - 24) / 480) - 24);
   const x = rect.x + Math.round(24 + (reverse ? 1 - tc : tc) * span);
   const y = Math.round(rect.y + rect.h - lift - s * Math.max(0, rect.h - lift - 6));
+  if (out) { out.x = x; out.y = y; out.visible = visible; out.low = s < 0.35; out.t = t; return out; }
   return { x, y, visible, low: s < 0.35, t };
 }
 
@@ -103,21 +106,25 @@ export function moonPhase(day) {
 
 /**
  * Comet placement and growth for a season progress 0..1 (the smudge grows, brightens and lengthens).
+ * The head hangs high at the right end of the band (x = 82% of the width, left of the tide dial),
+ * where the sun and moon arcs only pass low on the horizon, so the moon never crosses the comet.
  * @param {number} progress
  * @param {{x: number, y: number, w: number, h: number}} rect
+ * @param {object} [out]  record to fill instead of allocating one
  * @returns {{x: number, y: number, tail: number, stage: 0|1|2, density: number}}
  */
-export function cometLayout(progress, rect) {
+export function cometLayout(progress, rect, out) {
   const p = Math.max(0, Math.min(1, progress || 0));
-  const stage = p < 0.2 ? 0 : p < 0.6 ? 1 : 2;
-  return {
-    x: rect.x + Math.round(rect.w * 0.63),
-    y: rect.y + 4 + Math.round((1 - p) * 3),
-    tail: Math.round(4 + p * 34),
-    stage,
-    density: 0.25 + p * 0.65,
-  };
+  const o = out || {};
+  o.stage = p < 0.2 ? 0 : p < 0.6 ? 1 : 2;
+  o.x = rect.x + Math.round(rect.w * COMET_X);
+  o.y = rect.y + 4 + Math.round((1 - p) * 3);
+  o.tail = Math.round(4 + p * 34);
+  o.density = 0.25 + p * 0.65;
+  return o;
 }
+/** Comet head x as a fraction of the band width (between the arcs' low right end and the dial). */
+export const COMET_X = 0.82;
 
 /**
  * Where the lighthouse compass mark sits on the horizon: centred, shifted by the lighthouse's
@@ -228,7 +235,7 @@ const graded = new WeakMap();
 function gradedArt(id, grade, variant = null) {
   let m = graded.get(grade);
   if (!m) { m = new Map(); graded.set(grade, m); }
-  const k = variant ? id + '@' + variant : id;
+  const k = variant ? variantKey(id, variant) : id;
   let s = m.get(k);
   if (s) return s;
   const d = artDef(id);
@@ -278,8 +285,9 @@ export function drawSkyband(ctx, rect, o) {
   const weather = o.weather || 'clear';
   const grade = o.grade || gradeFor(o.minute, weather);
   const ms = o.reducedMotion ? 0 : (o.ms || 0);
-  const L = skyLayout(rect);
-  const sky = { x: rect.x, y: rect.y, w: rect.w, h: L.skyRows };
+  const L = bandLayout(rect);
+  const sky = SKY_BUF;
+  sky.x = rect.x; sky.y = rect.y; sky.w = rect.w; sky.h = L.skyRows;
   ctx.drawImage(gradientStrip(o.minute, weather, rect.w, L.skyRows), rect.x, rect.y);
   DRAW.images++;
   drawStars(ctx, sky, grade, ms, weather, 70);
@@ -298,7 +306,8 @@ export function drawSkyband(ctx, rect, o) {
 }
 
 function drawStars(ctx, sky, grade, ms, weather, count) {
-  const night = grade.night * (OVERCAST.has(weather) ? 0.25 : 1);
+  // a few stars through broken overcast; none through rain, storm, fog or snow cloud
+  const night = grade.night * (weather === 'overcast' ? 0.25 : OVERCAST.has(weather) ? 0 : 1);
   if (night < 0.05) return;
   const shown = Math.floor(count * night);
   for (let i = 0; i < shown; i++) {
@@ -314,9 +323,10 @@ function drawStars(ctx, sky, grade, ms, weather, count) {
 
 function drawComet(ctx, sky, progress, grade, weather) {
   if (progress <= 0) return;
-  const vis = Math.min(1, grade.night * 1.4 + 0.08) * (OVERCAST.has(weather) ? 0.4 : 1);
+  // like the stars: dimmed by broken overcast, hidden by rain, storm, fog and snow cloud
+  const vis = Math.min(1, grade.night * 1.4 + 0.08) * (weather === 'overcast' ? 0.4 : OVERCAST.has(weather) ? 0 : 1);
   if (vis < 0.15) return;
-  const C = cometLayout(progress, sky);
+  const C = cometLayout(progress, sky, COMET_BUF);
   // the tail: dithered streak to the upper left in tail pink, thinning with distance
   ctx.fillStyle = UI.cometTail;
   const dens = C.density * vis;
@@ -357,18 +367,21 @@ function drawMeteors(ctx, sky, minute, ms, grade, weather) {
 
 function drawSunMoon(ctx, sky, minute, day, weather) {
   const heavy = weather === 'rain' || weather === 'storm';
-  const sp = sunPos(minute, sky);
+  const sp = sunPos(minute, sky, SUN_BUF);
   if (sp.visible && !heavy) {
     if (weather === 'fog' || weather === 'overcast' || weather === 'snow') ctx.globalAlpha = 0.5;
-    const img = getSprite('sky-sun', sp.low ? { name: 'low' } : 0);
+    const img = getSprite('sky-sun', sp.low ? SUN_LOW : 0);
     ctx.drawImage(img.canvas, sp.x - 5, sp.y - 5);
     ctx.globalAlpha = 1;
     DRAW.images++;
   }
-  const mp = moonPos(minute, sky);
+  const mp = moonPos(minute, sky, MOON_BUF);
   if (mp.visible && !heavy) {
+    // veiled like the sun behind fog, overcast and snow cloud
+    if (weather === 'fog' || weather === 'overcast' || weather === 'snow') ctx.globalAlpha = 0.5;
     const img = getSprite('sky-moon', moonPhase(day));
     ctx.drawImage(img.canvas, mp.x - 5, mp.y - 5);
+    ctx.globalAlpha = 1;
     DRAW.images++;
   }
 }
@@ -383,7 +396,8 @@ function drawClouds(ctx, sky, grade, ms, weather, tall) {
   const rainy = weather === 'rain' || weather === 'storm';
   const sy = tall ? Math.max(1, Math.floor(sky.h / 40)) : 1;
   for (let i = 0; i < list.length; i++) {
-    const [id, y, v, off] = list[i];
+    const c = list[i];
+    const id = c[0], y = c[1], v = c[2], off = c[3];
     const spr = gradedArt(id, grade, rainy && id === 'sky-cloud-overcast' ? 'rain' : null);
     const span = sky.w + spr.w + 20;
     const cx = sky.x + ((((off + (ms / 1000) * v) % span) + span) % span) - spr.w - 10;
@@ -394,7 +408,8 @@ function drawClouds(ctx, sky, grade, ms, weather, tall) {
 
 function drawCompass(ctx, x, horizonY, grade, ms, lit) {
   // a 5x9 tower silhouette standing on the horizon; a lit lamp pip and a short ray once relit
-  const ink = gradeColour('st0', grade), wall = gradeColour('st2', grade), band = gradeColour('red1', grade);
+  const C = compassColours(grade);
+  const ink = C[0], wall = C[1], band = C[2];
   ctx.fillStyle = ink;
   ctx.fillRect(x - 2, horizonY - 9, 5, 9);
   ctx.fillStyle = wall;
@@ -426,7 +441,8 @@ function drawSeaStrip(ctx, rect, L, minute, grade, ms, weather) {
   }
   ctx.fillStyle = R[3];
   for (let i = 0; i < w / 40; i++) ctx.fillRect(x + ((i * 97 + Math.floor(ms / 133)) % w), hy + Math.min(6, L.seaH - 2), 3, 1);
-  const sp = sunPos(minute, { x, y: rect.y, w, h: L.skyRows });
+  SEA_SKY.x = x; SEA_SKY.y = rect.y; SEA_SKY.w = w; SEA_SKY.h = L.skyRows;
+  const sp = sunPos(minute, SEA_SKY, SUN_BUF);
   if (sp.visible && sp.t > 0 && sp.t < 1 && weather === 'clear') {
     ctx.fillStyle = sp.low ? UI.sunLow : UI.sunCore;
     ctx.globalAlpha = 0.65;
@@ -473,7 +489,9 @@ export function drawShoreView(ctx, rect, o) {
   const ms = o.reducedMotion ? 0 : (o.ms || 0);
   const R = seaRamp(grade);
   const horizon = rect.y + Math.round(rect.h * 0.48);
-  const sky = { x: rect.x, y: rect.y, w: rect.w, h: horizon - rect.y };
+  const sky = SKY_BUF;
+  sky.x = rect.x; sky.y = rect.y; sky.w = rect.w; sky.h = horizon - rect.y;
+  const sky2 = SHORE_SKY2;
   ctx.save();
   ctx.beginPath();
   ctx.rect(rect.x, rect.y, rect.w, rect.h);
@@ -481,10 +499,12 @@ export function drawShoreView(ctx, rect, o) {
   ctx.drawImage(gradientStrip(o.minute, weather, rect.w, sky.h), rect.x, rect.y);
   DRAW.images++;
   drawStars(ctx, sky, grade, ms, weather, 160);
-  drawComet(ctx, { x: sky.x, y: sky.y + 6, w: sky.w, h: sky.h }, o.comet || 0, grade, weather);
+  sky2.x = sky.x; sky2.y = sky.y + 6; sky2.w = sky.w; sky2.h = sky.h;
+  drawComet(ctx, sky2, o.comet || 0, grade, weather);
   drawMeteors(ctx, sky, o.minute, ms, grade, weather);
   drawSunMoon(ctx, sky, o.minute, o.day ?? 1, weather);
-  drawClouds(ctx, { x: sky.x, y: sky.y + 4, w: sky.w, h: sky.h }, grade, ms, weather, true);
+  sky2.y = sky.y + 4;
+  drawClouds(ctx, sky2, grade, ms, weather, true);
   // far isles along the horizon
   const isle = gradedArt('sky-isle-far', grade);
   ctx.drawImage(isle.canvas, rect.x + 30, horizon - 4);
@@ -516,16 +536,17 @@ export function drawShoreView(ctx, rect, o) {
   }
   DRAW.fills++;
   // the sun / moon glitter path
-  const sp = sunPos(o.minute, sky), mp = moonPos(o.minute, sky);
-  const glitter = sp.visible && weather === 'clear' ? [sp.x, sp.low ? UI.sunLow : UI.sunCore] : mp.visible && weather === 'clear' ? [mp.x, UI.moon] : null;
-  if (glitter) {
-    ctx.fillStyle = glitter[1];
+  const sp = sunPos(o.minute, sky, SUN_BUF), mp = moonPos(o.minute, sky, MOON_BUF);
+  const gx0 = sp.visible ? sp.x : mp.x;
+  const gcol = sp.visible ? (sp.low ? UI.sunLow : UI.sunCore) : UI.moon;
+  if (weather === 'clear' && (sp.visible || mp.visible)) {
+    ctx.fillStyle = gcol;
     for (let k = 0; k < 18; k++) {
       const t = k / 18;
       const gy = horizon + 2 + Math.floor(t * t * seaH * 0.95);
       const spread = 2 + Math.floor(t * 14);
       const hh = hash2(k, Math.floor(ms / 180));
-      ctx.fillRect(glitter[0] - spread + (hh % (spread * 2 + 1)), gy, 1 + Math.floor(t * 3), 1);
+      ctx.fillRect(gx0 - spread + (hh % (spread * 2 + 1)), gy, 1 + Math.floor(t * 3), 1);
     }
     DRAW.fills++;
   }
@@ -567,24 +588,19 @@ function drawHeadland(ctx, rect, horizon, grade, ms, o, R) {
   // a low rocky point rising from the horizon to the right: rock body, a lit west face, a grass
   // cap, a dark waterline, and the Keeper's Cottage on the slope
   const x0 = hx - 70;
-  const profile = (x) => {
-    const d = x - x0;
-    if (d < 0) return 0;
-    return Math.min(16, Math.floor(Math.sqrt(d) * 1.7) + ((hash2(x >> 2, 3) % 3) - 1));
-  };
   for (let x = x0; x < rect.x + rect.w; x++) {
-    const hgt = profile(x);
+    const hgt = headlandProfile(x, x0);
     if (hgt <= 0) continue;
     const top = horizon - hgt;
     ctx.fillStyle = R[12]; ctx.fillRect(x, top, 1, hgt);
-    if (profile(x - 2) < hgt - 1) { ctx.fillStyle = R[13]; ctx.fillRect(x, top + 2, 1, Math.max(1, Math.min(4, hgt - 3))); }
+    if (headlandProfile(x - 2, x0) < hgt - 1) { ctx.fillStyle = R[13]; ctx.fillRect(x, top + 2, 1, Math.max(1, Math.min(4, hgt - 3))); }
     ctx.fillStyle = R[16]; ctx.fillRect(x, top, 1, 1);
     ctx.fillStyle = R[15]; ctx.fillRect(x, top + 1, 1, 1);
     if ((hash2(x, 17) & 3) === 0) ctx.fillRect(x, top + 2, 1, 1);
     ctx.fillStyle = R[11]; ctx.fillRect(x, horizon - 1, 1, 2);
   }
   // the cottage: dark roof, cream wall, a window that is lit once the porch lamps are
-  const cx = hx - 40, cy = horizon - profile(hx - 40);
+  const cx = hx - 40, cy = horizon - headlandProfile(hx - 40, x0);
   ctx.fillStyle = R[11]; ctx.fillRect(cx - 1, cy - 7, 11, 3);
   ctx.fillStyle = R[14]; ctx.fillRect(cx, cy - 8, 9, 1);
   ctx.fillStyle = R[8]; ctx.fillRect(cx, cy - 4, 9, 4);
@@ -592,11 +608,12 @@ function drawHeadland(ctx, rect, horizon, grade, ms, o, R) {
   ctx.fillRect(cx + 2, cy - 3, 2, 2);
   ctx.fillStyle = R[11]; ctx.fillRect(cx + 6, cy - 3, 2, 3);
   DRAW.fills++;
-  const top = horizon - profile(hx);
+  const top = horizon - headlandProfile(hx, x0);
   // the lighthouse prop (scaffold stage, lamp) on the point
   const stage = Math.max(0, Math.min(7, L.stage ?? 0));
   const lit = !!L.lit && grade.lamp >= 0.5;
-  const tower = getSprite('lighthouse', lit ? { frame: stage, name: 'lit', grade } : { frame: stage, grade });
+  TOWER_OPT.frame = stage; TOWER_OPT.name = lit ? 'lit' : null; TOWER_OPT.grade = grade;
+  const tower = getSprite('lighthouse', TOWER_OPT);
   const tx = hx - 16, ty = top - 78;
   ctx.drawImage(tower.canvas, tx, ty);
   DRAW.images++;
@@ -613,7 +630,8 @@ function drawHeadland(ctx, rect, horizon, grade, ms, o, R) {
     DRAW.fills++;
   }
   if (lit) {
-    const lamp = { x: tx + 16, y: ty + 9 };
+    const lamp = LAMP_BUF;
+    lamp.x = tx + 16; lamp.y = ty + 9;
     const halo = ditherDisc(9, 9, UI.lighthouseAmber, 0.55);
     ctx.globalCompositeOperation = 'lighter';
     ctx.drawImage(halo.canvas, lamp.x - halo.rx, lamp.y - halo.ry);
@@ -623,9 +641,7 @@ function drawHeadland(ctx, rect, horizon, grade, ms, o, R) {
     const c = Math.cos(a), s = Math.sin(a);
     const reach = 220 * Math.abs(c) + 30;
     const half = 3 + 6 * Math.max(0, s);
-    const [r, g, b] = rgbOf(UI.lighthouseAmber);
-    const k = 0.25 + 0.25 * Math.max(0, s);
-    ctx.fillStyle = `rgb(${Math.round(r * k)},${Math.round(g * k)},${Math.round(b * k)})`;
+    ctx.fillStyle = beamFill(0.25 + 0.25 * Math.max(0, s));
     const dir = c >= 0 ? 1 : -1;
     for (let d = 3; d < reach; d++) {
       const spread = Math.round((half * d) / reach);
@@ -642,6 +658,55 @@ function drawHeadland(ctx, rect, horizon, grade, ms, o, R) {
 
 /* ================================================================== helpers */
 
+// reused per-frame records (the Skyband draws every frame: §12, no per-frame allocation)
+const SKY_BUF = { x: 0, y: 0, w: 0, h: 0 };
+const SEA_SKY = { x: 0, y: 0, w: 0, h: 0 };
+const SUN_BUF = { x: 0, y: 0, visible: false, low: false, t: 0 };
+const MOON_BUF = { x: 0, y: 0, visible: false, low: false, t: 0 };
+const COMET_BUF = { x: 0, y: 0, tail: 0, stage: 0, density: 0 };
+const SUN_LOW = Object.freeze({ name: 'low' });
+const SHORE_SKY2 = { x: 0, y: 0, w: 0, h: 0 };
+const LAMP_BUF = { x: 0, y: 0 };
+const TOWER_OPT = { frame: 0, name: null, grade: null };
+/** Headland height at column x for a point starting at x0 (0 before it). */
+function headlandProfile(x, x0) {
+  const d = x - x0;
+  if (d < 0) return 0;
+  return Math.min(16, Math.floor(Math.sqrt(d) * 1.7) + ((hash2(x >> 2, 3) % 3) - 1));
+}
+/** @type {Map<number, string>} beam strength step -> fill colour (lighthouse amber scaled) */
+const beamFills = new Map();
+function beamFill(k) {
+  const q = Math.round(k * 40);
+  let f = beamFills.get(q);
+  if (!f) { const c = rgbOf(UI.lighthouseAmber); f = `rgb(${Math.round(c[0] * q / 40)},${Math.round(c[1] * q / 40)},${Math.round(c[2] * q / 40)})`; beamFills.set(q, f); }
+  return f;
+}
+/** @type {Map<number, any>} band rect -> skyLayout (rects are few: the band is 480x40) */
+const layouts = new Map();
+function bandLayout(rect) {
+  const k = ((rect.x * 2048 + rect.y) * 2048 + rect.w) * 512 + rect.h;
+  let L = layouts.get(k);
+  if (!L) { if (layouts.size > 16) layouts.clear(); L = skyLayout(rect); layouts.set(k, L); }
+  return L;
+}
+/** @type {WeakMap<object, string[]>} grade -> compass mark colours [ink, wall, band] */
+const compassCache = new WeakMap();
+function compassColours(grade) {
+  let c = compassCache.get(grade);
+  if (!c) { c = [gradeColour('st0', grade), gradeColour('st2', grade), gradeColour('red1', grade)]; compassCache.set(grade, c); }
+  return c;
+}
+/** @type {Map<string, Map<string, string>>} art id -> variant -> `id@variant` */
+const variantKeys = new Map();
+function variantKey(id, variant) {
+  let m = variantKeys.get(id);
+  if (!m) { m = new Map(); variantKeys.set(id, m); }
+  let k = m.get(variant);
+  if (!k) { k = id + '@' + variant; m.set(variant, k); }
+  return k;
+}
+
 function wrap(m) {
   return ((m % 1440) + 1440) % 1440;
 }
@@ -656,4 +721,3 @@ function sample(stops, t) {
   return lerp3(stops[1], stops[2], (t - 0.5) * 2);
 }
 
-export { COLORS };

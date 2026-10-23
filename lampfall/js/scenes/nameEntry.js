@@ -106,6 +106,7 @@ export function createNameEntry(o) {
   let errorMs = 0;
   let caretMs = 0;
   let typing = false; // a physical keyboard is typing
+  let gridNav = false; // the keyboard last moved the grid cursor (Enter presses the focused key)
   let pressFlash = -1;
   let pressMs = 0;
   /** @type {string[]} */
@@ -174,10 +175,12 @@ export function createNameEntry(o) {
   function onKey(ev) {
     if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
     const k = ev.key;
-    if (k === 'Enter') { keyQueue.push('\n'); typing = true; ev.preventDefault?.(); return; }
-    if (k === 'Backspace') { keyQueue.push('\b'); typing = true; ev.preventDefault?.(); return; }
+    const arrows = { ArrowUp: 'U', ArrowDown: 'D', ArrowLeft: 'L', ArrowRight: 'R' };
+    if (arrows[k]) { keyQueue.push(`\x00${arrows[k]}`); ev.preventDefault?.(); return; }
+    // Enter finishes the name, unless the arrows were just used to walk the grid (then it presses the key)
+    if (k === 'Enter') { keyQueue.push(gridNav ? '\r' : '\n'); ev.preventDefault?.(); return; }
+    if (k === 'Backspace') { keyQueue.push('\b'); ev.preventDefault?.(); return; }
     if (k === 'Escape') { keyQueue.push('\x1b'); ev.preventDefault?.(); return; }
-    if (k === 'ArrowUp' || k === 'ArrowDown' || k === 'ArrowLeft' || k === 'ArrowRight') { typing = false; return; }
     if (typeof k === 'string' && Array.from(k).length === 1) { keyQueue.push(k); typing = true; ev.preventDefault?.(); }
   }
 
@@ -198,18 +201,45 @@ export function createNameEntry(o) {
   function drainKeys() {
     while (keyQueue.length) {
       const k = /** @type {string} */ (keyQueue.shift());
+      if (k.startsWith('\x00')) { typing = false; gridNav = true; moveDir(k.slice(1)); continue; }
       if (k === '\n') { done(); return true; }
+      if (k === '\r') { if (row5 >= 0) pressSpecial(SPECIAL[row5].id); else pressKey(focus.index); continue; }
       if (k === '\b') { apply({ type: 'delete' }); sfx('ui:cancel'); continue; }
-      if (k === '\x1b') { typing = false; back(); return true; }
+      // Escape backs out one level (Backspace is the keyboard's delete); never commits
+      if (k === '\x1b') { typing = false; sfx('ui:cancel'); o.onCancel(); return true; }
+      gridNav = false;
       apply({ type: 'char', ch: k });
       sfx('ui:textTick');
     }
     return false;
   }
 
+  /** One grid step: 'U' | 'D' | 'L' | 'R'. */
+  function moveDir(d) {
+    const dx = d === 'L' ? -1 : d === 'R' ? 1 : 0, dy = d === 'U' ? -1 : d === 'D' ? 1 : 0;
+    if (row5 >= 0) { moveRow5(dx, dy); sfx('ui:cursor'); return; }
+    const idx = focus.index;
+    const r = Math.floor(idx / COLS);
+    if ((dy > 0 && r === ROWS - 1) || (dy < 0 && r === 0)) { row5 = specialOfCol(idx % COLS); sfx('ui:cursor'); return; }
+    focus.move(dx, dy);
+    sfx('ui:cursor');
+  }
+
+  /** The column under a wide key, and the wide key over a column. */
+  function colOfSpecial(i) {
+    const r = specialRects[i];
+    return Math.max(0, Math.min(COLS - 1, Math.floor((r.x + r.w / 2 - gx) / KEY_W)));
+  }
+  function specialOfCol(col) {
+    const cx = gx + col * KEY_W + KEY_W / 2;
+    let best = 0, bestD = Infinity;
+    specialRects.forEach((r, i) => { const d = Math.abs(r.x + r.w / 2 - cx); if (d < bestD) { bestD = d; best = i; } });
+    return best;
+  }
+
   function moveRow5(dx, dy) {
-    if (dy < 0) { row5 = -1; focus.set(Math.min(COLS * ROWS - 1, (ROWS - 1) * COLS + Math.min(COLS - 1, Math.round((specialRects[0].x - gx) / KEY_W)))); return; }
-    if (dy > 0) { row5 = -1; focus.set(0); return; }
+    if (dy < 0) { const c = colOfSpecial(row5); row5 = -1; focus.set((ROWS - 1) * COLS + c, { force: true }); return; }
+    if (dy > 0) { const c = colOfSpecial(row5); row5 = -1; focus.set(c, { force: true }); return; }
     row5 = (row5 + dx + SPECIAL.length) % SPECIAL.length;
   }
 
@@ -219,10 +249,11 @@ export function createNameEntry(o) {
    */
   function handle(input = o.input) {
     if (drainKeys()) return true;
-    const kb = input.lastDevice === 'keyboard';
-    const usable = (action) => input.pressed(action) && !(typing && kb);
-    const rep = (dir) => input.repeat(dir, { delay: TIMING.repeatDelayMs, rate: TIMING.repeatRateMs });
-    // pointer: taps on keys
+    // a physical keyboard is read through the key listener above (letters type, arrows move, Enter
+    // presses / finishes); the action layer serves the gamepad and the touch overlay
+    const kb = input.lastDevice === 'keyboard' && attached;
+    const usable = (action) => input.pressed(action) && !kb;
+    const rep = (dir) => !kb && input.repeat(dir, { delay: TIMING.repeatDelayMs, rate: TIMING.repeatRateMs });
     const p = input.pointer;
     if (p && p.inside && p.justDown) {
       for (let i = 0; i < SPECIAL.length; i++) {
@@ -237,30 +268,12 @@ export function createNameEntry(o) {
       else if (ev && (ev.type === 'hover' || ev.type === 'move')) row5 = -1;
       return false;
     }
-    if (!(typing && kb)) {
-      if (row5 >= 0) {
-        if (rep('left')) moveRow5(-1, 0);
-        else if (rep('right')) moveRow5(1, 0);
-        else if (rep('up')) moveRow5(0, -1);
-        else if (rep('down')) moveRow5(0, 1);
-      } else {
-        const idx = focus.index;
-        const r = Math.floor(idx / COLS);
-        if (rep('down') && r === ROWS - 1) { row5 = Math.min(SPECIAL.length - 1, Math.floor((idx % COLS) / 2.6)); sfx('ui:cursor'); }
-        else if (rep('up') && r === 0) { row5 = Math.min(SPECIAL.length - 1, Math.floor((idx % COLS) / 2.6)); sfx('ui:cursor'); }
-        else {
-          for (const [dir, dx, dy] of [['left', -1, 0], ['right', 1, 0], ['up', 0, -1], ['down', 0, 1]]) {
-            if (rep(/** @type {string} */ (dir))) { focus.move(/** @type {number} */ (dx), /** @type {number} */ (dy)); sfx('ui:cursor'); break; }
-          }
-        }
-      }
+    for (const [dir, d] of [['left', 'L'], ['right', 'R'], ['up', 'U'], ['down', 'D']]) {
+      if (rep(dir)) { typing = false; moveDir(d); break; }
     }
-    if (usable('confirm')) {
-      if (row5 >= 0) pressSpecial(SPECIAL[row5].id); else pressKey(focus.index);
-      return false;
-    }
+    if (usable('confirm')) { typing = false; if (row5 >= 0) pressSpecial(SPECIAL[row5].id); else pressKey(focus.index); return false; }
     if (usable('cancel')) { back(); return false; }
-    if (input.pressed('start') && !(typing && kb)) { done(); return false; }
+    if (usable('start')) { done(); return false; }
     return false;
   }
 
@@ -306,7 +319,7 @@ export function createNameEntry(o) {
     for (let i = 0; i < chars.length; i++) {
       const r = items[i].rect;
       const ch = chars[i];
-      drawKey(ctx, r, ch === ' ' ? '_' : ch, row5 < 0 && focus.index === i && !(typing), pressFlash === i);
+      drawKey(ctx, r, ch === ' ' ? '_' : ch, row5 < 0 && focus.index === i && !typing, pressFlash === i);
     }
     for (let i = 0; i < SPECIAL.length; i++) {
       const s = SPECIAL[i];
@@ -317,7 +330,8 @@ export function createNameEntry(o) {
     const r = row5 >= 0 ? specialRects[row5] : items[focus.index].rect;
     if (!typing) drawText(ctx, TYPE.cursor, r.x - 7, r.y + Math.floor((r.h - TYPE.capH) / 2), { color: COLORS.focus.cursorOnPaper });
     // status line
-    const status = error ?? (typing ? 'Typing. Enter: done   Esc: back' : 'Z/A: press   X/B: delete   P/Start: done'); // str
+    const kbHint = gridNav ? 'Arrows + Enter: press key   Esc: back' : 'Type a name. Enter: done   Bksp: delete   Esc: back'; // str
+    const status = error ?? (o.input?.lastDevice === 'keyboard' ? kbHint : 'A: press   B: delete   Start: done'); // str
     drawText(ctx, status, card.x + card.w / 2, card.y + card.h - 11, { align: 'center', font: 'small', color: error ? PALETTE.r : COLORS.paper.inkFaint });
   }
 
@@ -328,7 +342,7 @@ export function createNameEntry(o) {
     get caps() { return caps; },
     get error() { return error; },
     /** test helper: type a string as if from the keyboard */
-    type(s) { for (const ch of Array.from(String(s))) keyQueue.push(ch); typing = true; },
+    type(s) { for (const ch of Array.from(String(s))) keyQueue.push(ch); typing = true; gridNav = false; },
     debugText: () => `entry: ${name}`,
   };
 }

@@ -5,7 +5,8 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { EVENT_TYPES, EVENT_FIELDS, OUTCOMES, BLOCK_REASONS, isEventType, checkEvent } from '../js/battle/events.js';
 import { simulate } from './fixtures/battle/sim.mjs';
-import { mk, duel, ofType, constRng } from './fixtures/battle/helpers.mjs';
+import { mk, duel, ofType, constRng, DATA } from './fixtures/battle/helpers.mjs';
+import { createBattle } from '../js/battle/engine.js';
 
 describe('the contract', () => {
   it('lists unique types, each with a field spec', () => {
@@ -61,6 +62,22 @@ describe('the engine honours the contract', () => {
     add(draw.submit([{ type: 'move', move: 0 }]));
     const hold = duel(mk('sloshkin', 5, ['tap']), mk('caldermaw', 5, ['settle']), { holdOut: 1, foeAi: () => ({ type: 'move', move: 0 }) });
     add(hold.submit([{ type: 'move', move: 0 }]));
+    // arena weather (start, tick, end) and a held item (start stages, a consumable threshold heal)
+    const items = [
+      { id: 'test-berry', name: 'Test Berry', held: { healAt: { below: 0.5, fraction: 0.25 }, consumable: true } },
+      { id: 'test-ballast', name: 'Test Ballast', held: { startStages: { def: 1 } } },
+    ];
+    const weatherKinds = [{ id: 'gale', name: 'Gale', text: 'Gale: everything takes a little chip.', power: {}, accuracy: 1, chip: { fraction: 1 / 16, chipImmune: [] }, evasion: null }];
+    const low = mk('sloshkin', 30, ['settle'], { heldItem: 'test-berry' });
+    low.hp = Math.floor(low.stats.hp * 0.4);
+    const weather = createBattle({
+      data: { ...DATA, items }, weatherKinds, weather: { kind: 'gale', turns: 1 }, kind: 'trainer', rng: constRng(0.5),
+      sides: [{ party: [low] }, { party: [mk('tossup', 30, ['settle'], { heldItem: 'test-ballast' })], trainer: { name: 'Rival' } }],
+      foeAi: () => ({ type: 'move', move: 0 }),
+    });
+    add(weather.intro);
+    add(weather.submit([{ type: 'move', move: 0 }]));
+    assert.ok(ofType(weather.log, 'held-item').some((e) => e.consumed), 'the berry is used up');
     assert.ok(ofType(learn.log, 'learn-offer').length >= 1);
     const missing = EVENT_TYPES.filter((t) => !seen.has(t));
     assert.deepEqual(missing, [], `never emitted: ${missing.join(', ')}`);

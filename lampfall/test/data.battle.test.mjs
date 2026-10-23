@@ -44,7 +44,7 @@ const EXPECTED = {
   'rimeholt-sunniva': ['lumenveil', 41, 4, [38, 41]], 'rimeholt-aldous': ['caldermaw', 42, 4, [39, 42]],
   pip: ['wirewhisk', 4, 1, [4, 4]],
   'maud-spire': ['bilgebob', 10, 2, [8, 10]], 'osric-spire': ['prismoth', 16, 3, [14, 16]], 'ines-spire': ['emberjaw', 22, 3, [20, 22]],
-  'wendel-spire': ['hulkwight', 29, 3, [27, 29]], 'hallorans-spire': ['coilcrest', 36, 6, [33, 36]], 'seraphine-spire': ['lumenveil', 43, 6, [42, 43]],
+  'wendel-spire': ['hulkwight', 29, 3, [27, 29]], 'hallorans-spire': ['coilcrest', 36, 6, [33, 36]], 'seraphine-spire': ['lumenveil', 43, 6, [40, 43]],
   'bar-corwen': ['hulkwight', 41, 4, [40, 41]], 'bar-tilda': ['strandrunner', 41, 4, [40, 41]], 'bar-ezra': ['cairnward', 42, 4, [41, 42]],
   'bar-ottilie': ['lumenveil', 43, 5, [41, 43]], 'bar-hamish': ['brinelance', 43, 5, [42, 43]], 'bar-delphine': ['cragmitt', 44, 5, [42, 44]],
   'bastien-keeper': ['hulkwight', 46, 5, [43, 46]], 'cass-keeper': ['skeinwing', 48, 5, [45, 48]], 'idris-champion': ['vesperay', 50, 6, [46, 50]],

@@ -17,6 +17,11 @@
  * 6. clear a boosted foe (Plumbline / Snuff)
  * 7. the best expected-damage hit; 8. any other legal status move, then the first legal move
  *
+ * Weather awareness: every damage score carries the arena weather's multiplier for the move's
+ * type (`legal()`'s `weatherMult`; the finisher reads `estimateDamage`, which counts it too), so
+ * the AI prefers moves the weather boosts and avoids those it weakens; replacements are scored
+ * the same way.
+ *
  * Profile memory lives in `battle.memo[side]` (per battle, plain data). The
  * wild brain draws from the battle rng, so everything stays deterministic.
  * Pure: no DOM.
@@ -105,7 +110,7 @@ function scoreMove(entry, me, stab) {
   if (!entry.selectable || entry.category === 'status' || entry.power <= 0) return 0;
   if (entry.word === 'Blocked' || entry.word === 'No effect' || entry.word === 'Blocked by Ward' || entry.mult === 0) return 0;
   const s = entry.type !== null && (me.types.includes(entry.type) || (entry.heartmark && me.heartmarkStab)) ? stab : 1;
-  return entry.power * entry.mult * s * entry.hitChance;
+  return entry.power * entry.mult * s * entry.hitChance * (entry.weatherMult ?? 1);
 }
 
 /**
@@ -124,7 +129,8 @@ function benchScore(battle, c, foe, foeAbility) {
     const check = wardCheck(foeAbility, mv, foe.types, type, battle.data.chart);
     if (!check.lands) continue;
     const stab = type !== null && c.types.includes(type) ? battle.tuning.stab : 1;
-    best = Math.max(best, mv.power * check.eff.mult * stab);
+    const weather = typeof battle.weatherPowerMult === 'function' ? battle.weatherPowerMult(type) : 1;
+    best = Math.max(best, mv.power * check.eff.mult * stab * weather);
   }
   return best;
 }
@@ -267,7 +273,17 @@ export function chooseTrainerAction(battle, side, opts = {}) {
   // 8. Anything else that is legal (a status move, then the first selectable).
   const status = find((mv, entry) => mv.category === 'status' && !mv.effect.recovery && !mv.effect.evasion && !mv.effect.guard && entry.word !== 'Blocked by Ward' && statusCanTake(battle, side, mv));
   if (status) return { type: 'move', move: status.index };
-  return { type: 'move', move: selectable[0].index };
+  return { type: 'move', move: unsmothered(selectable)[0].index };
+}
+
+/**
+ * Selectable entries without a hit the weather smothers (`weatherMult` 0), or all of them when
+ * every one is smothered (the side must still act).
+ * @param {any[]} selectable legal() move entries @returns {any[]}
+ */
+function unsmothered(selectable) {
+  const ok = selectable.filter((m) => !(m.category !== 'status' && m.weatherMult === 0));
+  return ok.length ? ok : selectable;
 }
 
 /**
@@ -286,7 +302,7 @@ export function chooseWildAction(battle, side) {
   if (!selectable.length) return { type: 'scrap' };
   const weighted = selectable.map((m) => ({ w: scoreMove(m, me, battle.tuning.stab), v: m.index })).filter((e) => e.w > 0);
   if (weighted.length) return { type: 'move', move: /** @type {(e: any[]) => number} */ (battle.rng.weighted)(weighted) };
-  return { type: 'move', move: battle.rng.pick(selectable).index };
+  return { type: 'move', move: battle.rng.pick(unsmothered(selectable)).index };
 }
 
 /**

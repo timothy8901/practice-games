@@ -353,10 +353,12 @@ describe('payouts, blackout and the Summit (section 13.2, 16)', () => {
     assert.equal(bt.result().blackoutCost, 0);
   });
 
-  it('result() carries ended/outcome/winner/turns/exp/payout/blackoutCost/caught', () => {
+  it('result() carries ended/outcome/winner/turns/exp/payout/blackoutCost/caught (+ consumedItems, weather)', () => {
     const { bt } = loss({ glint: 100 });
     const r = bt.result();
-    assert.deepEqual(Object.keys(r).sort(), ['blackoutCost', 'caught', 'ended', 'exp', 'outcome', 'payout', 'summitNoLoss', 'turns', 'winner']);
+    assert.deepEqual(Object.keys(r).sort(), ['blackoutCost', 'caught', 'consumedItems', 'ended', 'exp', 'outcome', 'payout', 'summitNoLoss', 'turns', 'weather', 'winner']);
+    assert.deepEqual(r.consumedItems, []);
+    assert.equal(r.weather.kind, null);
     assert.equal(r.ended, true);
     assert.equal(r.winner, 1);
     assert.equal(r.caught, null);

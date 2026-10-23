@@ -5,7 +5,8 @@
  * Keeper's Cottage and Linnet's house behind the fence, Isolde's old orchard, Wick's cliff stair and the
  * Dorrows' burrow, the Keeper's jetty ("the dock") and the point flats (the Glint, sparkles, glowing
  * mud), the shingle spit to the Lowmoor stepping stones (+-2 h) and the Bar road running north from the
- * lighthouse's foot (the day's lower low until the Relighting). North: the marsh delta and its reeds,
+ * lighthouse's foot ('b' = bar-road-near here: every low out to the spur foot; the far road to Shardcrown
+ * is the day's lower low until the Relighting, GDD-01 §17.2). North: the marsh delta and its reeds,
  * the footbridge and marsh boardwalk (the Lowmoor long way, any tide), the river with its tidal
  * stepping stones and the stone bridge, the north bank orchard, Thessaly's cottage, the empty north
  * creek with the Bracks' oyster boat, the weir, Ansel's beached launch, Stalk's Hill orchard.
@@ -13,7 +14,8 @@
  * the market lawn east), the Archive (Barnaby's porthole), Pell's Sundries, the Warden's house, the
  * post office (Ludo's eave). East: the co-op yard at the causeway end and the mainland causeway
  * (arrival only, +-1 h). South: the quay row (most of it dark), the Anchorage, the quay, Maud's berth,
- * the Old Pier (the Carnival Raft from day 3) and the Old Quay (bared at spring lows).
+ * the Old Pier (the Carnival Raft from day 3) and the Old Quay (bared at spring lows); the breakwater from the
+ * dock foot round to the harbor light (30,46) shelters Maud's berth, and a slipway drops off the quay at x 43-46.
  *
  * Layers: `ground` is the base tile everywhere; `detail` holds props that stand on a ground tile
  * (trees '8' pine / '9' alder, rocks 'o', fences '|' and gates '/', hedges, crates 'c', barrels '(',
@@ -33,13 +35,13 @@ export default {
   region: 'pellwick',
   w: 64,
   h: 48,
-  legend: { '?': 'roof-keeper', x: 'old-quay', d: 'porthole', n: 'net-rack', j: 'creel' },
+  legend: { '?': 'roof-keeper', x: 'old-quay', d: 'porthole', n: 'net-rack', j: 'creel', b: 'bar-road-near' },
   ground: [
     //0000000000111111111122222222223333333333444444444455555555556666
     //0123456789012345678901234567890123456789012345678901234567890123
-    'DDDDDDbbDDDDDkDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDSGGGGGGRRRGGGGGGGG', //  0
-    'DDDDDDbbDDDDDkDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDSGGGGGGRRRG,GGG,,G', //  1
-    'DDDDDDbbSSSSSkSSSSSSRRRSSSSSSSSSSSSSSSSSSSSSSSSGGGGGGRRR,,G,G,G,', //  2
+    'DDDDDDbbDDSSDkDSSSSDDDDDDDDDDDDDDDDDDDDDDDDDDDSGGGGGGRRRGGGGGGGG', //  0
+    'DDDDDDbbDSSSSkSSSSSSDDDDDDDDDDDDDDDDDDDDDDDDDDSGGGGGGRRRG,GGG,,G', //  1
+    'DDDDDDbbSSrrSkSrrrSSRRRSSSSSSSSSSSSSSSSSSSSSSSSGGGGGGRRR,,G,G,G,', //  2
     'DDDDDDbbSrrUUkrUrrrrRRRAaAaaaAaAaAammAaAAaAAAaAGGGGGGRRRG,GGGGGG', //  3
     'DDDDDDbbSrSUSkUUrrrrRRRaaaaaaaaGGGGmmmmm;mmmmm;mmmmmmRRRGGGGGGG,', //  4
     'DDDDDDbbSrrUrkSSrrrrRRRGGGGGGGGGGGGmGGGGGGGGGGGGGGGmmRRRGGG,G,GG', //  5
@@ -51,47 +53,47 @@ export default {
     'DDDDDDbbSrrrSrrrrrrrRRRRRRRRRRRRRzRRRNNRRRRRRRRRRRRRRRRR,G,GGGGG', // 11
     'DDDDDDbbSrrrrrrrrrrrRRRRRRRRRRRRRzRRRNNRRRrrrrrrrrrrRRGGG,,G,GGG', // 12
     'DDDSSSbbSrrrrrrrrrrrRRRRrrrrrrrRRzRRRNNRrrrrrrrrrrrrGGGGPPPPGGGG', // 13
-    'DDSSqqqqqrrrrrrrrrrrPPPPPPPPPPPPPPPPPOOPPPPPPPPPPPPPPPPPPGGGSSSS', // 14
-    'DDSCCqqqqCCCCCCCCCCGGG111111G^^^^^^^GOOGGGGGGG333333GGGGGGGASDDD', // 15
-    'DDSCfffffqGGG,GGG5555G111111G^^^^^^^GOOG66666G333333G5555GGASDDD', // 16
-    'DDSCssfffG,G,G,GG}}}$G111111G^^^^^^^GOOG66666G333333G5555GGASDDD', // 17
-    'DDSC@sfff,GGG,G,G$+$}Gw[[[w[G]s]]]s]GOOG#%%%#Gw[[[w[G}}}#GGASDDD', // 18
-    'DDSCfff?????G1111___GG[w!w[wGs]s@sdsGOOG%#+#%G[w!w[wG#+#}GGASDDD', // 19
-    'DDSCfff?????,1111GGGGGG___GGGGG___GGGOOGG___GGG___GGG___GGGASDDD', // 20
-    'DDSCGGP${{{$G%%%#POOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOASDDD', // 21
-    'DDSCGGP{$+${G#+#%PGGGGGGGGGOgggggggggggggggggggggO77777GGGGASDDD', // 22
-    'DDSSCGPG___GG___GPGGGG5555GOg**ggggggggggggggg**gO777774444ASDDD', // 23
-    'DDDSC,PG,GGGGGGGGP,GGG5555GOg*&gggOOOOOOOOgggg&*gO#%%%#%%%#ASDDD', // 24
-    'DDDSSCPPPPPPPPPPPPGGGG}}}#GOggggggOOOOOOOOgggggggO%#+#%#+#%ASDDD', // 25
-    'DDDSCGGGGGGG,,GG77777G#+#}GOggggggOOOOOOOOgggggggOG___GGGGGASDDD', // 26
-    'DDSSCGG,GGGGG,GG77777G___GGOggggggOOOOOOOOgggggggOfffffffGGASDDD', // 27
-    'DDSC,GG,GGGGGGGG#%%%#GGGGGGOgggggggggggggggg&*gggOfffffffqqqSDDD', // 28
-    'DDSCGGGGGGGGGGGG%#+#%GGGGGGOggg**&gggggggggg**gggOfffffffqqqSDDD', // 29
+    'DDSSqqqqqrrrrrrrrrrrPPPPPPPPPPPPPPPPPOOPPPPPPPPPPPPPPPPPPGGGAqSS', // 14
+    'DDSCCqqqqCCCCCCCCCCGGG111111G^^^^^^^GOOGGGGGGG333333GGGGGGGAAqSD', // 15
+    'DDSCfffffqGGG,GGG5555G111111G^^^^^^^GOOG66666G333333G5555GGAAAqS', // 16
+    'DDSCssfffG,G,G,GG}}}$G111111G^^^^^^^GOOG66666G333333G5555GGAAAqS', // 17
+    'DDSC@sfff,GGG,G,G$+$}Gw[[[w[G]s]]]s]GOOG#%%%#Gw[[[w[G}}}#GGAAqSD', // 18
+    'DSSCfff?????G1111___GG[w!w[wGs]s@sdsGOOG%#+#%G[w!w[wG#+#}GGAASSD', // 19
+    'SSSCfff?????,1111GGGGGG___GGGGG___GGGOOGG___GGG___GGG___GGGASSDD', // 20
+    'DSSCGGP${{{$G%%%#POOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOASDDD', // 21
+    'DDSCGGP{$+${G#+#%PGGGGGGGGGOgggggggggggggggggggggO77777GGGGAASDD', // 22
+    'DDSSCGPG___GG___GPGGGG5555GOg**ggggggggggggggg**gO777774444AAqSD', // 23
+    'DDDSC,PG,GGGGGGGGP,GGG5555GOg*&gggOOOOOOOOgggg&*gO#%%%#%%%#AAAqS', // 24
+    'DDDSSCPPPPPPPPPPPPGGGG}}}#GOggggggOOOOOOOOgggggggO%#+#%#+#%AqqqS', // 25
+    'DDDSCGGGGGGG,,GG77777G#+#}GOggggggOOOOOOOOgggggggOG___GGGGGAAqSS', // 26
+    'DSSSCGG,GGGGG,GG77777G___GGOggggggOOOOOOOOgggggggOfffffffGGAASSD', // 27
+    'DSSC,GG,GGGGGGGG#%%%#GGGGGGOgggggggggggggggg&*gggOfffffffqqqSDDD', // 28
+    'DSSCGGGGGGGGGGGG%#+#%GGGGGGOggg**&gggggggggg**gggOfffffffqqqSDDD', // 29
     'DDSSCGGG,GG,G,G,G___GGGGGGGOgggggggggggggggggggggOfffffffqqqXXXX', // 30
     'DDDSCCCCCCHCAAAAAGGGGGGOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOqqqXXXX', // 31
-    'DDDSSCCCCCHCAAAAAA5555G44444GGG22222GOOG5555G5555G555555555qSDDD', // 32
-    'DDDDSCCCCCHC"AAAKA5555G44444GGG22222GOOG5555G5555G555555555ASDDD', // 33
-    'DDDDMMMMqqqAAAWWKW}}}$G#%%%#GGGw[[[wGOOG}}}#G$}}}G}}}#s]]]sASDDD', // 34
-    'DDDMMMqqqMMMMMMMKW$+$}G%#+#%GGG[w!w[GOOG#+#}G}$+$G#+#}]s@s]ASDDD', // 35
-    'DDDMMqqMMMMM~MMMKM___WGG___GGGGG___GGOOG___GGG___G___GGGGGGASDDD', // 36
-    'DDDMqqMYYMMMMMMMKOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOSDDD', // 37
-    'qeeqqMMMYYYMMMMMKOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOSDDD', // 38
-    'DDDDMMMMMMYYMMMMKWHQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQSDDD', // 39
-    'DDDDDMYMMMMMMMYYKWHQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQSDDD', // 40
-    'DDDDDDMMM~MMYMMYWWHQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQSDDD', // 41
-    'DDDDDDDDMMMMMYMWWWSSSSSSSSSSSSSSSKKSSSSSSSSSSSSSSSKKSxxxxxxSSDDD', // 42
-    'DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDKKDDDDDDDDDDDDDDDKKSxxxxxxSDDDD', // 43
-    'DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDKKDDDDDDDDDDDDDDDKKSxxxxxxSDDDD', // 44
-    'DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDKKSxxxxxxSDDDD', // 45
-    'DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDKKSSSxxxxSDDDD', // 46
-    'DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDSSSSSSSSDDDD', // 47
+    'DDSSSCCCCCHCAAAAAA5555G44444GGG22222GOOG5555G5555G555555555qqSDD', // 32
+    'DDSDSCCCCCHC"AAAKA5555G44444GGG22222GOOG5555G5555G555555555AAqSD', // 33
+    'DDDDMMMMqqqAAAWWKW}}}$G#%%%#GGGw[[[wGOOG}}}#G$}}}G}}}#s]]]sAAAqS', // 34
+    'DDDMMMqqqMMMMMMMKW$+$}G%#+#%GGG[w!w[GOOG#+#}G}$+$G#+#}]s@s]AAqqS', // 35
+    'DDDMMqqMMMMM~MMMKM___WGG___GGGGG___GGOOG___GGG___G___GGGGGGAAqSD', // 36
+    'DDDMqqMYYMMMMMMMKOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOqSDD', // 37
+    'qeeqqMMMYYYMMMMMKOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOSSDD', // 38
+    'DDDDMMMMMMYYMMMMKWHQQQQQQQQQQQQQQQQQpppppppQQQQQQQQQQQQQQQQQSDDD', // 39
+    'DDDDDMYMMMMMMMYYKWHQQQQQQQQQQQQQQQQQpppppppQQQQQQQQQQQQQQQQQSDDD', // 40
+    'DDDDDDMMM~MMYMMYWWHQQQQQQQQQQQQQQQQQpppppppHHHHQQQQQQQQQQQQQSDDD', // 41
+    'DDDDDDDDMMMMMYMWWQQSSSSSSSSSSSSSSKKSSSSSSSSWWWWSSSKKSxxxxxxSSDDD', // 42
+    'DDDDDDDDDDDDDDDDDQQSSSSSSSSSSSSSSKKDDDDDDDDDDDDDDDKKSxxxxxxSDDDD', // 43
+    'DDDDDDDDDDDDDDDDDQQSSSSSSSSSSSSSSKKDDDDDDDDDDDDDDDKKSxxxxxxSDDDD', // 44
+    'DDDDDDDDDDDDDDDDDQQSSSSSSSSSSSSSSDDDDDDDDDDDDDDDDDKKSxxxxxxSDDDD', // 45
+    'DDDDDDDDDDDDDDDDDQQQQQQQQQQQQQQDDDDDDDDDDDDDDDDDDDKKSSSxxxxSDDDD', // 46
+    'DDDDDDDDDDDDDDDDDDDSSSSSSSSSSSSDDDDDDDDDDDDDDDDDDDDDSSSSSSSSDDDD', // 47
   ],
   detail: [
     //0000000000111111111122222222223333333333444444444455555555556666
     //0123456789012345678901234567890123456789012345678901234567890123
-    '...............................................888888...88888888', //  0
-    '...............................................888888...........', //  1
-    '...............................................888888..........8', //  2
+    '................................................88888...88888888', //  0
+    '...............................................88888............', //  1
+    '................................................8888...........8', //  2
     '................................................................', //  3
     '......................................o.........................', //  4
     '...............................................................8', //  5
@@ -106,36 +108,36 @@ export default {
     '....................................L..L........................', // 14
     '................................................................', // 15
     '........o.......................................................', // 16
-    '................................................................', // 17
+    '.o...........................................................o..', // 17
     '................................................................', // 18
-    '............|...................................................', // 19
+    '............|..................................................o', // 19
     '............|...................................................', // 20
-    '............|.....................................L.............', // 21
+    'o...........|.....................................L...........o.', // 21
     '............|.............L.........L..L........................', // 22
     '............|...................................................', // 23
     '....y..|./.|||/||...............................................', // 24
-    '................................................................', // 25
+    '.............................................................o..', // 25
     '...............................................L................', // 26
     '....y...........................................................', // 27
-    '................................................................', // 28
+    '.o..............................................................', // 28
     '....y.................L.........................................', // 29
     '...............y....................L..L........................', // 30
     '................................................................', // 31
     '.............................|..................................', // 32
-    '.............................|=.....=...........................', // 33
+    'o............................|=.....=..........................o', // 33
     '.............................|=.....=...........................', // 34
-    '.........ll..................|=.....=...........................', // 35
+    '.........ll..................|=.....=.........................o.', // 35
     '..............o..............|..................................', // 36
     '................................................................', // 37
     '.............l..o...L.........L.............L........L..........', // 38
-    '.......l.........l...n..ccj..(.............jc(.nn.......ccj.....', // 39
-    '......................................................j.........', // 40
+    '.......l.........l...n..ccj..(.............jc(.nn.......ccj...o.', // 39
+    '.......................jn......c(...............nn.j..j..c...o..', // 40
     '...........o..........)....)...)....).....)....).....)....).....', // 41
     '................................................................', // 42
     '................................................................', // 43
     '................................................................', // 44
     '................................................................', // 45
-    '................................................................', // 46
+    '....................)..)..)..)L.................................', // 46
     '................................................................', // 47
   ],
   overlay: null,
@@ -161,64 +163,64 @@ export default {
     { kind: 'tree', id: 'tree-grandam', name: 'Grandam', x: 58, y: 2, art: 'tree-fruit', fruitFrom: 'native', zone: 'hill-orchard' },
     { kind: 'tree', id: 'tree-parson-hobb', name: 'Parson Hobb', x: 60, y: 2, art: 'tree-fruit', fruitFrom: 'native', zone: 'hill-orchard' },
     { kind: 'tree', id: 'bee-hummer', name: 'Hummer', x: 62, y: 2, art: 'tree-bee', hive: 'honeycomb', zone: 'hill-orchard' },
-    { kind: 'tree', id: 'tree-crooked-kit', name: 'Crooked Kit', x: 56, y: 4, art: 'tree-fruit', fruitFrom: 'native', zone: 'hill-orchard' },
-    { kind: 'tree', id: 'tree-lantern-tree', name: 'Lantern Tree', x: 58, y: 4, art: 'tree-fruit', fruitFrom: 'native', zone: 'hill-orchard' },
-    { kind: 'tree', id: 'tree-ferryman', name: 'Ferryman', x: 60, y: 4, art: 'tree-fruit', fruitFrom: 'native', zone: 'hill-orchard' },
-    { kind: 'tree', id: 'tree-tide-widow', name: 'Tide Widow', x: 62, y: 4, art: 'tree-fruit', fruitFrom: 'native', zone: 'hill-orchard' },
-    { kind: 'tree', id: 'tree-gull-perch', name: 'Gull Perch', x: 56, y: 6, art: 'tree-fruit', fruitFrom: 'native', zone: 'hill-orchard' },
+    { kind: 'tree', id: 'tree-crooked-kit', name: 'Crooked Kit', x: 57, y: 4, art: 'tree-fruit', fruitFrom: 'native', zone: 'hill-orchard' },
+    { kind: 'tree', id: 'tree-lantern-tree', name: 'Lantern Tree', x: 59, y: 4, art: 'tree-fruit', fruitFrom: 'native', zone: 'hill-orchard' },
+    { kind: 'tree', id: 'tree-ferryman', name: 'Ferryman', x: 61, y: 4, art: 'tree-fruit', fruitFrom: 'native', zone: 'hill-orchard' },
+    { kind: 'tree', id: 'tree-tide-widow', name: 'Tide Widow', x: 63, y: 4, art: 'tree-fruit', fruitFrom: 'native', zone: 'hill-orchard' },
+    { kind: 'tree', id: 'tree-gull-perch', name: 'Gull Perch', x: 56, y: 6, art: 'tree-fruit-b', fruitFrom: 'native', zone: 'hill-orchard' },
     { kind: 'tree', id: 'tree-long-tom', name: 'Long Tom', x: 58, y: 6, art: 'tree-fruit', fruitFrom: 'native', zone: 'hill-orchard' },
     { kind: 'tree', id: 'purse-tightfist', name: 'Tightfist', x: 60, y: 6, art: 'tree-purse', purse: true, zone: 'hill-orchard' },
-    { kind: 'tree', id: 'tree-whistler', name: 'Whistler', x: 62, y: 6, art: 'tree-fruit', fruitFrom: 'native', zone: 'hill-orchard' },
-    { kind: 'tree', id: 'tree-sweet-fanny', name: 'Sweet Fanny', x: 56, y: 8, art: 'tree-fruit', fruitFrom: 'native', zone: 'hill-orchard' },
-    { kind: 'tree', id: 'tree-the-bishop', name: 'The Bishop', x: 58, y: 8, art: 'tree-fruit', fruitFrom: 'native', zone: 'hill-orchard' },
-    { kind: 'tree', id: 'tree-hollow-jack', name: 'Hollow Jack', x: 60, y: 8, art: 'tree-fruit', fruitFrom: 'native', zone: 'hill-orchard' },
-    { kind: 'tree', id: 'tree-mabrys-tree', name: 'Mabry\'s Tree', x: 62, y: 8, art: 'tree-fruit', fruitFrom: 'native', zone: 'hill-orchard' },
+    { kind: 'tree', id: 'tree-whistler', name: 'Whistler', x: 62, y: 6, art: 'tree-fruit-b', fruitFrom: 'native', zone: 'hill-orchard' },
+    { kind: 'tree', id: 'tree-sweet-fanny', name: 'Sweet Fanny', x: 57, y: 8, art: 'tree-fruit', fruitFrom: 'native', zone: 'hill-orchard' },
+    { kind: 'tree', id: 'tree-the-bishop', name: 'The Bishop', x: 59, y: 8, art: 'tree-fruit-b', fruitFrom: 'native', zone: 'hill-orchard' },
+    { kind: 'tree', id: 'tree-hollow-jack', name: 'Hollow Jack', x: 61, y: 8, art: 'tree-fruit', fruitFrom: 'native', zone: 'hill-orchard' },
+    { kind: 'tree', id: 'tree-mabrys-tree', name: 'Mabry\'s Tree', x: 63, y: 8, art: 'tree-fruit-b', fruitFrom: 'native', zone: 'hill-orchard' },
     { kind: 'tree', id: 'tree-captain-mallow', name: 'Captain Mallow', x: 56, y: 10, art: 'tree-fruit', fruitFrom: 'native', zone: 'hill-orchard' },
     { kind: 'tree', id: 'bee-queen-bess', name: 'Queen Bess', x: 58, y: 10, art: 'tree-bee', hive: 'honeycomb', zone: 'hill-orchard' },
     { kind: 'tree', id: 'tree-lame-duck', name: 'Lame Duck', x: 60, y: 10, art: 'tree-fruit', fruitFrom: 'native', zone: 'hill-orchard' },
     { kind: 'tree', id: 'tree-bell-tree', name: 'Bell Tree', x: 62, y: 10, art: 'tree-fruit', fruitFrom: 'native', zone: 'hill-orchard' },
-    { kind: 'tree', id: 'tree-saltlick', name: 'Saltlick', x: 56, y: 12, art: 'tree-fruit', fruitFrom: 'native', zone: 'hill-orchard' },
-    { kind: 'tree', id: 'tree-knuckles', name: 'Knuckles', x: 58, y: 12, art: 'tree-fruit', fruitFrom: 'native', zone: 'hill-orchard' },
-    { kind: 'tree', id: 'tree-weathervane', name: 'Weathervane', x: 60, y: 12, art: 'tree-fruit', fruitFrom: 'native', zone: 'hill-orchard' },
-    { kind: 'tree', id: 'tree-tallyman', name: 'Tallyman', x: 62, y: 12, art: 'tree-fruit', fruitFrom: 'native', zone: 'hill-orchard' },
+    { kind: 'tree', id: 'tree-saltlick', name: 'Saltlick', x: 55, y: 12, art: 'tree-fruit-b', fruitFrom: 'native', zone: 'hill-orchard' },
+    { kind: 'tree', id: 'tree-knuckles', name: 'Knuckles', x: 57, y: 12, art: 'tree-fruit', fruitFrom: 'native', zone: 'hill-orchard' },
+    { kind: 'tree', id: 'tree-weathervane', name: 'Weathervane', x: 59, y: 12, art: 'tree-fruit', fruitFrom: 'native', zone: 'hill-orchard' },
+    { kind: 'tree', id: 'tree-tallyman', name: 'Tallyman', x: 61, y: 12, art: 'tree-fruit', fruitFrom: 'native', zone: 'hill-orchard' },
     // north-bank
     { kind: 'tree', id: 'tree-brindle', name: 'Brindle', x: 30, y: 5, art: 'tree-fruit', fruitFrom: 'native', zone: 'north-bank' },
     { kind: 'tree', id: 'tree-mossback', name: 'Mossback', x: 32, y: 5, art: 'tree-fruit', fruitFrom: 'native', zone: 'north-bank' },
     { kind: 'tree', id: 'tree-bonny-lass', name: 'Bonny Lass', x: 34, y: 5, art: 'tree-fruit', fruitFrom: 'native', zone: 'north-bank' },
-    { kind: 'tree', id: 'tree-rooks-rest', name: 'Rook\'s Rest', x: 30, y: 7, art: 'tree-fruit', fruitFrom: 'native', zone: 'north-bank' },
-    { kind: 'tree', id: 'tree-keel', name: 'Keel', x: 32, y: 7, art: 'tree-fruit', fruitFrom: 'native', zone: 'north-bank' },
-    { kind: 'tree', id: 'purse-penny-hoard', name: 'Penny Hoard', x: 34, y: 7, art: 'tree-purse', purse: true, zone: 'north-bank' },
+    { kind: 'tree', id: 'tree-rooks-rest', name: 'Rook\'s Rest', x: 31, y: 7, art: 'tree-fruit', fruitFrom: 'native', zone: 'north-bank' },
+    { kind: 'tree', id: 'tree-keel', name: 'Keel', x: 33, y: 7, art: 'tree-fruit', fruitFrom: 'native', zone: 'north-bank' },
+    { kind: 'tree', id: 'purse-penny-hoard', name: 'Penny Hoard', x: 35, y: 7, art: 'tree-purse', purse: true, zone: 'north-bank' },
     { kind: 'tree', id: 'tree-gaffer', name: 'Gaffer', x: 30, y: 9, art: 'tree-fruit', fruitFrom: 'native', zone: 'north-bank' },
-    { kind: 'tree', id: 'tree-nan-coil', name: 'Nan Coil', x: 32, y: 9, art: 'tree-fruit', fruitFrom: 'native', zone: 'north-bank' },
+    { kind: 'tree', id: 'tree-nan-coil', name: 'Nan Coil', x: 32, y: 9, art: 'tree-fruit-b', fruitFrom: 'native', zone: 'north-bank' },
     { kind: 'tree', id: 'tree-little-ned', name: 'Little Ned', x: 34, y: 9, art: 'tree-fruit', fruitFrom: 'native', zone: 'north-bank' },
-    { kind: 'tree', id: 'tree-stooper', name: 'Stooper', x: 36, y: 7, art: 'tree-fruit', fruitFrom: 'native', zone: 'north-bank' },
-    { kind: 'tree', id: 'tree-sunday-best', name: 'Sunday Best', x: 38, y: 7, art: 'tree-fruit', fruitFrom: 'native', zone: 'north-bank' },
-    { kind: 'tree', id: 'tree-owl-light', name: 'Owl Light', x: 40, y: 7, art: 'tree-fruit', fruitFrom: 'native', zone: 'north-bank' },
+    { kind: 'tree', id: 'tree-stooper', name: 'Stooper', x: 37, y: 7, art: 'tree-fruit', fruitFrom: 'native', zone: 'north-bank' },
+    { kind: 'tree', id: 'tree-sunday-best', name: 'Sunday Best', x: 39, y: 7, art: 'tree-fruit', fruitFrom: 'native', zone: 'north-bank' },
+    { kind: 'tree', id: 'tree-owl-light', name: 'Owl Light', x: 41, y: 7, art: 'tree-fruit', fruitFrom: 'native', zone: 'north-bank' },
     { kind: 'tree', id: 'tree-the-leaner', name: 'The Leaner', x: 36, y: 9, art: 'tree-fruit', fruitFrom: 'native', zone: 'north-bank' },
-    { kind: 'tree', id: 'tree-shipwright', name: 'Shipwright', x: 38, y: 9, art: 'tree-fruit', fruitFrom: 'native', zone: 'north-bank' },
+    { kind: 'tree', id: 'tree-shipwright', name: 'Shipwright', x: 38, y: 9, art: 'tree-fruit-b', fruitFrom: 'native', zone: 'north-bank' },
     { kind: 'tree', id: 'tree-barrow-queen', name: 'Barrow Queen', x: 40, y: 9, art: 'tree-fruit', fruitFrom: 'native', zone: 'north-bank' },
     { kind: 'tree', id: 'tree-cobbler', name: 'Cobbler', x: 24, y: 5, art: 'tree-fruit', fruitFrom: 'native', zone: 'north-bank' },
-    { kind: 'tree', id: 'tree-tinker', name: 'Tinker', x: 26, y: 5, art: 'tree-fruit', fruitFrom: 'native', zone: 'north-bank' },
-    { kind: 'tree', id: 'tree-haverel', name: 'Haverel', x: 28, y: 5, art: 'tree-fruit', fruitFrom: 'native', zone: 'north-bank' },
-    { kind: 'tree', id: 'tree-fogbound', name: 'Fogbound', x: 36, y: 5, art: 'tree-fruit', fruitFrom: 'native', zone: 'north-bank' },
+    { kind: 'tree', id: 'tree-tinker', name: 'Tinker', x: 26, y: 5, art: 'tree-fruit-b', fruitFrom: 'native', zone: 'north-bank' },
+    { kind: 'tree', id: 'tree-haverel', name: 'Haverel', x: 28, y: 5, art: 'tree-fruit-b', fruitFrom: 'native', zone: 'north-bank' },
+    { kind: 'tree', id: 'tree-fogbound', name: 'Fogbound', x: 36, y: 5, art: 'tree-fruit-b', fruitFrom: 'native', zone: 'north-bank' },
     { kind: 'tree', id: 'tree-tidewrack', name: 'Tidewrack', x: 38, y: 5, art: 'tree-fruit', fruitFrom: 'native', zone: 'north-bank' },
     { kind: 'tree', id: 'tree-starling', name: 'Starling', x: 40, y: 5, art: 'tree-fruit', fruitFrom: 'native', zone: 'north-bank' },
     // weir-clearing
     { kind: 'tree', id: 'tree-maypole', name: 'Maypole', x: 49, y: 5, art: 'tree-fruit', fruitFrom: 'native', zone: 'weir-clearing' },
     { kind: 'tree', id: 'tree-wicket', name: 'Wicket', x: 47, y: 7, art: 'tree-fruit', fruitFrom: 'native', zone: 'weir-clearing' },
     { kind: 'tree', id: 'purse-spendthrift', name: 'Spendthrift', x: 49, y: 7, art: 'tree-purse', purse: true, zone: 'weir-clearing' },
-    { kind: 'tree', id: 'tree-plover', name: 'Plover', x: 48, y: 9, art: 'tree-fruit', fruitFrom: 'native', zone: 'weir-clearing' },
+    { kind: 'tree', id: 'tree-plover', name: 'Plover', x: 48, y: 9, art: 'tree-fruit-b', fruitFrom: 'native', zone: 'weir-clearing' },
     // green-west
     { kind: 'tree', id: 'tree-dunlin', name: 'Dunlin', x: 29, y: 23, art: 'tree-fruit', fruitFrom: 'native', zone: 'green-west' },
     { kind: 'tree', id: 'tree-curlew', name: 'Curlew', x: 31, y: 23, art: 'tree-fruit', fruitFrom: 'native', zone: 'green-west' },
     { kind: 'tree', id: 'tree-godwit', name: 'Godwit', x: 33, y: 23, art: 'tree-fruit', fruitFrom: 'native', zone: 'green-west' },
     { kind: 'tree', id: 'purse-the-miser', name: 'The Miser', x: 29, y: 25, art: 'tree-purse', purse: true, zone: 'green-west' },
     { kind: 'tree', id: 'tree-turnstone', name: 'Turnstone', x: 31, y: 25, art: 'tree-fruit', fruitFrom: 'native', zone: 'green-west' },
-    { kind: 'tree', id: 'tree-merlin', name: 'Merlin', x: 33, y: 25, art: 'tree-fruit', fruitFrom: 'native', zone: 'green-west' },
-    { kind: 'tree', id: 'tree-tern', name: 'Tern', x: 29, y: 27, art: 'tree-fruit', fruitFrom: 'native', zone: 'green-west' },
+    { kind: 'tree', id: 'tree-merlin', name: 'Merlin', x: 33, y: 25, art: 'tree-fruit-b', fruitFrom: 'native', zone: 'green-west' },
+    { kind: 'tree', id: 'tree-tern', name: 'Tern', x: 29, y: 27, art: 'tree-fruit-b', fruitFrom: 'native', zone: 'green-west' },
     { kind: 'tree', id: 'tree-puffins-post', name: 'Puffin\'s Post', x: 31, y: 27, art: 'tree-fruit', fruitFrom: 'native', zone: 'green-west' },
     { kind: 'tree', id: 'bee-honeypot', name: 'Honeypot', x: 33, y: 27, art: 'tree-bee', hive: 'honeycomb', zone: 'green-west' },
-    { kind: 'tree', id: 'tree-oystercatcher', name: 'Oystercatcher', x: 29, y: 29, art: 'tree-fruit', fruitFrom: 'native', zone: 'green-west' },
+    { kind: 'tree', id: 'tree-oystercatcher', name: 'Oystercatcher', x: 29, y: 29, art: 'tree-fruit-b', fruitFrom: 'native', zone: 'green-west' },
     { kind: 'tree', id: 'tree-spratling', name: 'Spratling', x: 31, y: 29, art: 'tree-fruit', fruitFrom: 'native', zone: 'green-west' },
     { kind: 'tree', id: 'tree-grey-lady', name: 'Grey Lady', x: 33, y: 29, art: 'tree-fruit', fruitFrom: 'native', zone: 'green-west' },
     // green-east
@@ -226,50 +228,50 @@ export default {
     { kind: 'tree', id: 'tree-mizzen', name: 'Mizzen', x: 45, y: 23, art: 'tree-fruit', fruitFrom: 'native', zone: 'green-east' },
     { kind: 'tree', id: 'tree-bowsprit', name: 'Bowsprit', x: 47, y: 23, art: 'tree-fruit', fruitFrom: 'native', zone: 'green-east' },
     { kind: 'tree', id: 'tree-bosun', name: 'Bosun', x: 43, y: 25, art: 'tree-fruit', fruitFrom: 'native', zone: 'green-east' },
-    { kind: 'tree', id: 'tree-anchor-watch', name: 'Anchor Watch', x: 45, y: 25, art: 'tree-fruit', fruitFrom: 'native', zone: 'green-east' },
+    { kind: 'tree', id: 'tree-anchor-watch', name: 'Anchor Watch', x: 45, y: 25, art: 'tree-fruit-b', fruitFrom: 'native', zone: 'green-east' },
     { kind: 'tree', id: 'tree-lighterman', name: 'Lighterman', x: 47, y: 25, art: 'tree-fruit', fruitFrom: 'native', zone: 'green-east' },
-    { kind: 'tree', id: 'tree-thimble', name: 'Thimble', x: 43, y: 27, art: 'tree-fruit', fruitFrom: 'native', zone: 'green-east' },
+    { kind: 'tree', id: 'tree-thimble', name: 'Thimble', x: 43, y: 27, art: 'tree-fruit-b', fruitFrom: 'native', zone: 'green-east' },
     { kind: 'tree', id: 'purse-old-purse', name: 'Old Purse', x: 45, y: 27, art: 'tree-purse', purse: true, zone: 'green-east' },
     { kind: 'tree', id: 'tree-darning-needle', name: 'Darning Needle', x: 47, y: 27, art: 'tree-fruit', fruitFrom: 'native', zone: 'green-east' },
     { kind: 'tree', id: 'tree-kettle-black', name: 'Kettle Black', x: 43, y: 29, art: 'tree-fruit', fruitFrom: 'native', zone: 'green-east' },
-    { kind: 'tree', id: 'tree-porch-light', name: 'Porch Light', x: 45, y: 29, art: 'tree-fruit', fruitFrom: 'native', zone: 'green-east' },
+    { kind: 'tree', id: 'tree-porch-light', name: 'Porch Light', x: 45, y: 29, art: 'tree-fruit-b', fruitFrom: 'native', zone: 'green-east' },
     { kind: 'tree', id: 'tree-mooring', name: 'Mooring', x: 47, y: 29, art: 'tree-fruit', fruitFrom: 'native', zone: 'green-east' },
     // keepers-orchard
-    { kind: 'tree', id: 'tree-low-water', name: 'Low Water', x: 5, y: 26, art: 'tree-fruit', fruitFrom: 'native', zone: 'keepers-orchard' },
+    { kind: 'tree', id: 'tree-low-water', name: 'Low Water', x: 5, y: 26, art: 'tree-fruit-b', fruitFrom: 'native', zone: 'keepers-orchard' },
     { kind: 'tree', id: 'tree-spring-tide', name: 'Spring Tide', x: 7, y: 26, art: 'tree-fruit', fruitFrom: 'native', zone: 'keepers-orchard' },
-    { kind: 'tree', id: 'tree-neap', name: 'Neap', x: 9, y: 26, art: 'tree-fruit', fruitFrom: 'native', zone: 'keepers-orchard' },
+    { kind: 'tree', id: 'tree-neap', name: 'Neap', x: 9, y: 26, art: 'tree-fruit-b', fruitFrom: 'native', zone: 'keepers-orchard' },
     { kind: 'tree', id: 'bee-the-hive', name: 'The Hive', x: 11, y: 26, art: 'tree-bee', hive: 'honeycomb', zone: 'keepers-orchard' },
     { kind: 'tree', id: 'tree-slack-water', name: 'Slack Water', x: 13, y: 26, art: 'tree-fruit', fruitFrom: 'native', zone: 'keepers-orchard' },
-    { kind: 'tree', id: 'tree-flood', name: 'Flood', x: 5, y: 28, art: 'tree-fruit', fruitFrom: 'native', zone: 'keepers-orchard' },
-    { kind: 'tree', id: 'tree-ebb', name: 'Ebb', x: 7, y: 28, art: 'tree-fruit', fruitFrom: 'native', zone: 'keepers-orchard' },
-    { kind: 'tree', id: 'purse-button-box', name: 'Button Box', x: 9, y: 28, art: 'tree-purse', purse: true, zone: 'keepers-orchard' },
-    { kind: 'tree', id: 'tree-shingle', name: 'Shingle', x: 11, y: 28, art: 'tree-fruit', fruitFrom: 'native', zone: 'keepers-orchard' },
-    { kind: 'tree', id: 'tree-sea-coal', name: 'Sea Coal', x: 13, y: 28, art: 'tree-fruit', fruitFrom: 'native', zone: 'keepers-orchard' },
+    { kind: 'tree', id: 'tree-flood', name: 'Flood', x: 6, y: 28, art: 'tree-fruit', fruitFrom: 'native', zone: 'keepers-orchard' },
+    { kind: 'tree', id: 'tree-ebb', name: 'Ebb', x: 8, y: 28, art: 'tree-fruit-b', fruitFrom: 'native', zone: 'keepers-orchard' },
+    { kind: 'tree', id: 'purse-button-box', name: 'Button Box', x: 10, y: 28, art: 'tree-purse', purse: true, zone: 'keepers-orchard' },
+    { kind: 'tree', id: 'tree-shingle', name: 'Shingle', x: 12, y: 28, art: 'tree-fruit-b', fruitFrom: 'native', zone: 'keepers-orchard' },
+    { kind: 'tree', id: 'tree-sea-coal', name: 'Sea Coal', x: 14, y: 28, art: 'tree-fruit', fruitFrom: 'native', zone: 'keepers-orchard' },
     { kind: 'tree', id: 'tree-hearthstone', name: 'Hearthstone', x: 5, y: 30, art: 'tree-fruit', fruitFrom: 'native', zone: 'keepers-orchard' },
-    { kind: 'tree', id: 'tree-ingle', name: 'Ingle', x: 7, y: 30, art: 'tree-fruit', fruitFrom: 'native', zone: 'keepers-orchard' },
-    { kind: 'tree', id: 'tree-tinderbox', name: 'Tinderbox', x: 9, y: 30, art: 'tree-fruit', fruitFrom: 'native', zone: 'keepers-orchard' },
+    { kind: 'tree', id: 'tree-ingle', name: 'Ingle', x: 7, y: 30, art: 'tree-fruit-b', fruitFrom: 'native', zone: 'keepers-orchard' },
+    { kind: 'tree', id: 'tree-tinderbox', name: 'Tinderbox', x: 9, y: 30, art: 'tree-fruit-b', fruitFrom: 'native', zone: 'keepers-orchard' },
     { kind: 'tree', id: 'tree-firkin', name: 'Firkin', x: 11, y: 30, art: 'tree-fruit', fruitFrom: 'native', zone: 'keepers-orchard' },
-    { kind: 'tree', id: 'tree-hogshead', name: 'Hogshead', x: 13, y: 30, art: 'tree-fruit', fruitFrom: 'native', zone: 'keepers-orchard' },
+    { kind: 'tree', id: 'tree-hogshead', name: 'Hogshead', x: 13, y: 30, art: 'tree-fruit-b', fruitFrom: 'native', zone: 'keepers-orchard' },
     // point-north
-    { kind: 'tree', id: 'tree-cooper', name: 'Cooper', x: 9, y: 17, art: 'tree-fruit', fruitFrom: 'native', zone: 'point-north' },
+    { kind: 'tree', id: 'tree-cooper', name: 'Cooper', x: 9, y: 17, art: 'tree-fruit-b', fruitFrom: 'native', zone: 'point-north' },
     { kind: 'tree', id: 'tree-quillet', name: 'Quillet', x: 11, y: 17, art: 'tree-fruit', fruitFrom: 'native', zone: 'point-north' },
     { kind: 'tree', id: 'tree-hobnail', name: 'Hobnail', x: 13, y: 17, art: 'tree-fruit', fruitFrom: 'native', zone: 'point-north' },
     { kind: 'tree', id: 'tree-gorsey', name: 'Gorsey', x: 15, y: 17, art: 'tree-fruit', fruitFrom: 'native', zone: 'point-north' },
-    { kind: 'tree', id: 'tree-brackenbank', name: 'Brackenbank', x: 5, y: 23, art: 'tree-fruit', fruitFrom: 'native', zone: 'point-north' },
+    { kind: 'tree', id: 'tree-brackenbank', name: 'Brackenbank', x: 5, y: 23, art: 'tree-fruit-b', fruitFrom: 'native', zone: 'point-north' },
     { kind: 'tree', id: 'tree-fernside', name: 'Fernside', x: 5, y: 21, art: 'tree-fruit', fruitFrom: 'native', zone: 'point-north' },
     // river-walk
-    { kind: 'tree', id: 'tree-herons-watch', name: 'Heron\'s Watch', x: 36, y: 17, art: 'tree-fruit', fruitFrom: 'native', zone: 'river-walk' },
+    { kind: 'tree', id: 'tree-herons-watch', name: 'Heron\'s Watch', x: 36, y: 17, art: 'tree-fruit-b', fruitFrom: 'native', zone: 'river-walk' },
     { kind: 'tree', id: 'tree-stilt', name: 'Stilt', x: 39, y: 15, art: 'tree-fruit', fruitFrom: 'native', zone: 'river-walk' },
-    { kind: 'tree', id: 'tree-upstart', name: 'Upstart', x: 54, y: 13, art: 'tree-fruit', fruitFrom: 'native', zone: 'river-walk' },
+    { kind: 'tree', id: 'tree-upstart', name: 'Upstart', x: 54, y: 13, art: 'tree-fruit-b', fruitFrom: 'native', zone: 'river-walk' },
     { kind: 'tree', id: 'tree-seedling-sal', name: 'Seedling Sal', x: 52, y: 13, art: 'tree-fruit', fruitFrom: 'native', zone: 'river-walk' },
     // east-shore
-    { kind: 'tree', id: 'tree-lonely-bob', name: 'Lonely Bob', x: 57, y: 17, art: 'tree-fruit', fruitFrom: 'native', zone: 'east-shore' },
+    { kind: 'tree', id: 'tree-lonely-bob', name: 'Lonely Bob', x: 57, y: 17, art: 'tree-fruit-b', fruitFrom: 'native', zone: 'east-shore' },
     { kind: 'tree', id: 'tree-old-faithful', name: 'Old Faithful', x: 57, y: 19, art: 'tree-fruit', fruitFrom: 'native', zone: 'east-shore' },
-    { kind: 'tree', id: 'tree-patience', name: 'Patience', x: 57, y: 15, art: 'tree-fruit', fruitFrom: 'native', zone: 'east-shore' },
+    { kind: 'tree', id: 'tree-patience', name: 'Patience', x: 57, y: 15, art: 'tree-fruit-b', fruitFrom: 'native', zone: 'east-shore' },
     // neck
     { kind: 'tree', id: 'tree-charity', name: 'Charity', x: 19, y: 23, art: 'tree-fruit', fruitFrom: 'native', zone: 'neck' },
     { kind: 'tree', id: 'tree-mercy', name: 'Mercy', x: 19, y: 25, art: 'tree-fruit', fruitFrom: 'native', zone: 'neck' },
-    { kind: 'tree', id: 'tree-constance', name: 'Constance', x: 21, y: 31, art: 'tree-fruit', fruitFrom: 'native', zone: 'neck' },
+    { kind: 'tree', id: 'tree-constance', name: 'Constance', x: 21, y: 31, art: 'tree-fruit-b', fruitFrom: 'native', zone: 'neck' },
     { kind: 'tree', id: 'tree-dorcas', name: 'Dorcas', x: 25, y: 29, art: 'tree-fruit', fruitFrom: 'native', zone: 'neck' },
     // ---- porches (PORCH_IDS): x,y = the lamp beside the door; step = where the household sits ----
     { kind: 'prop', id: 'porch-coop-yard', art: 'porch-lamp', x: 53, y: 25, porch: true, step: { x: 52, y: 26 }, door: { x: 52, y: 25 }, house: 'coop-yard', litAtStart: true },
@@ -313,7 +315,7 @@ export default {
     { kind: 'boat', id: 'carnival-raft', x: 52, y: 46, art: 'carnival-raft', verb: 'shop', shop: 'carnival-raft', cond: { flag: 'sp.raft-docked' }, note: 'ART REQUEST carnival-raft; moored at the Old Pier from day 3' },
     { kind: 'sign', id: 'sign-lowmoor-stones', x: 11, y: 35, art: 'signpost', text: 'Lowmoor by the stones. Dry two hours either side of low water. Mind the time.' },
     { kind: 'sign', id: 'sign-lowmoor-boardwalk', x: 19, y: 5, art: 'signpost', text: 'Lowmoor the long way: over the marsh boardwalk. Any tide.' },
-    { kind: 'sign', id: 'sign-the-bar', x: 8, y: 14, art: 'signpost', text: 'The Bar. Dry only at the day\'s lower low. It does not wait for you.' },
+    { kind: 'sign', id: 'sign-the-bar', x: 8, y: 14, art: 'signpost', text: 'The Bar road. Out to the Lantern Stack spur at any low water; on to Shardcrown only at the day\'s lower low. It does not wait for you.' },
     { kind: 'sign', id: 'sign-causeway', x: 59, y: 33, art: 'signpost', text: 'Mainland causeway. Dry an hour either side of low water. Last walker crossed: you.' },
     { kind: 'sign', id: 'sign-green', x: 28, y: 22, art: 'signpost', text: '{town} Green. The Commons board is by the bridge road.' },
     { kind: 'sign', id: 'sign-quay', x: 19, y: 39, art: 'signpost', text: '{town} Quay. Ferry at Maud\'s berth, 05:00 to 01:00.' },
@@ -366,9 +368,9 @@ export default {
     { x: 32, y: 19, kind: 'door', to: { mapId: 'int-archive', x: 8, y: 10, facing: 'up' }, sfx: 'doorOpen' },
     { x: 56, y: 25, kind: 'door', to: { mapId: 'int-yard-shed', x: 7, y: 8, facing: 'up' }, sfx: 'doorOpen' },
     { x: 4, y: 18, kind: 'door', to: { mapId: 'int-lighthouse', x: 6, y: 16, facing: 'up' }, sfx: 'doorOpen' },
-    { x: 0, y: 38, kind: 'edge', to: { mapId: 'lowmoor', x: 46, y: 22, facing: 'left' }, via: 'short-way', tideWindow: 120, note: 'Lowmoor stones from the point flats (GDD-00 §4: +-2 h)' },
+    { x: 0, y: 38, kind: 'edge', to: { mapId: 'lowmoor', x: 46, y: 22, facing: 'left' }, via: 'short-way', way: 'stones', tideWindow: 120, note: 'Lowmoor stones from the point flats (GDD-00 §4: +-2 h)' },
     { x: 13, y: 0, kind: 'edge', to: { mapId: 'lowmoor', x: 46, y: 4, facing: 'left' }, via: 'long-way', note: 'river footbridge + marsh boardwalk, any tide' },
-    { x: 6, y: 0, w: 2, kind: 'edge', to: { mapId: 'the-bar', x: 1, y: 12, facing: 'right' }, via: 'the-bar', tideWindow: 90, lowerLow: true, openFlag: 'lit.bar', note: 'the Bar road (tile-gated); any tide after the Relighting' },
+    { x: 6, y: 0, w: 2, kind: 'edge', to: { mapId: 'the-bar', x: 1, y: 12, facing: 'right' }, via: 'short-way', way: 'spur', tideWindow: 90, openFlag: 'lit.bar', note: 'the Bar road to the Bar head and the spur foot (bar-road-near): every low, any tide after the Relighting; Shardcrown beyond is the lower low only' },
   ],
   spawns: [
     { area: { x: 4, y: 25, w: 12, h: 6 }, table: 'pellwick-point-night', rate: 0.05, reeds: true, cond: { all: [{ flag: 'lit.calls' }, { phase: ['dusk', 'evening', 'night'] }] } },
@@ -417,6 +419,28 @@ export default {
     'porchlight-view': { x: 17, y: 30, w: 5, h: 2 },
   },
   markers: {
+    // trainer posts by data/trainers.js `post` (aliases of trainer-<id>, same cell)
+    'pellwick-quay-bollards': { x: 40, y: 40, facing: 'left', trainer: 'pip' },
+    'pellwick-keepers-dock': { x: 11, y: 23, facing: 'left', trainer: 'linnet-dock' },
+    'porch-coop-yard': { x: 52, y: 26, facing: 'down', trainer: 'porch-wren' },
+    'porch-tully': { x: 25, y: 36, facing: 'down', trainer: 'porch-tully' },
+    'porch-pells': { x: 24, y: 20, facing: 'down', trainer: 'porch-juniper' },
+    'porch-odile': { x: 18, y: 30, facing: 'down', trainer: 'porch-odile' },
+    'porch-dark-1': { x: 19, y: 36, facing: 'down', trainer: 'porch-tamsin' },
+    'porch-dorrow': { x: 12, y: 34, facing: 'down', trainer: 'porch-wick' },
+    'porch-wardens-house': { x: 42, y: 20, facing: 'down', trainer: 'porch-augusta' },
+    'porch-linnet': { x: 14, y: 23, facing: 'down', trainer: 'porch-linnet' },
+    // trainer posts (GDD-01 §1: every TRAINER_IDS row has trainer-<id> on its map)
+    'trainer-pip': { x: 40, y: 40, facing: 'left', trainer: 'pip' },
+    'trainer-linnet-dock': { x: 11, y: 23, facing: 'left', trainer: 'linnet-dock', note: 'night one: she vaults the fence by your step (script linnet-dock)' },
+    'trainer-porch-wren': { x: 52, y: 26, facing: 'down', trainer: 'porch-wren' },
+    'trainer-porch-tully': { x: 25, y: 36, facing: 'down', trainer: 'porch-tully' },
+    'trainer-porch-juniper': { x: 24, y: 20, facing: 'down', trainer: 'porch-juniper' },
+    'trainer-porch-odile': { x: 18, y: 30, facing: 'down', trainer: 'porch-odile' },
+    'trainer-porch-tamsin': { x: 19, y: 36, facing: 'down', trainer: 'porch-tamsin' },
+    'trainer-porch-wick': { x: 12, y: 34, facing: 'down', trainer: 'porch-wick' },
+    'trainer-porch-augusta': { x: 42, y: 20, facing: 'down', trainer: 'porch-augusta' },
+    'trainer-porch-linnet': { x: 14, y: 23, facing: 'down', trainer: 'porch-linnet' },
     'porch-coop-yard-step': { x: 52, y: 26, facing: 'down' },
     'door-coop-yard': { x: 52, y: 25, facing: 'up' },
     'porch-pells-step': { x: 24, y: 20, facing: 'down' },
@@ -501,10 +525,10 @@ export default {
     'linnet-porch': { x: 14, y: 23, facing: 'down' },
     'linnet-vault-to': { x: 11, y: 23, facing: 'left' },
     'dimity-lamp': { x: 10, y: 22, facing: 'down', onSolid: true },
-    'thatch-roof': { x: 9, y: 19, facing: 'down', onSolid: true },
+    'thatch-roof': { x: 9, y: 19, facing: 'down', onSolid: true, npc: 'the-thatch' },
     'maud-berth': { x: 34, y: 43, facing: 'right' },
     'maud-punt': { x: 35, y: 44, facing: 'left', water: true },
-    'maud-punt-dock': { x: 18, y: 42, facing: 'left', water: true },
+    'maud-punt-dock': { x: 19, y: 42, facing: 'left', water: true },
     'pip-quay': { x: 40, y: 40, facing: 'left' },
     'merrow-anchorage': { x: 56, y: 36, facing: 'down' },
     'anchorage-counter': { x: 56, y: 36, facing: 'up' },

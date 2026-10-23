@@ -165,7 +165,7 @@ function juniper(expr) {
 }
 const JUNIPER_PAL = {
   ...PORCH, K: '#141b33',
-  L: '#4a4862', F: '#2a2838', f: '#1f1d2a', D: '#171522',
+  L: '#4a4862', F: '#2a2838', f: '#1f1d2a', D: '#1e1c2e',
   I: '#2a6f8f', i: '#3fae8c',
   M: '#f1eee6', m: '#b9b4c4', n: '#7f7a96',
   E: '#141b33', W: '#f1eee6', X: '#3a3848', x: '#2a2433', R: '#a8323a',
@@ -349,9 +349,11 @@ function idris(expr) {
   // 3/4 view, bill to the viewer's left: long neck, head turned
   const neck = G();
   ball(neck, 26, 31, 8, 8, FUR);
-  // the diver's necklace: a patch of fine vertical white bars on the side of the neck
-  for (let x = 28; x <= 32; x += 2) for (let y = 27; y <= 30; y++) px(neck, x, y, 'w');
-  for (let x = 29; x <= 31; x += 2) px(neck, x, 26, 'V');
+  // the diver's necklace: a short slanting patch of fine white dashes on the
+  // side of the neck, behind the jaw. (Bars right under the bill, or a full
+  // band across the throat, read as teeth.)
+  for (const [x, y] of [[31, 29], [33, 30], [30, 31], [32, 32], [34, 31], [31, 33], [33, 34]]) px(neck, x, y, 'w');
+  for (const [x, y] of [[32, 30], [31, 32], [33, 32], [32, 34]]) px(neck, x, y, 'V');
   const head = G();
   ball(head, 28, 18, 11.5, 10.5, FUR, { bias: 0.04 });
   ball(head, 21, 22, 6, 5, FUR);
@@ -374,7 +376,7 @@ function idris(expr) {
 }
 const IDRIS_PAL = {
   ...ISLE, k: SW.k,
-  L: '#4e6664', F: '#2c3a38', f: '#1a2224', D: '#0f1416', G: '#3f7a6a',
+  L: '#4e6664', F: '#2c3a38', f: '#1a2224', D: '#161e21', G: '#3f7a6a',
   R: '#c03030', w: SW.w, V: SW.v, e: SW.e, y: SW.y, a: SW.a, P: '#a85a5a', i: SW.i,
   b: SW.b, n: SW.n, d: SW.d, X: '#6a6e7a', x: '#3a3e48', B: '#9aa0ac',
 };
@@ -408,13 +410,15 @@ function wick(expr) {
     pxs(eyes, [[20, ey + 3], [21, ey + 4], [32, ey + 3], [33, ey + 4]], 'm');
   }
   if (expr === 'worried') { browX(eyes, 16, ey - 2, 4, 'l', 'worried', 'm'); browX(eyes, 28, ey - 2, 4, 'r', 'worried', 'm'); }
-  // stubby orange beak
+  // the puffin bill, in miniature: a tall narrow wedge with a grey base
+  // plate, a pale ridge line and an orange tip (a duck's flat bill read as penguin)
   const beak = G();
-  const by = ey + 6;
-  poly(beak, [[19, by], [29, by], [27, by + 5], [21, by + 5]], 'N');
-  tint(beak, 'N', 'n', (x, y) => y >= by + 3 || x >= 27);
-  rect(beak, 20, by + 1, 8, 1, 'Y');
-  if (expr === 'surprised') { rect(beak, 22, by + 3, 4, 3, 'K'); }
+  const by = ey + 5;
+  poly(beak, [[20.5, by], [27.5, by], [26.5, by + 6], [24, by + 9], [21.5, by + 6]], 'N');
+  tint(beak, 'N', 'n', (x, y) => x >= 25 && y >= by + 3);
+  rect(beak, 21, by, 6, 2, 'm');
+  rect(beak, 21, by + 2, 6, 1, 'Y');
+  if (expr === 'surprised') { rect(beak, 23, by + 5, 2, 3, 'K'); }
   if (expr === 'happy') pxs(beak, [[18, by + 1], [30, by + 1]], 'm');
   blushX(eyes, 13, 35, ey + 5, expr, 'P');
   if (expr === 'worried') sweatX(eyes, 37, ey - 4, 'G', 'W');
@@ -422,7 +426,7 @@ function wick(expr) {
 }
 const WICK_PAL = {
   ...PORCH, K: '#141b33', k: '#3a1018',
-  L: '#4a4658', F: '#2a2433', f: '#1e1e28', D: '#16141e',
+  L: '#4a4658', F: '#2a2433', f: '#1e1e28', D: '#1d1b28',
   H: '#f6f1e3', M: '#e6e0d6', m: '#b8b0a8', E: '#141b33', W: '#f6f1e3',
   N: '#f28c28', n: '#c96a1a', Y: '#f6c070',
   Q: '#c84a52', C: '#a3283a', c: '#7a1e2c', q: '#5a1622', B: '#f4e8c1', b: '#d8c79b', P: '#e88a8a', G: '#9fc7d6',
@@ -474,8 +478,9 @@ function furBust(s) {
   const E = s.ears || 'round';
   if (E === 'round' || E === 'small') {
     const r = E === 'small' ? 2.8 : 4;
-    ball(ears, cx - ex, hy - hry + 3, r, r, FUR, { th: [0.8, 0.3, -0.1] }); ball(ears, cx + ex, hy - hry + 3, r, r, FUR, { th: [0.8, 0.3, -0.1] });
-    ball(face, cx - ex + 0.5, hy - hry + 3.5, r - 2, r - 2, [s.earIn || 'P', s.earIn || 'P', 'f']); ball(face, cx + ex + 0.5, hy - hry + 3.5, r - 2, r - 2, [s.earIn || 'P', 'f', 'f']);
+    const ey0 = hy - hry + 3 + (s.earDy ?? 0); // earDy: set low on the skull (mustelids)
+    ball(ears, cx - ex, ey0, r, r, FUR, { th: [0.8, 0.3, -0.1] }); ball(ears, cx + ex, ey0, r, r, FUR, { th: [0.8, 0.3, -0.1] });
+    ball(face, cx - ex + 0.5, ey0 + 0.5, r - 2, r - 2, [s.earIn || 'P', s.earIn || 'P', 'f']); ball(face, cx + ex + 0.5, ey0 + 0.5, r - 2, r - 2, [s.earIn || 'P', 'f', 'f']);
   } else if (E === 'pointed' || E === 'tufted' || E === 'tall' || E === 'long') {
     const top = E === 'tall' ? hy - hry - 9 : E === 'long' ? 0 : hy - hry - 4;
     const w = E === 'long' ? 3.5 : 5;
@@ -641,8 +646,18 @@ BUSTS.tamsin = () => furBust({
   },
 });
 BUSTS.pip = () => furBust({
-  ears: 'round', earX: 9, headRx: 11, headRy: 10.5, muzzle: { rx: 5.5, ry: 5.5, dy: 7 }, eyeY: 19, whiskers: true,
-  outfit: 'jersey', extra: hat.flat,
+  // a rat, not a bear: ears peeking out under the cap, a narrower tapering
+  // muzzle, a pink nose, beady eyes and long pale whiskers past the cheeks
+  ears: 'small', earX: 12, earDy: 3, headRx: 11, headRy: 10.5, muzzle: { rx: 4.5, ry: 5, dy: 8 }, eyeY: 18, eyeW: 3, eyeH: 3, noseW: 4, noseHi: 'P',
+  outfit: 'jersey',
+  extra(g, a) {
+    hat.flat(g, a);
+    const { cx, my, face } = a;
+    for (const sgn of [-1, 1]) {
+      seg(face, cx + sgn * 5, my - 1, cx + sgn * 13, my - 3, 'H');
+      seg(face, cx + sgn * 5, my + 1, cx + sgn * 13, my + 2, 'H');
+    }
+  },
 });
 BUSTS.thatch = () => {
   // the crew bust: goldfinches on a thatched ridge, one carrying a straw
@@ -667,16 +682,26 @@ BUSTS.thatch = () => {
   seg(f, 18, 32, 44, 26, 'Y'); seg(f, 19, 33, 45, 27, 'y'); // the straw for the roofs
   return finish([[ridge, 'k', 't'], [g, 'K', 'f'], [f, null]]);
 };
-BUSTS.isolde = () => birdBust({
-  headRx: 11.5, headRy: 11, beak: 'tube', beakY: 21, eyeY: 17, eyeDx: 6, outfit: 'shawl',
-  extra(g, { cx, ey }) {
-    // round reading spectacles
-    for (const ox of [-6, 6]) ring(g, cx + ox - 0.5, ey + 1.5, 4.2, 'A', 'B', 'a');
-    seg(g, cx - 2, ey + 1, cx + 1, ey + 1, 'A');
-    // grey at the brow: she is old
-    pxs(g, [[cx - 4, ey - 6], [cx - 2, ey - 7], [cx, ey - 7], [cx + 2, ey - 6]], 'M');
+BUSTS.isolde = () => birdTurned({
+  // turned like the other seabirds so the tube-nosed hooked bill reads (face-on,
+  // spectacles over a hidden bill read as an owl)
+  outfit: 'shawl',
+  headRx: 11, headRy: 10,
+  eye(face, x, y) { eyeX(face, x, y, 4, 3, 'neutral', { E: 'E', W: 'W' }); },
+  bill(b) {
+    // short, black, hooked, with the tube nostril riding on top
+    poly(b, [[19, 19], [9, 21], [9, 23.5], [19, 24]], 'X');
+    pxs(b, [[8, 22], [8, 23], [8, 24], [9, 24]], 'X');
+    rect(b, 13, 19, 6, 1, 'L'); px(b, 12, 20, 'L');
+    tint(b, 'X', 'x', (x, y) => y >= 22.5);
   },
-  extraSoft: 'a',
+  extra(g) {
+    // round reading spectacles on the near eye, the arm running back to the ear
+    ring(g, 21.5, 16.5, 4.2, 'A', 'B', 'a');
+    seg(g, 26, 16, 33, 17, 'A');
+    // a grizzled grey brow over the lens: she is old
+    pxs(g, [[17, 12], [18, 11], [19, 11], [20, 11], [22, 11]], 'M');
+  },
 });
 BUSTS.ludo = () => {
   const FUR = ['L', 'F', 'f', 'D'];
@@ -839,32 +864,52 @@ BUSTS.wendel = () => birdBust({
   },
   patch(f, { cx, hy }) { ball(f, cx, hy + 1, 9, 8, ['M', 'M', 'm']); rect(f, cx - 8, hy - 10, 16, 3, 'S'); },
 });
-BUSTS.ada = () => birdBust({
-  headRx: 12, beak: 'short', beakY: 22, eyeY: 15, eyeW: 4, eyeH: 4, outfit: 'vest', E: 'F', brows: false,
-  patch(f, { cx, hy }) {
-    // the grey hood over the nape and cheeks
-    tint(f, '.', 'R', (x, y) => y > hy - 7 && y < hy + 12 && Math.abs(x - cx) > 6 && Math.hypot(x - cx, (y - hy) * 1.05) < 12.6);
-    tint(f, 'R', 'r', (x, y) => x > cx + 8 && y > hy);
+/**
+ * 3/4 bird bust, bill to the viewer's left (the Idris build). Face-on, a long
+ * hooked bill foreshortens into a trunk and a short one into a nose, so the
+ * cormorant read as a cat and the jackdaws as hooded masks; turned, both read
+ * as birds at a glance.
+ */
+function birdTurned(s) {
+  const FUR = ['L', 'F', 'f', 'D'];
+  const body = outfit(s.outfit || 'coat');
+  const neck = G(); ball(neck, 26, 31, 8, 8, FUR);
+  const back = G(); if (s.crest) s.crest(back);
+  const head = G();
+  ball(head, 28, 18, s.headRx ?? 11.5, s.headRy ?? 10.5, FUR, { bias: 0.04 });
+  ball(head, 21, 22, 6, 5, FUR);
+  if (s.headTint) s.headTint(head, neck);
+  const face = G(); if (s.patch) s.patch(face);
+  const ey = s.eyeY ?? 15;
+  if (s.eye) s.eye(face, 20, ey); else eyeX(face, 20, ey, 4, 3, 'neutral', { E: 'E', W: 'W', iris: s.iris, lid: 'D' });
+  const bill = G(); s.bill(bill);
+  const extra = G(); if (s.extra) s.extra(extra);
+  return finish([[body, 'k', 'c'], [neck, 'K', 'f'], [back, 'K', 'f'], [head, 'K', 'f'], [face, null], [bill, 'K', 'x'], [extra, 'k', 'c']]);
+}
+const jackdaw = (scarfTail) => () => birdTurned({
+  outfit: 'vest',
+  headTint(head, neck) {
+    // black cap, face and throat; the grey shawl over the nape and behind the eye
+    const nape = (x, y) => { const v = x + 0.45 * y - 36; return y >= 12 && (v >= 1 || (v >= 0 && (x + y) % 2 === 0)); };
+    tint(head, 'LFfD', 'R', nape);
+    tint(neck, 'LFfD', 'R', nape);
+    tint(head, 'R', 'r', (x, y) => x >= 36 || y >= 26);
+    tint(neck, 'R', 'r', (x) => x >= 31);
   },
-  extra(g, { cx, ey, face }) {
-    // the jackdaw's pale silver eye: W iris ring round a small dark pupil
-    for (const x0 of [cx - 8, cx + 4]) { rect(face, x0, ey, 4, 4, 'W'); rect(face, x0 + 1, ey + 1, 2, 2, 'E'); px(face, x0, ey, 'w'); px(face, x0 + 3, ey + 3, 'w'); }
-    poly(g, [[12, 36], [36, 36], [34, 40], [14, 40]], 'P'); poly(g, [[14, 39], [18, 39], [17, 47], [13, 46]], 'P');
+  eye(face, x, y) {
+    // the jackdaw's pale silver eye: W iris round a small dark pupil
+    rect(face, x, y, 4, 4, 'W'); rect(face, x + 1, y + 1, 2, 2, 'E'); px(face, x, y, 'w'); px(face, x + 3, y + 3, 'w');
   },
+  bill(b) {
+    // short, stout, black, with a grey glint on the ridge
+    poly(b, [[19, 18.5], [10, 21.5], [10, 22.5], [19, 25]], 'X');
+    tint(b, 'X', 'x', (x, y) => y >= 22.5);
+    pxs(b, [[17, 19], [15, 20]], 'R');
+  },
+  extra(g) { poly(g, [[12, 36], [36, 36], [34, 40], [14, 40]], 'P'); poly(g, scarfTail, 'P'); },
 });
-BUSTS.ivo = () => birdBust({
-  headRx: 12, beak: 'short', beakY: 22, eyeY: 15, eyeW: 4, eyeH: 4, outfit: 'vest', E: 'F', brows: false,
-  patch(f, { cx, hy }) {
-    // the grey hood over the nape and cheeks
-    tint(f, '.', 'R', (x, y) => y > hy - 7 && y < hy + 12 && Math.abs(x - cx) > 6 && Math.hypot(x - cx, (y - hy) * 1.05) < 12.6);
-    tint(f, 'R', 'r', (x, y) => x > cx + 8 && y > hy);
-  },
-  extra(g, { cx, ey, face }) {
-    // the jackdaw's pale silver eye: W iris ring round a small dark pupil
-    for (const x0 of [cx - 8, cx + 4]) { rect(face, x0, ey, 4, 4, 'W'); rect(face, x0 + 1, ey + 1, 2, 2, 'E'); px(face, x0, ey, 'w'); px(face, x0 + 3, ey + 3, 'w'); }
-    poly(g, [[12, 36], [36, 36], [34, 40], [14, 40]], 'P'); poly(g, [[30, 39], [34, 39], [35, 46], [31, 47]], 'P');
-  },
-});
+BUSTS.ada = jackdaw([[14, 39], [18, 39], [17, 47], [13, 46]]);
+BUSTS.ivo = jackdaw([[30, 39], [34, 39], [35, 46], [31, 47]]);
 BUSTS.seraphine = () => furBust({
   ears: 'round', earX: 10, headRx: 12, cheeks: true, muzzle: { rx: 6, ry: 4.5, dy: 7 }, eyeY: 18, noseW: 3,
   outfit: 'coat', extra: hat.headlamp,
@@ -873,12 +918,21 @@ BUSTS.hollis = () => furBust({
   ears: 'side', horns: true, headRx: 10.5, headRy: 12, muzzle: { rx: 6, ry: 6, dy: 9 }, eyeY: 17, beard: true, lids: true,
   outfit: 'coat',
 });
-BUSTS.agathe = () => birdBust({
-  headRx: 11.5, beak: 'hook', beakY: 20, eyeY: 16, eyeDx: 6, E: 'E', iris: 'G', outfit: 'coat',
-  crest(g, { cx, hy, hry }) { poly(g, [[cx + 2, hy - hry + 1], [cx + 8, hy - hry - 6], [cx + 9, hy - hry + 3]], 'F'); },
-  patch(f, { cx, hy }) {
-    ball(f, cx - 5, hy + 4, 3, 2.4, ['Y', 'Y', 'y']); ball(f, cx + 5, hy + 4, 3, 2.4, ['Y', 'y', 'y']);
-    ball(f, cx - 8, hy + 7, 3.5, 3, ['M', 'M', 'm']); ball(f, cx + 8, hy + 7, 3.5, 3, ['M', 'm', 'm']);
+BUSTS.agathe = () => birdTurned({
+  iris: 'G',
+  // the stiff shaggy tuft at the back of the crown
+  crest(g) { poly(g, [[31, 10], [38, 1], [41, 3], [37, 12]], 'F'); px(g, 38, 2, 'L'); },
+  patch(f) {
+    // white cheek and throat patch, yellow gular skin at the bill base
+    ball(f, 25, 25, 5, 3, ['M', 'M', 'm']);
+    ball(f, 18, 22.5, 2.5, 2.5, ['Y', 'Y', 'y']);
+  },
+  bill(b) {
+    // long, slim, hooked at the tip
+    poly(b, [[19, 18.5], [3, 20.5], [3, 22.2], [19, 22.2]], 'X');
+    poly(b, [[19, 22.2], [5, 22.6], [19, 24.2]], 'x');
+    pxs(b, [[2, 21], [2, 22], [2, 23], [3, 23]], 'X');
+    pxs(b, [[16, 19], [12, 20]], 'M');
   },
   extra(g) { rect(g, 6, 41, 6, 3, 'k'); }, // mourning band on the sleeve
 });
@@ -892,7 +946,9 @@ BUSTS.dov = () => furBust({
   extra(g) { poly(g, [[18, 35], [24, 38], [30, 35], [30, 41], [24, 38], [18, 41]], 'Y'); px(g, 24, 38, 'y'); },
 });
 BUSTS.bastien = () => furBust({
-  ears: 'small', earX: 9, headRx: 9, headRy: 10, headY: 18, muzzle: { rx: 4, ry: 6.5, dy: 9, pale: false, noseUp: 5 }, eyeY: 15, eyeDx: 5, eyeW: 3, eyeH: 3, chinSpot: true, noseW: 4, browCh: 'L', mouth: false,
+  // mink: a flat broad skull with tiny ears set low at the sides (top-set round
+  // ears read as a bear), a short blunt snout and the white chin
+  ears: 'small', earX: 10, earDy: 3, headRx: 10.5, headRy: 9, headY: 19, muzzle: { rx: 4.5, ry: 4, dy: 6, pale: false, noseUp: 3 }, eyeY: 16, eyeDx: 5, eyeW: 3, eyeH: 3, chinSpot: true, noseW: 4, browCh: 'L', mouth: false,
   outfit: 'coat',
 });
 BUSTS.cass = () => furBust({
@@ -907,10 +963,10 @@ P.tully = { ...PORCH, K: '#2a2018', k: '#141b33', L: '#a8927a', F: '#8a7560', f:
 P.bryony = { ...PORCH, K: '#2e241c', k: '#141b33', L: '#ab9a82', F: '#8c7a64', f: '#6a5a48', D: '#4a3e30', H: '#ece0c8', M: '#d4c3a3', m: '#a8977c', N: '#2e241c', n: '#4e4034', E: '#141b33', W: '#f6f1e3', Q: '#f2e8d0', C: '#e8dcc0', c: '#bfb090', Y: '#e6c46e', y: '#b8963e', R: '#c0453a', P: '#d9907a' };
 P.thessaly = { ...PORCH, K: '#2e3242', k: '#141b33', L: '#aeb6c6', F: '#8a94a8', f: '#646e84', D: '#464e62', H: '#f4efe6', M: '#e6e0d4', m: '#bcb6aa', N: '#e89aa8', n: '#f6c0c8', P: '#e89aa8', E: '#141b33', W: '#f6f1e3', Q: '#e0a050', C: '#c98a3a', c: '#9a6a2a', Y: '#d9a441', a: '#7a5a36' };
 P.tamsin = { ...PORCH, K: '#1e1e28', k: '#2a3a33', L: '#a8a8b4', F: '#8a8a96', f: '#5f5f70', D: '#3e3e4a', H: '#f6f1e3', M: '#f1eee6', m: '#c8c4cc', N: '#1e1e28', n: '#3e3e48', R: '#24222c', E: '#141b33', W: '#f6f1e3', Q: '#6a8e7c', C: '#4e6e5d', c: '#3a5246' };
-P.pip = { ...PORCH, K: '#1e1410', k: '#141b33', L: '#9a7252', F: '#74503a', f: '#523828', D: '#3a2618', H: '#f0c878', M: '#d9a85a', m: '#b08040', N: '#1e1410', n: '#4a3428', E: '#141b33', W: '#f6f1e3', Q: '#4e5e80', C: '#3b4a6b', c: '#2b3a67', P: '#c88a7a' };
+P.pip = { ...PORCH, K: '#261a14', k: '#141b33', L: '#9a7252', F: '#74503a', f: '#523828', D: '#3a2618', H: '#f0c878', M: '#d9a85a', m: '#b08040', N: '#c88a7a', n: '#4a3428', E: '#141b33', W: '#f6f1e3', Q: '#4e5e80', C: '#3b4a6b', c: '#2b3a67', P: '#c88a7a' };
 P.pip.J = '#3a2618';
 P.thatch = { ...PORCH, K: '#2a1c18', k: '#3a2a1a', L: '#ead2a8', F: '#d9b88a', f: '#b0906a', D: '#7a5e44', R: '#d0483a', r: '#9a2e2a', S: '#262433', E: '#141b33', W: '#f6f1e3', M: '#f1eee6', N: '#ead8b8', Y: '#f2c14e', y: '#b8963e', T: '#a8885a', t: '#7e6440' };
-P.isolde = { ...PORCH, K: '#1e1a20', k: '#141b33', L: '#6e6670', F: '#4e4650', f: '#332d36', D: '#221e26', M: '#ece6da', m: '#bcb6ac', E: '#141b33', W: '#f6f1e3', X: '#2a2630', x: '#1a161e', Q: '#3b4a7a', C: '#2b3a67', c: '#1e2a4a', A: '#d9a441', B: '#f2d27a', a: '#8a6a1e' };
+P.isolde = { ...PORCH, K: '#1f1b21', k: '#141b33', L: '#6e6670', F: '#4e4650', f: '#332d36', D: '#221e26', M: '#ece6da', m: '#bcb6ac', E: '#141b33', W: '#f6f1e3', X: '#2a2630', x: '#1f1b24', Q: '#3b4a7a', C: '#2b3a67', c: '#1e2a4a', A: '#d9a441', B: '#f2d27a', a: '#8a6a1e' };
 P.isolde.J = '#5e7d8a'; P.isolde.j = '#43606c';
 P.ludo = { ...PORCH, K: '#2a1c22', k: '#2a1c22', L: '#8a6a72', F: '#6a4a52', f: '#4a3038', D: '#36222a', M: '#c9a090', m: '#a8807a', N: '#3a1f1c', n: '#5a3a36', P: '#e3a0a8', E: '#141b33', W: '#f6f1e3', V: '#a0727a', v: '#7e5260', S: '#e6d6c0', A: '#d9a441', a: '#8a6a1e', X: '#f9c46b' };
 P.barnaby = { ...PORCH, K: '#3a2410', L: '#e3b867', F: '#b8862f', f: '#7a5a1e', D: '#4e3418', W: '#f6f1e3', G: '#9fd3c0', g: '#5f9a8e', H: '#e9f7f2', E: '#141b33', Q: '#f29a7a', R: '#e06a4f', r: '#a8402e', s: '#6e2a2a' };
@@ -924,22 +980,22 @@ P.maud.J = '#443e36';
 P.osric = { ...ISLE, K: '#2a2a18', k: '#141b33', L: '#aaa874', F: '#8a8a5a', f: '#666a40', D: '#3a3e22', M: '#e8d8a8', m: '#bca878', N: '#2a2a18', E: '#141b33', W: '#f6f1e3', H: '#b08a4e', T: '#8a6a3a', t: '#5e4626', r: '#3a2a16', Q: '#ddd6c4', C: '#c9c2b0', c: '#9e9684', Y: '#d9a441', S: '#7a7a84' };
 P.osric.J = '#44482a'; P.osric.j = '#4e3420';
 P.ines = { ...ISLE, K: '#1e1e12', k: '#3a4a48', L: '#7e7a56', F: '#5e5a3e', f: '#403e28', D: '#2a2814', R: '#22200f', M: '#e8a030', m: '#b87820', N: '#1e1e12', n: '#2a2814', E: '#141b33', W: '#e8c060', Q: '#fbf6e8', C: '#f4ecd6', c: '#cfc3a4', Y: '#8fc7c0' };
-P.wendel = { ...ISLE, K: '#1e1a18', k: '#141b33', L: '#5a524a', F: '#3a3430', f: '#262220', D: '#161210', M: '#f1eee6', m: '#c8c4bc', R: '#a8502a', S: '#1e1a18', E: '#141b33', W: '#f6f1e3', X: '#e09a9a', x: '#b07070', Q: '#c0a070', C: '#a8885a', c: '#7e6440', Y: '#d9a441' };
+P.wendel = { ...ISLE, K: '#201c19', k: '#141b33', L: '#5a524a', F: '#3a3430', f: '#262220', D: '#211B18', M: '#f1eee6', m: '#c8c4bc', R: '#a8502a', S: '#201c19', E: '#141b33', W: '#f6f1e3', X: '#e09a9a', x: '#b07070', Q: '#c0a070', C: '#a8885a', c: '#7e6440', Y: '#d9a441' };
 P.wendel.J = '#7e6440'; P.wendel.j = '#5e4a30';
-P.ada = { ...ISLE, K: '#141b33', k: '#141b33', L: '#5a5a6e', F: '#33333f', f: '#24242e', D: '#181820', R: '#9aa0b0', r: '#70768a', E: '#141b33', W: '#dce4ec', w: '#aab4c0', X: '#4a4a58', x: '#2e2e3a', Q: '#f2ece0', C: '#e8e0d0', c: '#bdb4a2', P: '#c0453a', Y: '#d9a441' };
+P.ada = { ...ISLE, K: '#141b33', k: '#141b33', L: '#5a5a6e', F: '#33333f', f: '#24242e', D: '#1C1C25', R: '#9aa0b0', r: '#70768a', E: '#141b33', W: '#dce4ec', w: '#aab4c0', X: '#4a4a58', x: '#2e2e3a', Q: '#f2ece0', C: '#e8e0d0', c: '#bdb4a2', P: '#c0453a', Y: '#d9a441' };
 P.ada.J = '#6a5a46'; P.ada.j = '#4e4232';
 P.ivo = { ...P.ada, P: '#3b6dc9' };
 P.seraphine = { ...ISLE, K: '#4a5068', k: '#141b33', L: '#f6f1e3', F: '#ece6da', f: '#b8bcc8', D: '#8e94a4', H: '#f6f1e3', M: '#f6f1e3', m: '#d6d2ca', N: '#2a2a33', n: '#4a4a55', E: '#141b33', W: '#f6f1e3', P: '#e0a8a8', Q: '#d87a4e', C: '#c0603a', c: '#8e4428', S: '#3a3f4f', Y: '#d9a441', X: '#ffe29a' };
 P.seraphine.J = '#8e94a4';
 P.hollis = { ...ISLE, K: '#5a5448', k: '#141b33', L: '#f4efe2', F: '#e6e0d2', f: '#b4ae9e', D: '#8e8878', H: '#f6f1e3', M: '#d4ccb8', m: '#aaa290', R: '#2a2830', r: '#4a4850', N: '#3a3438', n: '#5a5458', E: '#141b33', W: '#f6f1e3', Q: '#86745e', C: '#6a5a46', c: '#4e4232', Y: '#c9a77c', a: '#7a5a36' };
 P.hollis.J = '#8e8878';
-P.agathe = { ...ISLE, K: '#0f1014', k: '#1a1c2c', L: '#5a5040', F: '#2a2a30', f: '#1a1a20', D: '#101014', E: '#141b33', W: '#f4f4f4', G: '#38b764', Y: '#ffcd75', y: '#d9a441', M: '#f4f4f4', m: '#94b0c2', X: '#94b0c2', x: '#566c86', Q: '#4a5470', C: '#333c57', c: '#1a1c2c' };
-P.agathe.J = '#101014';
+P.agathe = { ...ISLE, K: '#1b1c23', k: '#1a1c2c', L: '#5a5040', F: '#2a2a30', f: '#1c1c22', D: '#1C1C22', E: '#141b33', W: '#f4f4f4', G: '#38b764', Y: '#ffcd75', y: '#d9a441', M: '#f4f4f4', m: '#94b0c2', X: '#94b0c2', x: '#566c86', Q: '#4a5470', C: '#333c57', c: '#1a1c2c' };
+P.agathe.J = '#1C1C22';
 P.teo = { ...ISLE, K: '#1a1c2c', k: '#1a1c2c', L: '#b0b0b8', F: '#8e8e96', f: '#62626e', D: '#44444e', H: '#f6f1e6', M: '#ece6dc', m: '#bdb8b0', R: '#262433', N: '#1a1c2c', n: '#3a3a48', P: '#e8a0a0', E: '#141b33', W: '#f6f1e3', Q: '#ffdc8a', C: '#ffcd75', c: '#d9b38c', S: '#5a3a26', G: '#73eff7', g: '#41a6f6', Y: '#d9a441', y: '#f2d27a', a: '#8a6a1e' };
 P.teo.J = '#257179'; P.teo.j = '#29366f';
 P.dov = { ...ISLE, K: '#3a2214', k: '#141b33', L: '#d8a65a', F: '#b8843e', f: '#8e5e2a', D: '#5e3a1a', H: '#f4dca8', M: '#e8c88a', m: '#c09a5e', N: '#3a2214', n: '#5a3a24', P: '#d98a7a', E: '#141b33', W: '#f6f1e3', Q: '#fbf6e8', C: '#f4ecd6', c: '#cfc3a4', S: '#f4ecd6', Y: '#d9a441', y: '#8a6a1e' };
 P.dov.J = '#7a2e3a'; P.dov.j = '#5a1e2a';
-P.bastien = { ...ISLE, K: '#1a1210', k: '#1a1c2c', L: '#7a5240', F: '#4a3024', f: '#2e1e16', D: '#1e140e', H: '#f2ece0', M: '#e8e0d0', m: '#bdb4a2', N: '#1a1210', n: '#3a2a22', E: '#141b33', W: '#f6f1e3', Q: '#4e5466', C: '#3a3f4f', c: '#2a2e3a', Y: '#ffcd75', a: '#7a5a36' };
+P.bastien = { ...ISLE, K: '#251a17', k: '#1a1c2c', L: '#7a5240', F: '#4a3024', f: '#2e1e16', D: '#261a12', H: '#f2ece0', M: '#e8e0d0', m: '#bdb4a2', N: '#251a17', n: '#3a2a22', E: '#141b33', W: '#f6f1e3', Q: '#4e5466', C: '#3a3f4f', c: '#2a2e3a', Y: '#ffcd75', a: '#7a5a36' };
 P.bastien.J = '#94b0c2'; P.bastien.j = '#566c86';
 P.cass = { ...ISLE, K: '#3a2c20', k: '#1a1c2c', L: '#d8c09a', F: '#b89a72', f: '#8e7454', D: '#5e4a34', H: '#f6f1e6', M: '#ece4d4', m: '#c4b8a4', R: '#3a2c24', N: '#4a3030', n: '#6a4a4a', P: '#d98a8a', E: '#141b33', W: '#f6f1e3', y: '#ffcd75', Q: '#3f7a64', C: '#2f5a4a', c: '#1f4034', Y: '#ffcd75', a: '#7a5a36' };
 P.cass.J = '#d9c08a'; P.cass.j = '#b09a64';

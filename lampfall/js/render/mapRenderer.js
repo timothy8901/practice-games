@@ -9,9 +9,10 @@
  *  3. detail chunks and animated details (skyglass, shoals)
  *  4. objects and entities, y-sorted, through the per-grade recolour cache
  *  5. overlay chunks (eaves, string lights)
- *  6. light pools (<= 16 dither discs, additive) and the lighthouse beam after the Relighting
+ *  6. light pools (<= 16 dither discs: a multiply tint, then additive) and the lighthouse beam
  *  7. weather from `core/fx` (rain, snow, fireflies) and the fog banks (<= 35%)
- *  8. the Skyband across the top 40 px
+ *  8. emote bubbles (HUD: never hidden by trees, eaves or weather)
+ *  9. the Skyband across the top 40 px
  *
  * Grading is the palette LUT (`world/lighting.gradeFor`, quantized to 48 slots a day x weather), never
  * a multiply overlay: tiles, props and sprites are decoded through the grade by `art/atlas`, and `!`
@@ -114,14 +115,20 @@ export function createMapRenderer(opts = {}) {
   let lastFlags = undefined, lastTier = undefined, lastRoof = undefined;
   const lightBuf = [];
   const allLights = [];
+  /** lightSources inputs of the cached `lightBuf` (recomputed only when one changes, or every 30 frames) */
+  const lsKey = { grade: '', tide: '', flags: undefined, world: undefined, worldFlags: undefined, map: null, age: 0 };
   const chosen = [];
-  const lantern = { id: 'lantern', kind: 'lantern', x: 0, y: 0, px: 0, py: 0, radius: 44, color: null, intensity: 1 };
+  // x / y = -1: the Lantern is not a map cell, so no per-cell glow scale applies to it
+  const lantern = { id: 'lantern', kind: 'lantern', x: -1, y: -1, px: 0, py: 0, radius: 44, color: null, intensity: 1 };
   const viewRect = { x: 0, y: 0, w: 0, h: 0 };
   const fxCam = { x: 0, y: 0 };
+  const fxDrawOpt = { camera: fxCam };
   const focusPt = { x: 0, y: 0 };
   const beamOrigin = { x: 0, y: 0 };
   const shownBuf = { tide: 'mid', grade: null };
   let warmed = null;
+  let lastTide = null, dissolveFrom = null, dissolveT0 = 0;
+  let idleKey = -1;
   /** sprite and light-disc warm-up for a grade before the switch: [art, variant|null, frames][] */
   let warmList = null, warmFor = null, warmIdx = 0;
   const warmLights = [];
@@ -130,19 +137,24 @@ export function createMapRenderer(opts = {}) {
 
   function warmStep(grade, rect, camX, camY, ents, view, budget) {
     const t0 = nowMs();
-    if (warmFor !== grade) {
+    // rebuild when the grade differs or the last list for it already finished (warmList = null): a
+    // finished list must not be resumed, or a grade that comes back after a bakeNow would crash here
+    if (warmFor !== grade || !warmList) {
       warmFor = grade;
       warmIdx = 0;
       warmList = [];
       const seen = new Set();
-      const add = (art, name, n) => { const k = art + '|' + name; if (!seen.has(k)) { seen.add(k); warmList.push([art, name, n]); } };
+      const add = (art, name, n, only = -1) => { const k = art + '|' + name + '|' + only; if (!seen.has(k)) { seen.add(k); warmList.push([art, name, n, only]); } };
       const x0 = camX - 48, x1 = camX + rect.w + 48, y0 = camY - 16, y1 = camY + rect.h + 96;
       for (const o of tiles.objects) {
         if (o.sortY < y0 || o.sortY - o.h > y1 || o.x * 16 + o.w < x0 || o.x * 16 > x1) continue;
         const d = artDef(o.art);
-        add(o.art, null, d.frames.length);
-        if (o.litVariant) add(o.art, 'lit', d.variants.lit.length);
-        if (o.litArt) add(o.litArt, null, 1);
+        // animated art warms every frame; still art (the lighthouse: frame = scaffold stage) only its own
+        const still = !d.fps;
+        const only = o.special === 'lighthouse' ? Math.max(0, Math.min(d.frames.length - 1, (view.lighthouse && view.lighthouse.stage) || 0)) : still ? 0 : -1;
+        add(o.art, null, d.frames.length, only);
+        if (o.litVariant || o.special === 'lighthouse') { if (d.variants && d.variants.lit) add(o.art, 'lit', d.variants.lit.length, only); }
+        if (o.litArt) add(o.litArt, null, 1, 0);
       }
       for (const e of ents) {
         const id = e.artId && resolveArtId(e.artId);
@@ -153,8 +165,8 @@ export function createMapRenderer(opts = {}) {
       }
     }
     while (warmIdx < warmList.length) {
-      const [art, name, n] = warmList[warmIdx++];
-      for (let f = 0; f < n; f++) void getSprite(art, name ? { frame: f, name, grade } : { frame: f, grade }).canvas;
+      const [art, name, n, only] = warmList[warmIdx++];
+      for (let f = only >= 0 ? only : 0; f < (only >= 0 ? only + 1 : n); f++) void getSprite(art, name ? { frame: f, name, grade } : { frame: f, grade }).canvas;
       if (nowMs() - t0 > budget) return;
     }
     // light discs for the new grade
@@ -168,7 +180,9 @@ export function createMapRenderer(opts = {}) {
     warmList = null;
   }
 
-  const stats = { ms: 0, drawImages: 0, fills: 0, bakes: 0, chunks: 0, queued: 0, sprites: 0, lights: 0, particles: 0, grade: '', tide: '' };
+  /** per-pass timings of the last frame (ms) */
+  const T = { choose: 0, ground: 0, detail: 0, sprites: 0, lights: 0, weather: 0, sky: 0, pump: 0 };
+  const stats = { t: T, ms: 0, drawImages: 0, fills: 0, bakes: 0, chunks: 0, queued: 0, sprites: 0, lights: 0, particles: 0, grade: '', tide: '' };
   const lighthouseOpt = { stage: 0, lit: false };
   const entOpt = { grade: null, ms: 0, tide: 'mid', shadow: null, analysis: null, flags: null, lighthouse: lighthouseOpt, cond: null, onEnterCell: null };
   const lightOpt = { minute: 0, weather: 'clear', tide: 'mid', indoor: false, out: lightBuf };
@@ -195,6 +209,10 @@ export function createMapRenderer(opts = {}) {
     }
     zones = fireflyZones(tiles.analysis());
     shown = null;
+    idleKey = -1;
+    warmFor = null; warmList = null; warmed = null;
+    lsKey.map = null;
+    lastTide = null; dissolveFrom = null;
     weather.clear();
     fx.clear();
   }
@@ -232,6 +250,7 @@ export function createMapRenderer(opts = {}) {
       lastFlags = view.flags; lastTier = view.tier; lastRoof = view.roof;
       tiles.setBakeContext({ flags: view.flags || null, tier: view.tier, roof: view.roof, cond: view.cond || null });
       shown = null;
+      idleKey = -1;
     }
 
     // ---- choose the chunk set to show: the desired one once its chunks are baked and its sprites
@@ -256,16 +275,22 @@ export function createMapRenderer(opts = {}) {
         warmed = grade;
       }
     } else if (tiles.queueLength() === 0) {
-      // idle: keep the ring warm, then pre-bake the next grade slot
-      const next = nextGradeOf(grade, wname, indoor);
-      tiles.want([[tide, grade], [tide, next]]);
-      tiles.request(rect, camX, camY, tide, grade);
-      if (tiles.queueLength() === 0 && !indoor) tiles.request(rect, camX, camY, tide, next, { ring: false });
+      // idle: keep the ring warm, then pre-bake the next grade slot (only when the view moved to a
+      // new chunk or the key changed, so a still frame allocates nothing)
+      const ck = (Math.floor(camX / 128) * 4096 + Math.floor(camY / 128)) * 512 + gradeIndex(grade) * 3 + (tide === 'low' ? 0 : tide === 'high' ? 2 : 1);
+      if (ck !== idleKey) {
+        idleKey = ck;
+        const next = nextGradeOf(grade, wname, indoor);
+        tiles.want([[tide, grade], [tide, next]]);
+        tiles.request(rect, camX, camY, tide, grade);
+        if (!indoor) tiles.request(rect, camX, camY, tide, next, { ring: false });
+      }
     }
     shownBuf.tide = dTide; shownBuf.grade = dGrade;
     shown = shownBuf;
     const g = dGrade;
 
+    T.choose = nowMs() - t0; let tm = nowMs();
     // ---- passes
     ctx.save();
     ctx.beginPath();
@@ -276,8 +301,19 @@ export function createMapRenderer(opts = {}) {
     ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
     tiles.drawLayer(ctx, 0, rect, camX, camY, dTide, g);
     tiles.drawAnimated(ctx, 0, rect, camX, camY, dTide, g, ms);
+    // the tide dissolve: when the shown tide changes, the old waterline crumbles away over 1 s
+    if (dTide !== lastTide) {
+      if (lastTide !== null && !view.reducedMotion) { dissolveFrom = lastTide; dissolveT0 = ms; }
+      lastTide = dTide;
+    }
+    if (dissolveFrom !== null) {
+      const k = 1 - (ms - dissolveT0) / DISSOLVE_MS;
+      if (k <= 0 || dissolveFrom === dTide) dissolveFrom = null;
+      else tiles.drawDissolve(ctx, 0, rect, camX, camY, dissolveFrom, g, k);
+    }
     const raining = wname === 'rain' || wname === 'storm';
     if (raining && !view.reducedMotion) tiles.drawRain(ctx, rect, camX, camY, g, ms);
+    T.ground = nowMs() - tm; tm = nowMs();
     tiles.drawLayer(ctx, 1, rect, camX, camY, dTide, g);
     tiles.drawAnimated(ctx, 1, rect, camX, camY, dTide, g, ms);
 
@@ -293,31 +329,45 @@ export function createMapRenderer(opts = {}) {
     entOpt.analysis = tiles.analysis();
     entOpt.flags = view.flags || null;
     entOpt.cond = view.cond || null;
+    T.detail = nowMs() - tm; tm = nowMs();
     stats.sprites = sprites.draw(ctx, tiles.objects, ents, rect, camX, camY, entOpt);
+    T.sprites = nowMs() - tm; tm = nowMs();
 
     tiles.drawLayer(ctx, 2, rect, camX, camY, dTide, g);
     tiles.drawAnimated(ctx, 2, rect, camX, camY, dTide, g, ms);
 
     // ---- light pools and the beam
-    lightOpt.minute = view.minute; lightOpt.weather = wname; lightOpt.tide = dTide; lightOpt.indoor = indoor;
     const world = view.world || (view.flags ? FLAGS_WORLD(view.flags) : NO_WORLD);
-    lightSources(map, world, lightOpt);
-    allLights.length = 0;
-    for (let i = 0; i < lightBuf.length; i++) allLights.push(lightBuf[i]);
+    // the sources only change with the grade slot, the tide, the flags or the map: recompute then (a
+    // world whose flags mutate in place is re-read every 30 frames), so a still frame allocates nothing
+    if (lsKey.grade !== grade.id || lsKey.tide !== dTide || lsKey.flags !== view.flags || lsKey.world !== world
+      || lsKey.worldFlags !== world.flags || lsKey.map !== map || ++lsKey.age >= 30) {
+      lsKey.grade = grade.id; lsKey.tide = dTide; lsKey.flags = view.flags; lsKey.world = world;
+      lsKey.worldFlags = world.flags; lsKey.map = map; lsKey.age = 0;
+      lightOpt.minute = view.minute; lightOpt.weather = wname; lightOpt.tide = dTide; lightOpt.indoor = indoor;
+      lightSources(map, world, lightOpt);
+    }
+    // filled by index (setting length = 0 would drop the backing store and re-grow it every frame)
+    let nl = 0;
+    for (let i = 0; i < lightBuf.length; i++) allLights[nl++] = lightBuf[i];
     if (view.lantern && view.player && g.lamp > 0.2) {
       lantern.px = view.player.px + 8; lantern.py = view.player.py + 6;
       lantern.intensity = Math.min(1, g.lamp + 0.2);
-      allLights.push(lantern);
+      allLights[nl++] = lantern;
     }
+    if (allLights.length !== nl) allLights.length = nl;
     viewRect.x = camX; viewRect.y = camY; viewRect.w = rect.w; viewRect.h = rect.h;
     selectLights(allLights, viewRect, { lowPower: !!view.lowPower, out: chosen });
-    stats.lights = lights.drawPools(ctx, chosen, rect, camX, camY, g, ms, glowScaleAt);
+    lights.drawPools(ctx, chosen, rect, camX, camY, g, ms, glowScaleAt);
+    stats.lights = chosen.length;
+    if ((wname === 'rain' || wname === 'storm') && !view.reducedMotion) lights.drawWetStreaks(ctx, chosen, rect, camX, camY, ms);
     if (lighthouseOpt.lit && lhObj) {
       beamOrigin.x = lhObj.x * 16 + 16;
       beamOrigin.y = lhObj.sortY - lhObj.h + 9;
       lights.drawBeam(ctx, beamOrigin, beamAngle(ms, view.lighthouse.relitAt ?? -Infinity), rect, camX, camY, Math.min(1, g.lamp));
     }
 
+    T.lights = nowMs() - tm; tm = nowMs();
     // ---- weather
     weatherOpt.weather = wname; weatherOpt.grade = g; weatherOpt.zones = zones; weatherOpt.rect = rect;
     weatherOpt.reducedMotion = !!view.reducedMotion; weatherOpt.clearVisuals = !!view.clearVisuals; weatherOpt.lowPower = !!view.lowPower;
@@ -328,9 +378,12 @@ export function createMapRenderer(opts = {}) {
       weather.drawFog(ctx, rect, camX, camY, g, ms, view.player ? focusPt : null);
     }
     fxCam.x = camX - rect.x; fxCam.y = camY - rect.y;
-    fx.draw(ctx, { camera: fxCam });
+    fx.draw(ctx, fxDrawOpt);
+    // emote bubbles are HUD: above trees, eaves, light pools and weather, never hidden by the sort
+    sprites.drawEmotes(ctx);
     ctx.restore();
 
+    T.weather = nowMs() - tm; tm = nowMs();
     // ---- the Skyband
     if (skyband) {
       skyOpt.minute = view.minute; skyOpt.weather = wname; skyOpt.grade = g; skyOpt.ms = ms; skyOpt.day = view.day ?? 1;
@@ -346,14 +399,15 @@ export function createMapRenderer(opts = {}) {
       drawSkyband(ctx, SKY_RECT, skyOpt);
     }
 
+    T.sky = nowMs() - tm; tm = nowMs();
     tiles.pump(budgetMs);
-    const ts = tiles.stats();
+    T.pump = nowMs() - tm;
     stats.ms = Math.round((nowMs() - t0) * 100) / 100;
     stats.drawImages = DRAW.images;
     stats.fills = DRAW.fills;
     stats.bakes = DRAW.bakes;
-    stats.chunks = ts.size;
-    stats.queued = ts.queued;
+    stats.chunks = tiles.cache.size();
+    stats.queued = tiles.queueLength();
     stats.particles = fx.particleCount;
     stats.grade = g.id;
     stats.tide = dTide;
@@ -368,13 +422,15 @@ export function createMapRenderer(opts = {}) {
     lights,
     weather,
     fx,
-    invalidate: () => { tiles.invalidate(); shown = null; },
+    invalidate: () => { tiles.invalidate(); shown = null; idleKey = -1; warmFor = null; warmList = null; lsKey.map = null; },
     stats: () => ({ ...stats, tiles: tiles.stats(), weather: weather.stats() }),
     zones: () => zones,
   };
 }
 
 const EMPTY = Object.freeze([]);
+/** Length of the tide dissolve (§12). */
+export const DISSOLVE_MS = 1000;
 /** Pool radius scale by glowing tile id (render-side taste; the tileset's radius stays the default). */
 const GLOW_SCALE = Object.freeze({ 'string-lights': 0.35, 'window': 1, 'mud-glow': 0.8 });
 /** @type {WeakMap<object, object>} grade -> sun shadow (the same offsets the chunk bakes use) */

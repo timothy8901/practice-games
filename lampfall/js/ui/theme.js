@@ -49,7 +49,7 @@ export const PALETTE = Object.freeze({
   g: '#38B764', t: '#257179', n: '#29366F', b: '#3B5DC9', s: '#41A6F6', i: '#73EFF7',
   w: '#F4F4F4', v: '#94B0C2', e: '#566C86', d: '#333C57',
   /** Comet magenta: the bible leaves `m` to the art lead; this reads as magenta next to `p`. */
-  m: '#E65CC0',
+  m: '#FF5BD6',   // comet magenta, GDD-00 §14 (matches js/art/palette.js)
 });
 
 /** Semantic colour tokens used by every widget. */

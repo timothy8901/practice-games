@@ -13,6 +13,9 @@
  *  - `lowerLow`    dry only around the day's lower low (the Bar, until `lit.bar`).
  *  - `openFlag`    a world flag that makes the tile dry at any tide (the Bar after the Relighting).
  *  - `spring`      dry only at a spring low (the Old Quay, every 7th day).
+ *  - `way`         the clockSys TIDE_WINDOWS kind that opens the tile ('causeway' | 'stones' | 'flats' |
+ *                  'bar' | 'spur' | 'mainland'): the runtime asks `clockSys.gateTide(world, way)` per tile,
+ *                  and tools/map-reachability.mjs proves the routes with the same windows.
  *  - `autotile`    neighbour rule the renderer uses to pick ends/edges ('roof', 'fence', 'cliff', ...).
  *  - `roof`        roof colour family (ROOF_COLOUR_IDS) for roof tiles; `roofFrom:'player'` = the
  *                  colour picked at the payment ceremony.
@@ -98,8 +101,8 @@ export const TILESETS = Object.freeze([
   t('wet-sand', 'W', 'wet-sand', { tide: 'floods', verb: 'dig', sfx: WET, autotile: 'tideline' }),
   t('shingle', 'q', 'shingle'),
   t('mud-bank', 'm', 'mud-dry', { verb: 'dig', spawn: 'bank' }),
-  t('mud-flat', 'M', 'mud-wet', { tide: 'low', tideWindow: 90, verb: 'dig', sfx: WET, spawn: 'mud' }),
-  t('mud-glow', 'Y', 'mud-glow', { tide: 'glow', tideWindow: 90, verb: 'dig', sfx: WET, anim: { frames: 3, fps: 4 }, glow: GLOW.bio, spawn: 'mud' }),
+  t('mud-flat', 'M', 'mud-wet', { tide: 'low', tideWindow: 90, way: 'flats', verb: 'dig', sfx: WET, spawn: 'mud' }),
+  t('mud-glow', 'Y', 'mud-glow', { tide: 'glow', tideWindow: 90, way: 'flats', verb: 'dig', sfx: WET, anim: { frames: 3, fps: 4 }, glow: GLOW.bio, spawn: 'mud' }),
   t('soil', ';', 'soil', { verb: 'dig' }),
   t('snow', '-', 'snow'),
   t('ash', '>', 'ash'),
@@ -123,8 +126,8 @@ export const TILESETS = Object.freeze([
   t('boardwalk', 'k', 'boardwalk-h', { autotile: 'boardwalk' }),
   t('bridge-wood', 'B', 'bridge-wood', { water: false, autotile: 'bridge' }),
   t('bridge-stone', 'N', 'bridge-stone', { water: false }),
-  t('drowned-street', 'd', 'cobbles-b', { tide: 'low', tideWindow: 150, sfx: WET, note: 'Drownwood: the drowning street, dry around low water' }),
-  t('old-quay', null, 'causeway-sub', { tide: 'low', tideWindow: 90, spring: true, verb: 'dig', note: 'Pellwick: bared only at a spring low (GDD-00 §4)' }),
+  t('drowned-street', 'd', 'cobbles-b', { tide: 'low', tideWindow: 150, way: 'causeway', sfx: WET, note: 'Drownwood: the drowning street, dry around low water' }),
+  t('old-quay', null, 'causeway-sub', { tide: 'low', tideWindow: 90, way: 'flats', spring: true, verb: 'dig', note: 'Pellwick: bared only at a spring low (GDD-00 §4)' }),
 
   // --- water ------------------------------------------------------------------------------------
   t('deep-water', 'D', 'water-deep', sea({ autotile: 'swell' })),
@@ -140,11 +143,13 @@ export const TILESETS = Object.freeze([
   t('weir', 'Z', 'weir', { solid: true, water: true, verb: 'look', anim: { frames: 4, fps: 8 } }),
 
   // --- tide roads (GDD-00 §4 windows) ----------------------------------------------------------
-  t('stepping-stones', 'e', 'stepstone-sea', { tide: 'low', tideWindow: 120 }),
-  t('river-stones', 'z', 'stepstone', { tide: 'low', tideWindow: 120 }),
-  t('causeway', 'E', 'causeway', { tide: 'low', tideWindow: 150, autotile: 'causeway' }),
-  t('mainland-causeway', 'X', 'mainland-causeway', { tide: 'low', tideWindow: 60, autotile: 'causeway' }),
-  t('bar-road', 'b', 'causeway-v', { tide: 'low', tideWindow: 90, lowerLow: true, openFlag: 'lit.bar', autotile: 'causeway' }),
+  t('stepping-stones', 'e', 'stepstone-sea', { tide: 'low', tideWindow: 120, way: 'stones' }),
+  t('river-stones', 'z', 'stepstone', { tide: 'low', tideWindow: 120, way: 'stones' }),
+  t('causeway', 'E', 'causeway', { tide: 'low', tideWindow: 150, way: 'causeway', autotile: 'causeway' }),
+  t('mainland-causeway', 'X', 'mainland-causeway', { tide: 'low', tideWindow: 60, way: 'mainland', autotile: 'causeway' }),
+  t('bar-road', 'b', 'causeway-v', { tide: 'low', tideWindow: 90, way: 'bar', lowerLow: true, openFlag: 'lit.bar', autotile: 'causeway', note: 'the Bar road beyond the spur foot: the day\'s lower low only, any tide after the Relighting' }),
+  t('bar-road-near', null, 'causeway-v', { tide: 'low', tideWindow: 90, way: 'spur', openFlag: 'lit.bar', autotile: 'causeway', note: 'the Bar road from the point to the spur foot: every low (the Lantern Stack spur must be reachable at every low, GDD-00 §4), any tide after the Relighting' }),
+  t('bar-spur', null, 'sand-ripples', { tide: 'low', tideWindow: 90, way: 'spur', sfx: WET, note: 'the Lantern Stack spur, a sand bar: every low +-1.5 h (ART REQUEST bar-spur: a sand-bar variant)' }),
 
   // --- solid terrain ------------------------------------------------------------------------------
   t('cliff', 'C', 'cliff-face', solid({ autotile: 'cliff' })),
@@ -286,6 +291,6 @@ export const TILES = Object.freeze(Object.fromEntries(TILESETS.map((d) => [d.id,
 export const DEFAULT_LEGEND = Object.freeze(Object.fromEntries(TILESETS.filter((d) => d.char).map((d) => [d.char, d.id])));
 
 /** Tile art ids this table names that `js/art/tiles` / `js/art/props` do not draw yet (GDD-01 §9). */
-export const ART_REQUESTS = Object.freeze(['timber-stack', 'counter', 'shelf', 'table', 'bed', 'stairs-up', 'stairs-down', 'string-wall']);
+export const ART_REQUESTS = Object.freeze([]); // every art id above now resolves in js/art (the interior and yard tiles landed); GDD-01 §9 lists the nice-to-haves
 
 export default TILESETS;

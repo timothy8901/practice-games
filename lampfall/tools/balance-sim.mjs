@@ -7,14 +7,16 @@
  * Summit gauntlet and every route trainer against a typical on-curve player party, many times each,
  * with a competent player brain on side 0 and the trainer's own AI profile on side 1.
  *
- * What the engine does not run yet, the harness supplies or leaves out, and says so:
+ * The engine runs arena weather and held items itself: the Weather Spire's posted cycle
+ * (`theme.rule`) is passed as `weatherCycle`, trainer party entries carry their `held` item (as
+ * `heldItem`) and `onEntry` weather (Cass's and Idris's squall), and the item and weather tables
+ * (`data/items.ITEMS`, `data/spires.WEATHER_KINDS`) are injected with the rest of the content.
+ * What the engine does not run yet, the harness supplies, and says so:
  *  - posted boss Shifts (`party[i].bossShift`) are applied here, at the end of the turn the data
  *    names, on the trainer's own creature (cards rolled at the Flux base odds, or 100%);
  *  - the Relay Spire is played as three rounds of two player creatures each, no repeats;
  *  - the Summit is played as one run: three fights in a row, no Waystone between, +5 PP per move;
- *    the player's bag is used between fights (Revives on the fainted, Full Salves on the lowest);
- *  - arena weather (`onEntry`, the Weather Spire cycle) and held items are not modelled (the engine
- *    has neither yet); both are small and symmetric enough that the targets carry a margin.
+ *    the player's bag is used between fights (Revives on the fainted, Full Salves on the lowest).
  *
  * Player parties are the GDD-04 §Balance "on-curve parties": the starter line (three variants:
  * Sloshkin, Scrapling, Reedkit lines) plus forms commonly caught by that point, at the posted
@@ -37,14 +39,15 @@ import { ABILITIES } from '../js/data/abilities.js';
 import { SPECIES, FAMILIES } from '../js/data/species/index.js';
 import { MOVES } from '../js/data/moves/index.js';
 import { TRAINERS, TRAINER_BY_ID } from '../js/data/trainers.js';
-import { SPIRES, SUMMIT, BOSS_SHIFT_ODDS } from '../js/data/spires.js';
+import { SPIRES, SUMMIT, BOSS_SHIFT_ODDS, WEATHER_KINDS } from '../js/data/spires.js';
+import { ITEMS } from '../js/data/items.js';
 
 // --- data views -----------------------------------------------------------------------------------
 
 /** Tables for systems/creature (types as rows, for the Unfixed loop). */
 export const CREATURE_DATA = Object.freeze({ species: SPECIES, families: FAMILIES, moves: MOVES, abilities: ABILITIES, types: TYPES, items: [] });
-/** Tables for the battle engine (types as the chart table). */
-export const BATTLE_DATA = Object.freeze({ species: SPECIES, moves: MOVES, abilities: ABILITIES, types: TYPE_TABLE });
+/** Tables for the battle engine (types as the chart table; items drive held items; arena weather kinds). */
+export const BATTLE_DATA = Object.freeze({ species: SPECIES, moves: MOVES, abilities: ABILITIES, types: TYPE_TABLE, items: ITEMS, weatherKinds: WEATHER_KINDS });
 const VIEW = createBattleData(BATTLE_DATA);
 const SP = Object.fromEntries(SPECIES.map((s) => [s.id, s]));
 const MV = Object.fromEntries(MOVES.map((m) => [m.id, m]));
@@ -130,21 +133,29 @@ export function pickMoves(speciesId, level, discs = []) {
   return picked.slice(0, 4);
 }
 
-/** A trainer's party as battle creatures (moves as written; boss Shifts kept for the harness). */
+/**
+ * A trainer's party as battle creatures (moves as written; held items and entry weather as the
+ * engine reads them; boss Shifts kept for the harness).
+ */
 export function trainerParty(tr, scale = null) {
   return tr.party.map((c, i) => {
     const level = scale !== null && c.levelOffset !== undefined ? Math.max(2, scale + c.levelOffset) : c.level;
     const m = mon(c.species, level, c.moves ? [...c.moves] : null, { nick: c.nick });
     m._slot = i;
     m._bossShift = c.bossShift || null;
+    m.heldItem = c.held ?? null;
+    if (c.onEntry) m.onEntry = { ...c.onEntry };
     return m;
   });
 }
 
 // --- damage estimates for any pair (bench decisions) ----------------------------------------------
 
-/** Expected damage of one move from `att` to `def` at full stages (0 when it cannot land). */
-export function expectedDamage(att, def, moveId, wardDown = false) {
+/**
+ * Expected damage of one move from `att` to `def` at full stages (0 when it cannot land), under
+ * the battle's weather when one is given.
+ */
+export function expectedDamage(att, def, moveId, wardDown = false, battle = null) {
   const mv = VIEW.move(moveId);
   if (!isDamaging(mv)) return 0;
   const type = moveTypeFor(mv, att);
@@ -154,7 +165,7 @@ export function expectedDamage(att, def, moveId, wardDown = false) {
   if (!check.lands) return 0;
   const physical = mv.category === 'physical';
   const ua = VIEW.ability(att.ability);
-  let extra = 1;
+  let extra = battle ? battle.weatherPowerMult(type) : 1;
   if (ua.hooks.onAttackMult) extra *= ua.hooks.onAttackMult({ attacker: att, move: mv, hpRatio: att.hp / att.stats.hp, moveType: type });
   const dmg = damageFormula({
     level: att.level, power: mv.power, attack: physical ? att.stats.atk : att.stats.spa, defense: physical ? def.stats.def : def.stats.spd,
@@ -165,17 +176,17 @@ export function expectedDamage(att, def, moveId, wardDown = false) {
   return dmg * hits * acc * (mv.effect.charge ? 0.5 : 1);
 }
 
-/** Best expected damage of a creature's usable moves into a target. */
-export function bestDamage(att, def, wardDown = false) {
+/** Best expected damage of a creature's usable moves into a target (under the battle's weather when given). */
+export function bestDamage(att, def, wardDown = false, battle = null) {
   let best = 0;
-  for (const m of att.moves) if (m.pp > 0) best = Math.max(best, expectedDamage(att, def, m.id, wardDown));
+  for (const m of att.moves) if (m.pp > 0) best = Math.max(best, expectedDamage(att, def, m.id, wardDown, battle));
   return best;
 }
 
-/** Matchup score of `c` against `foe`: share of foe HP it takes per turn minus share it loses. */
-function matchup(c, foe, wardDown = false) {
-  const give = bestDamage(c, foe, wardDown) / Math.max(1, foe.hp);
-  const take = bestDamage(foe, c) / Math.max(1, c.hp);
+/** Matchup score of `c` against `foe`: share of foe HP it takes per turn minus share it loses (weather counted). */
+function matchup(c, foe, wardDown = false, battle = null) {
+  const give = bestDamage(c, foe, wardDown, battle) / Math.max(1, foe.hp);
+  const take = bestDamage(foe, c, false, battle) / Math.max(1, c.hp);
   const speed = c.stats.spe >= foe.stats.spe ? 0.1 : 0;
   return Math.min(1.2, give) - 0.8 * Math.min(1.2, take) + speed;
 }
@@ -201,7 +212,7 @@ export function playerBrain(battle, memo) {
     let score = -Infinity;
     const down = battle.sides[1].vol.wardSuppressed > 1;
     for (const o of opts) {
-      const sc = matchup(battle.sides[side].party[o.index], foe, down);
+      const sc = matchup(battle.sides[side].party[o.index], foe, down, battle);
       if (sc > score) { score = sc; best = o; }
     }
     return { type: 'switch', to: best.index };
@@ -223,7 +234,7 @@ export function playerBrain(battle, memo) {
     return { m, mv, exp: ((est.min + est.max) / 2) * m.hitChance * charge * selfKo, min: est.min };
   }).sort((a, b) => b.exp - a.exp);
   const best = scored[0];
-  const threat = bestDamage(foe, me);
+  const threat = bestDamage(foe, me, false, battle);
   const iAmFaster = battle.effStat(side, 'spe') >= battle.effStat(1, 'spe');
 
   // 1. A sure knock-out (most accurate first).
@@ -238,7 +249,7 @@ export function playerBrain(battle, memo) {
     let score = minScore;
     for (const o of acts.switches.filter((s) => s.selectable)) {
       const c = mine.party[o.index];
-      const sc = matchup(c, foe);
+      const sc = matchup(c, foe, false, battle);
       if (sc > score) { score = sc; pick = o; }
     }
     return pick;
@@ -254,9 +265,9 @@ export function playerBrain(battle, memo) {
       let sc = best.exp;
       for (const o of acts.switches.filter((x) => x.selectable)) {
         const c = mine.party[o.index];
-        const d = bestDamage(c, foe);
+        const d = bestDamage(c, foe, false, battle);
         const hitsTaken = c.stats.spe > foe.stats.spe ? 1 : 2;
-        if (d > sc && d >= foe.hp * 0.5 && bestDamage(foe, c) * hitsTaken < c.hp * 0.9) { sc = d; pick = o; }
+        if (d > sc && d >= foe.hp * 0.5 && bestDamage(foe, c, false, battle) * hitsTaken < c.hp * 0.9) { sc = d; pick = o; }
       }
       if (pick) { memo.lastSwitch = battle.turn; return { type: 'switch', to: pick.index }; }
     }
@@ -284,10 +295,10 @@ export function playerBrain(battle, memo) {
   }
 
   // 4. A losing matchup with a clear answer on the bench.
-  const now = matchup(me, foe);
+  const now = matchup(me, foe, false, battle);
   if (canSwitch && now < -0.25) {
     const pick = benchPick(now + 0.6);
-    if (pick && bestDamage(foe, mine.party[pick.index]) < mine.party[pick.index].hp * 0.75) {
+    if (pick && bestDamage(foe, mine.party[pick.index], false, battle) < mine.party[pick.index].hp * 0.75) {
       memo.lastSwitch = battle.turn;
       return { type: 'switch', to: pick.index };
     }
@@ -357,7 +368,7 @@ export function reform(c, formId) {
  * Plays one trainer battle to the end and returns {outcome, turns, party (player side state), items}.
  * @param {any[]} playerParty creatures (mutated copies are returned)
  * @param {any[]} foeParty
- * @param {{rng: any, trainer?: any, source?: string, summit?: boolean, items?: any[], crackdust?: number, maxTurns?: number}} o
+ * @param {{rng: any, trainer?: any, source?: string, summit?: boolean, items?: any[], crackdust?: number, maxTurns?: number, weatherCycle?: any, log?: string[]}} o
  */
 export function playBattle(playerParty, foeParty, o) {
   const rng = o.rng;
@@ -370,7 +381,9 @@ export function playBattle(playerParty, foeParty, o) {
       { party: foeParty, trainer: { name: o.trainer ? o.trainer.name : 'Trainer', items: o.trainer && o.trainer.items ? o.trainer.items.map((x) => ({ ...x })) : [] } },
     ],
     kind: 'trainer', data: BATTLE_DATA, dial: 'flux', rng: rng.fork('battle'), source: o.source || 'route', summit: !!o.summit, tuning: SIM_TUNING,
+    weatherCycle: o.weatherCycle || null,
   });
+  if (o.log) for (const ev of battle.intro) if (ev.text) o.log.push(`[t0] ${ev.text}`);
   const profile = o.trainer && o.trainer.ai ? o.trainer.ai : undefined;
   const memo = {};
   const onField = new Map();
@@ -392,7 +405,10 @@ export function playBattle(playerParty, foeParty, o) {
       }
     }
   }
-  return { outcome: battle.outcome, turns: battle.turn, party: battle.sides[0].party, items: battle.sides[0].items, crackdust: battle.sides[0].bag.crackdust };
+  return {
+    outcome: battle.outcome, turns: battle.turn, party: battle.sides[0].party, items: battle.sides[0].items, crackdust: battle.sides[0].bag.crackdust,
+    consumedItems: battle.result().consumedItems, events: battle.log,
+  };
 }
 
 // --- on-curve parties -----------------------------------------------------------------------------
@@ -462,7 +478,8 @@ export function simulateSpire(spireId, n = 200, seed = 'balance') {
       let turns;
       if (sp.theme.kind === 'relay') ({ win, turns } = playRelay(party, tr, sp, rng, items, null, plan));
       else {
-        const r = playBattle(party, trainerParty(tr), { rng, trainer: tr, source: 'spire', items, crackdust: PARTIES[spireId].crackdust });
+        const weatherCycle = sp.theme.kind === 'weather' ? sp.theme.rule : null;
+        const r = playBattle(party, trainerParty(tr), { rng, trainer: tr, source: 'spire', items, crackdust: PARTIES[spireId].crackdust, weatherCycle });
         win = r.outcome === 'win';
         turns = r.turns;
       }

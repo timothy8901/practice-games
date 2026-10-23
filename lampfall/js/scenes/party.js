@@ -43,15 +43,15 @@ import {
 } from './menuModel.js';
 import {
   prefsOf, skinOf, drawSkinPanel, drawCard, drawBackdrop, drawHeading, drawHints, drawCreature, drawCreatureIcon,
-  drawHeartmark, drawGlyph, itemGlyph, drawCursorAt, drawBody, createSlide, sfx, toast, sysCtx, MAGENTA,
+  drawHeartmark, drawGlyph, itemGlyph, drawCursorAt, drawBody, createSlide, fitText, sfx, toast, sysCtx, MAGENTA,
 } from './menuKit.js';
 
 /** Row geometry (GDD-09 §3.11). */
 const ROWS = Object.freeze({ x: 8, y: 16, w: 280, rowH: 38 });
 const COV = Object.freeze({ x: 296, y: 16, w: 176, h: 236 });
 const STAT_ORDER = Object.freeze(['hp', 'atk', 'def', 'spa', 'spd', 'spe']);
-const GRADE_GLYPH = Object.freeze({ strong: '+', neutral: '•', weak: '–', blocked: '×', none: '?' });
-const GRADE_WORD = Object.freeze({ strong: 'Strong', neutral: 'Neutral', weak: 'Weak', blocked: 'Blocked', none: '???' });
+const GRADE_GLYPH = Object.freeze({ strong: '+', neutral: '•', weak: '–', blocked: '×', none: '' });
+const GRADE_WORD = Object.freeze({ strong: 'Strong', neutral: 'Neutral', weak: 'Weak', blocked: 'Blocked', none: '—' });
 
 /**
  * @param {any} G
@@ -69,6 +69,8 @@ export function createPartyScene(G) {
   let busy = false;
   /** Where the held-item picker returns to. @type {'list'|'summary'} */
   let heldFrom = 'list';
+  /** Opened straight onto a Summary (e.g. from Storage): Back from it leaves the scene. */
+  let directSummary = false;
   const slide = createSlide({ dx: 12 });
 
   const rowFocus = createFocus({ cols: 1, wrap: true, items: [] });
@@ -82,11 +84,30 @@ export function createPartyScene(G) {
 
   const heldList = createList({
     rect: { x: 156, y: 92, w: 168, h: 112 }, rowH: 12, items: [],
+    render: (ctx, it, x, y, w, focused, rowH = 12) => {
+      const skin = skinOf(prefsOf(G));
+      if (focused && skin.dark) { ctx.fillStyle = skin.band; ctx.fillRect(x - 1, y, w + 2, rowH); }
+      if (it.marker) drawText(ctx, it.marker, x + 2, y + 3, { color: skin.dark ? PALETTE.y : COLORS.brass.dark });
+      const vw = it.value ? measureText(it.value).w + 8 : 4;
+      drawText(ctx, fitText(it.label, w - 12 - vw), x + 11, y + 3, { color: skin.text });
+      if (it.value) drawText(ctx, it.value, x + w - 3, y + 3, { color: skin.soft, align: 'right' });
+    },
     onSelect: (item) => giveHeld(item),
     onCancel: () => { mode = heldFrom; sfx(G, 'cancel'); },
   });
 
   const party = () => G.world?.party ?? [];
+  /**
+   * Whether a Still Knot holds this creature's windows. `creature.stillKnot` is the rule's flag; the
+   * held item's row is read too (items carry `held.blocksShift`, the rules read `blocksShifts`), so
+   * the row never hides a knot the creature is plainly wearing.
+   */
+  const knotted = (c) => {
+    if (!c) return false;
+    if (c.stillKnot) return true;
+    const row = c.heldItem ? look().itemOrNull(c.heldItem) : null;
+    return !!(row && (row.blocksShifts === true || row.held?.blocksShift === true || row.held?.blocksShifts === true));
+  };
   const data = () => G.data ?? null;
   const look = () => lookOf(data());
   const ctxOpts = () => ({ ...sysCtx(G) });
@@ -319,6 +340,7 @@ export function createPartyScene(G) {
   sumFocus.on('change', () => sfx(G, 'cursor'));
   sumFocus.on('activate', (ev) => { activateSummary(sumFocus.items[ev.index]?.id ?? ''); });
   sumFocus.on('cancel', () => {
+    if (directSummary) { leave(); return; }
     mode = 'list';
     rowFocus.set(summaryIndex);
     sfx(G, 'cancel');
@@ -370,7 +392,7 @@ export function createPartyScene(G) {
     if (resting) lines.push((yy) => drawText(ctx, t('party.fainted'), rx, yy, { color: skin.bad }));
     else if (c.status?.kind) lines.push((yy) => drawBadge(ctx, t(`battle.status.${c.status.kind}`), rx, yy - 2, { style: 'status', small: true, icon: c.status.kind }));
     const pending = (G.world?.pendingShifts ?? []).includes(c.uid);
-    if (c.stillKnot) lines.push((yy) => drawText(ctx, t('party.heldByKnot'), rx, yy, { color: skin.soft }));
+    if (knotted(c)) lines.push((yy) => drawText(ctx, t('party.heldByKnot'), rx, yy, { color: skin.soft }));
     else if (pending) {
       lines.push((yy) => {
         drawHeartmark(ctx, rx + 2, yy + 3, 1, {});
@@ -414,8 +436,11 @@ export function createPartyScene(G) {
     ctx.fillRect(COV.x + 6, fy - 3, COV.w - 12, 1);
     if (mode === 'coverage' && c.rows[covFocus.index]) {
       const row = c.rows[covFocus.index];
+      /** @type {Map<string, string[]>} */
+      const by = new Map();
+      for (const s2 of row.strong) { const l = by.get(s2.nick) ?? []; if (!l.includes(s2.move)) l.push(s2.move); by.set(s2.nick, l); }
       const who = row.strong.length
-        ? `Strong vs ${row.type}: ${listWords([...new Set(row.strong.map((s) => `${s.nick} (${s.move})`))].slice(0, 4))}` // str
+        ? `Strong vs ${row.type}: ${listWords([...by].slice(0, 4).map(([n, ms]) => `${n} (${ms.join(', ')})`))}` // str
         : `Nothing hits ${row.type} Strong yet.`; // str
       drawText(ctx, who, COV.x + 8, fy + 2, { color: skin.text, maxWidth: COV.w - 16 });
     } else {
@@ -539,7 +564,7 @@ export function createPartyScene(G) {
       drawGlyph(ctx, g.glyph, 98, 126, { ink: COLORS.paper.light, accent: g.accent, light: COLORS.night.ink });
     }
     drawText(ctx, `${t('summary.held')}: ${heldRow?.name ?? (c.heldItem || t('common.none'))}`, 109, 127, { color: COLORS.paper.light, maxWidth: 160 });
-    if (c.stillKnot) drawText(ctx, t('party.heldByKnot'), 109, 138, { font: 'small', color: PALETTE.v });
+    if (knotted(c)) drawText(ctx, t('party.heldByKnot'), 109, 138, { font: 'small', color: PALETTE.v });
     // moves
     const mv = { x: 276, y: 12, w: 200, h: 74 };
     drawSkinPanel(ctx, mv, skin, 'paper');
@@ -627,7 +652,7 @@ export function createPartyScene(G) {
     let windowNote = '';
     try {
       const next = exp.nextWindowLevel(c, data(), { tuning: TUNING });
-      if (c.stillKnot) windowNote = t('party.heldByKnot');
+      if (knotted(c)) windowNote = t('party.heldByKnot');
       else if ((G.world?.pendingShifts ?? []).includes(c.uid)) windowNote = 'A window is open: home or a Waystone at low tide.'; // str
       else if (next) windowNote = `Next window at Lv${next}.`; // str
       else if (sp?.flags?.neverShifts) windowNote = 'This form never Shifts.'; // str
@@ -646,13 +671,14 @@ export function createPartyScene(G) {
       ms = 0;
       mode = 'list';
       swapAnim = null;
+      directSummary = false;
       relayout();
       rowFocus.set(0, { force: true });
       slide.open(prefsOf(G));
       const want = params?.summary;
       if (want !== undefined && want !== null) {
         const i = typeof want === 'number' ? want : party().findIndex((c) => c.uid === want);
-        if (i >= 0 && party()[i]) openSummary(i);
+        if (i >= 0 && party()[i]) { openSummary(i); directSummary = params?.direct !== false; }
       }
     },
     exit() {},
@@ -672,20 +698,33 @@ export function createPartyScene(G) {
       switch (mode) {
         case 'list':
         case 'swap': {
-          if (mode === 'list' && (input.pressed('r') || input.pressed('l')) && cov) { mode = 'coverage'; covFocus.set(0, { force: true }); sfx(G, 'cursor'); return; }
+          if (mode === 'list' && (input.pressed('r') || input.pressed('l') || input.repeat('right')) && cov) {
+            // land on the Coverage cell level with the focused row
+            const row = Math.min(5, Math.max(0, Math.round((rowRect(rowFocus.index).y + 18 - (COV.y + 30)) / 20)));
+            mode = 'coverage'; covFocus.set(Math.min(cov.rows.length - 1, row * 2), { force: true }); sfx(G, 'cursor'); return;
+          }
           const p = input.pointer;
           if (mode === 'list' && p && p.justDown && p.inside && p.x >= COV.x) { mode = 'coverage'; covFocus.handle(input); return; }
           rowFocus.handle(input);
           return;
         }
         case 'coverage': {
-          if (input.pressed('l') || input.pressed('r')) { mode = 'list'; sfx(G, 'cursor'); return; }
+          if (input.pressed('l') || input.pressed('r') || (input.repeat('left') && covFocus.index % 2 === 0)) { mode = 'list'; sfx(G, 'cursor'); return; }
           const p = input.pointer;
           if (p && p.justDown && p.inside && p.x < COV.x) { mode = 'list'; rowFocus.handle(input); return; }
           covFocus.handle(input);
           return;
         }
-        case 'mini': miniFocus.handle(input); return;
+        case 'mini': {
+          const p = input.pointer;
+          const r0 = miniFocus.items[0]?.rect;
+          if (p && p.justDown && p.inside && r0) {
+            const box = { x: r0.x - 6, y: r0.y - 6, w: r0.w + 12, h: miniFocus.items.length * 13 + 12 };
+            if (p.x < box.x || p.x >= box.x + box.w || p.y < box.y || p.y >= box.y + box.h) { mode = 'list'; sfx(G, 'cancel'); return; }
+          }
+          miniFocus.handle(input);
+          return;
+        }
         case 'held': heldList.handle(input); return;
         case 'summary': {
           if (input.pressed('l') || input.repeat('left')) { switchCreature(-1); return; }

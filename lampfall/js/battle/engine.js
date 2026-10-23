@@ -9,7 +9,14 @@
  * - per-dial rules come from `setup.rules` over {@link DIAL_RULES};
  * - every designer number is in {@link DEFAULTS} and overridable by `setup.tuning`;
  * - `legal(side)` / `step(action)` are the primary names (`availableActions` /
- *   `submit` remain as aliases).
+ *   `submit` remain as aliases);
+ * - arena weather (`battle/weather.js`): a weather state `{kind, turnsLeft, posted}` set by
+ *   `setup.weather`, a posted cycle (`setup.weatherCycle`, the Weather Spire), a creature's
+ *   `onEntry: {weather, turns}` and a move's `weather` effect, always announced
+ *   ('weather-start' / 'weather-tick' / 'weather-end') and shown by {@link Battle#state};
+ * - held items (`battle/heldItems.js`): a creature's `heldItem` drives the onSwitchIn,
+ *   onDamageTaken, onTurnEnd, onHitCheck and onStatCalc hooks from its item row's `held` keys;
+ *   consumed items are reported in `result().consumedItems`.
  *
  * The UI asks {@link Battle#legal} what a side may do, submits one action per
  * side with {@link Battle#step} (or {@link Battle#submit}), and animates the
@@ -22,12 +29,16 @@
 
 import {
   DEFAULTS as EFFECT_DEFAULTS, mergeTuning, stageMult, critChance, damageFormula, damageRoll, captureOdds, captureBand, catchUpMult,
-  isDamaging, isSureHit, isSelfTargeting, isChipMove, moveTypeFor, wardCheck, wardHeldText, wardIndirect, isWard, MAJOR_STATUS,
+  isDamaging, isSureHit, isSelfTargeting, isChipMove, moveTypeFor, wardCheck, wardHeldText, wardIndirect, isWard, MAJOR_STATUS, weatherOf,
 } from './effects.js';
 import { DEFAULTS as ABILITY_DEFAULTS } from './abilityHooks.js';
 import { DEFAULTS as CREATURE_DEFAULTS, gainExp as defaultGainExp, isFainted, hpRatio } from './creatureOps.js';
 import { DEFAULTS as DATA_DEFAULTS, createBattleData } from './data.js';
 import { readCreature } from './read.js';
+import {
+  DEFAULTS as WEATHER_DEFAULTS, indexWeatherKinds, cycleProblems, cycleKindAt, cycleTurnsLeft, weatherSchedule,
+  weatherPowerMult, weatherChip, weatherWord,
+} from './weather.js';
 
 export { stageMult, critChance, damageFormula, captureOdds, captureBand, catchUpMult } from './effects.js';
 export { readCreature, readCard, dossier } from './read.js';
@@ -96,11 +107,11 @@ const ENGINE_DEFAULTS = Object.freeze({
 
 /**
  * Every designer-tunable number the battle rules read, by name: the engine's own
- * plus those of `effects.js`, `creatureOps.js`, `abilityHooks.js` and `data.js`.
+ * plus those of `effects.js`, `creatureOps.js`, `abilityHooks.js`, `data.js` and `weather.js`.
  * Override any subset with `createBattle({tuning})`.
- * @type {Readonly<typeof EFFECT_DEFAULTS & typeof CREATURE_DEFAULTS & typeof ABILITY_DEFAULTS & typeof DATA_DEFAULTS & typeof ENGINE_DEFAULTS>}
+ * @type {Readonly<typeof EFFECT_DEFAULTS & typeof CREATURE_DEFAULTS & typeof ABILITY_DEFAULTS & typeof DATA_DEFAULTS & typeof WEATHER_DEFAULTS & typeof ENGINE_DEFAULTS>}
  */
-export const DEFAULTS = Object.freeze({ ...EFFECT_DEFAULTS, ...CREATURE_DEFAULTS, ...ABILITY_DEFAULTS, ...DATA_DEFAULTS, ...ENGINE_DEFAULTS });
+export const DEFAULTS = Object.freeze({ ...EFFECT_DEFAULTS, ...CREATURE_DEFAULTS, ...ABILITY_DEFAULTS, ...DATA_DEFAULTS, ...WEATHER_DEFAULTS, ...ENGINE_DEFAULTS });
 
 /** Every key of {@link DEFAULTS}: the names `createBattle({tuning})` accepts (the GDD tuning table's battle keys). */
 export const TUNING_KEYS = Object.freeze(Object.keys(DEFAULTS));
@@ -262,6 +273,13 @@ export class BattleError extends Error {
  *   Lantern roll (GDD-00: `capture:<battleId>:<attempt>`, attempt counts from 0 per battle); default: the battle rng
  * @property {Partial<typeof DEFAULTS>} [tuning]      overrides of {@link DEFAULTS}
  * @property {(c: Creature, amount: number) => import('./creatureOps.js').ExpGain} [gainExp]   level-up implementation (default: creatureOps.gainExp)
+ * @property {string|{kind: string, turns?: number|null}|null} [weather]   arena weather as the battle opens (a kind id stands until
+ *   something replaces it; `turns` makes it timed)
+ * @property {import('./weather.js').WeatherCycle|null} [weatherCycle]     a posted cycle (the Weather Spire's `theme.rule`)
+ * @property {ReadonlyArray<any>|null} [weatherKinds]                       weather kind rows (default: `data.weatherKinds`)
+ *
+ * Creatures may also carry `heldItem` (an item id; its row's `held` keys drive the held-item hooks
+ * when `data` has an items table) and `onEntry: {weather, turns}` (posts weather as it enters).
  */
 
 /**
@@ -269,6 +287,8 @@ export class BattleError extends Error {
  * @property {boolean} ended  @property {string|null} outcome  @property {0|1|null} winner  @property {number} turns
  * @property {Array<{uid: any, name: string, amount: number, from: number, to: number, levelsGained: number, learned: string[], offers: string[]}>} exp
  * @property {number} payout  @property {number} blackoutCost  @property {boolean} summitNoLoss  @property {Creature|null} caught
+ * @property {Array<{side: 0|1, uid: any, item: string}>} consumedItems   held items used up this battle (side 0: remove them from the bag-side records)
+ * @property {{kind: string|null, turnsLeft: number|null, posted: Array<{turn: number, kind: string|null, name: string|null}>}} weather   the weather at the end
  */
 
 function freshVol() {
@@ -368,6 +388,8 @@ export class Battle {
         data.species(c.speciesId);
         data.ability(c.ability);
         for (const m of c.moves) data.move(m.id);
+        if (c.heldItem != null && typeof c.heldItem !== 'string') throw new TypeError(`createBattle: side ${i} party[${j}]: heldItem must be an item id or null`);
+        data.held(c.heldItem);
       });
       const first = s.party.findIndex((c) => !isFainted(c));
       if (first < 0) throw new RangeError(`createBattle: side ${i} has no healthy creature`);
@@ -404,8 +426,17 @@ export class Battle {
     }
     this.sides[1].party.forEach((c) => this.fieldLog.seen.add(c.speciesId));
     this.sides[0].party.forEach((c) => this.fieldLog.seen.add(c.speciesId));
+    /** @type {Array<{side: 0|1, uid: any, item: string}>} held items used up this battle */
+    this.consumedItems = [];
+    this._initWeather(opts);
     this._emit({ type: 'message', text: this.kind === 'wild' ? `A wild ${this.active(1).nickname} appeared.` : `${this.sides[1].trainer.name} wants to battle.` });
+    /** onEntry weather of the opening send-ins, applied once both leads are out. */
+    this._openingEntries = [];
     for (const side of this.sides) this._sendIn(side.index, side.active, true);
+    const opening = this._openingEntries;
+    this._openingEntries = null;
+    if (this.weather.kind !== null) this._announceWeather(this.weatherCycle && !this._timed ? 'cycle' : 'setup', null);
+    for (const e of opening) this._setTimedWeather(e.kind, e.turns, 'entry', e.side);
     /** @type {BattleEvent[]} events from the opening send-ins (switch-in abilities fire here) */
     this.intro = this._flush();
   }
@@ -468,7 +499,7 @@ export class Battle {
   }
 
   /**
-   * Effective stat with stages and numb.
+   * Effective stat with stages, numb and a held item's onStatCalc.
    * @param {number} side @param {'atk'|'def'|'spa'|'spd'|'spe'} key @returns {number}
    */
   effStat(side, key) {
@@ -476,11 +507,14 @@ export class Battle {
     const v = this.sides[side].vol;
     let value = c.stats[key] * stageMult(v.stages[key]);
     if (key === 'spe' && c.status && c.status.kind === 'numb') value *= this.tuning.numbSpeedMult;
+    const held = this.heldOf(c);
+    if (held) value *= held.hooks.onStatCalc({ self: c, stat: key });
     return Math.max(1, Math.floor(value));
   }
 
   /**
-   * Hit chance of a move from `side` against the foe (what the move panel shows).
+   * Hit chance of a move from `side` against the foe (what the move panel shows): accuracy,
+   * the foe's evasion, the weather's accuracy and the user's held item (onHitCheck).
    * @param {number} side @param {import('./effects.js').Move} move @returns {number}
    */
   hitChance(side, move) {
@@ -489,13 +523,19 @@ export class Battle {
     const acc = move.accuracy === null ? 100 : move.accuracy;
     const eva = this.sides[1 - side].vol.stages.eva;
     const mult = this.tuning.evasionMult;
-    return (acc / 100) * mult[Math.max(0, Math.min(this.tuning.evasionCap, mult.length - 1, eva))];
+    let p = (acc / 100) * mult[Math.max(0, Math.min(this.tuning.evasionCap, mult.length - 1, eva))];
+    const row = this.weatherRow();
+    if (row) p *= row.accuracy;
+    const user = this.active(side);
+    const held = this.heldOf(user);
+    if (held) p *= held.hooks.onHitCheck({ self: user, move });
+    return Math.min(1, p);
   }
 
   /**
    * Damage range of a move slot against the current foe, without rolling or
    * changing anything (no crit, no first-hit flags consumed). For the AI and
-   * for UI previews.
+   * for UI previews. Weather and held items are counted.
    * @param {number} side
    * @param {number|null} index move slot, or null for Scrap
    * @returns {{min: number, max: number, lands: boolean}}
@@ -515,7 +555,7 @@ export class Battle {
     const defense = this.effStat(foeSide, physical ? 'def' : 'spd');
     const ua = this.data.ability(user.ability);
     const ta = this.data.ability(target.ability);
-    let extra = 1;
+    let extra = this._attackExtra(user, move, moveType);
     if (ua.hooks.onAttackMult) extra *= ua.hooks.onAttackMult({ attacker: user, move, hpRatio: hpRatio(user), moveType });
     if (ta.hooks.onDefendMult) extra *= ta.hooks.onDefendMult({ defender: target, attacker: user, move, eff: check.eff, bflags: { ...this.bflags(foeSide, target) } }).mult;
     const stab = moveType !== null && (user.types.includes(moveType) || (move.id === user.heartmark && user.heartmarkStab));
@@ -545,6 +585,8 @@ export class Battle {
       outcome: this.outcome,
       winner: this.winner,
       captureStance: this.stance,
+      weather: this._weatherView(),
+      consumedItems: this.consumedItems.map((x) => ({ ...x })),
       sides: this.sides.map((s) => ({
         active: s.active,
         trainer: s.trainer ? s.trainer.name : null,
@@ -559,7 +601,7 @@ export class Battle {
         wardSuppressed: s.vol.wardSuppressed,
         party: s.party.map((c) => ({
           uid: c.uid, name: c.nickname, speciesId: c.speciesId, level: c.level, hp: c.hp, maxHp: c.stats.hp,
-          status: c.status ? c.status.kind : null, mends: c.mends, types: c.types.slice(), fainted: isFainted(c),
+          status: c.status ? c.status.kind : null, mends: c.mends, types: c.types.slice(), fainted: isFainted(c), heldItem: c.heldItem ?? null,
           moves: c.moves.map((m) => ({ id: m.id, pp: m.pp, maxPp: m.maxPp })),
         })),
       })),
@@ -601,7 +643,11 @@ export class Battle {
       const selectable = m.pp > 0;
       const reason = selectable ? null : 'No PP left.';
       const word = check.reason === 'ward' ? 'Blocked by Ward' : check.reason === 'immune' ? 'No effect' : isDamaging(mv) ? check.eff.word : null;
-      return { index: i, i, id: mv.id, name: mv.name, type, category: mv.category, power: mv.power, pp: m.pp, maxPp: m.maxPp, selectable, usable: selectable, reason, word, mult: check.eff.mult, hitChance: this.hitChance(side, mv), heartmark: m.id === c.heartmark };
+      const weatherMult = isDamaging(mv) ? this.weatherPowerMult(type) : 1;
+      return {
+        index: i, i, id: mv.id, name: mv.name, type, category: mv.category, power: mv.power, pp: m.pp, maxPp: m.maxPp, selectable, usable: selectable, reason, word,
+        mult: check.eff.mult, weatherMult, weatherWord: weatherWord(weatherMult), hitChance: this.hitChance(side, mv), heartmark: m.id === c.heartmark,
+      };
     });
     out.scrap = { available: allOut, usable: allOut, name: this.data.scrap.name, reason: allOut ? null : 'Scrap is only available when every move is out of PP.', cost: Math.max(1, Math.floor(c.stats.hp * t.scrapCost)) };
     out.switches = this._switchOptions(side, false);
@@ -679,6 +725,16 @@ export class Battle {
     });
   }
 
+  /**
+   * The weather as the HUD shows it: kind, name, rule line, turns left (null = standing) and the
+   * posted strip for the next turns (plain data).
+   * @returns {{kind: string|null, name: string|null, text: string|null, turnsLeft: number|null, posted: import('./weather.js').PostedTurn[], source: string|null}}
+   */
+  _weatherView() {
+    const row = this.weatherRow();
+    return { kind: this.weather.kind, name: row ? row.name : null, text: row ? row.text : null, turnsLeft: this.weather.turnsLeft, posted: this.weather.posted.map((p) => ({ ...p })), source: this.weather.source };
+  }
+
   /** @returns {BattleResult} the result (meaningful once `phase === 'ended'`) */
   result() {
     return {
@@ -691,6 +747,8 @@ export class Battle {
       blackoutCost: this.blackoutCost,
       summitNoLoss: this.summit,
       caught: this.caught,
+      consumedItems: this.consumedItems.map((x) => ({ ...x })),
+      weather: { kind: this.weather.kind, turnsLeft: this.weather.turnsLeft, posted: this.weather.posted.map((p) => ({ ...p })) },
     };
   }
 
@@ -787,6 +845,249 @@ export class Battle {
     this._emit({ type: 'type-shift', side, who: c.nickname, current: c.types[0], next, text: `${c.nickname} turns ${c.types[0]}. Next: ${next.join(', ')}.` });
   }
 
+
+  // ---- weather ---------------------------------------------------------------
+
+  /**
+   * Reads and checks the weather setup: kinds, a posted cycle, the opening weather, every
+   * `onEntry` and every weather move in either party (unknown kinds fail here, never mid-battle).
+   * @param {BattleSetup} opts
+   */
+  _initWeather(opts) {
+    /** @type {ReadonlyMap<string, import('./weather.js').WeatherKind>} */
+    this.weatherKinds = opts.weatherKinds != null ? indexWeatherKinds(opts.weatherKinds) : this.data.weatherKinds();
+    const need = (id, where) => {
+      if (!this.weatherKinds.has(id)) throw new RangeError(`createBattle: ${where} names weather ${JSON.stringify(id)}, not in weatherKinds (${[...this.weatherKinds.keys()].join(', ') || 'none injected'})`);
+    };
+    /** @type {Readonly<import('./weather.js').WeatherCycle>|null} */
+    this.weatherCycle = null;
+    if (opts.weatherCycle != null) {
+      const problems = cycleProblems(opts.weatherCycle, this.weatherKinds);
+      if (problems.length) throw new RangeError(`createBattle: ${problems.join('; ')}`);
+      this.weatherCycle = Object.freeze({ ...opts.weatherCycle, cycle: Object.freeze(opts.weatherCycle.cycle.slice()) });
+    }
+    /** @type {string|null} a weather that stands until something replaces it */
+    this._standing = null;
+    /** @type {{kind: string, turnsLeft: number, source: string}|null} a timed weather over the cycle / standing one */
+    this._timed = null;
+    this._inTurn = false;
+    const w = opts.weather;
+    if (w != null) {
+      const kind = typeof w === 'string' ? w : w && typeof w === 'object' ? w.kind : undefined;
+      if (typeof kind !== 'string') throw new TypeError('createBattle: weather must be a kind id or {kind, turns?}');
+      need(kind, 'setup.weather');
+      const turns = typeof w === 'object' ? w.turns ?? null : null;
+      if (turns !== null && !(Number.isInteger(turns) && turns > 0)) throw new RangeError(`createBattle: weather.turns must be a positive integer, got ${String(turns)}`);
+      if (turns === null && this.weatherCycle) throw new RangeError('createBattle: a standing weather cannot sit under a posted cycle (give it turns)');
+      if (turns === null) this._standing = kind;
+      else this._timed = { kind, turnsLeft: turns, source: 'setup' };
+    }
+    for (const s of this.sides) {
+      for (const c of s.party) {
+        if (c.onEntry != null) {
+          const e = c.onEntry;
+          if (!e || typeof e !== 'object' || typeof e.weather !== 'string' || !(e.turns == null || (Number.isInteger(e.turns) && e.turns > 0))) {
+            throw new TypeError(`createBattle: ${c.nickname}'s onEntry must be {weather, turns?}`);
+          }
+          need(e.weather, `${c.nickname}'s onEntry`);
+        }
+        for (const m of c.moves) {
+          const wo = weatherOf(this.data.move(m.id).effect);
+          if (wo) need(wo.kind, `move ${m.id}`);
+        }
+      }
+    }
+    /** @type {{kind: string|null, turnsLeft: number|null, posted: import('./weather.js').PostedTurn[], source: string|null}} */
+    this.weather = this._computeWeather(1);
+  }
+
+  /** @returns {number} the turn the weather is read for now (the turn being fought, or the coming one between turns) */
+  _weatherTurn() {
+    return this._inTurn ? this.turn : this.turn + 1;
+  }
+
+  /**
+   * The weather state for battle turn `turn` from the timed / cycle / standing layers.
+   * @param {number} turn
+   * @returns {{kind: string|null, turnsLeft: number|null, posted: import('./weather.js').PostedTurn[], source: string|null}}
+   */
+  _computeWeather(turn) {
+    const t = this._timed;
+    const cycle = this.weatherCycle;
+    const kind = t ? t.kind : cycle ? cycleKindAt(cycle, turn) : this._standing;
+    const turnsLeft = t ? t.turnsLeft : cycle ? cycleTurnsLeft(cycle, turn) : null;
+    const n = cycle && cycle.postedTurnsAhead != null ? cycle.postedTurnsAhead : this.tuning.weatherPostedTurns;
+    const posted = weatherSchedule({ cycle, standing: this._standing, timed: t ? { kind: t.kind, lastTurn: turn + t.turnsLeft - 1 } : null }, turn, n, this.weatherKinds);
+    return { kind, turnsLeft, posted, source: t ? t.source : cycle ? 'cycle' : kind ? 'setup' : null };
+  }
+
+  /** @returns {import('./weather.js').WeatherKind|null} the weather in force now */
+  weatherRow() {
+    return this.weather.kind ? /** @type {any} */ (this.weatherKinds.get(this.weather.kind)) : null;
+  }
+
+  /**
+   * Damage multiplier the weather in force gives a move of `moveType` (the AI and the menu read it).
+   * @param {string|null} moveType @returns {number}
+   */
+  weatherPowerMult(moveType) {
+    return weatherPowerMult(this.weatherRow(), moveType);
+  }
+
+  /**
+   * Emits 'weather-start' for the weather in force and grants its entry evasion.
+   * @param {string} source @param {string|null} who the creature that brought it (entry / move)
+   * @param {boolean} [renewed] the same weather picked up again (no second evasion grant)
+   */
+  _announceWeather(source, who, renewed = false) {
+    const row = this.weatherRow();
+    if (!row) return;
+    const w = this.weather;
+    const lower = row.name.toLowerCase();
+    const lead = renewed ? `The ${lower} picks up again. `
+      : source === 'entry' ? `${who} brings ${lower} in with it. `
+        : source === 'move' ? `${who} calls up ${lower}. `
+          : source === 'cycle' && this.turn > 0 ? 'The weather turns. ' : '';
+    const turns = w.turnsLeft != null ? ` (${w.turnsLeft} turn${w.turnsLeft === 1 ? '' : 's'})` : '';
+    this._emit({ type: 'weather-start', kind: row.id, name: row.name, turnsLeft: w.turnsLeft, posted: w.posted.map((p) => ({ ...p })), source, rule: row.text, text: `${lead}${row.text}${turns}` });
+    if (row.evasion && !renewed) {
+      for (const s of this.sides) {
+        const c = this.active(s.index);
+        if (!isFainted(c) && c.types.some((ty) => row.evasion.types.includes(ty))) this._changeStage(s.index, 'eva', row.evasion.stages, { bySelf: true });
+      }
+    }
+  }
+
+  /** @param {string|null} kind */
+  _endWeather(kind) {
+    const row = kind ? this.weatherKinds.get(kind) : null;
+    if (row) this._emit({ type: 'weather-end', kind: row.id, name: row.name, text: `The ${row.name.toLowerCase()} passes.` });
+  }
+
+  /**
+   * Sets a timed weather over the cycle / standing one (a creature's entry, a move).
+   * @param {string} kind @param {number|null} turns null = tuning.weatherMoveTurns
+   * @param {'entry'|'move'|'setup'} source @param {number|null} side who brought it
+   */
+  _setTimedWeather(kind, turns, source, side) {
+    if (this._openingEntries) {
+      this._openingEntries.push({ kind, turns, side });
+      return;
+    }
+    const prev = this.weather.kind;
+    this._timed = { kind, turnsLeft: turns ?? this.tuning.weatherMoveTurns, source };
+    this.weather = this._computeWeather(this._weatherTurn());
+    const who = side == null ? null : this.active(side).nickname;
+    if (prev === kind) return this._announceWeather(source, who, true);
+    if (prev !== null) this._endWeather(prev);
+    return this._announceWeather(source, who);
+  }
+
+  /**
+   * Sets or clears the arena weather between turns (the flow's hook: the Reading's phase weather,
+   * a scripted change). `turns` makes it timed; without it the kind stands until replaced.
+   * @param {string|null} kind null clears a standing / timed weather (a posted cycle stays)
+   * @param {{turns?: number|null}} [opts]
+   * @returns {BattleEvent[]}
+   * @throws {BattleError} ENDED after the end; {RangeError} for an unknown kind or bad turns
+   */
+  setWeather(kind, opts = {}) {
+    this._events = [];
+    if (this.phase === 'ended') throw new BattleError('ENDED', 'The battle is over.');
+    if (kind !== null && !this.weatherKinds.has(kind)) throw new RangeError(`setWeather: unknown weather ${JSON.stringify(kind)}`);
+    const turns = opts.turns ?? null;
+    if (turns !== null && !(Number.isInteger(turns) && turns > 0)) throw new RangeError(`setWeather: turns must be a positive integer, got ${String(turns)}`);
+    if (kind !== null && turns !== null) {
+      this._setTimedWeather(kind, turns, 'setup', null);
+      return this._flush();
+    }
+    if (kind !== null && this.weatherCycle) throw new RangeError('setWeather: a standing weather cannot replace a posted cycle (give it turns)');
+    const prev = this.weather.kind;
+    this._timed = null;
+    this._standing = kind;
+    this.weather = this._computeWeather(this._weatherTurn());
+    if (this.weather.kind !== prev) {
+      if (prev !== null) this._endWeather(prev);
+      this._announceWeather(this.weather.source || 'setup', null);
+    }
+    return this._flush();
+  }
+
+  /** End of turn: the tick, weather chip, weather cures, then the next turn's weather. */
+  _weatherEndOfTurn() {
+    const row = this.weatherRow();
+    if (this._timed) {
+      this._timed.turnsLeft--;
+      if (this._timed.turnsLeft <= 0) this._timed = null;
+    }
+    const next = this._computeWeather(this.turn + 1);
+    if (row) {
+      const left = this.weather.turnsLeft == null ? null : this.weather.turnsLeft - 1;
+      const text = left === null ? `${row.name} holds.` : left > 0 ? `${row.name} holds (${left} more turn${left === 1 ? '' : 's'}).` : `${row.name} is blowing itself out.`;
+      this._emit({ type: 'weather-tick', kind: row.id, name: row.name, turnsLeft: left, posted: next.posted.map((p) => ({ ...p })), text });
+      for (const s of this.sides) {
+        const c = this.active(s.index);
+        if (isFainted(c)) continue;
+        const f = weatherChip(row, c.types);
+        if (f > 0) {
+          this._emit({ type: 'message', side: s.index, text: `${c.nickname} is worn down by the ${row.name.toLowerCase()}.` });
+          this._applyDamage(s.index, Math.max(1, Math.floor(c.stats.hp * f)), 'weather');
+        }
+        if (!isFainted(c) && c.status && row.status.cures.includes(c.status.kind)) {
+          const kind = c.status.kind;
+          c.status = null;
+          this._emit({ type: 'status', side: s.index, target: c.nickname, kind, action: 'cure', text: `The ${row.name.toLowerCase()} clears it: ${c.nickname} ${CURE_WORD[kind] || 'is cured'}.` });
+        }
+      }
+    }
+    const prev = this.weather.kind;
+    this.weather = next;
+    if (next.kind !== prev) {
+      if (prev !== null) this._endWeather(prev);
+      if (next.kind !== null) this._announceWeather(next.source || 'setup', null);
+    }
+  }
+
+  // ---- held items --------------------------------------------------------------
+
+  /**
+   * The held-item runtime of a creature (null: nothing held, a bag item, or no items table).
+   * @param {Creature} c @returns {import('./heldItems.js').HeldRuntime|null}
+   */
+  heldOf(c) {
+    return c && c.heldItem ? this.data.held(c.heldItem) : null;
+  }
+
+  /** @param {number} side @param {Creature} c @param {import('./heldItems.js').HeldRuntime} rt @returns {number} */
+  _heldUses(side, c, rt) {
+    return this.bflags(side, c)[`held:${rt.id}:uses`] || 0;
+  }
+
+  /**
+   * Records that a held item fired: counts the use, uses a consumable up (marked on the creature,
+   * reported in the result) and emits 'held-item'.
+   * @param {number} side @param {Creature} c @param {import('./heldItems.js').HeldRuntime} rt
+   * @param {'start-stages'|'endure'|'heal'|'cure'} effect @param {string} text
+   */
+  _heldFired(side, c, rt, effect, text) {
+    const f = this.bflags(side, c);
+    const key = `held:${rt.id}:uses`;
+    f[key] = (f[key] || 0) + 1;
+    const consumed = rt.consumable;
+    if (consumed) {
+      c.heldItem = null;
+      this.consumedItems.push({ side: /** @type {0|1} */ (side), uid: c.uid, item: rt.id });
+    }
+    this._emit({ type: 'held-item', side, who: c.nickname, uid: c.uid, item: rt.id, itemName: rt.name, effect, consumed, text: consumed ? `${text} The ${rt.name} is used up.` : text });
+  }
+
+  /** A held heal: spends a Mend (the hook only fires with one left), then heals. @param {number} side @param {Creature} c @param {number} fraction @param {string} source */
+  _heldHeal(side, c, fraction, source) {
+    c.mends--;
+    this._emit({ type: 'mend-spent', side, user: c.nickname, remaining: c.mends, text: `${c.nickname} spends a Mend (${c.mends} left).` });
+    this._heal(side, Math.max(1, Math.floor(c.stats.hp * fraction)), source);
+  }
+
   // ---- the turn --------------------------------------------------------------
 
   /**
@@ -838,10 +1139,15 @@ export class Battle {
         }
       }
     }
-    for (const { side, action } of this._order(acts)) {
-      if (this.phase === 'ended') break;
-      if (isFainted(this.active(side)) && action.type !== 'switch') continue;
-      this._perform(side, action);
+    this._inTurn = true;
+    try {
+      for (const { side, action } of this._order(acts)) {
+        if (this.phase === 'ended') break;
+        if (isFainted(this.active(side)) && action.type !== 'switch') continue;
+        this._perform(side, action);
+      }
+    } finally {
+      this._inTurn = false;
     }
     if (this.phase !== 'ended') this._endOfTurn();
     if (this.phase !== 'ended') this._resolveFaints();
@@ -965,6 +1271,15 @@ export class Battle {
     const ability = this.data.ability(c.ability);
     if (this.rules.wardBadge === 'start') this._revealWard(side, c);
     if ((!initial || this.turn === 0) && ability.hooks.onSwitchIn) ability.hooks.onSwitchIn({ battle: this, side, self: c, foe: this.foeOf(side) });
+    const held = this.heldOf(c);
+    if (held) {
+      const r = held.hooks.onSwitchIn({ self: c });
+      if (r) {
+        this._heldFired(side, c, held, 'start-stages', r.text);
+        for (const [stat, n] of Object.entries(r.stages)) this._changeStage(side, stat, n, { bySelf: true });
+      }
+    }
+    if (c.onEntry && c.onEntry.weather) this._setTimedWeather(c.onEntry.weather, c.onEntry.turns ?? null, 'entry', side);
   }
 
   // ---- items, run, capture -------------------------------------------------------
@@ -1140,7 +1455,9 @@ export class Battle {
       return;
     }
     if (isSelfTargeting(move)) {
-      for (const st of e.stat) this._changeStage(side, st.stat, st.stages, { bySelf: true });
+      const w = weatherOf(e);
+      if (w) this._setTimedWeather(w.kind, w.turns, 'move', side);
+      for (const st of e.stat || []) this._changeStage(side, st.stat, st.stages, { bySelf: true });
       return;
     }
     if (e.selfKo) {
@@ -1194,6 +1511,8 @@ export class Battle {
     if (hits > 1) this._emit({ type: 'message', side, text: `Hit ${landed} time${landed === 1 ? '' : 's'}.` });
     if (isDamaging(move) && e.drain && totalDamage > 0) this._heal(side, Math.max(1, Math.floor(totalDamage * e.drain)), move.id);
     this._applySecondary(side, move, target);
+    const w = weatherOf(e);
+    if (w && !isFainted(user)) this._setTimedWeather(w.kind, w.turns, 'move', side);
     if (e.selfKo && !isFainted(user)) this._applyDamage(side, user.hp, 'self');
   }
 
@@ -1242,7 +1561,7 @@ export class Battle {
     const crit = v.critRoll < critChance(this._critStage(user, move), t);
     const rand = damageRoll(this.rng.next(), t);
     const stab = moveType !== null && (user.types.includes(moveType) || (move.id === user.heartmark && user.heartmarkStab));
-    let extra = 1;
+    let extra = this._attackExtra(user, move, moveType);
     if (userAbility.hooks.onAttackMult) extra *= userAbility.hooks.onAttackMult({ attacker: user, move, hpRatio: hpRatio(user), moveType });
     let defText = null;
     if (targetAbility.hooks.onDefendMult) {
@@ -1281,7 +1600,20 @@ export class Battle {
   /** @param {Creature} user @param {import('./effects.js').Move} move @returns {number} crit stage */
   _critStage(user, move) {
     const ability = this.data.ability(user.ability);
-    return (move.effect.highCrit || 0) + (ability.hooks.critStages ? ability.hooks.critStages() : 0);
+    const held = this.heldOf(user);
+    return (move.effect.highCrit || 0) + (ability.hooks.critStages ? ability.hooks.critStages() : 0) + (held ? held.hooks.critStages() : 0);
+  }
+
+  /**
+   * Damage multipliers outside the abilities: the weather on the move's type and the user's held
+   * item (onAttackMult, e.g. a type boost).
+   * @param {Creature} user @param {import('./effects.js').Move} move @param {string|null} moveType @returns {number}
+   */
+  _attackExtra(user, move, moveType) {
+    let m = this.weatherPowerMult(moveType);
+    const held = this.heldOf(user);
+    if (held) m *= held.hooks.onAttackMult({ self: user, move, moveType });
+    return m;
   }
 
   /** @param {number} side @param {import('./effects.js').Move} move @param {Creature} target */
@@ -1324,10 +1656,11 @@ export class Battle {
 
   /**
    * Applies damage to a side's active creature with the Capture Stance floor
-   * (every non-self source on the wild creature) and the 0..maxHp clamp.
+   * (every non-self source on the wild creature), the 0..maxHp clamp and the held item's
+   * onDamageTaken (before: an endure; after: a threshold heal).
    * @param {number} side target side
    * @param {number} amount
-   * @param {'party'|'self'|'status'} source
+   * @param {'party'|'self'|'status'|'weather'} source
    * @returns {number} HP actually removed
    */
   _applyDamage(side, amount, source) {
@@ -1337,9 +1670,27 @@ export class Battle {
     const floored = this.kind === 'wild' && side === 1 && this.stance && source !== 'self';
     if (floored) dmg = Math.min(dmg, Math.max(0, c.hp - 1));
     dmg = Math.min(dmg, c.hp);
+    const held = dmg > 0 && source !== 'self' ? this.heldOf(c) : null;
+    let endured = null;
+    if (held) {
+      const r = held.hooks.onDamageTaken({ phase: 'before', self: c, amount: dmg, source, uses: this._heldUses(side, c, held), mends: c.mends });
+      if (r && r.amount !== undefined && r.amount < dmg) {
+        dmg = Math.max(0, r.amount);
+        endured = r.text;
+      }
+    }
     c.hp -= dmg;
     this._emit({ type: 'damage', side, target: c.nickname, amount: dmg, hp: c.hp, maxHp: c.stats.hp, source, stanceFloor: floored && c.hp === 1 && dmg < want });
-    if (isFainted(c)) this._emit({ type: 'faint', side, target: c.nickname, text: `${c.nickname} fainted.` });
+    if (held && endured) this._heldFired(side, c, held, 'endure', endured);
+    if (isFainted(c)) {
+      this._emit({ type: 'faint', side, target: c.nickname, text: `${c.nickname} fainted.` });
+    } else if (held && c.heldItem === held.id) {
+      const r = held.hooks.onDamageTaken({ phase: 'after', self: c, amount: dmg, source, uses: this._heldUses(side, c, held), mends: c.mends });
+      if (r && r.heal) {
+        this._heldFired(side, c, held, 'heal', r.text);
+        this._heldHeal(side, c, r.heal, held.id);
+      }
+    }
     return dmg;
   }
 
@@ -1358,6 +1709,11 @@ export class Battle {
     const name = c.nickname;
     if (kind === 'trap') {
       const v = this.sides[side].vol;
+      const wr = this.weatherRow();
+      if (wr && wr.status.blocks.includes('trap')) {
+        this._emit({ type: 'status', side, target: name, kind, action: 'immune', text: `The ${wr.name.toLowerCase()} keeps ${name} from being trapped.` });
+        return false;
+      }
       if (v.trap > 0) {
         this._emit({ type: 'status', side, target: name, kind, action: 'already', text: `${name} is already trapped.` });
         return false;
@@ -1374,6 +1730,11 @@ export class Battle {
     const ability = this.data.ability(c.ability);
     if (this.data.typeBlocksStatus(kind, c.types) || (ability.hooks.statusImmune && ability.hooks.statusImmune(kind))) {
       this._emit({ type: 'status', side, target: name, kind, action: 'immune', text: `${name} cannot be ${STATUS_WORD[kind]}.` });
+      return false;
+    }
+    const row = this.weatherRow();
+    if (row && row.status.blocks.includes(kind)) {
+      this._emit({ type: 'status', side, target: name, kind, action: 'immune', text: `The ${row.name.toLowerCase()} keeps ${name} from being ${STATUS_WORD[kind]}.` });
       return false;
     }
     c.status = { kind, turns: kind === 'chill' ? this.rng.int(this.tuning.chillTurnsMin, this.tuning.chillTurnsMax) : 0 };
@@ -1431,7 +1792,7 @@ export class Battle {
         const k = c.status.kind;
         if (k === 'burn' || k === 'poison') {
           this._emit({ type: 'status', side: s.index, target: c.nickname, kind: k, action: 'tick', text: `${c.nickname} is hurt by ${k === 'burn' ? 'its burn' : 'poison'}.` });
-          this._applyDamage(s.index, Math.max(1, Math.floor(c.stats.hp * t.chip[k])), 'status');
+          this._applyDamage(s.index, Math.max(1, Math.floor(c.stats.hp * t.chip[k] * this._chipMult(c, k))), 'status');
         } else if (k === 'chill') {
           c.status.turns--;
           if (c.status.turns <= 0) {
@@ -1442,7 +1803,7 @@ export class Battle {
       }
       if (!isFainted(c) && v.trap > 0) {
         this._emit({ type: 'status', side: s.index, target: c.nickname, kind: 'trap', action: 'tick', text: `${c.nickname} is hurt by the trap.` });
-        this._applyDamage(s.index, Math.max(1, Math.floor(c.stats.hp * t.chip.trap)), 'status');
+        this._applyDamage(s.index, Math.max(1, Math.floor(c.stats.hp * t.chip.trap * this._chipMult(c, 'trap'))), 'status');
         v.trap--;
         if (v.trap === 0 && !isFainted(c)) this._emit({ type: 'status', side: s.index, target: c.nickname, kind: 'trap', action: 'cure', text: `${c.nickname} is free of the trap.` });
       }
@@ -1461,6 +1822,29 @@ export class Battle {
       const ability = this.data.ability(c.ability);
       if (!isFainted(c) && ability.hooks.onTurnEnd) ability.hooks.onTurnEnd({ battle: this, side: s.index, self: c });
     }
+    this._weatherEndOfTurn();
+    for (const s of this.sides) {
+      const c = this.active(s.index);
+      const held = isFainted(c) ? null : this.heldOf(c);
+      if (!held) continue;
+      const r = held.hooks.onTurnEnd({ self: c, uses: this._heldUses(s.index, c, held), mends: c.mends });
+      if (!r) continue;
+      if (r.cure && c.status) {
+        const kind = c.status.kind;
+        c.status = null;
+        this._heldFired(s.index, c, held, 'cure', r.text);
+        this._emit({ type: 'status', side: s.index, target: c.nickname, kind, action: 'cure', text: `${c.nickname} ${CURE_WORD[kind] || 'is cured'}.` });
+      } else if (r.heal) {
+        this._heldFired(s.index, c, held, 'heal', r.text);
+        this._heldHeal(s.index, c, r.heal, held.id);
+      }
+    }
+  }
+
+  /** Status-chip multiplier of a creature's held item (an Oilskin halves it). @param {Creature} c @param {string} kind @returns {number} */
+  _chipMult(c, kind) {
+    const held = this.heldOf(c);
+    return held ? held.hooks.chipMult(kind) : 1;
   }
 
   _resolveFaints() {
@@ -1495,7 +1879,11 @@ export class Battle {
       if (this.kind === 'trainer') {
         const tr = this.sides[1].trainer;
         const maxLevel = Math.max(...this.sides[1].party.map((c) => c.level));
-        this.payout = tr.payout ?? (tr.payoutRate ?? t.payoutPerLevel) * maxLevel;
+        const base = tr.payout ?? (tr.payoutRate ?? t.payoutPerLevel) * maxLevel;
+        const player = this.sides[0];
+        // a held payout item (Lucky Button) counts when its holder battled
+        const mult = Math.max(1, ...player.party.filter((c) => player.participants.has(c.uid)).map((c) => (this.heldOf(c) ? this.heldOf(c).payoutMult : 1)));
+        this.payout = Math.floor(base * mult);
         this._emit({ type: 'payout', amount: this.payout, text: `You won ${this.payout} glint.` });
       }
     } else if (outcome === 'loss') {
@@ -1522,10 +1910,11 @@ export class Battle {
     for (const d of defeated) {
       const base = Math.floor((this.data.species(d.speciesId).expYield * d.level) / t.expYieldDivisor) * (this.kind === 'trainer' ? t.trainerExpMult : 1);
       for (const c of recipients) {
-        const share = player.participants.has(c.uid) ? 1 : t.benchShare;
+        const battler = player.participants.has(c.uid);
+        const share = battler ? 1 : this._benchShare(c);
         let amount = Math.floor(base * share * catchUpMult(c.level, this.curveLevel, t));
         if (this.source === 'rematch' && this.curveLevel != null && c.level > this.curveLevel + t.dampStart) amount = Math.floor(amount * t.dampFactor);
-        add(c, amount, share === 1 ? 'battler' : 'bench');
+        add(c, amount, battler ? 'battler' : 'bench');
       }
     }
     for (const c of recipients) {
@@ -1543,6 +1932,12 @@ export class Battle {
     this._applyGains(gains, [...player.party, ...yard]);
   }
 
+  /** A bench creature's EXP share: its held item's `benchShare` (Tally Charm) or tuning.benchShare. @param {Creature} c @returns {number} */
+  _benchShare(c) {
+    const held = this.heldOf(c);
+    return held && held.benchShare !== null ? held.benchShare : this.tuning.benchShare;
+  }
+
   /** The flat hold-out EXP ({@link DEFAULTS}.holdOutExp): battlers all of it, the bench `benchShare`. */
   _holdOutExp() {
     const t = this.tuning;
@@ -1552,7 +1947,7 @@ export class Battle {
     for (const c of player.party) {
       if (isFainted(c)) continue;
       const battler = player.participants.has(c.uid);
-      const amount = Math.floor(t.holdOutExp * (battler ? 1 : t.benchShare));
+      const amount = Math.floor(t.holdOutExp * (battler ? 1 : this._benchShare(c)));
       if (!(amount > 0)) continue;
       gains.set(c.uid, amount);
       this._emit({ type: 'exp', creature: c.nickname, uid: c.uid, amount, share: battler ? 'battler' : 'bench', text: `${c.nickname} gained ${amount} EXP${battler ? '' : ' (bench)'}.` });
@@ -1615,7 +2010,13 @@ export class Battle {
       }
     }
     const types = chart.ordinary.filter((ty) => this._wardCheck(ability, { id: '-', name: '-', category: 'special', power: 100, accuracy: 100, pp: 1, priority: 0, type: ty, effect: {} }, target.types, ty).lands);
-    const indirect = wardIndirect(ability);
+    const indirect = wardIndirect(ability).slice();
+    // weather chip passes every Ward (wildshift-rules 8.3): name each chipping weather in force or posted that reaches this creature
+    const posted = new Set([this.weather.kind, ...this.weather.posted.map((p) => p.kind)].filter(Boolean));
+    for (const k of posted) {
+      const row = this.weatherKinds.get(k);
+      if (row && weatherChip(row, target.types) > 0) indirect.push(`weather chip (${row.name}${k === this.weather.kind ? '' : ', posted'})`);
+    }
     const lines = [wardHeldText(ability)];
     lines.push(canLand.length ? `Can land: ${canLand.map((e) => `${e.creature}'s ${e.moveName}`).join(', ')}.` : 'Nothing in your party lands right now.');
     if (outOfPp.length) lines.push(`Out of PP: ${outOfPp.map((e) => `${e.creature}'s ${e.moveName}`).join(', ')}.`);

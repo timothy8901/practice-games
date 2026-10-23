@@ -25,12 +25,15 @@
  * - `guard`, `evasion: n`, `sureHit`, `plumbline`, `scrap`, `clearRaised`, `flinch: p`,
  *   `popsDecoy: n`, `highCrit: stages`, `revealMoves`, `charge: 1`, `spread`, `queuedType`,
  *   `multiHit: [min, max]`, `drain: fraction`, `selfKo`, `contact`, `chance`
+ * - `weather: kindId | {kind, turns?}` sets the arena weather (`battle/weather.js`) for `turns`
+ *   turns (default tuning.weatherMoveTurns); on a status move it is a field move that never misses
+ *   and no Ward or guard stops; on a damaging move it follows a hit that lands
  * @type {ReadonlyArray<string>}
  */
 export const EFFECT_KEYS = Object.freeze([
   'stat', 'status', 'recovery', 'guard', 'evasion', 'sureHit', 'plumbline', 'scrap', 'clearRaised', 'flinch',
   'popsDecoy', 'highCrit', 'revealMoves', 'charge', 'spread', 'queuedType', 'multiHit', 'drain', 'selfKo',
-  'contact', 'chance',
+  'contact', 'chance', 'weather',
 ]);
 
 /** Status kinds a move may inflict. `trap` is volatile; the other four are major conditions. */
@@ -186,6 +189,7 @@ export function isSelfTargeting(mv) {
   if (mv.category !== 'status') return false;
   const e = mv.effect;
   if (e.guard || e.evasion || e.recovery) return true;
+  if (e.weather && !e.status && !e.plumbline && !e.clearRaised && !e.revealMoves) return !e.stat || e.stat.every((s) => s.target === 'self');
   return !!(e.stat && e.stat.every((s) => s.target === 'self') && !e.status && !e.plumbline && !e.clearRaised);
 }
 
@@ -230,7 +234,21 @@ export function moveProblems(mv) {
   if (e.multiHit && !(Array.isArray(e.multiHit) && e.multiHit.length === 2 && e.multiHit[0] >= 1 && e.multiHit[1] >= e.multiHit[0])) out.push(`move ${id}: multiHit must be [min, max]`);
   if (e.recovery && !(e.recovery.fraction > 0 && e.recovery.fraction <= 1 && Number.isInteger(e.recovery.delay ?? 0))) out.push(`move ${id}: bad recovery`);
   for (const k of ['flinch', 'drain', 'chance']) if (e[k] !== undefined && !(typeof e[k] === 'number' && e[k] >= 0 && e[k] <= 1)) out.push(`move ${id}: ${k} must be 0..1`);
+  if (e.weather !== undefined && weatherOf(e) === null) out.push(`move ${id}: weather must be a kind id or {kind, turns?: positive integer}`);
   return out;
+}
+
+/**
+ * The weather a move's `weather` effect sets, normalized (`turns` null = the tuning default).
+ * @param {Record<string, any>} effect
+ * @returns {{kind: string, turns: number|null}|null} null when the move sets none (or the value is malformed)
+ */
+export function weatherOf(effect) {
+  const w = effect && effect.weather;
+  if (w == null) return null;
+  if (typeof w === 'string') return w ? { kind: w, turns: null } : null;
+  if (typeof w === 'object' && typeof w.kind === 'string' && w.kind && (w.turns == null || (Number.isInteger(w.turns) && w.turns > 0))) return { kind: w.kind, turns: w.turns ?? null };
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -285,7 +303,8 @@ export function damageRoll(u, tuning) {
  * @returns {number} integer damage (>= 1 unless typeMult or power is 0)
  */
 export function damageFormula({ level, power, attack, defense, typeMult, stab, crit, rand, burned = false, extra = 1 }, tuning) {
-  if (typeMult === 0 || power <= 0) return 0;
+  // a zero multiplier anywhere (an immunity, or a weather that smothers the type) deals nothing, never the 1-HP floor
+  if (typeMult === 0 || power <= 0 || extra === 0) return 0;
   const t = tun(tuning);
   const base = Math.floor((Math.floor((2 * level) / 5 + 2) * power * attack) / Math.max(1, defense) / 50) + 2;
   let mods = typeMult * rand * extra;

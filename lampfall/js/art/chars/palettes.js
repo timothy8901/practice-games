@@ -155,9 +155,9 @@ export const PALETTES = {
   // Pip, water rat: navy dock jersey, brown flat cap, white tail tip.
   pip: {
     ...ROD, ...EYES,
-    K: '#1e1410', k: INK, F: '#74503a', f: '#523828', L: '#9a7252', M: '#d9a85a', m: '#b08040', N: '#1e1410', P: '#c88a7a',
+    K: '#261a14', k: INK, F: '#74503a', f: '#523828', L: '#9a7252', M: '#d9a85a', m: '#b08040', N: '#c88a7a', P: '#c88a7a',
     C: '#3b4a6b', c: '#2b3a67', D: '#8a6a46', d: '#6a4e30', Y: BRASS,
-    S: '#3e2a1e', s: '#2a1c14', B: '#2a2433', b: '#1e1a24',
+    S: '#3e2a1e', s: '#2a1c14', B: '#2a2433', b: '#1f1b25',
   },
   // Osric Penhallow, tortoise stonecutter: leather apron, amber shell.
   osric: {
@@ -177,23 +177,23 @@ export const PALETTES = {
   // Wendel Teague, great crested grebe, boatwright: tan work overalls.
   wendel: {
     ...ROD, E: INK, W: PAPER,
-    K: '#1e1a18', k: INK, F: '#3a3430', f: '#262220', L: '#5a524a', M: '#f1eee6', m: '#c8c4bc', R: '#a8502a', r: '#7a3a1e', S: '#1e1a18', N: '#d98a8a',
+    K: '#201c19', k: INK, F: '#3a3430', f: '#262220', L: '#5a524a', M: '#f1eee6', m: '#c8c4bc', R: '#a8502a', r: '#7a3a1e', S: '#201c19', N: '#d98a8a',
     C: '#a8885a', c: '#7e6440', D: '#a8885a', d: '#7e6440', Y: BRASS, A: BRASS, a: '#7a5a36', T: '#3a3430', t: '#262220',
     B: '#6a7a5a', b: '#4a5a3e',
   },
   // Ada Halloran, jackdaw: red scarf knotted left.
   ada: {
     ...ROD, E: INK, W: '#dce4ec',
-    K: '#141b33', k: INK, F: '#2a2a36', f: '#1e1e28', L: '#4a4a5a', R: '#8a90a0', r: '#646a7a', N: '#1e1e28', P: '#c0453a',
+    K: '#141b33', k: INK, F: '#2a2a36', f: '#1e1e28', L: '#4a4a5a', R: '#8a90a0', r: '#646a7a', N: '#4a4a5a', P: '#c0453a',
     C: '#e8e0d0', c: '#bdb4a2', D: '#6a5a46', d: '#4e4232', Y: BRASS, T: '#2a2a36', t: '#1e1e28',
     S: '#1e1e28', s: '#141b33', B: '#1e1e28', b: '#141b33',
   },
   // Isolde Petrel, storm petrel: sea-grey shawl, navy dress, her storm lantern.
   isolde: {
     ...ROD, ...EYES,
-    K: '#1e1a20', k: INK, F: '#4e4650', f: '#332d36', L: '#6e6670', M: '#ece6da', N: '#1e1a20', T: '#3a3438', t: '#26222a',
+    K: '#1f1b21', k: INK, F: '#4e4650', f: '#332d36', L: '#6e6670', M: '#ece6da', N: '#1f1b21', T: '#3a3438', t: '#26222a',
     C: '#2b3a67', c: '#1e2a4a', D: '#5e7d8a', d: '#43606c', A: BRASS, a: BRASS_S, X: '#f9c46b', Y: BRASS,
-    S: '#26222a', s: '#1e1a20', B: '#26222a', b: '#1e1a20',
+    S: '#26222a', s: '#1f1b21', B: '#26222a', b: '#1f1b21',
   },
   // The Thatch: goldfinches.
   thatch: {
@@ -213,20 +213,20 @@ export const PALETTES = {
   },
   corin: {
     ...ROD, E: INK, W: PAPER,
-    K: '#2e1c12', k: SW.k, F: '#8a5030', f: '#663a24', L: '#c08050', M: '#e0c090', m: '#b08a5a', N: '#e8d8a0',
+    K: '#2e1c12', k: SW.k, F: '#8a5030', f: '#663a24', L: '#c08050', M: '#e0c090', m: '#b08a5a', N: SW.y,
     C: SW.n, c: SW.d, D: SW.v, d: SW.e, Y: SW.y, A: SW.y, a: SW.u, G: SW.i, T: '#8a5030', t: '#663a24',
     S: '#c8b080', s: '#a08a5e', B: '#3a3438', b: '#26222a',
   },
   idris: {
     ...ROD, E: INK, W: PAPER,
-    K: '#0f1a1c', k: SW.k, F: '#24302e', f: '#161e20', L: '#3e5250', R: '#c03030', M: '#e8e8e0', N: '#2a2e36',
+    K: '#121f21', k: SW.k, F: '#24302e', f: '#161e20', L: '#3e5250', R: '#c03030', M: '#e8e8e0', N: '#6a6e7a',
     C: SW.n, c: SW.d, D: SW.w, d: SW.v, Y: SW.y, A: SW.y, a: SW.u, G: SW.i, T: '#24302e', t: '#161e20',
     S: '#2a2e36', s: '#1a1e26', B: '#2a2e36', b: '#1a1e26',
   },
   agathe: {
     ...ROD, E: INK, W: PAPER,
-    K: '#0f1014', k: SW.k, F: '#2a2a30', f: '#1a1a20', L: '#5a5040', G: SW.g, Y: SW.y, M: SW.w, m: SW.v, N: SW.v, n: SW.e,
-    C: SW.d, c: SW.k, D: SW.v, d: SW.e, A: SW.i, a: SW.u, T: '#2a2a30', t: '#1a1a20',
+    K: '#1b1c23', k: SW.k, F: '#2a2a30', f: '#1c1c22', L: '#5a5040', G: SW.g, Y: SW.y, M: SW.w, m: SW.v, N: SW.v, n: SW.e,
+    C: SW.d, c: SW.k, D: SW.v, d: SW.e, A: SW.i, a: SW.u, T: '#2a2a30', t: '#1c1c22',
     S: SW.k, s: SW.k, B: SW.k, b: SW.k,
   },
   teo: {
@@ -258,13 +258,13 @@ export const PALETTES = {
     ...ROD, ...EYES,
     K: '#3a2214', k: INK, F: '#b8843e', f: '#8e5e2a', L: '#d8a65a', M: '#e8c88a', m: '#c09a5e', P: '#d98a7a', N: '#3a2214',
     C: '#f4ecd6', c: '#cfc3a4', D: '#7a2e3a', d: '#5a1e2a', Y: BRASS,
-    S: '#8e5e2a', s: '#6a4420', B: '#3a2214', b: '#26160c',
+    S: '#8e5e2a', s: '#6a4420', B: '#3a2214', b: '#2a180d',
   },
   bastien: {
     ...ROD, ...EYES,
-    K: '#1a1210', k: SW.k, F: '#4a3024', f: '#2e1e16', L: '#6a4634', M: '#e8e0d0', N: '#1a1210',
+    K: '#251a17', k: SW.k, F: '#4a3024', f: '#2e1e16', L: '#6a4634', M: '#e8e0d0', N: '#251a17',
     C: '#3a3f4f', c: '#2a2e3a', D: SW.v, d: SW.e, Y: SW.y, A: SW.y,
-    S: '#2e1e16', s: '#1a1210', B: SW.d, b: SW.k,
+    S: '#2e1e16', s: '#251a17', B: SW.d, b: SW.k,
   },
   cass: {
     ...ROD, ...EYES,

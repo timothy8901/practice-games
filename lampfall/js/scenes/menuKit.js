@@ -26,10 +26,12 @@ import { drawPanel, drawNotchedFrame } from '../ui/panel.js';
 import { drawIcon } from '../ui/icons.js';
 import { drawKeyGlyph, keyGlyphWidth } from '../ui/widgets.js';
 import { artDef, artIds, getSprite } from '../art/atlas.js';
+import * as creatureArtLib from '../art/creatures/index.js';
+import { drawHeartmark as drawMarkArt, markAnchor, bodyKeyAt } from '../art/heartmark.js';
 import { MASTER } from '../art/palette.js';
 import { SAVE_PREFIX } from '../config.js';
 import { TUNING } from '../data/tuning.js';
-import { EXT_DEFAULTS, normalizeExt, markPixel, lookOf, primaryToken, hash32, typesOf } from './menuModel.js';
+import { EXT_DEFAULTS, normalizeExt, markPixel, lookOf, primaryToken, hash32, typesOf, heartmarkSpot } from './menuModel.js';
 
 /** Comet magenta: Heartmarks only on these screens (GDD-00 §14). */
 export const MAGENTA = MASTER.m;
@@ -361,7 +363,7 @@ export const GLYPHS = Object.freeze({
   quill: ['......##', '.....#o#', '....#o#.', '...#o#..', '..#o#...', '.##w#...', '#.##....', '##......'],
   disc: ['..####..', '.#oooo#.', '#oowwoo#', '#ow##wo#', '#ow##wo#', '#oowwoo#', '.#oooo#.', '..####..'],
   bottle: ['...##...', '...##...', '..#ww#..', '.#wwww#.', '.#oooo#.', '.#oooo#.', '.######.', '........'],
-  knot: ['..###...', '.#o.o#..', '.#.o.#..', '..#o#...', '.#.o.#..', '#o...o#.', '.#...#..', '........'],
+  knot: ['#......#', '.#....#.', '..#..#..', '...##...', '..#oo#..', '.#owoo#.', '.#oooo#.', '..####..'],
   wick: ['...o....', '..ooo...', '...w....', '..###...', '..#w#...', '..#w#...', '.#####..', '........'],
   bag: ['..####..', '.#....#.', '#oooooo#', '#oo##oo#', '#oooooo#', '#oooooo#', '.######.', '........'],
   box: ['########', '#oooooo#', '#o####o#', '########', '#oooooo#', '#oooooo#', '########', '........'],
@@ -551,22 +553,31 @@ export function drawHeartmark(ctx, cx, cy, scale = 1, o = {}) {
 }
 
 /**
- * Draws a creature (its current form, or `opts.form`) at x,y with its Heartmark in its spot.
+ * Draws a creature (its current form, or `opts.form`) at x,y with its Heartmark in its spot. Uses
+ * the ART-CREATURES art (`art/creatures.drawCreature` with the individual's anchor and offset) and
+ * falls back to the procedural placeholder for ids outside the roster.
  * @param {CanvasRenderingContext2D} ctx
  * @param {any} G
  * @param {any} c          creature record (uid, speciesId, mark, wild, hp)
  * @param {number} x @param {number} y
- * @param {{scale?: number, form?: string, grey?: boolean, glint?: boolean, bobY?: number, mark?: boolean}} [o]
+ * @param {{scale?: number, form?: string, grey?: boolean, glint?: boolean, bobY?: number, mark?: boolean, frame?: 0|1}} [o]
  * @returns {{w: number, h: number}}
  */
 export function drawCreature(ctx, G, c, x, y, o = {}) {
-  const look = lookOf(G?.data);
   const formId = o.form ?? c?.speciesId;
+  const scale = o.scale ?? 1;
+  const yy = Math.round(y + (o.bobY ?? 0));
+  if (formId && creatureArtLib.hasArt(formId)) {
+    const r = creatureArtLib.drawCreature(ctx, formId, Math.round(x), yy, {
+      scale, frame: o.frame ?? 0, anchor: heartmarkSpot(c), mark: c?.mark ?? null, lit: c ? c.wild !== true : false,
+      glint: o.glint ? 1 : 0, showMark: o.mark !== false && !!c, silhouette: o.grey ? PALETTE.e : null, types: typesOf(c),
+    });
+    return { w: r.w, h: r.h };
+  }
+  const look = lookOf(G?.data);
   const sp = look.speciesOrNull(formId) ?? { id: formId, types: typesOf(c), stage: 1, flags: {} };
   const { sprite } = formSprite(sp);
-  const scale = o.scale ?? 1;
   const img = o.grey ? silhouette(sprite, PALETTE.e) : sprite;
-  const yy = Math.round(y + (o.bobY ?? 0));
   drawSprite(ctx, img, Math.round(x), yy, scale !== 1 ? { scale } : undefined);
   if (o.mark !== false && c && c.wild !== true) {
     const p = markPixel(c, sp, { w: sprite.w, h: sprite.h });
@@ -578,7 +589,7 @@ export function drawCreature(ctx, G, c, x, y, o = {}) {
 
 /**
  * The 16x16 head-crop icon of a creature (party rows, learner strips, slot cards), with its mark when
- * the mark falls inside the crop. `grey` draws the resting (fainted) silhouette.
+ * the mark falls inside the crop. `grey` draws the resting (fainted) silhouette, `dim` a faded one.
  * @param {CanvasRenderingContext2D} ctx
  * @param {any} G
  * @param {any} c
@@ -586,8 +597,27 @@ export function drawCreature(ctx, G, c, x, y, o = {}) {
  * @param {{grey?: boolean, form?: string, dim?: boolean}} [o]
  */
 export function drawCreatureIcon(ctx, G, c, x, y, o = {}) {
-  const look = lookOf(G?.data);
   const formId = o.form ?? c?.speciesId;
+  const prev = ctx.globalAlpha;
+  if (formId && creatureArtLib.hasArt(formId)) {
+    const icon = creatureArtLib.getCreatureIcon(formId, { silhouette: o.grey ? PALETTE.e : null });
+    if (!icon) return;
+    if (o.dim) ctx.globalAlpha = prev * 0.45;
+    drawSprite(ctx, icon, Math.round(x), Math.round(y));
+    ctx.globalAlpha = prev;
+    const rec = creatureArtLib.creatureRecord(formId);
+    const win = creatureArtLib.CREATURE_ICONS[formId];
+    if (rec && win && c && c.wild !== true && !o.dim && !o.grey && win.step === 1) {
+      const at = markAnchor({ heartmark: rec.heartmarks[heartmarkSpot(c)] ?? rec.heartmarks[rec.mark] }, c.mark, { w: rec.w, h: rec.h });
+      const ix = at.x - win.ox, iy = at.y - win.oy;
+      if (ix >= 1 && ix <= 14 && iy >= 1 && iy <= 14) {
+        const centre = rec.highlight === 'y' ? MASTER.y : rec.highlight === 'w' ? MASTER.w : null;
+        drawMarkArt(ctx, Math.round(x) - win.ox, Math.round(y) - win.oy, at, { lit: true, scale: 1, body: bodyKeyAt(rec, at), centre });
+      }
+    }
+    return;
+  }
+  const look = lookOf(G?.data);
   const sp = look.speciesOrNull(formId) ?? { id: formId, types: typesOf(c), stage: 1, flags: {} };
   const { sprite, head } = formSprite(sp);
   const sx = Math.max(0, Math.min(sprite.w - 16, Math.round(head.x - 7)));
@@ -595,7 +625,6 @@ export function drawCreatureIcon(ctx, G, c, x, y, o = {}) {
   const img = o.grey ? silhouette(sprite, PALETTE.e) : sprite;
   const canvas = img.canvas;
   if (!canvas) return;
-  const prev = ctx.globalAlpha;
   if (o.dim) ctx.globalAlpha = prev * 0.45;
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(canvas, sx, sy, 16, 16, Math.round(x), Math.round(y), 16, 16);
@@ -613,8 +642,9 @@ export function drawCreatureIcon(ctx, G, c, x, y, o = {}) {
 // ---------------------------------------------------------------------------------------------
 
 /**
- * Draws wrapped body text, twice as large under Large text (when it fits in `maxLines`), clipped to
- * `maxLines`. Returns the height used.
+ * Draws wrapped body text, clipped to `maxLines` lines of 10 px (an ellipsis marks the cut). Under
+ * Large text it draws at ×2 whenever the whole text fits in the same height, else at ×1. Returns
+ * the height used.
  * @param {CanvasRenderingContext2D} ctx
  * @param {string} text
  * @param {number} x @param {number} y @param {number} w
@@ -622,16 +652,36 @@ export function drawCreatureIcon(ctx, G, c, x, y, o = {}) {
  * @returns {number}
  */
 export function drawBody(ctx, text, x, y, w, o) {
-  const maxLines = o.maxLines ?? 6;
+  const maxH = (o.maxLines ?? 6) * 10;
   for (const scale of o.large ? [2, 1] : [1]) {
     const lines = measureText(text, { maxWidth: w, scale }).lines;
-    if (scale === 2 && lines * 2 > maxLines) continue;
-    const cap = scale === 2 ? Math.floor(maxLines / 2) : maxLines;
+    const cap = Math.max(1, Math.floor(maxH / (10 * scale)));
+    if (scale === 2 && lines > cap) continue;
     const shown = lines > cap ? clipLines(text, w, cap, scale) : text;
     drawText(ctx, shown, x, y, { color: o.color, maxWidth: w, scale });
     return Math.min(lines, cap) * 10 * scale;
   }
   return 0;
+}
+
+/**
+ * One line of text that fits `maxW` pixels: the text itself when it fits, else cut at a character
+ * with a trailing `…`. Use it for single-line labels; `drawText`'s `maxWidth` wraps instead, which
+ * would spill a long place or item name into the line below.
+ * @param {string} text
+ * @param {number} maxW
+ * @param {{font?: string, scale?: number}} [opts]
+ * @returns {string}
+ */
+export function fitText(text, maxW, opts = {}) {
+  const s = String(text ?? '');
+  if (!(maxW > 0) || measureText(s, opts).w <= maxW) return s;
+  let lo = 0, hi = s.length;
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2);
+    if (measureText(`${s.slice(0, mid).trimEnd()}…`, opts).w <= maxW) lo = mid; else hi = mid - 1;
+  }
+  return lo > 0 ? `${s.slice(0, lo).trimEnd()}…` : '…';
 }
 
 /**

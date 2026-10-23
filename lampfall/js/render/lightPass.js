@@ -47,7 +47,7 @@ export const FOG_LAYERS = Object.freeze([0.2, 0.15]);
  * `[rxScale, ryScale, oy, strength]` and `halo` the lamp glow `[radius, oy, strength]` (or null).
  */
 export const LIGHT_STYLE = Object.freeze({
-  beam: Object.freeze({ priority: 0, color: UI.lighthouseAmber, pool: [0.6, 0.6, 0, 0.3], halo: [9, 0, 0.45] }),
+  beam: Object.freeze({ priority: 0, color: UI.lighthouseAmber, pool: [0.42, 0.3, 4, 0.26], halo: [9, 0, 0.45] }),
   lantern: Object.freeze({ priority: 1, color: UI.porchAmber, pool: [1, 0.62, 6, 0.32], halo: null }),
   fire: Object.freeze({ priority: 2, color: UI.lighthouseAmber, pool: [0.9, 0.55, 4, 0.32], halo: [5, -6, 0.4] }),
   lamp: Object.freeze({ priority: 3, color: UI.porchAmber, pool: [0.8, 0.45, 10, 0.3], halo: [4, -14, 0.42] }),
@@ -79,31 +79,36 @@ export function styleOf(kind) {
 export function selectLights(lights, view, opts = {}) {
   const max = opts.max ?? (opts.lowPower ? MAX_LIGHTS_LOW_POWER : MAX_LIGHTS);
   const out = opts.out || [];
-  out.length = 0;
   const cx = view.x + view.w / 2, cy = view.y + view.h / 2;
+  // candidates go to a module scratch list (it only ever grows) with their scores in a Float64Array,
+  // then the best `max` are copied into `out` by index: `out` keeps a stable length frame to frame, so
+  // neither array re-allocates its backing store (truncating and re-growing would, every frame)
+  let n = 0;
   for (let i = 0; i < lights.length; i++) {
     const L = lights[i];
     if (!(L.intensity > 0)) continue;
     const r = L.radius + 16;
     if (L.px + r < view.x || L.px - r > view.x + view.w || L.py + r < view.y || L.py - r > view.y + view.h) continue;
-    out.push(L);
+    if (n >= SCORES.length) { const grown = new Float64Array(SCORES.length * 2); grown.set(SCORES); SCORES = grown; }
+    const ddx = L.px - cx, ddy = L.py - cy;
+    const score = styleOf(L.kind).priority * 1e9 + ddx * ddx + ddy * ddy;
+    // insertion into the sorted prefix (n is small and the order is stable across frames)
+    let j = n - 1;
+    while (j >= 0 && SCORES[j] > score) { CAND[j + 1] = CAND[j]; SCORES[j + 1] = SCORES[j]; j--; }
+    CAND[j + 1] = L;
+    SCORES[j + 1] = score;
+    n++;
   }
-  // insertion sort on (priority, distance): n is small and stable across frames
-  for (let i = 1; i < out.length; i++) {
-    const a = out[i];
-    const ka = scoreOf(a, cx, cy);
-    let j = i - 1;
-    while (j >= 0 && scoreOf(out[j], cx, cy) > ka) { out[j + 1] = out[j]; j--; }
-    out[j + 1] = a;
-  }
-  if (out.length > max) out.length = max;
+  const m = Math.min(n, max);
+  for (let i = 0; i < m; i++) out[i] = CAND[i];
+  if (out.length !== m) out.length = m;
+  for (let i = 0; i < n; i++) CAND[i] = null; // hold no light past the call
   return out;
 }
 
-function scoreOf(L, cx, cy) {
-  const dx = L.px - cx, dy = L.py - cy;
-  return styleOf(L.kind).priority * 1e9 + dx * dx + dy * dy;
-}
+/** Candidate scratch list of {@link selectLights} (grows to the largest light count seen). */
+const CAND = [];
+let SCORES = new Float64Array(64);
 
 /**
  * Beam angle (radians, 0 = east, clockwise on screen) at `ms`, for a Relighting at `startMs`: the
@@ -147,7 +152,7 @@ const RINGS = Object.freeze([
 const discCache = new Map();
 /** @type {Map<string, number>} colour -> small id */
 const colorIds = new Map();
-const DISC_CACHE_MAX = 160;
+const DISC_CACHE_MAX = 512;
 
 /**
  * A dither disc (ellipse `rx x ry`) in `color` scaled by `strength`, cached. Drawn additively.
@@ -155,13 +160,16 @@ const DISC_CACHE_MAX = 160;
  * @returns {{canvas: any, rx: number, ry: number}}
  */
 export function ditherDisc(rx, ry, color, strength) {
-  rx = Math.max(1, Math.round(rx));
-  ry = Math.max(1, Math.round(ry));
-  const s = Math.round(strength * 20) / 20;
+  return discAt(Math.max(1, Math.round(rx)), Math.max(1, Math.round(ry)), color, Math.round(strength * 20));
+}
+
+/** {@link ditherDisc} with integer radii and strength in 1/20 steps (the hot path: no boxed doubles). */
+function discAt(rx, ry, color, step) {
+  const s = step / 20;
   let ci = colorIds.get(color);
   if (ci === undefined) { ci = colorIds.size; colorIds.set(color, ci); }
   // numeric key: no string building per pool per frame
-  const key = ((ci * 512 + Math.min(rx, 511)) * 512 + Math.min(ry, 511)) * 32 + Math.round(s * 20);
+  const key = ((ci * 512 + Math.min(rx, 511)) * 512 + Math.min(ry, 511)) * 32 + step;
   let d = discCache.get(key);
   if (d) return d;
   if (discCache.size >= DISC_CACHE_MAX) discCache.delete(discCache.keys().next().value);
@@ -203,12 +211,15 @@ const tintCache = new Map();
  * @returns {{canvas: any, rx: number, ry: number}}
  */
 export function tintDisc(rx, ry, color, strength) {
-  rx = Math.max(1, Math.round(rx));
-  ry = Math.max(1, Math.round(ry));
-  const s = Math.round(strength * 20) / 20;
+  return tintAt(Math.max(1, Math.round(rx)), Math.max(1, Math.round(ry)), color, Math.round(strength * 20));
+}
+
+/** {@link tintDisc} with integer radii and strength in 1/20 steps. */
+function tintAt(rx, ry, color, step) {
+  const s = step / 20;
   let ci = colorIds.get(color);
   if (ci === undefined) { ci = colorIds.size; colorIds.set(color, ci); }
-  const key = ((ci * 512 + Math.min(rx, 511)) * 512 + Math.min(ry, 511)) * 32 + Math.round(s * 20);
+  const key = ((ci * 512 + Math.min(rx, 511)) * 512 + Math.min(ry, 511)) * 32 + step;
   let d = tintCache.get(key);
   if (d) return d;
   if (tintCache.size >= DISC_CACHE_MAX) tintCache.delete(tintCache.keys().next().value);
@@ -252,11 +263,11 @@ export function tintDisc(rx, ry, color, strength) {
 
 /** @returns {LightPass} */
 export function createLightPass() {
-  /** @type {Map<string, any>} beam patterns by key */
+  /** @type {Map<number, any>} beam patterns by numeric key (density x strength step) */
   const patterns = new Map();
 
   function beamPattern(ctx, density, k) {
-    const key = `${density}|${k}`;
+    const key = Math.round(density * 16) * 64 + Math.round(k * 20);
     let p = patterns.get(key);
     if (p) return p;
     const c = makeCanvas(4, 4);
@@ -286,18 +297,21 @@ export function createLightPass() {
           const color = L.color || st.color;
           const level = Math.round(Math.min(1, L.intensity) * 4) / 4;
           if (level <= 0) continue;
-          let radius = L.radius * (scaleAt ? scaleAt(L) : 1);
+          let radius = Math.round(L.radius * (scaleAt ? scaleAt(L) : 1));
+          // fires flicker one step; glowing mud breathes between two sizes (both pre-warmed)
           if (L.kind === 'fire') radius += (Math.floor(ms / 110) + hash2(L.px, L.py)) % 3 === 0 ? 1 : 0;
-          if (L.kind === 'bio') radius += Math.round(Math.sin(ms / 900 + (L.px + L.py) * 0.05) * 2);
-          const [sx, sy, oy, strength] = st.pool;
-          const k = strength * level * dark;
-          const disc = pass === 0 ? tintDisc(radius * sx, radius * sy, color, k) : ditherDisc(radius * sx, radius * sy, color, k);
+          else if (L.kind === 'bio') radius -= Math.sin(ms / 900 + (L.px + L.py) * 0.05) > 0 ? 0 : 2;
+          const pool = st.pool;
+          const sx = pool[0], sy = pool[1], oy = pool[2];
+          const rx = Math.max(1, Math.round(radius * sx)) | 0, ry = Math.max(1, Math.round(radius * sy)) | 0;
+          const step = Math.round(pool[3] * level * dark * 20) | 0;
+          const disc = pass === 0 ? tintAt(rx, ry, color, step) : discAt(rx, ry, color, step);
           ctx.drawImage(disc.canvas, Math.round(L.px + dx - disc.rx), Math.round(L.py + dy + oy - disc.ry));
           n++;
           if (pass === 1 && st.halo) {
-            const [hr, hoy, hs] = st.halo;
-            const halo = ditherDisc(hr, hr, color, hs * level);
-            ctx.drawImage(halo.canvas, Math.round(L.px + dx - halo.rx), Math.round(L.py + dy + hoy - halo.ry));
+            const hl = st.halo;
+            const halo = discAt(hl[0], hl[0], color, Math.round(hl[2] * level * 20) | 0);
+            ctx.drawImage(halo.canvas, Math.round(L.px + dx - halo.rx), Math.round(L.py + dy + hl[1] - halo.ry));
             n++;
           }
         }
@@ -305,6 +319,32 @@ export function createLightPass() {
       ctx.globalCompositeOperation = 'source-over';
       DRAW.images += n;
       return n;
+    },
+
+    /**
+     * Rain: wet ground catches lamplight in 2-px streaks (bible §7.4) under each lamp, porch and fire,
+     * flickering as the drops land. Additive, in the light's colour, a dozen pixels per light.
+     */
+    drawWetStreaks(ctx, lights, rect, camX, camY, ms) {
+      const dx = rect.x - camX, dy = rect.y - camY;
+      ctx.globalCompositeOperation = 'lighter';
+      const tick = Math.floor(ms / 90);
+      for (let i = 0; i < lights.length; i++) {
+        const L = lights[i];
+        if (L.kind !== 'lamp' && L.kind !== 'porch' && L.kind !== 'fire' && L.kind !== 'lantern') continue;
+        const st = styleOf(L.kind);
+        ctx.fillStyle = streakHex(L.color || st.color);
+        const rx = L.radius * st.pool[0] * 0.8, ry = L.radius * st.pool[1] * 0.8;
+        const cx = L.px + dx, cy = L.py + dy + st.pool[2];
+        for (let k = 0; k < 14; k++) {
+          const h = hash2(k * 31 + L.x, L.y * 17 + (tick + k * 3 >> 2));
+          const ox = ((h & 0xff) / 255 - 0.5) * 2 * rx, oy = (((h >>> 8) & 0xff) / 255 - 0.5) * 2 * ry;
+          if ((ox * ox) / (rx * rx) + (oy * oy) / (ry * ry) > 1) continue;
+          ctx.fillRect(Math.round(cx + ox), Math.round(cy + oy), 1, 2 + ((h >>> 16) & 1));
+        }
+      }
+      ctx.globalCompositeOperation = 'source-over';
+      DRAW.fills++;
     },
 
     /** Creates (without drawing) the discs `drawPools` would use for these lights at this grade. */
@@ -316,11 +356,14 @@ export function createLightPass() {
         const color = L.color || st.color;
         const level = Math.round(Math.min(1, L.intensity) * 4) / 4;
         if (level <= 0) continue;
-        const radius = L.radius * (scaleAt ? scaleAt(L) : 1);
-        const [sx, sy, , strength] = st.pool;
-        const k = strength * level * dark;
-        tintDisc(radius * sx, radius * sy, color, k);
-        ditherDisc(radius * sx, radius * sy, color, k);
+        const radius = Math.round(L.radius * (scaleAt ? scaleAt(L) : 1));
+        const sx = st.pool[0], sy = st.pool[1];
+        const k = st.pool[3] * level * dark;
+        const radii = L.kind === 'fire' ? [radius, radius + 1] : L.kind === 'bio' ? [radius, radius - 2] : [radius];
+        for (const r of radii) {
+          tintDisc(r * sx, r * sy, color, k);
+          ditherDisc(r * sx, r * sy, color, k);
+        }
         if (st.halo) ditherDisc(st.halo[0], st.halo[0], color, st.halo[2] * level);
       }
     },
@@ -333,8 +376,9 @@ export function createLightPass() {
       ctx.clip();
       ctx.translate(rect.x - camX, rect.y - camY);
       ctx.globalCompositeOperation = 'lighter';
-      const cones = [[0.2, 1.0, 0.125, 0.2], [0.13, 0.8, 0.25, 0.18], [0.065, 0.5, 0.5, 0.2]];
-      for (const [half, reach, density, k] of cones) {
+      for (let c = 0; c < BEAM_CONES.length; c++) {
+        const cone = BEAM_CONES[c];
+        const half = cone[0], reach = cone[1], density = cone[2], k = cone[3];
         ctx.fillStyle = beamPattern(ctx, density, Math.round(k * strength * 20) / 20);
         ctx.beginPath();
         ctx.moveTo(origin.x, origin.y);
@@ -352,12 +396,40 @@ export function createLightPass() {
   };
 }
 
+/** Beam cones, outer to inner: [half angle (rad), reach (x R), dither density, strength]. */
+const BEAM_CONES = Object.freeze([
+  Object.freeze([0.2, 1.0, 0.125, 0.3]),
+  Object.freeze([0.13, 0.78, 0.25, 0.26]),
+  Object.freeze([0.065, 0.5, 0.5, 0.26]),
+]);
+
+/** Fog band layers: drift speed (px/ms), alpha, hash seed, row step (px), parallax. */
+const FOG_BANDS = Object.freeze([
+  Object.freeze({ speed: 0.012, alpha: FOG_LAYERS[0], seed: 3, step: 22, par: 1 }),
+  Object.freeze({ speed: -0.008, alpha: FOG_LAYERS[1], seed: 11, step: 30, par: 0.6 }),
+]);
+
+/** @type {Map<string, string>} light colour -> streak colour (the light at 45%) */
+const streaks = new Map();
+function streakHex(color) {
+  let s = streaks.get(color);
+  if (!s) { const c = rgbOf(color); s = hexOfRgb(c[0] * 0.45, c[1] * 0.45, c[2] * 0.45); streaks.set(color, s); }
+  return s;
+}
+
 /* ================================================================== weather */
 
 /** Weather colour names (art/palette COLORS / MASTER), graded by the hour before use. */
 const RAIN_COLORS = Object.freeze(['#B8CFE0', '#94B0C2', '#73EFF7']);
 const SNOW_COLORS = Object.freeze(['snow3', 'snow2', 'cream']);
 const FIREFLY_COLORS = Object.freeze(['#9FE8C8', '#C3D0BA', '#E9F7F2']);
+/** Snow flakes per second (the core/fx preset rate): ~180 live at its 6-9 s life. */
+export const SNOW_RATE = 24;
+/** Rain drops per second (storm): ~0.65 s life keeps both under 200 live. */
+export const RAIN_RATE = 240;
+export const STORM_RATE = 320;
+/** §12: weather particles on screen. */
+export const WEATHER_PARTICLE_CAP = 200;
 
 /**
  * A weather colour through the grade, lifted part way back toward its raw value so rain and snow
@@ -381,7 +453,8 @@ function liftColour(c, g, k) {
  * @returns {{update: (o: {weather: string, grade: object, zones: Array<{x: number, y: number}>, view: object, rect: object, reducedMotion?: boolean, clearVisuals?: boolean, lowPower?: boolean}) => void, drawFog: Function, stats: () => object, clear: () => void}}
  */
 export function createWeather(fx) {
-  let rain = null, snow = null, sig = '';
+  let rain = null, snow = null;
+  let lastKind = null, lastBucket = -1, lastClear = false, lastLow = false;
   /** active firefly emitters by zone index */
   const flies = new Map();
   const fogBuf = { canvas: null, w: 0, h: 0, hole: null };
@@ -395,15 +468,17 @@ export function createWeather(fx) {
     update(o) {
       const kind = o.reducedMotion ? 'none' : o.weather;
       const g = o.grade;
-      const s = `${kind}|${g.id}|${o.clearVisuals ? 1 : 0}|${o.lowPower ? 1 : 0}`;
-      if (s !== sig) {
-        sig = s;
+      // re-colour (restart) only when the light changes bucket: day, dusk, night
+      const bucket = g.night >= 0.6 ? 2 : g.lamp >= 0.5 || g.night > 0.1 ? 1 : 0;
+      const changed = kind !== lastKind || bucket !== lastBucket || !!o.clearVisuals !== lastClear || !!o.lowPower !== lastLow;
+      if (changed) {
+        lastKind = kind; lastBucket = bucket; lastClear = !!o.clearVisuals; lastLow = !!o.lowPower;
         stopAll();
         const thin = (o.clearVisuals ? 0.5 : 1) * (o.lowPower ? 0.5 : 1);
         if (kind === 'rain' || kind === 'storm') {
           rain = fx.particles('rain', {
             colors: RAIN_COLORS.map((c) => liftColour(c, g, 0.45)),
-            rate: Math.round((kind === 'storm' ? 320 : 240) * thin),
+            rate: Math.round((kind === 'storm' ? STORM_RATE : RAIN_RATE) * thin),
             alpha: kind === 'storm' ? [0.6, 0.85] : [0.5, 0.8],
             vx: kind === 'storm' ? [-80, -60] : [-40, -28],
             vy: [420, 520],
@@ -411,7 +486,8 @@ export function createWeather(fx) {
             x: -60, w: 600, y: o.rect.y - 16, h: 8,
           });
         } else if (kind === 'snow') {
-          snow = fx.particles('snow', { colors: SNOW_COLORS.map((c) => liftColour(c, g, 0.35)), rate: Math.round(36 * thin), y: o.rect.y - 8, h: 4 });
+          // 24 flakes/s x a 6-9 s life holds ~180 on screen (§12: weather <= 200 particles)
+          snow = fx.particles('snow', { colors: SNOW_COLORS.map((c) => liftColour(c, g, 0.35)), rate: Math.round(SNOW_RATE * thin), y: o.rect.y - 8, h: 4 });
         }
       }
       // fireflies: clear or overcast nights, over cover near the view
@@ -447,11 +523,8 @@ export function createWeather(fx) {
       g.clearRect(0, 0, w, h);
       const band = getTile('fog-band', 0, grade);
       const bw = band.w;
-      const layers = [
-        { speed: 0.012, alpha: FOG_LAYERS[0], seed: 3, step: 22, par: 1 },
-        { speed: -0.008, alpha: FOG_LAYERS[1], seed: 11, step: 30, par: 0.6 },
-      ];
-      for (const L of layers) {
+      for (let li = 0; li < FOG_BANDS.length; li++) {
+        const L = FOG_BANDS[li];
         g.globalAlpha = L.alpha;
         // bands are anchored to the world (with parallax) so walking moves through them
         const wy0 = Math.floor((camY * L.par) / L.step) - 1;
@@ -485,7 +558,7 @@ export function createWeather(fx) {
       stopAll();
       for (const em of flies.values()) em.stop();
       flies.clear();
-      sig = '';
+      lastKind = null;
     },
   };
 }

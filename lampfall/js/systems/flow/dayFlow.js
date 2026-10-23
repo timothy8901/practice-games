@@ -214,7 +214,7 @@ export function restNow(G, kind) {
 export function wake(G, report) {
   if (report.queue) report.queue.flush(G.bus);
   const mail = mailNumbers(report.overnight?.mail);
-  if (mail.length) G.bus?.emit?.('toast', { text: t('letter.arrived'), icon: 'mail' });
+  if (mail.length) G.bus?.emit?.('toast', { text: t('letter.arrived'), icon: 'read' });
 }
 
 /**
@@ -246,8 +246,32 @@ export function rest(G, kind = 'sleep') {
       realClock: report.rest && !report.rest.skipped,
       onClose: () => {
         wake(G, report);
-        resolvePendingForecasts(G, 'home').then(() => resolve(report));
+        // the night's events are out now: deferred Forecasts first, then any script they queued
+        // (the overworld resumed under the page before the events were released)
+        resolvePendingForecasts(G, 'home').then(() => {
+          if (G.scenes?.top?.()?.name === 'overworld') eventScripts.runPending(G);
+          resolve(report);
+        });
       },
+    });
+  });
+}
+
+/**
+ * Before Sleep (GDD-00 §5): the page lists what the night still holds (`dayPage.tonightList`) with
+ * *Not yet* (first) / *Sleep*; Sleep goes on to {@link rest}. Resolves with the report, or null when
+ * the player kept the night.
+ * @param {any} G
+ * @returns {Promise<NightReport|null>}
+ */
+export function askSleep(G) {
+  const opt = clockSys.restOptions(G.world, G.data).options.find((o) => o.kind === 'sleep');
+  if (opt && !opt.available) return rest(G, 'sleep');
+  const tonight = dayPage.tonightList(G.world, G.data, {});
+  return new Promise((resolve) => {
+    G.push('dayPage', {
+      mode: 'tonight', tonight,
+      onClose: (r) => { if (r && r.sleep) rest(G, 'sleep').then(resolve); else resolve(null); },
     });
   });
 }

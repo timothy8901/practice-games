@@ -325,8 +325,10 @@ def('moor-turf', { g: 'moor1', d: 'moor0', l: 'moor2', h: 'moor3' }, texture('g'
 // Marsh: sodden ground with irregular standing-water pockets catching the sky (Lowmoor). The pools
 // are walkable but splash; reed stubs and darker sedge around their rims.
 def('marsh', { g: 'moor1', d: 'moor0', l: 'moor2', w: 'tan2', r: 'skyref', b: 'skyref2', k: 'tan0' }, texture('g', [
-  [['..kkkk...', '.kwwwwkk.', 'kwwrbwwwk', '.kkwwwwk.', '...kkkk..'], 1, 2],
-  [['.kkk..', 'kwwrwk', '.kkkk.'], 10, 9],
+  // lumpy, lop-sided pools with the sky glint on the far (top) rim: a centred
+  // glint in a lens-shaped pool read as an eye staring out of the moor
+  [['..kkkk....', '.kwrrwkkk.', 'kwwwwwwwwk', '.kwwwwwwk.', '..kk.kkk..'], 1, 2],
+  [['.kkk...', 'kwrrkk.', 'kwwwwwk', '.kk.kk.'], 10, 9],
   [['d.l', 'd.d'], 12, 2], [['l', 'd'], 6, 9], [['d'], 3, 13], [['l'], 14, 14], [['d', 'd'], 8, 13], [['l'], 15, 6],
 ]));
 

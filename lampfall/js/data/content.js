@@ -27,6 +27,11 @@ import { SPECIES, FAMILIES } from './species/index.js';
 import { MOVES } from './moves/index.js';
 import { TRAINERS, TRAINER_SCRIPTS } from './trainers.js';
 import { SPIRES } from './spires.js';
+// GDD-01 world
+import { TILESETS } from './tilesets.js';
+import { MAPS } from './maps/index.js';
+import { ENCOUNTERS } from './encounters/index.js';
+import { REGIONS } from './regions.js';
 // GDD-05 town life
 import { COLLECTIONS } from './collections.js';
 import { FESTIVALS, WEATHER } from './town.js';
@@ -38,7 +43,7 @@ export const CONTENT_STATUS = Object.freeze({
   collections: true, festivals: true, weather: true,
   types: true, moves: true, abilities: true, species: true, families: true, trainers: true, spires: true,
   npcs: false, schedules: false, scripts: false, eventScripts: false,
-  maps: false, tilesets: false, regions: false, encounters: false,
+  maps: true, tilesets: true, regions: true, encounters: true,
 });
 
 export const DATA_CONTENT = deepFreeze({
@@ -65,6 +70,10 @@ export const DATA_CONTENT = deepFreeze({
   moves: MOVES,
   trainers: TRAINERS,
   spires: SPIRES,
+  tilesets: TILESETS,
+  maps: MAPS,
+  encounters: ENCOUNTERS,
+  regions: REGIONS,
 });
 
 export default DATA_CONTENT;

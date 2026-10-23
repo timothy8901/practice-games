@@ -23,8 +23,12 @@ export const STATUS_ACTIONS = Object.freeze(['inflict', 'already', 'immune', 'ti
 export const STATUS_EVENT_KINDS = Object.freeze(['burn', 'poison', 'chill', 'numb', 'trap', 'flinch']);
 /** `stat.result` values. */
 export const STAT_RESULTS = Object.freeze(['raised', 'lowered', 'capped', 'blocked', 'cleared', 'cleared-raised', 'none']);
-/** `damage.source` values: a party hit, the user's own cost (Scrap, self-KO) or status chip. */
-export const DAMAGE_SOURCES = Object.freeze(['party', 'self', 'status']);
+/** `damage.source` values: a party hit, the user's own cost (Scrap, self-KO), status chip or weather chip. */
+export const DAMAGE_SOURCES = Object.freeze(['party', 'self', 'status', 'weather']);
+/** `weather-start.source` values: battle setup, a posted cycle, a creature's entry, a move. */
+export const WEATHER_SOURCES = Object.freeze(['setup', 'cycle', 'entry', 'move']);
+/** `held-item.effect` values (the hook that fired). */
+export const HELD_EFFECTS = Object.freeze(['start-stages', 'endure', 'heal', 'cure']);
 /** `exp.share` values. */
 export const EXP_SHARES = Object.freeze(['battler', 'bench', 'sibling', 'yard']);
 
@@ -72,6 +76,10 @@ export const EVENT_FIELDS = Object.freeze({
   item: Object.freeze({ side: 'side', item: 'string', text: 'string' }),
   'ward-suppressed': Object.freeze({ side: 'side', target: 'string', turns: 'number', text: 'string' }),
   'type-shift': Object.freeze({ side: 'side', who: 'string', current: 'string', next: 'array', text: 'string' }),
+  'weather-start': Object.freeze({ kind: 'string', name: 'string', turnsLeft: '?number', posted: 'array', source: 'string', rule: 'string', text: 'string' }),
+  'weather-tick': Object.freeze({ kind: 'string', name: 'string', turnsLeft: '?number', posted: 'array', text: 'string' }),
+  'weather-end': Object.freeze({ kind: 'string', name: 'string', text: 'string' }),
+  'held-item': Object.freeze({ side: 'side', who: 'string', uid: 'any', item: 'string', itemName: 'string', effect: 'string', consumed: 'boolean', text: 'string' }),
   exp: Object.freeze({ creature: 'string', uid: 'any', amount: 'number', share: 'string', text: 'string' }),
   levelup: Object.freeze({ creature: 'string', uid: 'any', from: 'number', to: 'number', stats: 'object', text: 'string' }),
   learn: Object.freeze({ creature: 'string', uid: 'any', move: 'string', text: 'string' }),
@@ -94,6 +102,8 @@ const ENUMS = Object.freeze({
   'damage.source': DAMAGE_SOURCES,
   'exp.share': EXP_SHARES,
   'end.outcome': OUTCOMES,
+  'weather-start.source': WEATHER_SOURCES,
+  'held-item.effect': HELD_EFFECTS,
 });
 
 /**
@@ -165,7 +175,7 @@ export function checkEvent(ev) {
  *   crackdust: boolean, text: string}} WardReadoutEvent  side = the side whose hit was blocked
  */
 /** @typedef {{type: 'effectiveness', side: Side, target: string, word: string, mult: number, text?: string|null}} EffectivenessEvent  side = attacker */
-/** @typedef {{type: 'damage', side: Side, target: string, amount: number, hp: number, maxHp: number, source: 'party'|'self'|'status', stanceFloor: boolean}} DamageEvent  side = the damaged side */
+/** @typedef {{type: 'damage', side: Side, target: string, amount: number, hp: number, maxHp: number, source: 'party'|'self'|'status'|'weather', stanceFloor: boolean}} DamageEvent  side = the damaged side */
 /** @typedef {{type: 'crit', side: Side, target: string, text: string}} CritEvent  side = attacker */
 /** @typedef {{type: 'faint', side: Side, target: string, text: string}} FaintEvent */
 /** @typedef {{type: 'status', side: Side, target: string, kind: string, action: string, text: string, turns?: number}} StatusEvent */
@@ -187,6 +197,14 @@ export function checkEvent(ev) {
 /** @typedef {{type: 'item', side: Side, item: string, text: string}} ItemEvent */
 /** @typedef {{type: 'ward-suppressed', side: Side, target: string, turns: number, text: string}} WardSuppressedEvent  side = the Ward holder */
 /** @typedef {{type: 'type-shift', side: Side, who: string, current: string, next: string[], text: string}} TypeShiftEvent */
+/**
+ * @typedef {{type: 'weather-start', kind: string, name: string, turnsLeft: number|null, posted: Array<{turn: number, kind: string|null, name: string|null}>,
+ *   source: 'setup'|'cycle'|'entry'|'move', rule: string, text: string, side?: Side}} WeatherStartEvent
+ *   turnsLeft counts the coming turn (null = until something replaces it); posted = the strip for the next turns; rule = the kind's one-line effect
+ */
+/** @typedef {{type: 'weather-tick', kind: string, name: string, turnsLeft: number|null, posted: Array<{turn: number, kind: string|null, name: string|null}>, text: string}} WeatherTickEvent  end of turn, before weather chip */
+/** @typedef {{type: 'weather-end', kind: string, name: string, text: string}} WeatherEndEvent */
+/** @typedef {{type: 'held-item', side: Side, who: string, uid: any, item: string, itemName: string, effect: 'start-stages'|'endure'|'heal'|'cure', consumed: boolean, text: string}} HeldItemEvent */
 /** @typedef {{type: 'exp', creature: string, uid: any, amount: number, share: 'battler'|'bench'|'sibling'|'yard', text: string}} ExpEvent */
 /** @typedef {{type: 'levelup', creature: string, uid: any, from: number, to: number, stats: Record<string, number>, text: string}} LevelUpEvent */
 /** @typedef {{type: 'learn', creature: string, uid: any, move: string, text: string}} LearnEvent */
@@ -201,6 +219,6 @@ export function checkEvent(ev) {
  * @typedef {MessageEvent|TurnEvent|SwitchEvent|MoveEvent|ChargeEvent|MissEvent|DecoyEvent|DecoyPopEvent|GuardEvent|BlockedEvent|
  *   WardReadoutEvent|EffectivenessEvent|DamageEvent|CritEvent|FaintEvent|StatusEvent|StatEvent|HealEvent|MendSpentEvent|MendPendingEvent|
  *   MendCancelledEvent|AbilityEvent|GlintEvent|ScrapCostEvent|ReadEvent|RevealEvent|CaptureShakeEvent|CaptureEvent|CaptureFailEvent|
- *   RunEvent|StanceEvent|ItemEvent|WardSuppressedEvent|TypeShiftEvent|ExpEvent|LevelUpEvent|LearnEvent|LearnOfferEvent|PayoutEvent|
+ *   RunEvent|StanceEvent|ItemEvent|WardSuppressedEvent|TypeShiftEvent|WeatherStartEvent|WeatherTickEvent|WeatherEndEvent|HeldItemEvent|ExpEvent|LevelUpEvent|LearnEvent|LearnOfferEvent|PayoutEvent|
  *   BlackoutEvent|ReplaceNeededEvent|EndEvent} BattleEvent
  */

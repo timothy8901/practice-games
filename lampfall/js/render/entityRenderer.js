@@ -18,17 +18,18 @@
  * - **Occlusion**: feet sink into water (a wading cut with a two-frame ripple ring) and into tall
  *   grass, reeds and heather (the cover tile's lower rows are redrawn over the feet).
  * - **Emotes**: a paper bubble with a glyph pops up over the head (4 f rise, no squash); bubbles are
- *   HUD and bypass the LUT.
+ *   HUD and bypass the LUT: `draw` queues them and `drawEmotes` paints them after the overlay, light
+ *   and weather passes, so a tree or an eave never hides one.
  *
  * DOM-free at import.
  * @module render/entityRenderer
  */
 
 import { getSprite, getShadow, getTile, artDef, resolveArtId, animFrame, gradeColour } from '../art/atlas.js';
-import { UI, COLORS } from '../art/palette.js';
+import { UI } from '../art/palette.js';
 import { lampsLit } from '../world/lighting.js';
 import { makeCanvas, ctx2d, DRAW, BAYER4 } from './surface.js';
-import { CELL, cellStates, resolveCell, COVER_ART, isLit } from './tileRenderer.js';
+import { CELL, cellStates } from './tileRenderer.js';
 
 /** Milliseconds per character pose (12 fps, GDD-00 §14). */
 export const CHAR_POSE_MS = 1000 / 12;
@@ -155,6 +156,7 @@ function blobFor(w, h, color) {
 /**
  * @typedef {Object} EntityRenderer
  * @property {(ctx: any, objects: any[], entities: any[], rect: object, camX: number, camY: number, o: EntityFrameOpts) => number} draw
+ * @property {(ctx: any) => number} drawEmotes   the bubbles queued by the last draw
  * @property {() => {drawn: number, objects: number, entities: number}} stats
  */
 
@@ -230,7 +232,7 @@ export function createEntityRenderer() {
         DRAW.images++;
       }
     }
-    const img = getSprite(art, name ? { frame, name, grade: opt.grade } : { frame, grade: opt.grade });
+    const img = sprite(art, frame, name, opt.grade);
     ctx.drawImage(img.canvas, x, y);
     DRAW.images++;
   }
@@ -258,14 +260,14 @@ export function createEntityRenderer() {
     } else if (def.fps) {
       frame = animFrame(id, opt.ms, (e.x + e.y) & 3);
     }
-    const img = getSprite(id, name ? { frame, name, grade: opt.grade } : { frame, grade: opt.grade });
+    const img = sprite(id, frame, name, opt.grade);
     const ax = def.anchor ? def.anchor.x : 0;
     const ay = def.anchor ? def.anchor.y : def.h - 1;
     const x = s.isChar ? e.px + 8 - ax + dx - ((img.w - def.w) >> 1) : e.px + dx;
     const y = s.isChar ? e.py + 15 - ay + dy : e.py + 16 - def.h + dy;
     // contact shadow (characters) / cast shadow (objects)
     if (s.isChar) {
-      const blob = blobFor(def.w > 16 ? 14 : 10, 4, gradeColour('shadow', opt.grade));
+      const blob = def.w > 16 ? gc.blobWide : gc.blob;
       ctx.globalAlpha = opt.grade.night > 0.5 ? 0.28 : 0.38;
       ctx.drawImage(blob, e.px + dx + 8 - (blob.width >> 1), e.py + dy + 13);
       ctx.globalAlpha = 1;
@@ -282,8 +284,8 @@ export function createEntityRenderer() {
     // occlusion by the cell under the feet
     const occ = s.isChar || e.kind === 'roamer' ? occlusionAt(e, opt) : null;
     if (occ && occ.mode === 1) {
-      const cut = WADE_CUT;
-      const hh = img.h - cut;
+      // the cut is measured from the feet (the anchor row), not the image bottom, so padded art wades too
+      const hh = Math.min(img.h, ay + 1) - WADE_CUT;
       if (hh > 0) ctx.drawImage(img.canvas, 0, 0, img.w, hh, x, y, img.w, hh);
       drawRipple(ctx, e.px + dx + 2, y + hh - 1, opt);
       DRAW.images++;
@@ -299,23 +301,31 @@ export function createEntityRenderer() {
         DRAW.images++;
       }
     }
-    // emote bubble
+    // emote bubble: queued here, drawn by drawEmotes() after the overlay, lights and weather (HUD)
     if (e.emote) {
       if (s.emote !== e.emote) { s.emote = e.emote; s.emoteT0 = opt.ms; }
       const b = bubbleFor(e.emote);
       if (b) {
         const age = opt.ms - s.emoteT0;
         const rise = age < 66 ? 3 - Math.floor(age / 22) : 0;
-        ctx.drawImage(b, e.px + dx + 2, y - 14 + rise);
-        DRAW.images++;
+        let q = emoteQ[nEmote];
+        if (!q) { q = { b: null, x: 0, y: 0 }; emoteQ[nEmote] = q; }
+        q.b = b; q.x = e.px + dx + 2; q.y = y - 14 + rise;
+        nEmote++;
       }
     } else s.emote = null;
   }
+  /** pooled emote bubbles of the last draw() */
+  const emoteQ = [];
+  let nEmote = 0;
 
   function occlusionAt(e, opt) {
     const A = opt.analysis;
     if (!A) return null;
-    const cx = e.t >= 0.5 ? e.x : e.fromX, cy = e.t >= 0.5 ? e.y : e.fromY;
+    // the cell under the feet: the target once past half a step (entities without step state: their cell)
+    const mid = !(e.t < 0.5) || e.fromX === undefined || e.fromY === undefined;
+    const cx = mid ? e.x : e.fromX, cy = mid ? e.y : e.fromY;
+    if (!Number.isInteger(cx) || !Number.isInteger(cy)) return null;
     if (cx < 0 || cy < 0 || cx >= A.w || cy >= A.h) return null;
     const i = cy * A.w + cx;
     const st = cellStates(A, opt.tide)[i];
@@ -332,7 +342,7 @@ export function createEntityRenderer() {
 
   function drawRipple(ctx, x, y, opt) {
     const f = Math.floor(opt.ms / 250) & 1;
-    ctx.fillStyle = gradeColour('foam', opt.grade);
+    ctx.fillStyle = gc.foam;
     ctx.globalAlpha = 0.85;
     const w = 12 + f * 2, ox = x - f;
     ctx.fillRect(ox + 2, y, w - 4, 1);
@@ -352,9 +362,28 @@ export function createEntityRenderer() {
     DRAW.fills++;
   }
 
+  /** per-grade colours and shadow blobs (rebuilt only when the grade changes) */
+  const gc = { grade: null, blob: null, blobWide: null, foam: '' };
+  /** reused getSprite options (the atlas reads them immediately) */
+  const VAR = { frame: 0, name: null, grade: null };
+  const VAR_PLAIN = { frame: 0, grade: null };
+  function sprite(id, frame, name, grade) {
+    if (name) { VAR.frame = frame; VAR.name = name; VAR.grade = grade; return getSprite(id, VAR); }
+    VAR_PLAIN.frame = frame; VAR_PLAIN.grade = grade;
+    return getSprite(id, VAR_PLAIN);
+  }
+
   return {
     draw(ctx, objects, entities, rect, camX, camY, opt) {
       count = 0;
+      nEmote = 0;
+      if (gc.grade !== opt.grade) {
+        gc.grade = opt.grade;
+        const shade = gradeColour('shadow', opt.grade);
+        gc.blob = blobFor(10, 4, shade);
+        gc.blobWide = blobFor(14, 4, shade);
+        gc.foam = gradeColour('foam', opt.grade);
+      }
       const dt = Math.max(0, Math.min(100, opt.ms - lastMs));
       lastMs = opt.ms;
       const x0 = camX - 48, x1 = camX + rect.w + 48, y0 = camY - 16, y1 = camY + rect.h + 96;
@@ -406,8 +435,18 @@ export function createEntityRenderer() {
       drawn = count;
       return count;
     },
-    stats: () => ({ drawn, objects: nObj, entities: nEnt }),
+    /**
+     * Draws the emote bubbles queued by the last {@link EntityRenderer.draw} (call after the overlay,
+     * light and weather passes: bubbles are HUD and must never hide behind a tree or an eave).
+     * @param {any} ctx
+     * @returns {number} bubbles drawn
+     */
+    drawEmotes(ctx) {
+      for (let i = 0; i < nEmote; i++) { const q = emoteQ[i]; ctx.drawImage(q.b, q.x, q.y); }
+      DRAW.images += nEmote;
+      return nEmote;
+    },
+    stats: () => ({ drawn, objects: nObj, entities: nEnt, emotes: nEmote }),
   };
 }
 
-export { COVER_ART, isLit, resolveCell };

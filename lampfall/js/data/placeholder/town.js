@@ -14,7 +14,7 @@ export const ITEMS = Object.freeze([
 /** @type {ReadonlyArray<import('../index.js').NpcDef>} */
 export const NPCS = Object.freeze([
   {
-    id: 'ph-keeper', name: 'PLACEHOLDER Keeper', species: 'otter', portrait: 'ph-keeper', sprite: 'ph-keeper', home: 'ph-hut',
+    id: 'ph-keeper', name: 'PLACEHOLDER Keeper', species: 'pine-marten', portrait: 'ph-keeper', sprite: 'ph-keeper', home: 'ph-hut',
     threadId: 'ph-thread',
     schedule: [
       { at: 6 * 60, mapId: 'ph-hut', x: 2, y: 2, pose: 'stand' },
