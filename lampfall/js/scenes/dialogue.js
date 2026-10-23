@@ -322,7 +322,7 @@ export function createDialogueScene(G) {
   }
 
   // ------------------------------------------------------------------ nicknames and names
-  function startNickname(r) {
+  function startNickname(r, again = false) {
     const world = G.world;
     const npcRow = G.data && G.data.has('npcs', r.who) ? G.data.get('npcs', r.who) : null;
     const uid = npcRow ? null : creatureUidOf(world, r.who);
@@ -331,15 +331,15 @@ export function createDialogueScene(G) {
       const offer = typeof r.offer === 'string' && r.offer ? r.offer : world.player.name;
       state = 'nick';
       const line = `${sp.name} wants to call you “${offer}”.`; // str
-      textLog(G).push(sp.name, line);
-      showLine(line, sp);
+      if (!again) textLog(G).push(sp.name, line);
+      showLine(line, sp, { instant: again }); // back from name entry: already read, no retyping
       openChoices([
         { label: `“${offer}” is fine.`, value: 'accept' }, // str
         { label: `Just ${world.player.name}.`, value: 'decline' }, // str
         { label: 'How about…', value: 'counter' }, // str
       ], 0, (choice) => {
         if (choice === 'counter') {
-          openEntry(`What should ${sp.name} call you?`, world.player.name, '', (name) => applyNpcNick(r.who, 'counter', name, offer), () => startNickname(r)); // str
+          openEntry(`What should ${sp.name} call you?`, world.player.name, '', (name) => applyNpcNick(r.who, 'counter', name, offer), () => startNickname(r, true)); // str
           return;
         }
         applyNpcNick(r.who, choice, null, offer);

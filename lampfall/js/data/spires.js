@@ -220,7 +220,7 @@ export const SPIRES = f([
     dossier: f({
       title: 'Mirror Spire: Seraphine Locke',
       tacticTag: 'evasion to +2, three Mends each, Mirrorveil ace',
-      text: 'Rushling Lv40 (Tidal Mend, Root Knot). Floeback Lv41 (Rime Lock). Skeinwing Lv42 (Mirror Step). Lumenveil Lv43 (Glass, WARD: Mirrorveil; holds a Ballast Stone). A Full Salve and a Tonic. Sure-hit moves (Sure Pinch, Plumbline) never miss, whatever the evasion. "Count first. Then swing." -S.L.',
+      text: 'Gillwick Lv40 (Tidal Mend, Mire Bloom). Rimeplate Lv42 (Rime Lock). Floeback Lv41 (Stand Firm). Strandrunner Lv40 (Gale Cut). Skeinwing Lv42 (Mirror Step). Lumenveil Lv43 (Glass, WARD: Mirrorveil; holds a Ballast Stone). Two Full Salves. Sure-hit moves (Sure Pinch, Plumbline) never miss, whatever the evasion. "Count first. Then swing." -S.L.',
     }),
     badge: f({ id: 'mirror', name: 'Mirror Seal', seal: 'a fox paw in frosted white wax' }),
     prize: f({ buttons: 8600, starsalt: 3 }),

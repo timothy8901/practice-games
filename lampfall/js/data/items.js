@@ -108,7 +108,7 @@ export const ITEMS = freeze([
   { id: 'oilskin', name: 'Oilskin', pocket: 'held', kind: 'held', price: 1200, sell: 600, stack: 3, use: 'hold', held: { chipMult: 0.5 }, oneOfAKind: false,
     text: 'Held: burn, poison and trap chip it for half. Everything runs off.' },
   { id: 'ballast-stone', name: 'Ballast Stone', pocket: 'held', kind: 'held', price: 1200, sell: 600, stack: 3, use: 'hold', held: { startStages: { def: 1, spd: 1, spe: -1 } }, oneOfAKind: false,
-    text: 'Held: starts each battle a stage steadier in Defence and Sp. Defence, a stage slower.' },
+    text: 'Held: each time it comes in, a stage steadier in Defence and Sp. Defence, a stage slower.' },
   { id: 'lucky-button', name: 'Lucky Button', pocket: 'held', kind: 'held', price: 2000, sell: 1000, stack: 3, use: 'hold', held: { payoutMult: 1.5 }, oneOfAKind: false,
     text: 'Held: +50% buttons from any trainer battle it took part in. Brass, with four holes and a wink.' },
   { id: 'tally-charm', name: 'Tally Charm', pocket: 'held', kind: 'held', price: 1500, sell: 750, stack: 3, use: 'hold', held: { benchShare: 1 }, oneOfAKind: false,
