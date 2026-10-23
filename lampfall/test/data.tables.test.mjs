@@ -95,12 +95,12 @@ test('tuning: frozen table with named exports that mirror it', () => {
 });
 
 test('strings: t fills placeholders and plurals; missing keys render as [key]', () => {
-  assert.equal(t('wallet.main', { n: 1 }), '1 coin');
-  assert.equal(t('wallet.main', { n: 3 }), '3 coins');
+  assert.equal(t('wallet.main', { n: 1 }), '1 button');   // GDD-00 §7: buttons (◉)
+  assert.equal(t('wallet.main', { n: 3 }), '3 buttons');
   assert.equal(t('loan.tier', { tier: 2 }), 'Tier 2 cleared.');
   assert.equal(t('no.such.key'), '[no.such.key]');
   assert.equal(t('bag.got', { n: 2 }), 'Got 2 x {item}.');            // missing var stays visible
-  assert.equal(t('game.title'), 'GAME');
+  assert.equal(t('game.title'), 'Lampfall');                // GDD-00 §0
   assert.ok(has('save.ok') && !has('nope'));
   assert.equal(fill('{a}-{b}', { a: 'x', b: null }), 'x-');
   assert.equal(plural(1, 'boat', 'boats'), 'boat');

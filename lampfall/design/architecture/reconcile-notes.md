@@ -57,3 +57,16 @@ The rules lanes kept prototype DEFAULTS where GDD-00 later set different numbers
 - Debug hook should call G.music.refresh() after setTime.
 - clockSys DAY_PARTS and tracks DAY_PARTS must change together if the day-parts change.
 - main.js onShow can unmute even when settings.muted is true (BOOT bug).
+
+From the SYS-TOWN verifier (letters, schedule, memory, threads, dayPage; verdict solid):
+- FLOW: call dayPage.overnight at Sleep or at the clock:anchor morning, never at the porch bench; hand step.base (not step.rng) to gather.glintFor and weather.rollDay; forward wallet:changed, loan:paid and NOTE_EVENTS to dayPage.noteEvent; pass {loans: {residentShare}} to threads.advance/setBeat; attach TUNING as data.tuning or opts.tuning; bind __game.deliverLetter and __game.sleep.
+- Calendar: day 1 is a Sunday (selectors.DAY0_WEEKDAY = 6) everywhere.
+- Cast chapter must give each resident npc.porch {id (PORCH_IDS), mapId, x, y, facing, litAtStart?, days?, hours?} plus §14.5 schedule/topics/lines and festival spots; tuning.porchesLitAtStart holds the seven arrival-lit porches.
+- Porch Supper is only a capability (festival row host:'porch'); add the row in content if wanted.
+- Content fix: threads/mudlark-mile beat 2 advance.days should be 2 ('Legs need a day').
+
+From the SYS-GATHER+WORLD verifier (fishing, gather, fieldLog, encounter; lane tests green):
+- STATE: add settings.fishing ('standard'|'gentle'|'patient', default 'standard') with a migration; systems/settings.normalize currently drops it.
+- Real Clock: day numbers are absolute, so the Glint (500 + 60 x day) would pay ~a million. Use a run-relative day (days since new game) in wallet/clockSys/gather.
+- DATA: wire js/data/collections.js and encounters into js/data/index.js; DATA has no `tuning` table: scenes must pass ctx.tuning = data/tuning.TUNING (or add it to DATA).
+- Kept: Brine tell threshold 1 catch (GDD-00 §9); encounter floor 8 free steps; night low = night now and within ±90 min of a low.
