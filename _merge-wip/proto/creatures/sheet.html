@@ -19,7 +19,7 @@
   .card .type { color: var(--rule); }
   .card .feat { color: var(--v); font-size: 11px; }
   .row { margin-top: 18px; }
-  .row canvas { image-rendering: pixelated; display: block; background: #0e1326; border: 1px solid #3b4a6b; }
+  .row canvas { image-rendering: pixelated; display: block; background: #4d5a78; border: 1px solid #3b4a6b; }
   .legend { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 10px; color: var(--v); }
   .legend i { display: inline-block; width: 10px; height: 10px; vertical-align: -1px; margin-right: 3px; border: 1px solid #0003; }
   .caption { font-size: 10px; color: var(--v); margin-top: 2px; }
@@ -37,7 +37,7 @@
 </div>
 <div class="grid" id="grid"></div>
 <div class="row">
-  <div class="caption">Silhouette row: every front filled solid k (the "reads when filled" test) and, above it, the m-outlined Freefall unseen-form card look.</div>
+  <div class="caption">Silhouette row: every front filled solid k (the "reads when filled" test) and, above it, the m-outlined Freefall unseen-form card look. Background lifted to a mid grey so both fills read.</div>
   <canvas id="sil"></canvas>
 </div>
 <div class="legend" id="legend"></div>
@@ -115,7 +115,7 @@
   const lines = Math.ceil(ORDER.length / PER);
   sil.width = PER * CW + 8; sil.height = lines * 2 * CH + 8;
   const sctx = sil.getContext('2d');
-  sctx.fillStyle = '#0e1326'; sctx.fillRect(0, 0, sil.width, sil.height);
+  sctx.fillStyle = '#4d5a78'; sctx.fillRect(0, 0, sil.width, sil.height);
   sctx.font = '10px ui-monospace, Menlo, monospace';
   ORDER.forEach((name, i) => {
     const sp = SPRITES[name];

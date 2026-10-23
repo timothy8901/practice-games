@@ -924,10 +924,10 @@ S.Bogmonarch = {
     '.knkkkkkkkkkkkkkkkbbbbbbnnnnnk..',
     '.knnnbbbbbbbbbbbbbbbbbbbnnnnkk..',
     '..kkkoorroorroorroorrokkknnkk...',
-    '.kkoorroorrrorrorrrooorrookkkk..',
+    '.kkoorooorroorroorrooorrookkkk..',
     'koorrrorrrrrrrrrrrrrrrrrrorrook.',
-    'kkrrrrkkkkkbbbbbbbbbbbkkkrrrrrkk',
-    '.kssbbbbbbbbbbbbbbbbbbbbbbbnnnk.',
+    'kkrrrrkkkkkbrrbbbrrbbrkkkrrrrrkk',
+    '.kssbbbbbbbbrbbbbrbbbbbbbbbnnnk.',
     'kssbbkbbbbbbbbkbbbbkbbbbbbbnnnnk',
     'ksbbbkbbbbbbbbkbbbbkbbbbbbbnnnnk',
     'ksbbbkbbbbbbbbkbbbbkbbbbbbbnnnnk',
@@ -1005,11 +1005,11 @@ S.Mudfist = {
     'kaahkaahkaahkaahkaaaaaaaaaahhuuk',
     'kaahkaahkaahkaahkaaaaaaaaaahuuuk',
     'kaahkaahkaahkaahkhaaaaaaaahhuuuk',
-    'khhukhhukhhukhhukhhaaaaaahhuuuuk',
-    'kaaakaaakaaakaaakkhhhhhhhhhuuuuk',
-    'kaaakaaakaaakaaakkhhhhhhhuuuuukk',
-    'kaahkaahkaahkaahkkuhhhhhuuuuukk.',
-    'khhukhhukhhukhhuk.kkuuuuuuuukk..',
+    'kuuukuuukuuukuuukhhaaaaaahhuuuuk',
+    'khhukhhukhhukhhukkhhhhhhhhhuuuuk',
+    'khhukhhukhhukhhukkhhhhhhhuuuuukk',
+    'khhukhhukhhukhhukkuhhhhhuuuuukk.',
+    'khuukhuukhuukhuuk.kkuuuuuuuukk..',
     '.kkkkkkkkkkkkkkkk...kkkkkkkkk...',
     'kcaaaaaaaaaaaaahk...kuhhuuk.....',
     'kaaaaaaaaaaaaaahhk..kkkkkkk.....',
@@ -1089,16 +1089,16 @@ export function remap(rows, map) {
 // ---------------------------------------------------------------------------
 // Star-touched Sloshkin (Brine/Star, ~2% Forecast replacement for the Side card).
 // Same animal, same ruff, same mud: only the hide has gone comet-dusk. Body ramp
-// moves from s/b/n to e/d/n (the Star badge grey). No m on the body (bible 3.5).
+// moves from s/b/n to v/e/d (the Star badge grey) with an i eye glint. No m on the body (bible 3.5).
 // ---------------------------------------------------------------------------
 S.StarSloshkin = {
   type: 'Brine/Star', species: 'star-touched-sloshkin', displayName: 'Star-touched Sloshkin',
   feature: 'a Sloshkin whose hide has gone comet-dusk grey; coral ruff and mud unchanged',
-  palette: pal('kednorwua'),
+  palette: pal('kvedoriu'),
   heartmark: { ...S.Sloshkin.heartmark },
   heartmarkBack: { ...S.Sloshkin.heartmarkBack },
-  rows: remap(S.Sloshkin.rows, { b: 'd', s: 'e' }),
-  back: remap(S.Sloshkin.back, { b: 'd', s: 'e' }),
+  rows: remap(S.Sloshkin.rows, { b: 'e', s: 'v', n: 'd', w: 'i' }),
+  back: remap(S.Sloshkin.back, { b: 'e', s: 'v', n: 'd', w: 'i' }),
 };
 
 // Back views. Hand-drawn for the six concept creatures above; derived for the
@@ -1126,16 +1126,16 @@ S.Vagary.back = (() => {
 const FACE = {
   Puddlepip: [[10, 15, 12, 17, 'b'], [16, 15, 18, 17, 'b']],
   Chillnub: [[7, 18, 10, 21, 'b'], [10, 23, 13, 24, 'b']],
-  Mudfist: [[12, 9, 14, 11, 'a'], [20, 9, 22, 11, 'a'], [16, 13, 17, 13, 'a']],
+  Mudfist: [[17, 10, 19, 12, 'a'], [24, 10, 26, 12, 'a'], [21, 14, 22, 14, 'a']],
   Rushling: [[9, 15, 11, 17, 'g']],
   Lumenveil: [[13, 10, 15, 12, 'i'], [18, 10, 19, 12, 'i']],
-  Siltback: [[7, 10, 10, 13, 'b']],
-  Bogmonarch: [[3, 10, 7, 13, 'b']],
+  Siltback: [[4, 10, 7, 13, 'b']],
+  Bogmonarch: [[4, 8, 8, 12, 'b'], [3, 15, 17, 15, 'b']],
   Sedgehare: [[5, 15, 8, 18, 'g'], [9, 19, 14, 24, 'g']], // eye, then the belly patch (front only)
   Wirewhisk: [[8, 16, 10, 18, 'y'], [1, 21, 1, 21, 'k']], // eye, nose glint
   Squallcoil: [[6, 7, 8, 9, 'b']],
-  Stillox: [[10, 14, 12, 16, 'e']],
-  Caldermaw: [[12, 11, 14, 13, 'e']],
+  Stillox: [[4, 12, 5, 13, 'e'], [3, 16, 8, 16, 'e'], [2, 17, 2, 17, 'e']],
+  Caldermaw: [[4, 9, 13, 14, 'e'], [2, 17, 21, 19, 'e'], [2, 20, 21, 21, 'd']], // socket and maw face away
   Brinelance: [[6, 18, 8, 20, 'b']],
   Rimeplate: [],
   Tossup: [],
@@ -1152,7 +1152,7 @@ for (const [name, rects] of Object.entries(FACE)) {
 // "nearest equivalent"): move those to the nape.
 S.Sedgehare.heartmarkBack = { x: 22, y: 14 };
 S.Wirewhisk.heartmarkBack = { x: 18, y: 19 };
-S.Mudfist.heartmarkBack = { x: 16, y: 10 };
+S.Mudfist.heartmarkBack = { x: 11, y: 8 };
 S.Tossup.heartmarkBack = { x: 17, y: 8 };
 S.Scrapling.heartmarkBack = { x: 14, y: 12 };
 S.Chillnub.heartmarkBack = { x: 19, y: 20 };
@@ -1160,7 +1160,7 @@ S.Brinelance.heartmarkBack = { x: 19, y: 21 };
 
 // Second idle frames: grounded forms squash-breathe, fliers hover.
 const SQUASH = { Sloshkin: 26, StarSloshkin: 26, Scrapling: 26, Tossup: 23, Sedgehare: 27, Wirewhisk: 26, Rimeplate: 26,
-  Squallcoil: 27, Stillox: 21, Caldermaw: 27, Siltback: 27, Bogmonarch: 28, Mudfist: 29, Rushling: 26,
+  Squallcoil: 27, Stillox: 29, Caldermaw: 28, Siltback: 28, Bogmonarch: 28, Mudfist: 28, Rushling: 26,
   Chillnub: 28, Puddlepip: 22 };
 const HOVER = ['Skeinwing', 'Prismoth', 'Vesperay', 'Vagary', 'Lumenveil', 'Creelwight', 'Brinelance'];
 for (const [name, line] of Object.entries(SQUASH)) {
