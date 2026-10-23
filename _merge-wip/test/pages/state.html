@@ -1,0 +1,43 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><link rel="icon" href="data:,"><title>state lane smoke</title></head>
+<body><pre id="out">running…</pre>
+<script type="module">
+import { createNewWorld, validateWorld } from '../../js/state/schema.js';
+import { createStore } from '../../js/state/store.js';
+import { createRngs } from '../../js/state/rngs.js';
+import { createPersist } from '../../js/state/persist.js';
+import { migrateWorld } from '../../js/state/migrate.js';
+import * as sel from '../../js/state/selectors.js';
+import * as flags from '../../js/systems/flags.js';
+import * as stats from '../../js/systems/stats.js';
+import * as settings from '../../js/systems/settings.js';
+const lines = [];
+const log = (k, v) => lines.push(`${k}: ${typeof v === 'string' ? v : JSON.stringify(v)}`);
+try {
+  const q = new URLSearchParams(location.search);
+  const strict = q.get('strict') === '1';
+  const world = createNewWorld({ seedCode: q.get('seed') ?? 'FLUX-K7Q2-MD7F', lease: { name: 'Pell', mapId: 'harbor' } });
+  const store = createStore(world, { strict });
+  const rngs = createRngs(store);
+  const persist = createPersist({ storage: localStorage, prefix: 'state-smoke.' });
+  persist.markBoot();
+  store.tx('flags', (w) => { flags.setFlag(w, 'sp.arrived', true, { bus: store.bus }); stats.inc(w, 'steps', 3); settings.update(w, { textSpeed: 'fast' }); });
+  rngs.stream('loot').int(1, 6);
+  let strictThrew = false;
+  try { store.world.wallet.main = 1; } catch { strictThrew = true; }
+  log('strict', strict); log('strictThrew', strictThrew);
+  log('problems', validateWorld(store.world));
+  const res = persist.autosave({ store, bus: store.bus, scenes: { top: () => ({ name: 'overworld' }), has: () => false, isTransitioning: () => false } }, 'smoke');
+  log('save', res);
+  const back = persist.load(res.slot);
+  log('load ok', back.ok); log('load equal', JSON.stringify(back.world) === JSON.stringify(store.snapshot()));
+  const str = persist.exportString(res.slot);
+  log('export len', str.length); log('import ok', persist.importString(str).ok);
+  log('migrate v0', migrateWorld({ player: { name: 'Old' } }).ok);
+  log('time', `${sel.formatTime(store.world)} ${sel.phase(store.world)} tide=${sel.tideState(store.world)}`);
+  log('crashed', persist.crashed());
+  persist.markCleanExit();
+  log('RESULT', 'OK');
+} catch (e) { log('RESULT', 'FAIL ' + (e && e.stack || e)); console.error(e); }
+document.getElementById('out').textContent = lines.join('\n');
+window.__stateSmoke = lines;
+</script></body></html>

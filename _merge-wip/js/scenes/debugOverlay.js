@@ -9,11 +9,14 @@
 import { drawText } from '../core/font.js';
 import { validateWorld } from '../_shims/state/schema.js'; // INTEGRATOR: '../state/schema.js'
 
+/** How long a marker label stays up (long enough for a screenshot after `marker()`). */
+export const MARKER_MS = 250;
+
 /**
  * @typedef {Object} DebugOverlay
  * @property {boolean} visible
  * @property {() => void} toggle
- * @property {(name: string) => void} marker   show `name` in the corner for one frame
+ * @property {(name: string) => void} marker   show `name` in the corner for MARKER_MS
  * @property {(dt: number) => void} update
  * @property {(ctx: CanvasRenderingContext2D) => void} draw
  * @property {() => string[]} problems   last validateWorld result
@@ -26,16 +29,17 @@ import { validateWorld } from '../_shims/state/schema.js'; // INTEGRATOR: '../st
 export function createDebugOverlay(G) {
   let visible = true;
   let mark = '';
-  let markFrames = 0;
+  let markMs = 0;
   let sinceValidate = 1e9;
   let problems = [];
   const overlay = {
     get visible() { return visible; },
     set visible(v) { visible = Boolean(v); },
     toggle() { visible = !visible; },
-    marker(name) { mark = String(name); markFrames = 2; },
+    marker(name) { mark = String(name); markMs = MARKER_MS; },
     problems: () => problems.slice(),
     update(dt) {
+      if (markMs > 0) markMs -= dt;
       sinceValidate += dt;
       if (sinceValidate >= 1000) {
         sinceValidate = 0;
@@ -43,8 +47,7 @@ export function createDebugOverlay(G) {
       }
     },
     draw(ctx) {
-      if (markFrames > 0) {
-        markFrames--;
+      if (markMs > 0) {
         ctx.fillStyle = '#ffdd57';
         ctx.fillRect(0, 0, 6, 6);
         drawText(ctx, mark, 8, 0, { color: '#ffdd57', font: 'small', outline: true });

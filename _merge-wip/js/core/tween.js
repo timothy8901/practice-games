@@ -137,12 +137,17 @@ export const ease = Object.freeze({
   inCirc: (t) => 1 - Math.sqrt(1 - t * t),
   outCirc: (t) => Math.sqrt(1 - (t - 1) ** 2),
 
-  inBack: (t) => (BACK_S + 1) * t * t * t - BACK_S * t * t,
-  outBack: (t) => 1 + (BACK_S + 1) * (t - 1) ** 3 + BACK_S * (t - 1) ** 2,
-  inOutBack: (t) =>
-    t < 0.5
+  // The back family is guarded at both ends: the polynomial forms land ~2e-16
+  // off 0/1 in floating point, and "0 -> 0, 1 -> 1" is promised above.
+  inBack: (t) => (t <= 0 ? 0 : t >= 1 ? 1 : (BACK_S + 1) * t * t * t - BACK_S * t * t),
+  outBack: (t) => (t <= 0 ? 0 : t >= 1 ? 1 : 1 + (BACK_S + 1) * (t - 1) ** 3 + BACK_S * (t - 1) ** 2),
+  inOutBack: (t) => {
+    if (t <= 0) return 0;
+    if (t >= 1) return 1;
+    return t < 0.5
       ? ((2 * t) ** 2 * ((BACK_S2 + 1) * 2 * t - BACK_S2)) / 2
-      : ((2 * t - 2) ** 2 * ((BACK_S2 + 1) * (t * 2 - 2) + BACK_S2) + 2) / 2,
+      : ((2 * t - 2) ** 2 * ((BACK_S2 + 1) * (t * 2 - 2) + BACK_S2) + 2) / 2;
+  },
 
   inElastic: (t) => {
     if (t <= 0) return 0;
