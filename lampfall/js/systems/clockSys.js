@@ -1073,8 +1073,8 @@ function minutesAfter(a, b) {
 /**
  * The bed menu: Lie down (any time), Nap till dusk (from 12:00) and Sleep till dawn (from 21:00),
  * each with availability, wake time, minutes skipped and heal; plus the next two lows for the Sleep
- * confirmation's "what the night still holds". Under Real Clock every option is available and skips
- * nothing (Rest still saves and heals).
+ * confirmation's "what the night still holds". Under Real Clock the same windows apply (by device
+ * time), but no option skips anything (Rest still saves and heals).
  * @param {World} world
  * @param {any} [data]
  * @returns {{options: RestOption[], nextLows: TideExtreme[], realClock: boolean}}

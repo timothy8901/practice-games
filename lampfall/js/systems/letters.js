@@ -326,13 +326,15 @@ export function deliverMorning(world, data, opts = {}) {
  * @param {any} data
  * @param {number} day
  * @param {LetterOpts} [opts]
- * @returns {null|'already'|'too-early'|'counter-full'|'none-left'|'locked'}
+ * @param {{ignoreHour?: boolean}} [flags]   skip the "not before 18:00" check (previews)
+ * @returns {null|'already'|'too-early'|'not-yet'|'counter-full'|'none-left'|'locked'}
  */
-export function familyBlock(world, data, day, opts = {}) {
+export function familyBlock(world, data, day, opts = {}, flags = {}) {
   const t = tuningOf(data, opts);
   const L = world.letters;
   if (L.familyDay >= day) return 'already';
   if (gameDay(day, t) < t.familyFirstDay) return 'too-early';
+  if (!flags.ignoreHour && minuteNow(world, opts) < t.familyLetterHour * 60) return 'not-yet';
   if (L.counter !== null) return 'counter-full';
   const next = nextIn(world, data, 'family');
   if (!next) return 'none-left';
@@ -341,16 +343,39 @@ export function familyBlock(world, data, day, opts = {}) {
 }
 
 /**
- * The 18:00 family letter for `day` (call once at 18:00; repeats on one day do nothing): the next
- * family letter goes to Hesper's counter if the counter is empty.
+ * The evening the family-letter window open at `minute` belongs to: the window runs from
+ * `familyLetterHour` to the close of Hesper's counter (18:00–02:00), so 00:30 on day 5 is still
+ * day 4's evening. Null outside the window.
+ * @param {number} day core day of `minute`
+ * @param {number} minute
+ * @param {Readonly<typeof DEFAULTS>} t
+ * @returns {number|null}
+ */
+function familyEvening(day, minute, t) {
+  const from = t.familyLetterHour * 60;
+  const close = t.hesperCounterHours[1] % 1440;
+  if (minute >= from) return day;
+  // past midnight: still the evening before while the counter is open (close <= from wraps)
+  if (close < from && minute < close) return day - 1;
+  return null;
+}
+
+/**
+ * The 18:00 family letter (call at 18:00; repeats for one evening do nothing; before
+ * `familyLetterHour` it is `'not-yet'`): the next family letter goes to Hesper's counter if the
+ * counter is empty. After midnight, while Hesper's counter is still open (to 02:00), a call that
+ * missed 18:00 (a load, a clock jump) delivers the evening-before's letter.
  * @param {World} world
  * @param {any} data
  * @param {LetterOpts} [opts]
  * @returns {{family: number|null, reason: string|null, lateDelivery: boolean}}
  */
 export function deliverEvening(world, data, opts = {}) {
-  const day = coreDay(world, opts);
-  const reason = familyBlock(world, data, day, opts);
+  const t = tuningOf(data, opts);
+  const evening = familyEvening(coreDay(world, opts), minuteNow(world, opts), t);
+  if (evening === null) return { family: null, reason: 'not-yet', lateDelivery: false };
+  const day = evening;
+  const reason = familyBlock(world, data, day, opts, { ignoreHour: true });
   if (reason !== null) return { family: null, reason, lateDelivery: false };
   const next = nextIn(world, data, 'family');
   const n = arrive(world, data, next, 'counter', day, opts);

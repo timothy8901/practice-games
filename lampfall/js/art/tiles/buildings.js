@@ -138,7 +138,7 @@ def('door', DOORP, DOOR);
 def('door-brick', { ...DOORP, p: 'br2', s: 'br1', h: 'br3' }, DOOR);
 def('door-stone', { ...DOORP, p: 'st3', s: 'st2', h: 'st4', w: 'blue2', l: 'blue3', d: 'blue1' }, DOOR);
 // Porch hood: the door under a small gabled canopy on two brackets, a stone step in front.
-def('door-porch', { ...DOORP, r: 'slate2', q: 'slate1', e: 'slate3', i: 'ink', c: 'co3', g: 'co1' }, [
+def('door-porch', { ...DOORP, r: 'slate2', q: 'slate1', e: 'slate3', i: 'base', c: 'pl1', g: 'wd0' }, [
   '......eeee......',
   '....eerrrrqq....',
   '..eerrrrrrrrqq..',
@@ -269,27 +269,31 @@ def('string-lights', { k: 'iron', a: '!amber', b: '!lampcore', c: '!wglow' }, [l
 /* ---------------------------------------------------------------- cottage interiors by tier */
 // Tier 0: bare, gapped boards with one broken plank; tier 1: mended (paler patches); tier 2: waxed,
 // warmer; tier 3: herringbone parquet.
+// Long boards run east-west: 3px courses over a 1px gap, a butt joint on only some courses (staggered),
+// grain flecks along each board, so a floor reads as planking and not as brick.
 const BOARDS = [
-  'lllllllllllllkll',
-  'pppppppppppppkpp',
-  'pppdppppppppppkp',
+  'llllllllllllllll',
+  'pppppdpppppppppp',
+  'pppppppppppdpppp',
   'kkkkkkkkkkkkkkkk',
-  'llllkllllllllllll'.slice(0, 16),
-  'ppppkpppppppdppp',
-  'ppppkppppppppppp',
+  'lllllllllllkllll',
+  'ppdpppppppppkppp',
+  'pppppppdppppkppp',
   'kkkkkkkkkkkkkkkk',
-  'lllllllllkllllll',
-  'ppdppppppkpppppp',
-  'pppppppppkpppppp',
+  'llllllllllllllll',
+  'ppppppppppdppppp',
+  'pppdpppppppppppp',
   'kkkkkkkkkkkkkkkk',
-  'llllllkllllllllk',
-  'ppppppkpppppdppk',
-  'ppppppkppppppppk',
+  'lllklllllllllllll'.slice(0, 16),
+  'pppkpppppdpppppp',
+  'pppkpppppppppdpp',
   'kkkkkkkkkkkkkkkk',
 ];
 def('floor-boards', { l: 'wd3', p: 'wd2', d: 'wd1', k: 'wd0' }, BOARDS);
-def('cottage-floor-0', { l: 'ww3', p: 'ww2', d: 'ww1', k: 'ww0', g: 'ink' }, blit(BOARDS, ['gggg', '.gg.'], 9, 9));
-def('cottage-floor-1', { l: 'ww3', p: 'ww2', d: 'ww1', k: 'ww0', n: 'wd3', m: 'wd2' }, blit(BOARDS, ['nnnn', 'mmmm', 'mmmm'], 8, 8));
+// tier 0: weathered, gapped boards; a knot hole and one sprung board end (the cottage is a wreck)
+def('cottage-floor-0', { l: 'ww3', p: 'ww2', d: 'ww1', k: 'ww0', g: 'ink' }, blit(BOARDS, ['kg', 'gk'], 6, 9));
+// tier 1: mended and scrubbed: the same boards, sound and pale (a new board is a detail, not a repeat)
+def('cottage-floor-1', { l: 'ww4', p: 'ww3', d: 'ww2', k: 'ww1' }, BOARDS);
 def('cottage-floor-2', { l: 'wd4', p: 'wd3', d: 'wd2', k: 'wd1' }, BOARDS);
 def('cottage-floor-3', { l: 'wd4', p: 'wd3', d: 'wd2', k: 'wd1', h: 'wd0' }, [
   'pphlpphlpphlpphl',
@@ -411,6 +415,144 @@ def('floor-stone', { j: 'co1', l: 'co4', m: 'co3', d: 'co2' }, [
   'jdddddddjddddddd',
   'jjjjjjjjjjjjjjjj',
   'mmmdjlmmmmmmdjlm',
+]);
+
+/* ---------------------------------------------------------------- furniture & fittings (map lane requests) */
+// Opaque single cells so they read in either the ground or the detail layer: furniture sits on boards,
+// wall fittings on plaster.
+const FLOOR_UNDER = { l: 'wd3', p: 'wd2', d: 'wd1', k: 'wd0' };
+// Shop counter (Pell's, the post office): a panelled front with a lit top board and a brass bell.
+def('counter', { ...FLOOR_UNDER, t: 'wd4', m: 'wd1', b: 'brass', o: 'brass0', x: 'base' }, [
+  '.......bb.......'.replace(/\./g, 't'),
+  'tttttttobttttttt',
+  'llllllllllllllll',
+  'kkkkkkkkkkkkkkkk',
+  'kpppppkpppppkppk',
+  'kplllpkplllpkplk',
+  'kpl.dpkpl.dpkpl.'.replace(/\./g, 'p'),
+  'kpldppkpldppkpld'.slice(0, 16),
+  'kpddppkpddppkpdd',
+  'kppppdkppppdkppd',
+  'kpppppkpppppkppp',
+  'kpldppkpldppkpld',
+  'kpppppkpppppkppp',
+  'kddddddddddddddd',
+  'xxxxxxxxxxxxxxxx',
+  'kkkkkkkkkkkkkkkk',
+]);
+// Wall shelf: two boards of jars and tins against plaster.
+def('shelf', { w: 'pl2', s: 'pl1', h: 'pl3', k: 'wd0', p: 'wd2', l: 'wd3', r: 'red2', g: 'grass2', b: 'blue2', y: 'pear', c: 'st3', e: 'pane1' }, [
+  'wwwwwwwwwwwwwwww',
+  'wwwwwwwwwwwwwwww',
+  'wbbwrrwwyywcwwgw',
+  'wbbwrrwyyywcwggw',
+  'webwrrwyyywcwggw',
+  'llllllllllllllll',
+  'pppppppppppppppp',
+  'kskssssssssssksk',
+  'wwwwwwwwwwwwwwww',
+  'wcwwggwbwwrrwyyw',
+  'wcwggggbbwrrwyyw',
+  'wcwggggbbwrrwyyw',
+  'llllllllllllllll',
+  'pppppppppppppppp',
+  'kskssssssssssksk',
+  'wwwwwwwwwwwwwwww',
+]);
+// Table: a round-topped kitchen table with a cloth runner and a cup, on boards.
+def('table', { ...FLOOR_UNDER, t: 'wd3', h: 'wd4', m: 'wd1', c: 'pl3', r: 'red2', x: 'base', s: 'shadow', u: 'pl2' }, [
+  'llllllllllllllll',
+  'pppppppppppppppp',
+  'kkhhhhhhhhhhhhkk',
+  'khttttccttttttmk',
+  'khttttccttuuttmk',
+  'khttttccttuuttmk',
+  'khttttccttttttmk',
+  'khttttrrttttttmk',
+  'kmmmmmmmmmmmmmmk',
+  'kxxxxxxxxxxxxxxk',
+  'pkmkppppppppkmkp',
+  'pkmkppppppppkmkp',
+  'pkmkppppppppkmkp',
+  'kkkkkkkkkkkkkkkk',
+  'llllllllllllllll',
+  'pppppppppppppppp',
+]);
+// Bed (a cot, one cell): pillow at the head, quilt in wax red with a cream turn-down, on boards.
+def('bed', { ...FLOOR_UNDER, f: 'wd1', c: 'pl3', u: 'pl2', r: 'rug1', q: 'rug0', y: 'rug3', x: 'base' }, [
+  'kfffffffffffffkk',
+  'kfccccccccccccfk',
+  'kfcuuuuuuuuuucfk',
+  'kfcuuuuuuuuuucfk',
+  'kfccccccccccccfk',
+  'kfcccccccccccc fk'.replace(' ', '').slice(0, 16),
+  'kfrrrrrrrrrrrrfk',
+  'kfryrryrryrrrrfk',
+  'kfrrrrrrrrrrrrfk',
+  'kfrryrrryrrryrfk',
+  'kfrrrrrrrrrrrrfk',
+  'kfqqqqqqqqqqqqfk',
+  'kffffffffffffffk',
+  'kxxxxxxxxxxxxxxk',
+  'llllllllllllllll',
+  'pppppppppppppppp',
+]);
+// Stairs up (interior): treads climbing away from the viewer, lit nosings, a rail on the right.
+def('stairs-up', { k: 'wd0', d: 'wd1', p: 'wd2', l: 'wd3', h: 'wd4', i: 'iron' }, [
+  'kdddddddddddddki',
+  'kllllllllllllkki',
+  'kdddddddddddddki',
+  'kppppppppppppkki',
+  'khhhhhhhhhhhhhki',
+  'kddddddddddddkki',
+  'kppppppppppppkki',
+  'khhhhhhhhhhhhhki',
+  'kddddddddddddkki',
+  'kppppppppppppkki',
+  'khhhhhhhhhhhhhki',
+  'kddddddddddddkki',
+  'kppppppppppppkki',
+  'khhhhhhhhhhhhhki',
+  'kppppppppppppkki',
+  'kkkkkkkkkkkkkkki',
+]);
+// Stairs down: a dark well with the first treads dropping away under a lit floor edge.
+def('stairs-down', { k: 'wd0', d: 'wd1', p: 'wd2', l: 'wd3', i: 'ink', h: 'wd4' }, [
+  'llllllllllllllll',
+  'kkkkkkkkkkkkkkkk',
+  'khhhhhhhhhhhhhhk',
+  'kppppppppppppppk',
+  'kddddddddddddddk',
+  'kkkkkkkkkkkkkkkk',
+  'kllllllllllllllk',
+  'kddddddddddddddk',
+  'kkkkkkkkkkkkkkkk',
+  'kppppppppppppppk',
+  'kiiiiiiiiiiiiiik',
+  'kiiiiiiiiiiiiiik',
+  'kiiiiiiiiiiiiiik',
+  'kiiiiiiiiiiiiiik',
+  'kiiiiiiiiiiiiiik',
+  'kkkkkkkkkkkkkkkk',
+]);
+// Barnaby's string wall (the Archive): a cork board of pinned notes joined by red string.
+def('string-wall', { c: 'pa1', d: 'pa0', l: 'pa2', n: 'pl3', u: 'pl1', r: 'red2', b: 'brass', k: 'wd0' }, [
+  'kkkkkkkkkkkkkkkk',
+  'kcclcccdccclcccd',
+  'kcnnnbccccccccck',
+  'kcnuncrrrcnnnbck',
+  'kcnnnrcccrnunnck',
+  'kccrrcccccrnnnck',
+  'kcrccdcccccrcccd',
+  'kcrcccnnnbcrcccc',
+  'kcrcccnuncrcccck',
+  'kccrrrnnnrcccdck',
+  'kcccccrrrccnnbck',
+  'kcnnbcccccrnunck',
+  'kcnunrrrrrrnnnck',
+  'kcnnncccccccccck',
+  'kccdcccclcccdcck',
+  'kkkkkkkkkkkkkkkk',
 ]);
 
 /* ---------------------------------------------------------------- Spire interiors (6 themes) */

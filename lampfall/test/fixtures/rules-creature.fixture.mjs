@@ -60,3 +60,37 @@ export function spyBus() {
 }
 
 export { makeRng, SPECIES };
+
+/**
+ * A deterministic end-to-end scenario over the three modules (gifts, EXP, Shifts on every dial,
+ * catches, Still Knot, round trips). Returns plain JSON so a child process can print it and the
+ * adversarial test can compare it with an in-process run.
+ * @param {string} [seedCode]
+ */
+export async function scenario(seedCode = 'XPROC') {
+  const P = await import('../../js/systems/party.js');
+  const C = await import('../../js/systems/creature.js');
+  const E = await import('../../js/systems/exp.js');
+  const w = world(seedCode);
+  const rng = makeRng(seedCode);
+  const out = [];
+  for (const [speciesId, level] of [['sloshkin', 5], ['vagary', 40], ['scrapling', 7], ['tossup', 3], ['wirewhisk', 2], ['prismoth', 12], ['mudfist', 9]]) {
+    out.push(P.giveCreature(w, { speciesId, level }, DATA, rng).uid);
+  }
+  P.giveExp(w, 'c1', 5000, DATA);
+  P.giveExp(w, 'c5', 900, DATA);
+  P.setHeldItem(w, 'c3', 'fx-knot', DATA);
+  P.giveExp(w, 'c3', 4000, DATA);
+  const dials = ['drift', 'flux', 'freefall'];
+  const forms = ['skeinwing', 'brinelance', 'puddlepip', 'siltback'].filter((id) => SPECIES[id]);
+  forms.forEach((formId, i) => C.shiftTo(w.party[0], formId, DATA, dials[i % 3], { rng }));
+  P.applyOutcome(w, {
+    party: w.party.map((c) => ({ ...C.serialize(c), hp: Math.floor(c.hp / 2) })),
+    kind: 'trainer', source: 'rematch', curveLevel: 20,
+    defeated: [{ speciesId: 'mudfist', level: 18 }, { speciesId: 'sedgehare', level: 21 }],
+    participants: ['c1', 'c2'],
+    caught: C.serialize(C.makeCreature({ uid: 'c999', speciesId: 'rushling', level: 11, rng }, DATA)),
+  }, DATA, rng);
+  const trips = [...w.party, ...w.box].map((c) => C.deserialize(JSON.parse(JSON.stringify(C.serialize(c))), DATA));
+  return { uids: out, world: JSON.parse(JSON.stringify(w)), trips, pending: w.pendingShifts.slice(), open: w.party.map((c) => E.openWindows(c, DATA)) };
+}

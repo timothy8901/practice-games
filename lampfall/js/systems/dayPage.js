@@ -5,8 +5,10 @@
  * The only writer of `world.log` and `world.dayPage` (tools/lint-owners). Everything another lane
  * owns is reached through injected collaborators, so this module depends on no unfinished internals:
  *
- * {@link overnight} runs once per morning (at Sleep, at the porch bench, or when the clock reaches
- * the morning without a Rest; repeated calls for the same morning do nothing). In order:
+ * {@link overnight} runs once per morning: at Sleep (before or after the skip to dawn), or at the
+ * 06:00 anchor when the clock reaches the morning without a Rest; repeated calls for the same
+ * morning do nothing and {@link nextMorning} picks the morning. The porch bench only SHOWS the page
+ * ({@link summarize}, read-only); it does not run the night. In order:
  *
  *  1. closes the ending day: {@link summarize} -> `world.dayPage.last`, one line into `world.log`;
  *  2. runs the collaborator steps {@link OVERNIGHT_STEPS} that the caller supplied in `ctx.hooks`:
@@ -51,8 +53,15 @@ import { MINUTES_PER_DAY } from '../core/time.js';
 /** Collaborator steps of the overnight, in the order they run (see the module comment). */
 export const OVERNIGHT_STEPS = Object.freeze(['builds', 'regrow', 'reaches', 'cracks', 'glint', 'wanted', 'crate', 'weather', 'purse']);
 
-/** Rng label per step (`<label>:<day>`, core day); steps not listed use `<step>:<day>`. */
+/** Rng label per step (`<label>:<day>`); steps not listed use `<step>:<day>`. */
 export const STEP_STREAMS = Object.freeze({ glint: 'glint', weather: 'weather', cracks: 'cracks', wanted: 'shop:wanted', regrow: 'regrow' });
+
+/**
+ * Which day number a step's stream label uses: `'game'` (1-based GDD day) for `weather` because
+ * systems/weather names its stream `weather:<gameDay>`; every other step uses the CORE day, as
+ * systems/gather does for `glint:<day>` (so `step.rng` equals `rngs.day(label, day)` there).
+ */
+export const STEP_DAY_BASIS = Object.freeze({ weather: 'game' });
 
 /** Order of *Tomorrow:* items by kind; unknown kinds go last in insertion order. */
 export const TOMORROW_ORDER = Object.freeze(['build', 'graft', 'bench', 'forecast', 'letter', 'beat', 'low', 'carry', 'heirloom', 'errant', 'spire']);
@@ -70,6 +79,11 @@ export const DEFAULTS = Object.freeze({
   dayPageLogLines: LOG_MAX,
   /** *Tomorrow:* lists at most this many items. */
   tomorrowMax: 8,
+  /**
+   * Minutes after `dayStartMinute` during which an overnight with no `toDay` still means "this
+   * morning" when it has not been written ({@link nextMorning}; the 06:00 anchor, the wake from Sleep).
+   */
+  overnightGraceMinutes: 60,
 });
 
 /** Every tuning key this module reads (letters/threads/schedule keys are listed by those modules). */
@@ -82,6 +96,7 @@ const SPEC = {
   dayStartMinute: [(v) => isInt(v) && v >= 0 && v < MINUTES_PER_DAY, 'minute 0..1439'],
   dayPageLogLines: [(v) => isInt(v) && v >= 0 && v <= LOG_MAX, `integer 0..${LOG_MAX}`],
   tomorrowMax: [(v) => isInt(v) && v >= 1, 'integer >= 1'],
+  overnightGraceMinutes: [(v) => isInt(v) && v >= 0 && v <= 18 * 60, 'integer 0..1080'],
 };
 /** @type {WeakMap<object, any>} */
 const CACHE = new WeakMap();
@@ -141,8 +156,49 @@ export function beginDay(world, day) {
 }
 
 /**
- * Feeds a domain event into today's tally (FLOW forwards bus events here). Opens the tally on the
- * current day first if none is open. Returns whether anything changed.
+ * The core day the Day Page being written now belongs to: today from `dayStartMinute` (06:00), and
+ * the previous day in the small hours before it (a night out past midnight is still that day's
+ * page). Never below 0. Read-only.
+ * @param {World} world
+ * @param {{minute?: number, day?: number, tuning?: any}} [opts]
+ * @param {any} [data]
+ * @returns {number}
+ */
+export function pageDay(world, opts = {}, data = null) {
+  const t = tuningOf(data, opts);
+  const day = coreDay(world, opts);
+  return Math.max(0, minuteNow(world, opts) < t.dayStartMinute ? day - 1 : day);
+}
+
+/**
+ * The core day an overnight called now leads into, when the caller does not say (`ctx.toDay`):
+ *  - before 06:00 it is this morning (Sleep after midnight; the 05:40 builds anchor);
+ *  - within `overnightGraceMinutes` after 06:00, when this morning's page has not been written (the
+ *    tally is still on an earlier day), it is this morning: the call comes at the 06:00 anchor or
+ *    just after a Sleep that skipped to dawn (clockSys.rest wakes at 06:00);
+ *  - otherwise it is tomorrow (Sleep from 21:00). A morning missed altogether is not written late:
+ *    like the letters, it never accrues (GDD-00 §11), so an evening call never drifts a day behind.
+ * A new world opens the arrival day's tally (core day 0, which has no morning of its own); with no
+ * tally at all (`day < 0`) the call counts as an evening one.
+ * @param {World} world
+ * @param {any} data
+ * @param {{tuning?: any}} [opts]
+ * @returns {number}
+ */
+export function nextMorning(world, data, opts = {}) {
+  const t = tuningOf(data, opts);
+  const cur = coreDay(world);
+  const minute = minuteNow(world);
+  if (minute < t.dayStartMinute) return cur;
+  const D = world?.dayPage;
+  const unwritten = D && isInt(D.day) && D.day >= 0 && D.day < cur;
+  return unwritten && minute < t.dayStartMinute + t.overnightGraceMinutes ? cur : cur + 1;
+}
+
+/**
+ * Feeds a domain event into today's tally (FLOW forwards bus events here). Opens the tally first if
+ * none is open, on the day the current page belongs to ({@link pageDay}: the small hours before
+ * 06:00 still belong to the evening before). Returns whether anything changed.
  * @param {World} world
  * @param {string} evt
  * @param {any} payload
@@ -150,7 +206,7 @@ export function beginDay(world, day) {
  */
 export function noteEvent(world, evt, payload) {
   if (typeof evt !== 'string') return false;
-  if (!world.dayPage || world.dayPage.day < 0) beginDay(world, coreDay(world));
+  if (!world.dayPage || !isInt(world.dayPage.day) || world.dayPage.day < 0) beginDay(world, pageDay(world));
   const D = world.dayPage;
   if (evt === 'wallet:changed') {
     const amount = payload?.currency === 'main' && isInt(payload?.delta) ? payload.delta : 0;
@@ -364,15 +420,20 @@ export function tonightList(world, data, opts = {}) {
  * @property {number} gameDay      its GDD day number
  * @property {number} endedDay     the core day being closed
  * @property {number} now          total minutes the step happens at (builds 05:40, others 06:00)
- * @property {Rng} rng             the step's labelled fork (`<stream>:<day>`)
- * @property {(label: string) => Rng} rngFor   any other labelled fork
+ * @property {Rng} rng             the step's labelled fork (`<stream>:<day>`, see {@link STEP_DAY_BASIS}),
+ *   already positioned: draw from it directly. Do NOT hand it to a collaborator that forks its own
+ *   `<stream>:<day>` label (gather.glintFor, weather.rollDay) or the stream is forked twice and no
+ *   longer matches the overworld's; hand those `base` instead.
+ * @property {{fork: (label: string) => Rng}} base   the base source the overworld uses (`rng.fork(label)`
+ *   equals `rngs.fresh(label)` / `rngs.day(kind, day)`): pass it to gather.glintFor and weather.rollDay
+ * @property {(label: string) => Rng} rngFor   any other labelled fork (same as `base.fork`)
  * @property {Bus|null} bus
  * @property {any} tuning
  */
 
 /**
  * @typedef {Object} OvernightCtx
- * @property {number} [toDay]       core day the overnight leads into (default: the next 06:00)
+ * @property {number} [toDay]       core day the overnight leads into (default: {@link nextMorning})
  * @property {Bus|null} [bus]
  * @property {Partial<Record<string, (world: World, data: any, step: StepCtx) => any>>} [hooks]   collaborator steps by {@link OVERNIGHT_STEPS} name
  * @property {{landDue?: Function}} [loans]    shorthand: `loans.landDue(world, {data, bus, now})` becomes the `builds` hook
@@ -389,7 +450,7 @@ export function tonightList(world, data, opts = {}) {
  * @property {boolean} ran
  * @property {'already'|null} reason
  * @property {number} day           core day started
- * @property {number} endedDay      core day closed
+ * @property {number} endedDay      core day closed (always `day - 1`; a stale tally is relabelled to it)
  * @property {DaySummary|null} summary   the closed day's page
  * @property {Record<string, any>} steps  hook results by step name (skipped steps absent)
  * @property {Array<{step: string, message: string}>} errors
@@ -408,17 +469,19 @@ export function tonightList(world, data, opts = {}) {
  */
 export function overnight(world, data, rng, ctx = {}) {
   const t = tuningOf(data, ctx);
-  const cur = coreDay(world);
-  const toDay = isInt(ctx.toDay) ? ctx.toDay : (minuteNow(world) < t.dayStartMinute ? cur : cur + 1);
+  const toDay = isInt(ctx.toDay) ? ctx.toDay : nextMorning(world, data, ctx);
   const D = world.dayPage;
-  const endedDay = D && D.day >= 0 ? D.day : toDay - 1;
+  const endedDay = toDay - 1;
   /** @type {OvernightResult} */
   const result = { ran: false, reason: null, day: toDay, endedDay, summary: null, steps: {}, errors: [], heirlooms: [], mail: null };
-  if (D && D.day >= toDay) {
+  if (D && isInt(D.day) && D.day >= toDay) {
     result.reason = 'already';
     return result;
   }
   const bus = ctx.bus ?? null;
+  // a tally left open on an earlier day (mornings were skipped) is this night's page: what it
+  // counted since then is what the night closes
+  if (D && isInt(D.day) && D.day >= 0 && D.day < endedDay) D.day = endedDay;
 
   // 1. close the ending day
   const summary = summarize(world, data, { ...ctx, day: endedDay });
@@ -436,6 +499,7 @@ export function overnight(world, data, rng, ctx = {}) {
     hooks.builds = (w, d, s) => landDue(w, { data: d, bus: s.bus, now: s.now, tuning: ctx.tuning });
   }
   const fork = (label) => rngFor(rng, world, label);
+  const base = Object.freeze({ fork });
   for (const step of OVERNIGHT_STEPS) {
     const hook = hooks[step];
     if (typeof hook !== 'function') continue;
@@ -446,7 +510,8 @@ export function overnight(world, data, rng, ctx = {}) {
       gameDay: gameDay(toDay, t),
       endedDay,
       now: toDay * MINUTES_PER_DAY + minute,
-      rng: fork(`${STEP_STREAMS[step] ?? step}:${toDay}`),
+      rng: fork(`${STEP_STREAMS[step] ?? step}:${STEP_DAY_BASIS[step] === 'game' ? gameDay(toDay, t) : toDay}`),
+      base,
       rngFor: fork,
       bus,
       tuning: ctx.tuning ?? null,

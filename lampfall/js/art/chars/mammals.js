@@ -462,13 +462,14 @@ const MASK = {
     '....oxxxxxxo....',
     '.....oxxxxo.....',
   ],
+  // seated: elbows soft, both hands resting together in the lap (polish: sits read stiff)
   sit: [
     '....oxxxxxxo....',
     '...oxxxxxxxxo...',
     '...oxxxxxxxxo...',
-    '...oxxxxxxxxo...',
-    '...oxxxxxxxxo...',
-    '...ohhxxxxhho...',
+    '...oxoxxxxoxo...',
+    '...oxxoxxoxxo...',
+    '....oxxhhxxo....',
     '....oxxxxxxo....',
   ],
 };
@@ -509,9 +510,9 @@ export const MASK_WIDE = {
     '...oxxxxxxxxo...',
     '..oxxxxxxxxxxo..',
     '..oxxxxxxxxxxo..',
-    '..oxxxxxxxxxxo..',
-    '..oxxxxxxxxxxo..',
-    '..ohhxxxxxxhho..',
+    '..oxoxxxxxxoxo..',
+    '..oxxoxxxxoxxo..',
+    '...oxxxhhxxxo...',
     '...oxxxxxxxxo...',
   ],
 };
@@ -684,13 +685,13 @@ export const LEGS = {
       '....KKK..BbbK...',
       '.........KKK....',
     ],
-    // seated on a step: thighs toward the viewer, boots below
+    // seated on a step: thighs toward the viewer, boots dangling and turned out
     sit: [
       '....SSS..SSS....',
-      '...KSSSKKSSSK...',
       '...KSSsKKSSsK...',
-      '...KBBbKKBbbK...',
-      '....KKK..KKK....',
+      '...KSSsKKSSsK...',
+      '..KBBbK..KBBbK..',
+      '...KKK....KKK...',
     ],
   },
   left: {

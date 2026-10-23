@@ -341,12 +341,15 @@ describe('resolve', () => {
   });
   it('release: still logged, no fish given, the reach gets a nudge back', () => {
     const w = makeWorld({ total: DAY });
+    const k = until(castAt(w, [fishShadow('fish-a')], null), 'bite');
+    F.press(k);
+    assert.ok(Math.abs(F.resolve(w, k, 'keep', base()).health - 0.9) < 1e-9, 'a kept fish costs the reach');
     const s = until(castAt(w, [fishShadow('fish-a')], null), 'bite');
     F.press(s);
     const r = F.resolve(w, s, 'release', base({ give: () => assert.fail('released fish are not given') }));
-    assert.ok(Math.abs(r.health - 0.95) < 1e-9);
+    assert.ok(Math.abs(r.health - 0.95) < 1e-9, 'a release nudges health up');
     assert.equal(s.phase, 'released');
-    assert.equal(w.collections.fish['fish-a'].n, 1);
+    assert.equal(w.collections.fish['fish-a'].n, 2);
     // fished hard, the reach bottoms out at the floor
     for (let i = 0; i < 10; i++) {
       const t = until(castAt(w, [fishShadow('fish-a')], null), 'bite');

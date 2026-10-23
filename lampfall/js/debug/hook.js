@@ -7,9 +7,9 @@
  * busy scene is running, and `errors` collects `window.onerror` + `unhandledrejection`.
  *
  * Hooks whose system lives in another lane are REBINDABLE: the owning module registers the real
- * implementation with `__game.bind(name, fn)` (or `G.debugHook.bind`). Until then `give` and `earn`
- * run a day-1 fallback that edits the schema shape directly inside `store.tx`, and the others throw a
- * readable "not wired" error.
+ * implementation with `__game.bind(name, fn)` (or `G.debugHook.bind`). `give` and `earn` are wired to
+ * RULES-ECON (`systems/bag.give`, `systems/wallet.adjust`) inside `store.tx`; the others throw a readable
+ * "not wired" error until bound.
  * @module debug/hook
  */
 import { tokenDevice } from '../core/input.js';
@@ -17,6 +17,7 @@ import { validateWorld } from '../state/schema.js';
 import * as clockSys from '../systems/clockSys.js';
 import { setFlag } from '../systems/flags.js';
 import * as wallet from '../systems/wallet.js';
+import * as bag from '../systems/bag.js';
 
 /** Hooks that belong to another lane, with the lane that owns the real implementation. */
 export const LANE_HOOKS = Object.freeze({
@@ -25,8 +26,8 @@ export const LANE_HOOKS = Object.freeze({
   sleep: 'FLOW', runScript: 'SCRIPT',
 });
 
-/** Pocket the day-1 `give` fallback drops items into (`systems/bag` resolves the real pocket from item data). */
-export const FALLBACK_POCKET = 'items';
+/** Pocket {@link fallbackGive} drops an id no item table knows into (the satchel's default pocket). */
+export const FALLBACK_POCKET = 'finds';
 
 /**
  * Primary keyboard token for an action.
@@ -181,9 +182,18 @@ export function installDebugHook(G, opts = {}) {
   /** Day-1 fallbacks for lane hooks; replaced by `bind`. */
   const fallbacks = Object.freeze({
     give(itemId, n = 1) {
-      const total = G.store.tx('debug:give', (w) => fallbackGive(w, itemId, n));
-      G.bus.emit('bag:changed', { itemId, n: total, pocket: FALLBACK_POCKET, source: 'debug' });
-      return total;
+      // systems/bag places it by its data row (pocket, stack limit, overflow basket) and emits
+      // bag:changed; an id no item table knows (a debug probe) still lands in FALLBACK_POCKET.
+      const count = Math.max(1, Math.floor(Number(n) || 1));
+      return G.store.tx('debug:give', (w) => {
+        if (typeof itemId !== 'string' || !itemId) throw new TypeError('__game.give: itemId must be a non-empty string');
+        const r = bag.give(w, itemId, count, { data: G.data ?? null, bus: G.bus, source: 'debug' });
+        if (r.ok) return bag.count(w, itemId, { baskets: true }, { data: G.data ?? null });
+        if (r.reason !== 'unknown-item') return 0;
+        const total = fallbackGive(w, itemId, count);
+        G.bus.emit('bag:changed', { itemId, pocket: FALLBACK_POCKET, delta: count, count: total, overflow: 0, basketId: null, source: 'debug' });
+        return total;
+      });
     },
     earn(amount) {
       const balance = G.store.tx('debug:earn', (w) => fallbackEarn(w, amount));

@@ -14,7 +14,7 @@ const ids = (list) => list.map((b) => `${b.threadId}:${b.beat}`);
 /** A recording stand-in for systems/loans.residentShare. */
 const shareSpy = () => {
   const calls = [];
-  return { calls, residentShare: (world, threadId, ctx) => { calls.push([threadId, ctx.day]); return { ok: true, credited: 300 }; } };
+  return { calls, residentShare: (world, threadId, ctx) => { calls.push([threadId, ctx.threadDay]); return { ok: true, credited: 300 }; } };
 };
 
 describe('reading', () => {
@@ -172,7 +172,7 @@ describe('advance and setBeat', () => {
     const w = makeWorld({ day: 2 });
     const reg = createRegistry({ threads: data.threads, npcs: data.npcs });
     const before = w.loans.paid;
-    const r = T.setBeat(w, reg, 'tully-mile', 3, { loans: { residentShare: (world, id, ctx) => loans.residentShare(world, id, { bus: ctx.bus }) } });
+    const r = T.setBeat(w, reg, 'tully-mile', 3, { loans: { residentShare: (world, id, ctx) => loans.residentShare(world, id, ctx) } });
     assert.equal(r.share.ok, true);
     assert.deepEqual(w.loans.residentShares, ['tully-mile']);
     assert.ok(w.loans.paid >= before);

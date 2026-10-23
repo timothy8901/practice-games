@@ -48,6 +48,19 @@ import { t } from '../data/strings.js';
  */
 
 /**
+ * Whether a minute of day is inside the porch-talk window `[from, to)` (GDD-00 §5: 19:00–01:00);
+ * the window wraps past midnight when `to <= from` (same rule as systems/townCommon `inWindow`).
+ * @param {number} minute
+ * @returns {boolean}
+ */
+function inPorchWindow(minute) {
+  const from = porchWindow[0] % 1440;
+  const to = porchWindow[1] % 1440;
+  if (from === to) return false;
+  return from < to ? minute >= from && minute < to : minute >= from || minute < to;
+}
+
+/**
  * Source priority order, for tests and tooling.
  * @type {readonly string[]}
  */
@@ -153,7 +166,7 @@ function resolveNpc(world, data, target) {
   // at the porch is the more specific context, and the porch window overlaps the evening/night
   // phases, so a `lines.night` pool would otherwise make porch talk unreachable.
   const minute = sel.minuteOfDay(world);
-  if ((target.atPorch || target.pose === 'porch') && minute >= porchWindow[0] && minute < porchWindow[1]) {
+  if ((target.atPorch || target.pose === 'porch') && inPorchWindow(minute)) {
     const r = pick('porch', 'porch');
     if (r) return r;
   }

@@ -3,7 +3,8 @@
  *
  * Owns `world.fieldLog` (forms Seen / Read / Held, the per-seed ability recorded on Read, fish tells
  * learned) and `world.collections` (fish / bugs / finds with counts and bests, the Patient record
- * board, Barnaby's donations and string-wall pins, the Kiln clean-on-the-spot day).
+ * board, Barnaby's donations, the Kiln clean-on-the-spot day). String-wall pins are checked here
+ * and recorded by systems/letters (`world.letters.pinned`) through the injected `ctx.pinFind`.
  *
  * Also the shared base of the SYS-GATHER / SYS-WORLD lane (fishing, gather, encounter import it):
  *  - {@link rowsOf} / {@link rowOf} / {@link collectionRows}: one adapter over the content `data`

@@ -20,6 +20,9 @@
  *    day. One-of-a-kind items ask first.
  *  - **Consignment Crate** ({@link crateDeposit}, {@link settleCrate}): anything, paid at 90% overnight.
  *  - **Listings** ({@link listing}) carry the "After: n" preview and, for discs, the move they teach.
+ *  - **Items** are `items` rows or, for gathered goods (fish, bugs, finds, fruit), `collections` rows
+ *    (`systems/econ.itemOf`). A row without a valid `price` is never sold ('unpriced'), and anchor
+ *    stones are neither listed nor sold on a dial that does not sell them (Freefall).
  *
  * Day-scoped counters live in `world.shops` and reset lazily when the economy day changes.
  * Every function is `fn(world, ...args, ctx?)` (`systems/econ` EconCtx); it writes `world.shops`, and
@@ -34,7 +37,7 @@
 import { MINUTES_PER_DAY } from '../core/time.js';
 import { evalCond } from '../script/cond.js';
 import { forkFor } from '../state/rngs.js';
-import { makeTuning, lookup, nowOf, minuteOfDay, dayOf, gameDay, emit, assertCount, assertId, deepFreeze, is } from './econ.js';
+import { makeTuning, lookup, itemOf, allItems, money, isPriced, nowOf, minuteOfDay, dayOf, gameDay, emit, assertCount, assertId, deepFreeze, is } from './econ.js';
 import * as wallet from './wallet.js';
 import * as bag from './bag.js';
 
@@ -190,24 +193,38 @@ export function buyersAt(world, ctx) {
 // ---------------------------------------------------------------------------------------------
 
 /**
- * Item row (null when unknown).
+ * Item row (`items`, else `collections`; null when unknown).
  * @param {string} itemId
  * @param {EconCtx|undefined} ctx
  * @returns {Record<string, any>|null}
  */
 function item(itemId, ctx) {
-  return lookup(ctx?.data).row('items', itemId);
+  return itemOf(ctx?.data, itemId);
 }
 
 /**
- * What a shop charges for one: `round(price × priceMult)`.
+ * What a shop charges for one: `round(price × priceMult)` (0 for an unpriced row; {@link buy}
+ * refuses those).
  * @param {Record<string, any>} itemRow
  * @param {ShopRow} shop
  * @returns {number}
  */
 export function buyPrice(itemRow, shop) {
-  const mult = typeof shop.priceMult === 'number' && shop.priceMult > 0 ? shop.priceMult : 1;
-  return Math.round((Number.isFinite(itemRow.price) ? itemRow.price : 0) * mult);
+  const mult = typeof shop.priceMult === 'number' && Number.isFinite(shop.priceMult) && shop.priceMult > 0 ? shop.priceMult : 1;
+  return Math.round(money(itemRow.price) * mult);
+}
+
+/**
+ * Whether the dial lets the player buy this row: anchor stones are not sold on a dial whose anchor
+ * rule says so (Freefall).
+ * @param {World} world
+ * @param {Record<string, any>} itemRow
+ * @param {EconCtx|undefined} ctx
+ * @returns {boolean}
+ */
+function soldOnDial(world, itemRow, ctx) {
+  if (bag.walletCurrencyOf(itemRow) !== 'anchors') return true;
+  return wallet.anchorRulesFor(String(ctx?.dial ?? world.run?.dial ?? ''), ctx).buyable;
 }
 
 /**
@@ -221,17 +238,18 @@ export function isGoods(itemRow, ctx) {
 }
 
 /**
- * What one is worth when sold: goods at full `price`; other items at `sell`, else
- * `floor(price × spareSellRate)`. Currency items and one-of-a-kind keepsakes priced 0 are worth 0.
+ * What one is worth when sold, in whole buttons: goods at full `price`; other items at `sell`, else
+ * `floor(price × spareSellRate)`. Currency items, keepsakes priced 0 and broken values (missing,
+ * negative, NaN) are worth 0; fractional values floor.
  * @param {Record<string, any>} itemRow
  * @param {EconCtx} [ctx]
  * @returns {number}
  */
 export function sellValue(itemRow, ctx) {
   if (bag.walletCurrencyOf(itemRow)) return 0;
-  const price = Number.isFinite(itemRow.price) ? itemRow.price : 0;
+  const price = money(itemRow.price);
   if (isGoods(itemRow, ctx)) return price;
-  if (Number.isFinite(itemRow.sell)) return itemRow.sell;
+  if (typeof itemRow.sell === 'number' && Number.isFinite(itemRow.sell)) return money(itemRow.sell);
   return Math.floor(price * tuningOf(ctx).spareSellRate);
 }
 
@@ -366,6 +384,7 @@ export function leftToday(world, shop, itemId, ctx) {
   const it = item(itemId, ctx);
   if (it && bag.walletCurrencyOf(it) === 'starsalt') left = Math.min(left, wallet.starsaltLeftToday(world, ctx));
   if (it && bag.isOneOfAKind(it)) left = Math.min(left, bag.count(world, itemId, { baskets: true }, ctx) > 0 ? 0 : 1);
+  if (it && (!isPriced(it) || !soldOnDial(world, it, ctx))) left = 0;
   return left;
 }
 
@@ -388,10 +407,9 @@ export function wantedToday(world, shop, day, ctx) {
   if (!row || row.wanted !== true) return [];
   const t = tuningOf(ctx);
   const d = Number.isInteger(day) ? /** @type {number} */ (day) : dayOf(world, ctx, t);
-  const lk = lookup(ctx?.data);
   const pool = Array.isArray(row.wantedPool) && row.wantedPool.length
-    ? row.wantedPool.filter((id) => lk.row('items', id))
-    : lk.list('items').filter((it) => isGoods(it, ctx) && buysItem(row, it) && sellValue(it, ctx) > 0).map((it) => it.id);
+    ? row.wantedPool.filter((id) => itemOf(ctx?.data, id))
+    : allItems(ctx?.data).filter((it) => isGoods(it, ctx) && buysItem(row, it) && sellValue(it, ctx) > 0).map((it) => it.id);
   const unique = [...new Set(pool)];
   return dayRng(world, d, ctx).fork(`wanted:${row.id}`).shuffle(unique).slice(0, t.wantedTodayCount);
 }
@@ -444,7 +462,7 @@ export function sellQuote(world, shop, itemId, n, ctx) {
  * @param {EconCtx & {anyHour?: boolean}} [ctx]   `anyHour` skips the hours check (scripted gifts, tests)
  * @returns {{ok: true, spent: number, unitPrice: number, added: number, overflow: number, basketId: string|null, after: number}
  *   | {ok: false, needsConfirm: true, itemId: string, unitPrice: number}
- *   | {ok: false, reason: 'unknown-shop'|'unknown-item'|'closed'|'not-stocked'|'sold-out'|'daily-cap'|'not-sold'|'already-held'|'insufficient', left?: number, short?: number}}
+ *   | {ok: false, reason: 'unknown-shop'|'unknown-item'|'unpriced'|'closed'|'not-stocked'|'sold-out'|'daily-cap'|'not-sold'|'already-held'|'insufficient', left?: number, short?: number}}
  */
 export function buy(world, shopId, itemId, n = 1, ctx) {
   assertId(shopId, 'shops.buy');
@@ -455,7 +473,9 @@ export function buy(world, shopId, itemId, n = 1, ctx) {
   if (!row) return { ok: false, reason: 'unknown-shop' };
   const it = item(itemId, ctx);
   if (!it) return { ok: false, reason: 'unknown-item' };
+  if (!isPriced(it)) return { ok: false, reason: 'unpriced' };
   if (!ctx?.anyHour && !isOpen(world, row, ctx)) return { ok: false, reason: 'closed' };
+  if (!soldOnDial(world, it, ctx)) return { ok: false, reason: 'not-sold' };
   const day = dayOf(world, ctx, t);
   const line = stockFor(world, row, day, ctx).find((l) => l.item === itemId);
   if (!line) return { ok: false, reason: 'not-stocked' };
@@ -580,8 +600,8 @@ export function listing(world, shopId, ctx) {
   const lk = lookup(ctx?.data);
   const dial = String(ctx?.dial ?? world.run.dial);
   return stockFor(world, row, undefined, ctx).flatMap((line) => {
-    const it = lk.row('items', line.item);
-    if (!it) return [];
+    const it = item(line.item, ctx);
+    if (!it || !isPriced(it) || !soldOnDial(world, it, ctx)) return [];
     const price = buyPrice(it, row);
     const left = leftToday(world, row, line.item, ctx);
     const pocket = bag.pocketOf(it, ctx);

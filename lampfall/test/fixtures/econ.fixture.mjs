@@ -71,7 +71,7 @@ export const TABLES = Object.freeze({ items: ITEMS, shops: SHOPS, loans: LOANS, 
 export const REGISTRY = createRegistry({ items: ITEMS, shops: SHOPS, loans: LOANS, moves: MOVES });
 
 /** Registry-like for validateWorld that checks item ids only (maps/npcs are other lanes' content). */
-export const ITEM_CHECK = Object.freeze({ has: (table, id) => (table === 'items' ? REGISTRY.has('items', id) : true) });
+export const ITEM_CHECK = Object.freeze({ has: (table, id) => (table === 'items' || table === 'collections' ? REGISTRY.has(table, id) : true) });
 
 /** Minutes helpers. */
 export const DAY = 1440;

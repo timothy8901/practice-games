@@ -803,7 +803,14 @@ BAT.sideDown = [
 ];
 const LANTERN = ['.k.', 'kXk', 'kXk', '.k.'];
 /** Wing membrane: fur outside the body column becomes the paler V / v ramp. */
-const membrane = (f, x0 = 5, x1 = 10) => f.map((r) => [...r].map((ch, x) => (x < x0 || x > x1) ? (ch === 'F' ? 'V' : ch === 'f' ? 'v' : ch) : ch).join(''));
+const membrane = (f, x0 = 5, x1 = 10) => f.map((r, y) => [...r].map((ch, x) => {
+  if (x >= x0 && x <= x1) return ch;
+  if (ch !== 'F' && ch !== 'f') return ch;
+  // finger bones radiate from the wrist through the membrane (polish: Ludo read muddy at 1x)
+  const d = x < x0 ? x0 - x : x - x1;
+  if ((d === 2 || d === 4) && (y + d) % 2 === 0) return 'S';
+  return ch === 'F' ? 'V' : 'v';
+}).join(''));
 /** Soft ground shadow (z is a translucent ink) for anything airborne. */
 export function groundShadow(f, w = 6, cx = 8) {
   const g = f.map((r) => [...r]);
@@ -940,7 +947,7 @@ const STRAW = ['Y', 'Y', 'y'];
 function finchCrew(facing, lift) {
   const g = blank();
   const p = FINCH[facing];
-  const spots = facing === 'left' ? [[0, 16], [8, 17], [4, 11]] : [[0, 16], [9, 16], [4, 11]];
+  const spots = facing === 'left' ? [[0, 18], [8, 18], [4, 13]] : [[0, 17], [9, 17], [4, 12]];
   spots.forEach(([x, y], i) => {
     const dy = lift === i ? -2 : 0;
     stamp(g, p, x, y + dy);

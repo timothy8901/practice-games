@@ -295,14 +295,32 @@ function oddsFor(target, ctx, t, fails, display) {
     }
     if (typeof catchRate !== 'number' || !Number.isFinite(catchRate) || catchRate < 0) throw new RangeError(`capture.captureOdds: bad catch rate ${JSON.stringify(catchRate)}`);
     const maxHp = ctx.maxHp ?? target.stats?.hp ?? target.hp;
+    if (typeof target.hp !== 'number' || !Number.isFinite(target.hp) || target.hp < 0) throw new RangeError(`capture.captureOdds: bad target hp ${JSON.stringify(target.hp)}`);
+    if (typeof maxHp !== 'number' || !Number.isFinite(maxHp) || maxHp <= 0) throw new RangeError(`capture.captureOdds: bad max hp ${JSON.stringify(maxHp)}`);
     const hp = ctx.stance ? Math.max(1, target.hp) : target.hp;
     const status = ctx.status !== undefined ? ctx.status : (target.status ? target.status.kind : null);
     const raw = engineCaptureOdds({ catchRate, hp, maxHp, status, trapped: !!ctx.trapped, grade, fails }, et);
-    p = t.ROUND_TO_SHOWN ? Math.round(raw * 100) / 100 : raw;
+    p = t.ROUND_TO_SHOWN ? roundShown(raw, t) : raw;
   }
   const pct = Math.round(p * 100);
   const band = engineCaptureBand(p, et);
   return { p, pct, band, display, shown: display === 'percent' ? pct : band, sure: !!L.sure, confirm: !!L.sure, fails, bonus, grade };
+}
+
+/**
+ * Rounds odds to the whole percent shown, kept inside the clamp: a clamp that is not a whole percent
+ * (e.g. a 0.4% floor) rounds inward, so the odds rolled never fall to 0 or leave the clamp range.
+ * @param {number} raw
+ * @param {Readonly<CaptureTuning>} t
+ * @returns {number}
+ */
+function roundShown(raw, t) {
+  const lo = Math.ceil(t.CAPTURE_ODDS_MIN * 100 - 1e-9);
+  const hi = Math.floor(t.CAPTURE_ODDS_MAX * 100 + 1e-9);
+  let pct = Math.round(raw * 100);
+  if (lo <= hi) pct = Math.min(hi, Math.max(lo, pct));
+  else return raw; // no whole percent inside the clamp: roll the exact odds
+  return pct / 100;
 }
 
 // ---------------------------------------------------------------------------------------------

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The CI gate (ARCHITECTURE §11): validate data -> lint ownership/purity -> smoke-import every module
+# The CI gate (ARCHITECTURE §11): validate data -> lint ownership/purity -> lint art -> smoke-import every module
 # -> every Node unit test, one file at a time with a summary -> optional Playwright playtest.
 # Usage: tools/check.sh            -> full gate
 #        tools/check.sh pattern    -> full gate, but only test files whose path matches the pattern
@@ -18,6 +18,8 @@ step() { # step <name> <command...>
 
 step "validate-data" node tools/validate-data.mjs --quiet
 step "lint-owners" node tools/lint-owners.mjs --quiet
+# GDD-00 §14 art linter. char/portrait stay advisory until the ART-CHARS ramps are in art/palette.CAST_HEX.
+step "lint-art" node tools/lint-art.mjs --quiet --advisory=char,portrait
 if [ -f tools/smoke-import.mjs ]; then
   step "smoke-import" node tools/smoke-import.mjs --quiet
 else

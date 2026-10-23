@@ -45,9 +45,12 @@ export function createGroup(group) {
    * @param {string} id   kebab-case id
    * @param {Record<string, string>} pal  char -> colour name
    * @param {string[]|string[][]} frames  one frame (rows) or an array of frames
-   * @param {{w?: number, h?: number, kind?: string, fps?: number, reserved?: string, anchor?: {x: number, y: number}, note?: string, variants?: Record<string, string[]|string[][]>}} [opts]
+   * @param {{w?: number, h?: number, kind?: string, fps?: number, reserved?: string, anchor?: {x: number, y: number}, note?: string,
+   *   variants?: Record<string, string[]|string[][]|{frames?: string[]|string[][], pal?: Record<string, string>}>}} [opts]
+   *   `variants`: named frame sets; `{pal}` overrides palette entries for that variant (lit / unlit lamps).
    */
   function def(id, pal, frames, opts = {}) {
+    pal = { ...pal };
     if (!/^[a-z0-9][a-z0-9-]*$/.test(id)) throw new Error(`tile ${id}: id must be kebab-case`);
     if (tiles[id]) throw new Error(`tile ${id}: defined twice in group ${group}`);
     if (!Array.isArray(frames[0])) frames = [frames];
@@ -63,13 +66,24 @@ export function createGroup(group) {
       }
     };
     check(frames, '');
-    let variants = null;
+    // variants: name -> frames, or {frames?, pal?} (a palette override; frames default to the main ones)
+    let variants = null, variantPal = null;
     if (opts.variants) {
       variants = {};
-      for (const [vn, vf] of Object.entries(opts.variants)) {
-        const list = Array.isArray(vf[0]) ? vf : [vf];
+      for (const [vn, v] of Object.entries(opts.variants)) {
+        const spec = Array.isArray(v) ? { frames: v } : v;
+        const vfr = spec.frames || frames;
+        const list = Array.isArray(vfr[0]) ? vfr : [vfr];
+        const vpal = spec.pal ? { ...pal, ...spec.pal } : pal;
+        for (const c of Object.values(vpal)) {
+          if (!(c in COLORS) && !(typeof c === 'string' && c[0] === '#' && inPalette(c))) throw new Error(`tile ${id}@${vn}: unknown colour ${c}`);
+        }
+        const saved = pal;
+        pal = vpal;
         check(list, `@${vn}`);
+        pal = saved;
         variants[vn] = Object.freeze(list.map((f) => Object.freeze(f.slice())));
+        if (spec.pal) (variantPal ||= {})[vn] = Object.freeze(vpal);
       }
     }
     for (const v of Object.values(pal)) {
@@ -84,6 +98,7 @@ export function createGroup(group) {
       fps: opts.fps ?? 0,
     };
     if (variants) t.variants = Object.freeze(variants);
+    if (variantPal) t.variantPal = Object.freeze(variantPal);
     if (opts.reserved) t.reserved = opts.reserved;
     if (opts.anchor) t.anchor = Object.freeze({ ...opts.anchor });
     if (opts.note) t.note = opts.note;

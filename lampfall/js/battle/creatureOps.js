@@ -32,6 +32,9 @@ export const DEFAULTS = Object.freeze({
   moveSlots: 4,
 });
 
+/** Every key of {@link DEFAULTS}. */
+export const TUNING_KEYS = Object.freeze(Object.keys(DEFAULTS));
+
 /**
  * The battle-facing slice of a Creature record (ARCHITECTURE §3.1). Extra
  * fields are carried through untouched.
@@ -187,27 +190,33 @@ export function learnMove(c, moveId, data, replaceIndex, opts = {}) {
 /**
  * Adds EXP, levels up and surfaces new learnset moves. Moves learned at a new
  * level go into a free slot; when the slots are full they come back in
- * `offers` for the UI to resolve.
+ * `offers` for the UI to resolve (each move at most once). Total EXP stops at
+ * the max-level threshold.
  * @param {BattleCreature} c
- * @param {number} amount
+ * @param {number} amount negative counts as 0
  * @param {CreatureData} data
  * @param {{tuning?: Partial<typeof DEFAULTS>}} [opts]
  * @returns {ExpGain}
+ * @throws {TypeError} for a non-finite amount (a NaN would corrupt the saved EXP)
  */
 export function gainExp(c, amount, data, opts = {}) {
+  if (typeof amount !== 'number' || !Number.isFinite(amount)) throw new TypeError(`gainExp: amount must be a finite number, got ${String(amount)}`);
   const t = mergeTuning(DEFAULTS, pickKnown(opts.tuning), 'creatureOps');
   const species = data.species(c.speciesId);
   const levelOf = data.levelFromExp || ((g, e) => levelFromExp(g, e, t.maxLevel));
+  const expAt = data.expForLevel || ((g, l) => expForLevel(g, l, t.maxLevel));
   const from = c.level;
   const statsBefore = { ...c.stats };
-  c.exp += Math.max(0, Math.floor(amount));
+  const cap = expAt(species.growth, t.maxLevel);
+  const before = Number.isFinite(c.exp) ? c.exp : 0;
+  c.exp = Math.max(before, Math.min(cap, before + Math.max(0, Math.floor(amount))));
   const target = Math.min(t.maxLevel, levelOf(species.growth, c.exp));
   const learned = [];
   const offers = [];
   while (c.level < target) {
     c.level++;
     for (const e of species.learnset) {
-      if (e.level !== c.level || c.moves.some((m) => m.id === e.move)) continue;
+      if (e.level !== c.level || c.moves.some((m) => m.id === e.move) || offers.includes(e.move)) continue;
       if (learnMove(c, e.move, data, undefined, opts)) learned.push(e.move);
       else offers.push(e.move);
     }

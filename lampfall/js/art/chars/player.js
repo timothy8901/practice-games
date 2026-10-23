@@ -16,7 +16,7 @@
 import { HEADS, TORSOS, TAILS, buildMammal } from './mammals.js';
 import './heads.js';
 import './backs.js';
-import { JUMPER, APRON, INK, PAPER } from './palettes.js';
+import { JUMPER, APRON, INK, PAPER, snapRod } from './palettes.js';
 import { recolorHSL } from '../../core/pixelart.js';
 
 export const PLAYER_SPECIES = Object.freeze(['water-vole', 'pine-marten', 'red-panda', 'opossum', 'ferret', 'mongoose']);
@@ -77,17 +77,22 @@ const FUR = {
   ],
 };
 const PINK = '#f2a7b5';
-const sh = (hex, dH, dS, dL) => recolorHSL(hex, dH, dS, dL);
+const FLOOR = '#1a1210'; // nothing in a fur ramp goes darker than this (never pure black)
+const lum = (h) => { const n = parseInt(h.slice(1, 7), 16); return 0.2126 * (n >> 16) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255); };
+const CEIL = '#f6f1e3'; // ... and nothing lighter than cream (never pure white)
+const sh = (hex, dH, dS, dL) => { const v = recolorHSL(hex, dH, dS, dL); return lum(v) < lum(FLOOR) ? FLOOR : lum(v) > lum(CEIL) ? CEIL : v; };
 function furPalette(species, [name, F, M, S], i) {
   const p = {
     id: `${species}-${i}`, name,
     F, L: sh(F, 6, -0.02, 0.12), f: sh(F, -5, 0.02, -0.12), K: sh(S, -4, -0.05, -0.08),
     M, m: sh(M, -4, 0.04, -0.14), N: sh(S, 0, 0, -0.04), P: PINK,
-    S, s: sh(S, -3, 0, -0.08),
+    S, s: null,
     R: sh(S, 0, 0, 0.02), r: sh(F, -6, 0.04, -0.22),
     T: sh(F, 8, -0.12, 0.2), t: sh(F, 4, -0.08, 0.06),
   };
-  if (species === 'red-panda') { p.T = sh(M, 6, 0.1, -0.12); p.t = sh(M, 2, 0.12, -0.24); p.N = sh(S, 0, 0, -0.06); }
+  // near-duplicate darks share the outline so a card stays inside the 18-colour cap
+  p.N = species === 'opossum' ? p.N : p.K; p.s = p.K;
+  if (species === 'red-panda') { p.T = sh(M, 6, 0.1, -0.12); p.t = p.m; } // tail rings shade with the muzzle shade
   if (species === 'opossum') { p.N = '#e3a0a8'; p.P = '#e3a0a8'; p.T = '#e3a0a8'; p.t = '#b57a84'; p.K = sh(S, 0, 0, -0.06); }
   if (species === 'pine-marten') { p.P = sh(S, 0, 0, 0.06); }
   return Object.freeze(p);
@@ -150,9 +155,9 @@ function applyFreckles(g, side) {
   const e = eyeBoxes(g); if (!e) return;
   const y = e.y1 + 1, ok = new Set(['F', 'f', 'L', 'M', 'm']);
   if (side === 'down') {
-    if (e.l) { setIf(g, e.l.x0 - 1, y, 'r', ok); setIf(g, e.l.x0, y + 1, 'r', ok); }
-    if (e.r) { setIf(g, e.r.x1 + 1, y, 'r', ok); setIf(g, e.r.x1, y + 1, 'r', ok); }
-  } else if (e.l) { setIf(g, e.l.x1 + 2, y, 'r', ok); setIf(g, e.l.x1 + 1, y + 1, 'r', ok); setIf(g, e.l.x1 + 3, y + 1, 'r', ok); }
+    if (e.l) { setIf(g, e.l.x0 - 1, y, 'R', ok); setIf(g, e.l.x0, y + 1, 'R', ok); }
+    if (e.r) { setIf(g, e.r.x1 + 1, y, 'R', ok); setIf(g, e.r.x1, y + 1, 'R', ok); }
+  } else if (e.l) { setIf(g, e.l.x1 + 2, y, 'R', ok); setIf(g, e.l.x1 + 1, y + 1, 'R', ok); setIf(g, e.l.x1 + 3, y + 1, 'R', ok); }
 }
 function applyBlush(g, side) {
   const e = eyeBoxes(g); if (!e) return;
@@ -207,9 +212,10 @@ export function playerLook(card) {
   const head = markHead(HEADS[info.head], c);
   const body = buildMammal({ head, torso: c.outfit === 'apron' ? TORSOS.apron : TORSOS.jumper, tail: TAILS[info.tail] });
   const fur = FUR_PALETTES[c.species][c.fur];
-  const palette = { ...(c.outfit === 'apron' ? APRON : JUMPER), E: INK, W: PAPER, ...fur };
+  let palette = { ...(c.outfit === 'apron' ? APRON : JUMPER), E: INK, W: PAPER, ...fur, b: fur.K };
   delete palette.id; delete palette.name;
   if (c.markings.includes('socks')) { palette.S = fur.M; palette.s = fur.m; }
+  palette = snapRod(palette);
   look = Object.freeze({ key, body, palette: Object.freeze(palette) });
   looks.set(key, look);
   return look;

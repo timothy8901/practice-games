@@ -54,6 +54,8 @@ const ENGINE_DEFAULTS = Object.freeze({
   crackdustTurns: 3,
   /** Plumbline re-boost block in turns after the hit. */
   plumblineBlockTurns: 2,
+  /** Plumbline passes every Ward, Mirrorveil included (GDD-00 ruling; false = the prototype, where a status Ward blocked it). */
+  plumblineIgnoresWards: true,
   /** Speed multiplier while numbed. */
   numbSpeedMult: 0.5,
   /** Chance a numbed creature loses its turn. */
@@ -80,6 +82,8 @@ const ENGINE_DEFAULTS = Object.freeze({
   expYieldDivisor: 7,
   /** Default trainer payout per level of their highest creature. */
   payoutPerLevel: 40,
+  /** Flat EXP for a survived hold-out scene (battlers get all of it, the bench `benchShare`); 0 = none (prototype). */
+  holdOutExp: 0,
   /** Run odds: floor(mySpe * runSpeedScale / theirSpe) + runAttemptBonus * attempts, out of runAutoThreshold. */
   runSpeedScale: 128,
   runAttemptBonus: 30,
@@ -97,6 +101,11 @@ const ENGINE_DEFAULTS = Object.freeze({
  * @type {Readonly<typeof EFFECT_DEFAULTS & typeof CREATURE_DEFAULTS & typeof ABILITY_DEFAULTS & typeof DATA_DEFAULTS & typeof ENGINE_DEFAULTS>}
  */
 export const DEFAULTS = Object.freeze({ ...EFFECT_DEFAULTS, ...CREATURE_DEFAULTS, ...ABILITY_DEFAULTS, ...DATA_DEFAULTS, ...ENGINE_DEFAULTS });
+
+/** Every key of {@link DEFAULTS}: the names `createBattle({tuning})` accepts (the GDD tuning table's battle keys). */
+export const TUNING_KEYS = Object.freeze(Object.keys(DEFAULTS));
+/** Alias of {@link TUNING_KEYS}. */
+export const tuningKeys = TUNING_KEYS;
 
 // Convenience names for the defaults most callers and tests read (each equals its DEFAULTS key).
 /** `DEFAULTS.evasionMult`. */
@@ -172,6 +181,27 @@ export const DIAL_RULES = Object.freeze({
   freefall: Object.freeze({ readCostsTurn: true, captureDisplay: 'bands', wardBadge: 'after-block', runAllowed: true, holdOutTurns: null }),
 });
 
+/**
+ * Resolves a dial rule row into the engine's canonical {@link DialRules}, accepting the
+ * spellings `data/dials.js` rows use: `captureDisplay` 'percent' (= 'exact') or 'band'
+ * (= 'bands'); `wardBadge` true (= 'start') or false (= 'after-block'); `holdOutTurns` 0
+ * (= null, no hold-out). Keys the engine does not read (e.g. `rerollCostMult`) are dropped.
+ * @param {Record<string, any>} rules a full row (defaults merged in by the caller)
+ * @returns {DialRules}
+ * @throws {RangeError} for a value the engine cannot read (it never guesses)
+ */
+export function normalizeDialRules(rules) {
+  const r = rules || {};
+  const display = { exact: 'exact', percent: 'exact', bands: 'bands', band: 'bands' }[r.captureDisplay];
+  if (!display) throw new RangeError(`dial rules: captureDisplay must be 'exact' | 'percent' | 'bands' | 'band', got ${String(r.captureDisplay)}`);
+  const badge = r.wardBadge === true ? 'start' : r.wardBadge === false ? 'after-block' : r.wardBadge;
+  if (badge !== 'start' && badge !== 'after-block') throw new RangeError(`dial rules: wardBadge must be 'start' | 'after-block' | boolean, got ${String(r.wardBadge)}`);
+  for (const k of ['readCostsTurn', 'runAllowed']) if (typeof r[k] !== 'boolean') throw new RangeError(`dial rules: ${k} must be a boolean, got ${String(r[k])}`);
+  const hold = r.holdOutTurns == null || r.holdOutTurns === 0 ? null : r.holdOutTurns;
+  if (hold !== null && !(Number.isInteger(hold) && hold > 0)) throw new RangeError(`dial rules: holdOutTurns must be null, 0 or a positive integer, got ${String(r.holdOutTurns)}`);
+  return { readCostsTurn: r.readCostsTurn, captureDisplay: display, wardBadge: badge, runAllowed: r.runAllowed, holdOutTurns: hold };
+}
+
 /** Item action id of the Ward-suppressing dust (an engine mechanic, carried in `SideInput.bag.crackdust`). */
 export const CRACKDUST = 'crackdust';
 
@@ -225,9 +255,11 @@ export class BattleError extends Error {
  * @property {Creature[]} [yard]                      Training Yard creatures (share of party EXP)
  * @property {{seen: Set<string>, read: Set<string>}} [fieldLog]   built by the flow from world.fieldLog; the engine adds to it
  * @property {boolean} [prism=false]                  Scouting Prism owned
- * @property {Partial<DialRules>} [rules]             overrides of the dial's {@link DIAL_RULES}
+ * @property {Partial<DialRules>|Record<string, any>} [rules]   overrides of the dial's {@link DIAL_RULES}; a `data/dials.js` `rules` row works as is (see {@link normalizeDialRules})
  * @property {number|null} [holdOut]                  end as 'holdout' after this many turns (opening scene)
  * @property {string|number} [nextUid]                uid given to a caught creature
+ * @property {(attempt: number) => {chance: (p: number) => boolean}} [captureRng]   optional per-attempt stream for the
+ *   Lantern roll (GDD-00: `capture:<battleId>:<attempt>`, attempt counts from 0 per battle); default: the battle rng
  * @property {Partial<typeof DEFAULTS>} [tuning]      overrides of {@link DEFAULTS}
  * @property {(c: Creature, amount: number) => import('./creatureOps.js').ExpGain} [gainExp]   level-up implementation (default: creatureOps.gainExp)
  */
@@ -282,12 +314,17 @@ export class Battle {
     this.kind = opts.kind;
     this.dial = dial;
     /** @type {DialRules} */
-    this.rules = { ...DIAL_RULES[dial], ...(opts.rules || {}) };
-    if (opts.holdOut != null) this.rules.holdOutTurns = opts.holdOut;
-    if (this.rules.holdOutTurns != null && !(Number.isInteger(this.rules.holdOutTurns) && this.rules.holdOutTurns > 0)) {
-      throw new RangeError(`createBattle: holdOut must be a positive integer, got ${String(this.rules.holdOutTurns)}`);
+    this.rules = normalizeDialRules({ ...DIAL_RULES[dial], ...(opts.rules || {}) });
+    if (opts.holdOut != null) {
+      if (!(Number.isInteger(opts.holdOut) && opts.holdOut > 0)) throw new RangeError(`createBattle: holdOut must be a positive integer, got ${String(opts.holdOut)}`);
+      this.rules.holdOutTurns = opts.holdOut;
     }
     this.nextUid = opts.nextUid;
+    if (opts.captureRng != null && typeof opts.captureRng !== 'function') throw new TypeError('createBattle: captureRng must be a function (attempt) => Rng');
+    /** @type {((attempt: number) => {chance: (p: number) => boolean})|null} */
+    this.captureRng = opts.captureRng || null;
+    /** Lantern attempts made this battle (the `captureRng` attempt index). */
+    this.captureAttempts = 0;
     this.rng = opts.rng;
     this.curveLevel = opts.curveLevel ?? null;
     this.summit = !!opts.summit;
@@ -326,19 +363,20 @@ export class Battle {
     this._events = [];
     this.sides = opts.sides.map((s, i) => {
       if (!s || !Array.isArray(s.party) || s.party.length === 0) throw new TypeError(`createBattle: side ${i} needs a non-empty party`);
-      const first = s.party.findIndex((c) => !isFainted(c));
-      if (first < 0) throw new RangeError(`createBattle: side ${i} has no healthy creature`);
-      for (const c of s.party) {
+      s.party.forEach((c, j) => {
+        checkCreature(c, `createBattle: side ${i} party[${j}]`);
         data.species(c.speciesId);
         data.ability(c.ability);
         for (const m of c.moves) data.move(m.id);
-      }
+      });
+      const first = s.party.findIndex((c) => !isFainted(c));
+      if (first < 0) throw new RangeError(`createBattle: side ${i} has no healthy creature`);
       return {
         index: i,
         party: s.party,
         trainer: s.trainer || null,
         bag: { crackdust: 0, lanterns: null, ...(s.bag || {}) },
-        glint: s.glint ?? 0,
+        glint: Number.isFinite(s.glint) && s.glint > 0 ? s.glint : 0,
         items: s.trainer && s.trainer.items ? s.trainer.items.map((it) => ({ ...it })) : [],
         active: first,
         vol: freshVol(),
@@ -421,6 +459,15 @@ export class Battle {
   }
 
   /**
+   * {@link wardCheck} under this battle's rules (Plumbline may pass every Ward).
+   * @param {any} ability @param {import('./effects.js').Move} move @param {readonly string[]} types @param {string|null} moveType
+   * @returns {ReturnType<typeof wardCheck>}
+   */
+  _wardCheck(ability, move, types, moveType) {
+    return wardCheck(ability, move, types, moveType, this.data.chart, { plumblineIgnoresWards: this.tuning.plumblineIgnoresWards });
+  }
+
+  /**
    * Effective stat with stages and numb.
    * @param {number} side @param {'atk'|'def'|'spa'|'spd'|'spe'} key @returns {number}
    */
@@ -457,10 +504,11 @@ export class Battle {
     const user = this.active(side);
     const foeSide = 1 - side;
     const target = this.active(foeSide);
+    if (index !== null && !(Number.isInteger(index) && user.moves[index])) throw new BattleError('BAD_MOVE', `Side ${side}: no move at slot ${String(index)}.`);
     const move = index === null ? this.data.scrap : this.data.move(user.moves[index].id);
     if (!isDamaging(move) || isFainted(target)) return { min: 0, max: 0, lands: isDamaging(move) };
     const moveType = moveTypeFor(move, user);
-    const check = wardCheck(this.effectiveAbility(foeSide), move, target.types, moveType, this.data.chart);
+    const check = this._wardCheck(this.effectiveAbility(foeSide), move, target.types, moveType);
     if (!check.lands) return { min: 0, max: 0, lands: false };
     const physical = move.category === 'physical';
     const attack = this.effStat(side, physical ? 'atk' : 'spa');
@@ -547,7 +595,9 @@ export class Battle {
     out.moves = c.moves.map((m, i) => {
       const mv = this.data.move(m.id);
       const type = moveTypeFor(mv, c);
-      const check = isDamaging(mv) ? wardCheck(foeAbility, mv, foe.types, type, this.data.chart) : { lands: true, reason: null, eff: { mult: 1, word: 'Neutral' } };
+      // Damaging moves and foe-aimed status moves are checked against the Ward (a status Ward
+      // blocks the latter), so the menu and the AI both see "Blocked by Ward".
+      const check = isDamaging(mv) || !isSelfTargeting(mv) ? this._wardCheck(foeAbility, mv, foe.types, type) : { lands: true, reason: null, eff: { mult: 1, word: 'Neutral' } };
       const selectable = m.pp > 0;
       const reason = selectable ? null : 'No PP left.';
       const word = check.reason === 'ward' ? 'Blocked by Ward' : check.reason === 'immune' ? 'No effect' : isDamaging(mv) ? check.eff.word : null;
@@ -650,11 +700,12 @@ export class Battle {
    * Toggles Capture Stance (wild battles only, costs nothing).
    * @param {boolean} on
    * @returns {BattleEvent[]}
-   * @throws {BattleError} NO_STANCE in a trainer battle
+   * @throws {BattleError} NO_STANCE in a trainer battle, ENDED after the end
    */
   setCaptureStance(on) {
     this._events = [];
     if (this.kind !== 'wild') throw new BattleError('NO_STANCE', 'Capture Stance is only for wild battles.');
+    if (this.phase === 'ended') throw new BattleError('ENDED', 'The battle is over.');
     this.stance = !!on;
     this._emit({ type: 'stance', on: this.stance, text: this.stance ? 'Capture Stance. Party damage stops at 1 HP.' : 'Capture Stance off.' });
     return this._flush();
@@ -665,12 +716,14 @@ export class Battle {
    * Otherwise submit `{type:'read'}` as the turn's action.
    * @param {number} side
    * @returns {BattleEvent[]}
-   * @throws {BattleError} READ_COSTS_TURN or ENDED
+   * @throws {BattleError} BAD_SIDE, READ_COSTS_TURN, ENDED or REPLACING (a replacement is being chosen)
    */
   read(side) {
     this._events = [];
+    if (side !== 0 && side !== 1) throw new BattleError('BAD_SIDE', `No side ${String(side)}.`);
     if (this.rules.readCostsTurn) throw new BattleError('READ_COSTS_TURN', 'On this dial Read costs the turn: submit it as an action.');
     if (this.phase === 'ended') throw new BattleError('ENDED', 'The battle is over.');
+    if (this.phase === 'replace') throw new BattleError('REPLACING', 'Read is a battle-menu command: choose the replacement first.');
     this._doRead(side, 'Read');
     return this._flush();
   }
@@ -958,7 +1011,9 @@ export class Battle {
     const fails = this.captureFails.get(target.uid) || 0;
     const odds = this._captureOddsFor(target, grade, fails);
     if (s.bag.lanterns) s.bag.lanterns[grade]--;
-    const success = lantern.mult === Infinity || this.rng.chance(odds);
+    const attempt = this.captureAttempts++;
+    const roller = this.captureRng ? this.captureRng(attempt) : this.rng;
+    const success = lantern.mult === Infinity || roller.chance(odds);
     const segments = success ? 3 : Math.min(2, Math.floor(odds * 3));
     const exact = this.rules.captureDisplay === 'exact';
     this._emit({ type: 'capture-shake', side, target: target.nickname, grade, odds: exact ? odds : null, band: captureBand(odds, t), segments, success, text: `You raise the ${lantern.name}. The light draws ${target.nickname} in.` });
@@ -1107,7 +1162,7 @@ export class Battle {
       return;
     }
     const foeAbility = this.effectiveAbility(foeSide);
-    const check = wardCheck(foeAbility, move, target.types, moveType, this.data.chart);
+    const check = this._wardCheck(foeAbility, move, target.types, moveType);
     if (!check.lands) {
       if (check.reason === 'immune') {
         this._emit({ type: 'effectiveness', side, target: target.nickname, word: 'Blocked', mult: 0 });
@@ -1434,6 +1489,7 @@ export class Battle {
     this.winner = winner;
     this.pendingReplace = [];
     this._emit({ type: 'end', outcome, winner, text: outcomeText(outcome, this) });
+    if (outcome === 'holdout' && t.holdOutExp > 0) this._holdOutExp();
     if (outcome === 'win' || outcome === 'capture') {
       this._distributeExp();
       if (this.kind === 'trainer') {
@@ -1443,7 +1499,7 @@ export class Battle {
         this._emit({ type: 'payout', amount: this.payout, text: `You won ${this.payout} glint.` });
       }
     } else if (outcome === 'loss') {
-      this.blackoutCost = this.summit ? 0 : Math.min(t.blackoutCap, Math.floor(this.sides[0].glint * t.blackoutRate));
+      this.blackoutCost = this.summit ? 0 : Math.max(0, Math.min(t.blackoutCap, Math.floor(this.sides[0].glint * t.blackoutRate)));
       this._emit({ type: 'blackout', cost: this.blackoutCost, summit: this.summit, text: this.summit ? 'The Summit takes nothing.' : `You black out and lose ${this.blackoutCost} glint.` });
     }
   }
@@ -1458,7 +1514,7 @@ export class Battle {
     /** @type {Map<any, number>} */
     const gains = new Map();
     const add = (c, amount, share) => {
-      if (amount <= 0) return;
+      if (!(amount > 0)) return;
       gains.set(c.uid, (gains.get(c.uid) || 0) + amount);
       this._emit({ type: 'exp', creature: c.nickname, uid: c.uid, amount, share, text: `${c.nickname} gained ${amount} EXP${share === 'bench' ? ' (bench)' : share === 'sibling' ? ' (shared)' : share === 'yard' ? ' (Training Yard)' : ''}.` });
     };
@@ -1475,7 +1531,7 @@ export class Battle {
     for (const c of recipients) {
       const ability = this.data.ability(c.ability);
       if (ability.expShare && player.participants.has(c.uid)) {
-        const others = player.party.filter((o) => o !== c);
+        const others = player.party.filter((o) => o !== c && !isFainted(o));
         if (!others.length) continue;
         const lowest = others.reduce((a, b) => (b.level < a.level ? b : a));
         add(lowest, Math.floor((gains.get(c.uid) || 0) * ability.expShare.toLowest), 'sibling');
@@ -1484,7 +1540,32 @@ export class Battle {
     const partyTotal = [...gains.values()].reduce((a, b) => a + b, 0);
     const yard = this.yard.slice(0, t.yardMax);
     for (const y of yard) add(y, Math.floor(partyTotal * t.yardShare), 'yard');
-    for (const c of [...player.party, ...yard]) {
+    this._applyGains(gains, [...player.party, ...yard]);
+  }
+
+  /** The flat hold-out EXP ({@link DEFAULTS}.holdOutExp): battlers all of it, the bench `benchShare`. */
+  _holdOutExp() {
+    const t = this.tuning;
+    const player = this.sides[0];
+    /** @type {Map<any, number>} */
+    const gains = new Map();
+    for (const c of player.party) {
+      if (isFainted(c)) continue;
+      const battler = player.participants.has(c.uid);
+      const amount = Math.floor(t.holdOutExp * (battler ? 1 : t.benchShare));
+      if (!(amount > 0)) continue;
+      gains.set(c.uid, amount);
+      this._emit({ type: 'exp', creature: c.nickname, uid: c.uid, amount, share: battler ? 'battler' : 'bench', text: `${c.nickname} gained ${amount} EXP${battler ? '' : ' (bench)'}.` });
+    }
+    this._applyGains(gains, player.party);
+  }
+
+  /**
+   * Applies summed EXP through the level-up implementation and reports it.
+   * @param {Map<any, number>} gains by uid @param {Creature[]} creatures candidates, in report order
+   */
+  _applyGains(gains, creatures) {
+    for (const c of creatures) {
       const amount = gains.get(c.uid);
       if (!amount) continue;
       const r = this._gainExp(c, amount);
@@ -1519,7 +1600,7 @@ export class Battle {
       for (const m of c.moves) {
         const mv = this.data.move(m.id);
         const type = moveTypeFor(mv, c);
-        const lands = wardCheck(ability, mv, target.types, type, chart).lands;
+        const lands = this._wardCheck(ability, mv, target.types, type).lands;
         if (isDamaging(mv) && !mv.effect.scrap && lands) {
           const entry = { creature: c.nickname, uid: c.uid, move: mv.id, moveName: mv.name, type, pp: m.pp };
           if (m.pp > 0) canLand.push(entry);
@@ -1533,7 +1614,7 @@ export class Battle {
         }
       }
     }
-    const types = chart.ordinary.filter((ty) => wardCheck(ability, { id: '-', name: '-', category: 'special', power: 100, accuracy: 100, pp: 1, priority: 0, type: ty, effect: {} }, target.types, ty, chart).lands);
+    const types = chart.ordinary.filter((ty) => this._wardCheck(ability, { id: '-', name: '-', category: 'special', power: 100, accuracy: 100, pp: 1, priority: 0, type: ty, effect: {} }, target.types, ty).lands);
     const indirect = wardIndirect(ability);
     const lines = [wardHeldText(ability)];
     lines.push(canLand.length ? `Can land: ${canLand.map((e) => `${e.creature}'s ${e.moveName}`).join(', ')}.` : 'Nothing in your party lands right now.');
@@ -1561,6 +1642,29 @@ export class Battle {
     const out = this._events;
     this._events = [];
     return out;
+  }
+}
+
+/**
+ * Throws a readable TypeError when a party entry is not a usable battle creature
+ * (a malformed save or fixture must fail at setup, not as a NaN mid-battle).
+ * @param {any} c @param {string} where
+ */
+function checkCreature(c, where) {
+  if (!c || typeof c !== 'object') throw new TypeError(`${where}: not a creature object`);
+  if (c.uid === undefined || c.uid === null) throw new TypeError(`${where}: uid is required`);
+  if (typeof c.speciesId !== 'string') throw new TypeError(`${where}: speciesId must be a string`);
+  if (typeof c.ability !== 'string') throw new TypeError(`${where}: ability must be a string`);
+  if (!Number.isInteger(c.level) || c.level < 1) throw new TypeError(`${where}: level must be a positive integer, got ${String(c.level)}`);
+  if (!c.stats || typeof c.stats !== 'object') throw new TypeError(`${where}: stats are required`);
+  for (const k of ['hp', 'atk', 'def', 'spa', 'spd', 'spe']) {
+    if (!(Number.isFinite(c.stats[k]) && c.stats[k] > 0)) throw new TypeError(`${where}: stats.${k} must be a positive number, got ${String(c.stats[k])}`);
+  }
+  if (!Number.isFinite(c.hp) || c.hp < 0 || c.hp > c.stats.hp) throw new TypeError(`${where}: hp must be 0..stats.hp, got ${String(c.hp)}`);
+  if (!Array.isArray(c.types) || c.types.length === 0) throw new TypeError(`${where}: types must be a non-empty array`);
+  if (!Array.isArray(c.moves)) throw new TypeError(`${where}: moves must be an array`);
+  for (const m of c.moves) {
+    if (!m || typeof m.id !== 'string' || !Number.isFinite(m.pp) || !Number.isFinite(m.maxPp) || m.pp < 0) throw new TypeError(`${where}: bad move slot ${JSON.stringify(m)}`);
   }
 }
 

@@ -464,10 +464,12 @@ describe('Wards and the readout (section 8)', () => {
     assert.match(ro.text, /Nothing in your party lands right now/);
   });
 
-  it('Mirrorveil: status techniques fail (Plumbline included); damaging hits land', () => {
+  it('Mirrorveil: status techniques fail (Plumbline too, with the prototype rule plumblineIgnoresWards: false); damaging hits land', () => {
     const a = mk('sloshkin', 30, ['scorch', 'tap', 'plumbline']);
     const l = mk('lumenveil', 30, ['settle']);
-    const bt = duel(a, l);
+    const bt = duel(a, l, { tuning: { plumblineIgnoresWards: false } });
+    assert.equal(bt.availableActions(0).moves[0].word, 'Blocked by Ward', 'a blocked status move says so in the menu');
+    assert.equal(bt.availableActions(0).moves[2].word, 'Blocked by Ward');
     assert.equal(bt.availableActions(0).moves[1].word, 'Neutral');
     let evs = bt.submit([{ type: 'move', move: 0 }, { type: 'move', move: 0 }]);
     assert.ok(ofType(evs, 'blocked').some((e) => e.side === 0 && e.reason === 'ward' && e.ward === 'Mirrorveil'));
@@ -480,6 +482,19 @@ describe('Wards and the readout (section 8)', () => {
     assert.ok(bt.state().sides[1].stages.def > 0, 'Settle boosts stayed: Plumbline failed');
     evs = bt.submit([{ type: 'move', move: 1 }, { type: 'move', move: 0 }]);
     assert.ok(ofType(evs, 'damage').some((e) => e.side === 1 && e.source === 'party'));
+  });
+
+  it('Plumbline ignores Mirrorveil by default (GDD-00 ruling): it clears the boosts and blocks re-boosting', () => {
+    const a = mk('sloshkin', 30, ['tap', 'plumbline']);
+    const l = mk('lumenveil', 30, ['settle']);
+    const bt = duel(a, l);
+    assert.equal(bt.availableActions(0).moves[1].word, null);
+    bt.submit([{ type: 'move', move: 0 }, { type: 'move', move: 0 }]);
+    assert.ok(bt.state().sides[1].stages.def > 0);
+    const evs = bt.submit([{ type: 'move', move: 1 }, { type: 'move', move: 0 }]);
+    assert.ok(!ofType(evs, 'blocked').some((e) => e.side === 0 && e.reason === 'ward'));
+    assert.ok(ofType(evs, 'stat').some((e) => e.side === 1 && e.result === 'cleared'));
+    assert.equal(bt.state().sides[1].boostBlocked, true);
   });
 
   it('Stillcoat: hits under 50 power do nothing; 50 and up land', () => {

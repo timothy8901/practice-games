@@ -258,6 +258,38 @@ export function lowInfo(world, ctx) {
 }
 
 /**
+ * Whether the flats window of a low (±`flatsWindowMinutes`) touches game night, i.e. whether its
+ * skyglass can ever be dug. Night and day are each longer than the window, so the window touches
+ * night exactly when one of its ends is night.
+ * @param {number} lowTotal
+ * @param {LaneCtx} [ctx]
+ * @returns {boolean}
+ */
+export function lowTouchesNight(lowTotal, ctx) {
+  const W = T(ctx).flatsWindowMinutes;
+  return isNightMinute((lowTotal - W) % MINUTES_PER_DAY, ctx) || isNightMinute((lowTotal + W) % MINUTES_PER_DAY, ctx);
+}
+
+/**
+ * The low whose skyglass is next diggable: the current one when its window touches night, else the
+ * next low that does (searched up to four lows ahead; two consecutive lows are 12 h 25 m apart, so
+ * one of any two touches night). Used for the Glass/Hollow lead's dim by-day view.
+ * @param {World} world
+ * @param {LaneCtx & {total?: number, tideOffset?: number}} [ctx]
+ * @returns {{lowIndex: number, lowTotal: number}}
+ */
+export function nextNightLow(world, ctx) {
+  const li = lowInfo(world, ctx);
+  const P = TIDE_PERIOD_MINUTES;
+  for (let k = li.lowIndex; k <= li.lowIndex + 4; k++) {
+    const lowTotal = li.lowTotal + (k - li.lowIndex) * P;
+    if (lowTotal + T(ctx).flatsWindowMinutes < li.total) continue; // already over
+    if (lowTouchesNight(lowTotal, ctx)) return { lowIndex: k, lowTotal };
+  }
+  return { lowIndex: li.lowIndex, lowTotal: li.lowTotal };
+}
+
+/**
  * The environment a row's conditions are checked against.
  * @typedef {{phase: string, tideState: string, weather: string, night: boolean, world: World, data: any, mapId: string|null, region: string|null}} Env
  */
@@ -402,16 +434,20 @@ function viewMap(world, mapId) {
   return world?.maps?.[mapId] ?? mapStateDefaults();
 }
 
+/** Low-indexed `picked` keys: `s<low>#<i>` (sparkle), `k<low>#<i>` (skyglass), `r<low>@<x>,<y>` (rake). */
+const LOW_KEY_RE = /^(?:[sk](-?\d+)#\d+|r(-?\d+)@-?\d+,-?\d+)$/;
+
 /**
- * Low-indexed `picked` keys look like `<tag><low>#...` / `<tag><low>@...`; drops those older than
- * `low - 1` so the record never grows without bound.
+ * Drops low-indexed `picked` keys older than `low - 1` so the record never grows without bound.
+ * Only exact low keys match ({@link LOW_KEY_RE}), so a tree whose id looks like `s3` keeps its
+ * `s3#f0` / `s3#purse` / `s3#hive` keys.
  * @param {MapState} m
  * @param {number} low
  */
 function pruneLowKeys(m, low) {
   for (const k of Object.keys(m.picked)) {
-    const mt = /^([skr])(-?\d+)[#@]/.exec(k);
-    if (mt && Number(mt[2]) < low - 1) delete m.picked[k];
+    const mt = LOW_KEY_RE.exec(k);
+    if (mt && Number(mt[1] ?? mt[2]) < low - 1) delete m.picked[k];
   }
 }
 
@@ -945,7 +981,8 @@ export function rakeCockles(world, map, x, y, rng, ctx) {
 /**
  * What the player notices from `pos` with the current lead (GDD-00 §9 Crossovers): the Glint from 3
  * tiles (Grit/Stone; base `glintRevealRadius`), today's cracks marked, skyglass from 5 tiles and
- * dimly by day (Glass/Hollow; base `skyglassRevealRadius` at a night low only), the Tailhum within 4
+ * dimly by day: the next night low's relics (Glass/Hollow; base `skyglassRevealRadius` at a night
+ * low only), the Tailhum within 4
  * tiles of a ready purse tree, the undug Glint or any `ctx.headliners` position (Bolt).
  * @param {World} world
  * @param {{id: string, region?: string, entities?: any[], dig?: any, flats?: any}} map
@@ -973,7 +1010,10 @@ export function senses(world, map, pos, rng, ctx) {
       const r = Math.max(lb.skyglassSeeRadius, t.skyglassRevealRadius);
       for (const s of relics) if (tileDist(pos, s) <= r) out.skyglass.push({ x: s.x, y: s.y, dim: false, findId: s.findId });
     } else if (lb.skyglassByDay && !li.night) {
-      for (const s of relics) if (tileDist(pos, s) <= lb.skyglassSeeRadius) out.skyglass.push({ x: s.x, y: s.y, dim: true, findId: s.findId });
+      // by day the relics of the next NIGHT low show dimly (those are the ones that can be dug)
+      const nl = nextNightLow(world, ctx);
+      const ahead = nl.lowIndex === li.lowIndex ? relics : skyglassFor(world, map, rng, nl.lowIndex, ctx).filter((s) => !s.taken);
+      for (const s of ahead) if (tileDist(pos, s) <= lb.skyglassSeeRadius) out.skyglass.push({ x: s.x, y: s.y, dim: true, findId: s.findId });
     }
   }
   if (lb.humRadius > 0) {
@@ -1007,11 +1047,13 @@ export function senses(world, map, pos, rng, ctx) {
  * Places bugs at spots for the moment: each spot holds a bug with `bugSpawnChance` (× `bugLightMult`
  * at a lit spot, × `bugRainMult` in rain; capped at 1); the bug is a weighted pick among the active
  * bug rows ({@link rowActive}; `w`, `mods`), light-loving rows (`light: true`) weigh `bugLightMult`
- * more at lit spots and moths (`moth: true`) a further `mothLightMult` with a Bolt lead. Draws two
- * per spot that holds a bug, one per spot that does not.
+ * more at lit spots and moths (`moth: true`) a further `mothLightMult` with a Bolt lead. A spot with
+ * a `habitat` only holds rows whose `habitat` (string or list) names it; rows without a `habitat`
+ * live anywhere. Draws two per spot that holds a bug, one per spot that does not (a spot whose
+ * habitat no active row lives at still draws its one spawn roll, so spots never shift each other).
  * @param {World} world
  * @param {{id: string, region?: string}} map
- * @param {Array<{x: number, y: number, lit?: boolean}>} spots
+ * @param {Array<{x: number, y: number, lit?: boolean, habitat?: string}>} spots
  * @param {Rng} rng   the `loot` stream (or a per-visit fork)
  * @param {GatherCtx} [ctx]
  * @returns {Bug[]}
@@ -1030,7 +1072,13 @@ export function rollBugs(world, map, spots, rng, ctx) {
     const lit = Boolean(s.lit);
     const p = Math.min(1, t.bugSpawnChance * (lit ? t.bugLightMult : 1) * (rain ? t.bugRainMult : 1));
     if (!rng.chance(p)) continue;
-    const entries = rows.map((r) => {
+    const habitat = typeof s.habitat === 'string' ? s.habitat : null;
+    const here = habitat === null ? rows : rows.filter((r) => {
+      const h = Array.isArray(r.habitat) ? r.habitat : (typeof r.habitat === 'string' ? [r.habitat] : null);
+      return h === null || h.includes(habitat);
+    });
+    if (here.length === 0) continue;
+    const entries = here.map((r) => {
       let w = (typeof r.w === 'number' && Number.isFinite(r.w) ? r.w : 1) * modsFor(r, env);
       if (lit && r.light) w *= t.bugLightMult;
       if (lit && r.moth) w *= lb.mothLightMult;

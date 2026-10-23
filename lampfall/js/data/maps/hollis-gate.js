@@ -1,0 +1,43 @@
+/**
+ * Hollis's Gate (hollis-gate). STUB (GDD-01 §3): a minimal valid map so imports resolve; the isle / interior author replaces this file and keeps the arrival points named in GDD-01 §3.4.
+ * @type {import('../index.js').MapDef}
+ */
+export default {
+  stub: true,
+  id: 'hollis-gate',
+  name: 'Hollis\'s Gate',
+  kind: 'interior',
+  region: 'shardcrown',
+  w: 20,
+  h: 14,
+  legend: { '#': 'int-wall', F: 'floor-stone', '+': 'door' },
+  ground: [
+    '####################',
+    '#FFFFFFFFFFFFFFFFFF#',
+    '#FFFFFFFFFFFFFFFFFF#',
+    '#FFFFFFFFFFFFFFFFFF#',
+    '#FFFFFFFFFFFFFFFFFF#',
+    '#FFFFFFFFFFFFFFFFFF#',
+    '#FFFFFFFFFFFFFFFFFF#',
+    '#FFFFFFFFFFFFFFFFFF#',
+    '#FFFFFFFFFFFFFFFFFF#',
+    '#FFFFFFFFFFFFFFFFFF#',
+    '#FFFFFFFFFFFFFFFFFF#',
+    '#FFFFFFFFFFFFFFFFFF#',
+    '#FFFFFFFFFFFFFFFFFF#',
+    '##########+#########',
+  ],
+  detail: null,
+  overlay: null,
+  collision: null,
+  props: [],
+  entities: [],
+  triggers: [],
+  warps: [],
+  spawns: [],
+  regions: {},
+  markers: { 'from-door': { x: 10, y: 12, facing: 'up' } },
+  music: null,
+  light: { indoor: true },
+  entry: { x: 10, y: 12, facing: 'up' },
+};

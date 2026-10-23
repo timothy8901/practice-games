@@ -90,9 +90,16 @@ describe('migrateWorld', () => {
     assert.equal(res.ok, true);
     assert.equal(res.from, 3);
     assert.deepEqual(validateWorld(res.world), []);
-    assert.deepEqual(res.world.letters, { ...lettersDefaults(), delivered: 3, read: [1], today: 3, got: [1, 2, 3], mailbox: [3] });
+    const clockDay = Math.floor(v3.clock.total / 1440);
+    assert.deepEqual(res.world.letters, { ...lettersDefaults(), delivered: 3, read: [1], today: 3, keeperDay: clockDay, got: [1, 2, 3], mailbox: [3] },
+      'the v1 `today` letter came on the save\'s day: no second Keeper letter that morning');
     assert.deepEqual(res.world.npcs.wren, { ...npcMemoryDefaults(), met: true, talks: 2, lastTalkDay: 1, nickname: 'Keeper', affinity: 1, saidLines: { g1: 1 } });
-    assert.deepEqual(res.world.dayPage, dayPageDefaults());
+    const pageDay = Math.max(0, v3.clock.total % 1440 < 360 ? clockDay - 1 : clockDay);
+    const base = Object.fromEntries(Object.entries(v3.stats).filter(([k]) => k !== 'playMs'));
+    assert.deepEqual(res.world.dayPage, { ...dayPageDefaults(), day: pageDay, base }, 'the tally opens on the save\'s page day');
+    // no `today`: keeperDay stays unset; a save in the small hours opens the evening-before's page
+    const late = migrateWorld({ ...v3, letters: { delivered: 2, read: [], today: null }, clock: { ...v3.clock, total: 5 * 1440 + 120 } }).world;
+    assert.deepEqual([late.letters.keeperDay, late.dayPage.day], [-1, 4]);
     // a read `today` is no longer in the mailbox; a bad `today` is dropped; a bad count becomes 0
     const read = migrateWorld({ ...v3, letters: { delivered: 2, read: [2], today: 2 } }).world.letters;
     assert.deepEqual([read.got, read.mailbox, read.today], [[1, 2], [], 2]);

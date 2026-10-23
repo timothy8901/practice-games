@@ -93,6 +93,7 @@ describe('loans: pay and the ceremony', () => {
     assert.deepEqual(w.loans.builds, [{ id: 'bedsit', tier: 1, startedDay: 0, readyDay: 1, choice: null, done: false }]);
     assert.equal(w.flags['sys.loan.cleared'], 1);
     assert.equal(w.flags['sp.porch-lit'], true, 'porch lamp lit at payment');
+    assert.equal(w.flags['sp.first-payment'], true, 'first THWAP');
     assert.deepEqual(bus.of('loan:tier'), [{ tier: 2, prev: 1, done: false }]);
     assert.deepEqual(loans.nextLanding(w, C()), { id: 'bedsit', tier: 1, total: at(1, 5, 40), day: 1, minute: 340 });
     assert.deepEqual(validateWorld(w), []);
@@ -211,13 +212,13 @@ describe('loans: builds', () => {
     const w = freshWorld();
     clearTier(w, at(1, 10));
     assert.equal(loans.roofChoices(1, C()).length, 8);
-    assert.deepEqual(loans.chooseRoof(w, 1, 'plum', C()), { ok: true, id: 'bedsit', tier: 1, choice: 'plum' });
+    assert.deepEqual(loans.chooseRoof(w, 1, 'heather', C()), { ok: true, id: 'bedsit', tier: 1, choice: 'heather' });
     assert.deepEqual(loans.chooseRoof(w, 1, 'neon', C()), { ok: false, reason: 'unknown-colour' });
     assert.deepEqual(loans.chooseRoof(w, 'bedsit', 'ochre', C()).choice, 'ochre');
     assert.deepEqual(loans.chooseRoof(w, 2, 'ochre', C()), { ok: false, reason: 'no-build' });
     loans.landDue(w, C({ now: at(2, 6) }));
     assert.equal(w.loans.builds[0].choice, 'ochre');
-    assert.deepEqual(loans.chooseRoof(w, 1, 'plum', C()), { ok: false, reason: 'already-built' });
+    assert.deepEqual(loans.chooseRoof(w, 1, 'heather', C()), { ok: false, reason: 'already-built' });
   });
 });
 
@@ -268,7 +269,7 @@ describe('loans: commissions', () => {
   it('leftover rooms cost 20,000 each, only after the Relighting and the four picks', () => {
     const w = freshWorld();
     assert.equal(loans.buyLeftoverCommission(w, 'gallery', C()).reason, 'not-relit');
-    w.flags['sp.relit'] = true;
+    w.flags['sp.relighting'] = true;
     assert.equal(loans.buyLeftoverCommission(w, 'gallery', C()).reason, 'pick-first');
     w.loans.commissions.push('cellar', 'workshop', 'greenhouse', 'porch-loft');
     assert.deepEqual(loans.buyLeftoverCommission(w, 'gallery', C()), { ok: false, reason: 'insufficient', short: 20000 });
@@ -305,11 +306,14 @@ describe('loans: the Relighting', () => {
     // builds land one per night from day 2: bedsit d2, cottage d3, 4 rooms d4-d7, lamp room d8
     assert.equal(w.loans.builds.find((b) => b.id === 'lamp-room').readyDay, 8);
     loans.landDue(w, C({ now: at(7, 6) }));
-    assert.equal(w.flags['sp.relighting-due'], undefined);
+    assert.equal(w.flags['sys.relighting-due'], undefined);
+    assert.equal(w.flags['sp.lamp-room-built'], undefined);
     const bus = recBus();
     const r = loans.landDue(w, C({ now: at(8, 5, 40), bus }));
     assert.deepEqual(r.relighting, { set: true, day: 8 });
-    assert.equal(w.flags['sp.relighting-due'], 8);
+    assert.equal(w.flags['sys.relighting-due'], 8);
+    assert.equal(w.flags['sp.lamp-room-built'], true);
+    assert.equal(w.flags['sp.relighting'], undefined, 'set only when the Relighting plays');
     assert.equal(w.flags['sp.lamp-room'], true);
     assert.equal(loans.relightingDue(w, C({ now: at(8, 17, 59) })), false);
     assert.equal(loans.relightingDue(w, C({ now: at(8, 18) })), true);
@@ -356,9 +360,9 @@ describe('loans: Commons Jar', () => {
   it('the green\'s Training Yard waits for badge 5', () => {
     const w = freshWorld({ main: 20000 });
     loans.depositJar(w, 20000, C());
-    assert.equal(loans.fundProject(w, 'green-training-yard', C()).reason, 'locked');
+    assert.equal(loans.fundProject(w, 'training-yard-green', C()).reason, 'locked');
     w.badges.push('turn', 'ward', 'weather', 'hollow', 'relay');
-    assert.equal(loans.fundProject(w, 'green-training-yard', C()).spent, 8000);
+    assert.equal(loans.fundProject(w, 'training-yard-green', C()).spent, 8000);
   });
 
   it('commonsStatus lists the six projects', () => {
@@ -451,6 +455,9 @@ describe('loans: edges and tuning', () => {
     assert.deepEqual([d.errandCredit, d.errandCount, d.leftoverCommissionPrice, d.buildLandMinute, d.relightMinute], [500, 6, 20000, 340, 1080]);
     assert.equal(d.roofColours.length, 8);
     assert.equal(d.roofDefault, 'slate-blue');
+    assert.deepEqual([...d.roofColours], ['slate-blue', 'ochre', 'harbor-red', 'moss', 'sea-blue', 'straw', 'tar', 'heather']);
+    assert.deepEqual(d.commonsProjects.map((p) => p.id), ['dark-house-1', 'quay-lamps', 'mudlark-mile-flags', 'north-creek-footbridge', 'training-yard-green', 'third-stall']);
+    assert.deepEqual([...d.commissionRooms], ['training-yard', 'workshop', 'greenhouse', 'cellar', 'porch-loft', 'gallery']);
     assert.deepEqual(d.commonsProjects.map((p) => p.cost), [3000, 4000, 5000, 6000, 10000, 12000]);
     assert.deepEqual([...loans.TUNING_KEYS].sort(), Object.keys(d).sort());
     assert.throws(() => loans.tuningOf({ tuning: { relightFlag: 'no-namespace' } }), TypeError);

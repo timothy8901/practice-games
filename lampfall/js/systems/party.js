@@ -6,8 +6,8 @@
  * Owns `world.party`, `world.box` and `world.yard` (tools/lint-owners). Every function is
  * `fn(world, ...args, opts?)`, runs inside a caller's `store.tx`, and returns a plain result; with
  * `opts.bus` it emits domain events after mutating (§3.4): `party:changed {reason, uid?}`,
- * `creature:levelUp {uid, from, to}`, `creature:learned {uid, move}`, and (through systems/exp)
- * `shift:window {uid, level, held}`. Refusals are results (`{ok: false, reason}`), not throws;
+ * `creature:levelUp {uid, from, to}`, `creature:learned {uid, move}`, (through systems/exp)
+ * `shift:window {uid, level, held}` and (through systems/settings, on release) `settings:changed`. Refusals are results (`{ok: false, reason}`), not throws;
  * programming errors (bad indices types, duplicate uids) throw.
  *
  * Tunables: {@link DEFAULTS} here plus `creature.DEFAULTS` and `exp.DEFAULTS`; one flat
@@ -22,6 +22,7 @@ import { day as dayOf } from '../state/selectors.js';
 import { nextUid as nextCounterUid } from './flags.js';
 import * as creature from './creature.js';
 import * as exp from './exp.js';
+import { setAutoAnchor } from './settings.js';
 
 /** @typedef {import('../state/schema.js').World} World */
 /** @typedef {import('../state/schema.js').Creature} Creature */
@@ -67,6 +68,7 @@ const TUNING_CACHE = new WeakMap();
 
 /**
  * Resolves a partial tuning override over {@link DEFAULTS}. Keys of other modules are ignored.
+ * Cached per override object only when that object is frozen (mutable overrides are re-read).
  * @param {Partial<PartyTuning>|null|undefined} [tuning]
  * @returns {Readonly<PartyTuning>}
  * @throws {TypeError} when a known key has a malformed value
@@ -74,7 +76,8 @@ const TUNING_CACHE = new WeakMap();
 export function tuningOf(tuning) {
   if (tuning == null) return DEFAULTS;
   if (typeof tuning !== 'object') throw new TypeError('party.tuningOf: tuning must be an object');
-  const hit = TUNING_CACHE.get(tuning);
+  const cacheable = Object.isFrozen(tuning);
+  const hit = cacheable ? TUNING_CACHE.get(tuning) : undefined;
   if (hit) return hit;
   /** @type {any} */
   const out = { ...DEFAULTS };
@@ -86,7 +89,7 @@ export function tuningOf(tuning) {
     out[key] = v;
   }
   const frozen = Object.freeze(out);
-  TUNING_CACHE.set(tuning, frozen);
+  if (cacheable) TUNING_CACHE.set(tuning, frozen);
   return frozen;
 }
 
@@ -159,13 +162,15 @@ function emit(opts, evt, payload) {
 
 /**
  * Adds a creature to the party (or the box when the party is full). The stored record is a
- * normalized copy (`creature.serialize`); a missing uid is allocated with {@link nextUid}.
+ * normalized copy (`creature.serialize` then `creature.deserialize`: schema keys only, content ids
+ * checked against `data`, numbers clamped, stats recomputed); a uid that is not a non-empty string
+ * is replaced by one from {@link nextUid}.
  * @param {World} world
  * @param {Creature} c
  * @param {any} data
  * @param {PartyOpts & AddOpts} [opts]
  * @returns {{ok: true, uid: string, where: 'party'|'box', index: number, creature: Creature, skippedWindows: number[]}|{ok: false, reason: 'full'|'party-full'|'box-full'}}
- * @throws {TypeError} for a non-object; {Error} for a uid already in the world
+ * @throws {TypeError} for a non-object; {Error} for a uid already in the world; {RangeError} for unknown content ids
  */
 export function addCreature(world, c, data, opts = {}) {
   if (!c || typeof c !== 'object') throw new TypeError('party.addCreature: creature must be an object');
@@ -187,8 +192,9 @@ export function addCreature(world, c, data, opts = {}) {
   else if (boxRoom) where = 'box';
   else return { ok: false, reason: 'full' };
 
-  const rec = creature.serialize(c);
-  if (!rec.uid) rec.uid = nextUid(world);
+  const raw = creature.serialize(c);
+  if (typeof raw.uid !== 'string' || !raw.uid) raw.uid = nextUid(world);
+  const rec = creature.deserialize(raw, data, opts);
   /** @type {number[]} */
   let skippedWindows = [];
   if (opts.caught !== false) {
@@ -202,6 +208,49 @@ export function addCreature(world, c, data, opts = {}) {
   exp.refreshPending(world, rec.uid, data, opts);
   emit(opts, 'party:changed', { reason: 'add', uid: rec.uid, where });
   return { ok: true, uid: rec.uid, where, index: list.length - 1, creature: rec, skippedWindows };
+}
+
+/**
+ * @typedef {Object} GiftSpec
+ * @property {string} [speciesId]    form id (`species` is accepted too, as script ops spell it)
+ * @property {string} [species]
+ * @property {number} level
+ * @property {string|null} [nickname] (`nick` is accepted too)
+ * @property {string|null} [nick]
+ * @property {string|null} [heldItem]
+ * @property {string[]} [moves]
+ */
+
+/**
+ * Builds a brand-new creature from a spec and adds it (gifts, starters, script `addCreature`):
+ * allocates its uid with {@link nextUid}, draws its Heartmark placement (and an Unfixed loop) from
+ * `rng` forked by that uid, then {@link addCreature} with `caught: true` unless `opts.caught` is
+ * false. A refused add (`full`) leaves a gap in the uid counter, nothing else.
+ * @param {World} world
+ * @param {GiftSpec} spec
+ * @param {any} data
+ * @param {Rng|null} [rng]
+ * @param {PartyOpts & AddOpts} [opts]
+ * @returns {ReturnType<typeof addCreature>}
+ * @throws {TypeError} for a malformed spec; {RangeError} for unknown content ids
+ */
+export function giveCreature(world, spec, data, rng = null, opts = {}) {
+  if (!spec || typeof spec !== 'object') throw new TypeError('party.giveCreature: spec must be an object');
+  const speciesId = spec.speciesId ?? spec.species;
+  if (typeof speciesId !== 'string' || !speciesId) throw new TypeError('party.giveCreature: spec needs a species id');
+  if (!Number.isFinite(spec.level)) throw new TypeError('party.giveCreature: spec needs a finite level');
+  const name = spec.nickname ?? spec.nick ?? undefined;
+  const c = creature.makeCreature({
+    uid: nextUid(world),
+    speciesId,
+    level: spec.level,
+    nickname: typeof name === 'string' ? name : undefined,
+    heldItem: spec.heldItem ?? null,
+    moves: spec.moves,
+    rng,
+    tuning: opts.tuning,
+  }, data);
+  return addCreature(world, c, data, { ...opts, caught: opts.caught !== false });
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -278,8 +327,8 @@ export function fromBox(world, uid, data, opts = {}) {
 
 /**
  * Releases a creature for good (box UI, behind a confirm). Refuses the last party member. Also
- * removes it from the Yard and `pendingShifts`. Callers must also clear `settings.autoAnchor[uid]`
- * through systems/settings (not owned here).
+ * removes it from the Yard and `pendingShifts`, and clears its auto-anchor preset through
+ * `systems/settings.setAutoAnchor` (the owner of `world.settings`).
  * @param {World} world
  * @param {string} uid
  * @param {any} [data]
@@ -294,6 +343,8 @@ export function release(world, uid, data, opts = {}) {
   const y = world.yard.indexOf(uid);
   if (y >= 0) world.yard.splice(y, 1);
   exp.refreshPending(world, uid, data, opts);
+  const presets = world.settings && world.settings.autoAnchor;
+  if (presets && Object.prototype.hasOwnProperty.call(presets, uid)) setAutoAnchor(world, uid, null, { bus: opts.bus ?? null });
   emit(opts, 'party:changed', { reason: 'release', uid });
   return { ok: true, creature: c };
 }
@@ -342,7 +393,7 @@ export function fromYard(world, uid, opts = {}) {
  */
 export function heal(world, opts = {}) {
   const list = Array.isArray(opts.uids)
-    ? opts.uids.map((u) => findCreature(world, u)?.c).filter(Boolean)
+    ? [...new Set(opts.uids)].map((u) => findCreature(world, u)?.c).filter(Boolean)
     : world.party;
   const healed = [];
   for (const c of /** @type {Creature[]} */ (list)) {
@@ -389,6 +440,45 @@ export function pinHeartmark(world, uid, moveId, data, opts = {}) {
   const r = creature.pinHeartmarkTechnique(f.c, moveId, data, { force: opts.force });
   if (r.ok) emit(opts, 'party:changed', { reason: 'heartmark', uid, move: moveId });
   return r;
+}
+
+/**
+ * Gives (or takes, with null) a creature's held item and brings `pendingShifts` in line: a Still
+ * Knot (an item row with `blocksShifts: true`) hides an open window while held; it comes back when
+ * the Knot comes off. Windows *reached* while the Knot is held follow exp STILL_KNOT_MODE. Bag
+ * bookkeeping (taking the item out of / back into the bag) is the caller's, through systems/bag.
+ * @param {World} world
+ * @param {string} uid
+ * @param {string|null} itemId
+ * @param {any} data
+ * @param {PartyOpts} [opts]
+ * @returns {{ok: true, prev: string|null, stillKnot: boolean, pending: boolean}|{ok: false, reason: 'unknown'}}
+ * @throws {TypeError} for an item id that is not a string or null
+ */
+export function setHeldItem(world, uid, itemId, data, opts = {}) {
+  const f = findCreature(world, uid);
+  if (!f) return { ok: false, reason: 'unknown' };
+  const { prev } = creature.setHeldItem(f.c, itemId, data);
+  const { pending } = exp.refreshPending(world, uid, data, opts);
+  emit(opts, 'party:changed', { reason: 'held', uid, item: f.c.heldItem });
+  return { ok: true, prev, stillKnot: f.c.stillKnot, pending };
+}
+
+/**
+ * Reconciles `world.pendingShifts` with every creature (after a load, a migration or a tuning
+ * change): each party creature with an open window is listed once, everything else is dropped.
+ * @param {World} world
+ * @param {any} [data]
+ * @param {PartyOpts} [opts]
+ * @returns {{pending: string[], changed: boolean}}
+ */
+export function syncPending(world, data, opts = {}) {
+  let changed = false;
+  for (const uid of [...world.pendingShifts]) {
+    if (!findCreature(world, uid)) changed = exp.refreshPending(world, uid, data, opts).changed || changed;
+  }
+  for (const c of [...world.party, ...world.box]) changed = exp.refreshPending(world, c.uid, data, opts).changed || changed;
+  return { pending: world.pendingShifts.slice(), changed };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -473,9 +563,11 @@ function applyExpTo(world, c, amount, data, opts) {
  */
 
 /**
- * Writes a battle's outcome into the world (ARCHITECTURE §5.5): HP / PP / status back by uid
- * (clamped; statuses outside the schema's kinds dropped), EXP split and applied (levels, moves,
- * window detection into `pendingShifts`), the catch added via {@link addCreature}, and Field Log
+ * Writes a battle's outcome into the world (ARCHITECTURE §5.5): EXP split (fainted = 0 HP on the
+ * engine copy at the end) and applied (levels, moves, window detection into `pendingShifts`; level
+ * and EXP are never copied from the engine copies), then HP / PP / status back by uid (clamped;
+ * HP as the copy's ratio when the copy's max HP differs; statuses outside the schema's kinds
+ * dropped), the catch added via {@link addCreature}, and Field Log
  * marks through `opts.markFieldLog(world, 'seen'|'read'|'held', formId)` (systems/fieldLog owns
  * that state). Emits `creature:levelUp`, `creature:learned`, `shift:window` and one
  * `party:changed {reason: 'battle'}`.
@@ -485,28 +577,28 @@ function applyExpTo(world, c, amount, data, opts) {
  * @param {Rng|null} [rng]   only used to draw a Heartmark placement for a caught creature whose record lacks one
  * @param {PartyOpts & {markFieldLog?: (world: World, state: 'seen'|'read'|'held', formId: string) => void, day?: number, mapId?: string}} [opts]
  * @returns {OutcomeApplied}
- * @throws {TypeError} for a non-object result
+ * @throws {TypeError} for a non-object result or malformed EXP facts; {RangeError} for a catch with unknown content (both before any write)
  */
 export function applyOutcome(world, battleResult, data, rng = null, opts = {}) {
   if (!battleResult || typeof battleResult !== 'object') throw new TypeError('party.applyOutcome: battleResult must be an object');
   const r = battleResult;
+  // a catch with unknown content fails here, before anything in the world has changed
+  if (r.caught && typeof r.caught === 'object') creature.deserialize({ ...creature.serialize(r.caught), uid: 'probe' }, data, opts);
 
-  // 1. HP / PP / status back by uid
+  // engine copies of party creatures, by uid (first copy wins)
+  /** @type {Map<string, any>} */
+  const copies = new Map();
   for (const copy of Array.isArray(r.party) ? r.party : []) {
-    if (!copy || typeof copy.uid !== 'string') continue;
-    const c = world.party.find((x) => x.uid === copy.uid);
-    if (!c) continue;
-    if (Number.isFinite(copy.hp)) c.hp = Math.max(0, Math.min(c.stats.hp, Math.floor(copy.hp)));
-    for (const m of c.moves) {
-      const cm = Array.isArray(copy.moves) ? copy.moves.find((x) => x && x.id === m.id) : null;
-      if (cm && Number.isFinite(cm.pp)) m.pp = Math.max(0, Math.min(m.maxPp, Math.floor(cm.pp)));
-    }
-    c.status = copy.status && STATUS_KINDS.includes(copy.status.kind)
-      ? { kind: copy.status.kind, turns: Math.max(0, Math.floor(Number(copy.status.turns) || 0)) }
-      : null;
+    if (!copy || typeof copy.uid !== 'string' || copies.has(copy.uid)) continue;
+    if (world.party.some((x) => x.uid === copy.uid)) copies.set(copy.uid, copy);
   }
+  /** fainted at the end of the battle (the engine copy's HP when there is one) */
+  const faintedAfter = (/** @type {Creature} */ c) => {
+    const cp = copies.get(c.uid);
+    return cp && Number.isFinite(cp.hp) ? cp.hp <= 0 : c.hp <= 0;
+  };
 
-  // 2. EXP split
+  // 1. EXP split
   /** @type {Array<{uid: string, amount: number}>} */
   let awards;
   if (Array.isArray(r.defeated)) {
@@ -518,7 +610,7 @@ export function applyOutcome(world, battleResult, data, rng = null, opts = {}) {
       source: r.source,
       curveLevel: r.curveLevel ?? null,
       defeated: r.defeated,
-      party: world.party.map((c) => ({ uid: c.uid, level: c.level, fainted: c.hp <= 0, participated: participants.has(c.uid), ability: c.ability })),
+      party: world.party.map((c) => ({ uid: c.uid, level: c.level, fainted: faintedAfter(c), participated: participants.has(c.uid), ability: c.ability })),
       yard,
     }, data, opts).totals;
   } else {
@@ -530,7 +622,7 @@ export function applyOutcome(world, battleResult, data, rng = null, opts = {}) {
     awards = [...sum].map(([uid, amount]) => ({ uid, amount }));
   }
 
-  // 3. apply EXP
+  // 2. apply EXP (levels come only from here, never from the engine copies)
   /** @type {LevelUp[]} */
   const levelUps = [];
   /** @type {Array<{uid: string, level: number}>} */
@@ -545,6 +637,29 @@ export function applyOutcome(world, battleResult, data, rng = null, opts = {}) {
     for (const level of opened) windows.push({ uid, level });
   }
 
+  // 3. HP / PP / status back by uid. After the EXP so the PP of a move learned on a level-up is
+  // copied too, and HP keeps the copy's ratio when the engine levelled its copy (its max HP then
+  // differs from the record's before the EXP is applied here).
+  for (const [uid, copy] of copies) {
+    const c = world.party.find((x) => x.uid === uid);
+    if (!c) continue;
+    if (Number.isFinite(copy.hp)) {
+      const copyMax = copy.stats && Number.isFinite(copy.stats.hp) && copy.stats.hp > 0 ? copy.stats.hp : null;
+      let hp;
+      if (copy.hp <= 0) hp = 0;
+      else if (copyMax !== null && copyMax !== c.stats.hp) hp = Math.max(1, Math.round((Math.min(copy.hp, copyMax) / copyMax) * c.stats.hp));
+      else hp = Math.floor(copy.hp);
+      c.hp = Math.max(0, Math.min(c.stats.hp, hp));
+    }
+    for (const m of c.moves) {
+      const cm = Array.isArray(copy.moves) ? copy.moves.find((x) => x && x.id === m.id) : null;
+      if (cm && Number.isFinite(cm.pp)) m.pp = Math.max(0, Math.min(m.maxPp, Math.floor(cm.pp)));
+    }
+    c.status = copy.status && STATUS_KINDS.includes(copy.status.kind)
+      ? { kind: copy.status.kind, turns: Math.max(0, Math.floor(Number(copy.status.turns) || 0)) }
+      : null;
+  }
+
   // 4. the catch
   /** @type {OutcomeApplied['caught']} */
   let caught = null;
@@ -555,7 +670,7 @@ export function applyOutcome(world, battleResult, data, rng = null, opts = {}) {
     if (!rec.uid || findCreature(world, rec.uid)) rec.uid = nextUid(world);
     const m = r.caught.mark;
     if (!(m && Number.isInteger(m.x) && Number.isInteger(m.y)) && rng) {
-      rec.mark = creature.drawMark(typeof rng.fork === 'function' ? rng.fork(`mark:${rec.uid}`) : rng, opts);
+      rec.mark = creature.drawMark(creature.creatureStream(rng, 'mark', rec.uid), opts);
     }
     const res = addCreature(world, rec, data, { ...opts, caught: true });
     if (res.ok) caught = { uid: res.uid, where: res.where };

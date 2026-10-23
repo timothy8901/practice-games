@@ -81,7 +81,7 @@
   // ---- line-up -------------------------------------------------------------
   {
     const root = document.getElementById('lineup');
-    const W = 480, H = 64;
+    const W = 480, H = 112, PER = 26; // two rows of 26 on 16px tiles
     const c1 = canvas(W, H), c3 = canvas(W * 3, H * 3);
     root.append(c1, document.createElement('br'), c3);
     const order = ids.filter((id) => id !== 'route-trainer');
@@ -95,12 +95,12 @@
         }
         order.forEach((id, i) => {
           const ch = C.CHAR_SPRITES[id];
-          const tx = i * 16 + 2 * 0, ty = 48; // standing on the bottom tile row
+          const tx = 16 + (i % PER) * 17, ty = i < PER ? 48 : 96; // feet on tile rows 2 and 5
           if (tx + 16 > W) return;
           const off = C.drawOffset(ch.body);
           const step = on ? C.walkStep(t + i * 37, 83) : 0;
           const facing = 'down';
-          paint(ctx, C.frame(ch.body, facing, step), on ? (C.animatedPalette(C.CHARACTERS[id].palette, t) || ch.palette) : ch.palette, (tx + off.x) * s, (ty - 16 + off.y + 8) * s, s);
+          paint(ctx, C.frame(ch.body, facing, step), on ? (C.animatedPalette(C.CHARACTERS[id].palette, t) || ch.palette) : ch.palette, (tx + off.x) * s, (ty - 16 + off.y) * s, s);
         });
       }
     } });

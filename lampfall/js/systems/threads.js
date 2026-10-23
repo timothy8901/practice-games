@@ -17,7 +17,8 @@
  *  - eligible beats become NPC topics through {@link beatTopics} (porch beats only at the porch), and
  *    the beat's script calls {@link advance} (or the `beat` op calls {@link setBeat});
  *  - completing a thread pays the resident share through the injected `opts.loans.residentShare
- *    (world, threadId, ctx)` (RULES-ECON owns the money and `loans.residentShares`) when the last
+ *    (world, threadId, {data, tuning, bus, threadDay})` (RULES-ECON owns the money and
+ *    `loans.residentShares`, and credits each thread once) when the last
  *    beat's `reward.share` says so, defaulting to "kind is in `threadShareKinds`".
  *
  * Events (§3.4): `thread:beat {threadId, npcId, kind, beat, day, done}`, `thread:done {threadId,
@@ -89,8 +90,11 @@ export function tuningOf(data, opts) {
  * @typedef {Object} ThreadOpts
  * @property {number} [day]          core day (default: the world clock's)
  * @property {Bus|null} [bus]
- * @property {{residentShare?: (world: World, threadId: string, ctx: {day: number, bus?: Bus|null}) => any}} [loans]
- *   RULES-ECON collaborator; only `residentShare` is used
+ * @property {{residentShare?: (world: World, threadId: string, ctx: {data: any, tuning: any, bus: Bus|null, threadDay: number}) => any}} [loans]
+ *   RULES-ECON collaborator; only `residentShare` is used. Its ctx is a systems/econ `EconCtx`
+ *   (`data` and `tuning` so the share follows the content ladder and the tuned fraction; no `day`,
+ *   because econ reads `day` as its own 06:00-based economy day) plus `threadDay`, the core day the
+ *   thread finished. `loans.residentShare` itself refuses a second credit for the same thread.
  * @property {boolean} [atPorch]     for {@link beatTopics}: the player is at the NPC's porch
  * @property {any} [tuning]
  */
@@ -290,7 +294,7 @@ function applyBeat(world, data, def, beat, opts) {
     const last = beatsOf(def).find((b) => b.id === lastId);
     const pays = typeof last?.reward?.share === 'boolean' ? last.reward.share : t.threadShareKinds.includes(kind);
     if (pays && opts.loans && typeof opts.loans.residentShare === 'function') {
-      share = opts.loans.residentShare(world, def.id, { day, bus: opts.bus ?? null });
+      share = opts.loans.residentShare(world, def.id, { data, tuning: opts.tuning ?? null, bus: opts.bus ?? null, threadDay: day });
     }
     emit(opts.bus, 'thread:done', { threadId: def.id, kind, share: pays, result: share ?? null });
   }

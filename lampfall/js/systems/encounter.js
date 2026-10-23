@@ -14,8 +14,8 @@
  * Errants are rows with `errant: true` and never join the weighted pick. A `roam: 'route'` Errant
  * (default) Skyroams: it sits on one of the tables that list it and moves one table per game hour;
  * where it is, each encounter is it with `errantRouteChance` (about 1 in 300). A `roam: 'lit'` row
- * (the lit point after the Relighting; gate it with a `cond` on the flag) appears at night with
- * `errantLitChance` (1 in 120). A beaten or caught Errant is down until it returns: the next day
+ * (the lit point after the Relighting; gate it with a `cond` on the flag) appears at night: one
+ * `errantLitChance` roll (1 in 120) for the group, then one of the lit Errants that are up. A beaten or caught Errant is down until it returns: the next day
  * (GDD-00 §8), after the next badge, or after 2 hours of play, whichever comes first.
  *
  * Wild encounters only happen on isles and Pellwick's reed edges: interiors never roll, and on a map
@@ -121,6 +121,9 @@ export const tuningOf = makeTuning('encounter', DEFAULTS, SPEC);
 
 /** @param {LaneCtx|undefined} ctx */
 const T = (ctx) => tuningOf(tuningSource(ctx));
+
+/** `world.encounter.steps` stops counting here (it only has to pass the floor; keeps saves small). */
+export const STEPS_CAP = 1_000_000;
 
 /**
  * The stateful stream label for a map's step encounters and roamers (GDD-00 §15).
@@ -384,31 +387,50 @@ export function errantMarkers(world, ctx) {
 }
 
 /**
- * Errant rows present on a table now, each with its chance: route rows whose Errant Skyroams here,
- * lit rows at night; both only while the Errant is up and the row's `cond` holds.
+ * Errant rows present on a table now, each with its chance: route rows whose Errant Skyroams here
+ * (each `errantRouteChance`), and lit rows at night, which share ONE `errantLitChance` (GDD-00 §2:
+ * "1 in 120 night encounters on the point", whichever Errants are up), so each of n present lit rows
+ * reports `errantLitChance / n`; both only while the Errant is up and the row's `cond` holds.
  * @param {World} world
  * @param {string} tableId
  * @param {readonly EncounterRow[]} rows
  * @param {object} condCtx   roamer-style cond context
  * @param {boolean} night
  * @param {EncounterCtx} [ctx]
- * @returns {Array<{row: EncounterRow, chance: number}>}
+ * @returns {Array<{row: EncounterRow, chance: number, roam: 'route'|'lit'}>}
  */
 export function presentErrants(world, tableId, rows, condCtx, night, ctx) {
   const t = T(ctx);
+  /** @type {Array<{row: EncounterRow, chance: number, roam: 'route'|'lit'}>} */
   const out = [];
-  for (const r of rows) {
-    if (!r || r.errant !== true || typeof r.species !== 'string') continue;
+  /** @type {EncounterRow[]} */
+  const lit = [];
+  for (const r of Array.isArray(rows) ? rows : []) {
+    if (!validRow(r) || r.errant !== true) continue;
     if (!rowCondHolds(r.cond, condCtx)) continue;
     if (!errantUp(world, r.species, ctx)) continue;
     const roam = r.roam ?? 'route';
     if (roam === 'lit') {
-      if (night) out.push({ row: r, chance: t.errantLitChance });
+      if (night) lit.push(r);
     } else if (errantRouteNow(world, r.species, ctx) === tableId) {
-      out.push({ row: r, chance: t.errantRouteChance });
+      out.push({ row: r, chance: t.errantRouteChance, roam: 'route' });
     }
   }
+  for (const r of lit) out.push({ row: r, chance: t.errantLitChance / lit.length, roam: 'lit' });
   return out;
+}
+
+/**
+ * Whether an encounter row is well formed enough to roll: a species id, a `[lo, hi]` of finite
+ * levels and (when present) a finite weight. Malformed rows are skipped, never thrown on (the
+ * validator reports them; a bad row must not crash a step).
+ * @param {any} r
+ * @returns {boolean}
+ */
+export function validRow(r) {
+  return Boolean(r) && typeof r === 'object' && typeof r.species === 'string' && r.species.length > 0
+    && Array.isArray(r.levels) && r.levels.length === 2 && r.levels.every((n) => typeof n === 'number' && Number.isFinite(n))
+    && (r.w === undefined || (typeof r.w === 'number' && Number.isFinite(r.w)));
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -452,7 +474,7 @@ export function effectiveRows(world, map, tableId, ctx, opts = {}) {
     const lo = levelFor(r.levels[0], night, ctx), hi = levelFor(r.levels[1], night, ctx);
     return /** @type {[number, number]} */ ([Math.min(lo, hi), Math.max(lo, hi)]);
   };
-  const out = eligibleRows(rows.filter((r) => r && r.errant !== true), condCtx, [])
+  const out = eligibleRows(rows.filter((r) => validRow(r) && r.errant !== true), condCtx, [])
     .map((r) => ({ ...r, w: (typeof r.w === 'number' ? r.w : 0) * modsFor(r, envN), levels: shift(r) }))
     .filter((r) => r.w > 0);
   if (opts.includeErrants) {
@@ -472,8 +494,9 @@ export function effectiveRows(world, map, tableId, ctx, opts = {}) {
  * One player step: counts it, then maybe returns an encounter. In order: no spawn here / wild not
  * allowed / the spawn's `cond` fails / fewer than `encounterMinSteps` since the last -> `null` with
  * no draw. Otherwise one draw for the rate (`spawn.rate`, else `encounterRateDefault`); on a hit one
- * draw per present Errant (in table order) for its chance, else one draw for the weighted row and
- * one for its level (when the range is wider than one). A hit resets the step count, marks an
+ * draw per present route Errant (in table order) for its chance, then (when lit Errants are present)
+ * one draw for the shared `errantLitChance` plus one pick when more than one is up, else one draw for
+ * the weighted row; then one for the level (when the range is wider than one). A hit resets the step count, marks an
  * Errant seen and emits `encounter:start`.
  * @param {World} world
  * @param {any} map         MapDef or RuntimeMap (`id`, `kind`, `region`, `spawns` / `spawnAt`)
@@ -484,7 +507,7 @@ export function effectiveRows(world, map, tableId, ctx, opts = {}) {
 export function rollStep(world, map, rng, ctx) {
   if (!map || typeof map.id !== 'string') throw new TypeError('encounter.rollStep: map must have an id');
   const e = enc(world);
-  e.steps += 1;
+  e.steps = Math.min(STEPS_CAP, e.steps + 1);
   const spawn = spawnUnder(map, ctx);
   if (!wildAllowed(map, spawn, ctx?.data)) return null;
   const env = envFor(world, map, ctx);
@@ -501,8 +524,15 @@ export function rollStep(world, map, rng, ctx) {
   /** @type {EncounterRow|null} */
   let row = null;
   let errant = false;
-  for (const { row: r, chance } of presentErrants(world, spawn.table, rows, condCtx, night, ctx)) {
+  const present = presentErrants(world, spawn.table, rows, condCtx, night, ctx);
+  for (const { row: r, chance } of present) {
+    if (r.roam === 'lit') continue;
     if (rng.chance(chance)) { row = r; errant = true; break; }
+  }
+  const lit = present.filter((p) => p.roam === 'lit');
+  if (!row && lit.length > 0 && rng.chance(t.errantLitChance)) {
+    row = lit.length === 1 ? lit[0].row : /** @type {{row: EncounterRow}} */ (rng.pick(lit)).row;
+    errant = true;
   }
   if (!row) {
     const eff = effectiveRows(world, map, spawn.table, ctx);

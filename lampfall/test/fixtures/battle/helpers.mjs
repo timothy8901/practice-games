@@ -91,6 +91,7 @@ export function duel(a, b, opts = {}) {
     nextUid: opts.nextUid,
     tuning: opts.tuning,
     gainExp: opts.gainExp,
+    captureRng: opts.captureRng,
   });
 }
 

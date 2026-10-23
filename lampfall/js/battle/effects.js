@@ -97,6 +97,9 @@ export const DEFAULTS = Object.freeze({
   catchUpCap: 3,
 });
 
+/** Every key of {@link DEFAULTS} (the names a `tuning` override may use here). */
+export const TUNING_KEYS = Object.freeze(Object.keys(DEFAULTS));
+
 /**
  * Merges a partial `tuning` override onto a frozen defaults table. Unknown keys
  * throw so a typo in a GDD table fails loudly instead of being ignored.
@@ -118,8 +121,26 @@ export function mergeTuning(defaults, tuning, where = 'tuning', extraKeys = []) 
   for (const k of keys) {
     if (!(k in defaults) && !extraKeys.includes(k)) throw new RangeError(`${where}: unknown tuning key "${k}"`);
     if (tuning[k] === undefined) throw new RangeError(`${where}: tuning key "${k}" is undefined`);
+    if (k in defaults) {
+      const want = kindOf(defaults[k]);
+      const got = kindOf(tuning[k]);
+      if (want !== got) throw new TypeError(`${where}: tuning key "${k}" must be ${want}, got ${got === 'number' ? String(tuning[k]) : got}`);
+    }
   }
   return Object.freeze({ ...defaults, ...tuning });
+}
+
+/**
+ * The shape class of a tuning value, for {@link mergeTuning}'s type check:
+ * 'number' (NaN is 'NaN'), 'boolean', 'string', 'array', 'object', 'null' or the typeof.
+ * @param {any} v
+ * @returns {string}
+ */
+function kindOf(v) {
+  if (v === null) return 'null';
+  if (Array.isArray(v)) return 'array';
+  if (typeof v === 'number') return Number.isNaN(v) ? 'NaN' : 'number';
+  return typeof v;
 }
 
 /**
@@ -440,14 +461,17 @@ export function isWard(ability) {
  * @param {readonly string[]} defenderTypes
  * @param {string|null} moveType the type the move hits with (see {@link moveTypeFor})
  * @param {TypeChart} chart
+ * @param {{plumblineIgnoresWards?: boolean}} [opts] `plumblineIgnoresWards`: a `plumbline` move passes every Ward
+ *   (GDD-00 ruling: the Mirror Spire's disc must answer Mirrorveil); the engine passes its tuning flag
  * @returns {{lands: boolean, reason: 'ward'|'immune'|null, eff: {mult: number, word: string}}}
  */
-export function wardCheck(ability, move, defenderTypes, moveType, chart) {
+export function wardCheck(ability, move, defenderTypes, moveType, chart, opts = {}) {
   const eff = move.category === 'status' ? { mult: 1, word: WORDS.NEUTRAL } : chart.effectiveness(moveType, defenderTypes);
   if (move.category !== 'status' && eff.mult === 0) return { lands: false, reason: 'immune', eff };
   const ward = ability && ability.ward;
   if (!ward) return { lands: true, reason: null, eff };
   if (move.effect.scrap) return { lands: false, reason: 'ward', eff };
+  if (move.effect.plumbline && opts.plumblineIgnoresWards) return { lands: true, reason: null, eff };
   switch (ward.kind) {
     case 'strong-only':
       if (move.category === 'status') return { lands: true, reason: null, eff };

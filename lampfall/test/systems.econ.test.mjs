@@ -108,6 +108,7 @@ describe('econ: guards', () => {
     assert.throws(() => econ.assertId('', 'x'), TypeError);
     assert.equal(econ.is.flagId('sp.relit'), true);
     assert.equal(econ.is.flagId('relit'), false);
+    assert.equal(econ.is.flagId('sp.'), false);
   });
 
   it('emit is a no-op without a bus', () => {
@@ -183,7 +184,7 @@ describe('schema v3 (RULES-ECON): pockets, wallet bookkeeping, loans log, shops'
     const ok = worldDefaults();
     ok.bag.baskets.push({ id: 'b1', mapId: 'm', x: 1, y: 1, day: 0, items: [{ id: 'ghost', n: 1 }] });
     ok.shops.crate.push({ id: 'ghost', n: 1 });
-    const refs = validateWorld(ok, { has: (t, id) => t !== 'items' || id !== 'ghost' });
+    const refs = validateWorld(ok, { has: (t, id) => !(t === 'items' || t === 'collections') || id !== 'ghost' });
     assert.ok(refs.includes('world.bag.baskets[0].items[0].id: unknown items id "ghost"'));
     assert.ok(refs.includes('world.shops.crate[0].id: unknown items id "ghost"'));
   });

@@ -204,9 +204,10 @@ export function remember(world, npcId, key, value) {
   if (typeof key !== 'string' || !key) throw new TypeError('memory.remember: key must be a non-empty string');
   if (!jsonSafe(value)) throw new TypeError(`memory.remember: value for ${key} must be JSON (no undefined, functions, NaN)`);
   const m = ensure(world, npcId);
-  const before = JSON.stringify(m.remembered[key] ?? null);
+  const had = Object.prototype.hasOwnProperty.call(m.remembered, key);
+  const before = had ? JSON.stringify(m.remembered[key]) : undefined;
   m.remembered[key] = JSON.parse(JSON.stringify(value));
-  return { changed: before !== JSON.stringify(m.remembered[key]) || !(key in m.remembered) };
+  return { changed: !had || before !== JSON.stringify(m.remembered[key]) };
 }
 
 /**

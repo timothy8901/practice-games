@@ -21,12 +21,16 @@ describe('DEFAULTS and tuning', () => {
     assert.equal(C.DEFAULTS.MAX_BOND, 5);
   });
 
-  it('tuningOf merges overrides, caches by identity, ignores foreign keys and rejects bad values', () => {
-    const tun = { MENDS_PER_BATTLE: 2, SOMETHING_ELSE: 1 };
+  it('tuningOf merges overrides, caches frozen overrides by identity, ignores foreign keys and rejects bad values', () => {
+    const tun = Object.freeze({ MENDS_PER_BATTLE: 2, SOMETHING_ELSE: 1 });
     const t = C.tuningOf(tun);
     assert.equal(t.MENDS_PER_BATTLE, 2);
     assert.equal(t.MAX_BOND, 5);
     assert.equal(C.tuningOf(tun), t);
+    const mutable = { MENDS_PER_BATTLE: 2 };
+    assert.equal(C.tuningOf(mutable).MENDS_PER_BATTLE, 2);
+    mutable.MENDS_PER_BATTLE = 1;
+    assert.equal(C.tuningOf(mutable).MENDS_PER_BATTLE, 1, 'a mutable override is never served stale');
     assert.equal(C.tuningOf(null), C.DEFAULTS);
     assert.throws(() => C.tuningOf({ MOVE_SLOTS: 5 }), TypeError, 'above the schema cap');
     assert.throws(() => C.tuningOf({ MAX_BOND: 6 }), TypeError);

@@ -14,6 +14,10 @@
 //   drawOffset(bodyOrId)                 {x, y} to add to a tile's top-left so the feet land on that tile
 //   animatedPalette(palId, t)            Juniper's sheen cycled
 //   lettersUsed(body)                    every letter a body uses (palette checks / validator)
+//   CHAR_ART_PREFIX, charArtId(id)        art/atlas ids ('char-wren'); every character is registered at import:
+//                                        getSprite('char-wren', {frame, name: 'left' | 'up' | 'right' | 'sit' |
+//                                        'fish' | 'run-left' ..., grade}); the default frames are the down walk
+//   registerPlayerArt(card)              re-registers 'char-player' for a new lease card (atlas caches cleared)
 //
 // Size-as-character: cells are 16 wide; height is 24 for almost everyone,
 // 28 for Odile and 32 for Ansel (oy = 24 - h). Wick, the Thatch and Dimity are
@@ -29,6 +33,7 @@ import { PALETTES, CHAR_GLOW_KEYS, CHAR_RAMPS, SW } from './palettes.js';
 import { CHARACTERS } from './cast.js';
 import { playerLook, DEFAULT_CARD } from './player.js';
 import { decodeSprite } from '../../core/pixelart.js';
+import { registerArt } from '../atlas.js';
 
 export { PALETTES, CHARACTERS, CHAR_GLOW_KEYS, CHAR_RAMPS, SW, HEADS, TORSOS, TAILS, EXTRAS };
 export {
@@ -152,4 +157,30 @@ export function lettersUsed(body) {
     ...(b.run ? Object.values(b.run).flat() : []), ...(b.poses ? Object.values(b.poses) : [])];
   for (const f of all) for (const r of f) for (const ch of r) if (ch !== '.') s.add(ch);
   return [...s].sort();
+}
+
+// ---------------------------------------------------------------------------
+// art/atlas registration (ARCHITECTURE §12: per-grade recolour caches live in
+// the atlas; the entity renderer draws getSprite(charArtId(id), {...})).
+// ---------------------------------------------------------------------------
+export const CHAR_ART_PREFIX = 'char-';
+export const charArtId = (id) => CHAR_ART_PREFIX + id;
+
+/** Atlas definition for a frameset + palette: down walk as the default frames, the rest as named variants. */
+export function artDefOf(body, palette) {
+  const variants = { up: body.up, left: body.left, right: body.right, sit: [body.sit], fish: body.fishFrames };
+  if (body.run) for (const [f, set] of Object.entries(body.run)) variants[`run-${f}`] = set;
+  if (body.poses) for (const [k, fr] of Object.entries(body.poses)) variants[k] = [fr];
+  return { kind: 'char', w: body.w, h: body.h, fps: 12, frames: body.down, pal: palette, variants, anchor: { x: 8 - (body.ox || 0), y: body.h - 1 } };
+}
+/** Every character as an atlas table keyed by charArtId. */
+export function charArtTable() {
+  return Object.fromEntries(Object.values(CHAR_SPRITES).map((c) => [charArtId(c.id), artDefOf(c.body, c.palette)]));
+}
+registerArt(charArtTable(), { source: 'chars', kind: 'char', replace: true });
+
+/** Point 'char-player' at a lease card's look (call after the lease card is confirmed or edited). */
+export function registerPlayerArt(card) {
+  const { body, palette } = playerLook(card);
+  return registerArt({ [charArtId('player')]: artDefOf(body, palette) }, { source: 'chars', kind: 'char', replace: true });
 }

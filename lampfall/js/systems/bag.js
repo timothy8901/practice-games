@@ -8,9 +8,13 @@
  *  - **Slots**: 20 shared slots (one stack each) across the slotted pockets, expandable to 40
  *    ({@link expand}: the cottage and the Cellar each add 10). Keepsakes and tools take no slot, so a
  *    one-of-a-kind thing can never spill.
- *  - **Stacks**: fruit and shells stack to 10 (`stackByKind`, which wins over the row); everything else
- *    stacks to its row's `stack` (wicks per data), else `stackMax`. One-of-a-kind items stack to 1 and
- *    you can hold only one.
+ *  - **Items** are rows of the `items` table or, for what the player gathers (fish, bugs, finds,
+ *    fruit), of the `collections` table (`systems/econ.itemOf`); a collection row without `pocket`
+ *    goes to `bagDefaultPocket` (Finds).
+ *  - **Stacks**: fruit and shells stack to 10 (`stackByKind` on the row's `kind`, then `stackByGroup`
+ *    on its `group`, so the collections' shore finds count as shells; both win over the row);
+ *    everything else stacks to its row's `stack` (wicks per data), else `stackMax`. One-of-a-kind items
+ *    stack to 1 and you can hold only one.
  *  - **Overflow**: what does not fit drops into a **basket at your feet**, a world-map item
  *    (`world.bag.baskets`, at the player's tile or `ctx.at`) picked up with {@link takeBasket}. A give
  *    never fails for space and never stops on a prompt.
@@ -29,7 +33,7 @@
  */
 
 import { POCKET_IDS } from '../state/schema.js';
-import { makeTuning, lookup, dayOf, emit, assertCount, assertId, deepFreeze, is } from './econ.js';
+import { makeTuning, itemOf, knowsItems, dayOf, emit, assertCount, assertId, deepFreeze, is } from './econ.js';
 import * as wallet from './wallet.js';
 
 /** @typedef {import('../state/schema.js').World} World */
@@ -45,13 +49,15 @@ export { POCKET_IDS };
 /**
  * Designer defaults (GDD-00 §13 satchel 20 -> 40; Porchlight: fruit and shells stack to 10).
  * @type {Readonly<{bagSlotsBase: number, bagSlotsMax: number, bagUnslottedPockets: readonly string[],
- *   stackByKind: Readonly<Record<string, number>>, stackMax: number, bagDefaultPocket: string}>}
+ *   stackByKind: Readonly<Record<string, number>>, stackByGroup: Readonly<Record<string, number>>, stackMax: number,
+ *   bagDefaultPocket: string}>}
  */
 export const DEFAULTS = deepFreeze({
   bagSlotsBase: 20,                            // §13: 20 slots
   bagSlotsMax: 40,                             // §13: expandable to 40
   bagUnslottedPockets: ['keepsakes', 'tools'], // never count against slots, never spill
   stackByKind: { fruit: 10, shell: 10 },       // fruit and shells stack to 10 (wins over the row)
+  stackByGroup: { shore: 10 },                 // collections' shore finds (cockles, whelks, ...) are the shells
   stackMax: 99,                                // stack limit for a row without `stack`
   bagDefaultPocket: 'finds',                   // pocket for a row without `pocket` / without data
 });
@@ -62,6 +68,7 @@ const SPEC = {
   bagSlotsMax: [is.nonNegInt, 'integer >= 0'],
   bagUnslottedPockets: [is.ids, 'pocket id[]'],
   stackByKind: [(v) => is.intRecord(v) && Object.values(v).every((x) => x >= 1), 'Record<kind, integer >= 1>'],
+  stackByGroup: [(v) => is.intRecord(v) && Object.values(v).every((x) => x >= 1), 'Record<group, integer >= 1>'],
   stackMax: [is.posInt, 'integer >= 1'],
   bagDefaultPocket: [is.id, 'pocket id'],
 };
@@ -80,27 +87,26 @@ export const tuningOf = makeTuning('bag', DEFAULTS, SPEC);
 // ---------------------------------------------------------------------------------------------
 
 /**
- * The item row for an id, or `null` (no data, or the id is not in `items`).
+ * The item row for an id (`items`, else `collections`), or `null` (no data, or an unknown id).
  * @param {string} itemId
  * @param {EconCtx} [ctx]
  * @returns {Record<string, any>|null}
  */
 export function itemRow(itemId, ctx) {
-  return lookup(ctx?.data).row('items', itemId);
+  return itemOf(ctx?.data, itemId);
 }
 
 /**
- * Resolves an id to its row, a generic row when there is no items table, or `null` when the items
- * table exists and lacks the id.
+ * Resolves an id to its row, a generic row when the data has no item table at all, or `null` when
+ * item tables exist and none has the id.
  * @param {string} itemId
  * @param {EconCtx|undefined} ctx
  * @returns {Record<string, any>|null}
  */
 function resolveItem(itemId, ctx) {
-  const lk = lookup(ctx?.data);
-  const row = lk.row('items', itemId);
+  const row = itemOf(ctx?.data, itemId);
   if (row) return row;
-  return lk.hasTable('items') ? null : { id: itemId };
+  return knowsItems(ctx?.data) ? null : { id: itemId };
 }
 
 /**
@@ -114,8 +120,8 @@ export function pocketOf(item, ctx) {
 }
 
 /**
- * Stack limit of an item: 1 for one-of-a-kind, the kind rule (fruit/shell 10), the row's `stack`,
- * else `stackMax`.
+ * Stack limit of an item: 1 for one-of-a-kind, the kind rule (fruit/shell 10), the group rule (shore
+ * finds 10), the row's `stack`, else `stackMax`.
  * @param {Record<string, any>|null} item
  * @param {EconCtx} [ctx]
  * @returns {number}
@@ -123,7 +129,8 @@ export function pocketOf(item, ctx) {
 export function stackLimit(item, ctx) {
   const t = tuningOf(ctx);
   if (item?.oneOfAKind) return 1;
-  if (item && typeof item.kind === 'string' && t.stackByKind[item.kind]) return t.stackByKind[item.kind];
+  if (item && typeof item.kind === 'string' && Object.hasOwn(t.stackByKind, item.kind)) return t.stackByKind[item.kind];
+  if (item && typeof item.group === 'string' && Object.hasOwn(t.stackByGroup, item.group)) return t.stackByGroup[item.group];
   if (item && Number.isInteger(item.stack) && item.stack >= 1) return item.stack;
   return t.stackMax;
 }
@@ -241,7 +248,8 @@ export function roomFor(world, itemId, ctx) {
   const item = resolveItem(itemId, ctx);
   if (!item) return 0;
   if (walletCurrencyOf(item)) return Infinity;
-  if (isOneOfAKind(item)) return count(world, itemId, { baskets: true }, ctx) > 0 ? 0 : 1;
+  const ooak = isOneOfAKind(item);
+  if (ooak && count(world, itemId, { baskets: true }, ctx) > 0) return 0;
   const t = tuningOf(ctx);
   const pocket = pocketOf(item, ctx);
   const limit = stackLimit(item, ctx);
@@ -252,7 +260,8 @@ export function roomFor(world, itemId, ctx) {
   const pocketRoom = cap > 0 ? Math.max(0, cap - stacks.length) : Infinity;
   const slotRoom = t.bagUnslottedPockets.includes(pocket) ? Infinity : slots(world, ctx).free;
   const newStacks = Math.min(pocketRoom, slotRoom);
-  return newStacks === Infinity ? Infinity : room + newStacks * limit;
+  const total = newStacks === Infinity ? Infinity : room + newStacks * limit;
+  return ooak ? Math.min(1, total) : total;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -494,13 +503,13 @@ export function takeBasket(world, basketId, ctx) {
  * @returns {{moved: number, spilled: number, basketId: string|null}}
  */
 export function normalize(world, ctx) {
-  const lk = lookup(ctx?.data);
+  const data = ctx?.data;
   /** @type {Array<{pocket: string, id: string, n: number}>} */
   const all = [];
   let moved = 0;
   for (const [pocket, stacks] of Object.entries(world.bag.pockets)) {
     for (const s of stacks) {
-      const row = lk.row('items', s.id);
+      const row = itemOf(data, s.id);
       const home = row ? pocketOf(row, ctx) : pocket;
       if (home !== pocket) moved += 1;
       const prev = all.find((e) => e.pocket === home && e.id === s.id);
@@ -513,7 +522,7 @@ export function normalize(world, ctx) {
   /** @type {string|null} */
   let basketId = null;
   for (const e of all) {
-    const item = lk.row('items', e.id) ?? { id: e.id, pocket: e.pocket };
+    const item = itemOf(data, e.id) ?? { id: e.id, pocket: e.pocket };
     const put = place(world, { ...item, pocket: e.pocket }, e.n, ctx);
     if (put < e.n) {
       const b = basketAt(world, feetOf(world, ctx), ctx);

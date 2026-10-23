@@ -20,6 +20,7 @@
  */
 
 import { MINUTES_PER_DAY } from '../core/time.js';
+import { FLAG_NAMESPACES } from '../state/schema.js';
 
 /** @typedef {import('../state/schema.js').World} World */
 
@@ -193,6 +194,77 @@ export function lookup(data) {
 }
 
 /**
+ * Tables an item id may live in, in lookup order: shop and key items (`items`), then the Archive
+ * collections (`collections`: fish, bugs, finds, fruit), which the satchel carries and the shops buy.
+ */
+export const ITEM_TABLES = Object.freeze(['items', 'collections']);
+
+/**
+ * The row for a carryable thing: its `items` row, else its `collections` row, else `null`.
+ * @param {any} data   Registry or tables object
+ * @param {string} itemId
+ * @returns {Record<string, any>|null}
+ */
+export function itemOf(data, itemId) {
+  const lk = lookup(data);
+  for (const table of ITEM_TABLES) {
+    const row = lk.row(table, itemId);
+    if (row && typeof row === 'object') return row;
+  }
+  return null;
+}
+
+/**
+ * Whether the data source carries any item table (so an id missing from all of them is unknown).
+ * @param {any} data
+ * @returns {boolean}
+ */
+export function knowsItems(data) {
+  const lk = lookup(data);
+  return ITEM_TABLES.some((t) => lk.hasTable(t));
+}
+
+/**
+ * Every carryable row (`items` then `collections`), first row per id wins.
+ * @param {any} data
+ * @returns {Record<string, any>[]}
+ */
+export function allItems(data) {
+  const lk = lookup(data);
+  const seen = new Set();
+  /** @type {Record<string, any>[]} */
+  const out = [];
+  for (const table of ITEM_TABLES) {
+    for (const r of lk.list(table)) {
+      if (!r || typeof r !== 'object' || typeof r.id !== 'string' || seen.has(r.id)) continue;
+      seen.add(r.id);
+      out.push(r);
+    }
+  }
+  return out;
+}
+
+/**
+ * A designer money value as whole buttons: finite numbers floor to an integer, anything else
+ * (missing, NaN, negative) is 0. Keeps fractional or broken prices from reaching `wallet` (which
+ * throws on non-integers) halfway through a transaction.
+ * @param {unknown} v
+ * @returns {number}
+ */
+export function money(v) {
+  return typeof v === 'number' && Number.isFinite(v) && v > 0 ? Math.floor(v) : 0;
+}
+
+/**
+ * Whether a row carries a usable price (a finite number >= 0).
+ * @param {Record<string, any>|null|undefined} row
+ * @returns {boolean}
+ */
+export function isPriced(row) {
+  return !!row && typeof row.price === 'number' && Number.isFinite(row.price) && row.price >= 0;
+}
+
+/**
  * @param {any} registry
  * @param {string} table
  * @returns {any[]|null}
@@ -322,6 +394,6 @@ export const is = Object.freeze({
   minute: (v) => Number.isInteger(v) && v >= 0 && v < MINUTES_PER_DAY,
   id: (v) => typeof v === 'string' && v.length > 0,
   ids: (v) => Array.isArray(v) && v.every((x) => typeof x === 'string' && x.length > 0),
-  flagId: (v) => typeof v === 'string' && /^(sp|th|np|sys|seen)\..+/.test(v),
+  flagId: (v) => typeof v === 'string' && FLAG_NAMESPACES.some((ns) => v.startsWith(ns) && v.length > ns.length),
   intRecord: (v) => !!v && typeof v === 'object' && !Array.isArray(v) && Object.values(v).every((x) => Number.isInteger(x) && x >= 0),
 });

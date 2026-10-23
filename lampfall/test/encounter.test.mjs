@@ -233,9 +233,14 @@ describe('Errants', () => {
     w.flags['sp.lit.calls'] = true;
     for (let i = 0; i < 30; i++) assert.equal(rollUntil(w, POINT, makeRng(i), ctxAt(1, 1, { total: DAY, tuning: sure })).errant, false, 'not by day');
     const r = rollUntil(w, POINT, makeRng(1), ctxAt(1, 1, { total: NIGHT, tuning: sure }));
-    assert.deepEqual([r.speciesId, r.errant, r.level], ['errant-1', true, 46]);
+    assert.ok(['errant-1', 'errant-2'].includes(r.speciesId));
+    assert.deepEqual([r.errant, r.level], [true, 46]);
+    // both lit Errants turn up (one shared roll, then a pick among those that are up)
+    const picked = new Set();
+    for (let i = 0; i < 40; i++) picked.add(rollUntil(w, POINT, makeRng(100 + i), ctxAt(1, 1, { total: NIGHT, tuning: sure })).speciesId);
+    assert.deepEqual([...picked].sort(), ['errant-1', 'errant-2']);
     E.markErrantDown(w, 'errant-1', { total: NIGHT });
-    assert.equal(rollUntil(w, POINT, makeRng(1), ctxAt(1, 1, { total: NIGHT, tuning: sure })).speciesId, 'errant-2');
+    for (let i = 0; i < 10; i++) assert.equal(rollUntil(w, POINT, makeRng(i), ctxAt(1, 1, { total: NIGHT, tuning: sure })).speciesId, 'errant-2');
     let errants = 0;
     const rng = makeRng(9);
     w.encounter.errants = {};
@@ -243,8 +248,8 @@ describe('Errants', () => {
       const e = rollUntil(w, POINT, rng, ctxAt(1, 1, { total: NIGHT }));
       if (e.errant) { errants++; w.encounter.errants = {}; }
     }
-    // two lit Errants each at 1/120 per encounter
-    assert.ok(errants > 140 && errants < 260, `${errants} of 12000`);
+    // GDD-00 §2: 1 in 120 night encounters on the point, however many lit Errants are up
+    assert.ok(errants > 65 && errants < 140, `${errants} of 12000`);
   });
   it('map markers: shown once seen (Skyroam) or revealed by the Weatherglass / telescope', () => {
     const w = makeWorld({ total: DAY });

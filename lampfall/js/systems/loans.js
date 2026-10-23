@@ -7,8 +7,9 @@
  *    no deadline. The ladder comes from `data.loans` (`{id: 'tier-N', tier, amount, build,
  *    commissionSlot, roofChoices}`), else the `loanLadder` tuning default. `world.loans.tier` is the open
  *    loan; `paid` is what is paid toward it. When it reaches zero the stick splits, the next loan is
- *    offered (tier + 1, paid 0) and the cleared tier's build is queued. The last tier stays open at
- *    full payment once cleared ({@link isPaidOff}).
+ *    offered (tier + 1, paid 0) and the cleared tier's build is queued ({@link tierUp} does the same for
+ *    a loan already at zero, e.g. after a load). The last tier stays open at full payment once cleared
+ *    ({@link isPaidOff}). A malformed ladder row (no integer tier / amount, a repeated tier) throws.
  *  - **Paying** ({@link pay}) at the yard spends buttons and returns the ceremony: one abacus bead per
  *    1,000 (speeding up after ten), a notch per 5% of the open loan on a twenty-notch stick, the split
  *    and the stick appended to the tally wall (`loans.tally`).
@@ -96,25 +97,27 @@ export const DEFAULTS = deepFreeze({
   commissionRooms: ['training-yard', 'workshop', 'greenhouse', 'cellar', 'porch-loft', 'gallery'],
   leftoverCommissionPrice: 20000,            // §7: leftover rooms 20,000 each after the Relighting
   buildSatchel: { cottage: 10, cellar: 10 }, // §7: cottage satchel +10; Cellar satchel +10
-  roofColours: ['slate-blue', 'brick-red', 'moss-green', 'ochre', 'plum', 'sea-teal', 'charcoal', 'cream'], // §7: 8 colours
+  roofColours: ['slate-blue', 'ochre', 'harbor-red', 'moss', 'sea-blue', 'straw', 'tar', 'heather'], // §7: 8 colours (GDD-ids ROOF_COLOUR_IDS)
   roofDefault: 'slate-blue',                 // §7: slate blue is the cursor default
   buildLandMinute: 5 * 60 + 40,              // §5: 05:40 the Thatch tie off any overnight build
   buildsPerNight: 1,                         // §7: one build per night
   relightMinute: 18 * 60,                    // §7: the Relighting at the next dusk (18:00)
-  relightFlag: 'sp.relighting-due',          // set to the clock day whose dusk fires the Relighting
-  relitFlag: 'sp.relit',                     // set by the ending flow once the lamp is lit
+  relightFlag: 'sys.relighting-due',         // set to the clock day whose dusk fires the Relighting
+  relitFlag: 'sp.relighting',                // GDD-ids: the Relighting done (the ending flow sets it via markRelit)
+  firstPaymentFlag: 'sp.first-payment',      // GDD-ids: first THWAP (set when the first loan clears)
+  lampRoomBuiltFlag: 'sp.lamp-room-built',   // GDD-ids: Lamp Room built (set when the last tier's build lands)
   clearedFlag: 'sys.loan.cleared',           // highest tier cleared (number)
   paceWindowDays: 3,                         // Ledger pace line: credits over the last N economy days
   ledgerLogMax: 60,                          // credits kept in loans.log
   yardHours: [6 * 60, 24 * 60],              // §5: Wren's yard 06:00-24:00 (yardOpen helper)
   commonsNeighborShare: 0.2,                 // §7: neighbors add 10-30% (per-project override: neighborShare)
-  commonsProjects: [                         // §9: the six Commons projects
+  commonsProjects: [                         // §9: the six Commons projects (GDD-ids COMMONS_PROJECT_IDS)
     { id: 'dark-house-1', cost: 3000 },
     { id: 'quay-lamps', cost: 4000 },
-    { id: 'mudlark-flags', cost: 5000 },
-    { id: 'creek-footbridge', cost: 6000 },
-    { id: 'green-training-yard', cost: 10000, cond: { badge: 5 } },
-    { id: 'market-stall', cost: 12000 },
+    { id: 'mudlark-mile-flags', cost: 5000 },
+    { id: 'north-creek-footbridge', cost: 6000 },
+    { id: 'training-yard-green', cost: 10000, cond: { badge: 5 } },
+    { id: 'third-stall', cost: 12000 },
   ],
 });
 
@@ -145,6 +148,8 @@ const SPEC = {
   relightMinute: [is.minute, 'minute 0..1439'],
   relightFlag: [is.flagId, 'namespaced flag id'],
   relitFlag: [is.flagId, 'namespaced flag id'],
+  firstPaymentFlag: [is.flagId, 'namespaced flag id'],
+  lampRoomBuiltFlag: [is.flagId, 'namespaced flag id'],
   clearedFlag: [is.flagId, 'namespaced flag id'],
   paceWindowDays: [is.posInt, 'integer >= 1'],
   ledgerLogMax: [is.posInt, 'integer >= 1'],
@@ -166,6 +171,25 @@ export const tuningOf = makeTuning('loans', DEFAULTS, SPEC);
 // Ladder
 // ---------------------------------------------------------------------------------------------
 
+/**
+ * Rejects a malformed ladder loudly (a row without an integer `tier` >= 1 or a non-negative integer
+ * `amount`, or two rows on one tier). Without this a missing amount reads as NaN, and a NaN rung
+ * would clear itself and silently skip a loan.
+ * @param {readonly any[]} rows
+ * @throws {TypeError}
+ */
+function assertLadderRows(rows) {
+  const seen = new Set();
+  rows.forEach((r, i) => {
+    const where = `loans: ladder row ${i}${r && typeof r.id === 'string' ? ` (${r.id})` : ''}`;
+    if (!r || typeof r !== 'object') throw new TypeError(`${where}: must be an object`);
+    if (!Number.isInteger(r.tier) || r.tier < 1) throw new TypeError(`${where}: tier must be an integer >= 1, got ${JSON.stringify(r.tier)}`);
+    if (!Number.isInteger(r.amount) || r.amount < 0) throw new TypeError(`${where}: amount must be a non-negative integer, got ${JSON.stringify(r.amount)}`);
+    if (seen.has(r.tier)) throw new TypeError(`${where}: tier ${r.tier} appears twice`);
+    seen.add(r.tier);
+  });
+}
+
 /** @type {WeakMap<object, WeakMap<object, readonly LoanRow[]>>} rows -> tuning -> normalized ladder */
 const LADDER_CACHE = new WeakMap();
 
@@ -183,6 +207,7 @@ export function ladder(ctx) {
   if (!byTuning) LADDER_CACHE.set(rows, (byTuning = new WeakMap()));
   const hit = byTuning.get(t);
   if (hit) return hit;
+  assertLadderRows(rows);
   const out = deepFreeze(rows.slice().sort((a, b) => a.tier - b.tier).map((r) => {
     const commission = r.commission === true || r.commissionSlot === true;
     const build = commission ? null : (typeof r.build === 'string' && r.build ? r.build : null);
@@ -377,9 +402,10 @@ function clearTier(world, row, ctx) {
   L.tally.push({ tier: row.tier, day: dayOf(world, ctx, t) });
   L.scaffold = Math.min(ladder(ctx).length, L.tally.length);
   flags.setFlag(world, t.clearedFlag, row.tier, ctx);
+  if (L.tally.length === 1) flags.setFlag(world, t.firstPaymentFlag, true, ctx);
   for (const f of row.clearFlags) flags.setFlag(world, f, true, ctx);
   const build = row.commission ? commissionFor(world, row.tier, ctx) : row.build;
-  if (build) enqueue(world, row.tier, build, ctx);
+  if (build && !L.builds.some((b) => b.tier === row.tier)) enqueue(world, row.tier, build, ctx);
   const last = row.tier >= maxTier(ctx);
   if (!last) {
     L.tier = row.tier + 1;
@@ -440,16 +466,39 @@ function credit(world, amount, source, carry, ctx) {
 }
 
 /**
- * Clears any zero-amount rungs at the open tier (a ladder authored with a free tier).
+ * Clears every open loan whose balance is already zero (a zero-amount rung, or a save loaded against
+ * a ladder whose amount dropped), offering the next one each time.
  * @param {World} world
  * @param {EconCtx|undefined} ctx
+ * @returns {Clearance[]}
  */
 function settleZeroRungs(world, ctx) {
+  /** @type {Clearance[]} */
+  const out = [];
   for (let guard = 0; guard <= ladder(ctx).length; guard++) {
     const row = loanRow(world.loans.tier, ctx);
-    if (!row || row.tier >= maxTier(ctx) || row.amount - world.loans.paid > 0) return;
-    clearTier(world, row, ctx);
+    if (!row || row.amount - world.loans.paid > 0) break;
+    if (row.tier >= maxTier(ctx)) {
+      // the last loan stays open at full payment; clear it once if it never split (no tally stick)
+      if (!world.loans.tally.some((s) => s.tier === row.tier)) out.push(clearTier(world, row, ctx));
+      break;
+    }
+    out.push(clearTier(world, row, ctx));
   }
+  return out;
+}
+
+/**
+ * Tier-up: when the open loan's balance is zero, splits its stick, queues its build and offers the
+ * next loan, repeating while the next one is also at zero. {@link pay} and the share credits do this
+ * as part of crediting; call it after a load or a content change so a loan never sits at zero. Safe to
+ * call any time (does nothing when the open loan still has a balance).
+ * @param {World} world
+ * @param {EconCtx} [ctx]
+ * @returns {{cleared: Clearance[], tier: number}}
+ */
+export function tierUp(world, ctx) {
+  return { cleared: settleZeroRungs(world, ctx), tier: world.loans.tier };
 }
 
 /**
@@ -786,6 +835,7 @@ export function landDue(world, ctx) {
     const slotsAdded = satchelBonus(b, ctx);
     if (slotsAdded > 0) bag.expand(world, slotsAdded, { ...ctx, source: `build:${b.id}` });
     for (const f of buildFlagsOf(b, ctx)) flags.setFlag(world, f, true, ctx);
+    if (b.tier > 0 && b.tier === maxTier(ctx)) flags.setFlag(world, t.lampRoomBuiltFlag, true, ctx);
     emit(ctx, 'loan:built', { id: b.id, tier: b.tier, choice: b.choice });
     landed.push({ ...b });
   }
@@ -848,10 +898,15 @@ export function markRelit(world, ctx) {
  * The Commons projects: `data.commons` rows when present, else the `commonsProjects` tuning.
  * @param {EconCtx} [ctx]
  * @returns {CommonsProject[]}
+ * @throws {TypeError} for a malformed data row (a NaN cost would otherwise corrupt the jar)
  */
 export function commonsProjects(ctx) {
   const rows = lookup(ctx?.data).list('commons');
-  return rows.length ? rows : tuningOf(ctx).commonsProjects;
+  if (!rows.length) return tuningOf(ctx).commonsProjects;
+  rows.forEach((p, i) => {
+    if (!isProject(p)) throw new TypeError(`loans: commons row ${i} must be {id, cost: integer >= 0, neighborShare?: 0..1}, got ${JSON.stringify(p)}`);
+  });
+  return rows;
 }
 
 /**

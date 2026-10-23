@@ -428,8 +428,10 @@ export function porchTalkOpen(world, data, opts = {}) {
 }
 
 /**
- * Whether a shop is open: its `hours: [open, close]` (minutes; wraps past midnight when close <=
- * open; `[0, 1440]` = always) and its optional `cond`.
+ * Whether a shop is open, by the same rules as systems/shops `isOpen`: its `hours: [open, close)`
+ * (minutes; wraps past midnight when close < open; open === close (mod 1440), e.g. `[0, 1440]`,
+ * means always open), its `fromDay` (GDD day; tested on the day the opening started, so the Raft's
+ * after-midnight hours count as the evening's day) and its optional `cond`.
  * @param {string|any} shop   shop id or row
  * @param {World} world
  * @param {any} data
@@ -438,10 +440,19 @@ export function porchTalkOpen(world, data, opts = {}) {
  */
 export function isShopOpen(shop, world, data, opts = {}) {
   const s = typeof shop === 'string' ? row(data, 'shops', shop) : shop;
-  if (!s || !Array.isArray(s.hours) || s.hours.length !== 2) return false;
-  const [open, close] = s.hours;
-  if (open === 0 && close >= MINUTES_PER_DAY) return holds(world, s.cond, data);
-  return inWindow(minuteNow(world, opts), [open, close]) && holds(world, s.cond, data);
+  if (!s || !Array.isArray(s.hours) || s.hours.length !== 2 || !s.hours.every((h) => Number.isFinite(h))) return false;
+  const open = mod(Math.floor(s.hours[0]), MINUTES_PER_DAY);
+  const close = mod(Math.floor(s.hours[1]), MINUTES_PER_DAY);
+  const day = coreDay(world, opts);
+  const minute = minuteNow(world, opts);
+  let startDay = day;
+  if (open !== close) {
+    const start = windowStartDay(day, minute, [open, close]);
+    if (start === null) return false;
+    startDay = start;
+  }
+  if (isInt(s.fromDay) && gameDay(startDay, tuningOf(data, opts)) < s.fromDay) return false;
+  return holds(world, s.cond, data);
 }
 
 // ---------------------------------------------------------------------------------------------

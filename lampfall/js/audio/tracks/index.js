@@ -9,7 +9,8 @@
  * `test/audio.tracks.test.mjs` deep-compares each track and each `toEngine()` result with the prototype.
  *
  * Two additions, neither of which changes a note or a rule:
- *  - the exported tables are frozen (data convention §8.1);
+ *  - the exported tables are deep-frozen (data convention §8.1): tracks, layers, patterns, notes and
+ *    the CUES entries, so no consumer can retune the shared score by accident;
  *  - `CUES[0]` … `CUES[23]` exist as NON-enumerable keys naming the hour's day-part theme, which is
  *    what `tools/validate-data.mjs` checks ("every hour 0..23 maps to a track in CUES"). They do not
  *    show up in `Object.keys(CUES)`, so the prototype's shape is unchanged.
@@ -72,6 +73,24 @@ export { midi, P, at, rep, cat, SIGNAL_CHIMES, signalSting };
  * @property {string} [motif]  @property {string} [mood]
  * @property {Record<string, TrackLayerDef>} layers
  */
+
+/**
+ * Freezes an object graph in place (functions are left callable; already-frozen nodes are skipped).
+ * @template T
+ * @param {T} o
+ * @returns {T}
+ */
+function deepFreeze(o) {
+  if (o === null || (typeof o !== 'object' && typeof o !== 'function') || Object.isFrozen(o)) return o;
+  Object.freeze(o);
+  for (const k of Reflect.ownKeys(o)) {
+    const d = Object.getOwnPropertyDescriptor(o, k);
+    if (d && 'value' in d) deepFreeze(d.value);
+  }
+  return o;
+}
+for (const tr of [H_NIGHT_DEEP, H_PREDAWN, H_MORNING, H_LATE_MORNING, H_MIDDAY, H_AFTERNOON, H_DUSK, H_NIGHT, TITLE, FORECAST,
+  BATTLE_WILD, BATTLE_TRAINER, BATTLE_SPIRE, SUMMIT, VICTORY, SHIFT_REVEAL, SHIFT_REVEAL_ANCHOR, LETTER, RELIGHTING, LANTERN_MARKET, CREDITS]) deepFreeze(tr);
 
 /** The eight day-part themes, 00–03 … 21–24, in hour order. @type {readonly TrackDef[]} */
 export const DAY_PARTS = Object.freeze([H_NIGHT_DEEP, H_PREDAWN, H_MORNING, H_LATE_MORNING, H_MIDDAY, H_AFTERNOON, H_DUSK, H_NIGHT]);
@@ -145,7 +164,7 @@ export const CUES = {
 };
 // Hour keys for tools/validate-data.mjs (non-enumerable: Object.keys(CUES) stays the prototype's).
 for (let h = 0; h < 24; h++) Object.defineProperty(CUES, h, { value: themeForHour(h), enumerable: false });
-Object.freeze(CUES);
+deepFreeze(CUES);
 
 /** Drum note -> engine preset. The data uses one 'kit' layer; the engine wants one layer per drum voice. */
 const KIT_VOICES = { 36: 'kick', 38: 'snare', 42: 'hat', 37: 'snare' };

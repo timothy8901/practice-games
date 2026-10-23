@@ -45,10 +45,18 @@ export const CALENDAR_DEFAULTS = Object.freeze({
   calendarDayOffset: 1,
   /** Weekday of core day 0 (0 = Monday … 6 = Sunday). GDD-00 §5: day 1 is a Sunday. */
   calendarFirstDow: 6,
-  /** Porch id of the player's own porch. */
-  homePorchId: 'home',
+  /** Porch id of the player's own porch (the manifest id, `data/ids.manifest` PORCH_IDS). */
+  homePorchId: 'porch-keepers-cottage',
   /** The home porch is lit once `world.loans.tier` reaches this (loan 1 paid -> tier 2; GDD-00 §7). */
   homePorchLitTier: 2,
+  /**
+   * Porches lit at arrival when no porch row says so (GDD-00 §4: "7 lit at arrival (co-op yard
+   * house, Pell's, post office, Archive, Warden's house, Tully's, Linnet's)"). A porch row's
+   * `litAtStart: true` also lights it; a `sys.porch.<id>` flag overrides both.
+   */
+  porchesLitAtStart: Object.freeze([
+    'porch-coop-yard', 'porch-pells', 'porch-post-office', 'porch-archive', 'porch-wardens-house', 'porch-tully', 'porch-linnet',
+  ]),
 });
 
 const isInt = (v) => Number.isInteger(v);
@@ -60,6 +68,7 @@ export const CALENDAR_SPEC = Object.freeze({
   calendarFirstDow: [(v) => isInt(v) && v >= 0 && v <= 6, 'integer 0..6'],
   homePorchId: [(v) => typeof v === 'string' && v.length > 0, 'non-empty string'],
   homePorchLitTier: [(v) => isInt(v) && v >= 1, 'integer >= 1'],
+  porchesLitAtStart: [(v) => Array.isArray(v) && v.every((id) => typeof id === 'string' && id.length > 0), 'string[] (porch ids)'],
 });
 
 // ---------------------------------------------------------------------------------------------
@@ -367,7 +376,8 @@ export function porchFlag(porchId) {
 /**
  * Whether a porch is lit now. Order: an injected `opts.isPorchLit(id)` answer; the flag
  * `sys.porch.<id>` when it is set (true or false, so Linnet's porch can go dark); for the home
- * porch, `world.loans.tier >= homePorchLitTier`; else the porch row's `litAtStart`.
+ * porch, `world.loans.tier >= homePorchLitTier`; else the porch row's `litAtStart`, or the id is
+ * in `porchesLitAtStart` (the GDD's seven, so a content set without porch rows still works).
  * @param {World} world
  * @param {any} data
  * @param {string} porchId
@@ -382,10 +392,15 @@ export function isPorchLit(world, data, porchId, opts = {}) {
   }
   const f = world?.flags?.[porchFlag(porchId)];
   if (f !== undefined) return Boolean(f);
-  const t = { ...CALENDAR_DEFAULTS, ...(tuningSource(data, opts) ?? {}) };
-  if (porchId === t.homePorchId) return (world?.loans?.tier ?? 1) >= t.homePorchLitTier;
+  const src = tuningSource(data, opts) ?? {};
+  const pick = (key) => (Object.prototype.hasOwnProperty.call(src, key) && CALENDAR_SPEC[key][0](src[key]) ? src[key] : CALENDAR_DEFAULTS[key]);
+  if (porchId === pick('homePorchId')) {
+    const tier = world?.loans?.tier;
+    return (Number.isFinite(tier) ? tier : 1) >= pick('homePorchLitTier');
+  }
   const p = porchesOf(data).find((r) => r.id === porchId);
-  return Boolean(p && p.litAtStart);
+  if (p && p.litAtStart) return true;
+  return pick('porchesLitAtStart').includes(porchId);
 }
 
 // ---------------------------------------------------------------------------------------------

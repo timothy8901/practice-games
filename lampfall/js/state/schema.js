@@ -684,7 +684,7 @@ export function worldDefaults() {
     rng: {},
     stats: zeroCounters(),
     log: [],
-    dayPage: dayPageDefaults(),
+    dayPage: { ...dayPageDefaults(), day: 0 },   // the arrival day's page is open from the start (systems/dayPage)
     encounter: { steps: 0, errants: {} },
   };
 }
@@ -1218,6 +1218,10 @@ export function validateWorld(world, data) {
     const ref = (path, table, id) => {
       if (isStr(id) && id !== '' && !has(table, id)) out.push(`${path}: unknown ${table} id ${JSON.stringify(id)}`);
     };
+    // Carried things are `items` rows or gathered `collections` rows (fish, bugs, finds, fruit; systems/econ.itemOf).
+    const itemRef = (path, id) => {
+      if (isStr(id) && id !== '' && !has('items', id) && !has('collections', id)) out.push(`${path}: unknown items id ${JSON.stringify(id)}`);
+    };
     creatures.forEach((c) => {
       const where = w.party.includes(c) ? `party[${w.party.indexOf(c)}]` : `box[${w.box.indexOf(c)}]`;
       ref(`world.${where}.speciesId`, 'species', c.speciesId);
@@ -1236,14 +1240,14 @@ export function validateWorld(world, data) {
     }
     if (isPlainObject(w.bag) && isPlainObject(w.bag.pockets)) {
       for (const [pocket, stacks] of Object.entries(w.bag.pockets)) {
-        if (Array.isArray(stacks)) stacks.forEach((s, i) => isPlainObject(s) && ref(`world.bag.pockets.${pocket}[${i}].id`, 'items', s.id));
+        if (Array.isArray(stacks)) stacks.forEach((s, i) => isPlainObject(s) && itemRef(`world.bag.pockets.${pocket}[${i}].id`, s.id));
       }
     }
     if (isPlainObject(w.bag) && Array.isArray(w.bag.baskets)) {
-      w.bag.baskets.forEach((b, bi) => isPlainObject(b) && Array.isArray(b.items) && b.items.forEach((s, i) => isPlainObject(s) && ref(`world.bag.baskets[${bi}].items[${i}].id`, 'items', s.id)));
+      w.bag.baskets.forEach((b, bi) => isPlainObject(b) && Array.isArray(b.items) && b.items.forEach((s, i) => isPlainObject(s) && itemRef(`world.bag.baskets[${bi}].items[${i}].id`, s.id)));
     }
     if (isPlainObject(w.shops) && Array.isArray(w.shops.crate)) {
-      w.shops.crate.forEach((s, i) => isPlainObject(s) && ref(`world.shops.crate[${i}].id`, 'items', s.id));
+      w.shops.crate.forEach((s, i) => isPlainObject(s) && itemRef(`world.shops.crate[${i}].id`, s.id));
     }
     if (isPlainObject(w.npcs)) for (const id of Object.keys(w.npcs)) ref(`world.npcs.${id}`, 'npcs', id);
     if (isPlainObject(w.maps)) for (const id of Object.keys(w.maps)) ref(`world.maps.${id}`, 'maps', id);

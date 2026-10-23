@@ -40,9 +40,9 @@ describe('calendar and windows (townCommon)', () => {
     const w = makeWorld();
     assert.equal(isPorchLit(w, data, 'wren'), true);
     assert.equal(isPorchLit(w, data, 'odile'), false);
-    assert.equal(isPorchLit(w, data, 'home'), false, 'loan 1 unpaid');
+    assert.equal(isPorchLit(w, data, 'porch-keepers-cottage'), false, 'loan 1 unpaid');
     w.loans.tier = 2;
-    assert.equal(isPorchLit(w, data, 'home'), true);
+    assert.equal(isPorchLit(w, data, 'porch-keepers-cottage'), true);
     w.flags[porchFlag('wren')] = false;
     assert.equal(isPorchLit(w, data, 'wren'), false, 'a porch can go dark');
     assert.equal(isPorchLit(w, data, 'odile', { isPorchLit: (id) => id === 'odile' }), true, 'injected answer wins');

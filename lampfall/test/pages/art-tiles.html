@@ -30,7 +30,8 @@
   import { TILE_GROUPS } from '../../js/art/tiles/index.js';
   import { PROP_ART } from '../../js/art/props.js';
   import { UI_ART } from '../../js/art/ui.js';
-  import { getSprite, getTile, artDef, atlasStats } from '../../js/art/atlas.js';
+  import { getSprite, getTile, getShadow, artDef, atlasStats } from '../../js/art/atlas.js';
+  import { houseLayout } from '../../js/art/props.js';
   import { gradeFor } from '../../js/world/lighting.js';
 
   const q = new URLSearchParams(location.search);
@@ -47,7 +48,13 @@
 
   const sections = { ...TILE_GROUPS, props: PROP_ART, ui: UI_ART };
   let count = 0;
+  const sceneName = q.get('scene');
   try {
+    if (sceneName) {
+      // deferred: the scene table is defined below
+      setTimeout(() => { try { drawScene(sceneName); } catch (e) { document.getElementById('err').textContent = String(e && e.stack || e); console.error(e); } });
+      throw 'scene';
+    }
     for (const [name, table] of Object.entries(sections)) {
       if (only && only !== name) continue;
       const ids = Object.keys(table).filter((id) => !filter || id.includes(filter));
@@ -85,9 +92,181 @@
     }
     window.__artSheet = { count, stats: atlasStats() };
   } catch (e) {
-    document.getElementById('err').textContent = String(e && e.stack || e);
-    console.error(e);
+    if (e !== 'scene') {
+      document.getElementById('err').textContent = String(e && e.stack || e);
+      console.error(e);
+    }
   }
+
+  /* ------------------------------------------------------------ scene mosaics (in-context check) */
+  // Small hand-made maps so tiles are judged together, through the hour grade: ?scene=harbor|isles|interior&hour=21
+  function drawScene(name) {
+    const S = SCENES[name];
+    if (!S) throw new Error('unknown scene ' + name);
+    document.querySelector('header').style.display = 'none';
+    const W = S.rows[0].length, H = S.rows.length;
+    const canvas = document.createElement('canvas');
+    canvas.width = W * 16; canvas.height = H * 16;
+    const sc = Number(q.get('scale') || 2);
+    canvas.style.width = canvas.width * sc + 'px'; canvas.style.height = canvas.height * sc + 'px';
+    canvas.style.imageRendering = 'pixelated';
+    root.appendChild(canvas);
+    const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
+    const at = (x, y) => (x < 0 || y < 0 || x >= W || y >= H ? null : S.legend[S.rows[y][x]] || null);
+    const WATER = /^(water-|river)/;
+    const isWater = (id) => id && WATER.test(id);
+    const isTurf = (id) => id && /^(grass-|tall-grass|flowers-)/.test(id);
+    const anim = (id, x, y) => (artDef(id).frames.length > 1 ? (frame + ((x * 3 + y * 5) & 3)) : 0);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const id = at(x, y);
+      if (!id) continue;
+      ctx.drawImage(getTile(id, anim(id, x, y), grade, /^(grass-a|grass-b|sand|wet-sand|mud-)/.test(id) ? ((x * 7 + y * 13) >> 1) & 3 : 0).canvas, x * 16, y * 16);
+      const n = at(x, y - 1), e = at(x + 1, y), so = at(x, y + 1), w = at(x - 1, y);
+      const edge = (t) => ctx.drawImage(getTile(t, frame, grade).canvas, x * 16, y * 16);
+      if (isWater(id)) {
+        const kind = id === 'river' ? 'ripple' : 'foam';
+        const land = (q2) => q2 && !isWater(q2) && !/^(stepstone|causeway|pier|bridge)/.test(q2);
+        if (land(n)) edge(`${kind}-n`); if (land(so)) edge(`${kind}-s`); if (land(e)) edge(`${kind}-e`); if (land(w)) edge(`${kind}-w`);
+        if (id === 'water-deep') {
+          const sh = (q2) => q2 === 'water-shallow';
+          if (sh(n)) edge('shelf-n'); if (sh(so)) edge('shelf-s'); if (sh(e)) edge('shelf-e'); if (sh(w)) edge('shelf-w');
+        }
+        if (id === 'water-shallow' && land(n)) edge('swell-n');
+      } else {
+        if (isWater(so)) edge('bank-s'); if (isWater(n) && !/cobbles/.test(id)) edge('bank-n'); if (isWater(e)) edge('bank-e'); if (isWater(w)) edge('bank-w');
+        if (/^(path|sand)$/.test(id)) { if (isTurf(n)) edge('fringe-n'); if (isTurf(so)) edge('fringe-s'); if (isTurf(e)) edge('fringe-e'); if (isTurf(w)) edge('fringe-w'); }
+        if (id === 'wet-sand' && n === 'sand') edge('tideline-n');
+        if (/cobbles/.test(id) && isWater(n)) edge((x * 5) % 4 === 1 ? 'quay-lip-b' : 'quay-lip');
+      }
+    }
+    // detail layer
+    for (const d of S.detail || []) ctx.drawImage(getTile(d[0], frame, grade).canvas, d[1] * 16, d[2] * 16);
+    // props / objects sorted by anchor row; anchor = bottom-left tile
+    const items = [];
+    for (const p of S.props || []) {
+      if (p.house) { for (const part of houseLayout(p.house)) items.push({ art: night && part.lit ? part.lit : part.art, x: p.x + part.dx, y: p.y + part.dy, sort: p.y + 0.5 }); continue; }
+      items.push({ ...p, sort: p.y });
+    }
+    items.sort((a, b) => a.sort - b.sort || a.x - b.x);
+    for (const it of items) {
+      const def = artDef(it.art);
+      const v = it.lit && night && def.variants && def.variants.lit ? 'lit' : it.variant;
+      const img = getSprite(it.art, { frame: it.frame ?? anim(it.art, it.x, it.y), name: v, grade });
+      const shadow = getShadow(it.art, 0);
+      if (shadow && !night) { ctx.globalAlpha = 0.3; ctx.drawImage(shadow.canvas, it.x * 16 + 2, (it.y + 1) * 16 - def.h + 1); ctx.globalAlpha = 1; }
+      ctx.drawImage(img.canvas, it.x * 16, (it.y + 1) * 16 - def.h);
+      if (it.lit && night) pools.push([it.x * 16 + 8, (it.y + 1) * 16]);
+    }
+    // a light pool under each lit lamp (the light pass's job; approximated here)
+    const pool = getTile('light-pool');
+    ctx.globalCompositeOperation = 'screen'; ctx.globalAlpha = 0.45;
+    for (const [px, py] of pools) ctx.drawImage(pool.canvas, px - 16, py - 8);
+    ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+    window.__artSheet = { scene: name, stats: atlasStats() };
+  }
+  const night = grade ? grade.lamp >= 0.5 : false;
+  const pools = [];
+  const SCENES = {
+    harbor: {
+      legend: { D: 'water-deep', S: 'water-shallow', A: 'sand', W: 'wet-sand', G: 'grass-a', g: 'grass-b', c: 'grass-c', T: 'tall-grass', P: 'path', O: 'cobbles', o: 'cobbles-b', K: 'pier', k: 'pier-end', R: 'river', B: 'bridge-wood', F: 'flowers-a', f: 'flowers-b', M: 'mud-wet', L: 'mud-glow', E: 'reeds', Q: 'flagstones' },
+      rows: [
+        'DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD',
+        'DDDDDDDDDDDDkDDDDDDDDDDDDDDDDDDD',
+        'DDDDSSSSSSSSKSSSSSSSDDDDDDDDDDDD',
+        'DDSSSSSSSSSSKSSSSSSSSSSDDDDDDDDD',
+        'DSSSWWWWOOOOOOOOOOOOOSSSSSDDDDDD',
+        'SSWWWAAAOoOOOOoOOOOOOSSSSSSSSSSS',
+        'WWWAAAAAOOOOOOOOOOOOOAAAWWWWMMMM',
+        'AAAAAGGGOOOOoOOOOOOOOGAAAAWWMLML',
+        'GGGGGGGGGGGGGGQQQQGGGGGGAAAWMMEM',
+        'GGcGGGGGGGGGGGQQQQGGGGGGGGAWEEMM',
+        'GGGGGGGPPPPPPPPPPPPPPPPGGGGGGGGG',
+        'GGGGgGGPGGGGGGGGGGGGGGPGGGGGTTTG',
+        'GGGGGGGPGGGGGFGGGGGGGGPGGGGTTTTG',
+        'GGcGGGGPGGGGGGGGGGfGGGPGGGGGTTGG',
+        'GGGGGGGPGGGGGGGGGGGGGGPGGGGGGGGG',
+        'GGGGGGGPGGGGGGgGGGGGGGPGGGcGGGGG',
+        'GGGGGGGPGGGGGGGGGGGGGGPGGGGGGGGG',
+      ],
+      detail: [['mooring-post', 9, 4], ['crates', 17, 5], ['barrel', 18, 5], ['creel', 19, 6], ['bush', 2, 9], ['rock-a', 25, 5], ['dig-crack', 4, 6], ['hedge', 24, 13], ['hedge', 25, 13], ['string-lights', 14, 7], ['string-lights', 15, 7], ['string-lights', 16, 7]],
+      props: [
+        { art: 'boat', x: 13, y: 3 },
+        { art: 'waystone-lit', x: 20, y: 6 },
+        { art: 'lamp-post', x: 10, y: 6, lit: true },
+        { art: 'lamp-post', x: 19, y: 7, lit: true },
+        { art: 'commons-board', x: 14, y: 9 },
+        { house: { w: 3, roof: 'red', material: 'timber', porch: true }, x: 2, y: 13 },
+        { house: { w: 4, roof: 'teal', material: 'brick', dormer: 1 }, x: 9, y: 13 },
+        { house: { w: 3, roof: 'ochre', material: 'shiplap' }, x: 16, y: 16 },
+        { art: 'porch-lamp', x: 1, y: 13, lit: true },
+        { art: 'tree-fruit', x: 24, y: 10 },
+        { art: 'tree-alder-b', x: 28, y: 9 },
+        { art: 'tree-blossom', x: 19, y: 12 },
+        { art: 'tree-pine', x: 29, y: 15 },
+        { art: 'market-stall-red', x: 14, y: 8 },
+        { art: 'post-box', x: 7, y: 9 },
+      ],
+    },
+    isles: {
+      legend: { a: 'moor-turf', h: 'heather', g: 'gravel', x: 'ash', b: 'basalt', v: 'ember-vent', t: 'spa-terrace', l: 'spa-terrace-lip', s: 'water-spring', n: 'water-tannin', w: 'boardwalk-h', i: 'ice', m: 'mirror-ice', c: 'ice-cracked', o: 'snow', k: 'shingle', S: 'water-shallow', D: 'water-deep', e: 'stepstone-sea', p: 'marsh', d: 'deck-planks' },
+      rows: [
+        'aaaaahhhaaaaaaaxxxxbbbbxxxxxxxxx',
+        'aaahhhhhhaagaaaxxxxbbbbxxxxxxxxx',
+        'aaaahhhhaaaggaaxxxxbbbbxxxxxxxxx',
+        'aaaaaaaaaaaggaaxxxxxxxxxtttttttt',
+        'aaaaaaaaaaaaggaxxxxxxxxxllllllll',
+        'aaaapppaaaaaagaxxxxxxxxxssssssss',
+        'aaaapppaaaaaaagxxxxxxxxxssssssss',
+        'kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk',
+        'SSSSSeSSSSeSSSSSSSSDDDDDDDDDDDDD',
+        'nnnnnnnnnnnnnnnnnnnoooooooooooooo'.slice(0, 32),
+        'nnnnnnnnnnnnnnnnnnnooooooiiiiiio',
+        'wwwwwwwwwwwwwwwwwwwwwwwwwiicciio',
+        'nnnndddddnnnnnnnnnnooooooiiiiiio',
+        'nnnndddddnnnnnnnnnnoooooommmmmmo',
+        'nnnnnnnnnnnnnnnnnnnoooooommmmmmo',
+        'nnnnnnnnnnnnnnnnnnnoooooooooooooo'.slice(0, 32),
+        'nnnnnnnnnnnnnnnnnnnoooooooooooooo'.slice(0, 32),
+      ],
+      detail: [['ember-vent', 26, 1], ['gorse', 2, 3], ['thistles', 9, 4], ['volcanic-rock', 16, 5], ['glasswort', 6, 7], ['seaweed', 12, 7], ['lily-pads', 14, 13]],
+      props: [
+        { art: 'windmill', x: 3, y: 4 },
+        { art: 'standing-stone', x: 10, y: 2 },
+        { art: 'crag', x: 20, y: 3 },
+        { art: 'skyglass', x: 13, y: 6 },
+        { art: 'sea-stack', x: 26, y: 8 },
+        { art: 'wreck-ribs', x: 6, y: 8 },
+        { art: 'tree-mangrove', x: 1, y: 15 },
+        { art: 'tree-drowned', x: 12, y: 15 },
+        { art: 'tree-pine-snow', x: 20, y: 13 },
+        { art: 'waystone-lantern', x: 22, y: 9 },
+        { art: 'brazier', x: 18, y: 2 },
+      ],
+    },
+    interior: {
+      legend: { '0': 'cottage-floor-0', '1': 'cottage-floor-1', '2': 'cottage-floor-2', '3': 'cottage-floor-3', a: 'cottage-wall-0-top', b: 'cottage-wall-0', c: 'cottage-wall-1-top', d: 'cottage-wall-1', e: 'cottage-wall-2-top', f: 'cottage-wall-2', g: 'cottage-wall-3-top', h: 'cottage-wall-3', T: 'spire-floor-turn', W: 'spire-floor-ward', X: 'spire-floor-weather', H: 'spire-floor-hollow', R: 'spire-floor-relay', M: 'spire-floor-mirror', t: 'spire-wall-turn', w: 'spire-wall-ward', x: 'spire-wall-weather', o: 'spire-wall-hollow', r: 'spire-wall-relay', m: 'spire-wall-mirror', L: 'lamp-room-floor', l: 'lighthouse-wall', p: 'lighthouse-porthole', s: 'floor-stone' },
+      rows: [
+        'aaaaaaaccccccccceeeeeeeegggggggg',
+        'bbbbbbbdddddddddffffffffhhhhhhhh',
+        '0000000111111111222222223333333',
+        '0000000111111111222222223333333',
+        '0000000111111111222222223333333',
+        'ttttwwwwxxxxoooorrrrmmmmllplllll',
+        'TTTTWWWWXXXXHHHHRRRRMMMMLLLLLLLL',
+        'TTTTWWWWXXXXHHHHRRRRMMMMLLLLLLLL',
+        'TTTTWWWWXXXXHHHHRRRRMMMMLLLLLLLL',
+        'TTTTWWWWXXXXHHHHRRRRMMMMLLLLLLLL',
+        'ssssssssssssssssssssssssssssssss',
+      ].map((r) => r.padEnd(32, r[r.length - 1])),
+      detail: [['rug', 20, 3], ['rug', 28, 3]],
+      props: [
+        { art: 'hearth', x: 25, y: 2 },
+        { art: 'stair-spiral', x: 26, y: 9 },
+        { art: 'lens-lit', x: 29, y: 8 },
+      ],
+    },
+  };
 </script>
 </body>
 </html>

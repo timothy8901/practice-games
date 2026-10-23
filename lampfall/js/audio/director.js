@@ -41,6 +41,7 @@ import { TRACKS, CUES, themeForHour, twoBarsMs, toEngine, stemLayers, applyStems
 import { createSfxRouter } from './sfxMap.js';
 import * as selectors from '../state/selectors.js';
 import * as clockSys from '../systems/clockSys.js';
+import * as weatherSys from '../systems/weather.js';
 
 // ---------------------------------------------------------------------------------------------
 // Tuning
@@ -108,6 +109,28 @@ export const DEFAULTS = Object.freeze({
 
 /** Every tuning key, for the GDD table. @type {readonly string[]} */
 export const TUNING_KEYS = Object.freeze(Object.keys(DEFAULTS));
+/** Alias of {@link TUNING_KEYS} (the lane brief's spelling). @type {readonly string[]} */
+export const tuningKeys = TUNING_KEYS;
+
+/**
+ * The track definition for an id, or null. Own keys only, so a prototype key (`'constructor'`,
+ * `'__proto__'`, `'toString'`) arriving from a script, a map or a payload is never a track.
+ * @param {unknown} id
+ * @returns {import('./tracks/index.js').TrackDef|null}
+ */
+export function trackOf(id) {
+  return typeof id === 'string' && Object.hasOwn(TRACKS, id) ? TRACKS[id] : null;
+}
+/** @param {unknown} id @returns {any} the CUES entry for an own string key, else null */
+function cueOf(id) {
+  return typeof id === 'string' && Object.hasOwn(CUES, id) ? CUES[id] : null;
+}
+/** @param {unknown} v @returns {boolean} */
+const isPlainObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+/** A fade value: finite and >= 0, else `fallback`. @param {unknown} v @param {number} fallback */
+function fadeOf(v, fallback) {
+  return typeof v === 'number' && Number.isFinite(v) ? Math.max(0, v) : Math.max(0, fallback);
+}
 
 /**
  * Scene name -> what it does to the music. `'world'` / `'battle'` defer to those layers (battle falls
@@ -135,19 +158,33 @@ export const DIRECTOR_EVENTS = Object.freeze([
 ]);
 
 /**
- * Merged tuning: {@link DEFAULTS} under the overrides (numbers must be finite to override).
+ * Merged tuning: {@link DEFAULTS} under the overrides. An override must have the default's shape to
+ * apply: numbers must be finite, strings strings, lists arrays, and table-valued keys
+ * (`SEASON_INTENSITY`, `CUE_FADE_MS`) plain objects, which are merged OVER the default table so a
+ * partial override (`{SEASON_INTENSITY: {winter: 0.8}}`) keeps the other rows. Unknown keys are kept.
  * @param {Record<string, any>} [tuning]
  * @returns {Readonly<typeof DEFAULTS>}
  */
 export function tuningOf(tuning) {
+  /** @type {Record<string, any>} */
   const out = { ...DEFAULTS };
   if (tuning && typeof tuning === 'object') {
     for (const [k, v] of Object.entries(tuning)) {
-      if (typeof DEFAULTS[k] === 'number' && !(typeof v === 'number' && Number.isFinite(v))) continue;
-      if (v !== undefined) out[k] = v;
+      if (v === undefined || k === '__proto__') continue;
+      if (!Object.hasOwn(DEFAULTS, k)) { out[k] = v; continue; }
+      const d = /** @type {any} */ (DEFAULTS)[k];
+      if (typeof d === 'number') { if (typeof v === 'number' && Number.isFinite(v)) out[k] = v; }
+      else if (typeof d === 'string') { if (typeof v === 'string') out[k] = v; }
+      else if (Array.isArray(d)) { if (Array.isArray(v)) out[k] = Object.freeze(v.slice()); }
+      else if (isPlainObject(d)) {
+        if (!isPlainObject(v)) continue;
+        const merged = { ...d };
+        for (const [rk, rv] of Object.entries(v)) if (rk !== '__proto__' && typeof rv === 'number' && Number.isFinite(rv)) merged[rk] = rv;
+        out[k] = Object.freeze(merged);
+      }
     }
   }
-  return Object.freeze(out);
+  return /** @type {any} */ (Object.freeze(out));
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -160,6 +197,7 @@ export function tuningOf(tuning) {
  * @property {number} hour                 0..23
  * @property {number} weekday              0 = Monday
  * @property {string|null} weather         current weather kind id
+ * @property {string[]|null} weatherStems  stems the weather kind turns on (`systems/weather` kind `stems`), null = unknown
  * @property {number|null} tide            0..1, null when unknown
  * @property {string|null} tideState       'low' | 'mid' | 'high' … (fallback when the height is unknown)
  * @property {string|null} season
@@ -193,7 +231,7 @@ export function tuningOf(tuning) {
  */
 export function initialState(over = {}) {
   return {
-    hour: 12, weekday: 0, weather: null, tide: null, tideState: null, season: null, place: null, mapMusic: null,
+    hour: 12, weekday: 0, weather: null, weatherStems: null, tide: null, tideState: null, season: null, place: null, mapMusic: null,
     scenes: [], scenesKnown: false, battle: null, sting: null, override: null, stemOverrides: {}, oneShotDone: null,
     ...over,
   };
@@ -245,22 +283,25 @@ function tideHeightOf(s) {
  */
 export function pickWorldTrack(s, t = DEFAULTS) {
   const h = hourOf(s.hour);
-  if (s.weekday === t.MARKET_WEEKDAY && h >= t.MARKET_FROM_HOUR && s.place === t.MARKET_PLACE && TRACKS[t.MARKET_TRACK]) return t.MARKET_TRACK;
+  if (s.weekday === t.MARKET_WEEKDAY && h >= t.MARKET_FROM_HOUR && s.place === t.MARKET_PLACE && trackOf(t.MARKET_TRACK)) return t.MARKET_TRACK;
   return themeForHour(h);
 }
 
 /**
  * The world stem rules (core, melody, bass, perc, night, tide, rain) evaluated for a state, limited
- * to the layers `trackId` has.
+ * to the layers `trackId` has. Rain is on for a weather in `RAIN_STEM_WEATHERS` or whose weather
+ * kind lists the stem (`state.weatherStems`, from `systems/weather` kind data); any other stem a
+ * weather kind lists (e.g. a future `fog` layer) turns on too when the track has it.
  * @param {MusicState} s
  * @param {string} trackId
  * @param {Readonly<typeof DEFAULTS>} [t]
  * @returns {Record<string, boolean>}
  */
 export function worldStems(s, trackId, t = DEFAULTS) {
-  const track = TRACKS[trackId];
+  const track = trackOf(trackId);
   if (!track) return {};
   const h = hourOf(s.hour);
+  const wx = Array.isArray(s.weatherStems) ? s.weatherStems : [];
   const rules = {
     core: true,
     melody: true,
@@ -268,23 +309,30 @@ export function worldStems(s, trackId, t = DEFAULTS) {
     perc: !inHours(h, t.PERC_OFF_FROM_HOUR, t.PERC_OFF_TO_HOUR),
     night: inHours(h, t.NIGHT_STEM_FROM_HOUR, t.NIGHT_STEM_TO_HOUR),
     tide: tideHeightOf(s) > t.TIDE_STEM_ABOVE,
-    rain: Array.isArray(t.RAIN_STEM_WEATHERS) && t.RAIN_STEM_WEATHERS.includes(s.weather),
+    rain: (Array.isArray(t.RAIN_STEM_WEATHERS) && t.RAIN_STEM_WEATHERS.includes(s.weather)) || wx.includes('rain'),
   };
+  /** @type {Record<string, boolean>} */
   const out = {};
-  for (const [name, on] of Object.entries(rules)) if (track.layers[name]) out[name] = on;
+  for (const [name, on] of Object.entries(rules)) if (Object.hasOwn(track.layers, name)) out[name] = on;
+  for (const name of wx) if (typeof name === 'string' && !Object.hasOwn(rules, name) && Object.hasOwn(track.layers, name)) out[name] = true;
   return out;
 }
 
+/** `battle:start` kinds / sources that are trainer battles (rival, story, rematch, porch duel). */
+const TRAINER_KINDS = Object.freeze(['trainer', 'story', 'rematch', 'duel', 'rival']);
+
 /**
- * Normalizes a `battle:start` payload to a battle-music kind.
- * @param {any} payload  {kind:'wild'|'trainer'|'spire'|'summit', source?, summit?, spire?}
+ * Normalizes a `battle:start` payload (a `BattleSetup`, §5.5) to a battle-music kind. Summit beats
+ * Spire beats trainer; `{kind: 'story'}` / `{story: true}` (the autosave convention in
+ * `state/persist.js`), a trainer id, or a rematch / duel / rival source are trainer battles.
+ * @param {any} payload  {kind:'wild'|'trainer'|'spire'|'summit'|'story', source?, summit?, spire?, story?, trainerId?}
  * @returns {'wild'|'trainer'|'spire'|'summit'}
  */
 export function battleKindOf(payload) {
   const p = payload && typeof payload === 'object' ? payload : {};
   if (p.summit === true || p.kind === 'summit' || p.source === 'summit') return 'summit';
   if (p.spire === true || p.kind === 'spire' || p.source === 'spire') return 'spire';
-  if (p.kind === 'trainer' || p.source === 'rematch' || p.source === 'duel' || p.source === 'story' || typeof p.trainerId === 'string') return 'trainer';
+  if (TRAINER_KINDS.includes(p.kind) || TRAINER_KINDS.includes(p.source) || p.story === true || (typeof p.trainerId === 'string' && p.trainerId)) return 'trainer';
   return 'wild';
 }
 
@@ -297,7 +345,9 @@ export function hpRatioOf(p) {
   if (typeof p === 'number') return Number.isFinite(p) ? Math.max(0, Math.min(1, p)) : null;
   if (!p || typeof p !== 'object') return null;
   for (const k of ['hpRatio', 'ratio']) if (typeof p[k] === 'number' && Number.isFinite(p[k])) return Math.max(0, Math.min(1, p[k]));
-  if (typeof p.hp === 'number' && typeof p.maxHp === 'number' && p.maxHp > 0) return Math.max(0, Math.min(1, p.hp / p.maxHp));
+  if (typeof p.hp === 'number' && Number.isFinite(p.hp) && typeof p.maxHp === 'number' && Number.isFinite(p.maxHp) && p.maxHp > 0) {
+    return Math.max(0, Math.min(1, p.hp / p.maxHp));
+  }
   return null;
 }
 
@@ -313,21 +363,25 @@ export function hpRatioOf(p) {
  * @returns {Record<string, boolean>}
  */
 export function stemsFor(trackId, s, source, t = DEFAULTS, extra = {}) {
-  const track = TRACKS[trackId];
+  const track = trackOf(trackId);
   if (!track) return {};
+  /** @type {Record<string, boolean>} */
   const out = {};
   for (const [name, L] of Object.entries(track.layers)) out[name] = L.default !== false;
+  const has = (k) => Object.hasOwn(out, k);
+  const applyCue = (cueId) => {
+    const cueStems = cueOf(cueId)?.stems;
+    if (isPlainObject(cueStems)) for (const [k, v] of Object.entries(cueStems)) if (has(k) && typeof v === 'boolean') out[k] = v;
+  };
   if (source === 'world' || source === 'map') {
     Object.assign(out, worldStems(s, trackId, t));
-    const cueStems = CUES[trackId]?.stems;
-    if (cueStems && typeof cueStems === 'object') for (const [k, v] of Object.entries(cueStems)) if (k in out && typeof v === 'boolean') out[k] = v;
+    applyCue(trackId);
   } else if (source === 'battle') {
-    if ('tense' in out) out.tense = (s.battle ? s.battle.hpRatio : 1) <= t.TENSE_HP_RATIO;
+    if (has('tense')) out.tense = (s.battle ? s.battle.hpRatio : 1) <= t.TENSE_HP_RATIO;
   } else if (source === 'scene' && extra.cue) {
-    const cueStems = CUES[extra.cue]?.stems;
-    if (cueStems && typeof cueStems === 'object') for (const [k, v] of Object.entries(cueStems)) if (k in out && typeof v === 'boolean') out[k] = v;
+    applyCue(extra.cue);
   }
-  for (const [k, v] of Object.entries(s.stemOverrides ?? {})) if (k in out) out[k] = Boolean(v);
+  if (isPlainObject(s.stemOverrides)) for (const [k, v] of Object.entries(s.stemOverrides)) if (has(k)) out[k] = Boolean(v);
   return out;
 }
 
@@ -348,44 +402,46 @@ function seasonIntensity(s, t) {
  */
 export function decide(s, t = DEFAULTS, sceneMusic = SCENE_MUSIC) {
   const make = (source, track, fade, extra = {}) => ({
-    source, track, fade, oneShot: Boolean(track && TRACKS[track] && TRACKS[track].loop === false),
+    source, track, fade: fadeOf(fade, t.SCENE_FADE_MS), oneShot: Boolean(trackOf(track) && trackOf(track).loop === false),
     stems: track ? stemsFor(track, s, source, t, extra) : {},
     intensity: source === 'world' || source === 'map' ? seasonIntensity(s, t) : 1,
     scene: extra.scene ?? null,
   });
-  if (s.sting && TRACKS[s.sting.track]) return make('sting', s.sting.track, t.STING_FADE_MS);
+  if (s.sting && trackOf(s.sting.track)) return make('sting', s.sting.track, t.STING_FADE_MS);
   if (s.override) {
     const tr = s.override.track;
     if (tr === null) return make('silence', null, s.override.fade ?? t.STOP_FADE_MS);
-    if (TRACKS[tr]) return make('override', tr, s.override.fade ?? t.SCENE_FADE_MS);
+    if (trackOf(tr)) return make('override', tr, s.override.fade ?? t.SCENE_FADE_MS);
   }
   const battle = () => make('battle', CUES.battle.pick({ kind: s.battle.kind }), t.BATTLE_FADE_MS);
   const world = (scene = null) => {
-    if (s.mapMusic && TRACKS[s.mapMusic]) return make('map', s.mapMusic, t.MAP_FADE_MS, { scene });
+    if (s.mapMusic && trackOf(s.mapMusic)) return make('map', s.mapMusic, t.MAP_FADE_MS, { scene });
     return make('world', pickWorldTrack(s, t), t.WORLD_RETURN_FADE_MS, { scene });
   };
-  for (let i = s.scenes.length - 1; i >= 0; i--) {
-    const name = s.scenes[i];
-    const entry = Object.hasOwn(sceneMusic, name) ? sceneMusic[name] : undefined;
+  const scenes = Array.isArray(s.scenes) ? s.scenes : [];
+  for (let i = scenes.length - 1; i >= 0; i--) {
+    const name = scenes[i];
+    const entry = typeof name === 'string' && sceneMusic && Object.hasOwn(sceneMusic, name) ? sceneMusic[name] : undefined;
     if (entry === undefined) continue;
     if (entry === 'world') return s.battle ? battle() : world(name);
     if (entry === 'battle') { if (s.battle) return battle(); continue; }
     if (entry === 'silence') return make('silence', null, t.STOP_FADE_MS, { scene: name });
     if (entry && typeof entry === 'object') {
-      const cue = entry.cue && CUES[entry.cue] ? CUES[entry.cue] : null;
+      const cue = cueOf(entry.cue);
       let track = entry.track ?? cue?.track ?? null;
-      if (!track || !TRACKS[track]) continue;
-      if (TRACKS[track].loop === false && s.oneShotDone === track) {
+      if (!trackOf(track)) continue;
+      if (trackOf(track).loop === false && s.oneShotDone === track) {
         const then = entry.then ?? cue?.then ?? null;
-        if (!then || !TRACKS[then]) return make('silence', null, t.STOP_FADE_MS, { scene: name });
+        if (!trackOf(then)) return make('silence', null, t.STOP_FADE_MS, { scene: name });
         track = then;
       }
-      const fade = entry.fade ?? (t.CUE_FADE_MS && entry.cue ? t.CUE_FADE_MS[entry.cue] : undefined) ?? cue?.fade ?? t.SCENE_FADE_MS;
+      const cueFade = isPlainObject(t.CUE_FADE_MS) && typeof entry.cue === 'string' && Object.hasOwn(t.CUE_FADE_MS, entry.cue) ? t.CUE_FADE_MS[entry.cue] : undefined;
+      const fade = [entry.fade, cueFade, cue?.fade, t.SCENE_FADE_MS].find((v) => typeof v === 'number' && Number.isFinite(v));
       return make('scene', track, fade, { scene: name, cue: track === (entry.track ?? cue?.track) ? entry.cue : undefined });
     }
   }
   if (s.battle) return battle();
-  if (s.scenesKnown && s.scenes.length === 0) return make('silence', null, t.STOP_FADE_MS);
+  if (s.scenesKnown && scenes.length === 0) return make('silence', null, t.STOP_FADE_MS);
   return world();
 }
 
@@ -430,12 +486,12 @@ export function msToNextBar(nowPlaying, track) {
  * @returns {{delayMs: number, fadeMs: number}}
  */
 export function planHourCrossfade(nowPlaying, fromId, toId, t = DEFAULTS) {
-  const to = TRACKS[toId];
+  const to = trackOf(toId);
   const bars = Math.max(0, Number(t.HOUR_FADE_BARS) || 0);
   const fadeMs = to ? Math.round((twoBarsMs(to) * bars) / 2) : 0;
   let delayMs = 0;
-  if (t.HOUR_QUANTIZE && fromId && TRACKS[fromId]) {
-    delayMs = msToNextBar(nowPlaying, { ...TRACKS[fromId], id: fromId });
+  if (t.HOUR_QUANTIZE && trackOf(fromId)) {
+    delayMs = msToNextBar(nowPlaying, { ...trackOf(fromId), id: fromId });
     if (delayMs > t.HOUR_QUANTIZE_MAX_MS) delayMs = 0;
   }
   return { delayMs, fadeMs };
@@ -530,6 +586,8 @@ export function createMusicDirector(G, opts = {}) {
   let pollTimer = null;
   let locked = true;
   let lastSettings = null;
+  /** the player's Signal letter sting while one plays (defined on demand as 'letter_signal') */
+  let signalTrack = null;
   let historyN = 0;
   const hist = [];
   const defined = new Set();
@@ -573,6 +631,16 @@ export function createMusicDirector(G, opts = {}) {
     const k = w && w.weather ? (w.weather.current || w.weather.today) : null;
     return typeof k === 'string' && k ? k : state.weather;
   }
+  /** Stems the weather kind lists in `systems/weather` kind data (`G.data` rows over the defaults). */
+  function weatherStemsOf(kind) {
+    if (typeof kind !== 'string') return null;
+    const row = call(() => weatherSys.kinds(ctxG.data).get(kind));
+    return row && Array.isArray(row.stems) ? row.stems.filter((x) => typeof x === 'string') : null;
+  }
+  function setWeather(kind) {
+    state.weather = kind;
+    state.weatherStems = weatherStemsOf(kind);
+  }
   function mapInfo(mapId, payload = {}) {
     let def = null;
     const data = ctxG.data;
@@ -589,7 +657,7 @@ export function createMusicDirector(G, opts = {}) {
     state.weekday = readWeekday();
     state.tide = readTide();
     state.season = readSeason();
-    state.weather = readWeather();
+    setWeather(readWeather());
     const w = world();
     const mapId = w && w.player ? w.player.mapId : null;
     if (typeof mapId === 'string') { const m = mapInfo(mapId); state.place = m.place; state.mapMusic = m.music; }
@@ -616,14 +684,14 @@ export function createMusicDirector(G, opts = {}) {
     const a = audio();
     if (!a || defined.has(id)) return;
     if (typeof a.hasTrack === 'function' && call(() => a.hasTrack(id)) && id !== 'letter_signal') { defined.add(id); return; }
-    const def = TRACKS[id] ?? (id === 'letter_signal' ? state.signalTrack : null);
+    const def = trackOf(id) ?? (id === 'letter_signal' ? signalTrack : null);
     if (!def || typeof a.defineTrack !== 'function') return;
     call(() => a.defineTrack(id, toEngine(def)));
     if (id !== 'letter_signal') defined.add(id);
   }
   function pushStems(decision, full) {
     const a = audio();
-    const track = TRACKS[decision.track] ?? (decision.track === 'letter_signal' ? state.signalTrack : null);
+    const track = trackOf(decision.track) ?? (decision.track === 'letter_signal' ? signalTrack : null);
     if (!a || !track || typeof a.setStem !== 'function') return;
     const prev = full || !playing || playing.track !== decision.track ? null : playing.stems;
     const diff = {};
@@ -637,8 +705,9 @@ export function createMusicDirector(G, opts = {}) {
   function cancelPending() { if (pending) { call(() => timers.clearTimeout(pending.handle)); pending = null; } }
   function clearTimer(h) { if (h !== null) call(() => timers.clearTimeout(h)); return null; }
 
-  function start(decision, fade, reason, restart = false) {
+  function start(decision, fadeIn, reason, restart = false) {
     const a = audio();
+    const fade = fadeOf(fadeIn, decision.fade);
     cancelPending();
     oneShotTimer = clearTimer(oneShotTimer);
     if (decision.track === null) {
@@ -654,7 +723,7 @@ export function createMusicDirector(G, opts = {}) {
     playing = { track: decision.track, source: decision.source, stems: { ...decision.stems }, intensity: decision.intensity };
     log({ action: 'play', track: decision.track, source: decision.source, fade, reason });
     if (decision.oneShot && decision.source === 'scene') {
-      const def = TRACKS[decision.track];
+      const def = trackOf(decision.track);
       const id = decision.track;
       oneShotTimer = timers.setTimeout(() => {
         oneShotTimer = null;
@@ -673,7 +742,7 @@ export function createMusicDirector(G, opts = {}) {
   function reconcile(reason, o = {}) {
     if (destroyed) return;
     const d = decide(state, t, sceneMusic);
-    if (d.source === 'sting' && d.track === 'letter' && state.signalTrack) d.track = 'letter_signal';
+    if (d.source === 'sting' && d.track === 'letter' && signalTrack) d.track = 'letter_signal';
     // an hourly crossfade is already waiting for its bar line with this very track: let it land
     if (pending && pending.track === d.track && !o.force) return;
     const same = playing && playing.track === d.track && (d.track !== null || playing.track === null);
@@ -720,27 +789,27 @@ export function createMusicDirector(G, opts = {}) {
 
   // ----- stings -------------------------------------------------------------------------------
   function playSting(id, o = {}) {
-    if (!TRACKS[id]) return false;
+    if (!trackOf(id)) return false;
     if (!isReady() && !o.force) { log({ action: 'drop', track: id, source: 'sting', fade: 0, reason: 'locked' }); return false; }
     stingTimer = clearTimer(stingTimer);
-    state.signalTrack = null;
+    signalTrack = null;
     if (id === 'letter') {
       const sig = call(() => signalOf(world()));
       if (Array.isArray(sig) && sig.length === 6 && sig.every((i) => Number.isInteger(i) && i >= 0 && i <= 5)) {
-        state.signalTrack = call(() => signalSting(sig)) ?? null;
+        signalTrack = call(() => signalSting(sig)) ?? null;
       }
     }
     state.sting = { track: id };
-    const def = state.signalTrack && id === 'letter' ? state.signalTrack : TRACKS[id];
+    const def = signalTrack && id === 'letter' ? signalTrack : trackOf(id);
     // a repeated sting (two letters in a row) must restart: make the playing track look different
-    const shown = state.signalTrack && id === 'letter' ? 'letter_signal' : id;
+    const shown = signalTrack && id === 'letter' ? 'letter_signal' : id;
     if (playing && playing.track === shown) playing = { ...playing, track: null, source: 'restart' };
     reconcile('sting');
     stingTimer = timers.setTimeout(() => {
       stingTimer = null;
       if (destroyed) return;
       state.sting = null;
-      state.signalTrack = null;
+      signalTrack = null;
       reconcile('sting-end');
     }, trackLengthMs(def) + t.STING_TAIL_MS);
     return true;
@@ -793,7 +862,7 @@ export function createMusicDirector(G, opts = {}) {
     },
     'weather:change': (p) => {
       const k = typeof p === 'string' ? p : p && (p.current ?? p.kind ?? p.weather ?? p.today);
-      if (typeof k === 'string') state.weather = k;
+      if (typeof k === 'string') setWeather(k);
       reconcile('weather');
     },
     'map:enter': (p) => {
@@ -851,7 +920,7 @@ export function createMusicDirector(G, opts = {}) {
   function sceneTrack(name) {
     const e = Object.hasOwn(sceneMusic, name) ? sceneMusic[name] : null;
     if (!e || typeof e !== 'object') return null;
-    return e.track ?? (e.cue && CUES[e.cue] ? CUES[e.cue].track : null) ?? null;
+    return e.track ?? cueOf(e.cue)?.track ?? null;
   }
   function onStackChanged() {
     // a finished scene one-shot is forgotten once no scene that plays it is on the stack
@@ -901,13 +970,13 @@ export function createMusicDirector(G, opts = {}) {
     history: () => hist.map((h) => ({ ...h })),
     sting(id, o = {}) { try { checkUnlock(); return playSting(id, o); } catch { return false; } },
     play(track, o = {}) {
-      if (track !== null && !TRACKS[track]) return;
+      if (track !== null && !trackOf(track)) return;
       state.override = { track, fade: typeof o.fade === 'number' && Number.isFinite(o.fade) ? o.fade : undefined };
       call(() => reconcile('override'));
     },
     release() { state.override = null; call(() => reconcile('override')); },
     setStem(name, on) {
-      if (typeof name !== 'string' || !name) return;
+      if (typeof name !== 'string' || !name || name === '__proto__') return;
       if (on === null || on === undefined) delete state.stemOverrides[name];
       else state.stemOverrides[name] = Boolean(on);
       call(() => reconcile('stem'));

@@ -22,17 +22,24 @@
  * input timing anywhere).
  *
  * **Pools.** The family's Shift table row for the current form: `{up, side, down}` lists of
- * `{form, w}` where `w` is a number (every dial) or `{drift, flux, freefall}`. The current form's
+ * `{form, w}` where `w` is a number (every dial) or `{drift, flux, freefall}`. Forms that do not
+ * exist or are flagged `neverOnForecast` never reach a card. On a flat dial (POOL_FLAT_DIALS, or the
+ * dial rules' `poolWeights: 'flat'`) every positive weight becomes the card's mean. The current form's
  * row drops out and its weight spreads across its card in proportion; each form already in the
  * Shiftlog gets `SHIFTLOG_PULL` weight on its card; a held type tilt multiplies the weight of forms
  * of that type by `TILT_WEIGHT_MULT` and (with `TILT_GUARANTEE`) makes sure at least one card keeps
  * that type. Star-touched: with `STAR_CHANCE` per Forecast, outside every weight rule, the family's
  * star form takes the `STAR_CARD` slot at that card's odds.
  *
+ * A held Still Knot blocks the Forecast and the Shift (rules §4.8). The Rerolls taken in the current
+ * Shift live in `world.counters['sys.rerolls.<uid>']` (through `systems/flags`), so a reload keeps
+ * the escalated cost; Accept and Anchor reset it. Dial data (`opts.rules`: `rerollCostMult`,
+ * `anchorsAllowed`, `poolWeights`) wins over the matching tuning.
+ *
  * World writes: `creature.shiftCount` and the Shift itself (through `systems/creature.shiftTo`),
- * `pendingShifts` / `windowsUsed` (through `systems/exp.resolveWindow`), the wallet (through
- * `systems/wallet.spend`), the Field Log (through `systems/fieldLog`) and stats (through
- * `systems/stats`). Callers run the mutating functions inside `store.tx`. Domain events go to
+ * `pendingShifts` / `windowsUsed` (through `systems/exp.resolveWindow` / `refreshPending`), the
+ * wallet (through `systems/wallet.spend`), the Reroll count (through `systems/flags`), the Field Log
+ * (through `systems/fieldLog`) and stats (through `systems/stats`). Callers run the mutating functions inside `store.tx`. Domain events go to
  * `opts.bus`: `shift:resolved {uid, from, to, dir, anchored, level, ...}`.
  *
  * No species, family, map or NPC is named here; content arrives as `data`. Pure: no DOM.
@@ -40,12 +47,13 @@
  */
 
 import { forkFor } from '../state/rngs.js';
-import { dataLookup, openWindows, resolveWindow } from './exp.js';
+import { dataLookup, openWindows, refreshPending, resolveWindow } from './exp.js';
 import { shiftTo } from './creature.js';
 import { findCreature } from './party.js';
 import * as wallet from './wallet.js';
 import * as fieldLog from './fieldLog.js';
 import * as stats from './stats.js';
+import * as flags from './flags.js';
 
 /** @typedef {import('../state/schema.js').World} World */
 /** @typedef {import('../state/schema.js').Creature} Creature */
@@ -64,6 +72,9 @@ export const SLOT = Object.freeze({ star: 0, up: 1, side: 2, down: 3, pick: 4, t
 /** Number of uniforms every Forecast draw consumes from its stream. */
 export const DRAWS = 8;
 
+/** Species flag of a form that never appears on a Forecast card (data contract with the species rows). */
+export const NEVER_ON_FORECAST_FLAG = 'neverOnForecast';
+
 /**
  * @typedef {Object} ForecastTuning
  * @property {Record<string, {up: number, side: number, down: number}>} CARD_ODDS   base odds per dial, whole percent summing to 100; its keys are the known dials
@@ -75,6 +86,7 @@ export const DRAWS = 8;
  * @property {Dir} STAR_CARD                            which card the star form replaces
  * @property {number} SHIFTLOG_PULL                     weight added on its card to each form already in the Shiftlog
  * @property {boolean} PULL_REVIVES_ZERO                true: the pull also applies to a form whose weight on this dial is 0
+ * @property {string[]} POOL_FLAT_DIALS                 dials whose pool weights are flattened: every entry with a positive weight on the dial weighs the card's mean (rules §6.2 "Freefall flattens"; GDD-00 §8)
  * @property {string} ERRANT_FLAG                       species flag that marks an Errant form
  * @property {Record<string, boolean>} ERRANT_ZERO_DOWN per dial: an Errant's Down card shows (and is) 0%
  * @property {boolean} TILT_GUARANTEE                   a held type tilt guarantees at least one card of that type (when any pool has one)
@@ -112,6 +124,7 @@ export const DEFAULTS = deepFreeze({
   STAR_CARD: 'side',
   SHIFTLOG_PULL: 5,
   PULL_REVIVES_ZERO: false,
+  POOL_FLAT_DIALS: ['freefall'],
   ERRANT_FLAG: 'errant',
   ERRANT_ZERO_DOWN: { drift: true, flux: true, freefall: false },
   TILT_GUARANTEE: true,
@@ -146,6 +159,7 @@ const SPEC = {
   STAR_CARD: [(v) => DIRS.includes(v), DIRS.join('|')],
   SHIFTLOG_PULL: [nonNegNum, 'number >= 0'],
   PULL_REVIVES_ZERO: [(v) => typeof v === 'boolean', 'boolean'],
+  POOL_FLAT_DIALS: [strArray, 'dial id[]'],
   ERRANT_FLAG: [(v) => typeof v === 'string' && v.length > 0, 'non-empty string'],
   ERRANT_ZERO_DOWN: [recordOf((x) => typeof x === 'boolean'), '{dial: boolean}'],
   TILT_GUARANTEE: [(v) => typeof v === 'boolean', 'boolean'],
@@ -202,7 +216,7 @@ export function tuningOf(tuning) {
  */
 export class ForecastError extends Error {
   /**
-   * @param {'NO_CREATURE'|'NEVER_SHIFTS'|'NO_TABLE'|'EMPTY_POOL'|'STALE'|'BAD_CARD'|'ZERO_ODDS'|'BAD_DIAL'} code
+   * @param {'NO_CREATURE'|'NEVER_SHIFTS'|'STILL_KNOT'|'NO_TABLE'|'EMPTY_POOL'|'STALE'|'BAD_CARD'|'ZERO_ODDS'|'BAD_DIAL'} code
    * @param {string} message
    */
   constructor(code, message) {
@@ -272,7 +286,17 @@ export class ForecastError extends Error {
  * @property {number} [rerolls]              Rerolls already taken in this Shift (default 0)
  * @property {boolean} [freeAnchor]          the next Anchor costs nothing (GDD-00 `lit.keepersAnchor`)
  * @property {string[]} [challenges]         defaults to world.run.challenges
+ * @property {DialRuleOpts|null} [rules]     the dial's data rules (data/dials `rules` and/or `shift` row); they win over tuning
  * @property {Bus|null} [bus]
+ */
+
+/**
+ * The dial-data keys this module reads (ARCHITECTURE §5.4: "the cost table is dial data"). Any may be
+ * missing; a present key wins over the matching tuning value.
+ * @typedef {Object} DialRuleOpts
+ * @property {number} [rerollCostMult]          multiplier on the Reroll cost (over REROLL_COST_MULT[dial])
+ * @property {boolean} [anchorsAllowed]         false: Anchor is not offered on this dial
+ * @property {'source'|'flat'} [poolWeights]    'flat' flattens the pool weights (over POOL_FLAT_DIALS)
  */
 
 // ---------------------------------------------------------------------------------------------
@@ -432,6 +456,7 @@ function weightOn(e, dial) {
   let w = 0;
   if (typeof e.w === 'number') w = e.w;
   else if (isObj(e.w)) w = e.w[dial] ?? 0;
+  else if (e.w !== undefined && e.w !== null) w = e.w; // malformed: reported below
   else if (isObj(e.weights)) w = e.weights[dial] ?? 0;
   if (typeof w !== 'number' || !Number.isFinite(w) || w < 0) {
     throw new TypeError(`forecast: pool weight of ${safeJson(e.form)} on ${dial} must be a finite number >= 0, got ${safeJson(w)}`);
@@ -440,22 +465,33 @@ function weightOn(e, dial) {
 }
 
 /**
- * The weighted pool of one card for a creature (creatures §6.3): drops the current form and spreads
- * its weight across the card in proportion, adds the Shiftlog pull, applies the type tilt
- * multiplier. Duplicate forms merge. Only entries with a positive weight are returned.
+ * The weighted pool of one card for a creature (creatures §6.3): flattens the weights on a flat dial
+ * (every entry with a positive weight takes the card's mean, so 0 still means "never on this dial"),
+ * drops the current form and spreads its weight across the card in proportion, adds the Shiftlog
+ * pull, applies the type tilt multiplier. Duplicate forms merge. Only entries with a positive weight
+ * are returned.
  * @param {ReadonlyArray<any>|null|undefined} entries   `{form, w}` rows of one direction
  * @param {string} dial
  * @param {{speciesId: string, shiftlog?: string[]}} c
- * @param {{tuning?: Record<string, any>|null, tilt?: string|null, typesOf?: (formId: string) => string[]}} [opts]
+ * @param {{tuning?: Record<string, any>|null, tilt?: string|null, typesOf?: (formId: string) => string[], flat?: boolean, rules?: DialRuleOpts|null, allow?: (formId: string) => boolean}} [opts]
+ *   `flat` forces flattening on or off (default: dial rules `poolWeights`, then POOL_FLAT_DIALS);
+ *   `allow` drops entries it rejects before any weight rule (unknown forms, `neverOnForecast`)
  * @returns {Array<{form: string, w: number}>}
  */
 export function cardPool(entries, dial, c, opts = {}) {
   const t = tuningOf(opts.tuning);
   /** @type {Map<string, number>} */
   const merged = new Map();
-  for (const e of entries || []) {
+  for (const e of Array.isArray(entries) ? entries : []) {
     if (!e || typeof e.form !== 'string' || !e.form) continue;
+    if (opts.allow && !opts.allow(e.form)) continue;
     merged.set(e.form, (merged.get(e.form) ?? 0) + weightOn(e, dial));
+  }
+  const flat = typeof opts.flat === 'boolean' ? opts.flat : flatOn(t, dial, opts);
+  if (flat) {
+    const live = [...merged.values()].filter((w) => w > 0);
+    const mean = live.length ? live.reduce((a, b) => a + b, 0) / live.length : 0;
+    for (const [form, w] of merged) merged.set(form, w > 0 ? mean : 0);
   }
   const total = [...merged.values()].reduce((a, b) => a + b, 0);
   const wc = merged.get(c.speciesId) ?? 0;
@@ -551,6 +587,29 @@ function tiltOf(c, look, opts) {
 }
 
 /**
+ * The dial rules in `opts.rules` (null when absent or not an object).
+ * @param {{rules?: any}} opts
+ * @returns {DialRuleOpts|null}
+ */
+function rulesOf(opts) {
+  return isObj(opts.rules) ? opts.rules : null;
+}
+
+/**
+ * Whether the pool weights are flattened on this dial (dial rules first, then POOL_FLAT_DIALS).
+ * @param {Readonly<ForecastTuning>} t
+ * @param {string} dial
+ * @param {{rules?: any}} opts
+ * @returns {boolean}
+ */
+function flatOn(t, dial, opts) {
+  const pw = rulesOf(opts)?.poolWeights;
+  if (pw === 'flat') return true;
+  if (pw === 'source') return false;
+  return t.POOL_FLAT_DIALS.includes(dial);
+}
+
+/**
  * @param {World} world
  * @param {Creature|string} creature
  * @returns {Creature}
@@ -586,7 +645,7 @@ export function canForecast(world, creature, data, opts = {}) {
     return { ok: true };
   } catch (err) {
     if (err instanceof ForecastError) {
-      const map = { NEVER_SHIFTS: 'never-shifts', NO_TABLE: 'no-table', EMPTY_POOL: 'empty-pool', BAD_DIAL: 'bad-dial' };
+      const map = { STILL_KNOT: 'still-knot', NEVER_SHIFTS: 'never-shifts', NO_TABLE: 'no-table', EMPTY_POOL: 'empty-pool', BAD_DIAL: 'bad-dial' };
       const reason = /** @type {any} */ (map)[err.code];
       if (reason) return { ok: false, reason };
     }
@@ -602,13 +661,14 @@ export function canForecast(world, creature, data, opts = {}) {
  * @param {any} data                   Registry or tables `{species, abilities, families, items, moves}`
  * @param {ForecastOpts} [opts]
  * @returns {Forecast}
- * @throws {ForecastError} NO_CREATURE, BAD_DIAL, NEVER_SHIFTS (form flagged `neverShifts`), NO_TABLE (no Shift table row for the current form), EMPTY_POOL (all three pools empty)
+ * @throws {ForecastError} NO_CREATURE, BAD_DIAL, STILL_KNOT (a Still Knot is held, rules §4.8), NEVER_SHIFTS (form flagged `neverShifts`), NO_TABLE (no Shift table row for the current form), EMPTY_POOL (all three pools empty, or no card can land)
  */
 export function rollForecast(world, creature, data, opts = {}) {
   const t = tuningOf(opts.tuning);
   const c = creatureOf(world, creature);
   const dial = opts.dial ?? world.run.dial;
   assertDial(t, dial);
+  if (c.stillKnot) throw new ForecastError('STILL_KNOT', `forecast: ${c.uid} holds a Still Knot; it never Shifts while held`);
   const look = dataLookup(data);
   const cur = look.species(c.speciesId);
   if (cur.flags.neverShifts) throw new ForecastError('NEVER_SHIFTS', `forecast: form ${safeJson(cur.id)} never Shifts`);
@@ -618,9 +678,15 @@ export function rollForecast(world, creature, data, opts = {}) {
   const u = takeDraws(opts.stream ?? shiftStream(world, c));
   const tilt = tiltOf(c, look, opts);
   const typesOf = (id) => look.speciesOrNull(id)?.types ?? [];
-  const pools = DIRS.map((d) => cardPool(row[d], dial, c, { tuning: opts.tuning, tilt, typesOf }));
+  // a form can appear on a card only when it exists and is not flagged `neverOnForecast` (GDD-00: the comet form)
+  const allow = (id) => {
+    const sp = look.speciesOrNull(id);
+    return !!sp && !sp.flags[NEVER_ON_FORECAST_FLAG];
+  };
+  const flat = flatOn(t, dial, opts);
+  const pools = DIRS.map((d) => cardPool(row[d], dial, c, { tuning: opts.tuning, tilt, typesOf, flat, allow }));
 
-  const starForm = star && star !== c.speciesId && look.speciesOrNull(star) && u[SLOT.star] < t.STAR_CHANCE ? star : null;
+  const starForm = star && star !== c.speciesId && allow(star) && u[SLOT.star] < t.STAR_CHANCE ? star : null;
   const starIdx = DIRS.indexOf(t.STAR_CARD);
   /** @type {(string|null)[]} */
   const forms = DIRS.map((d, i) => (starForm && i === starIdx ? starForm : pickForm(pools[i], u[SLOT[d]])));
@@ -642,6 +708,7 @@ export function rollForecast(world, creature, data, opts = {}) {
     empty: DIRS.filter((_, i) => forms[i] === null),
   }, opts);
   const odds = [o.up, o.side, o.down];
+  if (!odds.some((x) => x > 0)) throw new ForecastError('EMPTY_POOL', `forecast: no card can land for form ${safeJson(cur.id)} on ${dial}`);
 
   const silhouetteDial = t.SILHOUETTE_DIALS.includes(dial);
   const logOf = (id) => world.fieldLog?.forms?.[id] ?? null;
@@ -669,8 +736,8 @@ export function rollForecast(world, creature, data, opts = {}) {
     };
   }));
 
-  const rerolls = nonNegInt(opts.rerolls) ? opts.rerolls : 0;
-  const cost = rerollCost(rerolls, { dial, tuning: opts.tuning });
+  const rerolls = nonNegInt(opts.rerolls) ? opts.rerolls : rerollsTaken(world, c.uid);
+  const cost = rerollCost(rerolls, { dial, tuning: opts.tuning, rules: rulesOf(opts) });
   const rs = rerollStatus(world, cost, opts);
   const as = anchorStatus(world, c, data, opts);
   const preset = world.settings?.autoAnchor?.[c.uid] ?? null;
@@ -707,18 +774,45 @@ export function flip(forecast, rng = null) {
 // Reroll
 // ---------------------------------------------------------------------------------------------
 
+/** Counter-id prefix holding the Rerolls taken in a creature's current Shift (saved with the world). */
+export const REROLL_COUNTER_PREFIX = 'sys.rerolls.';
+
 /**
- * Starsalt for the Reroll after `n` Rerolls in the same Shift: REROLL_BASE × REROLL_GROWTH^n ×
- * REROLL_COST_MULT[dial], rounded up (1, 2, 4, 8, ... by default; no cap).
+ * Rerolls already taken in the creature's current Shift (window): kept in `world.counters` through
+ * `systems/flags`, so a reload mid-Forecast keeps the escalated cost. Reset when the window resolves.
+ * @param {World} world
+ * @param {string} uid
+ * @returns {number}
+ */
+export function rerollsTaken(world, uid) {
+  const n = flags.get(world, REROLL_COUNTER_PREFIX + uid);
+  return nonNegInt(n) ? n : 0;
+}
+
+/**
+ * Clears the Reroll count when a Shift resolves (no counter key is created when it is already 0).
+ * @param {World} world
+ * @param {string} uid
+ * @param {Bus|null} bus
+ */
+function resetRerolls(world, uid, bus) {
+  if (flags.get(world, REROLL_COUNTER_PREFIX + uid) !== 0) flags.set(world, REROLL_COUNTER_PREFIX + uid, 0, { bus });
+}
+
+/**
+ * Starsalt for the Reroll after `n` Rerolls in the same Shift: REROLL_BASE × REROLL_GROWTH^n × the
+ * dial multiplier (dial rules `rerollCostMult`, else REROLL_COST_MULT[dial]), rounded up (1, 2, 4,
+ * 8, ... by default; no cap; saturates at Number.MAX_SAFE_INTEGER).
  * @param {number} n   Rerolls already taken in this Shift
- * @param {{dial?: string, tuning?: Record<string, any>|null}} [opts]
+ * @param {{dial?: string, tuning?: Record<string, any>|null, rules?: DialRuleOpts|null}} [opts]
  * @returns {number}
  * @throws {TypeError} for a negative / non-integer n
  */
 export function rerollCost(n, opts = {}) {
   if (!nonNegInt(n)) throw new TypeError(`forecast.rerollCost: n must be an integer >= 0, got ${String(n)}`);
   const t = tuningOf(opts.tuning);
-  const mult = opts.dial !== undefined ? (t.REROLL_COST_MULT[opts.dial] ?? 1) : 1;
+  const rm = rulesOf(opts)?.rerollCostMult;
+  const mult = nonNegNum(rm) ? rm : opts.dial !== undefined ? (t.REROLL_COST_MULT[opts.dial] ?? 1) : 1;
   const cost = Math.ceil(t.REROLL_BASE * t.REROLL_GROWTH ** n * mult - 1e-9);
   return Number.isSafeInteger(cost) ? cost : Number.MAX_SAFE_INTEGER;
 }
@@ -760,14 +854,27 @@ function assertFresh(c, forecast) {
 export function reroll(world, uid, forecast, data, opts = {}) {
   const c = creatureOf(world, uid);
   assertFresh(c, forecast);
-  const cost = rerollCost(forecast.rerolls, { dial: forecast.dial, tuning: opts.tuning });
+  const cost = rerollCost(forecast.rerolls, { dial: forecast.dial, tuning: opts.tuning, rules: rulesOf(opts) });
   const st = rerollStatus(world, cost, opts);
   if (!st.can) return { ok: false, reason: /** @type {'locked'|'starsalt'} */ (st.reason), cost };
-  const paid = wallet.spend(world, cost, { currency: 'starsalt', bus: opts.bus ?? null, source: 'reroll' });
-  if (!paid.ok) return { ok: false, reason: 'starsalt', cost };
+  const nextOpts = { ...opts, stream: undefined, dial: forecast.dial, rerolls: forecast.rerolls + 1 };
+  // Draw the next Forecast before paying, so a content error (or a Still Knot put on since) changes nothing.
   c.shiftCount += 1;
+  try {
+    rollForecast(world, c, data, nextOpts);
+  } catch (err) {
+    c.shiftCount -= 1;
+    throw err;
+  }
+  const paid = wallet.spend(world, cost, { currency: 'starsalt', bus: opts.bus ?? null, source: 'reroll' });
+  if (!paid.ok) {
+    c.shiftCount -= 1;
+    return { ok: false, reason: 'starsalt', cost };
+  }
+  flags.set(world, REROLL_COUNTER_PREFIX + c.uid, forecast.rerolls + 1, { bus: opts.bus ?? null });
   stats.inc(world, 'rerolls', 1, { bus: opts.bus ?? null });
-  const next = rollForecast(world, c, data, { ...opts, stream: undefined, dial: forecast.dial, rerolls: forecast.rerolls + 1 });
+  // drawn again after paying so canReroll / rerollCost reflect the new balance
+  const next = rollForecast(world, c, data, nextOpts);
   return { ok: true, spent: cost, forecast: next };
 }
 
@@ -784,16 +891,18 @@ export function reroll(world, uid, forecast, data, opts = {}) {
  */
 
 /**
- * Applies a Shift (rules §2.6, §3.4, §5.3): `systems/creature.shiftTo` (stat floor, Memory, Shiftlog
- * append), the run's per-seed ability for the new form, `shiftCount + 1`, the window consumed
- * (`exp.resolveWindow`), Field Log Held, `stats.forecasts`, then emits `shift:resolved`.
+ * Applies a Shift (rules §2.6, §3.4, §5.3): the window consumed (`exp.resolveWindow`, read on the
+ * form the window opened on, before the Shift), `systems/creature.shiftTo` (stat floor, Memory,
+ * Shiftlog append), the run's per-seed ability for the new form, `shiftCount + 1`, `pendingShifts`
+ * refreshed for the new form, the Reroll count reset, Field Log Held, `stats.forecasts`, then emits
+ * `shift:resolved`. The Shift is tried on a copy first, so a refusal changes nothing.
  * @param {World} world
  * @param {string} uid
  * @param {Card|string} card   a card of the creature's current Forecast (checked against its draw), or a bare form id (scripts, tests)
  * @param {any} data
  * @param {ForecastOpts & {heartmark?: string, rng?: Rng|null, consumeWindow?: boolean}} [opts]   `heartmark` pins the technique at the first Shift; `rng` seeds an Unfixed loop
  * @returns {ShiftApplied}
- * @throws {ForecastError} NO_CREATURE, BAD_CARD (empty card / missing form), STALE (card from another draw or form), ZERO_ODDS (a 0% card never lands), BAD_DIAL; {Error} from shiftTo
+ * @throws {ForecastError} NO_CREATURE, STILL_KNOT, BAD_CARD (empty card / missing form), STALE (card from another draw or form), ZERO_ODDS (a 0% card never lands), BAD_DIAL; {Error} from shiftTo
  */
 export function applyShift(world, uid, card, data, opts = {}) {
   const t = tuningOf(opts.tuning);
@@ -815,16 +924,24 @@ export function applyShift(world, uid, card, data, opts = {}) {
     dir = card.dir;
     starTouched = !!card.isStarTouched;
   }
+  if (c.stillKnot) throw new ForecastError('STILL_KNOT', `forecast.applyShift: ${c.uid} holds a Still Knot; it never Shifts while held`);
   const look = dataLookup(data);
-  const res = shiftTo(c, formId, data, dial, { tuning: opts.tuning, heartmark: opts.heartmark, rng: opts.rng ?? null });
+  const shiftOpts = { tuning: opts.tuning, heartmark: opts.heartmark, rng: opts.rng ?? null };
+  // dry run on a copy: throws (unknown form, a form that never Shifts, a bad Heartmark pin) before any write
+  // (no rng: an rng that cannot fork would otherwise lose draws to the dry run)
+  shiftTo(JSON.parse(JSON.stringify(c)), formId, data, dial, { ...shiftOpts, rng: null });
+  const bus = opts.bus ?? null;
+  const level = opts.consumeWindow === false ? null : resolveWindow(world, c.uid, data, { tuning: opts.tuning, bus });
+  const res = shiftTo(c, formId, data, dial, shiftOpts);
   c.ability = abilityFor(world, formId, look.species(formId));
   c.shiftCount += 1;
-  const level = opts.consumeWindow === false ? null : resolveWindow(world, uid, data, { tuning: opts.tuning, bus: opts.bus ?? null });
+  refreshPending(world, c.uid, data, { tuning: opts.tuning });
+  resetRerolls(world, c.uid, bus);
   const held = fieldLog.markHeld(world, formId, { bus: opts.bus ?? null, data });
   stats.inc(world, 'forecasts', 1, { bus: opts.bus ?? null });
   /** @type {ShiftApplied} */
   const out = {
-    uid, from: res.from, to: res.to, dir, kept: res.kept, toMemory: res.toMemory, statDelta: res.statDelta, floored: res.floored,
+    uid: c.uid, from: res.from, to: res.to, dir, kept: res.kept, toMemory: res.toMemory, statDelta: res.statDelta, floored: res.floored,
     level, starTouched, firstHeld: held.first,
   };
   opts.bus?.emit('shift:resolved', { ...out, anchored: false });
@@ -883,8 +1000,9 @@ function challengesOf(world, opts) {
 }
 
 /**
- * Whether Anchor is offered now and what it costs (rules §4.7, §18.5). Anchor needs an open window
- * unless `requireWindow` is false.
+ * Whether Anchor is offered now and what it costs (rules §4.7, §18.5). Disabled by an active
+ * challenge in ANCHOR_DISABLED_CHALLENGES or by dial rules `anchorsAllowed: false`. Anchor needs an
+ * open window unless `requireWindow` is false.
  * @param {World} world
  * @param {Creature|string} creature
  * @param {any} [data]
@@ -895,6 +1013,7 @@ export function anchorStatus(world, creature, data, opts = {}) {
   const t = tuningOf(opts.tuning);
   const c = creatureOf(world, creature);
   const cost = anchorCost(world, opts);
+  if (rulesOf(opts)?.anchorsAllowed === false) return { can: false, cost, reason: 'disabled' };
   if (challengesOf(world, opts).some((id) => t.ANCHOR_DISABLED_CHALLENGES.includes(id))) return { can: false, cost, reason: 'disabled' };
   if (opts.requireWindow !== false && openWindows(c, data, { tuning: opts.tuning }).length === 0) return { can: false, cost, reason: 'no-window' };
   if (!wallet.canAfford(world, cost, 'anchors')) return { can: false, cost, reason: 'no-stones' };
@@ -904,7 +1023,7 @@ export function anchorStatus(world, creature, data, opts = {}) {
 /**
  * Anchor (rules §4.7): spends the stones (`wallet.spend`, currency `anchors`), uses the window up
  * (`exp.resolveWindow`; it does not re-open), consumes one stream draw, counts `stats.anchors` and
- * `stats.forecasts`, emits `shift:resolved {anchored: true}`. Stone supply per dial (Drift issued
+ * `stats.forecasts`, resets the Reroll count, emits `shift:resolved {anchored: true}`. Stone supply per dial (Drift issued
  * free and refilled per badge, Flux bought, Freefall one per badge) is `systems/wallet`'s
  * `anchorRulesFor`. Refusals change nothing.
  * @param {World} world
@@ -924,6 +1043,7 @@ export function anchor(world, uid, data, opts = {}) {
   }
   c.shiftCount += 1;
   const level = resolveWindow(world, c.uid, data, { tuning: opts.tuning, bus: opts.bus ?? null });
+  resetRerolls(world, c.uid, opts.bus ?? null);
   stats.inc(world, 'anchors', 1, { bus: opts.bus ?? null });
   stats.inc(world, 'forecasts', 1, { bus: opts.bus ?? null });
   opts.bus?.emit('shift:resolved', { uid: c.uid, from: c.speciesId, to: c.speciesId, dir: null, anchored: true, level, spent: st.cost });

@@ -40,6 +40,7 @@ import {
 } from './fieldLog.js';
 import { ensureMap, envFor, rowActive, modsFor, nowTotal, tileDist } from './gather.js';
 import { eligibleRows, rollRow, rollLevel, rowCondHolds } from '../world/roamer.js';
+import { levelFor, isNight as encounterNight, validRow } from './encounter.js';
 
 /** @typedef {import('../state/schema.js').World} World */
 /** @typedef {import('../core/rng.js').Rng} Rng */
@@ -130,6 +131,7 @@ const T = (ctx) => tuningOf(tuningSource(ctx));
  * @property {string} [kind]                    e.g. 'river' | 'quay' | 'creek' | 'sea'; fish rows' `where` may name it
  * @property {{x: number, y: number, w: number, h: number}} area   water tiles the shadows swim in
  * @property {[number, number]} [shadows]       per-reach override of `fishShadowsPerReach`
+ * @property {string|string[]} [nightKind]     extra kinds the reach counts as after dark (a quay reach is also `sea`)
  * @property {string} [creatureTable]           encounter table whose rows can be hooked here
  * @property {object} [cond]                    §6.4 Cond; when false the reach is empty (the north creek until the weir turns)
  */
@@ -216,7 +218,8 @@ export function setReachHealth(world, mapId, reachId, health, ctx) {
  * @property {string} id                 `<reachId>:<n>`
  * @property {string|null} fishId        fish row id (`null` for a creature)
  * @property {{speciesId: string, level: number, errant: false, tableId: string}|null} creature
- * @property {'small'|'medium'|'large'|'forked'|string} silhouette
+ * @property {'small'|'medium'|'large'|'forked'|string} silhouette   the size class (row `shadow`)
+ * @property {string|null} shape         the row's `silhouette` shape (finned, round, flat, ribbon, school, forked), or null
  * @property {number} size               cm, one decimal (0 for a creature)
  * @property {number} x  @property {number} y
  * @property {boolean} named             species shown (Brine lead)
@@ -234,7 +237,20 @@ export function setReachHealth(world, mapId, reachId, health, ctx) {
  */
 
 /**
- * Fish rows that can bite on a reach now (`where` may name the map, region, reach id or kind).
+ * Place tags a reach answers to now: its id, its kind and, at night, its `nightKind`(s).
+ * @param {ReachDef} reach
+ * @param {boolean} night
+ * @returns {string[]}
+ */
+export function reachPlaces(reach, night) {
+  const out = [reach?.id, reach?.kind];
+  if (night) out.push(...(Array.isArray(reach?.nightKind) ? reach.nightKind : [reach?.nightKind]));
+  return out.filter((v) => typeof v === 'string' && v.length > 0);
+}
+
+/**
+ * Fish rows that can bite on a reach now (`where` may name the map, region, reach id, kind or,
+ * after dark, a `nightKind`).
  * @param {World} world
  * @param {{id: string, region?: string}} map
  * @param {ReachDef} reach
@@ -243,7 +259,7 @@ export function setReachHealth(world, mapId, reachId, health, ctx) {
  */
 export function fishFor(world, map, reach, ctx) {
   const env = envFor(world, map, ctx);
-  const places = [reach.id, reach.kind].filter((s) => typeof s === 'string');
+  const places = reachPlaces(reach, env.night);
   return collectionRows(ctx?.data, 'fish').filter((r) => rowActive(r, env, places));
 }
 
@@ -251,7 +267,8 @@ export function fishFor(world, map, reach, ctx) {
  * Simulates the shadows of a reach: count = `max × health` clamped to the reach's [min, max], plus
  * the lead's `extraShadows` and `ctx.extraShadows` (e.g. the quay-lamps project). Each shadow draws,
  * in order: the creature chance (only on a reach with a `creatureTable`), then the row (weighted by
- * `w` × `mods`), its level (creature) or size (fish), x and y.
+ * `w` × `mods`), its level (creature; the night bonus applies as to any wild) or size (fish), x and
+ * y. Rows with a malformed `size` count as size 0; malformed creature rows are skipped.
  * @param {World} world
  * @param {{id: string, region?: string, reaches?: ReachDef[]}} map
  * @param {string|ReachDef} reachRef
@@ -277,7 +294,7 @@ export function reachShadows(world, map, reachRef, rng, ctx) {
   const count = Math.max(0, Math.min(hi, Math.max(lo, Math.round(hi * health))) + extra);
   const fish = fishFor(world, map, reach, ctx);
   const creatureRows = typeof reach.creatureTable === 'string'
-    ? eligibleRows(/** @type {any[]} */ (rowOf(ctx?.data, 'encounters', reach.creatureTable) ?? []).filter((r) => !r.errant), { phase: env.phase, tideState: env.tideState, weather: env.weather, world, data: ctx?.data })
+    ? eligibleRows(/** @type {any[]} */ (rowOf(ctx?.data, 'encounters', reach.creatureTable) ?? []).filter((r) => validRow(r) && !r.errant), { phase: env.phase, tideState: env.tideState, weather: env.weather, world, data: ctx?.data })
     : null;
   const { x: ax, y: ay, w: aw, h: ah } = reach.area;
   for (let i = 0; i < count; i++) {
@@ -285,7 +302,7 @@ export function reachShadows(world, map, reachRef, rng, ctx) {
     let row = null;
     if (creatureRows && creatureRows.length > 0 && rng.chance(t.fishCreatureChance)) {
       const cr = rollRow(rng, creatureRows);
-      if (cr) creature = { speciesId: cr.species, level: rollLevel(rng, cr), errant: /** @type {false} */ (false), tableId: reach.creatureTable };
+      if (cr) creature = { speciesId: cr.species, level: levelFor(rollLevel(rng, cr), encounterNight(world, ctx), ctx), errant: /** @type {false} */ (false), tableId: reach.creatureTable };
     }
     if (!creature) {
       row = rng.weighted(fish.map((r) => ({ w: (typeof r.w === 'number' && Number.isFinite(r.w) ? r.w : 1) * modsFor(r, env), v: r })));
@@ -293,7 +310,7 @@ export function reachShadows(world, map, reachRef, rng, ctx) {
     }
     let size = 0;
     if (row) {
-      const [s0, s1] = Array.isArray(row.size) && row.size.length === 2 ? row.size : [0, 0];
+      const [s0, s1] = Array.isArray(row.size) && row.size.length === 2 && row.size.every((n) => typeof n === 'number' && Number.isFinite(n) && n >= 0) ? row.size : [0, 0];
       size = Math.round((s0 + rng.next() * Math.max(0, s1 - s0)) * 10) / 10;
     }
     const x = ax + rng.int(0, Math.max(0, aw - 1));
@@ -303,6 +320,7 @@ export function reachShadows(world, map, reachRef, rng, ctx) {
       fishId: row ? row.id : null,
       creature,
       silhouette: row ? (row.shadow ?? 'medium') : 'large',
+      shape: row && typeof row.silhouette === 'string' ? row.silhouette : null,
       size,
       x, y,
       named: lb.fishNameSpecies,
@@ -569,8 +587,9 @@ export function cancel(s) {
 
 /**
  * Settles a finished session into the world. A landed fish is logged (count, best, Patient board,
- * tell), counts in `stats.fishCaught`, and costs the reach `fishReachCatchCost`; `'keep'` gives it
- * (`ctx.give`), `'release'` gives `fishReleaseNudge` back. A landed creature returns its encounter
+ * tell) and counts in `stats.fishCaught` either way. `'keep'` takes it out of the reach (health −
+ * `fishReachCatchCost`) and gives it (`ctx.give`); `'release'` puts it back and nudges the reach's
+ * health UP by `fishReleaseNudge` (GDD-00 §7: health dips when fished hard; a release is not fished). A landed creature returns its encounter
  * (the flow starts the battle). A miss just emits `fishing:miss`. Idempotent: a resolved session
  * returns `{ok: false, kind: 'none'}`.
  * @param {World} world
@@ -597,9 +616,8 @@ export function resolve(world, s, choice = 'keep', ctx) {
   const t = T(ctx);
   const log = recordFish(world, fishId, s.shadow.size, { patient: s.mode === 'patient' }, ctx);
   stats.inc(world, 'fishCaught', 1, ctx);
-  let h = res.health - t.fishReachCatchCost;
   const keep = choice !== 'release';
-  if (!keep) h += t.fishReleaseNudge;
+  const h = keep ? res.health - t.fishReachCatchCost : res.health + t.fishReleaseNudge;
   const health = setReachHealth(world, s.mapId, s.reachId, h, ctx);
   if (keep && typeof ctx?.give === 'function') ctx.give(fishId, 1);
   s.phase = keep ? 'kept' : 'released';

@@ -7,13 +7,16 @@
 //
 // LUT: the letter X is a real flame / lamp glass on every character palette
 // (Hesper's eyestalk lantern, Ludo's lantern, Seraphine's headlamp, Isolde's
-// storm lantern). CHAR_GLOW_KEYS lists it so art/atlas skips grading it, the
-// same contract as the tile palette's leading '!'.
+// storm lantern) and is always porchlight amber #F9C46B, which
+// art/palette.isLutExempt already exempts, so art/atlas never grades it.
+// CHAR_GLOW_KEYS names the letter for renderers that recolour by key.
 //
 // Changes on adoption: species fixes per GDD-00 §10 (Corin tawny owl, Idris
 // great northern diver, Agathe cormorant, Teo raccoon; the otter palette is
 // gone with the otter); Linnet's shadow fur no longer falls to purple (`p`);
 // it uses the brown ramp in CHAR_RAMPS; every missing resident is added.
+
+import { MASTER, CHAR_RAMPS as SHARED_RAMPS } from '../palette.js';
 
 export const INK = '#141b33', PAPER = '#f6f1e3', BRASS = '#d9a441', BRASS_S = '#8a6a1e';
 
@@ -21,33 +24,41 @@ export const INK = '#141b33', PAPER = '#f6f1e3', BRASS = '#d9a441', BRASS_S = '#
 export const CHAR_GLOW_KEYS = Object.freeze(['X']);
 
 /**
- * The 21-key sprite letter set (Sweetie-16 + m c h u a), values identical to
- * proto/creatures/sprites.js MASTER so characters and creatures share one set.
- * art/palette.js (ART-SHARED) is the owner; this copy is kept in step with it.
+ * The 21-key sprite letter set by letter, lower-case hex, straight from
+ * art/palette.MASTER (creatures and characters share one set).
  */
-export const SW = Object.freeze({
-  k: '#1a1c2c', p: '#5d275d', r: '#b13e53', o: '#ef7d57', y: '#ffcd75', l: '#a7f070', g: '#38b764', t: '#257179',
-  n: '#29366f', b: '#3b5dc9', s: '#41a6f6', i: '#73eff7', w: '#f4f4f4', v: '#94b0c2', e: '#566c86', d: '#333c57',
-  m: '#ff5bd6', c: '#f2c9a3', h: '#cf8a5e', u: '#7a4b2e', a: '#d9b38c',
-});
+export const SW = Object.freeze(Object.fromEntries(Object.entries(MASTER).map(([k, v]) => [k, v.toLowerCase()])));
 
-// ===== ART-CHARS ramps (intended for the art/palette.js extras block) =========
-// A warm brown ramp between u (umber) and k, so dark fur shades stay brown
-// instead of dropping to p (purple) or d (slate). Used by Linnet (overworld
-// and portrait), the marten and every brown-furred bust.
-export const CHAR_RAMPS = Object.freeze({
-  chestnutLight: '#c98a5a', // between h and u
-  chestnut: '#9a623c',
-  brownDeep: '#5c3a26',     // fur shadow (replaces p on Linnet)
-  brownDark: '#3a2219',     // deepest fur / outline-adjacent (replaces k-on-fur)
-});
-// ==============================================================================
+/**
+ * The ART-CHARS brown ramp (owned by the ART-CHARS block of art/palette.js):
+ * dark fur shades stay brown instead of dropping to p (purple) or d (slate).
+ */
+export const CHAR_RAMPS = Object.freeze(Object.fromEntries(Object.entries(SHARED_RAMPS).map(([k, v]) => [k, v.toLowerCase()])));
 const CR = CHAR_RAMPS;
 
 // Shared outfit tokens
 export const JUMPER = { O: '#c9a16b', k: INK, C: '#f4e8c1', c: '#d8c79b', D: '#3b4a6b', d: '#2b3a67', Y: BRASS, A: BRASS, a: '#7a5a36', G: '#cfe7f2', B: '#5c4028', b: '#3e2618' };
 export const APRON = { O: '#c9a16b', k: INK, C: '#e8dcc0', c: '#bfb090', D: '#8a5a3b', d: '#6a4330', Y: '#f2c14e', A: BRASS, a: '#7a5a36', G: '#cfe7f2', B: '#5c4028', b: '#3e2618' };
 const EYES = { E: INK, W: PAPER };
+
+const rgbOf = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+/**
+ * The fishing rod's cane (O) and cork (a) snap to the nearest colour the
+ * character already wears, so the 24-wide fish frames add no new keys (the
+ * art linter caps people at 18 colours).
+ */
+export function snapRod(pal) {
+  // candidates: letters every body actually draws (fur, limbs, boots, cloth), never optional marks
+  const DRAWN = 'FfLMmKSsBbCcDdk';
+  const vals = Object.entries(pal).filter(([k, v]) => DRAWN.includes(k) && typeof v === 'string' && v.length === 7).map(([, v]) => v);
+  const near = (target) => {
+    const t = rgbOf(target);
+    let best = target, bd = Infinity;
+    for (const v of vals) { const c = rgbOf(v); const d = (c[0] - t[0]) ** 2 + (c[1] - t[1]) ** 2 + (c[2] - t[2]) ** 2; if (d < bd) { bd = d; best = v; } }
+    return best;
+  };
+  return { ...pal, O: near('#c9a16b'), a: near('#7a5a36') };
+}
 const ROD = { O: '#c9a16b', a: '#7a5a36' };
 
 export const PALETTES = {
@@ -100,8 +111,8 @@ export const PALETTES = {
   },
   ludo: {
     ...ROD,
-    K: '#2a1c22', F: '#6a4a52', f: '#4a3038', L: '#8a6a72', M: '#c9a090', m: '#a8807a', E: INK, W: PAPER,
-    N: '#3a1f1c', P: '#e3a0a8', S: '#3a2830', k: '#2a1c22', V: '#a0727a', v: '#7e5260', z: '#141b3366', X: '#f9c46b', C: '#3b4a6b', c: '#2b3a67', Y: '#a8323a',
+    K: '#2a1c22', F: '#5a3a44', f: '#3e2830', L: '#8a6a72', M: '#e0b8a0', m: '#b08878', E: INK, W: PAPER,
+    N: '#3a1f1c', P: '#e3a0a8', S: '#3a2830', k: '#2a1c22', V: '#c49a94', v: '#946a70', z: '#141b3366', X: '#f9c46b', C: '#3b4a6b', c: '#2b3a67', Y: '#a8323a',
   },
   dimity: {
     ...ROD,
@@ -233,7 +244,7 @@ export const PALETTES = {
   seraphine: {
     ...ROD, E: INK, W: PAPER,
     K: '#4a5068', k: INK, F: '#ece6da', f: '#b8bcc8', L: PAPER, M: '#ece6da', N: '#2a2a33',
-    C: '#c0603a', c: '#8e4428', D: '#3b4a6b', d: '#2b3a67', Y: BRASS, A: BRASS, a: BRASS_S, X: '#ffe29a',
+    C: '#c0603a', c: '#8e4428', D: '#3b4a6b', d: '#2b3a67', Y: BRASS, A: BRASS, a: BRASS_S, X: '#f9c46b',
     S: '#b8bcc8', s: '#8e94a4', B: '#5a4a3a', b: '#3e3228',
   },
   hollis: {
@@ -270,4 +281,6 @@ export const PALETTES = {
 };
 // Ivo shares Ada's palette with a blue scarf.
 PALETTES.ivo = { ...PALETTES.ada, P: '#3b6dc9' };
-for (const p of Object.values(PALETTES)) Object.freeze(p);
+// Osric: shell seams and limb shade share the outline (key cap)
+PALETTES.osric = { ...PALETTES.osric, r: PALETTES.osric.K, s: PALETTES.osric.K };
+for (const k of Object.keys(PALETTES)) PALETTES[k] = Object.freeze(snapRod(PALETTES[k]));

@@ -397,3 +397,31 @@ export function inPalette(hex) {
   if (!c) return false;
   return ALL_HEX.has('#' + c.map((v) => v.toString(16).padStart(2, '0')).join('').toUpperCase());
 }
+
+/* ==========================================================================================
+ * ART-CHARS block — appended by the ART-CHARS lane (js/art/chars/*, js/art/portraits.js).
+ * Everything above this line belongs to ART-SHARED; ART-SHARED may fold this block into
+ * CAST_HEX / ALL_HEX whenever it likes. Keep edits by the character lane inside this block.
+ * ========================================================================================== */
+import { ART_CHARS_HEX } from './chars/hexes.js'; // pure data, no imports (no cycle)
+
+/**
+ * Warm brown ramp between `u` (umber) and `k` for fur shadows, so dark fur stays brown instead
+ * of falling to `p` (purple) or `d` (slate). Linnet's overworld sprite and bust use it (polish
+ * backlog: "Linnet's portrait shadow fur goes purple"), as do the marten and other brown busts.
+ * @type {Readonly<Record<string, string>>}
+ */
+export const CHAR_RAMPS = Object.freeze({
+  chestnutLight: '#C98A5A', // between h and u
+  chestnut: '#9A623C',
+  brownDeep: '#5C3A26',     // fur shadow (replaces p on Linnet)
+  brownDark: '#3A2219',     // deepest fur, next to the outline
+});
+
+/** The extra cast colours (lease-card fur ramps, new residents, busts); see js/art/chars/hexes.js. */
+export { ART_CHARS_HEX };
+
+// Register them so inPalette() / tools/lint-art.mjs accept the cast. ALL_HEX is a frozen Set
+// object whose contents can still grow; this is the only place that adds to it after creation.
+for (const h of [...Object.values(CHAR_RAMPS), ...ART_CHARS_HEX]) ALL_HEX.add(hexOf(h));
+/* ================================ end of the ART-CHARS block =============================== */

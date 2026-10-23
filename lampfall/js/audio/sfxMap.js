@@ -25,6 +25,7 @@
  * @module audio/sfxMap
  */
 import { makeRng } from '../core/rng.js';
+import { sfxDuration } from '../core/audio.js';
 
 // ---------------------------------------------------------------------------------------------
 // Tuning
@@ -40,7 +41,10 @@ import { makeRng } from '../core/rng.js';
  *   STAT_STAGE_SEMITONES: number, STAT_MAX_SEMITONES: number,
  *   HIT_STRONG_MULT: number, HIT_WEAK_MULT: number, HIT_MIN_INTERVAL_MS: number,
  *   CAPTURE_SHAKE_SEMITONES: number, CAPTURE_SHAKE_MAX_SEMITONES: number,
- *   LEVEL_UP_VOLUME: number, SAVE_OK_VOLUME: number, AMBIENT_VOLUME: number, AMBIENT_MIN_INTERVAL_MS: number
+ *   LEVEL_UP_VOLUME: number, SAVE_OK_VOLUME: number, AMBIENT_VOLUME: number, AMBIENT_MIN_INTERVAL_MS: number,
+ *   BUMP_MIN_INTERVAL_MS: number, NPC_TALK_MIN_INTERVAL_MS: number, SAVE_MIN_INTERVAL_MS: number,
+ *   WARP_MIN_INTERVAL_MS: number, SHAKE_MIN_INTERVAL_MS: number, DIG_MIN_INTERVAL_MS: number,
+ *   CAPTURE_SHAKE_MIN_INTERVAL_MS: number, SCRIPT_SFX_MIN_INTERVAL_MS: number
  * }>}
  */
 export const DEFAULTS = Object.freeze({
@@ -79,10 +83,39 @@ export const DEFAULTS = Object.freeze({
   SAVE_OK_VOLUME: 0.5,
   AMBIENT_VOLUME: 0.6,
   AMBIENT_MIN_INTERVAL_MS: 2000,
+  /** walking into a wall: bump thud spacing */
+  BUMP_MIN_INTERVAL_MS: 250,
+  /** NPC greeting blip spacing (mashing confirm on an NPC) */
+  NPC_TALK_MIN_INTERVAL_MS: 150,
+  /** save chime / save error spacing (autosave bursts) */
+  SAVE_MIN_INTERVAL_MS: 1000,
+  /** door / warp sound spacing */
+  WARP_MIN_INTERVAL_MS: 300,
+  /** tree-shake rustle spacing */
+  SHAKE_MIN_INTERVAL_MS: 200,
+  /** shovel spacing */
+  DIG_MIN_INTERVAL_MS: 150,
+  /** Lantern shake ticks: 0 = every tick sounds (the meter animation spaces them) */
+  CAPTURE_SHAKE_MIN_INTERVAL_MS: 0,
+  /** sounds named outright by scripts (`playSfx` op / `sfx` event): 0 = no spacing */
+  SCRIPT_SFX_MIN_INTERVAL_MS: 0,
 });
 
 /** Every tuning key this module reads, for the GDD table. @type {readonly string[]} */
 export const TUNING_KEYS = Object.freeze(Object.keys(DEFAULTS));
+/** Alias of {@link TUNING_KEYS} (the lane brief's spelling). @type {readonly string[]} */
+export const tuningKeys = TUNING_KEYS;
+
+/**
+ * True when `name` is a sound the core engine knows (`core/audio` SFX bank or one of its aliases).
+ * Names that arrive in payloads (`sfx` events, a warp's or a tile's `sfx` field) are checked with
+ * this, so a typo is silent instead of a console warning and a wasted burst slot.
+ * @param {unknown} name
+ * @returns {boolean}
+ */
+export function isKnownSfx(name) {
+  return typeof name === 'string' && name !== '' && sfxDuration(name) !== null;
+}
 
 // ---------------------------------------------------------------------------------------------
 // Rule shapes
@@ -103,19 +136,19 @@ export const TUNING_KEYS = Object.freeze(Object.keys(DEFAULTS));
  *  - `fixed`  : `semitones` (default 0)
  *  - `jitter` : a random multiplier in `1 ± amount` (from the injected rng)
  *  - `combo`  : `semitones` per consecutive play of the same key within `resetMs`, up to `max` steps
- *  - `field`  : `semitones` × the numeric payload `field`, clamped to ±`max`
+ *  - `field`  : `semitones` × the numeric payload `field` (or the first numeric of a list of fields), clamped to ±`max`
  *  - `payload`: `pitch` (multiplier) / `semitones` taken straight from the payload (generic `sfx` event)
  * @typedef {{kind: 'fixed', semitones?: TunedNumber}
  *   | {kind: 'jitter', amount: TunedNumber}
  *   | {kind: 'combo', semitones: TunedNumber, max: TunedNumber, resetMs: TunedNumber}
- *   | {kind: 'field', field: string, semitones: TunedNumber, max?: TunedNumber}
+ *   | {kind: 'field', field: string|string[], semitones: TunedNumber, max?: TunedNumber}
  *   | {kind: 'payload'}} PitchRule
  */
 /**
  * One way an event can sound.
  * @typedef {Object} SfxRule
  * @property {string|null} sfx              engine sound id; null = this case is silent
- * @property {string} [sfxField]            take the sound id from this payload field when it is a non-empty string
+ * @property {string} [sfxField]            take the sound id from this payload field when it names a known sound
  * @property {Match|Match[]} [when]         all must match (omitted = always)
  * @property {PitchRule} [pitch]
  * @property {TunedNumber} [volume]         0..2 (default 1)
@@ -148,10 +181,10 @@ const ui = (sfx) => Object.freeze({ sfx, minIntervalMs: '$UI_MIN_INTERVAL_MS', k
  */
 export const BUS_SFX = Object.freeze({
   'player:step': Object.freeze([
-    Object.freeze({ when: { field: 'terrain', in: ['water', 'shallows', 'mud', 'wet'] }, sfx: 'stepWater', key: 'step', pitch: { kind: 'jitter', amount: '$STEP_PITCH_JITTER' }, volume: '$STEP_VOLUME', minIntervalMs: '$STEP_MIN_INTERVAL_MS' }),
-    Object.freeze({ sfx: 'step', key: 'step', pitch: { kind: 'jitter', amount: '$STEP_PITCH_JITTER' }, volume: '$STEP_VOLUME', minIntervalMs: '$STEP_MIN_INTERVAL_MS' }),
+    Object.freeze({ when: { field: 'terrain', in: ['water', 'shallows', 'mud', 'wet'] }, sfx: 'stepWater', sfxField: 'sfx', key: 'step', pitch: { kind: 'jitter', amount: '$STEP_PITCH_JITTER' }, volume: '$STEP_VOLUME', minIntervalMs: '$STEP_MIN_INTERVAL_MS' }),
+    Object.freeze({ sfx: 'step', sfxField: 'sfx', key: 'step', pitch: { kind: 'jitter', amount: '$STEP_PITCH_JITTER' }, volume: '$STEP_VOLUME', minIntervalMs: '$STEP_MIN_INTERVAL_MS' }),
   ]),
-  'player:bump': Object.freeze({ sfx: 'blocked', minIntervalMs: 250 }),
+  'player:bump': Object.freeze({ sfx: 'blocked', minIntervalMs: '$BUMP_MIN_INTERVAL_MS' }),
   'wallet:changed': Object.freeze([
     Object.freeze({ when: { field: 'delta', gt: 0 }, sfx: 'coin', pitch: { kind: 'combo', semitones: '$COIN_COMBO_SEMITONES', max: '$COIN_COMBO_MAX_STEPS', resetMs: '$COIN_COMBO_RESET_MS' } }),
     Object.freeze({ when: { field: 'delta', lt: 0 }, sfx: 'purse' }),
@@ -161,7 +194,7 @@ export const BUS_SFX = Object.freeze({
   'loan:built': Object.freeze({ sfx: 'bell' }),
   'letter:read': Object.freeze({ sfx: 'blip' }),
   'thread:beat': Object.freeze({ sfx: 'bell' }),
-  'npc:talked': Object.freeze({ sfx: 'blip', minIntervalMs: 150 }),
+  'npc:talked': Object.freeze({ sfx: 'blip', minIntervalMs: '$NPC_TALK_MIN_INTERVAL_MS' }),
   'fieldLog:held': Object.freeze({ sfx: 'stamp' }),
   'fieldLog:read': Object.freeze({ sfx: 'blip' }),
   'collection:added': Object.freeze([
@@ -175,10 +208,10 @@ export const BUS_SFX = Object.freeze({
   'shift:window': Object.freeze({ sfx: 'shiftFlip' }),
   'badge:won': Object.freeze({ sfx: 'achievement' }),
   'summit:cleared': Object.freeze({ sfx: 'achievement' }),
-  'save:ok': Object.freeze({ sfx: 'stamp', volume: '$SAVE_OK_VOLUME', minIntervalMs: 1000 }),
+  'save:ok': Object.freeze({ sfx: 'stamp', volume: '$SAVE_OK_VOLUME', minIntervalMs: '$SAVE_MIN_INTERVAL_MS' }),
   'save:fail': Object.freeze([
     Object.freeze({ when: { field: 'willRetry', truthy: true }, sfx: null }),
-    Object.freeze({ sfx: 'error', minIntervalMs: 1000 }),
+    Object.freeze({ sfx: 'error', minIntervalMs: '$SAVE_MIN_INTERVAL_MS' }),
   ]),
   toast: Object.freeze({ sfx: 'toast', minIntervalMs: '$TOAST_MIN_INTERVAL_MS' }),
   'tide:change': Object.freeze([
@@ -196,9 +229,9 @@ export const BUS_SFX = Object.freeze({
     Object.freeze({ sfx: null }),
   ]),
   /** a warp / door: the warp's own `sfx` field, else the door sound */
-  warp: Object.freeze({ sfx: 'doorOpen', sfxField: 'sfx', minIntervalMs: 300 }),
+  warp: Object.freeze({ sfx: 'doorOpen', sfxField: 'sfx', minIntervalMs: '$WARP_MIN_INTERVAL_MS' }),
   /** scripts' `playSfx` op and anything else that names a sound outright */
-  sfx: Object.freeze({ sfx: null, sfxField: 'name', pitch: { kind: 'payload' }, minIntervalMs: 0 }),
+  sfx: Object.freeze({ sfx: null, sfxField: 'name', pitch: { kind: 'payload' }, minIntervalMs: '$SCRIPT_SFX_MIN_INTERVAL_MS' }),
   'ui:cursor': ui('blip'),
   'ui:confirm': ui('confirm'),
   'ui:cancel': ui('cancel'),
@@ -218,9 +251,9 @@ export const VERB_SFX = Object.freeze({
   look: Object.freeze({ sfx: 'blip' }),
   inspect: Object.freeze({ sfx: 'blip' }),
   pickUp: Object.freeze({ sfx: 'fruitDrop' }),
-  shake: Object.freeze({ sfx: 'shake', minIntervalMs: 200 }),
+  shake: Object.freeze({ sfx: 'shake', minIntervalMs: '$SHAKE_MIN_INTERVAL_MS' }),
   fish: Object.freeze({ sfx: 'splash' }),
-  dig: Object.freeze({ sfx: 'dig', minIntervalMs: 150 }),
+  dig: Object.freeze({ sfx: 'dig', minIntervalMs: '$DIG_MIN_INTERVAL_MS' }),
   catch: Object.freeze({ sfx: 'thwap' }),
   enter: Object.freeze({ sfx: 'doorOpen' }),
   board: Object.freeze({ sfx: 'splash' }),
@@ -232,7 +265,8 @@ export const VERB_SFX = Object.freeze({
 });
 
 /**
- * Battle events (`battle/events.EVENT_FIELDS` types) -> sound, for the battle scene's animation queue.
+ * Battle events (`battle/events.EVENT_FIELDS` types; every key is one) -> sound, for the battle
+ * scene's animation queue. Event types not listed (turn, message, move, exp, end, ...) are silent.
  * @type {Readonly<Record<string, SfxEntry>>}
  */
 export const BATTLE_SFX = Object.freeze({
@@ -264,8 +298,8 @@ export const BATTLE_SFX = Object.freeze({
     Object.freeze({ sfx: null }),
   ]),
   switch: Object.freeze({ sfx: 'confirm' }),
-  lantern: Object.freeze({ sfx: 'lantern' }),
-  'capture-shake': Object.freeze({ sfx: 'shake', minIntervalMs: 0, pitch: { kind: 'field', field: 'n', semitones: '$CAPTURE_SHAKE_SEMITONES', max: '$CAPTURE_SHAKE_MAX_SEMITONES' } }),
+  /** the engine emits one shake event with `segments` (0..3); a scene replaying it per tick adds `n` */
+  'capture-shake': Object.freeze({ sfx: 'shake', minIntervalMs: '$CAPTURE_SHAKE_MIN_INTERVAL_MS', pitch: { kind: 'field', field: Object.freeze(['n', 'shake', 'segments']), semitones: '$CAPTURE_SHAKE_SEMITONES', max: '$CAPTURE_SHAKE_MAX_SEMITONES' } }),
   capture: Object.freeze({ sfx: 'capture' }),
   'capture-fail': Object.freeze({ sfx: 'captureFail' }),
   read: Object.freeze({ sfx: 'bell' }),
@@ -273,7 +307,8 @@ export const BATTLE_SFX = Object.freeze({
   reveal: Object.freeze({ sfx: 'shiftFlip' }),
   levelup: Object.freeze({ sfx: 'levelUp', volume: '$LEVEL_UP_VOLUME' }),
   learn: Object.freeze({ sfx: 'confirm' }),
-  scrap: Object.freeze({ sfx: 'thwap' }),
+  'scrap-cost': Object.freeze({ sfx: 'thwap' }),
+  'type-shift': Object.freeze({ sfx: 'shiftFlip' }),
   glint: Object.freeze({ sfx: 'coin' }),
   payout: Object.freeze({ sfx: 'coin' }),
   run: Object.freeze({ sfx: 'step' }),
@@ -296,7 +331,8 @@ export function tuningOf(tuning) {
   const out = { ...DEFAULTS };
   if (tuning && typeof tuning === 'object') {
     for (const [k, v] of Object.entries(tuning)) {
-      if (typeof DEFAULTS[k] === 'number' && !(typeof v === 'number' && Number.isFinite(v))) continue;
+      if (k === '__proto__') continue;
+      if (Object.hasOwn(DEFAULTS, k) && !(typeof v === 'number' && Number.isFinite(v))) continue;
       out[k] = v;
     }
   }
@@ -313,7 +349,8 @@ export function tuningOf(tuning) {
  */
 export function resolveRef(v, tuning, fallback = 0) {
   if (typeof v === 'string' && v.startsWith('$')) {
-    const r = tuning?.[v.slice(1)];
+    const k = v.slice(1);
+    const r = tuning && Object.hasOwn(tuning, k) ? tuning[k] : undefined;
     return typeof r === 'number' && Number.isFinite(r) ? r : fallback;
   }
   return typeof v === 'number' && Number.isFinite(v) ? v : fallback;
@@ -419,7 +456,12 @@ export function pitchSemitones(rule, payload, ctx) {
       return count * step;
     }
     case 'field': {
-      const v = Number(readField(payload, rule.field));
+      const fields = Array.isArray(rule.field) ? rule.field : [rule.field];
+      let v = NaN;
+      for (const f of fields) {
+        const x = readField(payload, f);
+        if (typeof x === 'number' && Number.isFinite(x)) { v = x; break; }
+      }
       if (!Number.isFinite(v)) return 0;
       const st = v * resolveRef(rule.semitones, t, 0);
       const max = rule.max === undefined ? Infinity : Math.abs(resolveRef(rule.max, t, Infinity));
@@ -450,7 +492,7 @@ export function resolveSfx(entry, payload, ctx = {}) {
   let sfx = rule.sfx;
   if (rule.sfxField) {
     const named = readField(payload, rule.sfxField);
-    if (typeof named === 'string' && named.trim()) sfx = named.trim();
+    if (typeof named === 'string' && isKnownSfx(named.trim())) sfx = named.trim();
   }
   if (typeof sfx !== 'string' || !sfx) return null;
   const key = rule.key ?? sfx;
@@ -575,11 +617,13 @@ export function createSfxRouter(opts = {}) {
   /** @type {SfxPlay[]} */
   const recent = [];
 
-  const ctx = () => ({ tuning, rng, now: now(), combo, map, verbs, battle: battleTable });
+  /** one clock read per play: resolution (combo pitch) and the limiter see the same instant */
+  const ctx = (at) => ({ tuning, rng, now: at, combo, map, verbs, battle: battleTable });
+  const clock = () => { const v = Number(now()); return Number.isFinite(v) ? v : 0; };
 
-  function fire(play) {
+  function fire(play, at) {
     if (!play) { counts.silent++; return null; }
-    if (!limiter.allow(play.key, now(), play.minIntervalMs)) { counts.limited++; return null; }
+    if (!limiter.allow(play.key, at, play.minIntervalMs)) { counts.limited++; return null; }
     try {
       if (audio && typeof audio.sfx === 'function') audio.sfx(play.sfx, { pitch: play.pitch, volume: play.volume });
     } catch {
@@ -594,9 +638,9 @@ export function createSfxRouter(opts = {}) {
   }
 
   const api = {
-    event: (evt, payload) => fire(sfxForEvent(evt, payload, ctx())),
-    verb: (v, payload) => fire(sfxForVerb(v, payload, ctx())),
-    battle: (ev) => fire(sfxForBattleEvent(ev, ctx())),
+    event: (evt, payload) => { const at = clock(); return fire(sfxForEvent(evt, payload, ctx(at)), at); },
+    verb: (v, payload) => { const at = clock(); return fire(sfxForVerb(v, payload, ctx(at)), at); },
+    battle: (ev) => { const at = clock(); return fire(sfxForBattleEvent(ev, ctx(at)), at); },
     stats: () => ({ ...counts }),
     log: () => recent.slice(),
     destroy() { while (offs.length) offs.pop()(); },

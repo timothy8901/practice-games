@@ -11,12 +11,15 @@
  *  - every tunable number is a key of the frozen {@link DEFAULTS}, overridable per call with
  *    `opts.tuning` (level cap and growth curves are read from `systems/exp`'s tuning);
  *  - `shiftTo` does not touch `shiftCount` (that counts Shift-stream draws and belongs to
- *    systems/forecast), and keeps `familyId` (the individual's family, not the form's).
+ *    systems/forecast), and keeps `familyId` (the individual's family, not the form's);
+ *  - levels and EXP sit on the individual's growth curve (its first form's, {@link growthOf}), not
+ *    the current form's, so a Shift never re-levels a creature (rules §2.6).
  *
  * Randomness: only the injected `rng` (`core/rng` Rng). `makeCreature` draws the per-individual
- * Heartmark placement from `rng.fork('mark')` and an Unfixed type loop from `rng.fork('unfixed')`,
- * so neither consumes draws from the caller's stream; without an rng the mark is `{x:0, y:0}` and
- * the loop is a fixed pick.
+ * Heartmark placement from `rng.fork('heartmark:<uid>')` and an Unfixed type loop from
+ * `rng.fork('unfixed:<uid>')` ({@link creatureStream}), so neither consumes draws from the caller's
+ * stream and two creatures built from one rng still differ; without an rng the mark is `{x:0, y:0}`
+ * and the loop is a fixed pick.
  *
  * Functions mutate the creature passed in (callers run them inside `store.tx` on a world creature,
  * or on a battle copy) and return a plain result. Pure: no DOM.
@@ -100,6 +103,7 @@ const TUNING_CACHE = new WeakMap();
 
 /**
  * Resolves a partial tuning override over {@link DEFAULTS}. Keys of other modules are ignored.
+ * Cached per override object only when that object is frozen (mutable overrides are re-read).
  * @param {Partial<CreatureTuning>|null|undefined} [tuning]
  * @returns {Readonly<CreatureTuning>}
  * @throws {TypeError} when a known key has a malformed value
@@ -107,7 +111,8 @@ const TUNING_CACHE = new WeakMap();
 export function tuningOf(tuning) {
   if (tuning == null) return DEFAULTS;
   if (typeof tuning !== 'object') throw new TypeError('creature.tuningOf: tuning must be an object');
-  const hit = TUNING_CACHE.get(tuning);
+  const cacheable = Object.isFrozen(tuning);
+  const hit = cacheable ? TUNING_CACHE.get(tuning) : undefined;
   if (hit) return hit;
   /** @type {any} */
   const out = { ...DEFAULTS };
@@ -119,7 +124,7 @@ export function tuningOf(tuning) {
     out[key] = v;
   }
   const frozen = deepFreeze(out);
-  TUNING_CACHE.set(tuning, frozen);
+  if (cacheable) TUNING_CACHE.set(tuning, frozen);
   return frozen;
 }
 
@@ -380,14 +385,22 @@ export function pinHeartmarkTechnique(c, moveId, data, opts = {}) {
 // ---------------------------------------------------------------------------------------------
 
 /**
- * A sub-stream for one purpose: `rng.fork(label)` when available (no draw consumed from `rng`),
- * else `rng` itself.
- * @param {any} rng
- * @param {string} label
+ * Fork label prefixes. Labels carry the creature's uid (`heartmark:c17`, GDD-00's stream name), so
+ * creatures built from the same rng still get their own placement and Unfixed loop.
  */
-function sub(rng, label) {
+export const FORK_LABELS = Object.freeze({ mark: 'heartmark', unfixed: 'unfixed' });
+
+/**
+ * The per-creature sub-stream for one purpose: `rng.fork('<prefix>:<uid>')` when the rng can fork
+ * (no draw is consumed from `rng`), else `rng` itself; null without an rng.
+ * @param {Rng|null|undefined} rng
+ * @param {'mark'|'unfixed'} purpose
+ * @param {string} uid
+ * @returns {Rng|null}
+ */
+export function creatureStream(rng, purpose, uid) {
   if (!rng) return null;
-  return typeof rng.fork === 'function' ? rng.fork(label) : rng;
+  return typeof rng.fork === 'function' ? rng.fork(`${FORK_LABELS[purpose]}:${uid}`) : rng;
 }
 
 /**
@@ -443,7 +456,7 @@ export function buildTypeQueue(formTypes, typeNames, rng, opts = {}) {
  * @property {number} [level]                  default DEFAULT_LEVEL; clamped to 1..MAX_LEVEL
  * @property {number} [exp]                    total EXP; clamped into the level's band (default: the level's threshold)
  * @property {string} [nickname]               default: the form's name
- * @property {Rng|null} [rng]                  Heartmark placement + Unfixed loop (forked by label)
+ * @property {Rng|null} [rng]                  Heartmark placement + Unfixed loop (forked by label + uid)
  * @property {Partial<StatBlock>} [trained]
  * @property {string|null} [heldItem]          a held item whose row has `blocksShifts: true` sets `stillKnot`
  * @property {number} [bond]
@@ -467,6 +480,12 @@ export function makeCreature(opts, data) {
   if (!opts || typeof opts !== 'object') throw new TypeError('makeCreature: opts must be an object');
   if (typeof opts.uid !== 'string' || opts.uid.length === 0) {
     throw new TypeError('makeCreature: opts.uid must be a non-empty string (allocate it with party.nextUid)');
+  }
+  if (opts.moves !== undefined && opts.moves !== null && !(Array.isArray(opts.moves) && opts.moves.every((id) => typeof id === 'string'))) {
+    throw new TypeError('makeCreature: opts.moves must be an array of move ids');
+  }
+  if (opts.heldItem !== undefined && opts.heldItem !== null && typeof opts.heldItem !== 'string') {
+    throw new TypeError('makeCreature: opts.heldItem must be an item id or null');
   }
   const t = tuningOf(opts.tuning);
   const et = expTuningOf(opts.tuning);
@@ -495,14 +514,14 @@ export function makeCreature(opts, data) {
   const rng = opts.rng || null;
   const mark = opts.mark && Number.isInteger(opts.mark.x) && Number.isInteger(opts.mark.y)
     ? { x: opts.mark.x, y: opts.mark.y }
-    : drawMark(sub(rng, 'mark'), opts);
+    : drawMark(creatureStream(rng, 'mark', opts.uid), opts);
   const typeQueue = isUnfixedAbility(look.ability(sp.ability))
-    ? buildTypeQueue(sp.types, look.typeNames(), sub(rng, 'unfixed'), opts)
+    ? buildTypeQueue(sp.types, look.typeNames(), creatureStream(rng, 'unfixed', opts.uid), opts)
     : null;
 
   const [lo, hi] = expBand(sp.growth, level, opts);
   const exp = isNum(opts.exp) ? Math.max(lo, Math.min(hi, Math.floor(opts.exp))) : lo;
-  const heldItem = opts.heldItem ?? null;
+  const heldItem = opts.heldItem || null;
 
   return {
     uid: opts.uid,
@@ -652,7 +671,7 @@ export function shiftTo(c, formId, data, dial, opts = {}) {
   c.types = to.types.slice();
   c.ability = to.ability;
   if (isUnfixedAbility(look.ability(to.ability))) {
-    if (!Array.isArray(c.typeQueue) || !c.typeQueue.length) c.typeQueue = buildTypeQueue(to.types, look.typeNames(), sub(opts.rng, 'unfixed'), opts);
+    if (!Array.isArray(c.typeQueue) || !c.typeQueue.length) c.typeQueue = buildTypeQueue(to.types, look.typeNames(), creatureStream(opts.rng, 'unfixed', c.uid), opts);
   } else {
     c.typeQueue = null;
   }
@@ -678,7 +697,8 @@ export function shiftTo(c, formId, data, dial, opts = {}) {
 
 /**
  * Adds EXP, levels up (stats recomputed, HP ratio kept) and surfaces learnset moves of each new
- * level. EXP stops at the MAX_LEVEL threshold. Does not open Shift windows: that is
+ * level (from the current form's learnset). Levels follow the creature's own growth curve
+ * ({@link growthOf}), which a Shift never changes. EXP stops at the MAX_LEVEL threshold. Does not open Shift windows: that is
  * `exp.detectWindows`, run on the world after a battle.
  * @param {Creature} c
  * @param {number} amount   negative counts as 0
@@ -691,12 +711,13 @@ export function gainExp(c, amount, data, opts = {}) {
   if (!isNum(amount)) throw new TypeError(`gainExp: amount must be a finite number, got ${String(amount)}`);
   const et = expTuningOf(opts.tuning);
   const sp = speciesOf(c, data);
+  const growth = growthOf(c, data);
   const from = c.level;
   const statsBefore = { ...c.stats };
-  const cap = expForLevel(sp.growth, et.MAX_LEVEL, opts);
+  const cap = expForLevel(growth, et.MAX_LEVEL, opts);
   const prevExp = c.exp;
   c.exp = Math.max(c.exp, Math.min(cap, c.exp + Math.max(0, Math.floor(amount))));
-  const target = Math.min(et.MAX_LEVEL, levelFromExp(sp.growth, c.exp, opts));
+  const target = Math.min(et.MAX_LEVEL, levelFromExp(growth, c.exp, opts));
   const learned = [];
   const offers = [];
   while (c.level < target) {
@@ -712,7 +733,7 @@ export function gainExp(c, amount, data, opts = {}) {
 }
 
 /**
- * EXP still needed for the next level (0 at the cap).
+ * EXP still needed for the next level (0 at the cap), on the creature's own curve ({@link growthOf}).
  * @param {Creature} c
  * @param {any} data
  * @param {TuningOpts} [opts]
@@ -721,7 +742,24 @@ export function gainExp(c, amount, data, opts = {}) {
 export function expToNext(c, data, opts = {}) {
   const et = expTuningOf(opts.tuning);
   if (c.level >= et.MAX_LEVEL) return 0;
-  return Math.max(0, expForLevel(speciesOf(c, data).growth, c.level + 1, opts) - c.exp);
+  return Math.max(0, expForLevel(growthOf(c, data), c.level + 1, opts) - c.exp);
+}
+
+/**
+ * The growth curve id of an individual: its first form's (`shiftlog[0]`, the form it was born or
+ * caught as), falling back to the current form when that row is gone. A Shift never touches level
+ * or EXP (rules §2.6), so the curve those numbers sit on must not change with the form either:
+ * reading the new form's curve would re-level the creature on its next EXP gain (the Chaos V2
+ * re-read the rules reject) or make `deserialize` re-clamp its EXP.
+ * @param {Pick<Creature, 'speciesId'|'shiftlog'>} c
+ * @param {any} data
+ * @returns {string}
+ * @throws {RangeError} when neither the first nor the current form is known
+ */
+export function growthOf(c, data) {
+  const look = dataLookup(data);
+  const first = Array.isArray(c.shiftlog) && typeof c.shiftlog[0] === 'string' ? look.speciesOrNull(c.shiftlog[0]) : null;
+  return (first ?? look.species(c.speciesId)).growth;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -775,12 +813,15 @@ export function addBond(c, pips, opts = {}) {
 
 /**
  * Sets (or clears, with null) the held item. `stillKnot` follows the item row's `blocksShifts`.
+ * On a world creature use `party.setHeldItem`, which also brings `pendingShifts` in line.
  * @param {Creature} c
  * @param {string|null} itemId
  * @param {any} data
  * @returns {{prev: string|null}}
+ * @throws {TypeError} for an item id that is not a string or null
  */
 export function setHeldItem(c, itemId, data) {
+  if (itemId !== null && itemId !== undefined && typeof itemId !== 'string') throw new TypeError('setHeldItem: itemId must be an item id or null');
   const prev = c.heldItem;
   c.heldItem = itemId || null;
   c.stillKnot = blocksShifts(dataLookup(data), c.heldItem);
@@ -809,8 +850,11 @@ export function serialize(c) {
 
 /**
  * Rebuilds a creature from {@link serialize} output (or an older snapshot), self-healing: unknown
- * keys dropped, numbers clamped, EXP clamped into the level's band, statuses outside the schema's
- * kinds cleared, and stats recomputed from base + level + trained.
+ * keys dropped, numbers clamped, a missing level read off the EXP, EXP clamped into the level's
+ * band on the creature's own curve ({@link growthOf}), Memory ids that are not moves dropped, statuses outside the schema's kinds cleared, an empty move list given the fallback move,
+ * `stillKnot` false without a held item (and following a known item row's `blocksShifts`), an
+ * Unfixed creature's `types` reset to its form's (the loop position is `typeIndex`, wrapped into
+ * the loop), and stats recomputed from base + level + trained.
  * @param {Record<string, any>} rec
  * @param {any} data
  * @param {TuningOpts} [opts]
@@ -824,9 +868,13 @@ export function deserialize(rec, data, opts = {}) {
   const et = expTuningOf(opts.tuning);
   const look = dataLookup(data);
   const sp = look.species(rec.speciesId);
-  const level = clampInt(rec.level, 1, et.MAX_LEVEL);
-  const [lo, hi] = expBand(sp.growth, level, opts);
   const strs = (v) => (Array.isArray(v) ? v.filter((x) => typeof x === 'string') : []);
+  const shiftlog = strs(rec.shiftlog);
+  const growth = growthOf({ speciesId: sp.id, shiftlog }, data);
+  // a record without a usable level reads it off its EXP (an older or hand-edited snapshot)
+  const level = isNum(rec.level) ? clampInt(rec.level, 1, et.MAX_LEVEL)
+    : isNum(rec.exp) ? levelFromExp(growth, Math.max(0, rec.exp), opts) : 1;
+  const [lo, hi] = expBand(growth, level, opts);
   const base = { ...sp.base };
   if (rec.base && typeof rec.base === 'object') for (const k of STAT_KEYS) if (isNum(rec.base[k])) base[k] = Math.max(1, Math.floor(rec.base[k]));
   const moves = (Array.isArray(rec.moves) ? rec.moves : [])
@@ -838,21 +886,30 @@ export function deserialize(rec, data, opts = {}) {
       const maxPp = nonNegInt(m.maxPp) ? m.maxPp : s.maxPp;
       return { id: m.id, pp: clampInt(isNum(m.pp) ? m.pp : maxPp, 0, maxPp), maxPp };
     });
+  if (moves.length === 0) {
+    const fb = fallbackMove(sp, level, t);
+    if (fb) moves.push(slot(look, fb));
+  }
   const ability = typeof rec.ability === 'string' && look.abilityOrNull(rec.ability) ? rec.ability : sp.ability;
   const heartmark = typeof rec.heartmark === 'string' && rec.heartmark ? rec.heartmark : null;
   if (heartmark) look.move(heartmark);
-  const typeQueue = Array.isArray(rec.typeQueue) && rec.typeQueue.length ? strs(rec.typeQueue) : null;
+  const queue = strs(rec.typeQueue);
+  const typeQueue = queue.length ? queue : null;
   const status = rec.status && STATUS_KINDS.includes(rec.status.kind)
     ? { kind: rec.status.kind, turns: clampInt(rec.status.turns, 0, Number.MAX_SAFE_INTEGER) }
     : null;
   const heldItem = typeof rec.heldItem === 'string' && rec.heldItem ? rec.heldItem : null;
+  // a Still Knot is a held item: none held, no Knot; a known item row decides; else trust the record
+  const itemRow = heldItem ? look.itemOrNull(heldItem) : null;
+  const stillKnot = !heldItem ? false : itemRow ? itemRow.blocksShifts === true : rec.stillKnot === true;
   const windowsUsed = [...new Set((Array.isArray(rec.windowsUsed) ? rec.windowsUsed : []).filter(posInt))].sort((a, b) => a - b);
   const c = {
     uid: rec.uid,
     speciesId: sp.id,
     familyId: typeof rec.familyId === 'string' && rec.familyId ? rec.familyId : sp.familyId,
     nickname: typeof rec.nickname === 'string' && rec.nickname ? rec.nickname : sp.name,
-    types: Array.isArray(rec.types) && rec.types.length ? strs(rec.types) : sp.types.slice(),
+    // an Unfixed creature's in-battle type lives in typeQueue/typeIndex; its record keeps the form's types
+    types: !typeQueue && strs(rec.types).length ? strs(rec.types) : sp.types.slice(),
     ability,
     level,
     exp: isNum(rec.exp) ? Math.max(lo, Math.min(hi, Math.floor(rec.exp))) : lo,
@@ -861,21 +918,21 @@ export function deserialize(rec, data, opts = {}) {
     stats: zeroStats(),
     hp: 0,
     moves,
-    memory: [...new Set(strs(rec.memory))],
+    memory: [...new Set(strs(rec.memory))].filter((id) => look.moveOrNull(id) !== null),
     status,
     mends: nonNegInt(rec.mends) ? rec.mends : t.MENDS_PER_BATTLE,
     bond: clampInt(rec.bond ?? 0, 0, t.MAX_BOND),
     heartmark,
     heartmarkStab: rec.heartmarkStab === true,
     mark: rec.mark && Number.isInteger(rec.mark.x) && Number.isInteger(rec.mark.y) ? { x: rec.mark.x, y: rec.mark.y } : { x: 0, y: 0 },
-    shiftlog: Array.isArray(rec.shiftlog) && rec.shiftlog.length ? strs(rec.shiftlog) : [sp.id],
+    shiftlog: shiftlog.length ? shiftlog : [sp.id],
     shiftCount: nonNegInt(rec.shiftCount) ? rec.shiftCount : 0,
     windowsUsed,
-    stillKnot: typeof rec.stillKnot === 'boolean' ? rec.stillKnot : blocksShifts(look, heldItem),
+    stillKnot,
     heldItem,
     wild: rec.wild === true,
     typeQueue,
-    typeIndex: typeQueue ? clampInt(rec.typeIndex ?? 0, 0, typeQueue.length - 1) : 0,
+    typeIndex: typeQueue ? ((clampInt(rec.typeIndex ?? 0, 0, Number.MAX_SAFE_INTEGER) % typeQueue.length) + typeQueue.length) % typeQueue.length : 0,
     caughtDay: Number.isInteger(rec.caughtDay) ? rec.caughtDay : 0,
     caughtMap: typeof rec.caughtMap === 'string' ? rec.caughtMap : '',
   };

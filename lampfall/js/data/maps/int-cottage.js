@@ -1,0 +1,41 @@
+/**
+ * Keeper's Cottage (int-cottage). STUB (GDD-01 §3): a minimal valid map so imports resolve; the isle / interior author replaces this file and keeps the arrival points named in GDD-01 §3.4.
+ * @type {import('../index.js').MapDef}
+ */
+export default {
+  stub: true,
+  id: 'int-cottage',
+  name: 'Keeper\'s Cottage',
+  kind: 'interior',
+  region: 'pellwick',
+  w: 16,
+  h: 12,
+  legend: { '#': 'cottage-wall', F: 'cottage-floor', '+': 'door' },
+  ground: [
+    '################',
+    '#FFFFFFFFFFFFFF#',
+    '#FFFFFFFFFFFFFF#',
+    '#FFFFFFFFFFFFFF#',
+    '#FFFFFFFFFFFFFF#',
+    '#FFFFFFFFFFFFFF#',
+    '#FFFFFFFFFFFFFF#',
+    '#FFFFFFFFFFFFFF#',
+    '#FFFFFFFFFFFFFF#',
+    '#FFFFFFFFFFFFFF#',
+    '#FFFFFFFFFFFFFF#',
+    '########+#######',
+  ],
+  detail: null,
+  overlay: null,
+  collision: null,
+  props: [],
+  entities: [],
+  triggers: [],
+  warps: [{ x: 8, y: 11, kind: 'door', to: { mapId: 'pellwick', x: 9, y: 23, facing: 'down' }, sfx: 'doorOpen' }],
+  spawns: [],
+  regions: {},
+  markers: { 'from-door': { x: 8, y: 10, facing: 'up' } },
+  music: null,
+  light: { indoor: true },
+  entry: { x: 8, y: 10, facing: 'up' },
+};

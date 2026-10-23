@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>Music Director Bench</title>
+<style>
+  :root { --bg: #14181f; --panel: #1d232d; --ink: #e8edf3; --dim: #8e9ab0; --accent: #f2b84b; --ok: #6fd18a; --bad: #ff6b6b; }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 16px; background: var(--bg); color: var(--ink); font: 14px/1.4 system-ui, sans-serif; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  #status { color: var(--dim); margin-bottom: 10px; }
+  .row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+  button { background: var(--panel); color: var(--ink); border: 1px solid #2f3846; border-radius: 6px; padding: 7px 10px; cursor: pointer; font: inherit; }
+  button:hover { border-color: var(--accent); }
+  pre { background: #0d1015; border-radius: 6px; padding: 10px; max-height: 70vh; overflow: auto; font: 12px/1.45 ui-monospace, monospace; white-space: pre-wrap; }
+  .pass { color: var(--ok); } .fail { color: var(--bad); } .info { color: var(--dim); }
+</style>
+</head>
+<body>
+<h1>audio/director test bench</h1>
+<div id="status">running…</div>
+<div class="row">
+  <button id="rerun">Re-run checks</button>
+  <button id="listen">Listen: play the 24-hour sweep in real time (1 s per hour)</button>
+  <button id="stop">Stop</button>
+</div>
+<pre id="log"></pre>
+
+<script type="module">
+// Boots the real core/audio engine behind a recording proxy, a real core/events bus as the fake game
+// bus, and the music director on virtual (fake) timers, so the whole script runs in well under a
+// second while every engine call is real WebAudio. Logs one PASS/FAIL line per check (FAIL lines go
+// to console.error so tools/pw-harness.mjs counts them).
+import { createAudio } from '../../js/core/audio.js';
+import { createBus } from '../../js/core/events.js';
+import { createMusicDirector, DEFAULTS, trackLengthMs } from '../../js/audio/director.js';
+import { TRACKS, CUES, themeForHour } from '../../js/audio/tracks/index.js';
+
+const logEl = document.getElementById('log');
+const statusEl = document.getElementById('status');
+let passed = 0;
+let failed = 0;
+function line(cls, text) {
+  const span = document.createElement('span');
+  span.className = cls;
+  span.textContent = text + '\n';
+  logEl.appendChild(span);
+}
+function check(name, ok, detail = '') {
+  if (ok) { passed++; line('pass', `PASS ${name}`); console.log(`PASS ${name}`); }
+  else { failed++; line('fail', `FAIL ${name} ${detail}`); console.error(`FAIL ${name} ${detail}`); }
+}
+const info = (t) => { line('info', t); console.log(t); };
+
+/** Virtual timers: the director's waits run instantly and in order when advance() is called. */
+function virtualTimers() {
+  let now = 0; let seq = 0; const q = new Map();
+  return {
+    setTimeout(fn, ms) { const id = ++seq; q.set(id, { at: now + Math.max(0, +ms || 0), fn, id }); return id; },
+    clearTimeout(id) { q.delete(id); },
+    advance(ms) {
+      const end = now + ms;
+      for (;;) {
+        let n = null;
+        for (const e of q.values()) if (e.at <= end && (!n || e.at < n.at || (e.at === n.at && e.id < n.id))) n = e;
+        if (!n) break;
+        q.delete(n.id); now = n.at; n.fn();
+      }
+      now = end;
+    },
+  };
+}
+
+/** Wraps a real engine, recording every call the director makes and forwarding it. */
+function recording(engine) {
+  const calls = [];
+  const wrap = (name) => (...args) => { calls.push([name, ...args]); return engine[name](...args); };
+  const proxy = {
+    get ready() { return engine.ready; },
+    get state() { return engine.state; },
+    calls,
+    of: (k) => calls.filter((c) => c[0] === k),
+  };
+  for (const k of ['unlock', 'setVolume', 'getVolume', 'mute', 'isMuted', 'sfx', 'defineTrack', 'hasTrack', 'trackIds', 'playMusic', 'stopMusic', 'setStem', 'getStems', 'setMusicParam', 'nowPlaying', 'dispose']) proxy[k] = wrap(k);
+  return proxy;
+}
+
+let current = null;
+
+async function run() {
+  passed = 0; failed = 0; logEl.textContent = '';
+  if (current) { current.music.destroy(); await current.engine.dispose(); current = null; }
+
+  // ---------- 1. unlocked engine ----------
+  const engine = createAudio();
+  const unlocked = await engine.unlock();
+  info(`engine unlocked: ${unlocked} (state ${engine.state})`);
+  const audio = recording(engine);
+  const bus = createBus();
+  const timers = virtualTimers();
+  const clock = { hour: 0, tide: 0.1, season: 'summer' };
+  const world = { settings: { volumes: { master: 0.6, music: 0.5, sfx: 0.7 }, muted: false }, weather: { current: 'clear' }, player: { mapId: 'bench' }, clock: { total: 0, seed: null }, run: {} };
+  const scenes = [];
+  const G = { bus, audio, clock, world, scenes: { top: () => null } };
+  const music = createMusicDirector(G, { timers, tuning: { HOUR_QUANTIZE: 1 } });
+  current = { music, engine };
+  const sc = (type, name, top = name) => music.onSceneChange({ type, scene: name ? { name } : null, top: top ? { name: top } : null });
+
+  check('boot: silent before any scene', audio.of('playMusic').length === 0);
+  check('boot: settings pushed to the engine', JSON.stringify(engine.getVolume()) === JSON.stringify({ master: 0.6, music: 0.5, sfx: 0.7 }));
+  sc('push', 'boot');
+  sc('replace', 'title');
+  check('title scene plays the title theme', engine.nowPlaying()?.id === 'title', JSON.stringify(engine.nowPlaying()));
+  check('title stems: bells + lighthouse swell on', engine.getStems().includes('night') && engine.getStems().includes('tide'));
+  sc('replace', 'overworld');
+  check('overworld at 00:00 plays the deep-night theme', engine.nowPlaying()?.id === 'h_night_deep');
+
+  // ---------- 2. sweep 24 hours at speed ----------
+  const heard = [];
+  for (let h = 1; h <= 24; h++) {
+    clock.hour = h % 24;
+    bus.emit('clock:hour', { hour: h % 24, day: h === 24 ? 1 : 0 });
+    timers.advance(5000); // longer than any bar-line wait
+    heard.push(engine.nowPlaying()?.id);
+    if (h % 3 === 0) {
+      const expect = themeForHour(h % 24);
+      check(`hour ${String(h % 24).padStart(2, '0')}:00 -> ${expect}`, engine.nowPlaying()?.id === expect, `got ${engine.nowPlaying()?.id}`);
+    }
+    if (h % 24 === 3) check('03:00 quiet hours drop the brushes (perc.hat off)', !engine.getStems().includes('perc.hat'));
+    if (h % 24 === 22) check('22:00 night bells on', engine.getStems().includes('night'));
+    if (h % 24 === 12) check('12:00 night bells off, brushes on', !engine.getStems().includes('night') && engine.getStems().includes('perc.kick'));
+  }
+  const switches = music.history().filter((e) => e.action === 'play' && e.reason === 'hour');
+  check('24-hour sweep: 8 on-the-hour crossfades', switches.length === 8, `got ${switches.length}`);
+  check('every hourly crossfade spans two bars of the incoming theme', switches.every((e) => e.fade === CUES.world.fade(e.track)));
+  info(`bar-line waits during the sweep: ${music.history().filter((e) => e.action === 'schedule').map((e) => e.delayMs + ' ms').join(', ') || 'none (each hour landed on a downbeat)'}`);
+
+  // ---------- 3. tide and rain ----------
+  clock.hour = 14; bus.emit('clock:hour', { hour: 14 }); timers.advance(5000);
+  bus.emit('tide:change', { state: 'high', previous: 'mid', tide: 0.86 });
+  check('high tide turns the tide stem on', engine.getStems().includes('tide'));
+  clock.tide = 0.5; bus.emit('clock:minute', { hour: 14, minute: 20 });
+  check('falling tide turns it off again', !engine.getStems().includes('tide'));
+  bus.emit('weather:change', { current: 'rain' });
+  check('rain turns the rain stem on', engine.getStems().includes('rain'));
+  bus.emit('weather:change', { current: 'clear' });
+  check('clear weather turns it off', !engine.getStems().includes('rain'));
+
+  // ---------- 4. battle ----------
+  bus.emit('battle:start', { kind: 'trainer' });
+  sc('push', 'battle');
+  check('battle:start (trainer) plays the trainer battle theme', engine.nowPlaying()?.id === 'battle_trainer');
+  check('battle starts calm (tense off)', !engine.getStems().includes('tense'));
+  bus.emit('battle:event', { event: { type: 'damage', side: 0, target: 'lead', amount: 40, hp: 20, maxHp: 100, source: 'party' } });
+  check('lead at 20% HP turns the tense stem on', engine.getStems().includes('tense'));
+  bus.emit('battle:hp', { hp: 80, maxHp: 100 });
+  check('healed lead turns it off', !engine.getStems().includes('tense'));
+  bus.emit('battle:end', { outcome: 'win' });
+  check('a win plays the victory sting', engine.nowPlaying()?.id === 'victory');
+  timers.advance(trackLengthMs(TRACKS.victory) + DEFAULTS.STING_TAIL_MS);
+  sc('pop', 'battle', 'overworld');
+  check('after the sting the world theme returns', engine.nowPlaying()?.id === 'h_midday', `got ${engine.nowPlaying()?.id}`);
+  bus.emit('battle:start', { kind: 'trainer', source: 'spire' });
+  check('Spire battle plays the Spire theme', engine.nowPlaying()?.id === 'battle_spire');
+  bus.emit('battle:end', { outcome: 'loss' });
+  check('a loss returns straight to the world', engine.nowPlaying()?.id === 'h_midday');
+
+  // ---------- 5. every sting ----------
+  for (const [evt, payload, id] of [
+    ['shift:resolved', { uid: 'c1' }, 'shift_reveal'],
+    ['shift:resolved', { uid: 'c1', anchored: true }, 'shift_reveal_anchor'],
+    ['letter:delivered', { n: 1 }, 'letter'],
+  ]) {
+    bus.emit(evt, payload);
+    check(`${evt} plays ${id}`, engine.nowPlaying()?.id === id, `got ${engine.nowPlaying()?.id}`);
+    check(`${id} is a one-shot`, engine.nowPlaying()?.oneShot === true);
+    timers.advance(trackLengthMs(TRACKS[id]) + DEFAULTS.STING_TAIL_MS);
+    check(`after ${id} the world theme returns`, engine.nowPlaying()?.id === 'h_midday');
+  }
+  check('victory via the API', music.sting('victory') && engine.nowPlaying()?.id === 'victory');
+  timers.advance(10000);
+  sc('push', 'forecast');
+  check('forecast scene plays the forecast loop', engine.nowPlaying()?.id === 'forecast');
+  sc('pop', 'forecast', 'overworld');
+  sc('push', 'ending');
+  check('ending scene plays the Relighting', engine.nowPlaying()?.id === 'relighting');
+  timers.advance(trackLengthMs(TRACKS.relighting) + DEFAULTS.STING_TAIL_MS);
+  check('after the Relighting: its follow-on night theme', engine.nowPlaying()?.id === CUES.relighting.then);
+  sc('push', 'credits');
+  check('credits scene plays the credits theme', engine.nowPlaying()?.id === 'credits');
+
+  // ---------- 6. settings and sfx ----------
+  world.settings.muted = true;
+  bus.emit('settings:changed', { changed: ['muted'] });
+  check('settings mute reaches the engine', engine.isMuted() === true);
+  world.settings.muted = false;
+  bus.emit('settings:changed', { changed: ['muted'] });
+  check('unmute reaches the engine', engine.isMuted() === false);
+  bus.emit('capture:ok', {});
+  check('sfx router plays capture:ok through the engine', audio.of('sfx').some((c) => c[1] === 'capture'));
+
+  // ---------- 7. locked engine ----------
+  const lockedEngine = createAudio();
+  const lockedBus = createBus();
+  const lockedTimers = virtualTimers();
+  const locked = createMusicDirector({ bus: lockedBus, audio: lockedEngine, clock: { hour: 9, tide: 0, season: 'spring' }, world }, { timers: lockedTimers });
+  check('locked: director reports locked and does not throw', locked.status().locked === true);
+  check('locked: the engine queues the world theme', lockedEngine.nowPlaying()?.pending === true && lockedEngine.nowPlaying()?.id === 'h_late_morning');
+  lockedBus.emit('letter:delivered', {});
+  check('locked: stings are dropped, not queued', locked.history().at(-1).action === 'drop');
+  await lockedEngine.unlock();
+  lockedTimers.advance(DEFAULTS.UNLOCK_POLL_MS);
+  check('unlock is detected and the decision re-applied', locked.status().locked === false && lockedEngine.nowPlaying()?.id === 'h_late_morning');
+  locked.destroy();
+  await lockedEngine.dispose();
+
+  check('the director drove the real engine', audio.of('playMusic').length > 20 && audio.of('setStem').length > 20);
+  statusEl.textContent = `${passed} passed, ${failed} failed`;
+  const summary = `DONE ${passed} passed, ${failed} failed`;
+  if (failed) console.error(summary); else console.log(summary);
+  window.__benchResult = { passed, failed, heard };
+  document.title = failed ? 'FAIL' : 'PASS';
+}
+
+/** Real-time listening mode: one second per in-game hour, real timers. */
+async function listen() {
+  if (current) { current.music.destroy(); await current.engine.dispose(); current = null; }
+  const engine = createAudio();
+  await engine.unlock();
+  const bus = createBus();
+  const clock = { hour: 0, tide: 0.2, season: 'summer' };
+  const music = createMusicDirector({ bus, audio: engine, clock, world: { settings: { volumes: { master: 0.8, music: 0.7, sfx: 0.9 }, muted: false } } });
+  current = { music, engine };
+  let h = 0;
+  const id = setInterval(() => {
+    h = (h + 1) % 24; clock.hour = h; bus.emit('clock:hour', { hour: h });
+    statusEl.textContent = `listening: ${String(h).padStart(2, '0')}:00 — ${music.status().track}`;
+    if (!current || current.music !== music) clearInterval(id);
+  }, 1000);
+}
+
+document.getElementById('rerun').addEventListener('click', () => { run().catch((e) => console.error('FAIL bench crashed', e)); });
+document.getElementById('listen').addEventListener('click', () => { listen().catch((e) => console.error('FAIL listen crashed', e)); });
+document.getElementById('stop').addEventListener('click', async () => { if (current) { current.music.destroy(); await current.engine.dispose(); current = null; statusEl.textContent = 'stopped'; } });
+run().catch((e) => { console.error('FAIL bench crashed', e && e.stack || e); statusEl.textContent = 'crashed'; });
+</script>
+</body>
+</html>

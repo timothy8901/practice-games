@@ -20,3 +20,18 @@ From the UI-kit verifier (js/ui, verdict solid):
 - Toast fade uses globalAlpha (briefly off-palette); dithered fade is a polish item.
 - Disabled-reason tooltip (1.6 s) can cover the neighbouring row (e.g. the effectiveness word in the move menu).
 - Textbox choices have a 250 ms choice lock; confirm has a 500 ms lock with a faint default cursor.
+
+From the SYS-TIME verifier (clockSys, weather; verdict acceptable):
+- New games start at 17:40 day 1 (schema NEW_GAME_START_MINUTE) with a day-1 low at 16:40 (DAY1_LOW_MINUTE); tide seed lives in state/schema (tideSeedFor), clockSys delegates.
+- Integration to wire: overworld/fishing call weather.update after clockSys.tick and after any rest; dayFlow listens to day:start and clock:anchor; warps/tilemap call clockSys.gateTide; bed/porch scenes call rest/sit/stand. restoreFrom resets speed to 1 and unpauses (porch Sit never survives a reload).
+- Real Clock resync spanning > 7 days reports only the last midnight; dayFlow misses the days between (acceptable: absence catch-up summarises).
+- docs-checkpoint0.md / README claims that setTide and day length wait on core are out of date (freezeTide + setMinutesPerDay exist).
+
+From the RULES-ECON verifier (bag, wallet, loans, shops; verdict acceptable):
+- Items resolve from `items` OR `collections` (econ.itemOf / allItems); shore finds stack to 10 via tuning bag.stackByGroup.
+- Script beat must set sp.lamp-room-offered (Wren offers the Lamp Room at loan 6); loans does not set it.
+- validate-data should require ask:true on script `take` of one-of-a-kind items (bag.take returns needsConfirm otherwise).
+- cond `hasItem` (selectors.itemCount) counts satchel stacks only; currency items (starsalt) read from the wallet -> {hasItem:'starsalt'} is always false. Fix in cond or selectors.
+- threads.js calls loans.residentShare without data and must pass the economy day (06:00 turnover).
+- Not built: Gallery frame income, Raft relic refining, Barnaby's archivePrice service (data fields exist).
+- A test file (audio.director.test.mjs) has been seen hanging check.sh runs; tools/check.sh should run each file with a timeout.

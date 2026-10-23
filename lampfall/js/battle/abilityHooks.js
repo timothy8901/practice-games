@@ -77,6 +77,9 @@ export const DEFAULTS = Object.freeze({
   expShareToLowest: 0.3,
 });
 
+/** Every key of {@link DEFAULTS}. */
+export const TUNING_KEYS = Object.freeze(Object.keys(DEFAULTS));
+
 const FLAGS_NONE = Object.freeze({});
 
 /**
@@ -237,6 +240,10 @@ export function abilityProblems(row) {
     if (row.ward.kind === 'min-power' && !(row.ward.minPower > 0)) out.push(`ability ${id}: a min-power Ward needs minPower > 0`);
   }
   if (row.hookParams != null && (typeof row.hookParams !== 'object' || Array.isArray(row.hookParams))) out.push(`ability ${id}: hookParams must be an object`);
+  if (row.expShare != null && typeof row.expShare !== 'boolean') {
+    const share = typeof row.expShare === 'number' ? row.expShare : row.expShare && row.expShare.toLowest;
+    if (!(typeof share === 'number' && share >= 0 && share <= 1)) out.push(`ability ${id}: expShare must be a boolean, a share 0..1 or {toLowest: 0..1}`);
+  }
   return out;
 }
 

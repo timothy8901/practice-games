@@ -49,6 +49,7 @@ export const MAX_BUCKET_IMAGES = 4096;
  * @property {Readonly<Record<string, string>>} pal    char -> colour name or hex
  * @property {number} fps
  * @property {Readonly<Record<string, ReadonlyArray<ReadonlyArray<string>>>>} [variants] named frame sets
+ * @property {Readonly<Record<string, Readonly<Record<string, string>>>>} [variantPal] full palette per variant that overrides colours
  */
 
 /** @type {Map<string, ArtDef>} */
@@ -81,7 +82,9 @@ function normalize(id, def, source) {
     id, source, kind: def.kind || source, w, h,
     frames, pal, fps: def.fps || 0,
     variants: variants ? Object.freeze(variants) : null,
+    variantPal: def.variantPal || null,
     anchor: def.anchor || null,
+    reserved: def.reserved || null,
   });
 }
 
@@ -164,14 +167,19 @@ const shadows = new Map();
 /** @type {WeakMap<object, Record<string, string|null>>} pal object -> hex palette */
 const rawPalCache = new WeakMap();
 
-function rawPalette(def) {
-  let p = rawPalCache.get(def.pal);
+function rawPalette(palObj) {
+  let p = rawPalCache.get(palObj);
   if (!p) {
     p = {};
-    for (const [ch, v] of Object.entries(def.pal)) p[ch] = rawHex(v);
-    rawPalCache.set(def.pal, p);
+    for (const [ch, v] of Object.entries(palObj)) p[ch] = rawHex(v);
+    rawPalCache.set(palObj, p);
   }
   return p;
+}
+
+/** The palette a variant draws with (its override, or the art's own). */
+function palOf(def, name) {
+  return (name && def.variantPal && def.variantPal[name]) || def.pal;
 }
 
 function framesOf(def, name) {
@@ -391,7 +399,7 @@ function imageOf(artId, frame, gradeArg, flip, name) {
     const arr = slotArray(byVar, vkey, n * 4);
     let s = arr[slot];
     if (!s) {
-      s = decodeSprite(frames[fi], rawPalette(def), { flipX: !!(flip & 1), flipY: !!(flip & 2) });
+      s = decodeSprite(frames[fi], rawPalette(palOf(def, name)), { flipX: !!(flip & 1), flipY: !!(flip & 2) });
       arr[slot] = s;
     }
     return s;
@@ -407,8 +415,9 @@ function imageOf(artId, frame, gradeArg, flip, name) {
       b.count = 0;
       return imageOf(artId, frame, grade, flip, name);
     }
+    const src = palOf(def, name);
     const pal = {};
-    for (const ch in def.pal) pal[ch] = gradedHex(b, def.pal[ch]);
+    for (const ch in src) pal[ch] = gradedHex(b, src[ch]);
     s = rasterize(frames[fi], pal, flip & 3);
     arr[slot] = s;
     b.count++;

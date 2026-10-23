@@ -208,8 +208,9 @@ const snowOn = (rows) => rows.map((r, y) => r.split('').map((c, x) => {
   const up = rows[y - 1] ? rows[y - 1][x] : '.';
   const up2 = rows[y - 2] ? rows[y - 2][x] : '.';
   // snow lies on each tier's upper surface: where the pixel above is sky or the dark overhang band
-  if (up === '.' || up === 'n') return x < 21 ? 'w' : 'h';
-  if ((up2 === '.' || up2 === 'n') && x < 18 && (x + y) % 2 === 0) return 'h';
+  const flat = r[x - 1] !== undefined && r[x - 1] !== '.' && r[x + 1] !== undefined && r[x + 1] !== '.';
+  if ((up === '.' || up === 'n') && flat) return x < 20 ? 'w' : 'h';
+  if ((up2 === '.' || up2 === 'n') && flat && x < 18 && (x + y) % 2 === 0) return 'h';
   return c;
 }).join(''));
 def('tree-pine-snow', { ...PINEPAL, w: 'snow3', h: 'snow2' }, PINE_FRAMES.map(snowOn), { w: 32, h: 32, kind: 'object', fps: 3 });

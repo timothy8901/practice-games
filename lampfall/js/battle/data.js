@@ -39,6 +39,9 @@ export const DEFAULTS = Object.freeze({
   scrapPower: 50,
 });
 
+/** Every key of {@link DEFAULTS}. */
+export const TUNING_KEYS = Object.freeze(Object.keys(DEFAULTS));
+
 /**
  * A normalized species row.
  * @typedef {Object} SpeciesView
@@ -67,12 +70,15 @@ export const DEFAULTS = Object.freeze({
  * @property {true} isBattleData
  */
 
-/** @type {WeakMap<object, Map<any, BattleData>>} */
+/** @type {WeakMap<object, Map<string|symbol, BattleData>>} */
 const CACHE = new WeakMap();
 const NO_TUNING = Symbol('no-tuning');
 
 /**
  * Builds (or returns the cached) battle data view.
+ * A prebuilt view is returned as is: the tuning it was built with (ability-hook
+ * params, `scrapPower`, `maxLevel`) stays in force, so build it with the same
+ * tuning the battle gets.
  * @param {any} data `{species, moves, abilities, types}`, a Registry, or a BattleData view (returned as is)
  * @param {{tuning?: Record<string, any>}} [opts] battle tuning (ability-hook and scrap keys are read)
  * @returns {BattleData}
@@ -81,7 +87,7 @@ const NO_TUNING = Symbol('no-tuning');
 export function createBattleData(data, opts = {}) {
   if (data && data.isBattleData === true) return data;
   if (!data || typeof data !== 'object') throw new TypeError('createBattleData: data {species, moves, abilities, types} is required');
-  const key = opts.tuning || NO_TUNING;
+  const key = tuningKey(opts.tuning);
   let byTuning = CACHE.get(data);
   if (!byTuning) {
     byTuning = new Map();
@@ -93,6 +99,21 @@ export function createBattleData(data, opts = {}) {
   if (byTuning.size > 32) byTuning.clear();
   byTuning.set(key, view);
   return view;
+}
+
+/**
+ * Cache key of a tuning table: only the keys the view reads, by value (a caller
+ * that mutates and reuses one tuning object never gets a stale view).
+ * @param {Record<string, any>|undefined} tuning
+ * @returns {string|symbol}
+ */
+function tuningKey(tuning) {
+  if (!tuning) return NO_TUNING;
+  const parts = [];
+  for (const k of Object.keys(tuning).sort()) {
+    if (k in ABILITY_DEFAULTS || k === 'scrapPower' || k === 'maxLevel') parts.push([k, tuning[k]]);
+  }
+  return parts.length ? JSON.stringify(parts) : NO_TUNING;
 }
 
 /**

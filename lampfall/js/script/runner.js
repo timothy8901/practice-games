@@ -341,7 +341,8 @@ export function createRunner(ops, ctx, state = null) {
       }
       case 'take': {
         vars._took = answer === true;
-        if (answer === true) sys('take', op.op)(w, op.item, op.n ?? 1, { data });
+        // The player answered the ask: that IS the one-of-a-kind confirm (systems/bag.take needs it).
+        if (answer === true) sys('take', op.op)(w, op.item, op.n ?? 1, { data, confirm: true });
         advance(frame);
         return;
       }

@@ -126,7 +126,7 @@ describe('Keeper letters (06:00)', () => {
 
   it('a dark home porch (flag) stops the post again; tuning can drop the porch rule', () => {
     const w = litWorld(1);
-    w.flags[porchFlag('home')] = false;
+    w.flags[porchFlag('porch-keepers-cottage')] = false;
     assert.equal(morning(w, 1).reason, 'porch-dark');
     assert.equal(morning(w, 2, { tuning: { keeperNeedsLitPorch: false } }).keeper, 1);
     assert.equal(morning(w, 3, { isPorchLit: () => true }).reason, 'mailbox-full');
@@ -156,6 +156,13 @@ describe('family letters (18:00), doors and heirlooms', () => {
   it('one at the counter from day 2, only while the counter is empty', () => {
     const w = makeWorld({ day: 0, minute: 18 * MIN });
     assert.equal(L.deliverEvening(w, data).reason, 'too-early');
+    at(w, 1, 17 * MIN + 59);
+    assert.equal(L.deliverEvening(w, data).reason, 'not-yet', 'not before 18:00');
+    at(w, 2, MIN);
+    assert.equal(L.familyBlock(w, data, 2), 'not-yet', '01:00 belongs to the next day, still before its 18:00');
+    assert.equal(L.familyBlock(w, data, 2, {}, { ignoreHour: true }), null);
+    assert.equal(L.deliverEvening(at(w, 1, 12 * MIN), data, { tuning: { familyLetterHour: 12 } }).family, 21, 'tunable hour');
+    w.letters = { ...w.letters, got: [], delivered: 0, counter: null, familyDay: -1 };
     at(w, 1, 18 * MIN);
     const bus = recBus();
     const r = L.deliverEvening(w, data, { bus });

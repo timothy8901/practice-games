@@ -6,8 +6,9 @@
  *   Shardcrown; burning / cold).
  * - Signs: finger post, the Commons board, a hanging shop sign, the tide chalkboard, the post box.
  * - Scaffold stages 0-7 and the lighthouse with dark / lit lamp at every stage (`lighthouse`, frame =
- *   stage, variant `lit`); the scaffold on its own (`scaffold`, frame = stage) for the Dawn Build.
- * - Roof colours ×8 (`roof-swatch`, frame = index in `palette.ROOF_COLOURS`) for the Payment Ceremony.
+ *   stage, variant `'lit'`); the scaffold on its own (`scaffold`, frame = stage) for the Dawn Build.
+ *   Lamps, the punt and the porch lamp take variant `'lit'`; the brazier takes `'cold'`.
+ * - Roof colours ×8 (`roof-swatch`, variant = colour name in `palette.ROOF_COLOURS`) for the Payment Ceremony.
  * - Chimneys (brick, stone, tin stovepipe), market stalls (three awnings), the windmill (turning
  *   sails), a bench, the Summit Bell.
  *
@@ -70,34 +71,33 @@ const PUNT = [
   '.....s.s.s.s.s.s.s.s.s.s.s.s.s.s.s.s.s.s........',
 ];
 const PUNTP = { k: 'wd0', d: 'wd1', p: 'wd2', w: 'wd3', l: 'wd4', t: 'wd4', o: 'wd1', b: 'blue2', n: 'blue1', s: 'deep0', i: 'iron' };
-P('punt', { ...PUNTP, a: 'pane1', y: 'pane0' }, PUNT, { w: 48, h: 16, variants: { lit: [PUNT] } });
-// the lit variant shares rows; its palette differs, so it is a separate prop id the scenes swap to
-P('punt-lit', { ...PUNTP, a: '!amber', y: '!lampcore' }, PUNT, { w: 48, h: 16 });
-// Ansel's beached launch (32×24): a small motor launch heeled over on the sand, flaking paint, a
-// tarpaulin over the well, the propeller shaft showing. Blocking; base and cast shadow.
-P('launch-beached', { k: 'base', d: 'wd0', m: 'wd1', p: 'pl1', h: 'pl2', l: 'pl3', g: 'moss1', q: 'moss2', r: 'red1', i: 'iron', s: 'shadow', y: 'sand0' }, [
+P('punt', { ...PUNTP, a: 'pane1', y: 'pane0' }, PUNT, { w: 48, h: 16, variants: { lit: { pal: { a: '!amber', y: '!lampcore' } } } });
+// Ansel's beached launch (32×24): a small motor launch heeled on the sand, a wheelhouse with two
+// windows, white hull with flaking paint over a red boot-top, bow to the east, the propeller shaft
+// showing under the stern. Blocking; base and cast shadow.
+P('launch-beached', { k: 'base', d: 'wd0', m: 'wd1', w: 'pl2', h: 'pl3', l: 'pl1', g: 'pane0', e: 'pane1', r: 'red1', q: 'red2', i: 'iron', s: 'shadow', y: 'sand0' }, [
   '................................',
   '................................',
   '................................',
-  '.............kkkk...............',
-  '.............kiik...............',
-  '.......kkkkkkkiikkkkkkk.........',
-  '.....kkllllllllllllllllkkk......',
-  '....klhhhhhhhhhhhhhhhhhhllkk....',
-  '...klhgggggggggggggggqqhhhllk...',
-  '..klhggqgggggggggqgggggqhhhlk...',
-  '..klhgggggggggggggggggggqhhhk...',
-  '..khhgggqggggggggggqggggghhhk...',
-  '..khhhgggggggggggggggggghhhpk...',
-  '..kphhhhhhhhhhhhhhhhhhhhhhppk...',
-  '..kpprrrrrrrrrrrrrrrrrrrrpppk...',
-  '..kppphhhphhhhhphhhhhphhhppk....',
-  '...kpppppppppppppppppppppppk....',
-  '....kkmmmmmmmmmmmmmmmmmmmkkiik..',
-  '.....kkkkkkkkkkkkkkkkkkkkkk.ik..',
-  '.....yyyyyyyyyyyyyyyyyyyyyys.s..',
-  '.......ssssssssssssssssssssss...',
-  '.........ssssssssssssssssss.....',
+  '.........kkkkkkkk...............',
+  '.........kmmmmmmmk..............',
+  '........kddddddddk..............',
+  '........khhhhhhhlk..............',
+  '........khgehgehlk..............',
+  '........khgghgghlk..............',
+  '........khhhhhhhlk..............',
+  '...kkkkkkkkkkkkkkkkkkkkkkkk.....',
+  '..kmmmmmmmmmmmmmmmmmmmmmmmmkk...',
+  '..khhhhhhhhhhhhhhhhhhhhhhhhhhkk.',
+  '..khwwwwwwwmwwwwwwwwwwwwwwwwwlk.',
+  '..khwwwwwwwwwwwwwwwmwwwwwwwwlk..',
+  '..khwwmwwwwwwwwwwwwwwwwwwwwlk...',
+  '..kqqqqqqqqqqqqqqqqqqqqqqqqk....',
+  '..krrrrrrrrrrrrrrrrrrrrrrrk.....',
+  '.ikkkkkkkkkkkkkkkkkkkkkkkk......',
+  'iik.yyyyyyyyyyyyyyyyyyyyyyss....',
+  '.....sssssssssssssssssssssss....',
+  '.......sssssssssssssssssss......',
   '................................',
   '................................',
 ], { w: 32, h: 24 });
@@ -117,8 +117,8 @@ const LAMP = [
   '.....xxxxxx.....',
   '................',
 ];
-P('lamp-post', { k: 'iron', g: 'pane1', a: 'pane0', G: 'pane1', p: 'wd1', x: 'wd0' }, LAMP, { w: 16, h: 24 });
-P('lamp-post-lit', { k: 'iron', g: '!amber', a: '!lampcore', G: '!amber', p: 'wd1', x: 'wd0' }, LAMP, { w: 16, h: 24 });
+const LIT_LAMP = { pal: { g: '!amber', a: '!lampcore', G: '!amber' } };
+P('lamp-post', { k: 'iron', g: 'pane1', a: 'pane0', G: 'pane1', p: 'wd1', x: 'wd0' }, LAMP, { w: 16, h: 24, variants: { lit: LIT_LAMP } });
 // Wall porch lamp (16×16 overlay beside a door): a bracket lantern; the porchlight itself.
 const WALL_LAMP = [
   '................',
@@ -138,8 +138,7 @@ const WALL_LAMP = [
   '................',
   '................',
 ];
-P('porch-lamp', { k: 'iron', i: 'iron2', g: 'pane1', a: 'pane0', G: 'pane1' }, WALL_LAMP);
-P('porch-lamp-lit', { k: 'iron', i: 'iron2', g: '!amber', a: '!lampcore', G: '!amber' }, WALL_LAMP);
+P('porch-lamp', { k: 'iron', i: 'iron2', g: 'pane1', a: 'pane0', G: 'pane1' }, WALL_LAMP, { variants: { lit: LIT_LAMP } });
 // Brazier (16×24): an iron fire basket on a tripod. Burning (real flame, LUT-exempt, 3 frames) / cold.
 const BRAZIER = [
   '................',
@@ -327,14 +326,12 @@ const STAGES = Array.from({ length: SCAFFOLD_SECTIONS + 1 }, (_, i) => i);
 P('scaffold', { ...SC_PAL }, STAGES.map((s) => remapSc(scaffoldRows(s))), { w: 32, h: 80, note: 'frame = stage 0-7' });
 P('lighthouse', { ...TOWER_DARK.pal, ...SC_PAL }, STAGES.map((s) => towerAt(TOWER_DARK, s)), {
   w: 32, h: 80, note: 'frame = scaffold stage 0-7; variant lit = lamp burning',
-  variants: { lit: STAGES.map((s) => towerAt(TOWER_LIT, s)) },
+  variants: { lit: { pal: TOWER_LIT.pal } },
 });
-// the lit variant needs the lit palette: register it as its own prop too (scenes ask for either)
-P('lighthouse-lit-stages', { ...TOWER_LIT.pal, ...SC_PAL }, STAGES.map((s) => towerAt(TOWER_LIT, s)), { w: 32, h: 80, note: 'frame = stage; lamp lit' });
 
 /* ---------------------------------------------------------------- roof swatches (×8) */
-// Payment Ceremony roof swatches: a shingle card in each roof colour with a tag hole; frame = index in
-// palette.ROOF_COLOURS. Separate ids per colour too, so scenes can ask by name.
+// Payment Ceremony roof swatches: a shingle card in each roof colour; variant = the colour name in
+// palette.ROOF_COLOURS (default slate): getSprite('roof-swatch', 'teal').
 const SWATCH = [
   '................',
   '..kkkkkkkkkkkk..',
@@ -353,7 +350,8 @@ const SWATCH = [
   '..kkkkkkkkkkkk..',
   '................',
 ];
-for (const c of ROOF_COLOURS) P(`roof-swatch-${c}`, { k: 'ink', d: `${c}0`, s: `${c}1`, b: `${c}2`, l: `${c}3` }, SWATCH);
+const swatchPal = (c) => ({ k: 'ink', d: `${c}0`, s: `${c}1`, b: `${c}2`, l: `${c}3` });
+P('roof-swatch', swatchPal('slate'), SWATCH, { variants: Object.fromEntries(ROOF_COLOURS.map((c) => [c, { pal: swatchPal(c) }])) });
 
 /* ---------------------------------------------------------------- chimneys */
 // Chimney (16×24, bottom aligned to the ridge tile): brick stack with mortar courses, lit left face, a
@@ -434,7 +432,7 @@ const STALL = [
   '................................',
   '................................',
 ];
-const STALLP = { k: 'base', w: 'pl3', v: 'pl1', l: 'wd3', p: 'wd2', d: 'wd1', f: 'pear', o: 'pear0', g: 'grass2', r: 'red2', y: 'yellow', s: 'shadow' };
+const STALLP = { k: 'base', w: 'pl3', v: 'pl1', l: 'wd3', p: 'wd2', d: 'wd1', m: 'wd0', f: 'pear', o: 'pear0', g: 'grass2', r: 'red2', y: 'yellow', s: 'shadow' };
 P('market-stall-red', { ...STALLP, a: 'red2', q: 'red1' }, STALL, { w: 32, h: 32 });
 P('market-stall-blue', { ...STALLP, a: 'blue2', q: 'blue1' }, STALL, { w: 32, h: 32 });
 P('market-stall-moss', { ...STALLP, a: 'moss2', q: 'moss1' }, STALL, { w: 32, h: 32 });
@@ -442,9 +440,9 @@ P('market-stall-moss', { ...STALLP, a: 'moss2', q: 'moss1' }, STALL, { w: 32, h:
 function windmill(f) {
   const g = blank(48, 64).map((r) => r.split(''));
   const put = (x, y, c) => { if (y >= 0 && y < 64 && x >= 0 && x < 48) g[y][x] = c; };
-  // body: tapering tower rows 24..61
-  for (let y = 24; y < 62; y++) {
-    const half = 7 + Math.floor((y - 24) / 6);
+  // body: tapering tower rows 26..61
+  for (let y = 26; y < 62; y++) {
+    const half = 7 + Math.floor((y - 26) / 6);
     for (let x = 24 - half; x < 24 + half; x++) {
       const edge = x === 24 - half || x === 24 + half - 1;
       put(x, y, edge ? 'k' : x < 24 - half / 3 ? 'h' : x < 24 + half / 3 ? 'w' : 's');
@@ -456,29 +454,34 @@ function windmill(f) {
   for (let y = 53; y < 61; y++) for (let x = 22; x < 26; x++) put(x, y, y === 53 ? 'k' : 'd');
   for (let y = 38; y < 41; y++) for (let x = 23; x < 25; x++) put(x, y, 'g');
   // cap
-  for (let y = 18; y < 25; y++) {
-    const half = 3 + (y - 18);
-    for (let x = 24 - half; x < 24 + half; x++) put(x, y, y === 24 ? 'k' : x < 24 ? 'r' : 'q');
+  for (let y = 20; y < 27; y++) {
+    const half = 3 + (y - 20);
+    for (let x = 24 - half; x < 24 + half; x++) put(x, y, y === 26 ? 'k' : x < 24 ? 'r' : 'q');
   }
-  // sails: four arms from the hub at (24, 21), rotated by frame (0, 22.5, 45, 67.5 degrees)
-  const a0 = (f * Math.PI) / 8;
-  for (let arm = 0; arm < 4; arm++) {
-    const a = a0 + (arm * Math.PI) / 2;
-    const ca = Math.cos(a), sa = Math.sin(a);
-    for (let t = 2; t <= 21; t++) {
-      for (let w = -2; w <= 2; w++) {
-        const x = Math.round(24 + ca * t - sa * w * 0.9);
-        const y = Math.round(21 + sa * t + ca * w * 0.9);
-        const lattice = w === 0 || (t % 4 === 0);
-        put(x, y, w === 0 ? 'm' : lattice ? 'm' : t > 5 ? 'c' : 'm');
+  // sails: four arms from the hub at (24, 23); two poses (square and diagonal) so every line stays a
+  // clean pixel line (rotating pixel art by odd angles breaks it up). The cloth sits on the trailing
+  // side of each spar with a lattice line every third pixel.
+  const dirs = f % 2 === 0 ? [[1, 0], [0, 1], [-1, 0], [0, -1]] : [[1, 1], [-1, 1], [-1, -1], [1, -1]];
+  const len = f % 2 === 0 ? 19 : 14;
+  for (const [dx, dy] of dirs) {
+    const px = -dy, py = dx; // perpendicular (trailing side)
+    for (let t = 1; t <= len; t++) {
+      put(24 + dx * t, 23 + dy * t, 'm');
+      if (dx && dy) put(24 + dx * t - dx, 23 + dy * t, 'm');
+      if (t < 4) continue;
+      for (let w = 1; w <= 3; w++) {
+        const lattice = t % 3 === 0 || w === 3;
+        const x = 24 + dx * t + px * w, y = 23 + dy * t + py * w;
+        put(x, y, lattice ? 'm' : 'c');
+        if (dx && dy) put(x - dx, y, lattice ? 'm' : 'c');
       }
     }
   }
-  put(24, 21, 'i'); put(23, 21, 'i'); put(24, 20, 'i'); put(23, 20, 'i');
+  put(24, 23, 'i'); put(23, 23, 'i'); put(24, 22, 'i'); put(23, 22, 'i');
   return g.map((r) => r.join(''));
 }
 P('windmill', { k: 'base', w: 'pl2', h: 'pl3', s: 'pl1', d: 'wd1', g: 'pane0', r: 'red2', q: 'red1', m: 'wd0', c: 'pl3', i: 'iron', x: 'base', y: 'shadow' },
-  [0, 1, 2, 3].map(windmill), { w: 48, h: 64, fps: 4 });
+  [0, 1].map(windmill), { w: 48, h: 64, fps: 3 });
 // Bench (32×16): a slatted harbor bench (Ambrose's bench in the yard).
 P('bench', { k: 'base', d: 'wd0', m: 'wd1', p: 'wd2', l: 'wd3', i: 'iron', s: 'shadow' }, [
   '................................',

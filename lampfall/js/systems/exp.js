@@ -6,7 +6,7 @@
  * Every designer-tunable number is a key of the frozen {@link DEFAULTS}; every function takes an
  * optional `opts.tuning` (a partial override, merged over DEFAULTS by {@link tuningOf}). Content
  * (species, abilities, families) arrives through the `data` argument: a Registry
- * (`get(table, id)` / `has(table, id)`) or a plain object of tables; see `creature.dataView`.
+ * (`get(table, id)` / `has(table, id)`) or a plain object of tables; see {@link dataLookup}.
  *
  * Windows (rules §2.2): a creature opens a window the first time it reaches each configured curve
  * level. Levels come from `opts.levels`, else the creature's family row `windows` (when
@@ -134,7 +134,8 @@ const TUNING_CACHE = new WeakMap();
 /**
  * Resolves a partial tuning override over {@link DEFAULTS}. Keys this module does not know are
  * ignored (one flat tuning object is shared by creature/exp/party; `party.checkTuning` reports
- * unknown keys). Results are cached per override object.
+ * unknown keys). Results are cached per override object only when that object is frozen (a
+ * mutable override is re-read on every call, so later edits are never masked by a stale cache).
  * @param {Partial<ExpTuning>|null|undefined} [tuning]
  * @returns {Readonly<ExpTuning>}
  * @throws {TypeError} when a known key has a malformed value
@@ -142,7 +143,8 @@ const TUNING_CACHE = new WeakMap();
 export function tuningOf(tuning) {
   if (tuning == null) return DEFAULTS;
   if (typeof tuning !== 'object') throw new TypeError('exp.tuningOf: tuning must be an object');
-  const hit = TUNING_CACHE.get(tuning);
+  const cacheable = Object.isFrozen(tuning);
+  const hit = cacheable ? TUNING_CACHE.get(tuning) : undefined;
   if (hit) return hit;
   /** @type {any} */
   const out = { ...DEFAULTS };
@@ -154,7 +156,7 @@ export function tuningOf(tuning) {
     out[key] = v;
   }
   const frozen = deepFreeze(out);
-  TUNING_CACHE.set(tuning, frozen);
+  if (cacheable) TUNING_CACHE.set(tuning, frozen);
   return frozen;
 }
 
@@ -217,19 +219,24 @@ export function dataLookup(data) {
       try { return typeof data.list === 'function' ? data.list('types') : []; } catch { return []; }
     };
   } else {
-    /** @type {Map<string, (id: string) => any>} */
+    // One getter per table, rebuilt when the table is replaced or an array table changes length
+    // (plain test tables are often mutable; a frozen DATA never rebuilds).
+    /** @type {Map<string, {t: any, len: number, g: (id: string) => any}>} */
     const getters = new Map();
     const getter = (table) => {
-      let g = getters.get(table);
-      if (g) return g;
       const t = data[table];
+      const len = Array.isArray(t) ? t.length : -1;
+      const hit = getters.get(table);
+      if (hit && hit.t === t && hit.len === len) return hit.g;
+      /** @type {(id: string) => any} */
+      let g;
       if (typeof t === 'function') g = (id) => t(id) ?? null;
       else if (Array.isArray(t)) {
         const index = new Map(t.filter((r) => r && typeof r === 'object' && typeof r.id === 'string').map((r) => [r.id, r]));
         g = (id) => index.get(id) ?? null;
       } else if (t && typeof t === 'object') g = (id) => (Object.prototype.hasOwnProperty.call(t, id) ? t[id] : null);
       else g = () => null;
-      getters.set(table, g);
+      getters.set(table, { t, len, g });
       return g;
     };
     rowOf = (table, id) => (typeof id === 'string' ? getter(table)(id) : null);
@@ -434,6 +441,11 @@ export function computeAward(input, data, opts = {}) {
   const defeated = Array.isArray(input.defeated) ? input.defeated : [];
   const participants = Array.isArray(input.participants) ? new Set(input.participants) : null;
   const look = data ? dataLookup(data) : null;
+  for (const m of party) {
+    if (!m || typeof m.uid !== 'string') throw new TypeError('exp.computeAward: party entries need a string uid');
+    if (!isNum(m.level)) throw new TypeError(`exp.computeAward: party entry ${JSON.stringify(m.uid)} needs a finite level`);
+  }
+  if (input.curveLevel != null && !isNum(input.curveLevel)) throw new TypeError('exp.computeAward: curveLevel must be a finite number or null');
   const battled = (m) => (m.participated !== undefined ? !!m.participated : participants ? participants.has(m.uid) : false);
 
   /** @type {AwardLine[]} */
@@ -448,6 +460,7 @@ export function computeAward(input, data, opts = {}) {
 
   for (const foe of defeated) {
     if (!foe || typeof foe !== 'object') throw new TypeError('exp.computeAward: defeated entries must be objects');
+    if (!isNum(foe.level)) throw new TypeError('exp.computeAward: a defeated foe needs a finite level');
     let yieldV = foe.expYield;
     if (!nonNeg(yieldV)) {
       if (!look || typeof foe.speciesId !== 'string') throw new TypeError('exp.computeAward: a defeated foe needs expYield, or speciesId plus data');
@@ -455,10 +468,13 @@ export function computeAward(input, data, opts = {}) {
     }
     const base = baseYield(yieldV, foe.level, input.kind, opts);
     for (const m of party) {
-      if (!m || typeof m.uid !== 'string') throw new TypeError('exp.computeAward: party entries need a string uid');
       const kind = m.fainted ? 'fainted' : battled(m) ? 'battler' : 'bench';
       const share = kind === 'fainted' ? t.FAINTED_EXP_SHARE : kind === 'battler' ? t.PARTICIPANT_SHARE : t.BENCH_SHARE;
-      const amount = Math.floor(base * share * catchUpMult(m.level, input.curveLevel, opts) * dampMult(m.level, input.curveLevel, input.source, opts));
+      // Rounded in the battle engine's order (floor, then damping, then floor) so the "gained N EXP"
+      // lines the engine shows in battle equal what is applied here, whatever DAMP_FACTOR is.
+      let amount = Math.floor(base * share * catchUpMult(m.level, input.curveLevel, opts));
+      const damp = dampMult(m.level, input.curveLevel, input.source, opts);
+      if (damp !== 1) amount = Math.floor(amount * damp);
       add(m.uid, amount, kind);
     }
   }
@@ -632,7 +648,17 @@ export function refreshPending(world, uid, data, opts = {}) {
     for (let i = world.pendingShifts.length - 1; i >= 0; i--) if (world.pendingShifts[i] === uid) world.pendingShifts.splice(i, 1);
     return { pending: false, changed: true };
   }
-  return { pending: should, changed: false };
+  let changed = false;
+  if (should) {
+    // keep the first copy only
+    for (let i = world.pendingShifts.length - 1; i > at; i--) {
+      if (world.pendingShifts[i] === uid) {
+        world.pendingShifts.splice(i, 1);
+        changed = true;
+      }
+    }
+  }
+  return { pending: should, changed };
 }
 
 /**

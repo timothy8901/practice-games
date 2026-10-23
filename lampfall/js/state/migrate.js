@@ -100,9 +100,11 @@ function migrate2to3(data) {
 /**
  * v3 -> v4 (SYS-TOWN): letters arrive on three channels (GDD-00 §11), so `world.letters` records
  * which letters arrived (`got`) instead of assuming 1..delivered. A v3 save delivered letters in
- * order, so `got` is `1..delivered`, and an unread `today` is still in the mailbox. The other new
+ * order, so `got` is `1..delivered`, and an unread `today` is still in the mailbox; a `today` letter
+ * stamps `keeperDay` with the save's clock day so loading never brings a second one. The other new
  * letter keys, the new NpcMemory keys (`gifts`, `nicknameChoice`, `lastLineId`, `lingerDay`,
- * `lastGiftDay`) and the new `dayPage` key come from {@link fillDefaults}.
+ * `lastGiftDay`) come from {@link fillDefaults}; the new `dayPage` tally is opened on the save's
+ * page day with the save's stats as its base.
  * @param {Record<string, any>} data
  * @returns {Record<string, any>}
  */
@@ -113,14 +115,28 @@ function migrate3to4(data) {
     if (!Array.isArray(L.got)) {
       const read = Array.isArray(L.read) ? L.read : [];
       const today = Number.isInteger(L.today) && L.today >= 1 && L.today <= delivered ? L.today : null;
+      // the v1 `today` letter came this morning: stamp the day so no second one arrives on load
+      const total = isPlainObject(data.clock) && typeof data.clock.total === 'number' && Number.isFinite(data.clock.total) && data.clock.total >= 0 ? data.clock.total : 0;
+      const keeperDay = Number.isInteger(L.keeperDay) ? L.keeperDay : today !== null ? Math.floor(total / 1440) : -1;
       data.letters = {
         ...L,
         delivered,
         today,
+        keeperDay,
         got: Array.from({ length: delivered }, (_, i) => i + 1),
         mailbox: today !== null && !read.includes(today) ? [today] : [],
       };
     }
+  }
+  // open the Day Page tally on the save's page day (the small hours before 06:00 belong to the day
+  // before), so the first overnight after loading knows which morning comes next
+  if (!isPlainObject(data.dayPage)) {
+    const total = isPlainObject(data.clock) && typeof data.clock.total === 'number' && Number.isFinite(data.clock.total) && data.clock.total >= 0 ? data.clock.total : 0;
+    const day = Math.floor(total / 1440);
+    /** @type {Record<string, number>} */
+    const base = {};
+    if (isPlainObject(data.stats)) for (const [k, v] of Object.entries(data.stats)) if (typeof v === 'number' && Number.isFinite(v) && k !== 'playMs') base[k] = v;
+    data.dayPage = { day: Math.max(0, total % 1440 < 360 ? day - 1 : day), base, earned: 0, paid: 0, notes: [], last: null };
   }
   data.v = 4;
   return data;

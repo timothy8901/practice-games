@@ -23,7 +23,7 @@
  * @module battle/ai
  */
 
-import { isDamaging, moveTypeFor, wardCheck, CHIP_KINDS } from './effects.js';
+import { isDamaging, moveTypeFor, wardCheck, CHIP_KINDS, MAJOR_STATUS } from './effects.js';
 
 /**
  * @typedef {Object} AiProfile
@@ -55,6 +55,9 @@ export const DEFAULTS = Object.freeze({
   }),
 });
 
+/** Every tuning key this module accepts (`{profiles: {...}}`). */
+export const TUNING_KEYS = Object.freeze(Object.keys(DEFAULTS));
+
 /** Profile names. */
 export const AI_PROFILES = Object.freeze(Object.keys(DEFAULTS.profiles));
 /** Profiles by name (the table tools/validate-data checks trainer `ai` fields against). */
@@ -81,7 +84,13 @@ export function resolveProfile(name, tuning) {
   }
   const over = tuning && tuning.profiles && tuning.profiles[name];
   if (!over) return base;
-  for (const k of Object.keys(over)) if (!(k in base)) throw new RangeError(`ai: unknown profile field "${k}"`);
+  for (const k of Object.keys(over)) {
+    if (!(k in base)) throw new RangeError(`ai: unknown profile field "${k}"`);
+    const want = typeof base[/** @type {keyof AiProfile} */ (k)];
+    const v = over[/** @type {keyof AiProfile} */ (k)];
+    if (typeof v !== want || (want === 'number' && Number.isNaN(v))) throw new TypeError(`ai: profile field "${k}" must be a ${want}, got ${String(v)}`);
+    if (k === 'brain' && v !== 'wild' && v !== 'tactical') throw new RangeError(`ai: brain must be 'wild' or 'tactical', got ${String(v)}`);
+  }
   return Object.freeze({ ...base, ...over });
 }
 
@@ -118,6 +127,25 @@ function benchScore(battle, c, foe, foeAbility) {
     best = Math.max(best, mv.power * check.eff.mult * stab);
   }
   return best;
+}
+
+/**
+ * Whether a move's status could take on the foe right now: false when the foe
+ * already has a major condition (or is already trapped), or its type or
+ * ability makes it immune. Moves without a status pass.
+ * @param {import('./engine.js').Battle} battle @param {number} side @param {any} mv
+ * @returns {boolean}
+ */
+function statusCanTake(battle, side, mv) {
+  const st = mv.effect.status;
+  if (!st) return true;
+  const foe = battle.foeOf(side);
+  if (st.kind === 'trap') return !(battle.sides[1 - side].vol.trap > 0);
+  if (!MAJOR_STATUS.includes(st.kind)) return true;
+  if (foe.status) return false;
+  if (battle.data.typeBlocksStatus(st.kind, foe.types)) return false;
+  const ab = battle.data.ability(foe.ability);
+  return !(ab.hooks.statusImmune && ab.hooks.statusImmune(st.kind));
 }
 
 /**
@@ -223,7 +251,7 @@ export function chooseTrainerAction(battle, side, opts = {}) {
   const foeHasWard = !!(foeAbility && foeAbility.ward);
   const weakHit = !best || scored[0].m.mult < 1;
   if (p.chip && (foeHasWard || weakHit) && !foe.status && !theirs.vol.trap) {
-    const chip = find((mv, entry) => mv.effect.status && mv.category === 'status' && CHIP_KINDS.includes(mv.effect.status.kind) && entry.word !== 'Blocked by Ward');
+    const chip = find((mv, entry) => mv.effect.status && mv.category === 'status' && CHIP_KINDS.includes(mv.effect.status.kind) && entry.word !== 'Blocked by Ward' && statusCanTake(battle, side, mv));
     if (chip) return { type: 'move', move: chip.index };
   }
 
@@ -237,7 +265,7 @@ export function chooseTrainerAction(battle, side, opts = {}) {
   if (best) return { type: 'move', move: best.index };
 
   // 8. Anything else that is legal (a status move, then the first selectable).
-  const status = find((mv, entry) => mv.category === 'status' && !mv.effect.recovery && !mv.effect.evasion && !mv.effect.guard && entry.word !== 'Blocked by Ward');
+  const status = find((mv, entry) => mv.category === 'status' && !mv.effect.recovery && !mv.effect.evasion && !mv.effect.guard && entry.word !== 'Blocked by Ward' && statusCanTake(battle, side, mv));
   if (status) return { type: 'move', move: status.index };
   return { type: 'move', move: selectable[0].index };
 }

@@ -25,7 +25,7 @@ describe('DEFAULTS', () => {
     assert.equal(MENDS_PER_BATTLE, 3);
     assert.deepEqual(DIALS, ['drift', 'flux', 'freefall']);
     for (const d of DIALS) assert.ok(Object.isFrozen(DIAL_RULES[d]));
-    for (const [k, v] of Object.entries(DEFAULTS)) assert.ok(typeof v === 'number' || typeof v === 'object', k);
+    for (const [k, v] of Object.entries(DEFAULTS)) assert.ok(typeof v === 'number' || typeof v === 'object' || typeof v === 'boolean', k);
   });
 
   it('battle.tuning is the merged table; an unknown key fails loudly', () => {

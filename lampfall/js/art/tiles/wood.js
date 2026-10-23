@@ -115,24 +115,24 @@ const BRIDGE = [
 ];
 def('bridge-wood', BRP, BRIDGE);
 def('bridge-wood-v', BRP, turn(BRIDGE));
-// Stilt-town decking (Drownwood): long silvered planks running east-west, grain streaks along each
-// board, staggered butt joints, nail heads at the joists.
-def('deck-planks', { k: 'ww0', d: 'ww1', m: 'ww2', l: 'ww3', h: 'ww4', n: 'iron' }, [
-  'hllllllllllkhlll',
-  'mmmdddmmmmmkmmmm',
-  'mnmmmmmmmmnkmmnm',
+// Stilt-town decking (Drownwood): long tarred planks running east-west, grain streaks along each board,
+// butt joints on only some courses, nail heads at the joists.
+def('deck-planks', { k: 'mg0', d: 'mg1', m: 'mg2', l: 'ww3', n: 'iron' }, [
+  'llllllllllllllll',
+  'mmmdddmmmmmmmmmm',
+  'mnmmmmmmmmmmmmnm',
   'kkkkkkkkkkkkkkkk',
-  'lllkhlllllllllll',
-  'mmmkmmmmmmdddmmm',
-  'mmnkmmmmmmmmmmmm',
+  'lllllllllklllll'.padEnd(16, 'l'),
+  'mmmmmmmmmkddmmmm',
+  'mmnmmmmmmkmmmmmm',
   'kkkkkkkkkkkkkkkk',
-  'llllllllhllllllk',
-  'mddddmmmmmmmmmmk',
-  'nmmmmmmmmmmmmmnk',
+  'llllllllllllllll',
+  'mddddmmmmmmmmmmm',
+  'nmmmmmmmmmmmmmnm',
   'kkkkkkkkkkkkkkkk',
-  'lllllkhlllllllll',
-  'mmmmmkmmmmdddmmm',
-  'mmnmmkmmmmmmmmnm',
+  'llklllllllllllll',
+  'mmkmmmmmmmdddmmm',
+  'mmkmmmmmmmmmmmnm',
   'kkkkkkkkkkkkkkkk',
 ]);
 
@@ -289,6 +289,27 @@ def('net-rack', { k: 'base', d: 'wd1', p: 'wd2', l: 'wd3', n: 'st3', m: 'st2', f
   '.dks.........dks',
   '.kkss........kks',
   '..ss..........ss',
+], { kind: 'detail' });
+
+// Timber stack (the co-op yard: Wren's alder planks): sawn planks stacked on bearers, end grain to the
+// viewer, lit tops, a dark base line and cast shadow.
+def('timber-stack', { k: 'base', d: 'wd1', p: 'wd2', l: 'wd3', h: 'wd4', e: 'pa3', r: 'pa1', s: 'shadow' }, [
+  '................',
+  '................',
+  '................',
+  '..hhhhhhhhhhhh..',
+  '.kerekerekerekk.',
+  '.kdddkdddkdddkk.',
+  '.hhhhhhhhhhhhhh.',
+  'kerekerekerekerk',
+  'kdddkdddkdddkddk',
+  'hhhhhhhhhhhhhhhh',
+  'kerekerekerekerk',
+  'kdddkdddkdddkddk',
+  'kkkkkkkkkkkkkkkk',
+  '.kk.........kks.',
+  '..ssssssssssssss',
+  '................',
 ], { kind: 'detail' });
 
 /* ---------------------------------------------------------------- the lost fleet */
