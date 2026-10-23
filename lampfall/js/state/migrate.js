@@ -13,7 +13,7 @@
  * @module state/migrate
  */
 
-import { SCHEMA_VERSION, worldDefaults, creatureDefaults, npcMemoryDefaults, mapStateDefaults, threadStateDefaults, fieldLogEntryDefaults, isPlainObject } from './schema.js';
+import { SCHEMA_VERSION, worldDefaults, creatureDefaults, npcMemoryDefaults, mapStateDefaults, threadStateDefaults, fieldLogEntryDefaults, weatherStateDefaults, isPlainObject } from './schema.js';
 
 /** @typedef {import('./schema.js').World} World */
 
@@ -29,12 +29,37 @@ function migrate0to1(data) {
 }
 
 /**
+ * v1 -> v2 (SYS-TIME): `world.weather` grows from `{today, tomorrow, intensity}` to the full
+ * WeatherState (`day, lead, current, onset, forecast, outlook`). A v1 save never rolled a forecast,
+ * so `day` is 0 and `systems/weather.update` rolls the current day on the first tick after loading;
+ * `lead` and `current` take the saved `today` so nothing changes on screen until then.
+ * @param {Record<string, any>} data
+ * @returns {Record<string, any>}
+ */
+function migrate1to2(data) {
+  const old = isPlainObject(data.weather) ? data.weather : {};
+  const base = weatherStateDefaults();
+  const today = typeof old.today === 'string' && old.today !== '' ? old.today : base.today;
+  data.weather = {
+    ...base,
+    today,
+    lead: today,
+    current: today,
+    tomorrow: typeof old.tomorrow === 'string' && old.tomorrow !== '' ? old.tomorrow : base.tomorrow,
+    intensity: typeof old.intensity === 'number' && old.intensity >= 0 && old.intensity <= 1 ? old.intensity : base.intensity,
+  };
+  data.v = 2;
+  return data;
+}
+
+/**
  * Upgrade steps keyed by source version. Append one entry each time {@link SCHEMA_VERSION} bumps;
  * never edit an existing step once a save in the wild carries that version.
  * @type {Readonly<Record<number, (data: Record<string, any>, fromVersion: number) => Record<string, any>>>}
  */
 export const MIGRATIONS = Object.freeze({
   0: migrate0to1,
+  1: migrate1to2,
 });
 
 /**

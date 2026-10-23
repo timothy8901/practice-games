@@ -17,7 +17,7 @@ import { makeRng, hashString, decodeSeedCode } from '../core/rng.js';
 import { CLOCK_STATE_VERSION, DEFAULT_START_MINUTE } from '../core/time.js';
 
 /** Version stamped on `world.v`; bump together with a new entry in `migrate.MIGRATIONS`. */
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 /** Maximum party size. */
 export const PARTY_MAX = 6;
@@ -116,10 +116,28 @@ export const WORLDGEN_LABEL = 'worldgen';
  */
 
 /**
+ * Today's weather and the posted forecasts. Written only by `systems/weather.js` (v2 added every key
+ * but `today`, `tomorrow` and `intensity`). Kind ids come from `systems/weather` KINDS / `data.weather`.
  * @typedef {Object} WeatherState
- * @property {string} today       weather kind id  // [GDD: kinds]
- * @property {string} tomorrow
- * @property {number} intensity   0..1
+ * @property {number} day         game day (1-based, GDD numbering) this state was rolled for; 0 = never rolled
+ * @property {string} today       the day's main weather kind id (what the day turns into)
+ * @property {string} lead        the kind in effect before `onset`
+ * @property {string} current     the kind in effect right now (`lead` before `onset`, `today` from it)
+ * @property {number} onset       minute of day (integer 0..1439) at which `today` sets in
+ * @property {string} tomorrow    tomorrow's POSTED kind (the outlook's kind; the true weather stays unrolled)
+ * @property {number} intensity   0..1, today's strength (particles, overlays, effect multipliers)
+ * @property {WeatherForecast|null} forecast   today's forecast as Augusta posted it at dawn
+ * @property {WeatherForecast|null} outlook    tomorrow's forecast (Day Page "Tomorrow:" line)
+ */
+
+/**
+ * One posted forecast, honest at its stated odds (`odds` in 10 times it comes true).
+ * @typedef {Object} WeatherForecast
+ * @property {string} kind        predicted weather kind id
+ * @property {number} odds        integer 1..10: "7 in 10"
+ * @property {number} minute      minute of day of the tide the forecast names (integer 0..1439)
+ * @property {'low'|'high'} tide  which tide it names
+ * @property {string} part        day-part word for that tide ('morning' | 'afternoon' | 'evening' | 'night')
  */
 
 /**
@@ -411,6 +429,14 @@ export function fieldLogEntryDefaults() {
   return { seen: false, read: false, held: false, ability: null };
 }
 
+/**
+ * The never-rolled weather state (`systems/weather.rollDay` fills it on the first day start).
+ * @returns {WeatherState}
+ */
+export function weatherStateDefaults() {
+  return { day: 0, today: 'clear', lead: 'clear', current: 'clear', onset: 0, tomorrow: 'clear', intensity: 0, forecast: null, outlook: null };
+}
+
 /** @returns {Settings} */
 export function settingsDefaults() {
   return {
@@ -467,7 +493,7 @@ export function worldDefaults() {
       realClock: false,
       seed: null,
     },
-    weather: { today: 'clear', tomorrow: 'clear', intensity: 0 }, // [GDD: weather kinds]
+    weather: weatherStateDefaults(),
     player: {
       name: '',
       species: '',
@@ -629,6 +655,13 @@ const nonNegInt = (v) => isInt(v) && v >= 0;
 const unit = (v) => isNum(v) && v >= 0 && v <= 1;
 const strArray = (v) => Array.isArray(v) && v.every(isStr);
 const intArray = (v) => Array.isArray(v) && v.every(isInt);
+/** A posted forecast (see the WeatherForecast typedef); exact keys, nothing extra. */
+const FORECAST_KEYS = Object.freeze(['kind', 'minute', 'odds', 'part', 'tide']);
+const isWeatherForecast = (f) => isPlainObject(f)
+  && Object.keys(f).sort().join() === FORECAST_KEYS.join()
+  && isStr(f.kind) && isInt(f.odds) && f.odds >= 1 && f.odds <= 10
+  && isInt(f.minute) && f.minute >= 0 && f.minute < 1440
+  && (f.tide === 'low' || f.tide === 'high') && isStr(f.part);
 
 /**
  * Field spec table: `[predicate, description]`. Nested plain objects are specs themselves.
@@ -711,7 +744,17 @@ const WORLD_SPEC = {
     realClock: [isBool, 'boolean'],
     seed: [(v) => v === null || isStr(v) || isNum(v), 'string|number|null'],
   },
-  weather: { today: [isStr, 'string'], tomorrow: [isStr, 'string'], intensity: [unit, '0..1'] },
+  weather: {
+    day: [nonNegInt, 'non-negative integer'],
+    today: [isStr, 'string'],
+    lead: [isStr, 'string'],
+    current: [isStr, 'string'],
+    onset: [(v) => isInt(v) && v >= 0 && v < 1440, 'integer 0..1439'],
+    tomorrow: [isStr, 'string'],
+    intensity: [unit, '0..1'],
+    forecast: [isNullOr(isWeatherForecast), 'null or {kind, odds 1..10, minute 0..1439, tide low|high, part}'],
+    outlook: [isNullOr(isWeatherForecast), 'null or {kind, odds 1..10, minute 0..1439, tide low|high, part}'],
+  },
   player: {
     name: [isStr, 'string'],
     species: [isStr, 'string'],
