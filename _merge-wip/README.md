@@ -34,11 +34,14 @@ The touch overlay appears on touch devices or with `?touch=1`.
 strict=1 scene=<name>&trainer=<id>`
 
 With `?debug=1` (or on localhost) `window.__game` is installed (`js/debug/hook.js`, draft §11):
-`state() warp() setTime() flag() press() tap() idle() scene() stack() text() save() load() step()
-pause() resume() marker() errors perf() validate() rng()`. Hooks owned by other lanes (`give earn
-addCreature heal battle wild forecast deliverLetter sleep runScript`) throw a readable "not wired"
-error until that lane calls `__game.bind(name, fn)`. The perf overlay (top right) shows fps, update
-and draw ms, drawImage count, the scene stack and `validateWorld` problems.
+`state() warp() give() earn() setTime() setTide() flag() flags() speed() skipAnims() press() tap()
+idle() scene() stack() text() save() load() step() pause() resume() marker() errors perf() validate()
+rng() push()`. Every mutating hook runs through `store.tx`, so events and autosave behave as in play.
+`give` and `earn` run a day-1 fallback until RULES-ECON rebinds them; the other lane hooks
+(`addCreature heal battle wild forceForecast deliverLetter sleep runScript`) throw a readable
+"not wired" error until that lane calls `__game.bind(name, fn)`. `setTide` needs
+`core/time.freezeTide` (draft §13.6, owner CORE). The perf overlay (top right) shows fps, update and
+draw ms, drawImage count, the scene stack and `validateWorld` problems.
 
 ## Tests
 
@@ -47,7 +50,8 @@ and draw ms, drawImage count, the scene stack and `validateWorld` problems.
     node tools/smoke-import.mjs       # imports every js/**/*.js under Node (rule 2 of the draft)
 
 Headless browser check (Playwright, not a dependency of the game):
-`node <scratchpad>/tools/playtest.mjs http://127.0.0.1:8777/_merge-wip/?debug=1 out/ script.json`.
+`node tools/pw-harness.mjs 'http://127.0.0.1:8777/_merge-wip/?debug=1&skipTitle=1' out/ script.json`
+(reports console errors and writes screenshots; `?strict=1` adds the store write guard).
 
 ## Layout
 

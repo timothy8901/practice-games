@@ -6,10 +6,18 @@
  * crash verdict and the newest save entry so it can offer "Resume from autosave".
  * @module scenes/boot
  */
-import { createNewWorld } from '../_shims/state/schema.js'; // INTEGRATOR: '../state/schema.js'
+import { createNewWorld } from '../state/schema.js';
 import { FEATURES, TRANSITION_MS } from '../config.js';
 import { KIT } from './day1kit.js';
 import { drawText } from '../core/font.js';
+
+/**
+ * Lease card used when no lease-card scene ran (`?skipTitle=1`, or New Game while
+ * `FEATURES.leaseCard` is off). `mapId` stays `''` until the arrival map exists in data.
+ * // [GDD: default name, species and arrival map]
+ * @type {Readonly<{name: string, species: string, pronouns: string}>}
+ */
+export const DEFAULT_LEASE = Object.freeze({ name: 'Keeper', species: 'player', pronouns: 'they' });
 
 /**
  * Whether the previous session ended without a clean exit. Tolerates the two shapes the STATE lane
@@ -41,10 +49,10 @@ export function fadeMs(G, ms = TRANSITION_MS) {
  * `?scene=<name>` is set the named scene is pushed on top for visual work. The arrival cutscene is
  * data (`world.pendingScript`) and is the panel's to write. [GDD: arrival script content]
  * @param {object} G
- * @param {{seedCode: string, lease?: object}} opts
+ * @param {{seedCode: string, lease?: object}} opts   `lease` defaults to {@link DEFAULT_LEASE}
  */
 export function newGame(G, opts) {
-  const world = createNewWorld({ seedCode: opts.seedCode, lease: opts.lease });
+  const world = createNewWorld({ seedCode: opts.seedCode, lease: opts.lease ?? DEFAULT_LEASE });
   G.scenes.transition('fade', fadeMs(G), () => {
     G.store.replace(world);
     G.replaceWith('overworld', { fresh: true });

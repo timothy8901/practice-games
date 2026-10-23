@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>fx.js + tween.js demo</title>
+  <link rel="icon" href="data:,">
+  <style>
+    html, body { margin: 0; height: 100%; background: #111; display: grid; place-items: center; }
+    canvas { width: 960px; height: 540px; image-rendering: pixelated; image-rendering: crisp-edges; }
+  </style>
+</head>
+<body>
+  <canvas id="game" width="480" height="270"></canvas>
+  <script type="module">
+    // Demo + browser smoke test for js/core/fx.js and js/core/tween.js: every particle preset runs on
+    // its own labelled station, the camera shakes (with a flash) on a timer, and two tweened markers
+    // bounce so the easing table gets real-browser coverage too.
+    // Keys: Space = shake + flash; B = fire every burst preset; W = toggle rain/snow; C = clear.
+    import { createFX, PARTICLE_PRESETS } from '../../js/core/fx.js';
+    import { createTweens } from '../../js/core/tween.js';
+
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
+
+    const params = new URLSearchParams(location.search);
+    const seed = params.get('seed') ?? 'demo';
+    const fx = createFX({ seed });
+    const tweens = createTweens();
+    fx.setWind(6, 0);
+
+    /** Pixel-font-free label for the demo page. */
+    function label(text, x, y, color = '#fff', size = 10) {
+      ctx.fillStyle = color;
+      ctx.font = `${size}px monospace`;
+      ctx.textBaseline = 'top';
+      ctx.fillText(text, x, y);
+    }
+
+    // Stations: one per non-weather preset, laid out on a 4 x 3 grid of the 480x270 buffer.
+    const CONTINUOUS = ['fireflies', 'leaves', 'motes', 'embers', 'bubbles'];
+    const BURSTS = ['sparkles', 'splash', 'dust', 'confetti'];
+    const WEATHER = ['rain', 'snow'];
+    const names = Object.keys(PARTICLE_PRESETS).filter((n) => !WEATHER.includes(n));
+    const stations = names.map((name, i) => ({
+      name,
+      x: 60 + (i % 4) * 120,
+      y: 60 + Math.floor(i / 4) * 85,
+      burst: BURSTS.includes(name),
+    }));
+
+    const emitters = {};
+    let weather = 'rain';
+    /** (Re)starts the continuous emitters: one per ambient station plus the current weather. */
+    function startAmbient() {
+      for (const st of stations) {
+        if (!st.burst) {
+          // Leaves fall from above the station, bubbles rise from below it.
+          const dy = st.name === 'leaves' ? -36 : st.name === 'bubbles' ? 24 : 0;
+          emitters[st.name] = fx.particles(st.name, { x: st.x - 20, y: st.y + dy, w: 40, h: 4 });
+        }
+      }
+      emitters.weather = fx.particles(weather);
+    }
+    startAmbient();
+
+    function fireBursts() {
+      for (const st of stations) {
+        if (!st.burst) continue;
+        const y = st.name === 'confetti' ? st.y - 30 : st.y;
+        fx.particles(st.name, { x: st.x, y, space: 'world' });
+      }
+    }
+    function shakeNow(amount = 6) {
+      fx.shake(amount, 500);
+      fx.flash('#ffffff', 220, { alpha: 0.45 });
+    }
+    function toggleWeather() {
+      emitters.weather.kill();
+      weather = weather === 'rain' ? 'snow' : 'rain';
+      emitters.weather = fx.particles(weather);
+    }
+
+    // Tweened markers: a bouncing square (outBounce, yoyo forever) and an elastic one (outElastic).
+    const bounce = { y: 200 };
+    const elastic = { x: 300 };
+    tweens.to(bounce, { y: 240 }, 900, { ease: 'outBounce', repeat: Infinity, yoyo: true });
+    tweens.to(elastic, { x: 440 }, 1400, { ease: 'outElastic', repeat: Infinity, yoyo: true, delay: 300 });
+
+    // Deterministic timeline in page-milliseconds (bursts and shakes repeat).
+    let elapsed = 0;
+    let last = performance.now();
+    let nextBurst = 400;
+    let nextShake = 1200;
+    let nextWeather = 4000;
+    let shakes = 0;
+
+    document.addEventListener('keydown', (e) => {
+      if (e.code === 'Space') { shakeNow(); e.preventDefault(); }
+      else if (e.code === 'KeyB') fireBursts();
+      else if (e.code === 'KeyW') toggleWeather();
+      else if (e.code === 'KeyC') { fx.clear(); startAmbient(); }
+    });
+
+    function drawWorld() {
+      // Sky + ground.
+      const g = ctx.createLinearGradient(0, 0, 0, 200);
+      g.addColorStop(0, '#1b2440');
+      g.addColorStop(1, '#3d4a6b');
+      ctx.fillStyle = g;
+      ctx.fillRect(-16, -16, 512, 216);
+      ctx.fillStyle = '#2f5d3a';
+      ctx.fillRect(-16, 200, 512, 86);
+      ctx.fillStyle = '#264a30';
+      for (let x = -16; x < 496; x += 16) ctx.fillRect(x, 200 + ((x / 16) % 2) * 2, 8, 2);
+      // Station pads and labels.
+      for (const st of stations) {
+        ctx.fillStyle = st.burst ? '#5a3e2b' : '#3a3a55';
+        ctx.fillRect(st.x - 24, st.y + 8, 48, 4);
+        label(st.name, st.x - st.name.length * 3, st.y + 14, '#dfe6f5', 10);
+      }
+      // Water pool under the splash station, pond under bubbles.
+      const splash = stations.find((s) => s.name === 'splash');
+      ctx.fillStyle = '#2f6fa8';
+      ctx.fillRect(splash.x - 24, splash.y, 48, 8);
+      const bub = stations.find((s) => s.name === 'bubbles');
+      ctx.fillStyle = '#2a5d8f';
+      ctx.fillRect(bub.x - 24, bub.y - 24, 48, 48);
+      // Tweened markers.
+      ctx.fillStyle = '#f2c14e';
+      ctx.fillRect(272, Math.round(bounce.y), 8, 8);
+      ctx.fillStyle = '#e76f51';
+      ctx.fillRect(Math.round(elastic.x), 252, 8, 8);
+      label('outBounce', 236, 256, '#f2c14e', 8);
+      label('outElastic ->', 300, 242, '#e76f51', 8);
+    }
+
+    function frame(now) {
+      const dt = Math.min(100, now - last);
+      last = now;
+      elapsed += dt;
+      if (elapsed >= nextBurst) { fireBursts(); nextBurst += 1500; }
+      if (elapsed >= nextShake) { shakeNow(); shakes += 1; nextShake += 2500; }
+      if (elapsed >= nextWeather) { toggleWeather(); nextWeather += 4000; }
+      tweens.update(dt);
+      fx.update(dt);
+
+      const off = fx.cameraOffset();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, 480, 270);
+      ctx.translate(off.x, off.y);
+      drawWorld();
+      fx.draw(ctx, { layer: 'back' });
+      // (actors would draw here)
+      fx.draw(ctx, { layer: 'front' });
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      const s = fx.stats();
+      label(`t=${Math.round(elapsed)}ms  particles=${s.particles} emitters=${s.emitters} shake=${fx.shakeStrength().toFixed(2)} off=${off.x},${off.y} weather=${weather}`, 4, 2, '#fff', 9);
+      label('Space shake  B bursts  W weather  C clear', 300, 262, '#9aa4bd', 8);
+      requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+
+    window.__fx = {
+      fx,
+      tweens,
+      shakeNow,
+      fireBursts,
+      toggleWeather,
+      state: () => ({
+        elapsed: Math.round(elapsed),
+        stats: fx.stats(),
+        offset: fx.cameraOffset(),
+        strength: fx.shakeStrength(),
+        weather,
+        shakes,
+        tweenCount: tweens.count,
+        bounceY: bounce.y,
+        elasticX: elastic.x,
+        presets: fx.presetNames,
+        layers: [...new Set(fx.snapshot().map((p) => p.layer))].sort(),
+        shapes: [...new Set(fx.snapshot().map((p) => p.shape))].sort(),
+      }),
+    };
+  </script>
+</body>
+</html>

@@ -122,9 +122,11 @@ export const ease = Object.freeze({
   outQuart: (t) => 1 - (1 - t) ** 4,
   inOutQuart: (t) => (t < 0.5 ? 8 * t * t * t * t : 1 - (-2 * t + 2) ** 4 / 2),
 
-  inSine: (t) => 1 - Math.cos((t * Math.PI) / 2),
+  // Guarded: 1 - cos(pi/2) is 1 - 6e-17 in floating point, not exactly 1.
+  inSine: (t) => (t >= 1 ? 1 : 1 - Math.cos((t * Math.PI) / 2)),
   outSine: (t) => Math.sin((t * Math.PI) / 2),
-  inOutSine: (t) => -(Math.cos(Math.PI * t) - 1) / 2,
+  // Written as (1 - cos) so t = 0 yields +0, not -0.
+  inOutSine: (t) => (1 - Math.cos(Math.PI * t)) / 2,
 
   inExpo: (t) => (t <= 0 ? 0 : 2 ** (10 * t - 10)),
   outExpo: (t) => (t >= 1 ? 1 : 1 - 2 ** (-10 * t)),
@@ -677,7 +679,13 @@ export function createTweens({ timeScale = 1 } = {}) {
     return n;
   }
 
-  /** @param {number} dt */
+  /**
+   * Advances every tween by `dt` ms (negative `dt` counts as 0). A callback
+   * that throws does not desynchronise the others: the frame is completed for
+   * every remaining tween first, then the first error is rethrown.
+   * @param {number} dt
+   * @throws {TypeError} for a non-finite `dt`; rethrows the first callback error
+   */
   function update(dt) {
     if (typeof dt !== 'number' || !Number.isFinite(dt)) {
       throw new TypeError(`tweens.update: dt must be a finite number of milliseconds, got ${describe(dt)}`);
@@ -685,16 +693,28 @@ export function createTweens({ timeScale = 1 } = {}) {
     const step = Math.max(0, dt) * scale;
     const arr = list;
     const n = arr.length;
+    let failed = false;
+    let error;
     for (let i = 0; i < n; i++) {
-      arr[i].step(step);
+      try {
+        arr[i].step(step);
+      } catch (e) {
+        if (!failed) {
+          failed = true;
+          error = e;
+        }
+      }
       // clear() inside a callback swaps the list; the old one is abandoned.
-      if (list !== arr) return;
+      if (list !== arr) break;
     }
-    let w = 0;
-    for (let i = 0; i < arr.length; i++) {
-      if (!arr[i].done) arr[w++] = arr[i];
+    if (list === arr) {
+      let w = 0;
+      for (let i = 0; i < arr.length; i++) {
+        if (!arr[i].done) arr[w++] = arr[i];
+      }
+      arr.length = w;
     }
-    arr.length = w;
+    if (failed) throw error;
   }
 
   function clear() {

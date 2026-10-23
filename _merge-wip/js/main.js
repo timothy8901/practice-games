@@ -17,12 +17,12 @@ import { createTweens } from './core/tween.js';
 import { createFX } from './core/fx.js';
 import { createClock } from './core/time.js';
 import { makeRng, randomSeedCode, setSeedToggles } from './core/rng.js';
-// ---- sibling lanes. INTEGRATOR: delete js/_shims and replace '/_shims/' with '/' in these paths. ----
-import { createStore } from './_shims/state/store.js';
-import { createPersist } from './_shims/state/persist.js';
-import { createNewWorld, SCHEMA_VERSION } from './_shims/state/schema.js';
-import { MIGRATIONS } from './_shims/state/migrate.js';
-import { createRngs } from './_shims/state/rngs.js';
+import { createStore } from './state/store.js';
+import { createPersist } from './state/persist.js';
+import { createNewWorld, SCHEMA_VERSION } from './state/schema.js';
+import { MIGRATIONS } from './state/migrate.js';
+import { createRngs } from './state/rngs.js';
+// ---- lanes not landed yet. INTEGRATOR: delete js/_shims and replace '/_shims/' with '/' here. ----
 import { DATA } from './_shims/data/index.js';
 import { createRegistry } from './_shims/data/registry.js';
 import { DIALS, TOGGLE_ORDER } from './_shims/data/dials.js';
@@ -35,31 +35,32 @@ import { createDebugOverlay } from './scenes/debugOverlay.js';
 
 /**
  * The one context object, created once here and handed to every scene factory. Never imported.
- * See ARCHITECTURE-DRAFT §2.2 for the shared fields; BOOT adds `perf`, `loop`, `debugOverlay` and
- * `debugHook` (debug builds only).
+ * See ARCHITECTURE-DRAFT §2.2 for the shared fields; BOOT adds `perf`, `loop`, `persistView`,
+ * `debugOverlay` and `debugHook` (debug builds only).
  * @typedef {Object} G
- * @property {import('./_shims/state/store.js').Store} store
- * @property {object} world            getter: store.world (re-pointed on load; read each frame, never cache)
- * @property {import('./core/events.js').EventBus} bus
+ * @property {import('./state/store.js').Store} store
+ * @property {import('./state/schema.js').World} world   getter: store.world (re-pointed on load; read each frame, never cache)
+ * @property {import('./core/events.js').EventBus} bus   alias of store.bus
  * @property {import('./core/canvas.js').Display} display
  * @property {import('./core/input.js').Input} input
  * @property {import('./core/scene.js').SceneStack} scenes
  * @property {import('./core/audio.js').AudioEngine} audio
- * @property {object} music
+ * @property {import('./_shims/audio/director.js').MusicDirector} music
  * @property {import('./_shims/data/registry.js').Registry} data
- * @property {import('./_shims/state/rngs.js').Rngs} rngs
- * @property {import('./core/time.js').Clock} clock
- * @property {import('./core/tween.js').Tweens} tweens
- * @property {import('./core/fx.js').FX} fx
- * @property {import('./_shims/state/persist.js').Persist} persist
+ * @property {import('./state/rngs.js').Rngs} rngs
+ * @property {import('./core/time.js').Clock} clock      bound to world.clock via systems/clockSys
+ * @property {import('./core/tween.js').Tweens} tweens   screen-level (toasts, HUD); scenes create their own
+ * @property {import('./core/fx.js').FX} fx              screen-level flash/shake; scenes create their own particle FX
+ * @property {import('./state/persist.js').Persist} persist
+ * @property {import('./state/persist.js').PersistG} persistView   the view of G that persist reads (§10); hand it to every persist call
  * @property {import('./_shims/ui/toast.js').Toasts} toasts
  * @property {import('./debug/flags.js').BootFlags} flags
  * @property {Record<string, (G: G) => import('./core/scene.js').Scene>} sceneFactories
- * @property {(name: string, params?: any) => void} push
+ * @property {(name: string, params?: any) => void} push        sugar: scenes.push(sceneFactories[name](G), params)
  * @property {(name: string, params?: any) => void} replaceWith
- * @property {number} speed
- * @property {boolean} lowPower
- * @property {import('./core/rng.js').Rng} entropy
+ * @property {number} speed                    debug multiplier (1)
+ * @property {boolean} lowPower                30-fps fallback engaged
+ * @property {import('./core/rng.js').Rng} entropy   unseeded cosmetic rng (title particles only)
  * @property {PerfCounters} perf
  * @property {{paused: boolean, pause: () => void, resume: () => void, step: (n?: number) => void}} loop
  * @property {import('./scenes/debugOverlay.js').DebugOverlay|null} debugOverlay
@@ -81,7 +82,7 @@ import { createDebugOverlay } from './scenes/debugOverlay.js';
 /**
  * Storage that survives a throwing `localStorage` getter (private mode, blocked site data).
  * @param {Window} win
- * @returns {Storage|null}
+ * @returns {Storage|null} null = persist falls back to in-memory storage
  */
 function safeLocalStorage(win) {
   try {
@@ -96,21 +97,25 @@ function safeLocalStorage(win) {
 }
 
 /**
- * Seed code for the pre-title world: `?seed=` when it decodes, else a fresh random code.
- * @param {string|null} requested
- * @param {import('./core/rng.js').Rng} entropy
- * @returns {string}
+ * The view of `G` that `state/persist` reads (its `PersistG` typedef): the store, the bus, the data
+ * registry and a scene-stack view whose `isTransitioning` is a function (core/scene exposes it as a
+ * getter, `has` takes a scene object there and a name here).
+ * @param {import('./state/store.js').Store} store
+ * @param {import('./core/scene.js').SceneStack} scenes
+ * @param {object} data
+ * @returns {import('./state/persist.js').PersistG}
  */
-function initialSeedCode(requested, entropy) {
-  if (requested) {
-    try {
-      createNewWorld({ seedCode: requested });
-      return requested;
-    } catch (e) {
-      console.warn(`main: ignoring ?seed=${requested}: ${e.message}`);
-    }
-  }
-  return randomSeedCode(DIALS.default.toUpperCase(), entropy);
+export function makePersistView(store, scenes, data) {
+  return Object.freeze({
+    store,
+    bus: store.bus,
+    data,
+    scenes: Object.freeze({
+      top: () => scenes.top(),
+      has: (name) => scenes.find(name) !== null,
+      isTransitioning: () => scenes.isTransitioning,
+    }),
+  });
 }
 
 /**
@@ -141,7 +146,7 @@ export function boot(env = {}) {
   });
   const input = createInput({ canvas: display.canvas, display, touchParent: touchHost, touch: flags.touch });
 
-  // 3. persistence
+  // 3. persistence (reads the crash marker; writes nothing until markBoot)
   const persist = createPersist({
     storage: safeLocalStorage(win),
     prefix: config.SAVE_PREFIX,
@@ -158,10 +163,13 @@ export function boot(env = {}) {
 
   // 5. store, rngs, clock
   setSeedToggles(TOGGLE_ORDER);
-  const store = createStore(createNewWorld({ seedCode: initialSeedCode(flags.seed, entropy) }), { strict: flags.strict });
+  const seedCode = flags.seed ?? randomSeedCode(DIALS.default.toUpperCase(), entropy);
+  const store = createStore(createNewWorld({ seedCode }), { strict: flags.strict });
   const rngs = createRngs(store);
   const clock = createClock(clockSys.optionsFrom(store.world));
-  store.bus.on('world:replaced', (world) => clockSys.restoreFrom(world, clock));
+  clockSys.restoreFrom(store.world, clock);
+  store.onSnapshot((w) => clockSys.serializeInto(w, clock));
+  store.bus.on('world:replaced', ({ world }) => clockSys.restoreFrom(world, clock));
 
   // 6. scene stack
   const scenes = createSceneStack({
@@ -198,6 +206,7 @@ export function boot(env = {}) {
     tweens: createTweens(),
     fx: createFX({ width: config.NATIVE_W, height: config.NATIVE_H, rng: entropy.fork('fx') }),
     persist,
+    persistView: makePersistView(store, scenes, data),
     toasts: createToasts({ width: config.NATIVE_W, height: config.NATIVE_H }),
     flags,
     sceneFactories,
@@ -217,7 +226,12 @@ export function boot(env = {}) {
   }
   G.music = createMusicDirector(G);
   G.bus.on('toast', (payload) => G.toasts.push(typeof payload === 'string' ? payload : payload?.text ?? ''));
-  G.bus.on('save:fail', (res) => G.toasts.push(`Save failed: ${res.error?.code ?? 'unknown'}`, { color: '#ff9b9b' }));
+  // A failure that persist will retry in 2 s is not shown; the banner appears when the retry fails too (§10).
+  G.bus.on('save:fail', (res) => {
+    if (res && res.willRetry) return;
+    G.toasts.push(`Save failed: ${res?.error?.code ?? 'unknown'}`, { color: '#ff9b9b' });
+  });
+  persist.attach(G.persistView); // AUTOSAVE_TRIGGERS are bus events, never calls in scenes
 
   if (debug) {
     if (config.FEATURES.debugOverlay) G.debugOverlay = createDebugOverlay(G);
@@ -237,11 +251,9 @@ export function boot(env = {}) {
   win.addEventListener('pointerdown', unlock);
   win.addEventListener('keydown', unlock);
 
-  // 9. crash marker + clean exit
-  if (persist.crashMarker && typeof persist.crashMarker.arm === 'function') persist.crashMarker.arm();
-  win.addEventListener('pagehide', () => {
-    if (persist.crashMarker && typeof persist.crashMarker.clear === 'function') persist.crashMarker.clear();
-  });
+  // 9. crash marker: dirty now, clean on pagehide (§10)
+  persist.markBoot();
+  win.addEventListener('pagehide', () => { persist.markCleanExit(); });
 
   // 10. pause on blur / resume on focus
   let hiddenPause = false;
@@ -251,7 +263,8 @@ export function boot(env = {}) {
     hiddenPause = true;
     mutedBefore = audio.isMuted();
     audio.mute(true);
-    if (scenes.find('overworld') && !scenes.find('menu') && !scenes.isTransitioning && scenes.top()?.name === 'overworld') {
+    // Only the field pauses into the menu; a modal, battle or title keeps its own state.
+    if (!scenes.find('menu') && !scenes.isTransitioning && scenes.top()?.name === 'overworld') {
       G.push('menu');
     }
   }
@@ -281,6 +294,7 @@ export function boot(env = {}) {
     G.bus.emit('display:lowPower', { on: true });
   }
 
+  /** 90 slow frames (> 24 ms) -> low power; never flips back in-session. */
   function watchBudget(dt) {
     if (dt > config.SLOW_FRAME_MS) {
       perf.slowFrames++;
@@ -295,9 +309,9 @@ export function boot(env = {}) {
     G.tweens.update(ms);
     G.fx.update(ms);
     G.toasts.update(ms);
-    G.scenes.handleInput(G.input);
-    G.scenes.update(ms);
-    G.persist.tick(G, ms);
+    G.scenes.handleInput(G.input);        // the stack ignores input during transitions
+    G.scenes.update(ms);                  // only overworld/fishing scenes call clockSys.tick
+    G.persist.tick(G.persistView, ms);    // route autosave timer + failure retry
     if (G.debugOverlay) G.debugOverlay.update(ms);
   }
 
@@ -312,7 +326,7 @@ export function boot(env = {}) {
 
   function frame(now) {
     win.requestAnimationFrame(frame);
-    const dt = Math.min(now - last, config.MAX_FRAME_DT_MS);
+    const dt = Math.min(now - last, config.MAX_FRAME_DT_MS); // clamp after tab sleep
     last = now;
     perf.frames++;
     fpsAcc += dt;
@@ -321,11 +335,11 @@ export function boot(env = {}) {
 
     const t0 = win.performance.now();
     if (!loop.paused) {
-      acc += dt * G.speed;
+      acc += dt * G.speed;                                          // debug speed scales simulation only
       const maxSteps = config.MAX_STEPS_PER_FRAME * Math.max(1, G.speed);
       let steps = 0;
       while (acc >= TICK && steps < maxSteps) { step(TICK); acc -= TICK; steps++; }
-      if (steps === maxSteps) acc = 0;
+      if (steps === maxSteps) acc = 0;                              // drop time rather than spiral
     }
     const t1 = win.performance.now();
     perf.drawImages = 0;

@@ -6,6 +6,7 @@ test page (`demo.html`). Nothing here touches the DOM except the demo.
 
 ```
 node proto/music/validate.mjs        # structural checks, no audio needed
+node proto/music/analyze.mjs         # music-director report: ranges, clashes, density, bar alignment, loop points
 http://127.0.0.1:8777/_merge-wip/proto/music/demo.html   # plays + renders, logs PASS/FAIL
 ```
 
@@ -66,10 +67,10 @@ Season is a mix tilt rather than a stem (`CUES.world.intensity`: winter 0.9 … 
 | `forecast` | Shift Forecast | E dorian (sus chords) | 96 | 8 | glass E5/B4 tick every beat, hat tick every step, bell melody that touches only 2nd and 6th; nothing resolves |
 | `battle_wild` | Tall Grass | B minor | 126 | 16 | off-beat pluck stabs, driving 8th bass, riff F#5 · F#5 A5 B5 A5 F#5; B section lifts to D |
 | `battle_trainer` | Across the Field | F# minor | 132 | 16 | stacked C#5 F#5 A5 ascent, marimba counter-line |
-| `battle_spire` | The Spire | B minor | 120 | 24 | heavy kit, low brass pad (bass preset on pad voicings −12), **Vagary** A5 G5 F#5 D5 |
+| `battle_spire` | The Spire | B minor | 120 | 24 | heavy kit, low brass pedal (bass preset on open fifths an octave above the bass), **Vagary** A5 G5 F#5 D5 |
 | `summit` | Summit | D major → B minor | 128 | 32 | Heartmark in sixteenths, Vagary in the minor half, bells, counter ostinato |
 | `victory` | Caught the Light | D major | 120 | 4 | one-shot: Heartmark then D major fanfare + glass cascade |
-| `shift_reveal` | Shift | D major | 120 | 2 | one-shot: rising glass run (charge) → scramble → Heartmark chord (resolve); matches 18f/36f/36f animation |
+| `shift_reveal` | Shift | D major | 150 | 1 (32 steps) | one-shot on a 50 ms grid: rising glass run (charge, 0.3 s) → scramble (0.6 s) → Heartmark chord (resolve, 0.7 s); matches the 18f/36f/36f animation. `shift_reveal_anchor` is the chord alone on the same grid |
 | `letter` | A Letter | D pentatonic | 100 | 2 | one-shot music box: the Signal D5 F#5 A5 B5 A5 D6 |
 | `relighting` | The Relighting | D major | 80 | 24 | one-shot build: pad → bass (bar 5) → bells (9) → Heartmark flute (13) → brushes (17) → sustained D with bell cascade (21–24) |
 | `lantern_market` | Lantern Market Waltz | G lydian | 138 | 16 in 3/4 | 12 steps per bar, `beatsPerBar: 3`; marimba lilt, oom-pah-pah bass, bells on |
@@ -107,7 +108,7 @@ Differences from the contract found while reading `js/core/audio.js`, and how th
 - **Muted-by-default layers are `stem: true`**, not a separate "optional" list. `default: false` maps to it.
 - **Scale names** are `pentatonic` (not `major-pentatonic`); `dorian`, `lydian`, `mixolydian` exist.
 - **No rhodes preset** — the `rain` layer uses `bell` at low velocity.
-- **No brass preset** — the Spire's "low brass" is the `bass` preset playing pad voicings an octave down.
+- **No brass preset** — the Spire's "low brass" is the `bass` preset holding open root–fifth dyads in octave 3 (full voicings an octave down put thirds below C3, under the bass line).
 - `humanize` defaults to 0.5 in the engine; the data asks for 0.35 (0.2 for drums) to keep the brushes tight.
 - Chord events pass `n` as an array; the engine resolves arrays natively.
 

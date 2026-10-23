@@ -19,7 +19,7 @@
 import { makeRng } from '../../js/core/rng.js';
 import { SPECIES_LIST } from './species.js';
 import { makeCreature, isFainted } from './creature.js';
-import { getMove, isDamaging } from './moves.js';
+import { getMove, isDamaging, isChipMove } from './moves.js';
 import { getAbility, wardCheck } from './abilities.js';
 import { createBattle, MAX_TURNS } from './engine.js';
 import { chooseAction, chooseReplacement, isLegal } from './ai.js';
@@ -112,6 +112,13 @@ export function simulateBattle(opts) {
       if (!wardCheck(ability, mv, target.types, e.type).lands || e.pp <= 0) note(`ward readout lists a move that cannot land: ${e.creature}'s ${e.move}`);
     }
     if (ev.types.length === 0 && ability.ward.kind !== 'no-status' && expect) note('ward readout lists no type although a technique lands');
+    // Chip techniques listed must be real chip moves with PP that the Ward lets through.
+    for (const e of ev.chip) {
+      const mv = getMove(e.move);
+      if (!isChipMove(mv) || e.pp <= 0 || !wardCheck(ability, mv, target.types, e.type || mv.type).lands) note(`ward readout lists a chip technique that cannot work: ${e.creature}'s ${e.move}`);
+    }
+    const expectChip = battle.sides[side].party.some((c) => !isFainted(c) && c.moves.some((m) => m.pp > 0 && isChipMove(getMove(m.id)) && wardCheck(ability, getMove(m.id), target.types, getMove(m.id).type).lands && (!target.status || getMove(m.id).effect.status.kind === 'trap')));
+    if (expectChip && ev.chip.length === 0) note(`ward readout omits a usable chip technique (turn ${battle.turn})`);
     return ev;
   };
   const brainRng = rng.fork('brain');

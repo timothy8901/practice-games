@@ -84,6 +84,9 @@ import { day as dayOf, formatTime, placeLabel, hasChallenge } from './selectors.
  * @property {() => boolean} crashed                                   last session did not exit cleanly
  * @property {() => boolean} markBoot                                  writes the dirty marker (`cleanExit = 0`)
  * @property {() => boolean} markCleanExit                             writes `cleanExit = 1`
+ * @property {{arm: () => boolean, clear: () => boolean, check: () => boolean}} crashMarker
+ *   the same three operations grouped as BOOT's `main.js` calls them: `arm()` = markBoot (returns
+ *   `crashed()`), `clear()` = markCleanExit, `check()` = crashed
  * @property {() => {failed: boolean, lastError: SaveError|null, retryPending: boolean, lastOk: SaveResult|null}} status
  * @property {(on: boolean) => void} setNoRewind                       rebuild with 1 auto slot and no manual slots
  * @property {() => SaveSystem} system                                 the inner core/save system (debug, tools)
@@ -416,6 +419,11 @@ export function createPersist(opts) {
     crashed: () => sawDirtyMarker,
     markBoot: () => writeMarker('0'),
     markCleanExit: () => writeMarker('1'),
+    crashMarker: Object.freeze({
+      arm: () => { writeMarker('0'); return sawDirtyMarker; },
+      clear: () => writeMarker('1'),
+      check: () => sawDirtyMarker,
+    }),
     status: () => ({ failed: lastError !== null, lastError, retryPending: retry !== null, lastOk }),
     setNoRewind(on) {
       const next = on === true;

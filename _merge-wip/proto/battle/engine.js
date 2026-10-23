@@ -14,16 +14,20 @@
  * 'ability', 'glint', 'scrap-cost', 'read', 'reveal', 'capture-shake', 'capture',
  * 'capture-fail', 'run', 'stance', 'item', 'ward-suppressed', 'type-shift', 'exp',
  * 'levelup', 'learn', 'learn-offer', 'payout', 'blackout', 'replace-needed', 'end', 'message'.
+ * Outcomes ('end'.outcome / result().outcome): 'win' | 'loss' | 'capture' | 'run' |
+ * 'holdout' (the opening "hold out N turns" scene) | 'draw' (MAX_TURNS safety cap).
  *
  * API (architecture draft section 5.1): `createBattle(setup, rng?)`, `battle.state()`,
  * `battle.availableActions(side)` (alias `legal`), `battle.submit(actions)` (alias
  * `step`), `battle.read(side)`, `battle.setCaptureStance(on)`, `battle.result()`.
+ * Per-dial rules (Read cost, capture display, Ward badge timing, Run) come from
+ * {@link DIAL_RULES} and may be overridden with `setup.rules`.
  *
  * @module proto/battle/engine
  */
 
 import { effectiveness, ORDINARY_TYPES } from './types.js';
-import { getMove, SCRAP, isDamaging, isSureHit, isSelfTargeting } from './moves.js';
+import { getMove, SCRAP, isDamaging, isSureHit, isSelfTargeting, isChipMove } from './moves.js';
 import { getAbility, wardCheck, wardHeldText, isWard } from './abilities.js';
 import { getSpecies } from './species.js';
 import { gainExp, hpRatio, isFainted, speciesOf, MENDS_PER_BATTLE } from './creature.js';
@@ -84,6 +88,24 @@ export const TRAINER_EXP_MULT = 1.5;
 export const MAX_TURNS = 200;
 
 const DIALS = Object.freeze(['drift', 'flux', 'freefall']);
+
+/**
+ * Per-dial battle rules (rules 17.1). `createBattle({rules})` may override any
+ * key (the architecture draft resolves these from `data/dials.js`).
+ * - `readCostsTurn`: in-battle Read spends the turn (Freefall) or is free once per foe
+ * - `captureDisplay`: 'exact' percentages or Freefall 'bands' (Low / Fair / Good)
+ * - `wardBadge`: the "Ward ?" badge shows from 'start' or only 'after-block'
+ * - `runAllowed`: Run from wild battles (trainer battles never allow it)
+ * - `holdOutTurns`: null, or end the battle as a 'holdout' after this many turns
+ *   (the opening "hold out 3 turns" scene, rules 17.2)
+ * @typedef {{readCostsTurn:boolean, captureDisplay:'exact'|'bands', wardBadge:'start'|'after-block', runAllowed:boolean, holdOutTurns:number|null}} DialRules
+ */
+export const DIAL_RULES = Object.freeze({
+  drift: Object.freeze({ readCostsTurn: false, captureDisplay: 'exact', wardBadge: 'start', runAllowed: true, holdOutTurns: null }),
+  flux: Object.freeze({ readCostsTurn: false, captureDisplay: 'exact', wardBadge: 'start', runAllowed: true, holdOutTurns: null }),
+  freefall: Object.freeze({ readCostsTurn: true, captureDisplay: 'bands', wardBadge: 'after-block', runAllowed: true, holdOutTurns: null }),
+});
+
 const STAT_NAMES = Object.freeze({ atk: 'Attack', def: 'Defence', spa: 'Sp. Attack', spd: 'Sp. Defence', spe: 'Speed', eva: 'evasion' });
 const MAJOR_STATUS = Object.freeze(['burn', 'poison', 'chill', 'numb']);
 const STATUS_TYPE_IMMUNITY = Object.freeze({ burn: 'Kiln', chill: 'Rime', poison: 'Rust', numb: 'Bolt' });
@@ -274,7 +296,6 @@ function freshVol() {
     charging: null,
     flinched: false,
     movedThisTurn: false,
-    hollowHitThisTurn: false,
     trap: 0,
     wardSuppressed: 0,
     critRoll: 1,
@@ -305,6 +326,9 @@ export class Battle {
    * @param {import('./creature.js').Creature[]} [opts.yard] Training Yard creatures (25% of party EXP)
    * @param {{seen:Set<string>, read:Set<string>}} [opts.fieldLog]
    * @param {boolean} [opts.prism=false] Scouting Prism owned
+   * @param {Partial<DialRules>} [opts.rules] overrides of the dial's {@link DIAL_RULES}
+   * @param {number|null} [opts.holdOut] end the battle as a 'holdout' after this many turns (opening scene)
+   * @param {number|string} [opts.nextUid] uid given to a caught creature (the game allocates uids)
    */
   constructor(opts) {
     if (!opts || !Array.isArray(opts.sides) || opts.sides.length !== 2) throw new TypeError('createBattle: sides must be [player, foe]');
@@ -316,6 +340,13 @@ export class Battle {
     }
     this.kind = opts.kind;
     this.dial = dial;
+    /** @type {DialRules} */
+    this.rules = { ...DIAL_RULES[dial], ...(opts.rules || {}) };
+    if (opts.holdOut != null) this.rules.holdOutTurns = opts.holdOut;
+    if (this.rules.holdOutTurns != null && !(Number.isInteger(this.rules.holdOutTurns) && this.rules.holdOutTurns > 0)) {
+      throw new RangeError(`createBattle: holdOut must be a positive integer, got ${String(this.rules.holdOutTurns)}`);
+    }
+    this.nextUid = opts.nextUid;
     this.rng = opts.rng;
     this.curveLevel = opts.curveLevel ?? null;
     this.summit = !!opts.summit;
@@ -360,7 +391,8 @@ export class Battle {
     if (this.kind === 'wild' && this.sides[1].trainer) throw new RangeError('createBattle: a wild battle has no foe trainer');
     if (this.kind === 'trainer' && !this.sides[1].trainer) this.sides[1].trainer = { name: 'Trainer' };
     this.stance = this.kind === 'wild' ? !!opts.captureStance : false;
-    this.wardBadge = [false, false];
+    /** uids of creatures whose "Ward ?" badge has been revealed (per creature, so it follows switches). */
+    this.wardBadgeUids = new Set();
     for (const side of this.sides) {
       for (const c of side.party) {
         c.mends = MENDS_PER_BATTLE;
@@ -403,6 +435,16 @@ export class Battle {
     return s.bflags.get(c.uid);
   }
 
+  /** Whether the "Ward ?" badge shows beside this side's active creature (rules 8.2). */
+  wardBadge(side) {
+    return this.wardBadgeUids.has(this.active(side).uid);
+  }
+
+  /** Reveals a creature's Ward badge (send-in on Drift/Flux, or the first blocked hit). */
+  _revealWard(side, c = this.active(side)) {
+    if (isWard(getAbility(c.ability))) this.wardBadgeUids.add(c.uid);
+  }
+
   /** Effective ability of the active creature (null while Crackdust suppresses a Ward). */
   effectiveAbility(side) {
     const ability = getAbility(this.active(side).ability);
@@ -435,6 +477,7 @@ export class Battle {
     return {
       kind: this.kind,
       dial: this.dial,
+      rules: { ...this.rules },
       turn: this.turn,
       phase: this.phase,
       pendingReplace: this.pendingReplace.slice(),
@@ -444,10 +487,12 @@ export class Battle {
       sides: this.sides.map((s) => ({
         active: s.active,
         trainer: s.trainer ? s.trainer.name : null,
-        wardBadge: this.wardBadge[s.index],
+        wardBadge: this.wardBadge(s.index),
         stages: { ...s.vol.stages },
         guarding: s.vol.guarding,
-        boostBlocked: this.turn <= s.vol.boostBlockUntil,
+        // Whether the coming turn's boosts are blocked by Plumbline (the menu is drawn for the next turn), and for how many turns.
+        boostBlocked: this.turn < s.vol.boostBlockUntil,
+        boostBlockedTurns: Math.max(0, s.vol.boostBlockUntil - this.turn),
         trapped: s.vol.trap > 0,
         charging: s.vol.charging ? s.party[s.active].moves[s.vol.charging.move].id : null,
         pendingHeal: s.vol.pendingHeal ? Math.max(0, s.vol.pendingHeal.until - this.turn) : null,
@@ -462,8 +507,10 @@ export class Battle {
   }
 
   /**
-   * What a side may do now. Every entry carries `selectable` and, when it is
-   * not selectable, a `reason` string for the menu to show.
+   * What a side may do now. Every entry carries `selectable` (alias `usable`,
+   * the architecture draft's name) and, when it is not selectable, a `reason`
+   * string for the menu to show. Move entries carry their slot as `index`
+   * (alias `i`).
    * @param {number} side
    */
   availableActions(side) {
@@ -493,43 +540,55 @@ export class Battle {
         reason = 'No PP left.';
       }
       const panelWord = check.reason === 'ward' ? 'Blocked by Ward' : check.reason === 'immune' ? 'No effect' : isDamaging(mv) ? check.eff.word : null;
-      return { index: i, id: mv.id, name: mv.name, type, category: mv.category, power: mv.power, pp: m.pp, maxPp: m.maxPp, selectable, reason, word: panelWord, mult: check.eff.mult, hitChance: this.hitChance(side, mv), heartmark: m.id === c.heartmark };
+      return { index: i, i, id: mv.id, name: mv.name, type, category: mv.category, power: mv.power, pp: m.pp, maxPp: m.maxPp, selectable, usable: selectable, reason, word: panelWord, mult: check.eff.mult, hitChance: this.hitChance(side, mv), heartmark: m.id === c.heartmark };
     });
-    out.scrap = { available: allOut, name: SCRAP.name, reason: allOut ? null : 'Scrap is only available when every move is out of PP.', cost: Math.max(1, Math.floor(c.stats.hp * SCRAP_COST)) };
+    out.scrap = { available: allOut, usable: allOut, name: SCRAP.name, reason: allOut ? null : 'Scrap is only available when every move is out of PP.', cost: Math.max(1, Math.floor(c.stats.hp * SCRAP_COST)) };
     out.switches = this._switchOptions(side, false);
     const isTrainer = this.kind === 'trainer';
+    const canRun = !isTrainer && this.rules.runAllowed;
     out.run = side === 0
-      ? { available: !isTrainer, reason: isTrainer ? 'You cannot run from a trainer battle.' : null }
-      : { available: false, reason: 'Only the player may run.' };
+      ? { available: canRun, usable: canRun, reason: isTrainer ? 'You cannot run from a trainer battle.' : canRun ? null : 'You cannot run from this battle.' }
+      : { available: false, usable: false, reason: 'Only the player may run.' };
     const foeKey = foe.uid;
     const readDone = s.readUsed.has(foeKey);
     out.read = {
       available: !readDone,
-      free: this.dial !== 'freefall',
-      costsTurn: this.dial === 'freefall',
+      usable: !readDone,
+      free: !this.rules.readCostsTurn,
+      costsTurn: this.rules.readCostsTurn,
       reason: readDone ? `${foe.nickname} has already been Read.` : null,
     };
     if (side === 0 && this.kind === 'wild') {
       const fails = this.captureFails.get(foe.uid) || 0;
+      const exact = this.rules.captureDisplay === 'exact';
       const grades = [1, 2, 3].map((g) => {
         const odds = captureOdds({ catchRate: speciesOf(foe).catchRate, hp: foe.hp, maxHp: foe.stats.hp, status: foe.status ? foe.status.kind : null, trapped: this.sides[1].vol.trap > 0, grade: g, fails });
         const stock = s.bag.lanterns ? s.bag.lanterns[g] || 0 : null;
-        return { grade: g, name: LANTERN[g].name, price: LANTERN[g].price, odds: this.dial === 'freefall' ? null : odds, band: captureBand(odds), stock, selectable: stock === null || stock > 0, reason: stock === 0 ? `No ${LANTERN[g].name} left.` : null };
+        const selectable = stock === null || stock > 0;
+        return { grade: g, name: LANTERN[g].name, price: LANTERN[g].price, odds: exact ? odds : null, band: captureBand(odds), stock, selectable, usable: selectable, reason: stock === 0 ? `No ${LANTERN[g].name} left.` : null };
       });
-      out.lantern = { available: true, fails, grades, exactOdds: this.dial !== 'freefall' };
+      out.lantern = { available: true, fails, grades, exactOdds: exact };
       out.captureStance = { on: this.stance, available: true, text: 'Party damage cannot drop the wild creature below 1 HP.' };
     } else {
       out.lantern = { available: false, reason: side === 0 ? 'You cannot capture a trainer\'s creature.' : 'Only the player captures.' };
       out.captureStance = { on: false, available: false, reason: 'Capture Stance is only for wild battles.' };
     }
     if (s.bag.crackdust > 0) {
-      const foeIsWard = isWard(getAbility(foe.ability));
-      out.items.push({ id: 'crackdust', name: 'Crackdust', count: s.bag.crackdust, selectable: foeIsWard && this.sides[1 - side].vol.wardSuppressed === 0, reason: !foeIsWard ? `${foe.nickname} has no Ward.` : this.sides[1 - side].vol.wardSuppressed > 0 ? 'Its Ward is already suppressed.' : null });
+      const why = this._crackdustBlocked(side);
+      out.items.push({ id: 'crackdust', name: 'Crackdust', count: s.bag.crackdust, selectable: !why, usable: !why, reason: why });
     }
     for (const it of s.items) {
-      if (it.heal) out.items.push({ id: it.id, name: it.name || it.id, count: 1, selectable: c.hp < c.stats.hp, reason: c.hp < c.stats.hp ? null : 'HP is full.' });
+      if (it.heal) out.items.push({ id: it.id, name: it.name || it.id, count: 1, selectable: c.hp < c.stats.hp, usable: c.hp < c.stats.hp, reason: c.hp < c.stats.hp ? null : 'HP is full.' });
     }
     return out;
+  }
+
+  /** Why Crackdust cannot be thrown right now (null when it can). */
+  _crackdustBlocked(side) {
+    const foe = this.foeOf(side);
+    if (!isWard(getAbility(foe.ability))) return `${foe.nickname} has no Ward.`;
+    if (this.sides[1 - side].vol.wardSuppressed > 0) return 'Its Ward is already suppressed.';
+    return null;
   }
 
   /**
@@ -560,7 +619,7 @@ export class Battle {
         selectable = false;
         reason = `${c.nickname} has fainted.`;
       }
-      return { index: i, name: c.nickname, speciesId: c.speciesId, level: c.level, hp: c.hp, maxHp: c.stats.hp, selectable, reason };
+      return { index: i, i, name: c.nickname, speciesId: c.speciesId, level: c.level, hp: c.hp, maxHp: c.stats.hp, selectable, usable: selectable, reason };
     });
   }
 
@@ -602,7 +661,8 @@ export class Battle {
    */
   read(side) {
     this._events = [];
-    if (this.dial === 'freefall') throw new BattleError('READ_COSTS_TURN', 'On Freefall, Read costs the turn: submit it as an action.');
+    if (this.rules.readCostsTurn) throw new BattleError('READ_COSTS_TURN', 'On this dial Read costs the turn: submit it as an action.');
+    if (this.phase === 'ended') throw new BattleError('ENDED', 'The battle is over.');
     this._doRead(side, 'Read');
     return this._flush();
   }
@@ -617,7 +677,8 @@ export class Battle {
     s.readUsed.add(foe.uid);
     this.fieldLog.read.add(foe.speciesId);
     const info = readCreature(foe, this.dial, { prism: this.prism });
-    if (info.ability.ward && this.dial !== 'freefall') this.wardBadge[1 - side] = true;
+    info.costsTurn = this.rules.readCostsTurn;
+    if (this.rules.wardBadge === 'start') this._revealWard(1 - side, foe);
     this._emit({ type: 'read', side, target: foe.nickname, source, info, text: `${foe.nickname}: ${info.ability.name}. ${info.ability.text}` });
     return true;
   }
@@ -697,11 +758,17 @@ export class Battle {
     for (const s of this.sides) {
       s.vol.movedThisTurn = false;
       s.vol.flinched = false;
-      s.vol.hollowHitThisTurn = false;
+      // Crits are rolled at the start of the turn for every creature (Keen Glint, Proposed):
+      // the roll is kept and compared against the chosen technique's crit stage when it lands.
       s.vol.critRoll = this.rng.next();
-      const ability = getAbility(this.active(s.index).ability);
-      if (ability.glint && s.vol.critRoll < critChance(ability.hooks.critStages())) {
-        this._emit({ type: 'glint', side: s.index, who: this.active(s.index).nickname, text: `${this.active(s.index).nickname}'s ears glint. Its next hit will crit.` });
+      const me = this.active(s.index);
+      const ability = getAbility(me.ability);
+      if (ability.glint) {
+        const a = acts[s.index];
+        const chosen = a && a.type === 'move' && me.moves[a.move] ? getMove(me.moves[a.move].id) : a && a.type === 'scrap' ? SCRAP : null;
+        if (chosen && isDamaging(chosen) && s.vol.critRoll < critChance(this._critStage(me, chosen))) {
+          this._emit({ type: 'glint', side: s.index, who: me.nickname, text: `${me.nickname}'s ears glint. Its next hit will crit.` });
+        }
       }
     }
     const order = this._order(acts);
@@ -713,19 +780,25 @@ export class Battle {
     }
     if (this.phase !== 'ended') this._endOfTurn();
     if (this.phase !== 'ended') this._resolveFaints();
+    if (this.phase !== 'ended' && this.rules.holdOutTurns != null && this.turn >= this.rules.holdOutTurns) this._finish('holdout', null);
     if (this.phase !== 'ended' && this.turn >= MAX_TURNS) this._finish('draw', null);
     return this._flush();
   }
 
   /**
    * Alias of {@link Battle#submit} that also accepts a single player action
-   * (`step(action)`); the foe's action then comes from `foeAi`.
+   * (`step(action)`); the foe's action then comes from `foeAi`. When only the
+   * foe must send in a replacement, the player's action is ignored (there is
+   * nothing for the player to choose) and `foeAi` picks the replacement.
    * @param {any|any[]} action
    * @returns {any[]} events
    */
   step(action) {
     if (Array.isArray(action)) return this.submit(action);
-    if (this.phase === 'replace' && !this.pendingReplace.includes(0)) return this.submit([undefined, action]);
+    if (this.phase === 'replace' && !this.pendingReplace.includes(0)) {
+      const foeSwitch = action && action.type === 'switch' && !this.foeAi ? action : undefined;
+      return this.submit([undefined, foeSwitch]);
+    }
     return this.submit([action]);
   }
 
@@ -749,22 +822,27 @@ export class Battle {
       case 'run':
         if (side !== 0) throw new BattleError('NO_RUN', 'Only the player may run.');
         if (this.kind === 'trainer') throw new BattleError('NO_RUN', 'You cannot run from a trainer battle.');
+        if (!this.rules.runAllowed) throw new BattleError('NO_RUN', 'You cannot run from this battle.');
         return;
       case 'read':
-        if (this.dial !== 'freefall') throw new BattleError('READ_FREE', 'On this dial Read is free: call battle.read(side) instead.');
+        if (!this.rules.readCostsTurn) throw new BattleError('READ_FREE', 'On this dial Read is free: call battle.read(side) instead.');
         return;
       case 'lantern':
         if (side !== 0 || this.kind !== 'wild') throw new BattleError('NO_LANTERN', 'Lanterns are for wild battles.');
         if (!LANTERN[a.grade]) throw new BattleError('BAD_LANTERN', `Unknown Lantern grade ${String(a.grade)}.`);
         if (s.bag.lanterns && !(s.bag.lanterns[a.grade] > 0)) throw new BattleError('NO_LANTERN', `No ${LANTERN[a.grade].name} left.`);
         return;
-      case 'item':
-        if (a.item === 'crackdust') {
+      case 'item': {
+        const itemId = itemIdOf(a);
+        if (itemId === 'crackdust') {
           if (!(s.bag.crackdust > 0)) throw new BattleError('NO_ITEM', 'No Crackdust.');
+          const why = this._crackdustBlocked(side);
+          if (why) throw new BattleError('NO_WARD', `Crackdust would be wasted: ${why}`);
           return;
         }
-        if (!s.items.some((it) => it.id === a.item)) throw new BattleError('NO_ITEM', `No item ${String(a.item)}.`);
+        if (!s.items.some((it) => it.id === itemId)) throw new BattleError('NO_ITEM', `No item ${String(itemId)}.`);
         return;
+      }
       default:
         throw new BattleError('BAD_ACTION', `Unknown action type ${String(a.type)}.`);
     }
@@ -812,7 +890,7 @@ export class Battle {
         this._captureAttempt(side, a.grade);
         return;
       case 'item':
-        this._useItem(side, a.item);
+        this._useItem(side, itemIdOf(a));
         return;
       case 'scrap':
         this._useMove(side, null);
@@ -838,7 +916,7 @@ export class Battle {
     const c = s.party[to];
     s.participants.add(c.uid);
     const ability = getAbility(c.ability);
-    if (isWard(ability) && this.dial !== 'freefall') this.wardBadge[side] = true;
+    if (this.rules.wardBadge === 'start') this._revealWard(side, c);
     if (!initial || this.turn === 0) {
       if (ability.hooks.onSwitchIn) ability.hooks.onSwitchIn({ battle: this, side, self: c, foe: this.foeOf(side) });
     }
@@ -883,9 +961,11 @@ export class Battle {
     if (s.bag.lanterns) s.bag.lanterns[grade]--;
     const success = grade === 'sure' || this.rng.chance(odds);
     const segments = success ? 3 : Math.min(2, Math.floor(odds * 3));
-    this._emit({ type: 'capture-shake', side, target: target.nickname, grade, odds, band: captureBand(odds), segments, success, text: `You raise the ${LANTERN[grade].name}. The light draws ${target.nickname} in.` });
+    const exact = this.rules.captureDisplay === 'exact';
+    this._emit({ type: 'capture-shake', side, target: target.nickname, grade, odds: exact ? odds : null, band: captureBand(odds), segments, success, text: `You raise the ${LANTERN[grade].name}. The light draws ${target.nickname} in.` });
     if (success) {
       target.wild = false;
+      if (this.nextUid !== undefined) target.uid = this.nextUid;
       this.caught = target;
       this._emit({ type: 'capture', side, speciesId: target.speciesId, name: target.nickname, text: `${target.nickname} was caught. Its Heartmark lights.` });
       this._finish('capture', 0);
@@ -893,7 +973,7 @@ export class Battle {
       const next = fails + 1;
       this.captureFails.set(target.uid, next);
       const nextOdds = captureOdds({ catchRate: speciesOf(target).catchRate, hp: target.hp, maxHp: target.stats.hp, status: target.status ? target.status.kind : null, trapped: this.sides[1 - side].vol.trap > 0, grade, fails: next });
-      this._emit({ type: 'capture-fail', side, target: target.nickname, fails: next, nextOdds, text: `${target.nickname} slipped out of the light.` });
+      this._emit({ type: 'capture-fail', side, target: target.nickname, fails: next, nextOdds: exact ? nextOdds : null, nextBand: captureBand(nextOdds), text: `${target.nickname} slipped out of the light.` });
     }
   }
 
@@ -1033,7 +1113,7 @@ export class Battle {
         this._emit({ type: 'effectiveness', side, target: target.nickname, word: 'Blocked', mult: 0 });
         this._emit({ type: 'blocked', side, target: target.nickname, reason: 'immune', text: `It has no effect on ${target.nickname}.` });
       } else {
-        this.wardBadge[foeSide] = true;
+        this._revealWard(foeSide, target);
         this._emit({ type: 'effectiveness', side, target: target.nickname, word: 'Blocked', mult: check.eff.mult });
         this._emit({ type: 'blocked', side, target: target.nickname, reason: 'ward', ward: foeAbility.name, text: wardHeldText(foeAbility) });
         this._emit(this._wardReadout(side, foeAbility, target));
@@ -1099,8 +1179,7 @@ export class Battle {
     const defense = this.effStat(foeSide, physical ? 'def' : 'spd');
     const userAbility = getAbility(user.ability);
     const targetAbility = getAbility(target.ability);
-    let critStage = (move.effect.highCrit || 0) + (userAbility.hooks.critStages ? userAbility.hooks.critStages() : 0);
-    const crit = v.critRoll < critChance(critStage);
+    const crit = v.critRoll < critChance(this._critStage(user, move));
     const rand = 0.85 + this.rng.next() * 0.15;
     const stab = moveType !== null && (user.types.includes(moveType) || (move.id === user.heartmark && user.heartmarkStab));
     let extra = 1;
@@ -1136,6 +1215,12 @@ export class Battle {
       }
     }
     return dealt;
+  }
+
+  /** Crit stage of a technique for its user (move's high-crit stages plus ability stages). */
+  _critStage(user, move) {
+    const ability = getAbility(user.ability);
+    return (move.effect.highCrit || 0) + (ability.hooks.critStages ? ability.hooks.critStages() : 0);
   }
 
   _applySecondary(side, move, moveType, target) {
@@ -1191,7 +1276,6 @@ export class Battle {
     }
     dmg = Math.min(dmg, c.hp);
     c.hp -= dmg;
-    if (source === 'party' && extra.moveType === 'Hollow') this.sides[side].vol.hollowHitThisTurn = true;
     this._emit({ type: 'damage', side, target: c.nickname, amount: dmg, hp: c.hp, maxHp: c.stats.hp, source, stanceFloor: this.kind === 'wild' && side === 1 && this.stance && c.hp === 1 && dmg < Math.floor(amount) });
     if (isFainted(c)) this._emit({ type: 'faint', side, target: c.nickname, text: `${c.nickname} fainted.` });
     return dmg;
@@ -1418,13 +1502,28 @@ export class Battle {
     }
     const types = ORDINARY_TYPES.filter((t) => wardCheck(ability, { category: 'special', power: 100, type: t, effect: {} }, target.types, t).lands);
     const indirect = ability.ward.kind === 'no-status' ? ['poison (from a damaging hit)', 'burn (from a damaging hit)'] : ['poison', 'burn', 'trap'];
+    // The party's chip techniques (poison / burn / trap) that still work: a status
+    // move that the Ward lets through, or a damaging move that lands and may inflict chip.
+    const chip = [];
+    for (const c of s.party) {
+      if (isFainted(c)) continue;
+      for (const m of c.moves) {
+        const mv = getMove(m.id);
+        if (!isChipMove(mv) || m.pp <= 0) continue;
+        const type = mv.effect.queuedType && c.typeQueue ? c.typeQueue[(c.typeIndex + 1) % c.typeQueue.length] : mv.type;
+        if (!wardCheck(ability, mv, target.types, type).lands) continue;
+        if (target.status && mv.effect.status.kind !== 'trap' && MAJOR_STATUS.includes(mv.effect.status.kind)) continue;
+        chip.push({ creature: c.nickname, uid: c.uid, move: mv.id, moveName: mv.name, kind: mv.effect.status.kind, pp: m.pp });
+      }
+    }
     const lines = [wardHeldText(ability)];
     lines.push(canLand.length ? `Can land: ${canLand.map((e) => `${e.creature}'s ${e.moveName}`).join(', ')}.` : 'Nothing in your party lands right now.');
     if (outOfPp.length) lines.push(`Out of PP: ${outOfPp.map((e) => `${e.creature}'s ${e.moveName}`).join(', ')}.`);
     lines.push(types.length ? `Types that get through: ${types.join(', ')}.` : 'No type gets through directly.');
     lines.push(`Indirect damage that works: ${indirect.join(', ')}.`);
+    if (chip.length) lines.push(`Your chip techniques: ${chip.map((e) => `${e.creature}'s ${e.moveName} (${e.kind})`).join(', ')}.`);
     if (s.bag.crackdust > 0) lines.push(`You carry Crackdust (${s.bag.crackdust}).`);
-    return { type: 'ward-readout', side, target: target.nickname, targetTypes: target.types.slice(), ward: ability.name, wardId: ability.id, wardKind: ability.ward.kind, canLand, outOfPp, types, indirect, crackdust: s.bag.crackdust > 0, text: lines.join(' ') };
+    return { type: 'ward-readout', side, target: target.nickname, targetTypes: target.types.slice(), ward: ability.name, wardId: ability.id, wardKind: ability.ward.kind, canLand, outOfPp, types, indirect, chip, crackdust: s.bag.crackdust > 0, text: lines.join(' ') };
   }
 
   // ---- events ------------------------------------------------------------------------
@@ -1441,6 +1540,11 @@ export class Battle {
   }
 }
 
+/** Item id of an item action: the architecture draft names it `id`, the prototype `item`. */
+function itemIdOf(a) {
+  return a.item !== undefined ? a.item : a.id;
+}
+
 function describeStatus(kind) {
   return { burn: 'burned', poison: 'poisoned', chill: 'chilled', numb: 'numbed' }[kind] || kind;
 }
@@ -1451,6 +1555,7 @@ function outcomeText(outcome, b) {
     case 'loss': return 'You have no creatures left.';
     case 'capture': return `${b.caught.nickname} joins you.`;
     case 'run': return 'You got away.';
+    case 'holdout': return `You held out for ${b.turn} turns.`;
     default: return 'The battle ends in a draw.';
   }
 }

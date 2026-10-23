@@ -9,11 +9,13 @@ const DAY_IDS = DAY_PARTS.map(t => t.id);
 for (const [id, t] of Object.entries(TRACKS)) {
   const spb = t.stepsPerBar || 16;
   const total = t.bars * spb;
-  ok(t.bpm >= 60 && t.bpm <= 140, `${id}: bpm ${t.bpm}`);
+  ok(t.loop === false ? (t.bpm >= 60 && t.bpm <= 300) : (t.bpm >= 60 && t.bpm <= 140), `${id}: bpm ${t.bpm}${t.loop === false ? ' (one-shot)' : ''}`);
   const problems = [];
   for (const [name, L] of Object.entries(t.layers)) {
     if (!PRESETS.has(L.inst)) problems.push(`${name}: unknown inst ${L.inst}`);
     if (!Array.isArray(L.pattern) || L.pattern.length === 0) { problems.push(`${name}: empty`); continue; }
+    // melodies written in the P() DSL: every '|' must land on a bar boundary, or the tune drifts off its harmony
+    if (L.pattern.barLines) for (const b of L.pattern.barLines) if (b % spb !== 0) problems.push(`${name}: bar line at step ${b} is not a multiple of ${spb}`);
     let last = -1, lastEnd = 0;
     for (const e of L.pattern) {
       if (!(e.t >= 0 && e.t < total)) problems.push(`${name}: t=${e.t} outside 0..${total - 1}`);
@@ -56,7 +58,14 @@ ok(CUES.world.pick({ weekday: 6, hour: 20, place: 'market' }) === 'lantern_marke
 for (const id of ['battle_wild', 'battle_trainer', 'battle_spire', 'summit']) ok(TRACKS[id].layers.tense && TRACKS[id].bpm >= 120 && TRACKS[id].bpm <= 132, `${id}: tense stem, ${TRACKS[id].bpm} bpm`);
 ok(TRACKS.forecast.bars === 8, 'forecast is 8 bars');
 ok(stemLayers(TRACKS.h_morning, 'perc').join(',') === 'perc.kick,perc.snare,perc.hat', 'perc stem maps to kick/snare/hat layers');
-ok(TRACKS.victory.bars === 4 && TRACKS.shift_reveal.bars === 2 && TRACKS.letter.bars === 2 && TRACKS.relighting.bars === 24, 'sting lengths');
+ok(TRACKS.victory.bars === 4 && TRACKS.shift_reveal.bars === 1 && TRACKS.shift_reveal.stepsPerBar === 32 && TRACKS.shift_reveal_anchor.stepsPerBar === 32 && TRACKS.letter.bars === 2 && TRACKS.relighting.bars === 24, 'sting lengths');
+{
+  // shift_reveal is locked to the 18f/36f/36f animation: 50 ms steps, phases 6/12/14 steps = 300/600/700 ms
+  const sr = TRACKS.shift_reveal, stepMs = 60000 / sr.bpm / (sr.stepsPerBar / 4);
+  const mel = sr.layers.melody.pattern, chordEv = mel[mel.length - 1];
+  ok(Math.abs(stepMs - 50) < 1e-9 && chordEv.t === 18 && chordEv.d === 14 && CUES.shift_reveal.phasesMs.join() === '300,600,700', `shift_reveal grid ${stepMs} ms/step, chord at step ${chordEv.t} for ${chordEv.d} steps, phases ${CUES.shift_reveal.phasesMs.join('/')} ms`);
+  ok(Object.values(TRACKS).filter(t => t.stepsPerBar === 12).every(t => toEngine(t).beatsPerBar === 3), '3/4 tracks reach the engine with beatsPerBar 3');
+}
 ok(signalSting([5, 4, 3, 2, 1, 0]).layers.melody.pattern.length === 7, 'signalSting builds a custom letter');
 {
   const c = worldCue({ hour: 22, weekday: 2, weather: 'rain', tide: 0.9, season: 'summer', place: 'town' });

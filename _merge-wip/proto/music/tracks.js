@@ -28,9 +28,11 @@ export function midi(name) {
  */
 export function P(str, { v = 0.8, t0 = 0, legato = 1 } = {}) {
   const out = [];
+  const barLines = []; // cursor at each '|' (non-enumerable metadata; validate/analyze check they fall on bar boundaries)
   let t = t0;
   for (const tok of str.split(/\s+/)) {
-    if (!tok || tok === '|') continue;
+    if (!tok) continue;
+    if (tok === '|') { barLines.push(t); continue; }
     const parts = tok.split(':');
     const head = parts[0];
     const d = Number(parts[1] ?? 1);
@@ -40,6 +42,7 @@ export function P(str, { v = 0.8, t0 = 0, legato = 1 } = {}) {
     out.push({ t, n, d: Math.max(1, Math.round(d * legato)), v: vel });
     t += d;
   }
+  Object.defineProperty(out, 'barLines', { value: barLines, enumerable: false });
   return out;
 }
 
@@ -248,7 +251,7 @@ function theme(id, { title, bpm, key, scale, bars, melody, melodyInst = 'flute',
 // Motifs: HEARTMARK = 4 notes, intervals +4 +3 +2 (D F# A B; G B D E) — title, morning (home town), every Shift sting.
 //         VAGARY    = falling phrase A G F# D (-2 -1 -4) — Spire/summit battles, skyglass.
 
-// 00–03 "Harbor Asleep" — B minor, 84 bpm. Flute, nearly all rests; low tide ticks live in the perc whisper.
+// 00–03 "Harbor Asleep" — B minor, 84 bpm. Flute in long tones with a rest at every phrase end; low tide ticks live in the perc whisper.
 const H_NIGHT_DEEP = [
   'B: B3 D4 F#4', 'G: G3 B3 D4 F#4', 'D: A3 D4 F#4', 'E: E3 G3 B3 D4',
   'B: B3 D4 F#4', 'G: G3 B3 D4', 'A: A3 D4 E4 / A: A3 C#4 E4', 'B: B3 D4 F#4',
@@ -256,10 +259,10 @@ const H_NIGHT_DEEP = [
   'E: E3 G3 B3 D4', 'F#: F#3 A3 C#4', 'G: G3 B3 D4', 'A: A3 C#4 E4',
 ];
 const M_NIGHT_DEEP = P(`
-  r:4 F#4:4 A4:4 B4:4 | A4:8 r:8 | F#4:4 E4:4 D4:6 r:2 | E4:12 r:4 |
+  r:4 F#4:4 A4:4 B4:4 | A4:8 r:8 | F#4:4 E4:4 D4:6 r:2 | E4:8 r:8 |
   r:4 F#4:4 A4:4 B4:4 | D5:6 C#5:2 B4:4 A4:4 | F#4:12 r:4 | E4:8 F#4:8 |
   r:4 A4:4 B4:4 D5:4 | C#5:8 E5:4 D5:4 | B4:8 D5:4 F#5:4 | G5:8 r:8 |
-  E5:4 D5:4 B4:8 | C#5:8 A4:8 | B4:6 D5:2 B4:4 G4:4 | F#4:4 E4:4 F#4:8`, { v: 0.6 });
+  E5:4 D5:4 B4:8 | C#5:8 A4:8 | B4:6 D5:2 B4:4 G4:4 | F#4:4 E4:4 F#4:4 r:4`, { v: 0.6 });
 
 // 03–06 "Before the Gulls" — E dorian, 88 bpm. Plucked guitar, rising hopeful motif E G A B.
 const H_PREDAWN = [
@@ -432,6 +435,20 @@ function pulseLayer(bars, { v = 0.45, spb = 16 } = {}) {
   });
   return out;
 }
+/**
+ * Low "brass" pedal (Spire): open root–fifth dyads an octave above the bass line on the bass preset. The first draft dropped
+ * the whole pad voicing an octave, which parked minor thirds at 80–100 Hz (E2 G2) under a driving 8th-note bass — below the
+ * low-interval limit. Open fifths in octave 3 keep the weight and stay out of the bass's way.
+ */
+function brassLayer(bars, { v = 0.45, spb = 16, oct = 3 } = {}) {
+  const out = [];
+  bars.forEach((bar, i) => {
+    const chords = parseBar(bar);
+    const slice = spb / chords.length;
+    chords.forEach((c, j) => { const r = rootMidi(c.root, oct); out.push({ t: i * spb + j * slice, n: [r, r + 7], d: slice, v }); });
+  });
+  return out;
+}
 /** Low-HP layer: high tremolo on a minor-9th-ish colour plus extra sixteenth hats. */
 function tenseLayer(bars) {
   const out = [];
@@ -480,7 +497,7 @@ const BATTLE_TRAINER = battle('battle_trainer', {
     at(128, counterLayer(H_BATTLE_TRAINER.slice(8), [[4, 0], [6, 1], [12, 2], [14, 3]], { v: 0.5, oct: 12 }))),
 });
 
-// BATTLE_SPIRE — bigger: 120 bpm, 24 bars, low brass pad, quotes the Vagary motif (A G F# D).
+// BATTLE_SPIRE — bigger: 120 bpm, 24 bars, low brass pedal (open fifths), quotes the Vagary motif (A G F# D).
 const H_BATTLE_SPIRE = [
   'B: B3 D4 F#4', 'B: B3 D4 F#4', 'G: G3 B3 D4', 'F#: F#3 A3 C#4',
   'B: B3 D4 F#4', 'B: B3 D4 F#4', 'E: E3 G3 B3', 'A: A3 C#4 E4',
@@ -502,7 +519,7 @@ const BATTLE_SPIRE = battle('battle_spire', {
   // off-beat arpeggio of whatever the pad holds (B3 D4 F#4 B3 on the B bars; it bends with the G, E, F# and A bars)
   counter: counterLayer(H_BATTLE_SPIRE, [[2, 0], [6, 1], [10, 2], [14, 0]], { v: 0.45 }),
   extra: {
-    brass: { inst: 'bass', gain: 0.4, default: true, role: 'brass', pattern: padLayer(H_BATTLE_SPIRE, { v: 0.4 }).map(e => ({ ...e, n: e.n.map(x => x - 12) })) },
+    brass: { inst: 'bass', gain: 0.4, default: true, role: 'brass', pattern: brassLayer(H_BATTLE_SPIRE) },
   },
 });
 
@@ -568,9 +585,10 @@ const SHIFT_REVEAL = {
     perc:   { inst: 'kit',   gain: 0.5, default: true, role: 'perc', pattern: [{ t: 0, n: KICK, d: 1, v: 0.35 }, { t: 18, n: KICK, d: 1, v: 0.55 }, { t: 18, n: SNARE, d: 1, v: 0.3 }] },
   },
 };
-// "Anchor plays only the chord" (Wildshift 16.4): the resolve part alone, same length as the chord phase (0.7 s).
+// "Anchor plays only the chord" (Wildshift 16.4): the resolve part alone on the same 32-step / 50 ms grid, so the chord holds
+// exactly the chord phase (14 steps = 0.7 s) and the rest of the bar is ring-out.
 const SHIFT_REVEAL_ANCHOR = {
-  id: 'shift_reveal_anchor', title: 'Shift (Anchor)', bpm: 150, key: 'D', scale: 'major', bars: 1, stepsPerBar: 16, loop: false,
+  id: 'shift_reveal_anchor', title: 'Shift (Anchor)', bpm: 150, key: 'D', scale: 'major', bars: 1, stepsPerBar: 32, loop: false,
   motif: 'HEARTMARK chord only', mood: 'the resolved chord without the charge or scramble',
   layers: {
     melody: { inst: 'glass', gain: 0.7, default: true, role: 'melody', pattern: [{ t: 0, n: SHIFT_CHORD, d: 14, v: 0.55 }] },
@@ -641,7 +659,7 @@ const LANTERN_MARKET = {
     melody: { inst: 'marimba', gain: 0.62, default: true, role: 'melody', pattern: P(`
       B4:4 D5:4 G5:4 | F#5:8 r:4 | A4:4 D5:4 F#5:4 | E5:8 D5:4 |
       B4:4 E5:4 G5:4 | A5:8 E5:4 | F#5:4 D5:4 A4:4 | D5:8 r:4 |
-      G4:4 B4:4 D5:4 | E5:8 D5:4 | B4:4 D5:4 F#5:4 | E5:8 r:4 |
+      G4:4 B4:4 D5:4 | E5:8 D5:4 | B4:4 D5:4 G5:4 | E5:8 r:4 |
       D5:4 B4:4 G4:4 | A4:4 D5:4 F#5:4 | E5:4 C#5:4 A4:4 | G4:8 r:4`, { v: 0.75 }) },
     bass:   { inst: 'bass',    gain: 0.6, default: true, role: 'bass', pattern: bassLayer(H_WALTZ, { style: 'waltz', spb: 12 }) },
     perc:   { inst: 'kit',     gain: 0.5, default: true, role: 'perc', pattern: percLayer('waltz', 16, 12) },

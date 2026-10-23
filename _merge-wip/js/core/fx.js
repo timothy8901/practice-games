@@ -967,7 +967,8 @@ function drawShape(ctx, p, x, y, size) {
  * @property {number} [width=480] Screen width in game pixels (flash size, screen-space culling).
  * @property {number} [height=270] Screen height in game pixels.
  * @property {number} [maxParticles=2000] Hard cap; spawns beyond it are dropped.
- * @property {number} [maxDt=100] Largest step simulated per `update()` call (ms); bigger `dt`s are clamped.
+ * @property {number} [maxDt=100] Largest particle-simulation step per `update()` call (ms, > 0); bigger
+ *   `dt`s are clamped for particles only. Shakes and flashes always advance by the full `dt`.
  * @property {number} [cullMargin=32] Pixels past the screen edge before culling.
  * @property {Record<string, ParticleSpec>} [presets] Extra or overriding presets, merged over the built-ins.
  */
@@ -1025,6 +1026,9 @@ export function createFX(options = {}) {
     if (typeof v !== 'number' || !Number.isFinite(v) || v < 0) {
       throw new RangeError(`createFX: ${name} must be a finite number >= 0, got ${describe(v)}`);
     }
+  }
+  if (maxDt <= 0) {
+    throw new RangeError(`createFX: maxDt must be > 0 (it is the largest simulated step per update), got ${maxDt}`);
   }
   if (typeof extraPresets !== 'object' || extraPresets === null) {
     throw new TypeError(`createFX: presets must be an object, got ${describe(extraPresets)}`);
@@ -1236,7 +1240,11 @@ export function createFX(options = {}) {
    * @param {number} ms
    * @param {{freq?: number, decay?: number, axis?: 'both'|'x'|'y'}} [opts]
    */
-  function shake(amount, ms, { freq = SHAKE_FREQ, decay = 2, axis = 'both' } = {}) {
+  function shake(amount, ms, opts = {}) {
+    if (typeof opts !== 'object' || opts === null) {
+      throw new TypeError(`fx.shake: options must be an object, got ${describe(opts)}`);
+    }
+    const { freq = SHAKE_FREQ, decay = 2, axis = 'both' } = opts;
     for (const [name, v] of Object.entries({ amount, ms, freq, decay })) {
       if (typeof v !== 'number' || !Number.isFinite(v)) {
         throw new TypeError(`fx.shake: ${name} must be a finite number, got ${describe(v)}`);
@@ -1266,7 +1274,11 @@ export function createFX(options = {}) {
    * @param {{alpha?: number, ease?: string|((t: number) => number), hold?: number}} [opts]
    * @returns {Flash}
    */
-  function flash(color, ms, { alpha = 0.85, ease: easing = 'outQuad', hold = 0 } = {}) {
+  function flash(color, ms, opts = {}) {
+    if (typeof opts !== 'object' || opts === null) {
+      throw new TypeError(`fx.flash: options must be an object, got ${describe(opts)}`);
+    }
+    const { alpha = 0.85, ease: easing = 'outQuad', hold = 0 } = opts;
     if (typeof color !== 'string' || color === '') {
       throw new TypeError(`fx.flash: color must be a non-empty string, got ${describe(color)}`);
     }
@@ -1281,21 +1293,30 @@ export function createFX(options = {}) {
     return fl;
   }
 
-  /** @param {number} dt */
+  /**
+   * Advances everything by `dt` ms (negative `dt` counts as 0). Shakes and
+   * flashes are time envelopes and always advance by the full `dt`, like
+   * tweens, so they stay in sync with `tween.js` after a long frame. The
+   * particle simulation (emission and integration) advances by at most
+   * `maxDt` per call, so a hitch cannot tunnel particles through floors or
+   * burst-spawn thousands of them.
+   * @param {number} dt
+   */
   function update(dt) {
     if (typeof dt !== 'number' || !Number.isFinite(dt)) {
       throw new TypeError(`fx.update: dt must be a finite number of milliseconds, got ${describe(dt)}`);
     }
-    const step = Math.min(Math.max(0, dt), maxDt);
+    const elapsed = Math.max(0, dt);
+    const step = Math.min(elapsed, maxDt);
     const s = step / 1000;
 
     if (shakes.length > 0) {
-      for (const sh of shakes) sh.elapsed += step;
+      for (const sh of shakes) sh.elapsed += elapsed;
       shakes = shakes.filter((sh) => sh.elapsed < sh.ms);
       computeShake();
     }
     if (flashes.length > 0) {
-      for (const fl of flashes) fl.tick(step);
+      for (const fl of flashes) fl.tick(elapsed);
       flashes = flashes.filter((fl) => !fl.done);
     }
     for (const em of emitters) em.tick(step);
@@ -1307,10 +1328,14 @@ export function createFX(options = {}) {
    * @param {CanvasRenderingContext2D} ctx
    * @param {{layer?: 'back'|'front', camera?: {x: number, y: number}}} [opts]
    */
-  function draw(ctx, { layer = null, camera = null } = {}) {
+  function draw(ctx, opts = {}) {
     if (!ctx || typeof ctx.fillRect !== 'function' || typeof ctx.save !== 'function') {
       throw new TypeError('fx.draw: expected a Canvas 2D context');
     }
+    if (typeof opts !== 'object' || opts === null) {
+      throw new TypeError(`fx.draw: options must be an object, got ${describe(opts)}`);
+    }
+    const { layer = null, camera = null } = opts;
     if (layer !== null && !LAYERS.includes(layer)) {
       throw new TypeError(`fx.draw: layer must be one of ${LAYERS.join('|')}, got ${describe(layer)}`);
     }

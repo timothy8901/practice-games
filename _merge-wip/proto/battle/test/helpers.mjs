@@ -63,6 +63,9 @@ export function duel(a, b, opts = {}) {
     foeAi: opts.foeAi,
     fieldLog: opts.fieldLog,
     prism: opts.prism,
+    rules: opts.rules,
+    holdOut: opts.holdOut,
+    nextUid: opts.nextUid,
   });
 }
 

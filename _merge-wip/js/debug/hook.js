@@ -6,20 +6,24 @@
  * window (keyboard tokens are `KeyboardEvent.code`), `idle()` resolves when no transition, tween or
  * busy scene is running, and `errors` collects `window.onerror` + `unhandledrejection`.
  *
- * Hooks whose system has not landed (`give`, `earn`, `addCreature`, `heal`, `battle`, `wild`,
- * `forceForecast`, `deliverLetter`, `sleep`, `runScript`) throw a readable "not wired" error until the
- * owning lane registers an implementation with `hook.bind(name, fn)`.
+ * Hooks whose system lives in another lane are REBINDABLE: the owning module registers the real
+ * implementation with `__game.bind(name, fn)` (or `G.debugHook.bind`). Until then `give` and `earn`
+ * run a day-1 fallback that edits the schema shape directly inside `store.tx`, and the others throw a
+ * readable "not wired" error.
  * @module debug/hook
  */
 import { tokenDevice } from '../core/input.js';
-import { validateWorld } from '../_shims/state/schema.js'; // INTEGRATOR: '../state/schema.js'
+import { validateWorld } from '../state/schema.js';
 
-/** Hooks that wait on another lane, with the lane that owns them. */
+/** Hooks that belong to another lane, with the lane that owns the real implementation. */
 export const LANE_HOOKS = Object.freeze({
   give: 'RULES-ECON', earn: 'RULES-ECON', addCreature: 'RULES-CREATURE', heal: 'RULES-CREATURE',
   battle: 'FLOW', wild: 'FLOW', forceForecast: 'RULES-SHIFT', deliverLetter: 'SYS-TOWN',
   sleep: 'FLOW', runScript: 'SCRIPT',
 });
+
+/** Pocket the day-1 `give` fallback drops items into (`systems/bag` resolves the real pocket from item data). */
+export const FALLBACK_POCKET = 'items';
 
 /**
  * Primary keyboard token for an action.
@@ -55,6 +59,39 @@ export function keyInitFor(code) {
 }
 
 /**
+ * Day-1 `give`: adds `n` of an item to the fallback pocket (merging into an existing stack).
+ * Pure on the world; the hook wraps it in `store.tx`.
+ * @param {object} world
+ * @param {string} itemId
+ * @param {number} n
+ * @returns {number} stack size after the gift
+ */
+export function fallbackGive(world, itemId, n) {
+  if (typeof itemId !== 'string' || !itemId) throw new TypeError('__game.give: itemId must be a non-empty string');
+  const count = Math.max(1, Math.floor(Number(n) || 1));
+  const pockets = world.bag.pockets;
+  if (!Array.isArray(pockets[FALLBACK_POCKET])) pockets[FALLBACK_POCKET] = [];
+  const pocket = pockets[FALLBACK_POCKET];
+  const stack = pocket.find((s) => s.id === itemId);
+  if (stack) { stack.n += count; return stack.n; }
+  pocket.push({ id: itemId, n: count });
+  return count;
+}
+
+/**
+ * Day-1 `earn`: adds to the main wallet (negative amounts spend; the balance never drops below 0).
+ * @param {object} world
+ * @param {number} amount
+ * @returns {number} new balance
+ */
+export function fallbackEarn(world, amount) {
+  const delta = Math.trunc(Number(amount));
+  if (!Number.isFinite(delta)) throw new TypeError('__game.earn: amount must be a finite number');
+  world.wallet.main = Math.max(0, world.wallet.main + delta);
+  return world.wallet.main;
+}
+
+/**
  * @param {string} name
  * @returns {Error}
  */
@@ -65,33 +102,44 @@ function notWired(name) {
 /**
  * @typedef {Object} DebugHook
  * @property {object} G
- * @property {object} world
- * @property {() => object} state
+ * @property {object} world                                      live (not a copy)
+ * @property {() => object} state                                structuredClone of the raw world
  * @property {(mapId: string, x: number, y: number) => void} warp
+ * @property {(itemId: string, n?: number) => void} give
+ * @property {(amount: number) => void} earn
  * @property {(hour: number, minute?: number) => void} setTime
- * @property {(x: number|null) => void} setTide
+ * @property {(x: number|null) => void} setTide                  core/time.freezeTide
+ * @property {(speciesId: string, level: number, opts?: object) => object} addCreature
+ * @property {() => void} heal
+ * @property {(trainerId: string) => Promise<object>} battle
+ * @property {(speciesId: string, level: number) => Promise<object>} wild
+ * @property {(uid?: string) => Promise<string>} forceForecast
  * @property {(id: string, value?: any) => void} flag
  * @property {() => object} flags
+ * @property {(n: number) => void} deliverLetter
+ * @property {() => void} sleep
+ * @property {(scriptId: string) => Promise<void>} runScript
  * @property {(mult: number) => void} speed
  * @property {(on: boolean) => void} skipAnims
- * @property {(action: string, frames?: number) => Promise<void>} press
+ * @property {(action: string, frames?: number) => Promise<void>} press   dispatches KeyboardEvent(code) for the action's primary keyboard token
  * @property {(action: string) => Promise<void>} tap
- * @property {() => Promise<void>} idle
+ * @property {() => Promise<void>} idle                          resolves when no transition, tween or busy scene is running
  * @property {() => string} scene
  * @property {() => string[]} stack
- * @property {() => string} text
+ * @property {() => string} text                                 visible dialogue/menu text for assertions
  * @property {(label: string) => import('../core/rng.js').Rng} rng
  * @property {() => string[]} validate
- * @property {(name: string) => void} marker
- * @property {Array<{message: string, stack: string}>} errors
+ * @property {(name: string) => void} marker                     1-frame label in the corner + console `MARK name`
+ * @property {Array<{message: string, stack: string}>} errors    window.onerror + unhandledrejection
  * @property {() => object} perf
  * @property {(reason?: string) => object} save
  * @property {(slot: string) => boolean} load
  * @property {(n: number) => void} step
  * @property {() => void} pause
  * @property {() => void} resume
- * @property {(name: string, fn: Function) => void} bind   register a lane-owned hook implementation
- * @property {(name: string, params?: any) => void} push   push a scene by name (visual work)
+ * @property {(name: string, fn: Function) => void} bind         register a lane-owned hook implementation
+ * @property {(name: string) => boolean} isBound                 whether a lane has replaced the default for `name`
+ * @property {(name: string, params?: any) => void} push         push a scene by name (visual work)
  * @property {() => void} uninstall
  */
 
@@ -110,6 +158,10 @@ export function installDebugHook(G, opts = {}) {
     ? target.requestAnimationFrame.bind(target)
     : (fn) => setTimeout(() => fn(performance.now()), 16);
   const nextFrame = () => new Promise((resolve) => raf(() => resolve()));
+  /** The view persist reads (main.js builds it); a bare G works for tests. */
+  const persistG = () => G.persistView ?? G;
+  /** The unproxied world (strict mode wraps `store.world` in a Proxy that structuredClone rejects). */
+  const rawWorld = () => (typeof G.store.raw === 'function' ? G.store.raw() : G.world);
 
   /** @type {Array<{message: string, stack: string}>} */
   const errors = [];
@@ -123,7 +175,21 @@ export function installDebugHook(G, opts = {}) {
   target.addEventListener('error', onError);
   target.addEventListener('unhandledrejection', onError);
 
+  /** @type {Record<string, Function>} lane-bound implementations */
   const bound = Object.create(null);
+  /** Day-1 fallbacks for lane hooks; replaced by `bind`. */
+  const fallbacks = Object.freeze({
+    give(itemId, n = 1) {
+      const total = G.store.tx('debug:give', (w) => fallbackGive(w, itemId, n));
+      G.bus.emit('bag:changed', { itemId, n: total, pocket: FALLBACK_POCKET, source: 'debug' });
+      return total;
+    },
+    earn(amount) {
+      const balance = G.store.tx('debug:earn', (w) => fallbackEarn(w, amount));
+      G.bus.emit('wallet:changed', { main: balance, delta: Math.trunc(Number(amount)), source: 'debug' });
+      return balance;
+    },
+  });
 
   function isIdle() {
     if (G.loop && G.loop.paused) return true;
@@ -135,11 +201,11 @@ export function installDebugHook(G, opts = {}) {
   const hook = {
     G,
     get world() { return G.world; },
-    state: () => structuredClone(G.world),
+    state: () => structuredClone(rawWorld()),
     errors,
 
     warp(mapId, x, y) {
-      G.store.tx('debug:warp', (w) => { w.player.mapId = mapId; w.player.x = x; w.player.y = y; });
+      G.store.tx('debug:warp', (w) => { w.player.mapId = mapId; w.player.x = Math.round(x); w.player.y = Math.round(y); });
       G.bus.emit('debug:warp', { mapId, x, y });
     },
     setTime(hour, minute = 0) {
@@ -147,7 +213,7 @@ export function installDebugHook(G, opts = {}) {
       G.store.tx('debug:setTime', (w) => { w.clock = G.clock.serialize(); });
     },
     setTide(x) {
-      if (typeof G.clock.freezeTide !== 'function') throw new Error('__game.setTide: core/time.freezeTide is not available yet (owner: CORE)');
+      if (typeof G.clock.freezeTide !== 'function') throw new Error('__game.setTide: core/time.freezeTide is not available yet (owner: CORE, draft §13.6)');
       G.clock.freezeTide(x);
     },
     flag(id, value = true) { G.store.tx('debug:flag', (w) => { w.flags[id] = value; }); },
@@ -187,14 +253,14 @@ export function installDebugHook(G, opts = {}) {
       return out.join('\n');
     },
     rng: (label) => G.rngs.fresh(label),
-    validate: () => validateWorld(G.world, G.data),
+    validate: () => validateWorld(rawWorld(), G.data),
     marker(name) {
       console.log(`MARK ${name}`);
       if (G.debugOverlay) G.debugOverlay.marker(name);
       G.bus.emit('debug:marker', { name });
     },
     perf: () => ({ ...(G.perf ?? {}) }),
-    save: (reason = 'debug') => G.persist.autosave(G, reason),
+    save: (reason = 'debug') => G.persist.autosave(persistG(), reason),
     load(slot) {
       const res = G.persist.load(slot);
       if (!res.ok) return false;
@@ -210,6 +276,7 @@ export function installDebugHook(G, opts = {}) {
       if (typeof fn !== 'function') throw new TypeError(`__game.bind: fn for '${name}' must be a function`);
       bound[name] = fn;
     },
+    isBound: (name) => typeof bound[name] === 'function',
     uninstall() {
       target.removeEventListener('error', onError);
       target.removeEventListener('unhandledrejection', onError);
@@ -218,8 +285,9 @@ export function installDebugHook(G, opts = {}) {
   };
   for (const name of Object.keys(LANE_HOOKS)) {
     hook[name] = (...args) => {
-      if (!bound[name]) throw notWired(name);
-      return bound[name](...args);
+      const impl = bound[name] ?? fallbacks[name];
+      if (!impl) throw notWired(name);
+      return impl(...args);
     };
   }
   if (opts.expose !== false) target.__game = hook;

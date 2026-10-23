@@ -151,7 +151,7 @@ export function chooseTrainerAction(battle, side) {
 
   // 4. Evasion, at most twice per battle and never past the cap.
   const eva = find((mv) => mv.effect.evasion);
-  if (eva && memo.evasionUses < MAX_EVASION_USES && mine.vol.stages.eva < 2 && hpr > 0.5 && battle.turn > mine.vol.boostBlockUntil) {
+  if (eva && memo.evasionUses < MAX_EVASION_USES && mine.vol.stages.eva < 2 && hpr > 0.5 && battle.turn >= mine.vol.boostBlockUntil) {
     memo.evasionUses++;
     return { type: 'move', move: eva.index };
   }
@@ -229,7 +229,7 @@ export function isLegal(battle, side, action) {
     case 'run': return acts.run.available;
     case 'read': return acts.read.available && acts.read.costsTurn;
     case 'lantern': return !!(acts.lantern && acts.lantern.available && acts.lantern.grades.some((g) => g.grade === action.grade && g.selectable));
-    case 'item': return acts.items.some((it) => it.selectable && it.id === action.item);
+    case 'item': return acts.items.some((it) => it.selectable && it.id === (action.item !== undefined ? action.item : action.id));
     default: return false;
   }
 }

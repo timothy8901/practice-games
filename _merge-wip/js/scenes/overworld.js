@@ -11,12 +11,19 @@
 import { drawText } from '../core/font.js';
 import { makeRng } from '../core/rng.js';
 import * as clockSys from '../_shims/systems/clockSys.js'; // INTEGRATOR: '../systems/clockSys.js'
+import * as stats from '../systems/stats.js';
 import { TILE, NATIVE_W, NATIVE_H } from '../config.js';
 import { drawStrip, KIT } from './day1kit.js';
 
 /** Test map size in tiles. */
 export const MAP_W = 40;
 export const MAP_H = 24;
+
+/** Spawn tile of the test map (the crossroads of the two path bands). */
+export const SPAWN = Object.freeze({ x: 20, y: 12 });
+
+/** Map id shown while the player has no map yet (`player.mapId === ''`). // [GDD: arrival map id] */
+export const STUB_MAP_ID = 'stub-map';
 
 /** Tile kinds of the test map. `solid` blocks the player. */
 export const TEST_TILES = Object.freeze([
@@ -130,8 +137,10 @@ export function createOverworldScene(G) {
     opaque: true,
     enter() {
       map = buildTestMap(G.world.run.seed);
-      if (!passable(map, G.world.player.x, G.world.player.y)) {
-        G.store.tx('player:spawn', (w) => { w.player.x = 20; w.player.y = 12; });
+      // No map yet (fresh lease) or standing in a wall: spawn at the crossroads. // [GDD: arrival tile]
+      const p0 = G.world.player;
+      if (p0.mapId === '' && p0.x === 0 && p0.y === 0 || !passable(map, p0.x, p0.y)) {
+        G.store.tx('player:spawn', (w) => { w.player.x = SPAWN.x; w.player.y = SPAWN.y; });
       }
       syncFromWorld();
       G.bus.emit('map:enter', { mapId: G.world.player.mapId });
@@ -140,7 +149,10 @@ export function createOverworldScene(G) {
     pause() {},
     resume() { syncFromWorld(); },
     update(dt) {
-      G.store.tx('clock:tick', (w) => clockSys.tick(w, G.clock, dt));
+      G.store.tx('clock:tick', (w) => {
+        clockSys.tick(w, G.clock, dt);   // the world clock advances only here and in fishing
+        stats.addPlayMs(w, dt);          // simulated step, so paused menus do not count
+      });
       if (moveT < 1) moveT = Math.min(1, moveT + dt / moveMs);
       const p = G.world.player;
       if (moveT >= 1 && (p.x !== to.x || p.y !== to.y)) syncFromWorld(); // moved by a debug warp
@@ -178,7 +190,7 @@ export function createOverworldScene(G) {
       const [fx, fy] = DIRS[G.world.player.facing] ?? DIRS.down;
       ctx.fillRect(sx + 7 + fx * 4, sy + 6 + fy * 4, 2, 2);
       drawStrip(ctx, hudLine(), 2, 2);
-      drawStrip(ctx, `${G.world.run.seedCode}  ${G.world.player.mapId} ${to.x},${to.y}`, 2, 16, { font: 'small' });
+      drawStrip(ctx, `${G.world.run.seedCode}  ${G.world.player.mapId || STUB_MAP_ID} ${to.x},${to.y}`, 2, 16, { font: 'small' });
       drawText(ctx, 'arrows: move  shift: run  esc: menu', 478, 260, { color: KIT.paper, align: 'right', font: 'small', shadow: true });
     },
     debugText: () => hudLine(),

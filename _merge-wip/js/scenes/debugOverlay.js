@@ -7,7 +7,7 @@
  * @module scenes/debugOverlay
  */
 import { drawText } from '../core/font.js';
-import { validateWorld } from '../_shims/state/schema.js'; // INTEGRATOR: '../state/schema.js'
+import { validateWorld } from '../state/schema.js';
 
 /** How long a marker label stays up (long enough for a screenshot after `marker()`). */
 export const MARKER_MS = 250;

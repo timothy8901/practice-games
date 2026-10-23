@@ -1,0 +1,15 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><link rel="icon" href="data:,"><title>Chars Sheet</title>
+<style>html,body{margin:0;background:#2b3a67;color:#f4f1e6;font:12px ui-monospace,monospace}body{padding:12px}canvas{image-rendering:pixelated;display:block}</style></head>
+<body><canvas id="c"></canvas>
+<script type="module">
+import { decodeSprite, drawSprite } from '../../js/core/pixelart.js';
+import { BODIES, PALETTES, CHARACTERS, frame } from './chars.js';
+const S=3, c=document.getElementById('c'); const ids=Object.keys(CHARACTERS);
+c.width=(4*4+2)*18*S; c.height=ids.length*28*S; const ctx=c.getContext('2d');
+let t=0; function render(){ ctx.fillStyle='#4e6e5d'; ctx.fillRect(0,0,c.width,c.height);
+ ids.forEach((id,row)=>{ const ch=CHARACTERS[id], pal=PALETTES[ch.palette]; let col=0;
+  for(const f of ['down','up','left','right']) for(let s=0;s<4;s++){ const sp=decodeSprite(frame(ch.body,f,s),pal,{scale:S}); drawSprite(ctx,sp,col*18*S,row*28*S+2*S); col++; }
+  for(const f of ['sit','fish']){ const sp=decodeSprite(frame(ch.body,f),pal,{scale:S}); drawSprite(ctx,sp,col*18*S,row*28*S+2*S); col++; }
+ }); }
+render(); window.__sheet={ok:true};
+</script></body></html>

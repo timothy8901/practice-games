@@ -380,6 +380,29 @@ describe('crash marker', () => {
     const afterClean = createPersist({ storage, prefix: 'GAME.', now });
     assert.equal(afterClean.crashed(), false);
   });
+
+  it('exposes the same operations as crashMarker.arm / clear / check (what main.js calls)', () => {
+    const storage = new Map();
+    const first = createPersist({ storage, prefix: 'GAME.', now });
+    assert.equal(first.crashMarker.arm(), false, 'arm returns whether the previous session crashed');
+    assert.equal(storage.get('GAME.cleanExit'), '0', 'arm writes the dirty marker');
+    const afterCrash = createPersist({ storage, prefix: 'GAME.', now });
+    assert.equal(afterCrash.crashMarker.check(), true);
+    assert.equal(afterCrash.crashMarker.arm(), true);
+    assert.equal(afterCrash.crashMarker.clear(), true);
+    assert.equal(storage.get('GAME.cleanExit'), '1');
+    assert.equal(createPersist({ storage, prefix: 'GAME.', now }).crashMarker.check(), false);
+  });
+
+  it('marker operations never throw on a broken storage', () => {
+    const broken = { getItem() { throw new Error('nope'); }, setItem() { throw new Error('nope'); }, removeItem() { throw new Error('nope'); } };
+    const p = createPersist({ storage: broken, prefix: 'GAME.', now });
+    assert.equal(p.crashed(), false);
+    assert.equal(p.markBoot(), false);
+    assert.equal(p.markCleanExit(), false);
+    assert.equal(p.crashMarker.arm(), false);
+    assert.equal(p.crashMarker.clear(), false);
+  });
 });
 
 describe('No Rewind', () => {
