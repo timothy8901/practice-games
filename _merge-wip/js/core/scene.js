@@ -25,6 +25,11 @@
  *    pops itself from `update`) are applied immediately. The stack is always mutated before any hook
  *    runs, so re-entrant calls observe a consistent stack. Errors thrown by hooks propagate to the
  *    caller; the structural change that preceded the hook stays applied.
+ *  - Hooks stay strictly paired however a hook re-enters the stack: `enter` is skipped for a scene
+ *    that a hook removed before it could enter, `exit` only reaches a scene that entered, `pause`
+ *    only reaches an active scene and `resume` only a paused one, and a scene that finds itself
+ *    beneath another right after entering is paused at once. So when any call returns, the top
+ *    scene is active and every scene beneath it is paused.
  *
  * Time: `update(dt)` takes MILLISECONDS, the same unit as the `ms` argument of `transition()` and
  * every other duration in the engine.
@@ -176,7 +181,8 @@ export const DEFAULT_HEIGHT = 270;
  *   transition started. While another transition is running the call is ignored and returns false.
  *   `'none'`, or a total duration of 0, runs `fn` synchronously and returns true even while busy.
  * @property {() => TransitionState|null} transitionState Snapshot of the running transition.
- * @property {(name: string) => Scene|null} find The topmost scene with that `name`, or null.
+ * @property {(name: string) => Scene|null} find
+ *   The topmost scene with that `name`, or null (always null for a non-string name).
  * @property {(scene: Scene) => boolean} has Whether `scene` is on the stack.
  * @property {() => Scene[]} clear
  *   Cancels any transition and exits every scene, top to bottom. Returns the removed scenes.
@@ -344,6 +350,9 @@ export function transitionFrame(elapsed, ms, hold = 0) {
   assertDuration(hold, 'hold', 'transitionFrame');
   const half = ms / 2;
   const total = ms + hold;
+  if (!Number.isFinite(total)) {
+    throw new TypeError(`scene.transitionFrame: ms + hold must be finite, got ${ms} + ${hold}`);
+  }
   const e = Math.min(Math.max(elapsed, 0), total);
   /** @type {TransitionPhase} */
   let phase;
@@ -544,8 +553,64 @@ export function createSceneStack(options) {
   /** The most recent input object seen, whose `flush()` is called on scene changes. */
   let inputRef = opts.input;
 
+  /** Scenes that received `enter()` and not yet `exit()`. @type {WeakSet<Scene>} */
+  const entered = new WeakSet();
+
+  /** Entered scenes that received `pause()` and not yet `resume()`. @type {WeakSet<Scene>} */
+  const paused = new WeakSet();
+
   /** @returns {Scene|null} */
   const topScene = () => (scenes.length ? scenes[scenes.length - 1] : null);
+
+  /**
+   * Sends `pause()` to an active scene. A scene that never entered, or is already paused (a hook
+   * re-entered the stack), gets nothing: `pause` means "you stopped being the top scene".
+   * @param {Scene} scene
+   */
+  function pauseScene(scene) {
+    if (!entered.has(scene) || paused.has(scene)) return;
+    paused.add(scene);
+    invoke(scene, 'pause');
+  }
+
+  /**
+   * Sends `resume(result)` to a paused scene; an active scene or one that never entered gets nothing.
+   * @param {Scene} scene
+   * @param {any} result
+   */
+  function resumeScene(scene, result) {
+    if (!paused.has(scene)) return;
+    paused.delete(scene);
+    invoke(scene, 'resume', result);
+  }
+
+  /**
+   * Sends `enter(params)` to a scene that is (still) on the stack. The scene counts as entered even
+   * if its hook throws, so it will still be exited later. A scene that a re-entrant hook pushed
+   * something over while it was entering is paused straight away, keeping "top = active" true.
+   * @param {Scene} scene
+   * @param {any} params
+   */
+  function enterScene(scene, params) {
+    if (!scenes.includes(scene)) return;
+    entered.add(scene);
+    try {
+      invoke(scene, 'enter', params);
+    } finally {
+      if (scenes.includes(scene) && topScene() !== scene) pauseScene(scene);
+    }
+  }
+
+  /**
+   * Sends `exit()` to a scene that entered; a scene removed before it ever entered gets nothing.
+   * @param {Scene} scene
+   */
+  function exitScene(scene) {
+    if (!entered.has(scene)) return;
+    entered.delete(scene);
+    paused.delete(scene);
+    invoke(scene, 'exit');
+  }
 
   /** Discards buffered presses so a held key never counts as a press in a new scene. */
   function flushInput() {
@@ -612,8 +677,8 @@ export function createSceneStack(options) {
     }
     const previous = topScene();
     scenes.push(scene);
-    if (previous) invoke(previous, 'pause');
-    invoke(scene, 'enter', params);
+    if (previous) pauseScene(previous);
+    enterScene(scene, params);
     flushInput();
     notify('push', scene);
     return scene;
@@ -626,9 +691,9 @@ export function createSceneStack(options) {
   function pop(result) {
     const scene = scenes.pop();
     if (!scene) return null;
-    invoke(scene, 'exit');
+    exitScene(scene);
     const next = topScene();
-    if (next) invoke(next, 'resume', result);
+    if (next) resumeScene(next, result);
     flushInput();
     notify('pop', scene);
     return scene;
@@ -651,8 +716,8 @@ export function createSceneStack(options) {
       throw new Error(`scene.replace: ${label(scene)} is already on the stack`);
     }
     scenes[index] = scene;
-    invoke(old, 'exit');
-    invoke(scene, 'enter', params);
+    exitScene(old);
+    enterScene(scene, params);
     flushInput();
     notify('replace', scene, { replaced: old });
     return old;
@@ -665,7 +730,7 @@ export function createSceneStack(options) {
     while (scenes.length) {
       const scene = /** @type {Scene} */ (scenes.pop());
       removed.push(scene);
-      invoke(scene, 'exit');
+      exitScene(scene);
     }
     flushInput();
     notify('clear', null, { removed: removed.slice() });
@@ -747,6 +812,9 @@ export function createSceneStack(options) {
     }
 
     const total = ms + hold;
+    if (!Number.isFinite(total)) {
+      throw new TypeError(`scene.transition: ms + hold must be finite, got ${ms} + ${hold}`);
+    }
     if (kind === 'none' || total <= 0) {
       if (fn) fn(api);
       if (onDone) onDone(api);
@@ -794,6 +862,7 @@ export function createSceneStack(options) {
    * @returns {Scene|null}
    */
   function find(name) {
+    if (typeof name !== 'string') return null;
     for (let i = scenes.length - 1; i >= 0; i--) {
       if (scenes[i].name === name) return scenes[i];
     }

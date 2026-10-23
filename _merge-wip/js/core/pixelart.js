@@ -272,9 +272,12 @@ export function lerpColor(a, b, t) {
 
 /**
  * Convert RGB to HSL. Round-trips exactly with {@link hslToRgb} for 8-bit
- * colours.
+ * colours. `h` is in [0, 360), `s` and `l` in [0, 1] (saturation is clamped,
+ * since the formula can overshoot 1 by a few ulps for near-white tints).
  * @param {RGBA|string} color An `{r, g, b, a?}` object or hex string.
  * @returns {HSLA}
+ * @throws {TypeError} If `color` is not an object/hex string or a component is
+ *   not a finite number.
  */
 export function rgbToHsl(color) {
   const c = typeof color === 'string' ? hexToRgb(color) : color;
@@ -291,7 +294,7 @@ export function rgbToHsl(color) {
   let h = 0;
   let s = 0;
   if (d > 0) {
-    s = d / (1 - Math.abs(2 * l - 1));
+    s = clamp01(d / (1 - Math.abs(2 * l - 1)));
     if (max === R) h = ((G - B) / d) % 6;
     else if (max === G) h = (B - R) / d + 2;
     else h = (R - G) / d + 4;
@@ -1056,13 +1059,15 @@ export function buildAtlas(sprites, opts) {
  * @param {number} x
  * @param {number} y
  * @param {DrawOptions} [opts]
- * @throws {RangeError} If `index` is out of range.
+ * @throws {RangeError} If `index` is not an integer in `0..frames.length-1`.
  */
 export function drawAtlasFrame(ctx, atlas, index, x, y, opts) {
   assertCtx(ctx);
   if (!atlas || atlas[ATLAS_TAG] !== true) throw new TypeError('pixelart: atlas must come from buildAtlas()');
+  if (!Number.isInteger(index) || index < 0 || index >= atlas.frames.length) {
+    throw new RangeError(`pixelart: atlas frame ${String(index)} does not exist (${atlas.frames.length} frames)`);
+  }
   const f = atlas.frames[index];
-  if (!f) throw new RangeError(`pixelart: atlas frame ${String(index)} does not exist (${atlas.frames.length} frames)`);
   if (!visible(opts)) return;
   blit(ctx, atlas.canvas, f.x, f.y, f.w, f.h, x, y, f.ox, f.oy, opts);
 }

@@ -1141,9 +1141,12 @@ describe('touch overlay', () => {
     off.input.setTouchVisible(true);
     assert.equal(off.input.touchVisible, false);
     const desktop = harness({ touch: 'auto', matchMedia: (q) => ({ matches: q.includes('fine') }) });
-    assert.ok(desktop.overlayRoot());
+    assert.equal(desktop.overlayRoot(), null, 'no overlay DOM on a mouse-and-keyboard device (contract: shown only on touch devices or ?touch=1)');
     assert.equal(desktop.input.touchVisible, false);
     assert.equal(desktop.input.lastDevice, 'keyboard');
+    desktop.canvas.dispatchEvent(evt('pointerdown', { clientX: 100, clientY: 100, pointerId: 1, pointerType: 'touch' }));
+    assert.ok(desktop.overlayRoot(), 'first touch builds the overlay lazily');
+    assert.equal(desktop.input.touchVisible, true);
     const noDoc = harness({ touch: true, doc: null });
     assert.equal(noDoc.input.touchVisible, false);
     assert.doesNotThrow(() => { noDoc.press('KeyZ'); noDoc.tick(); noDoc.input.setTouchVisible('auto'); noDoc.input.destroy(); });

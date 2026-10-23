@@ -54,9 +54,11 @@ const ACTION_SET = new Set(ACTION_LIST);
 const TOUCH_TOKEN_SET = new Set(TOUCH_TOKENS);
 const DIRS = ['up', 'down', 'left', 'right'];
 const NO_DIRS = Object.freeze({ up: false, down: false, left: false, right: false });
-const GAMEPAD_TOKEN_RE = /^gp:(?:b\d{1,2}|axis\d[+-])$/;
-const KEYBOARD_TOKEN_RE = /^[A-Za-z][A-Za-z0-9]*$/;
+// Only the two sticks (axes 0-3) are digitised: on several drivers the triggers show up as extra
+// axes resting at -1, which would read as permanently engaged. The token grammar matches.
 const MAX_GAMEPAD_AXES = 4;
+const GAMEPAD_TOKEN_RE = /^gp:(?:b\d{1,2}|axis[0-3][+-])$/;
+const KEYBOARD_TOKEN_RE = /^[A-Za-z][A-Za-z0-9]*$/;
 const MAX_VIBRATE_MS = 5000;
 const TAN_22_5 = 0.41421356;
 
@@ -104,7 +106,12 @@ const KEY_NAME_FIXUPS = {
   Esc: 'Escape', Up: 'ArrowUp', Down: 'ArrowDown', Left: 'ArrowLeft', Right: 'ArrowRight',
   Spacebar: 'Space', ' ': 'Space', Del: 'Delete', Shift: 'ShiftLeft', Control: 'ControlLeft',
   Alt: 'AltLeft', Meta: 'MetaLeft', OS: 'MetaLeft',
+  '[': 'BracketLeft', ']': 'BracketRight', '`': 'Backquote', '-': 'Minus', '=': 'Equal',
+  ';': 'Semicolon', "'": 'Quote', ',': 'Comma', '.': 'Period', '/': 'Slash', '\\': 'Backslash',
 };
+
+/** Modifier keys that are allowed through the Ctrl/Meta shortcut filter (they *are* the modifier). */
+const MODIFIER_TOKENS = new Set(['ControlLeft', 'ControlRight', 'MetaLeft', 'MetaRight']);
 
 const OVERLAY_STYLE_ID = 'wsp-touch-style';
 const OVERLAY_CSS = [
@@ -173,11 +180,14 @@ const OVERLAY_CSS = [
  * @property {{toGame?: (clientX: number, clientY: number) => {x: number, y: number}}} [display]
  *   Display from `canvas.js`; its `toGame` converts client to game coordinates. Without it
  *   the canvas rect is scaled to `width` x `height`.
- * @property {number} [width=480]   Logical game width (for `pointer.inside` and fallback mapping).
- * @property {number} [height=270]  Logical game height.
+ * @property {number} [width]   Logical game width for `pointer.inside` and the fallback mapping
+ *   (defaults to `display.width`, else 480).
+ * @property {number} [height]  Logical game height (defaults to `display.height`, else 270).
  * @property {boolean|'auto'} [touch='auto'] Touch overlay: `true` always, `false` never,
  *   `'auto'` on coarse-pointer devices and whenever a touch is seen (hidden again on
  *   keyboard/gamepad input). `?touch=1` / `?touch=0` in the page URL override everything.
+ *   The overlay DOM is only created the first time it has to be shown, so a desktop page
+ *   never gets the elements.
  * @property {HTMLElement} [touchParent] Element to host the overlay (absolute positioning);
  *   defaults to `document.body` with fixed positioning.
  * @property {EventTarget} [target]     Keyboard/blur/pointer-up target; defaults to `window`.
@@ -244,7 +254,9 @@ export function tokenDevice(token) {
 export function tokenFromKeyEvent(ev) {
   if (!ev) return null;
   const code = typeof ev.code === 'string' ? ev.code : '';
-  if (code && code !== 'Unidentified') return code;
+  // Only a well-formed keyboard token is trusted; anything else (empty, `Unidentified`, or a
+  // synthetic event smuggling a `gp:`/`touch:` token) falls through to the `key` fallback.
+  if (code && code !== 'Unidentified' && KEYBOARD_TOKEN_RE.test(code)) return code;
   const key = typeof ev.key === 'string' ? ev.key : '';
   if (!key || key === 'Unidentified' || key === 'Dead') return null;
   if (Object.prototype.hasOwnProperty.call(KEY_NAME_FIXUPS, key)) return KEY_NAME_FIXUPS[key];
@@ -391,20 +403,21 @@ export function createInput(options = {}) {
   const {
     canvas,
     display = null,
-    width = 480,
-    height = 270,
     touch = 'auto',
     touchParent = null,
     target = globalThis.window ?? null,
     doc = globalThis.document ?? null,
     nav = globalThis.navigator ?? null,
-    now = defaultNow,
     deadzone = 0.5,
     preventDefault = true,
   } = options;
   if (!canvas || typeof canvas.addEventListener !== 'function') {
     throw new TypeError('createInput: `canvas` must be an EventTarget (the visible canvas)');
   }
+  const now = typeof options.now === 'function' ? options.now : defaultNow;
+  // Logical size: explicit option, else the display's native size, else the contract default.
+  const width = positiveOr(options.width, positiveOr(display && display.width, 480));
+  const height = positiveOr(options.height, positiveOr(display && display.height, 270));
   const search = options.search ?? (globalThis.location && typeof globalThis.location.search === 'string'
     ? globalThis.location.search
     : '');
@@ -434,6 +447,7 @@ export function createInput(options = {}) {
   let lastDevice = 'keyboard';
   let lastToken = null;
   let enabled = true;
+  let destroyed = false;
   let vibrationEnabled = true;
 
   // ---- per-frame latched state ------------------------------------------------------------
@@ -464,7 +478,7 @@ export function createInput(options = {}) {
   let gamepadDown = new Set();
   let gamepadCount = 0;
   let gamepadBroken = false;
-  const engage = Math.max(0.05, Math.min(0.95, Number(deadzone) || 0.5));
+  const engage = Math.max(0.05, Math.min(0.95, Number.isFinite(Number(deadzone)) ? Number(deadzone) : 0.5));
   const disengage = engage * 0.7;
 
   // ---- listener bookkeeping ---------------------------------------------------------------
@@ -477,25 +491,45 @@ export function createInput(options = {}) {
   };
 
   // ---- touch overlay ---------------------------------------------------------------------
+  // The DOM is only ever built when the overlay has to be shown: on touch devices, with
+  // `?touch=1` / `touch: true`, the first time a touch is seen in auto mode, or on
+  // `setTouchVisible(true)`. A mouse-and-keyboard page never gets the elements at all.
   const touchPref = detectTouchPreference({ touch, search, nav, matchMedia });
   let touchForced = touchPref.forced;
-  const overlayParent = touchParent ?? (doc && doc.body) ?? null;
-  const overlay = touch !== false || touchPref.visible
-    ? createTouchOverlay({
+  const overlayAllowed = touch !== false || touchPref.visible; // the URL flag beats `touch: false`
+  /** @type {ReturnType<typeof createTouchOverlay>|null} */
+  let overlay = null;
+
+  function ensureOverlay() {
+    if (overlay || destroyed || !overlayAllowed) return overlay;
+    overlay = createTouchOverlay({
       doc,
-      parent: overlayParent,
+      parent: touchParent ?? (doc && doc.body) ?? null,
       fixed: !touchParent,
       onToken: (token, down) => (down ? tokenDown(token, 'touch') : tokenUp(token)),
-    })
-    : null;
-  if (overlay) overlay.setVisible(touchPref.visible);
-  if (touchPref.visible) lastDevice = 'touch';
+    });
+    return overlay;
+  }
+
+  function showOverlay(on) {
+    if (on) {
+      const built = ensureOverlay();
+      if (built) built.setVisible(true);
+    } else if (overlay) {
+      overlay.setVisible(false);
+    }
+  }
+
+  if (touchPref.visible) {
+    lastDevice = 'touch';
+    showOverlay(true);
+  }
 
   // ---- core token transitions -------------------------------------------------------------
   function setDevice(device) {
     if (device === lastDevice) return;
     lastDevice = device;
-    if (overlay && !touchForced) overlay.setVisible(device === 'touch');
+    if (!touchForced) showOverlay(device === 'touch');
   }
 
   function tokenDown(token, device) {
@@ -547,7 +581,8 @@ export function createInput(options = {}) {
     if (!enabled || ev.isComposing || isEditable(ev.target)) return;
     const token = tokenFromKeyEvent(ev);
     if (!token) return;
-    if (ev.ctrlKey || ev.metaKey) return; // leave browser/OS shortcuts alone
+    // Leave browser/OS shortcuts (Ctrl+S, Cmd+R, ...) alone; the modifier key itself still counts.
+    if ((ev.ctrlKey || ev.metaKey) && !MODIFIER_TOKENS.has(token)) return;
     if (preventDefault && tokenToActions.has(token) && typeof ev.preventDefault === 'function') ev.preventDefault();
     if (ev.repeat) tokenHold(token, 'keyboard');
     else tokenDown(token, 'keyboard');
@@ -564,8 +599,12 @@ export function createInput(options = {}) {
   // ---- pointer -----------------------------------------------------------------------------
   function toGame(clientX, clientY) {
     if (display && typeof display.toGame === 'function') {
-      const p = display.toGame(clientX, clientY);
-      return { x: finite(p && p.x), y: finite(p && p.y) };
+      try {
+        const p = display.toGame(clientX, clientY);
+        return { x: finite(p && p.x), y: finite(p && p.y) };
+      } catch {
+        // a broken display must not take the whole input system down with it
+      }
     }
     const rect = typeof canvas.getBoundingClientRect === 'function' ? canvas.getBoundingClientRect() : null;
     if (!rect || !(rect.width > 0) || !(rect.height > 0)) return { x: finite(clientX), y: finite(clientY) };
@@ -605,6 +644,7 @@ export function createInput(options = {}) {
 
   function onPointerMove(ev) {
     if (ptrId !== null && pointerId(ev) !== ptrId) return; // only the captured finger drags
+    if (ptrId === null && overlay && overlay.owns(ev.target)) return; // a d-pad finger is not the game pointer
     updatePointerPos(ev);
   }
 
@@ -758,13 +798,13 @@ export function createInput(options = {}) {
     };
   }
 
-  function repeat(action, { delay = 300, rate = 80 } = {}) {
+  function repeat(action, opts) {
     assertAction(action, true);
     let state = repeatState.get(action);
     if (!state) repeatState.set(action, (state = { frame: -1, result: false, nextAt: 0, armed: false }));
     if (state.frame === frame) return state.result; // same answer for every caller in a frame
-    const safeDelay = Math.max(0, Number(delay) || 0);
-    const safeRate = Math.max(1, Number(rate) || 1);
+    const safeDelay = Math.max(0, numberOr(opts && opts.delay, 300));
+    const safeRate = Math.max(1, numberOr(opts && opts.rate, 80));
     let result = false;
     if (pressed(action)) {
       result = true;
@@ -791,9 +831,10 @@ export function createInput(options = {}) {
   }
 
   // ---- binding management -----------------------------------------------------------------
-  function rebind(action, key, { device, slot } = {}) {
+  function rebind(action, key, opts) {
     assertAction(action, false);
-    const keys = key == null ? [] : Array.isArray(key) ? [...key] : [key];
+    const { device, slot } = opts && typeof opts === 'object' ? opts : {};
+    const keys = key == null || key === '' ? [] : Array.isArray(key) ? [...key] : [key];
     let dev = device ?? null;
     for (const token of keys) {
       const tokenDev = tokenDevice(token);
@@ -869,13 +910,15 @@ export function createInput(options = {}) {
   }
 
   // ---- haptics ---------------------------------------------------------------------------------
-  function vibrate(ms = 50, { strong = 0.6, weak = 0.4 } = {}) {
-    if (!vibrationEnabled || !(ms > 0)) return false;
-    const duration = Math.min(MAX_VIBRATE_MS, Math.round(ms));
+  function vibrate(ms = 50, opts) {
+    if (!vibrationEnabled || destroyed || !(ms > 0)) return false;
+    const duration = Math.min(MAX_VIBRATE_MS, Math.max(1, Math.round(Number(ms))));
+    const strong = clamp01(numberOr(opts && opts.strong, 0.6));
+    const weak = clamp01(numberOr(opts && opts.weak, 0.4));
     let done = false;
     if (lastDevice === 'gamepad') {
       for (const pad of readGamepads()) {
-        if (rumble(pad, duration, clamp01(strong), clamp01(weak))) done = true;
+        if (rumble(pad, duration, strong, weak)) done = true;
       }
     }
     if (!done && lastDevice === 'touch' && nav && typeof nav.vibrate === 'function') {
@@ -890,28 +933,30 @@ export function createInput(options = {}) {
 
   // ---- toggles ---------------------------------------------------------------------------------
   function setEnabled(on) {
-    const next = Boolean(on);
+    const next = Boolean(on) && !destroyed;
     if (next === enabled) return;
     enabled = next;
     if (!enabled) releaseAll();
   }
 
   function setTouchVisible(value) {
-    if (!overlay) return;
+    if (!overlayAllowed || destroyed) return;
     if (value === 'auto') {
       touchForced = false;
-      overlay.setVisible(lastDevice === 'touch');
+      showOverlay(lastDevice === 'touch');
       return;
     }
     touchForced = true;
-    overlay.setVisible(Boolean(value));
+    showOverlay(Boolean(value));
   }
 
   function destroy() {
     for (const off of subs.splice(0)) off();
-    if (overlay) overlay.destroy();
     releaseAll();
-    tokens.clear();
+    if (overlay) overlay.destroy();
+    overlay = null;
+    destroyed = true;
+    enabled = false; // update() keeps working (the release edges drain) but nothing new gets in, gamepads included
   }
 
   // ---- wiring --------------------------------------------------------------------------------
@@ -989,7 +1034,7 @@ export function createInput(options = {}) {
  */
 function createTouchOverlay({ doc, parent, fixed, onToken }) {
   if (!doc || !parent || typeof doc.createElement !== 'function') {
-    return { visible: false, setVisible() {}, release() {}, destroy() {} };
+    return { visible: false, setVisible() {}, release() {}, destroy() {}, owns: () => false };
   }
   ensureOverlayStyle(doc);
   const root = doc.createElement('div');
@@ -1099,6 +1144,15 @@ function createTouchOverlay({ doc, parent, fixed, onToken }) {
     setVisible(on) {
       visible = Boolean(on);
       root.hidden = !visible;
+    },
+    /** Whether `el` is one of the overlay's own elements (so pointer events on it are not game pointer input). */
+    owns(el) {
+      if (!el || typeof root.contains !== 'function') return false;
+      try {
+        return root.contains(el);
+      } catch {
+        return false;
+      }
     },
     /** Lift every finger (focus loss); emits the matching release tokens. */
     release() {
@@ -1223,6 +1277,19 @@ function clamp01(value) {
 function finite(value) {
   const n = Number(value);
   return Number.isFinite(n) ? n : 0;
+}
+
+/** `value` as a finite number, else `fallback` (so `null`, `NaN`, `'x'` and missing options are safe). */
+function numberOr(value, fallback) {
+  if (value === undefined || value === null) return fallback;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+/** `value` as a positive finite number, else `fallback`. */
+function positiveOr(value, fallback) {
+  const n = numberOr(value, NaN);
+  return n > 0 ? n : fallback;
 }
 
 function defaultNow() {

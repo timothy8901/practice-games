@@ -233,7 +233,7 @@ describe('computeLayout: malformed inputs', () => {
   });
 
   test('exotic mode values are rejected without throwing on stringification', () => {
-    for (const mode of [Symbol('fit'), {}, [], () => 'fit', 0, true, 'Fit', ' fit', 'fit\u0000']) {
+    for (const mode of [Symbol('fit'), {}, [], () => 'fit', 0, true, 'Fit', ' fit', 'fit\u0000', '\ufb01t', 'ｆｉｔ', 'integer\u200b', new String('fit')]) {
       assert.throws(() => computeLayout({ cssWidth: 960, cssHeight: 540, mode }), TypeError);
     }
   });
@@ -958,5 +958,224 @@ describe('createDisplay: coordinate mapping under stress', () => {
     assert.ok(near(b.toGame(0, 45).x, 0));
     b.destroy();
     assert.equal(window.listenerCount('resize'), 0);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// Second verification pass: boundaries, huge inputs, validation, determinism, restore
+// ---------------------------------------------------------------------------------------------
+
+describe('computeLayout: safe-integer boundary and huge inputs', () => {
+  test('the largest safe integer is accepted and still yields a finite, consistent layout', () => {
+    const L = computeLayout({ width: Number.MAX_SAFE_INTEGER, height: 1, cssWidth: 1, cssHeight: 1 });
+    for (const [k, v] of Object.entries(L)) {
+      if (typeof v === 'number') assert.ok(Number.isFinite(v) && v >= 0, `${k}=${v}`);
+    }
+    assert.ok(L.pixelScale > 0 && L.pixelScale < 1);
+    assert.equal(L.integer, false);
+    assert.equal(L.destWidth, 1);
+  });
+
+  test('MAX_SAFE_INTEGER + 1 and 2 ** 60 are RangeErrors even though Number.isInteger says yes', () => {
+    for (const huge of [Number.MAX_SAFE_INTEGER + 1, 2 ** 60, 1e300]) {
+      assert.ok(Number.isInteger(huge));
+      assert.throws(() => computeLayout({ width: huge, height: 270 }), RangeError, String(huge));
+      assert.throws(() => computeLayout({ width: 480, height: huge }), RangeError, String(huge));
+      const { env } = makeEnv();
+      assert.throws(() => createDisplay({ env, parent: new FakeElement(960, 540), width: huge }), RangeError);
+    }
+  });
+
+  test('a 1x1 native buffer and a 10000x10000 one both lay out sanely', () => {
+    const tiny = computeLayout({ width: 1, height: 1, cssWidth: 960, cssHeight: 540 });
+    assert.equal(tiny.pixelScale, 540);
+    assert.equal(tiny.destWidth, 540);
+    assert.equal(tiny.deviceOffsetX, 210);
+    const big = computeLayout({ width: 10_000, height: 10_000, cssWidth: 960, cssHeight: 540 });
+    assert.equal(big.integer, false);
+    assert.equal(big.destHeight, 540);
+    assert.ok(near(big.destWidth, 540));
+  });
+
+  test('enormous CSS boxes stay finite with and without a backing cap', () => {
+    const free = computeLayout({ cssWidth: 1e7, cssHeight: 1e7, dpr: 3 });
+    assert.equal(free.backingWidth, 3e7);
+    assert.equal(free.pixelScale, Math.floor(3e7 / 480));
+    assert.ok(Number.isInteger(free.deviceOffsetX) && free.deviceOffsetX >= 0);
+    const capped = computeLayout({ cssWidth: 1e7, cssHeight: 1e7, dpr: 3, maxBackingPixels: 16_777_216 });
+    assert.ok(capped.backingWidth * capped.backingHeight <= 16_777_216 + capped.backingWidth + capped.backingHeight);
+    assert.ok(capped.dpr < 3 && capped.dpr > 0);
+    assert.equal(capped.cssWidth, 1e7);
+    const absurd = computeLayout({ cssWidth: 1e308, cssHeight: 1e308 });
+    assert.ok(Number.isFinite(absurd.backingWidth));
+    assert.equal(absurd.backingWidth, 1e308);
+    assert.ok(Number.isFinite(absurd.scale));
+  });
+
+  test('100k random specs never produce NaN, negative or non-finite fields', () => {
+    const rnd = lcg(0xdeadbeef);
+    const dprs = [1e-6, 0.5, 1, 1.25, 1.5, 1.75, 2, 2.625, 3, 4, 10];
+    for (let i = 0; i < 100_000; i++) {
+      const L = computeLayout({
+        width: 1 + Math.floor(rnd() * 2000),
+        height: 1 + Math.floor(rnd() * 2000),
+        cssWidth: Math.floor(rnd() * 6000) - 10,
+        cssHeight: Math.floor(rnd() * 4000) - 10,
+        dpr: dprs[Math.floor(rnd() * dprs.length)],
+        mode: rnd() < 0.5 ? 'integer' : 'fit',
+        maxBackingPixels: rnd() < 0.2 ? Math.floor(rnd() * 1e7) : Infinity,
+      });
+      for (const key of ['dpr', 'cssWidth', 'cssHeight', 'backingWidth', 'backingHeight', 'pixelScale', 'destWidth', 'destHeight', 'deviceOffsetX', 'deviceOffsetY', 'scale', 'offsetX', 'offsetY', 'viewWidth', 'viewHeight']) {
+        const v = L[key];
+        if (!(Number.isFinite(v) && v >= 0 && !Object.is(v, -0))) assert.fail(`${key}=${v} for ${JSON.stringify(L)}`);
+      }
+      assert.ok(L.destWidth <= L.backingWidth + 1e-9 && L.destHeight <= L.backingHeight + 1e-9);
+      assert.ok(L.pixelScale > 0 && L.scale > 0);
+    }
+  });
+
+  test('non-object specs are tolerated as "no overrides" (strings/numbers) or rejected (null)', () => {
+    assert.deepEqual(computeLayout('nope'), computeLayout());
+    assert.deepEqual(computeLayout(42), computeLayout());
+    assert.throws(() => computeLayout(null), TypeError);
+  });
+});
+
+describe('createDisplay: validation (second pass)', () => {
+  test('a null or primitive options argument is a clear TypeError, not a destructuring crash', () => {
+    for (const bad of [null, 'opts', 42, true]) {
+      assert.throws(() => createDisplay(bad), { name: 'TypeError', message: /options object/ }, String(bad));
+    }
+  });
+
+  test('clear() rejects non-string colours instead of silently reusing the last fillStyle', () => {
+    const { env } = makeEnv();
+    const d = createDisplay({ env, parent: new FakeElement(960, 540) });
+    d.ctx.fillStyle = '#bad';
+    for (const bad of [0, 0xffffff, {}, [], true, '', NaN]) {
+      assert.throws(() => d.clear(bad), TypeError, String(bad));
+    }
+    assert.deepEqual(d.ctx.ops, []);
+    d.clear('rgba(1, 2, 3, .5)');
+    d.clear(null);
+    d.clear(undefined); // explicit undefined -> the default (background)
+    assert.deepEqual(
+      d.ctx.ops.map((o) => [o.op, o.fillStyle]),
+      [
+        ['fillRect', 'rgba(1, 2, 3, .5)'],
+        ['clearRect', undefined],
+        ['fillRect', '#000'],
+      ],
+    );
+  });
+
+  test('a window devicePixelRatio given as a numeric string is coerced; a negative one falls back to 1', () => {
+    const { env, window, queries } = makeEnv({ dpr: '2' });
+    const d = createDisplay({ env, parent: new FakeElement(960, 540) });
+    assert.equal(d.dpr, 2);
+    assert.equal(d.canvas.width, 1920);
+    assert.equal(queries.at(-1).media, '(resolution: 2dppx)');
+    window.devicePixelRatio = -3;
+    queries.at(-1).fire();
+    assert.equal(d.dpr, 1);
+    assert.equal(d.canvas.width, 960);
+  });
+
+  test('unicode-named modes are rejected by setMode without changing state', () => {
+    const { env } = makeEnv();
+    let count = 0;
+    const d = createDisplay({ env, parent: new FakeElement(800, 540), onResize: () => count++ });
+    for (const bad of ['ﬁt', 'ｉｎｔｅｇｅｒ', 'fit ', 'FIT', 'fit\n']) {
+      assert.throws(() => d.setMode(bad), TypeError, JSON.stringify(bad));
+    }
+    assert.equal(d.mode, 'integer');
+    assert.equal(count, 1);
+  });
+
+  test('the native size is exposed read-only in spirit: layout.width/height never drift from options', () => {
+    const { env, observers } = makeEnv();
+    const parent = new FakeElement(960, 540);
+    const d = createDisplay({ env, parent, width: 320, height: 180 });
+    for (const w of [10, 5000, 320, 0, 961]) {
+      parent.clientWidth = w;
+      observers[0].cb();
+      assert.equal(d.layout.width, 320);
+      assert.equal(d.layout.height, 180);
+      assert.equal(d.buffer.width, 320);
+      assert.equal(d.buffer.height, 180);
+    }
+  });
+});
+
+describe('createDisplay: determinism and state restore (second pass)', () => {
+  test('two displays built from identical inputs issue identical present() op streams', () => {
+    const run = () => {
+      const { env } = makeEnv({ dpr: 1.5 });
+      const d = createDisplay({ env, parent: new FakeElement(1234, 777), background: '#123' });
+      d.setMode('fit');
+      d.setMode('integer');
+      d.canvas.ctx.ops.length = 0;
+      d.present();
+      d.present();
+      return JSON.stringify(d.canvas.ctx.ops.map((o) => ({ ...o, args: o.args.map((a) => (typeof a === 'object' ? 'buffer' : a)) })));
+    };
+    assert.equal(run(), run());
+  });
+
+  test('destroying and recreating a display on the same parent restores a deep-equal layout and a clean DOM', () => {
+    const { env, window, document, observers } = makeEnv({ dpr: 2 });
+    const parent = new FakeElement(1000, 700);
+    const first = createDisplay({ env, parent, mode: 'fit' });
+    const snapshot = first.layout;
+    const style = { ...first.canvas.style };
+    first.destroy();
+    assert.equal(parent.children.length, 0);
+    assert.equal(window.listenerCount('resize'), 0);
+    assert.ok(observers.every((o) => o.disconnected));
+    const second = createDisplay({ env, parent, mode: 'fit' });
+    assert.deepEqual(second.layout, snapshot);
+    assert.notEqual(second.layout, snapshot);
+    assert.deepEqual({ ...second.canvas.style }, style);
+    assert.equal(parent.children.length, 1);
+    assert.equal(document.body.children.length, 0);
+    second.destroy();
+  });
+
+  test('present() after a resize storm draws the frame exactly where the current layout says', () => {
+    const { env, observers, window } = makeEnv();
+    const parent = new FakeElement(960, 540);
+    const d = createDisplay({ env, parent });
+    const rnd = lcg(31337);
+    for (let i = 0; i < 300; i++) {
+      parent.clientWidth = 1 + Math.floor(rnd() * 3000);
+      parent.clientHeight = 1 + Math.floor(rnd() * 2000);
+      window.devicePixelRatio = [1, 1.5, 2][Math.floor(rnd() * 3)];
+      observers[0].cb();
+      d.canvas.ctx.ops.length = 0;
+      d.present();
+      const L = d.layout;
+      const blit = d.canvas.ctx.ops.at(-1);
+      assert.equal(blit.op, 'drawImage');
+      assert.deepEqual(blit.args.slice(1), [0, 0, 480, 270, L.deviceOffsetX, L.deviceOffsetY, L.destWidth, L.destHeight]);
+      for (const f of fills(d)) {
+        const [x, y, w, h] = f.args;
+        // No strip may overlap the frame rectangle.
+        const overlapsX = x < L.deviceOffsetX + L.destWidth && x + w > L.deviceOffsetX;
+        const overlapsY = y < L.deviceOffsetY + L.destHeight && y + h > L.deviceOffsetY;
+        assert.ok(!(overlapsX && overlapsY), `strip ${f.args} overlaps frame ${JSON.stringify(L)}`);
+        assert.ok(x >= 0 && y >= 0 && x + w <= L.backingWidth + 1e-9 && y + h <= L.backingHeight + 1e-9, `strip ${f.args} outside canvas`);
+      }
+    }
+  });
+
+  test('toGame is pure with respect to repeated calls (no hidden state, 50k calls)', () => {
+    const { env } = makeEnv({ dpr: 1.25 });
+    const d = createDisplay({ env, parent: new FakeElement(1000, 600) });
+    d.canvas.rect = { left: 3, top: 4, width: 1000, height: 600 };
+    const ref = d.toGame(503, 304);
+    for (let i = 0; i < 50_000; i++) {
+      const p = d.toGame(503, 304);
+      if (p.x !== ref.x || p.y !== ref.y || p.inside !== ref.inside) assert.fail(`drifted at ${i}`);
+    }
   });
 });

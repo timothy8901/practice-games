@@ -1,0 +1,51 @@
+/* [BOOT] Black letterbox, crisp canvas, touch overlay host. The game draws everything else into the
+   480x270 buffer; core/input injects its own touch-button CSS. */
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: #000;
+  overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-text-size-adjust: 100%;
+}
+#stage {
+  position: fixed;
+  inset: 0;
+  background: #000;
+}
+#stage canvas {
+  display: block;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  outline: none;
+  touch-action: none;
+}
+#stage canvas:focus-visible {
+  box-shadow: inset 0 0 0 2px #3b6ea5;
+}
+#touch {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+/* Touch button chrome: the overlay elements are created by core/input; these only tune the host. */
+#touch > * {
+  pointer-events: auto;
+}
+noscript {
+  display: block;
+  color: #f1e7cf;
+  font: 16px/1.4 system-ui, sans-serif;
+  padding: 1.5em;
+  text-align: center;
+}
+/* Hook for scenes that read reduced-motion through getComputedStyle or matchMedia. */
+:root {
+  --reduced-motion: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --reduced-motion: 1;
+  }
+}

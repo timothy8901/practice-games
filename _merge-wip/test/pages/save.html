@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>save.js demo</title>
+  <link rel="icon" href="data:,">
+  <style>
+    html, body { margin: 0; background: #111; color: #eee; font: 13px/1.4 monospace; }
+    main { max-width: 900px; margin: 0 auto; padding: 16px; }
+    h1 { font-size: 16px; margin: 0 0 4px; }
+    p { margin: 0 0 12px; color: #aaa; }
+    table { border-collapse: collapse; width: 100%; }
+    td, th { text-align: left; padding: 3px 8px; border-bottom: 1px solid #222; vertical-align: top; }
+    .pass { color: #7ad97a; }
+    .fail { color: #ff6b6b; }
+    .skip { color: #d9c37a; }
+    #summary { margin-top: 10px; font-weight: bold; }
+    pre { white-space: pre-wrap; word-break: break-all; color: #9ad; background: #181818; padding: 8px; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>save.js against the real localStorage</h1>
+    <p>Exercises the verified-write path, autosave rotation, export/import, tampering, crash recovery and a
+       real QuotaExceededError on this origin. Keys live under <code>demo.save.</code> and are removed at the end.</p>
+    <table id="rows"><thead><tr><th>#</th><th>check</th><th>result</th><th>detail</th></tr></thead><tbody></tbody></table>
+    <div id="summary">running…</div>
+    <pre id="export"></pre>
+  </main>
+  <script type="module">
+    import { createSaveSystem, createMemoryStorage, ERROR_CODES, encodeRecord } from '../../js/core/save.js';
+
+    const PREFIX = 'demo.save.';
+    const FILL = 'demo.fill.';
+    const rows = document.querySelector('#rows tbody');
+    const results = [];
+
+    function report(name, ok, detail = '') {
+      results.push({ name, ok, detail: String(detail) });
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${results.length}</td><td>${name}</td><td class="${ok === 'skip' ? 'skip' : ok ? 'pass' : 'fail'}">${ok === 'skip' ? 'SKIP' : ok ? 'PASS' : 'FAIL'}</td><td>${detail}</td>`;
+      rows.appendChild(tr);
+    }
+
+    function check(name, fn) {
+      try {
+        const out = fn();
+        report(name, out === undefined ? true : out !== false, out === true || out === false || out === undefined ? '' : out);
+      } catch (error) {
+        report(name, false, `threw: ${error && error.message ? error.message : error}`);
+      }
+    }
+
+    /** Removes every key under a prefix; localStorage shifts indices on removal, so collect first. */
+    function wipe(prefix) {
+      const keys = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith(prefix)) keys.push(k);
+      }
+      for (const k of keys) localStorage.removeItem(k);
+      return keys.length;
+    }
+
+    /**
+     * Fills localStorage with throwaway keys until the browser refuses a write. Returns how many
+     * chunks fit, or -1 when the cap was reached without ever hitting the quota (storage too roomy).
+     */
+    function fillToQuota(chunk = 256 * 1024, cap = 120) {
+      const blob = 'f'.repeat(chunk);
+      for (let i = 0; i < cap; i++) {
+        try {
+          localStorage.setItem(FILL + i, blob);
+        } catch (error) {
+          return i;
+        }
+      }
+      return -1;
+    }
+
+    wipe(PREFIX);
+    wipe(FILL);
+
+    let fixed = 1_700_000_000_000;
+    const sys = createSaveSystem({ prefix: PREFIX, now: () => (fixed += 1000) });
+    const payload = { hero: 'Ünïcödé ✦ 日本 😀', hp: 12, bag: ['coin', 'shell'], summary: { day: 3, hour: 18 } };
+
+    check('uses persistent host storage', () => sys.persistent === true);
+    check('starts empty', () => sys.list().length === 0 && sys.latest() === null);
+    check('save(1) writes a verified record', () => {
+      const r = sys.save(1, payload);
+      return r.ok && r.seq === 1 && localStorage.getItem(`${PREFIX}manual:1.tmp`) === null ? `size ${r.size}` : JSON.stringify(r);
+    });
+    check('load(1) round-trips unicode exactly', () => JSON.stringify(sys.load(1).data) === JSON.stringify(payload));
+    check('summary is read from the header', () => JSON.stringify(sys.peek(1).summary) === JSON.stringify(payload.summary));
+    check('autosave rotates through 3 slots and overwrites the oldest', () => {
+      const slots = [1, 2, 3, 4].map((n) => sys.autosave({ n }).slot);
+      return JSON.stringify(slots) === JSON.stringify(['auto:1', 'auto:2', 'auto:3', 'auto:1']) ? slots.join(' ') : slots.join(' ');
+    });
+    check('latest() is the last autosave', () => sys.latest().slot === 'auto:1' && sys.load('auto:1').data.n === 4);
+    check('list() shows four readable slots in slot order', () => {
+      const ids = sys.list().map((e) => e.slot).join(',');
+      return ids === 'manual:1,auto:1,auto:2,auto:3' ? ids : `got ${ids}`;
+    });
+    let exported = '';
+    check('exportString() is plain base64', () => {
+      exported = sys.exportString(1);
+      document.querySelector('#export').textContent = `export of manual:1 (${exported.length} chars):\n${exported}`;
+      return /^[A-Za-z0-9+/]+=*$/.test(exported);
+    });
+    check('importString() into slot 2 keeps data and summary', () => {
+      const r = sys.importString(exported, { slot: 2 });
+      return r.ok && r.slot === 'manual:2' && JSON.stringify(sys.load(2).data) === JSON.stringify(payload)
+        && JSON.stringify(sys.peek(2).summary) === JSON.stringify(payload.summary);
+    });
+    check('tampered record is reported corrupt, not loaded', () => {
+      const key = `${PREFIX}manual:2`;
+      localStorage.setItem(key, localStorage.getItem(key).replace('"hp":12', '"hp":99'));
+      const entry = sys.peek(2);
+      const loaded = sys.load(2);
+      return entry.state === 'corrupt' && loaded.error.code === ERROR_CODES.CORRUPT && !sys.list().some((e) => e.slot === 'manual:2');
+    });
+    check('remove(2) clears the corrupt slot', () => sys.remove(2).ok && sys.peek(2).state === 'empty');
+    check('crash recovery promotes a newer staged copy on construction', () => {
+      const staged = encodeRecord({ version: 1, time: 0, seq: 999, kind: 'manual', slot: 'manual:3', data: { recovered: true } }).record;
+      localStorage.setItem(`${PREFIX}manual:3.tmp`, staged);
+      const second = createSaveSystem({ prefix: PREFIX });
+      return localStorage.getItem(`${PREFIX}manual:3.tmp`) === null && second.load(3).data.recovered === true
+        && second.latest().slot === 'manual:3';
+    });
+    check('foreign text in a slot key is a format error', () => {
+      localStorage.setItem(`${PREFIX}manual:3`, 'not a save');
+      return sys.load(3).error.code === ERROR_CODES.FORMAT && sys.peek(3).state === 'corrupt';
+    });
+    check('in-memory backends behave identically (Map is flagged non-persistent)', () => {
+      const viaMap = createSaveSystem({ storage: new Map(), now: () => 1 });
+      const viaMemory = createSaveSystem({ storage: createMemoryStorage(), now: () => 1 });
+      return viaMap.persistent === false && viaMap.save(1, payload).ok && viaMemory.save(1, payload).ok
+        && JSON.stringify(viaMap.load(1).data) === JSON.stringify(payload)
+        && viaMemory.exportString(1) === viaMap.exportString(1);
+    });
+
+    // Real quota: fill the origin, then try a save that cannot fit.
+    const before = localStorage.getItem(`${PREFIX}manual:1`);
+    const chunks = fillToQuota();
+    if (chunks < 0) {
+      wipe(FILL);
+      report('real QuotaExceededError is reported as {ok:false, code:"quota"}', 'skip', 'storage never filled within 30MB');
+    } else {
+      check('real QuotaExceededError is reported as {ok:false, code:"quota"}', () => {
+        const r = sys.save(1, { pad: 'x'.repeat(300 * 1024) });
+        return r.ok === false && r.error.code === ERROR_CODES.QUOTA && r.error.slot === 'manual:1'
+          ? `filled after ${chunks} x 256KB chunks; ${r.error.message}` : JSON.stringify(r).slice(0, 200);
+      });
+      check('the previous record survives the refused write', () => localStorage.getItem(`${PREFIX}manual:1`) === before
+        && localStorage.getItem(`${PREFIX}manual:1.tmp`) === null && JSON.stringify(sys.load(1).data) === JSON.stringify(payload));
+      check('autosave under quota pressure also fails cleanly', () => sys.autosave({ pad: 'y'.repeat(300 * 1024) }).error.code === ERROR_CODES.QUOTA);
+      wipe(FILL);
+      check('saving works again once space is freed', () => {
+        const r = sys.save(1, { after: 'quota' });
+        return r.ok && sys.load(1).data.after === 'quota';
+      });
+    }
+
+    check('clearAll() removes every demo key', () => {
+      const r = sys.clearAll();
+      return r.ok && sys.list({ all: true }).every((e) => e.state === 'empty') && wipe(PREFIX) === 0;
+    });
+
+    const failed = results.filter((r) => r.ok === false).length;
+    const skipped = results.filter((r) => r.ok === 'skip').length;
+    document.querySelector('#summary').textContent = `${results.length - failed - skipped} passed, ${failed} failed, ${skipped} skipped`;
+    document.querySelector('#summary').className = failed ? 'fail' : 'pass';
+    window.__saveDemo = { done: true, failed, skipped, results };
+  </script>
+</body>
+</html>

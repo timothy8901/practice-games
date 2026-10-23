@@ -200,7 +200,7 @@ describe('encodeRecord / decodeRecord', () => {
     assert.equal(dec.size, a.record.length);
   });
 
-  it('parses only the header with parseData: false', () => {
+  it('omits the payload with parseData: false', () => {
     const { record } = encodeRecord(FIELDS);
     const dec = decodeRecord(record, { parseData: false });
     assert.equal(dec.ok, true);
@@ -267,8 +267,13 @@ describe('encodeRecord / decodeRecord', () => {
     assert.equal(decodeRecord(craftRecord(header, 'null')).error.code, ERROR_CODES.CORRUPT);
     assert.equal(decodeRecord(craftRecord(header, '42')).error.code, ERROR_CODES.CORRUPT);
     assert.equal(decodeRecord(craftRecord(header, '{bad json')).error.code, ERROR_CODES.CORRUPT);
-    // Header-only decoding does not look at the payload at all.
-    assert.equal(decodeRecord(craftRecord(header, '{bad json'), { parseData: false }).ok, true);
+    // Header-only decoding still validates the payload (a slot listed as ok must be loadable); it just
+    // does not return it.
+    assert.equal(decodeRecord(craftRecord(header, '{bad json'), { parseData: false }).error.code, ERROR_CODES.CORRUPT);
+    assert.equal(decodeRecord(craftRecord(header, '42'), { parseData: false }).error.code, ERROR_CODES.CORRUPT);
+    const headerOnly = decodeRecord(craftRecord(header, '{"a":1}'), { parseData: false });
+    assert.equal(headerOnly.ok, true);
+    assert.equal(headerOnly.data, undefined);
     // Informational fields are defaulted when absent.
     const minimal = decodeRecord(craftRecord(JSON.stringify({ version: 1, time: 5, seq: 1 }), '{"a":1}'));
     assert.equal(minimal.ok, true);
@@ -769,7 +774,7 @@ describe('list / peek / latest', () => {
     assert.deepEqual(sys.list({ kind: 'other' }), []);
   });
 
-  it('peeks one slot without parsing the payload, and returns null for unknown slots', () => {
+  it('peeks one slot by its header fields, and returns null for unknown slots', () => {
     const { sys, map } = freshSystem();
     sys.save(1, { summary: 's', payload: 'p'.repeat(5000) });
     const entry = sys.peek(1);

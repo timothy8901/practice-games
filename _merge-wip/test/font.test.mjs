@@ -437,9 +437,18 @@ describe('drawText with a mocked canvas environment', () => {
     const offsets = o.calls.slice(0, 8).map((c) => `${c[5] - 5},${c[6] - 5}`).sort();
     assert.deepEqual(offsets, ['-2,-2', '-2,0', '-2,2', '0,-2', '0,2', '2,-2', '2,0', '2,2'].sort());
     assert.equal(glyphCacheSize('main'), 3); // white, shadow colour, outline colour
+    // Shadow + outline: the shadow is the shadow of the outlined shape (full 5x5 footprint for
+    // width 2), painted first; then the 24 outline offsets; then the fill. Back to front.
     const both = fakeCtx();
     drawText(both, 'A', 0, 0, { outline: { width: 2 }, shadow: { color: '#000', dx: 0, dy: 2 } });
-    assert.equal(both.calls.length, 24 + 1 + 1);
+    assert.equal(both.calls.length, 25 + 24 + 1);
+    const colourOf = (call) => call[0].fills[0][4];
+    assert.ok(both.calls.slice(0, 25).every((c) => colourOf(c) === '#000'), 'shadow passes come first');
+    assert.ok(both.calls.slice(25, 49).every((c) => colourOf(c) === '#000000'), 'outline passes come second');
+    assert.equal(colourOf(both.calls[49]), '#ffffff', 'fill is painted last');
+    const shadowOffsets = both.calls.slice(0, 25).map((c) => `${c[5]},${c[6]}`);
+    assert.ok(shadowOffsets.includes('2,4'), 'shadow footprint extends outline width past the shadow offset');
+    assert.ok(shadowOffsets.includes('-2,0'), 'shadow footprint covers the outline on the far side too');
     assert.throws(() => drawText(fakeCtx(), 'A', 0, 0, { outline: { width: 0 } }), RangeError);
   });
 

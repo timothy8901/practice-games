@@ -52,9 +52,9 @@ function allFinite(c) {
 /**
  * Independent re-computation of "does anything in this party land on the Ward holder".
  */
-function partyHasWardAnswer(battle, side, target) {
-  const ability = getAbility(target.ability);
+function partyHasWardAnswer(battle, side, target, ability = getAbility(target.ability)) {
   return battle.sides[side].party.some((c) => !isFainted(c) && c.moves.some((m) => {
+    if (m.pp <= 0) return false;
     const mv = getMove(m.id);
     if (!isDamaging(mv) || mv.effect.scrap) return false;
     const type = mv.effect.queuedType && c.typeQueue ? c.typeQueue[(c.typeIndex + 1) % c.typeQueue.length] : mv.type;
@@ -99,6 +99,21 @@ export function simulateBattle(opts) {
     kind === 'wild' ? { party: foeParty } : { party: foeParty, trainer: { name: 'Sim Trainer', items: rng.chance(0.5) ? [{ id: 'tonic', name: 'Tonic', heal: 0.5 }] : [] } },
   ];
   const battle = createBattle({ sides, kind, dial, rng: rng.fork('battle'), captureStance: kind === 'wild' && rng.chance(0.5), curveLevel: rng.chance(0.5) ? rng.int(10, 50) : null, summit: rng.chance(0.1) });
+  // Check every Ward readout at the moment it is built (the party's PP and the
+  // target's types are exactly what the readout saw), independently of the engine.
+  const origReadout = battle._wardReadout.bind(battle);
+  battle._wardReadout = (side, ability, target) => {
+    const ev = origReadout(side, ability, target);
+    const expect = partyHasWardAnswer(battle, side, target, ability);
+    const listed = ev.canLand.length > 0;
+    if (expect !== listed) note(`ward readout mismatch: expected answer=${expect}, listed ${ev.canLand.length} (turn ${battle.turn})`);
+    for (const e of ev.canLand) {
+      const mv = getMove(e.move);
+      if (!wardCheck(ability, mv, target.types, e.type).lands || e.pp <= 0) note(`ward readout lists a move that cannot land: ${e.creature}'s ${e.move}`);
+    }
+    if (ev.types.length === 0 && ability.ward.kind !== 'no-status' && expect) note('ward readout lists no type although a technique lands');
+    return ev;
+  };
   const brainRng = rng.fork('brain');
   const events = battle.intro.slice();
   let steps = 0;
@@ -128,11 +143,7 @@ export function simulateBattle(opts) {
     for (const ev of evs) {
       events.push(ev);
       if (ev.type === 'move' && ev.pp !== null && ev.pp < 0) note(`move event with negative PP: ${ev.move}`);
-      if (ev.type === 'ward-readout') {
-        const target = battle.active(ev.side === 0 ? 1 : 0);
-        const expect = partyHasWardAnswer(battle, ev.side, target);
-        if (expect !== ev.canLand.length > 0) note(`ward readout mismatch: expected answer=${expect}, listed ${ev.canLand.length} (turn ${battle.turn})`);
-      }
+      if (ev.type === 'ward-readout' && !Array.isArray(ev.targetTypes)) note('ward readout without targetTypes');
     }
     for (const s of battle.sides) {
       for (const c of s.party) {

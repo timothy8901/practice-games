@@ -36,9 +36,15 @@
   const cams = { harbor: [3 * 16, 0], town: [3 * 16, 9 * 16], flats: [10 * 16, 0], west: [0, 6 * 16] };
   const canvas = document.getElementById('c');
   const full = state.cam === 'full';
-  canvas.width = full ? HARBOR.w * 16 : 480;
-  canvas.height = full ? HARBOR.h * 16 + 40 : 270;
-  const scale = full ? 1 : state.scale;
+  const states = state.cam === 'states';
+  // `states`: a 3x2 contact sheet (noon / dusk / night x low / high tide) of the harbor view.
+  const STATES = [
+    { hour: 12, tide: 0, label: 'noon, low tide' }, { hour: 18.25, tide: 0, label: 'dusk, low tide' }, { hour: 22, tide: 0, label: 'night, low tide' },
+    { hour: 12, tide: 1, label: 'noon, high tide' }, { hour: 18.25, tide: 1, label: 'dusk, high tide' }, { hour: 22, tide: 1, label: 'night, high tide' },
+  ];
+  canvas.width = full ? HARBOR.w * 16 : states ? 960 : 480;
+  canvas.height = full ? HARBOR.h * 16 + 40 : states ? 540 : 270;
+  const scale = full || states ? 1 : state.scale;
   canvas.style.width = canvas.width * scale + 'px';
   canvas.style.height = canvas.height * scale + 'px';
   const ctx = canvas.getContext('2d');
@@ -50,6 +56,26 @@
     const g = gradeFor(state.hour, state.weather);
     const lit = state.lit === null ? g.night > 0.5 : state.lit;
     if (state.sheet) { drawSheet(ctx, tileset, { hour: state.hour, frame: state.frame }); return; }
+    if (states) {
+      ctx.fillStyle = '#141B33';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      STATES.forEach((st, i) => {
+        const px = (i % 3) * 320, py = Math.floor(i / 3) * 270;
+        const gs = gradeFor(st.hour, state.weather);
+        ctx.save();
+        ctx.translate(px, py);
+        drawMap(ctx, HARBOR, tileset, {
+          frame: state.frame, hour: st.hour, weather: state.weather, tide: st.tide,
+          camX: 5 * 16, camY: 2 * 16, view: { x: 0, y: 24, w: 320, h: 246 }, skybandH: 24,
+          lighthouseStage: state.stage, lighthouseLit: state.lit === null ? gs.night > 0.5 : state.lit,
+        });
+        ctx.fillStyle = '#F4F1E6';
+        ctx.font = '10px monospace';
+        ctx.fillText(st.label, 4, 268);
+        ctx.restore();
+      });
+      return;
+    }
     const [cx, cy] = full ? [0, 0] : (cams[state.cam] || cams.harbor);
     ctx.fillStyle = '#141B33';
     ctx.fillRect(0, 0, canvas.width, canvas.height);

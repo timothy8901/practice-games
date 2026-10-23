@@ -26,6 +26,17 @@
  * fire nothing, except that a resync longer than `maxCatchUpMinutes` still
  * reports a tide-state change.
  *
+ * Listener rules match events.js: listeners run synchronously in registration
+ * order; one registered during a dispatch first fires at the next boundary; one
+ * removed during a dispatch (by its unsubscribe or `clearListeners()`) does not
+ * fire if it has not run yet; a throwing listener aborts the advance at that
+ * boundary (the clock stays there, usable) and the remaining listeners are skipped.
+ *
+ * Range: `total` never exceeds {@link MAX_TOTAL_MINUTES}; `update()` and `skipTo()`
+ * stop there rather than drift into imprecise floats, and `restore()` rejects
+ * anything beyond it. Real-clock mode is confined to the range `Date` can
+ * represent and rejects instants outside it with a `RangeError`.
+ *
  * @module core/time
  */
 
@@ -88,6 +99,14 @@ export const LUNAR_MONTH_DAYS = 29.5;
 export const SPRING_TIDE_HALF_WINDOW_DAYS = 1.5;
 /** Shape version written by `serialize()` and accepted by `restore()`. */
 export const CLOCK_STATE_VERSION = 1;
+/**
+ * Largest `total` the clock holds: `Number.MAX_SAFE_INTEGER` in-game minutes
+ * (about 17 billion years), the point past which minute arithmetic stops being
+ * exact. `update()` and `skipTo()` stop there; `restore()` rejects more.
+ */
+export const MAX_TOTAL_MINUTES = Number.MAX_SAFE_INTEGER;
+/** Day number that holds {@link MAX_TOTAL_MINUTES}: the largest `day`, `startDay` or `tidesForDay()` argument. */
+export const MAX_DAY = Math.floor(MAX_TOTAL_MINUTES / MINUTES_PER_DAY);
 
 const TWO_PI = Math.PI * 2;
 const MS_PER_DAY = 86_400_000;
@@ -96,6 +115,14 @@ const MS_PER_DAY = 86_400_000;
  * the days-since-epoch count by 3 makes `day % 7` land on 0 = Monday.
  */
 const REAL_DAY_OFFSET = 3;
+/**
+ * `Date` covers ±1e8 days (±8.64e15 ms) around the epoch. Keeping one day of
+ * margin on the instant means any time zone's local date still has a valid `Date`.
+ */
+const MAX_REAL_TIME_MS = 8.64e15 - MS_PER_DAY;
+/** Real-clock day numbers whose `Date` is valid (see {@link realCalendar}). */
+const MIN_REAL_DAY = -1e8 + REAL_DAY_OFFSET;
+const MAX_REAL_DAY = 1e8 + REAL_DAY_OFFSET;
 const MONTH_NAMES = Object.freeze(['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']);
 /** First month (0-based) of each meteorological season, indexed like {@link SEASONS}. */
 const SEASON_START_MONTHS = Object.freeze([2, 5, 8, 11]);
@@ -243,22 +270,18 @@ const DUSK_START = phaseStart('dusk');
 const DUSK_END = phaseStart('evening');
 
 /**
- * Splits a total-minute count into a day number and a minute of day, guarding
- * against floating-point drift at midnight so `minute` is always in `[0, 1440)`.
- * @param {number} total
+ * Splits a total-minute count into a day number and a minute of day. `%` is exact
+ * in IEEE arithmetic, so `minute` is always in `[0, 1440)` even for huge totals,
+ * and `day * 1440 + minute` reproduces `total` whenever `total` is a safe integer
+ * or smaller.
+ * @param {number} total finite
  * @returns {{day: number, minute: number}}
  */
 function splitTotal(total) {
-  let day = Math.floor(total / MINUTES_PER_DAY);
-  let minute = total - day * MINUTES_PER_DAY;
-  if (minute < 0) {
-    day -= 1;
-    minute += MINUTES_PER_DAY;
-  } else if (minute >= MINUTES_PER_DAY) {
-    day += 1;
-    minute -= MINUTES_PER_DAY;
-  }
-  return { day, minute };
+  let minute = total % MINUTES_PER_DAY;
+  if (minute < 0) minute += MINUTES_PER_DAY;
+  if (minute >= MINUTES_PER_DAY) minute = 0; // a rounding hair below zero rounded up to a full day
+  return { day: Math.round((total - minute) / MINUTES_PER_DAY), minute };
 }
 
 // ---------------------------------------------------------------------------
@@ -426,12 +449,13 @@ export function gameCalendar(day, daysPerSeason = DEFAULT_DAYS_PER_SEASON) {
  * Converts a wall-clock instant to the real-clock-mode total: the local calendar
  * day (numbered so weekdays match, Monday = 0) times 1440 plus the local minute
  * of day, including seconds and milliseconds as a fraction.
- * @param {number} ms milliseconds since the Unix epoch, as from `Date.now()`
+ * @param {number} ms milliseconds since the Unix epoch, as from `Date.now()`, within
+ *   the range `Date` represents (about ±1e8 days)
  * @returns {number} in-game total minutes
- * @throws {TypeError} on a non-finite instant
+ * @throws {TypeError|RangeError} on a non-finite instant or one `Date` cannot represent
  */
 export function realTimeToTotal(ms) {
-  checkNumber('realTimeToTotal: ms', ms);
+  checkNumber('realTimeToTotal: ms', ms, { min: -MAX_REAL_TIME_MS, max: MAX_REAL_TIME_MS });
   const d = new Date(ms);
   const minute = d.getHours() * MINUTES_PER_HOUR + d.getMinutes() + d.getSeconds() / 60 + d.getMilliseconds() / 60_000;
   const dayIndex = Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / MS_PER_DAY);
@@ -442,12 +466,12 @@ export function realTimeToTotal(ms) {
  * The real calendar for a real-clock-mode day number (as produced by
  * {@link realTimeToTotal}): meteorological seasons (spring = March to May, and
  * so on), the real year and a `'Mon DD'` date text. Time-zone independent.
- * @param {number} day integer day number
+ * @param {number} day integer day number within the range `Date` represents
  * @returns {CalendarInfo}
- * @throws {TypeError|RangeError} on a non-integer day
+ * @throws {TypeError|RangeError} on a non-integer day or one `Date` cannot represent
  */
 export function realCalendar(day) {
-  checkNumber('realCalendar: day', day, { integer: true });
+  checkNumber('realCalendar: day', day, { integer: true, min: MIN_REAL_DAY, max: MAX_REAL_DAY });
   const d = new Date((day - REAL_DAY_OFFSET) * MS_PER_DAY);
   const y = d.getUTCFullYear();
   const mo = d.getUTCMonth();
@@ -478,9 +502,10 @@ export function realCalendar(day) {
 /**
  * Options for {@link createClock}.
  * @typedef {Object} ClockOptions
- * @property {number} [minutesPerDay=24] real minutes one in-game day lasts (> 0)
+ * @property {number} [minutesPerDay=24] real minutes one in-game day lasts (> 0, and large enough that
+ *   one real millisecond is a finite, non-zero number of in-game minutes)
  * @property {boolean} [realClock=false] follow the local wall clock instead of `update(realDt)`
- * @property {number} [startDay=0] day number at creation (integer >= 0; ignored in real-clock mode)
+ * @property {number} [startDay=0] day number at creation (integer in `[0, MAX_DAY]`; ignored in real-clock mode)
  * @property {number} [startMinute=1120] minute of day at creation, in `[0, 1440)` (ignored in real-clock mode)
  * @property {string|number|null} [seed] world seed; shifts the tide and moon schedules (see {@link scheduleForSeed})
  * @property {() => number} [now=Date.now] wall-clock source in ms since the Unix epoch; inject one in tests
@@ -545,7 +570,8 @@ export function realCalendar(day) {
  * The world clock. All properties are live getters.
  * @typedef {Object} Clock
  * @property {(realDt?: number) => void} update advance by `realDt` real milliseconds (clamped to `maxDt`,
- *   scaled by `minutesPerDay` and `speed`); in real-clock mode `realDt` is ignored and the wall clock is read
+ *   scaled by `minutesPerDay` and `speed`, never past {@link MAX_TOTAL_MINUTES}); in real-clock mode `realDt`
+ *   is ignored and the wall clock is read (a `now()` outside the `Date` range throws a `RangeError`)
  * @property {number} total in-game minutes since 00:00 of day 0
  * @property {number} minute minute of day, `[0, 1440)`, fractional
  * @property {number} hour `[0, 23]`
@@ -591,7 +617,8 @@ export function realCalendar(day) {
  * @property {(fn: (e: TideEvent) => void) => Unsubscribe} onTideChange
  * @property {() => void} clearListeners drop every listener (new game, teardown)
  * @property {() => ClockState} serialize
- * @property {(state: ClockState) => void} restore silently adopt a serialized state, including its seed
+ * @property {(state: ClockState) => void} restore silently adopt a serialized state, including its seed;
+ *   throws `TypeError`/`RangeError` on a malformed state and leaves the clock unchanged
  * @property {(options?: {hour12?: boolean}) => string} formatTime `'18:40'` or `'6:40 PM'`
  * @property {(options?: {year?: boolean}) => string} dateLabel `'Mon, Spring 1'` (`', Year 1'` with `year`);
  *   real-clock mode gives `'Fri, Oct 23'` (`', 2026'`)
@@ -611,7 +638,7 @@ export function createClock(options = {}) {
     throw new TypeError(`createClock: options must be an object, got ${describe(o)}`);
   }
   const minutesPerDay = checkNumber('createClock: minutesPerDay', o.minutesPerDay ?? DEFAULT_MINUTES_PER_DAY, { min: 0, exclusiveMin: true });
-  const startDay = checkNumber('createClock: startDay', o.startDay ?? 0, { integer: true, min: 0 });
+  const startDay = checkNumber('createClock: startDay', o.startDay ?? 0, { integer: true, min: 0, max: MAX_DAY });
   const startMinute = checkNumber('createClock: startMinute', o.startMinute ?? DEFAULT_START_MINUTE, { min: 0, max: MINUTES_PER_DAY, exclusiveMax: true });
   const daysPerSeason = checkNumber('createClock: daysPerSeason', o.daysPerSeason ?? DEFAULT_DAYS_PER_SEASON, { integer: true, min: 1 });
   const lowTide = checkNumber('createClock: lowTide', o.lowTide ?? DEFAULT_LOW_TIDE, { min: 0, max: 1, exclusiveMin: true, exclusiveMax: true });
@@ -623,6 +650,9 @@ export function createClock(options = {}) {
   const thresholds = Object.freeze({ lowTide, highTide });
   /** In-game minutes per real millisecond at speed 1. */
   const minutesPerMs = MINUTES_PER_DAY / (minutesPerDay * MINUTES_PER_HOUR * 1000);
+  if (!Number.isFinite(minutesPerMs) || minutesPerMs <= 0) {
+    throw new RangeError(`createClock: minutesPerDay ${minutesPerDay} is outside the measurable range`);
+  }
 
   let realClock = checkBoolean('createClock: realClock', o.realClock ?? false);
   let seed = o.seed ?? null;
@@ -633,7 +663,12 @@ export function createClock(options = {}) {
   let advancing = false;
   let lastTideState = tideStateAt(total, tideOffset, thresholds);
 
-  /** @type {{minute: {fn: Function}[], hour: {fn: Function}[], day: {fn: Function}[], tide: {fn: Function}[]}} */
+  /**
+   * One registration per entry. `active` is cleared on removal so that a dispatch
+   * already in flight (which iterates a snapshot) skips listeners removed mid-way.
+   * @typedef {{fn: Function, active: boolean}} ListenerEntry
+   */
+  /** @type {{minute: ListenerEntry[], hour: ListenerEntry[], day: ListenerEntry[], tide: ListenerEntry[]}} */
   const listeners = { minute: [], hour: [], day: [], tide: [] };
 
   // -- derived values ------------------------------------------------------
@@ -663,22 +698,35 @@ export function createClock(options = {}) {
   const moonPhase = () => mod(total / MINUTES_PER_DAY + moonOffset, LUNAR_MONTH_DAYS) / LUNAR_MONTH_DAYS;
 
   /**
-   * Low and high waters within a day, ascending. Extremes sit at
-   * `tideOffset + k * period / 2`; even `k` is low water, odd `k` high water.
-   * @param {number} day
+   * Low and high waters within a day, ascending. Extremes sit every half period
+   * from `tideOffset`: at tide phase 0 (low water) and half a period later (high
+   * water). Uses `%`, which is exact, so the list is right even for far-off days.
+   * @param {number} day integer in `[-MAX_DAY, MAX_DAY]`
    * @returns {ReadonlyArray<Readonly<{minute: number, kind: 'low'|'high', time: string}>>}
    */
   function tidesForDay(day) {
-    checkNumber('clock.tidesForDay: day', day, { integer: true });
+    checkNumber('clock.tidesForDay: day', day, { integer: true, min: -MAX_DAY, max: MAX_DAY });
     const half = TIDE_PERIOD_MINUTES / 2;
     const start = day * MINUTES_PER_DAY;
-    const end = start + MINUTES_PER_DAY;
-    const kFirst = Math.ceil((start - tideOffset) / half);
-    const kLast = Math.ceil((end - tideOffset) / half) - 1;
+    // Whole minutes from the last low water to 00:00 (integers in, so `%` is exact even near 2^53);
+    // the first extreme on or after 00:00 is then that low itself, the high half a period in, or the next low.
+    const sinceLow = mod(start - tideOffset, TIDE_PERIOD_MINUTES);
+    let first;
+    let low;
+    if (sinceLow === 0) {
+      first = 0;
+      low = true;
+    } else if (sinceLow < half) {
+      first = half - sinceLow;
+      low = false;
+    } else {
+      first = TIDE_PERIOD_MINUTES - sinceLow;
+      low = true;
+    }
     const out = [];
-    for (let k = kFirst; k <= kLast; k++) {
-      const minute = tideOffset + k * half - start;
-      out.push(Object.freeze({ minute, kind: (k & 1) === 0 ? 'low' : 'high', time: formatMinute(minute) }));
+    for (let minute = first; minute < MINUTES_PER_DAY; minute += half) {
+      out.push(Object.freeze({ minute, kind: low ? 'low' : 'high', time: formatMinute(minute) }));
+      low = !low;
     }
     return Object.freeze(out);
   }
@@ -687,30 +735,35 @@ export function createClock(options = {}) {
 
   /**
    * Registers a listener and returns its unsubscribe function.
-   * @param {{fn: Function}[]} list
+   * @param {ListenerEntry[]} list
    * @param {string} label
    * @param {unknown} fn
    * @returns {Unsubscribe}
    */
   function subscribe(list, label, fn) {
-    const entry = { fn: checkFunction(label, fn) };
+    const entry = { fn: checkFunction(label, fn), active: true };
     list.push(entry);
     return () => {
+      entry.active = false;
       const i = list.indexOf(entry);
       if (i !== -1) list.splice(i, 1);
     };
   }
 
   /**
-   * Calls every listener in `list` with a frozen payload, iterating a snapshot
-   * so listeners may unsubscribe (themselves or others) mid-dispatch.
-   * @param {{fn: Function}[]} list
+   * Calls every listener in `list` with a frozen payload. Iterates a snapshot so
+   * listeners may subscribe or unsubscribe mid-dispatch: a listener added now
+   * first fires at the next boundary, and one removed now (itself or a sibling)
+   * is skipped if it has not run yet, as on the events.js bus.
+   * @param {ListenerEntry[]} list
    * @param {() => object} makePayload built only when someone listens
    */
   function emit(list, makePayload) {
     if (list.length === 0) return;
     const payload = Object.freeze(makePayload());
-    for (const entry of list.slice()) entry.fn(payload);
+    for (const entry of list.slice()) {
+      if (entry.active) entry.fn(payload);
+    }
   }
 
   /**
@@ -802,7 +855,8 @@ export function createClock(options = {}) {
     checkNumber('clock.update: realDt (ms)', realDt, { min: 0 });
     if (paused) return;
     const delta = Math.min(realDt, maxDt) * minutesPerMs * speed;
-    if (delta > 0) advanceTo(total + delta, false);
+    const target = Math.min(total + delta, MAX_TOTAL_MINUTES);
+    if (target > total) advanceTo(target, false);
   }
 
   /** @param {number} mult */
@@ -815,8 +869,8 @@ export function createClock(options = {}) {
     assertIdle('setRealClock');
     checkBoolean('clock.setRealClock: on', on);
     if (on === realClock) return;
+    if (on) jumpSilently(realTimeToTotal(now())); // may throw: then the mode is left unchanged
     realClock = on;
-    if (on) jumpSilently(realTimeToTotal(now()));
   }
 
   /**
@@ -830,6 +884,7 @@ export function createClock(options = {}) {
     checkBoolean('clock.skipTo: silent', silent);
     let target = currentDay() * MINUTES_PER_DAY + minute;
     if (target < total) target += MINUTES_PER_DAY;
+    target = Math.min(target, MAX_TOTAL_MINUTES);
     if (target > total) advanceTo(target, silent);
   }
 
@@ -847,17 +902,22 @@ export function createClock(options = {}) {
     if (state.version !== CLOCK_STATE_VERSION) {
       throw new RangeError(`clock.restore: unsupported state version ${describe(state.version)} (expected ${CLOCK_STATE_VERSION})`);
     }
-    const nextTotal = checkNumber('clock.restore: state.total', state.total, { min: 0 });
+    const nextRealClock = checkBoolean('clock.restore: state.realClock', state.realClock);
+    // A real-clock total must map to a day `Date` can represent (which allows pre-1970 negatives);
+    // a game total is any safe non-negative minute count.
+    const totalRange = nextRealClock
+      ? { min: MIN_REAL_DAY * MINUTES_PER_DAY, max: (MAX_REAL_DAY + 1) * MINUTES_PER_DAY, exclusiveMax: true }
+      : { min: 0, max: MAX_TOTAL_MINUTES };
+    const nextTotal = checkNumber('clock.restore: state.total', state.total, totalRange);
     const nextSpeed = checkNumber('clock.restore: state.speed', state.speed, { min: 0 });
     const nextPaused = checkBoolean('clock.restore: state.paused', state.paused);
-    const nextRealClock = checkBoolean('clock.restore: state.realClock', state.realClock);
     seedKey('clock.restore: state.seed', state.seed);
     seed = state.seed ?? null;
     ({ tideOffset, moonOffset } = scheduleForSeed(seed));
     speed = nextSpeed;
     paused = nextPaused;
     realClock = nextRealClock;
-    jumpSilently(nextTotal);
+    jumpSilently(nextTotal === 0 ? 0 : nextTotal); // normalise a JSON-safe -0
   }
 
   /** @returns {Readonly<Record<string, unknown>>} */
@@ -1009,7 +1069,10 @@ export function createClock(options = {}) {
     onDayStart: (fn) => subscribe(listeners.day, 'clock.onDayStart: fn', fn),
     onTideChange: (fn) => subscribe(listeners.tide, 'clock.onTideChange: fn', fn),
     clearListeners() {
-      for (const list of Object.values(listeners)) list.length = 0;
+      for (const list of Object.values(listeners)) {
+        for (const entry of list) entry.active = false;
+        list.length = 0;
+      }
     },
     serialize,
     restore,

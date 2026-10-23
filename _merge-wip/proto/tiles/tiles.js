@@ -76,6 +76,70 @@ function def(name, pal, frames, w = TILE, h = TILE) {
   return tiles[name];
 }
 
+/* ---------------------------------------------------------------- helpers */
+/** `h` rows of `w` copies of `ch`. */
+const blank = (w, h, ch = '.') => Array.from({ length: h }, () => ch.repeat(w));
+/** Paint `sprite` rows onto `rows` at (x, y); '.' in the sprite is transparent. Returns new rows. */
+function blit(rows, sprite, x, y) {
+  const out = rows.slice();
+  for (let j = 0; j < sprite.length; j++) {
+    const yy = y + j;
+    if (yy < 0 || yy >= out.length) continue;
+    const line = out[yy].split('');
+    for (let i = 0; i < sprite[j].length; i++) {
+      const xx = x + i;
+      const c = sprite[j][i];
+      if (c === '.' || xx < 0 || xx >= line.length) continue;
+      line[xx] = c;
+    }
+    out[yy] = line.join('');
+  }
+  return out;
+}
+/**
+ * Procedural leaf canopy: overlapping round lobes lit from the top-left, a shadow crescent where a
+ * higher lobe overhangs a lower one, light flecks on the lit side, and a selective outline (own-hue
+ * dark along the top, the deepest shade along the underside). Returns `h` rows of `w` chars.
+ * @param {number} w @param {number} h
+ * @param {{cx:number, cy:number, r:number}[]} lobes
+ * @param {{out:string, deep:string, l:string, b:string, d:string}} ch palette chars
+ */
+function canopy(w, h, lobes, ch) {
+  const inside = (x, y) => lobes.some((L) => (x - L.cx) ** 2 + (y - L.cy) ** 2 <= L.r * L.r);
+  // one light field over the whole crown (its bounding circle), so bands stay coherent
+  const minX = Math.min(...lobes.map((L) => L.cx - L.r)), maxX = Math.max(...lobes.map((L) => L.cx + L.r));
+  const minY = Math.min(...lobes.map((L) => L.cy - L.r)), maxY = Math.max(...lobes.map((L) => L.cy + L.r));
+  const cx0 = (minX + maxX) / 2, cy0 = (minY + maxY) / 2, R = Math.max(maxX - minX, maxY - minY) / 2;
+  const grid = blank(w, h).map((r) => r.split(''));
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (!inside(x, y)) continue;
+      const dot = -((x - cx0) / R + (y - cy0) / R) / Math.SQRT2; // 1 = facing the light
+      const edge = !inside(x - 1, y) || !inside(x + 1, y) || !inside(x, y - 1) || !inside(x, y + 1);
+      if (edge) { grid[y][x] = dot < -0.1 || !inside(x, y + 1) ? ch.deep : ch.out; continue; }
+      // shadow crescent: the lower rim of a lobe that overhangs another lobe below it
+      let shaded = false;
+      for (const M of lobes) {
+        if (y <= M.cy) continue;
+        const dm = Math.hypot(x - M.cx, y - M.cy) / M.r;
+        if (dm > 1 || dm < 0.8) continue;
+        if (lobes.some((N) => N !== M && N.cy > M.cy && (x - N.cx) ** 2 + (y - N.cy) ** 2 <= N.r * N.r)) shaded = true;
+      }
+      const checker = ((x + y) & 1) === 0;
+      let c = dot > 0.5 || (dot > 0.4 && checker) ? ch.l : dot > -0.25 || (dot > -0.35 && checker) ? ch.b : ch.d;
+      if (shaded) c = c === ch.l ? ch.b : ch.d;
+      else if (c === ch.b && dot > 0.1 && (x * 7 + y * 13) % 23 === 0) c = ch.l;
+      grid[y][x] = c;
+    }
+  }
+  // close 1px notches between lobes along the underside
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      if (grid[y][x] === '.' && grid[y][x - 1] !== '.' && grid[y][x + 1] !== '.') grid[y][x] = ch.deep;
+    }
+  }
+  return grid.map((r) => r.join(''));
+}
 /* ------------------------------------------------------------------ grass */
 const GP = { g: 'grass2', d: 'grass1', l: 'grass3', k: 'grass0', h: 'grass4' };
 def('grass_a', GP, [
@@ -115,61 +179,25 @@ def('grass_b', GP, [
   'ggggdggggggggggg',
 ]);
 
-// Tall grass: tufts with a darker-green outline over visible ground; 3 sway frames.
-const TG = { g: 'grass2', o: 'grass0', b: 'grass1', m: 'grass3', h: 'grass4', d: 'grass1' };
-def('tallgrass', TG, [[
-  'ggggghgggggggggg',
-  'ggggbogggggghggg',
-  'gghgboggggggbggg',
-  'ggobmobggggbogmg',
-  'ggobbbobgggobbog',
-  'ggobbbbogggobbog',
-  'gggooooogggooogg',
-  'gggggggggggggggg',
-  'gggggggggggggggg',
-  'gggggggggghggggg',
-  'gghggggggobogggg',
-  'ggbogggghobbogmg',
-  'gobmogggobbbobog',
-  'gobbogggobbbbbog',
-  'gobbogggoobbbogg',
-  'ggooggggggooogg g'.replace(' ', ''),
-], [
-  'ggggggggggggggg g'.replace(' ', ''),
-  'gggghoggggggghgg',
-  'ggghboggggggbogg',
-  'ggobmobgggggbomg',
-  'ggobbbobgggobbog',
-  'ggobbbbogggobbog',
-  'gggooooogggooogg',
-  'gggggggggggggggg',
-  'gggggggggggggggg',
-  'gggggggggggggggg',
-  'ggghggggggghgggg',
-  'ggbogggghgobogmg',
-  'gobmoggggobbbobg',
-  'gobbogggobbbbbog',
-  'gobbogggoobbbogg',
-  'ggooggggggooogg g'.replace(' ', ''),
-], [
-  'ggggggggggggggg g'.replace(' ', ''),
-  'ggggbhgggggggggg',
-  'gggghoggggghgggg',
-  'ggobmobgggggbomg',
-  'ggobbbobgggobbog',
-  'ggobbbbogggobbog',
-  'gggooooogggooogg',
-  'gggggggggggggggg',
-  'gggggggggggggggg',
-  'gggggggggggghggg',
-  'ggggggggggggbogg',
-  'ggbhggggggobbogg',
-  'gobmogggghbbbobg',
-  'gobbogggobbbbbog',
-  'gobbogggoobbbogg',
-  'ggooggggggooogg g'.replace(' ', ''),
-]]);
-
+// Tall grass (encounter tile): outlined tufts lighter than the turf, turf always visible between
+// them, no trunk. Three sway frames lean the tuft heads one pixel.
+const TUFT = [
+  'h..h..h',
+  'mo.mo.m',
+  'mo.momo',
+  'omo.mmo',
+  'ommmmbo',
+  '.ommbo.',
+  '..ooo..',
+];
+const lean = (tuft, dx) => tuft.map((r, i) => (i < 3 && dx ? (dx > 0 ? '.' + r.slice(0, -1) : r.slice(1) + '.') : r));
+const TG = { ...GP, o: 'grass0', m: 'grass3', b: 'grass1' };
+const tgFrame = (dx) => {
+  let r = tiles.grass_a.frames[0];
+  for (const [x, y] of [[1, 0], [9, 3], [4, 9]]) r = blit(r, lean(TUFT, dx), x, y);
+  return r;
+};
+def('tallgrass', TG, [tgFrame(0), tgFrame(1), tgFrame(-1)]);
 /* --------------------------------------------------------- sand / mud */
 const SP = { s: 'sand2', d: 'sand1', l: 'sand3', k: 'sand0' };
 def('sand', SP, [
@@ -249,144 +277,95 @@ def('mud_wet', WMP, [
   'mrrmmmmmdmmmmmmm',
   'mmmmmmmmmmmmmmmm',
 ]);
-// Glowing night mud: three-frame cycle of bioluminescent specks. LUT-exempt glow chars.
-const GMP = { m: 'gmud1', d: 'gmud0', a: '!bio1', b: '!bio2', c: '!bio0' };
-const GLOW0 = [
-  'mmmmmmmmmmmmmmmm',
-  'mmmmmmmmmmmammmm',
-  'mmabmmmmmmmmmmmm',
-  'mmmmmmmmmmmmmmmm',
-  'mmmmmmmmmmmmmmmm',
-  'mmmmmmmbmmmmmmmm',
-  'mmmmmmmmmmmmmmmm',
-  'mmmmmmmmmmmmmmmm',
-  'mmmmmmmmmmmmmmcm',
-  'mmmmmmmmmmmmmmmm',
-  'mmmcmmmmmmmmmmmm',
-  'mmmmmmmmmmmmmmmm',
-  'mmmmmmmmmmammmmm',
-  'mmmmmmmmmmmmmmmm',
-  'mmmmmmbmmmmmmmmm',
-  'mmmmmmmmmmmmmmmm',
+// Glowing night mud: the same wet mud, with sparse bioluminescent clusters (LUT-exempt) that pulse
+// out of phase over three frames (bright → mid → dim).
+const GMP = { m: 'wmud1', d: 'wmud0', l: 'wmud2', a: '!bio1', b: '!bio2', c: '!bio0' };
+// Irregular 2x2 blobs with a loose halo; never a plus or a four-point star (that glyph is the Heartmark's).
+const GLOW_STATES = [
+  ['ab.', 'bac', '..c'],
+  ['ac.', 'ca.', '...'],
+  ['c..', '.c.', '...'],
 ];
-const cyc = (rows) => rows.map((r) => r.replace(/[abc]/g, (c) => ({ a: 'b', b: 'c', c: 'a' })[c]));
-def('mud_glow', GMP, [GLOW0, cyc(GLOW0), cyc(cyc(GLOW0))]);
-
+const GLOW_SPOTS = [[2, 2, 0], [10, 5, 1], [5, 11, 2]];
+const GLOW_BASE = tiles.mud_wet.frames[0].map((r) => r.replace(/[rb]/g, 'l'));
+const glowFrame = (f) => GLOW_SPOTS.reduce((rows, [x, y, ph]) => blit(rows, GLOW_STATES[(f + ph) % 3], x, y), GLOW_BASE);
+def('mud_glow', GMP, [glowFrame(0), glowFrame(1), glowFrame(2)]);
 /* ------------------------------------------------------------- water */
-// One 4-frame wavelet set, three palettes (deep / shallow / river).
-const WAVES = [[
+// A calm base with sparse highlight strokes (and a few darker troughs) that breathe over four
+// frames: each stroke erodes a pixel from one end and grows back. Tiles stay seamless and a field
+// of them shimmers quietly instead of reading as static.
+const WATER_BASE = [
   'wwwwwwwwwwwwwwww',
-  'wwhhhwwwwwwwwwww',
-  'wwwkkwwwwwwhhwww',
-  'wwwwwwwwwwwwkwww',
-  'wwwwwwwwpwwwwwww',
-  'wwwwwwwwwwwwwwww',
-  'whhwwwwwwwwwwwpw',
-  'wwkwwhhhhwwwwwww',
-  'wwwwwwkkwwwwwwww',
-  'wwwwwwwwwwwwhhww',
-  'wwpwwwwwwwwwwkww',
-  'wwwwwwwwwwwwwwww',
-  'wwwwhhwwwwwwwwww',
-  'wwwwwkwwwwhhhwww',
-  'wwwwwwwpwwwwkwww',
-  'wwwwwwwwwwwwwwww',
-], [
-  'wwwwwwwwwwwwwwww',
-  'wwwhhhwwwwwwwwww',
-  'wwwwkkwwwwwwhhww',
-  'wwwwwwwwwwwwwkww',
-  'wwwwwwwwpwwwwwww',
-  'wwwwwwwwwwwwwwww',
-  'wwhhwwwwwwwwwwpw',
-  'wwwkwwhhhwwwwwww',
-  'wwwwwwwkkwwwwwww',
+  'wwhhhhwwwwwwwwww',
   'wwwwwwwwwwwwwhhw',
-  'wwpwwwwwwwwwwwkw',
   'wwwwwwwwwwwwwwww',
-  'wwwwwhhwwwwwwwww',
-  'wwwwwwkwwwwwhhww',
-  'wwwwwwwpwwwwwkww',
+  'wwwwwwwkkwwwwwww',
+  'wwwwwwwhhhwwwwww',
   'wwwwwwwwwwwwwwww',
-], [
   'wwwwwwwwwwwwwwww',
-  'wwwwhhwwwwwwwwww',
-  'wwwwwkwwwwwwwhww',
+  'hhwwwwwwwwwwwwww',
+  'wwwwwwwwwwhhhhww',
+  'wwwwkkwwwwwwwwww',
   'wwwwwwwwwwwwwwww',
-  'wwwwwwwwpwwwwwww',
+  'wwwwhhhwwwwwwwww',
   'wwwwwwwwwwwwwwww',
-  'wwwhwwwwwwwwwwpw',
-  'wwwwwwwhhwwwwwww',
-  'wwwwwwwwkwwwwwww',
-  'wwwwwwwwwwwwwwhh',
-  'wwpwwwwwwwwwwwwk',
+  'wwwwwwwwwwwwwhhh',
   'wwwwwwwwwwwwwwww',
-  'wwwwwwhwwwwwwwww',
-  'wwwwwwwwwwwwwhww',
-  'wwwwwwwpwwwwwwww',
-  'wwwwwwwwwwwwwwww',
-], [
-  'wwwwwwwwwwwwwwww',
-  'whhhhwwwwwwwwwww',
-  'wwkkwwwwwwwhhhww',
-  'wwwwwwwwwwwwkkww',
-  'wwwwwwwwpwwwwwww',
-  'wwwwwwwwwwwwwwww',
-  'hhhwwwwwwwwwwwpw',
-  'wkkwwhhhhhwwwwww',
-  'wwwwwwkkkwwwwwww',
-  'wwwwwwwwwwwhhhww',
-  'wwpwwwwwwwwwkkww',
-  'wwwwwwwwwwwwwwww',
-  'wwwhhhwwwwwwwwww',
-  'wwwwkkwwwwhhhhww',
-  'wwwwwwwpwwwwkkww',
-  'wwwwwwwwwwwwwwww',
-]];
-def('water_deep', { w: 'deep1', h: 'deep2', k: 'deep0', p: 'deep1' }, WAVES);
-def('water_shallow', { w: 'sh2', h: 'sh3', k: 'sh1', p: 'dapple' }, WAVES);
-// River: vertical flow streaks that slide downstream (rows rotate 4 per frame → seamless).
-const RIVROWS = [
+];
+function erode(row, e, fromLeft) {
+  return row.replace(/h+|k+/g, (run) => {
+    const keep = Math.max(1, run.length - e);
+    const pad = 'w'.repeat(run.length - keep);
+    return fromLeft ? pad + run.slice(0, keep) : run.slice(0, keep) + pad;
+  });
+}
+const WAVES = [0, 1, 2, 1].map((e) => WATER_BASE.map((row, y) => erode(row, e, (y & 1) === 0)));
+def('water_deep', { w: 'deep1', h: 'deep2', k: 'deep0' }, WAVES);
+def('water_shallow', { w: 'sh2', h: 'sh3', k: 'sh1' }, WAVES);
+def('water_mud', { w: 'shm1', h: 'shm2', k: 'shm0' }, WAVES);
+// River: light flow streaks that slide downstream (rows rotate 4 per frame → seamless loop).
+const RIVER_BASE = [
   'rrrrrrrrrrrrrrrr',
   'rrsrrrrrrrrrrrrr',
-  'rrsrrrrrrrrdrrrr',
+  'rrsrrrrrrrrrrrrr',
+  'rrsrrrrrrrrrdrrr',
   'rrsrrrrrrrrrrrrr',
   'rrrrrrrrrrrrrsrr',
-  'rrrrrrdrrrrrrsrr',
   'rrrrrrrrrrrrrsrr',
+  'rrrrrrrrrrrrrsrr',
+  'rrrrrrrsrrrrrrrr',
+  'rrrrrrrsrrrrrrrr',
+  'rrdrrrrsrrrrrrrr',
+  'rrrrrrrsrrrrrrrr',
   'rrrrrrrrrrrrrrrr',
-  'rrrrrrrrsrrrrrrr',
-  'rrrrrrrrsrrrrrrr',
-  'rrdrrrrrsrrrrrrr',
   'rrrrrrrrrrrrrrrr',
-  'rrrrrrrrrrrrrrrr',
-  'rrrrsrrrrrrdrrrr',
-  'rrrrsrrrrrrrrrrr',
+  'rrrrsrrrrrrrdrrr',
   'rrrrsrrrrrrrrrrr',
 ];
 const rot = (rows, n) => rows.map((_, i) => rows[(i - n + rows.length) % rows.length]);
-const RIVER_FRAMES = WAVES.map((f, k) => {
-  const st = rot(RIVROWS, k * 4);
-  return f.map((row, y) => row.split('').map((c, x) => (st[y][x] === 's' ? 's' : c === 'p' ? 'w' : c)).join(''));
-});
-def('river', { w: 'riv1', h: 'riv2', k: 'riv0', s: 'riv3' }, RIVER_FRAMES);
-def('water_mud', { w: 'shm1', h: 'shm2', k: 'shm0', p: 'shmud' }, WAVES);
-
-// Foam edges where water meets land (3-frame palette cycle via shape change). N edge; others rotated in render.
+def('river', { r: 'riv1', s: 'riv3', d: 'riv2' }, [0, 1, 2, 3].map((k) => rot(RIVER_BASE, k * 4)));
+// Foam where water meets land: a broken 3px band (foam, a paler shallow tone, then a few stray
+// pixels) in three frames. Authored for the N edge; render.js rotates it for the others.
 const FP = { f: 'foam', s: 'sh3' };
-def('foam_n', FP, [[
-  'f.ff.fff.ff.fff.',
-  '.s..s....s..s...',
-  ...Array.from({ length: 14 }, () => '................'),
-], [
-  'ff.fff.ff.fff.ff',
-  '..s....s....s..s',
-  ...Array.from({ length: 14 }, () => '................'),
-], [
-  '.ff.ff.fff.ff.ff',
-  's....s...s....s.',
-  ...Array.from({ length: 14 }, () => '................'),
-]]);
+const foamFrame = (a, b, c) => [a, b, c, ...blank(16, 13)];
+def('foam_n', FP, [
+  foamFrame('fff.ffffff.fff.f', '.s.f..s..f..s.f.', '...s........s...'),
+  foamFrame('ffffff.fffff.fff', 'f..s.f..s..f..s.', '.....s.......s..'),
+  foamFrame('ff.ffff.ffffff.f', '.f..s.f..s..f.s.', 's........s......'),
+]);
+// River bank: a single broken ripple instead of surf. N edge; rotated like foam.
+def('ripple_n', { s: 'riv3' }, [
+  ['s.ss...s.ss..s..', ...blank(16, 15)],
+  ['.ss..s..ss..s.s.', ...blank(16, 15)],
+  ['ss...s.s..ss..ss', ...blank(16, 15)],
+]);
+// Grass fringe: ragged turf creeping over a path or sand tile along a grass edge. N edge; rotated.
+def('fringe_n', { g: 'grass2', d: 'grass1' }, [
+  'gg.ggg.g.gg.ggg.',
+  '.g..g.....g..g..',
+  '....d........d..',
+  ...blank(16, 13),
+]);
 // Shelf: dithered transition from shallows into deep water (drawn on the deep tile, N edge).
 def('shelf_n', { s: 'sh1' }, [
   's.s.s.s.s.s.s.s.',
@@ -514,10 +493,21 @@ def('cliff_face', CP, [
   'kkkkkkkkkkkkkkkk',
   'kkkkkkkkkkkkkkkk',
 ]);
-// Rim overlays for cliff-top edges (drawn over grass): lit west/north edge, shaded east edge.
-def('cliff_rim_w', { l: 'cl4', d: 'cl2' }, Array.from({ length: 16 }, () => 'ld..............'));
-def('cliff_rim_e', { k: 'cl0', d: 'cl1' }, Array.from({ length: 16 }, () => '..............dk'));
-def('cliff_rim_n', { l: 'cl4', d: 'cl2' }, ['llllllllllllllll', 'dddddddddddddddd', ...Array.from({ length: 14 }, () => '................')]);
+// Side faces for cliff-top edges (drawn over the cliff-top grass): a lit 3px face with a dark base
+// line on the west, a shaded one on the east, and a lit lip along the north edge.
+def('cliff_rim_w', { k: 'cl0', m: 'cl2', d: 'cl1', l: 'cl4', b: 'cl3' }, [
+  'kml.............', 'kmb.............', 'kml.............', 'kdb.............',
+  'kml.............', 'kmb.............', 'kml.............', 'kml.............',
+  'kdb.............', 'kml.............', 'kmb.............', 'kml.............',
+  'kml.............', 'kdb.............', 'kml.............', 'kmb.............',
+]);
+def('cliff_rim_e', { k: 'cl0', m: 'cl2', d: 'cl1' }, [
+  '.............mdk', '.............ddk', '.............mdk', '.............mdk',
+  '.............ddk', '.............mdk', '.............mdk', '.............ddk',
+  '.............mdk', '.............mdk', '.............ddk', '.............mdk',
+  '.............mdk', '.............ddk', '.............mdk', '.............mdk',
+]);
+def('cliff_rim_n', { l: 'cl4', b: 'cl3' }, ['llllllllllllllll', 'bbbbbbbbbbbbbbbb', ...blank(16, 14)]);
 // Ledge (one-way): grass above, light lip, 2px shadow, chevron notch.
 def('ledge', { g: 'grass2', y: 'sand3', l: 'cl4', m: 'cl2', d: 'cl1', k: 'cl0', s: 'grass0' }, [
   'gggggggggggggggg',
@@ -632,26 +622,26 @@ def('boat', { k: 'wd0', d: 'wd1', w: 'wd3', p: 'wd2', s: 'deep0', l: 'wd4' }, [
   '................................',
   '................................',
 ], 32, 16);
-// Steps cut into a cliff face (the ramp down from the point).
+// Steps cut into a cliff face (the ramp down from the point): three treads, each a lit nosing,
+// two rows of riser and a shadow line, between dark side walls.
 def('steps', { g: 'grass1', k: 'cl0', d: 'cl1', b: 'cl3', l: 'cl4' }, [
   'gggggggggggggggg',
   'kllllllllllllllk',
   'kbbbbbbbbbbbbbbk',
-  'kddddddddddddddk',
-  'kllllllllllllllk',
   'kbbbbbbbbbbbbbbk',
   'kddddddddddddddk',
+  'kkkkkkkkkkkkkkkk',
   'kllllllllllllllk',
+  'kbbbbbbbbbbbbbbk',
   'kbbbbbbbbbbbbbbk',
   'kddddddddddddddk',
+  'kkkkkkkkkkkkkkkk',
   'kllllllllllllllk',
+  'kbbbbbbbbbbbbbbk',
   'kbbbbbbbbbbbbbbk',
   'kddddddddddddddk',
-  'kllllllllllllllk',
-  'kbbbbbbbbbbbbbbk',
   'kkkkkkkkkkkkkkkk',
 ]);
-
 /* ------------------------------------------------------- buildings */
 const WP = { p: 'pl2', s: 'pl1', d: 'pl0', h: 'pl3', t: 'wd1', k: 'wd0' };
 def('wall_timber', WP, [
@@ -753,61 +743,13 @@ def('window_lit', { p: 'pl2', s: 'pl1', h: 'pl3', t: 'wd1', k: 'wd0', a: '!wglow
 def('window_brick_unlit', { p: 'br2', s: 'br1', h: 'pl1', t: 'wd1', k: 'br0', a: 'pane0', b: 'pane1', m: 'wd0' }, WINROWS);
 def('window_brick_lit', { p: 'br2', s: 'br1', h: 'pl1', t: 'wd1', k: 'br0', a: '!wglow', b: '!amber', m: 'wd0' }, WINROWS);
 
-// Roof tiles (shingle courses) – one shape, six palettes.
-const ROOF_BODY = [
-  'bbblbbbblbbbblbb',
-  'bbbbbbbbbbbbbbbb',
-  'ssssssssssssssss',
-  'lbbbblbbbblbbbbl',
-  'bbbbbbbbbbbbbbbb',
-  'ssssssssssssssss',
-  'bbblbbbblbbbblbb',
-  'bbbbbbbbbbbbbbbb',
-  'ssssssssssssssss',
-  'lbbbblbbbblbbbbl',
-  'bbbbbbbbbbbbbbbb',
-  'ssssssssssssssss',
-  'bbblbbbblbbbblbb',
-  'bbbbbbbbbbbbbbbb',
-  'ssssssssssssssss',
-  'lbbbblbbbblbbbbl',
-];
-const ROOF_RIDGE = [
-  '................',
-  '................',
-  'llllllllllllllll',
-  'dddddddddddddddd',
-  'bbblbbbblbbbblbb',
-  'bbbbbbbbbbbbbbbb',
-  'ssssssssssssssss',
-  'lbbbblbbbblbbbbl',
-  'bbbbbbbbbbbbbbbb',
-  'ssssssssssssssss',
-  'bbblbbbblbbbblbb',
-  'bbbbbbbbbbbbbbbb',
-  'ssssssssssssssss',
-  'lbbbblbbbblbbbbl',
-  'bbbbbbbbbbbbbbbb',
-  'ssssssssssssssss',
-];
-const ROOF_EAVE = [
-  'bbblbbbblbbbblbb',
-  'bbbbbbbbbbbbbbbb',
-  'ssssssssssssssss',
-  'lbbbblbbbblbbbbl',
-  'bbbbbbbbbbbbbbbb',
-  'ssssssssssssssss',
-  'bbblbbbblbbbblbb',
-  'bbbbbbbbbbbbbbbb',
-  'ssssssssssssssss',
-  'lbbbblbbbblbbbbl',
-  'bbbbbbbbbbbbbbbb',
-  'ssssssssssssssss',
-  'bsbsbsbsbsbsbsbs',
-  'dddddddddddddddd',
-  'kkkkkkkkkkkkkkkk',
-  '................',
-];
+// Roof tiles: staggered shingle courses (lit nosing top-left, dark joint, shadow line under each
+// course), one shape, six palettes.
+const COURSE_A = ['lbbdlbbdlbbdlbbd', 'bbbdbbbdbbbdbbbd', 'ssssssssssssssss'];
+const COURSE_B = ['bdlbbdlbbdlbbdlb', 'bdbbbdbbbdbbbdbb', 'ssssssssssssssss'];
+const ROOF_BODY = [...COURSE_A, ...COURSE_B, ...COURSE_A, ...COURSE_B, ...COURSE_A, COURSE_B[0]];
+const ROOF_RIDGE = ['................', '................', 'llllllllllllllll', 'dddddddddddddddd', ...COURSE_A, ...COURSE_B, ...COURSE_A, ...COURSE_B];
+const ROOF_EAVE = [...COURSE_A, ...COURSE_B, ...COURSE_A, ...COURSE_B, COURSE_A[0], COURSE_A[1], 'kkkkkkkkkkkkkkkk', '................'];
 for (const c of ROOF_COLOURS) {
   const pal = { k: 'ink', d: `${c}0`, s: `${c}1`, b: `${c}2`, l: `${c}3` };
   if (c === 'dark') pal.k = 'ink';
@@ -942,25 +884,17 @@ def('flowers_b', { g: 'grass2', d: 'grass1', o: 'marigold', y: 'yellow', w: 'pet
   'ggggggdgggggwggg',
   'gggggggggggggggg',
 ]);
-// Bush: blocking, so it has a visible base line and cast shadow bottom-right.
-def('bush', { k: 'grass0', d: 'grass1', b: 'grass2', l: 'grass3', h: 'grass4', s: 'shadow', x: 'uiink' }, [
-  '................',
-  '......kkkk......',
-  '....kkllbbkk....',
-  '...klhlbbbbdk...',
-  '..klhlbbbbbbdk..',
-  '..klbbbbbbbddk..',
-  '.kllbbbbbbbbddk.',
-  '.klbbbbbbbbbddk.',
-  '.kbbbbbbbbbdddk.',
-  '.kbbbbbbbbddddk.',
-  '.kdbbbbbbbddddk.',
-  '..kdbbbbbdddddks',
-  '..kkdddddddddkks',
-  '...kkkkkkkkkkkss',
+// Bush: blocking, so it has a visible base line and a cast shadow bottom-right. Canopy is lighter
+// than the turf so it pops; outline is a dark shade of its own green.
+const BUSH_LOBES = [{ cx: 5.5, cy: 8, r: 4.6 }, { cx: 10, cy: 7, r: 4.6 }, { cx: 8, cy: 9.6, r: 4.6 }];
+const BUSH_BASE = [
+  '..............s.',
+  '.............ss.',
   '.....xxxxxxxssss',
   '........ssssss..',
-]);
+];
+def('bush', { k: 'grass0', n: 'pine0', d: 'grass1', b: 'grass3', l: 'grass4', s: 'shadow', x: 'uiink' },
+  blit(blit(blank(16, 16), BUSH_BASE, 0, 12), canopy(16, 16, BUSH_LOBES, { out: 'k', deep: 'n', l: 'l', b: 'b', d: 'd' }), 0, 0));
 // Rocks.
 def('rock_a', { k: 'st0', d: 'st1', m: 'st2', l: 'st3', h: 'st4', s: 'shadow' }, [
   '................',
@@ -1038,30 +972,11 @@ def('tree_pine', TREEPAL, [
   '...........ssssssssssssssss.....',
   '..............sssssssssss.......',
 ], 32, 32);
-def('tree_alder', { k: 'ald0', d: 'ald1', b: 'ald2', l: 'ald3', t: 'aldbark0', u: 'aldbark1', v: 'aldbark2', s: 'shadow', x: 'uiink', n: 'pine1' }, [
-  '..........nkkkkkk...............',
-  '........nkklllbbbkk.............',
-  '.......nklllbbbbbbdkk...........',
-  '......nkllbbbbbbbbbdddk.........',
-  '.....nkllbbbbbbbbbbbdddk........',
-  '....nkllbbbbbbbbbbbbbdddk.......',
-  '....nklbbbbbbbbbbbbbbbdddk......',
-  '...nklbbbbbbbbbbbbbbbbbdddk.....',
-  '...nklbbbbbbbbbkkbbbbbbdddnk....',
-  '..nklbbbbbbbbbkddkbbbbbbdddnk...',
-  '..nkbbbbbbbbbbkdddkbbbbbddddnk..',
-  '..nkbbbbbbbbbbbkddkbbbbbdddddn..',
-  '..nkbbbbbbbbbbbbkkbbbbbbdddddn..',
-  '..nkdbbbbbbbbbbbbbbbbbbdddddddn.',
-  '..nkdbbbbbbbbbbbbbbbbbbbddddddn.',
-  '...nkdbbbbbbbbbbbbbbbbbdddddddn.',
-  '...nkddbbbbbbbbbbbbbbbddddddddn.',
-  '....nkddbbbbbbbbbbbbbddddddddn..',
-  '....nnkdddbbbbbbbbbbdddddddddn..',
-  '.....nnkddddbbbbbbdddddddddnn...',
-  '......nnkkdddddddddddddddnnn....',
-  '........nnnkkkdddddddkkknn......',
-  '..........nnnnvutnnnnnn.........',
+// Broadleaf trees: procedural clustered canopies (see `canopy`) over a hand-drawn trunk, base line
+// and dithered cast shadow. Four sway frames shift the crown a pixel against the trunk.
+const TRUNK_ROWS = [
+  '...............vut..............',
+  '...............vut..............',
   '...............vut..............',
   '...............vut..............',
   '...............vuut.............',
@@ -1071,45 +986,28 @@ def('tree_alder', { k: 'ald0', d: 'ald1', b: 'ald2', l: 'ald3', t: 'aldbark0', u
   '..........sssssssssssssssssss...',
   '............ssssssssssssssss....',
   '...............ssssssssss.......',
-], 32, 32);
-const FRUITPAL = { k: 'fr0', d: 'fr1', b: 'fr2', l: 'fr3', t: 'wd0', u: 'wd1', v: 'wd2', s: 'shadow', x: 'uiink', f: 'pear', g: 'pear2', e: 'pear0' };
-const FRUIT_ROWS = [
-  '............kkkkkkk.............',
-  '..........kkllbbbbbkk...........',
-  '.........kllbbbbbbbbdk..........',
-  '.......kkllbbbbbbbbbbddk........',
-  '......klllbbbbbbbbbbbbddk.......',
-  '.....kllbbbbbbbbbbbbbbbddk......',
-  '.....klbbbbgfbbbbbbbbbbbdk......',
-  '....klbbbbbffbbbbbbgfbbbddk.....',
-  '....klbbbbbeebbbbbbffbbbddk.....',
-  '...kllbbbbbbbbbbbbbeebbbbddk....',
-  '...klbbbbbbbbbbbbbbbbbbbbddk....',
-  '...klbbbbbbbbbbbbbbbbbbbbddk....',
-  '...kbbbbbbbbbbgfbbbbbbbbbdddk...',
-  '...kbbbbgfbbbbffbbbbbbgfbdddk...',
-  '...kbbbbffbbbbeebbbbbbffbdddk...',
-  '...kdbbbeebbbbbbbbbbbbeebdddk...',
-  '...kdbbbbbbbbbbbbbbbbbbbddddk...',
-  '....kdbbbbbbbbbbbbbbbbbdddddk...',
-  '....kddbbbbbbbgfbbbbbbdddddk....',
-  '.....kddbbbbbbffbbbbbddddddk....',
-  '.....kkdddbbbbeebbbbdddddddk....',
-  '.......kkdddddbbbddddddddkk.....',
-  '.........kkkkddddddddkkkk.......',
-  '.............kkvutkkk...........',
-  '...............vut..............',
-  '...............vut..............',
-  '...............vut.....s........',
-  '..............vvutt..ssss.......',
-  '.............xxxxxxxxssssss.....',
-  '...........ssssssssssssssss.....',
-  '.............ssssssssssssss.....',
-  '................sssssss.........',
 ];
-def('tree_fruit', FRUITPAL, FRUIT_ROWS, 32, 32);
+const SWAY = [0, 1, 0, -1];
+function treeFrames(lobes, chars, decorate = (rows) => rows) {
+  const crown = decorate(canopy(32, 24, lobes, chars));
+  return SWAY.map((dx) => blit(blit(blank(32, 32), TRUNK_ROWS, 0, 21), crown, dx, 0));
+}
+const ALDER_LOBES = [
+  { cx: 15.5, cy: 8, r: 7.5 }, { cx: 9, cy: 13, r: 7 }, { cx: 22, cy: 13, r: 7 }, { cx: 15.5, cy: 16, r: 6.5 },
+];
+def('tree_alder', { k: 'ald0', n: 'pine1', d: 'ald1', b: 'ald2', l: 'ald3', t: 'aldbark0', u: 'aldbark1', v: 'aldbark2', s: 'shadow', x: 'uiink' },
+  treeFrames(ALDER_LOBES, { out: 'k', deep: 'n', l: 'l', b: 'b', d: 'd' }), 32, 32);
+const FRUIT_LOBES = [
+  { cx: 15.5, cy: 7.5, r: 7 }, { cx: 9, cy: 12.5, r: 7.5 }, { cx: 22, cy: 12.5, r: 7.5 }, { cx: 15.5, cy: 15, r: 7 },
+];
+const PEAR = ['gf', 'ff', 'ee'];
+const PEAR_SPOTS = [[8, 8], [19, 5], [13, 13], [23, 13], [9, 16], [17, 18]];
+const hangFruit = (rows) => PEAR_SPOTS.reduce((r, [x, y]) => blit(r, PEAR, x, y), rows);
+const FRUITPAL = { k: 'fr0', n: 'pine0', d: 'fr1', b: 'fr2', l: 'fr3', t: 'wd0', u: 'wd1', v: 'wd2', s: 'shadow', x: 'uiink', f: 'pear', g: 'pear2', e: 'pear0' };
+const FRUIT_CH = { out: 'k', deep: 'n', l: 'l', b: 'b', d: 'd' };
+def('tree_fruit', FRUITPAL, treeFrames(FRUIT_LOBES, FRUIT_CH, hangFruit), 32, 32);
 // Bare variant: fruit chars become canopy.
-def('tree_fruit_bare', { ...FRUITPAL, f: 'fr2', g: 'fr3', e: 'fr1' }, FRUIT_ROWS, 32, 32);
+def('tree_fruit_bare', { ...FRUITPAL, f: 'fr2', g: 'fr3', e: 'fr1' }, treeFrames(FRUIT_LOBES, FRUIT_CH, hangFruit), 32, 32);
 
 /* ---------------------------------------------------------- landmarks */
 // Waystone: a dock marker; stone pillar, iron ring, glowing rune (exempt). 16x32, anchor bottom tile.

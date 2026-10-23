@@ -14,6 +14,9 @@ import { getMove } from './moves.js';
 import { getAbility } from './abilities.js';
 import { ORDINARY_TYPES } from './types.js';
 
+/** Fallback uid counter for creatures built without an rng or an explicit uid. */
+let nextFallbackUid = 1;
+
 /** Stat keys in display order. */
 export const STAT_KEYS = Object.freeze(['hp', 'atk', 'def', 'spa', 'spd', 'spe']);
 
@@ -128,6 +131,8 @@ function slot(id) {
  * @param {string[]} [opts.moves] explicit move ids (max 4)
  * @param {string|null} [opts.heartmark] explicit Heartmark technique (defaults to the species' fixed one)
  * @param {boolean} [opts.wild=false]
+ * @param {number|string} [opts.uid] explicit uid (the game allocates these); otherwise drawn from `rng`, else a counter
+ * @param {number} [opts.exp] explicit total EXP (defaults to the level's threshold)
  * @returns {Creature}
  */
 export function makeCreature(opts) {
@@ -155,7 +160,7 @@ export function makeCreature(opts) {
     typeQueue = ['Star', ...picks];
   }
   return {
-    uid: rng ? rng.int(1, 2 ** 31 - 1) : 0,
+    uid: opts.uid !== undefined ? opts.uid : rng ? rng.int(1, 2 ** 31 - 1) : nextFallbackUid++,
     speciesId: species.id,
     nickname: opts.nickname || species.name,
     types: species.types.slice(),
@@ -398,7 +403,7 @@ export function deserialize(data) {
   if (!data || typeof data !== 'object' || data.v !== 1) throw new TypeError('deserialize: not a v1 creature snapshot');
   const species = getSpecies(data.speciesId);
   const c = {
-    uid: data.uid | 0,
+    uid: typeof data.uid === 'string' ? data.uid : data.uid | 0,
     speciesId: species.id,
     nickname: String(data.nickname || species.name),
     types: Array.isArray(data.types) ? data.types.slice() : species.types.slice(),

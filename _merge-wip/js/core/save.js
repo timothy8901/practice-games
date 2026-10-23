@@ -13,8 +13,10 @@
  *
  * The CRC-32 covers everything after the second newline (`header\ndata`) as UTF-8 bytes, so a record can
  * be verified with any standard CRC-32 tool. The header (version, time, sequence number, summary) is
- * tiny and parsed on its own, so listing slots and choosing an autosave slot never parses the payload.
- * `JSON.stringify` never emits a raw newline, so the delimiters are unambiguous.
+ * tiny and parsed on its own; listing still parses the payload once to confirm it is a JSON object or
+ * array, so a slot is only ever reported `ok` when `load()` would succeed on it (the entry `latest()`
+ * hands to a "Continue" button must be loadable). `JSON.stringify` never emits a raw newline, so the
+ * delimiters are unambiguous.
  *
  * Write protocol: serialize → checksum → write `<key>.tmp` → read back and compare → write `<key>` →
  * read back and compare → delete `<key>.tmp`. If the page dies between the two writes, the complete
@@ -27,7 +29,9 @@
  *
  * Ordering is by a persisted sequence number (`seq`, one higher than every record already stored), not
  * by wall-clock time, so autosave rotation and `latest()` behave identically under a frozen or
- * backwards-stepping clock.
+ * backwards-stepping clock. Each system also remembers the highest `seq` it has issued, so removing
+ * the newest slot never lets a later write reuse its number (a stale staged copy could otherwise
+ * outrank the newer record in `recover()`).
  *
  * Storage-facing operations never throw: each returns `{ok: false, error}` with a structured
  * {@link SaveError}. Only invalid construction options throw, since those are programmer errors.
@@ -128,7 +132,8 @@ export const ERROR_CODES = Object.freeze({
  *   in memory for this page load; a UI can warn the player.
  * @property {() => readonly string[]} slots All slot ids, manual slots first, each kind in index order.
  * @property {(slot: string|number) => boolean} isValidSlot
- * @property {(slot: string|number) => SlotEntry|null} peek Header-only inspection of one slot.
+ * @property {(slot: string|number) => SlotEntry|null} peek Inspects one slot (verifies the record,
+ *   reports header fields) without returning its payload.
  * @property {(slot: string|number, data: object, opts?: {summary?: any}) => ({ok: true, slot: string,
  *   kind: string, index: number, time: number, seq: number, size: number} | Failure)} save
  * @property {(slot: string|number) => ({ok: true, slot: string, data: object,
@@ -371,7 +376,8 @@ function normalizeHeader(raw) {
  *   because such a record could never be loaded again.
  * @returns {{ok: true, record: string, size: number} | Failure}
  */
-export function encodeRecord({ version, time, seq, kind, slot, summary = null, data }) {
+export function encodeRecord(fields) {
+  const { version, time, seq, kind, slot, summary = null, data } = fields ?? {};
   if (!isObjectLike(data)) {
     return failure(ERROR_CODES.INVALID_DATA, 'record data must be a non-null object');
   }
@@ -395,13 +401,15 @@ export function encodeRecord({ version, time, seq, kind, slot, summary = null, d
 }
 
 /**
- * Parses and verifies a record string. The checksum is checked before anything is parsed.
+ * Parses and verifies a record string. The checksum is checked before anything is parsed, and the
+ * payload is always checked to be a JSON object or array, so `ok` here means `load()` would succeed.
  * @param {unknown} text
- * @param {{parseData?: boolean}} [opts] `parseData: false` verifies the record and parses only the
- *   header, which is all listing needs.
+ * @param {{parseData?: boolean}|null} [opts] `parseData: false` still verifies the whole record but
+ *   leaves `data` undefined, so listing every slot does not keep every payload alive.
  * @returns {{ok: true, header: RecordHeader, data: object|undefined, size: number} | Failure}
  */
-export function decodeRecord(text, { parseData = true } = {}) {
+export function decodeRecord(text, opts) {
+  const parseData = opts?.parseData ?? true;
   if (typeof text !== 'string') return failure(ERROR_CODES.CORRUPT, 'record is not a string');
   const nl1 = text.indexOf('\n');
   if (nl1 < 0 || text.slice(0, nl1) !== RECORD_MAGIC) {
@@ -425,15 +433,13 @@ export function decodeRecord(text, { parseData = true } = {}) {
   }
   if (!header) return failure(ERROR_CODES.CORRUPT, 'header fields are invalid');
   let data;
-  if (parseData) {
-    try {
-      data = JSON.parse(body.slice(nl3 + 1));
-    } catch (cause) {
-      return failure(ERROR_CODES.CORRUPT, 'payload is not valid JSON', { cause });
-    }
-    if (!isObjectLike(data)) return failure(ERROR_CODES.CORRUPT, 'payload is not an object');
+  try {
+    data = JSON.parse(body.slice(nl3 + 1));
+  } catch (cause) {
+    return failure(ERROR_CODES.CORRUPT, 'payload is not valid JSON', { cause });
   }
-  return { ok: true, header, data, size: text.length };
+  if (!isObjectLike(data)) return failure(ERROR_CODES.CORRUPT, 'payload is not an object');
+  return { ok: true, header, data: parseData ? data : undefined, size: text.length };
 }
 
 // ---------------------------------------------------------------------------------------------------
@@ -463,12 +469,13 @@ function isQuotaError(error) {
 
 /**
  * An in-memory `localStorage` look-alike for tests and for browsers without usable storage.
- * @param {{quota?: number}} [opts] `quota` caps the total characters held (keys plus values); a write
- *   that would exceed it throws a `QuotaExceededError`-shaped error exactly like a real browser.
+ * @param {{quota?: number}|null} [opts] `quota` caps the total characters held (keys plus values); a
+ *   write that would exceed it throws a `QuotaExceededError`-shaped error exactly like a real browser.
  * @returns {StorageLike & {length: number, usage: number, key: (i: number) => string|null,
  *   clear: () => void}}
  */
-export function createMemoryStorage({ quota = Infinity } = {}) {
+export function createMemoryStorage(opts) {
+  const quota = opts?.quota ?? Infinity;
   /** @type {Map<string, string>} */
   const map = new Map();
   let used = 0;
@@ -670,6 +677,13 @@ export function createSaveSystem(options = {}) {
   const slotIds = Object.freeze([...slotTable.keys()]);
 
   /**
+   * Highest sequence number this system has committed. Storage alone cannot provide monotonic
+   * numbering once the newest slot is removed, so the next write takes the larger of this and the
+   * stored maximum.
+   */
+  let lastSeq = 0;
+
+  /**
    * @param {unknown} slot A slot id, or a manual slot number.
    * @returns {SlotInfo|null}
    */
@@ -778,7 +792,9 @@ export function createSaveSystem(options = {}) {
    *   menu can draw every slot in order; `kind` restricts to one family.
    * @returns {SlotEntry[]}
    */
-  function list({ all = false, kind } = {}) {
+  function list(opts) {
+    const all = Boolean(opts?.all);
+    const kind = opts?.kind;
     return allEntries().filter((entry) => (kind === undefined || entry.kind === kind)
       && (all || entry.state === 'ok'));
   }
@@ -933,32 +949,36 @@ export function createSaveSystem(options = {}) {
     if (!isObjectLike(data)) {
       return failure(ERROR_CODES.INVALID_DATA, 'save data must be a non-null object', { slot: info.slot });
     }
-    const current = entries ?? allEntries();
-    const seq = current.reduce((max, entry) => (entry.state === 'ok' && entry.seq > max ? entry.seq : max), 0) + 1;
     let time;
     try {
       time = now();
     } catch (cause) {
       return failure(ERROR_CODES.SERIALIZE, 'the clock threw while stamping the record', { slot: info.slot, cause });
     }
+    // The summary runs before the sequence number is chosen, so a summarizer that re-enters the
+    // system and saves another slot still leaves this record numbered after that one.
     const summary = summaryOverride === undefined ? safeSummarize(data) : summaryOverride;
+    const current = entries ?? allEntries();
+    const storedMax = current.reduce((max, entry) => (entry.state === 'ok' && entry.seq > max ? entry.seq : max), 0);
+    const seq = Math.max(storedMax, lastSeq) + 1;
     const encoded = encodeRecord({ version, time, seq, kind: info.kind, slot: info.slot, summary, data });
     if (!encoded.ok) return withSlot(encoded, info.slot);
     const committed = commit(info, encoded.record);
     if (!committed.ok) return committed;
+    lastSeq = Math.max(lastSeq, seq);
     return { ok: true, slot: info.slot, kind: info.kind, index: info.index, time, seq, size: encoded.size };
   }
 
   /**
    * @param {string|number} slot
    * @param {object} data
-   * @param {{summary?: any}} [opts]
+   * @param {{summary?: any}|null} [opts]
    * @returns {ReturnType<typeof writeSlot>}
    */
-  function save(slot, data, { summary } = {}) {
+  function save(slot, data, opts) {
     const info = resolveSlot(slot);
     if (!info) return invalidSlot(slot);
-    return writeSlot(info, data, summary, null);
+    return writeSlot(info, data, opts?.summary, null);
   }
 
   /**
@@ -976,14 +996,14 @@ export function createSaveSystem(options = {}) {
 
   /**
    * @param {object} data
-   * @param {{summary?: any}} [opts]
+   * @param {{summary?: any}|null} [opts]
    * @returns {ReturnType<typeof writeSlot>}
    */
-  function autosave(data, { summary } = {}) {
+  function autosave(data, opts) {
     const entries = allEntries();
     const target = pickAutosaveSlot(entries);
     if (!target) return failure(ERROR_CODES.INVALID_SLOT, 'no autosave slots are configured');
-    return writeSlot(slotTable.get(target.slot), data, summary, entries);
+    return writeSlot(slotTable.get(target.slot), data, opts?.summary, entries);
   }
 
   // --- removal ---
@@ -997,8 +1017,11 @@ export function createSaveSystem(options = {}) {
     if (!info) return invalidSlot(slot);
     const before = readRaw(info.key);
     const existed = before.ok && before.value !== null;
-    const removedReal = removeRaw(info.key);
-    if (!removedReal.ok) return withSlot(removedReal, info.slot);
+    // A key the read just showed absent is not removed again; an unreadable key still gets the attempt.
+    if (existed || !before.ok) {
+      const removedReal = removeRaw(info.key);
+      if (!removedReal.ok) return withSlot(removedReal, info.slot);
+    }
     const removedTmp = removeRaw(info.tmpKey);
     if (!removedTmp.ok) return withSlot(removedTmp, info.slot);
     return { ok: true, slot: info.slot, existed };
@@ -1033,12 +1056,13 @@ export function createSaveSystem(options = {}) {
   /**
    * Decodes, verifies and migrates an exported string. Nothing is written unless `slot` is given.
    * @param {string} text
-   * @param {{slot?: string|number|null}} [opts] With a non-null `slot`, the imported data is also saved
-   *   there (keeping the exported summary); the save result is returned as `saved`.
+   * @param {{slot?: string|number|null}|null} [opts] With a non-null `slot`, the imported data is also
+   *   saved there (keeping the exported summary); the save result is returned as `saved`.
    * @returns {{ok: true, data: object, meta: RecordHeader & {migratedFrom: number|null, size: number},
    *   slot?: string, saved?: object} | Failure}
    */
-  function importString(text, { slot } = {}) {
+  function importString(text, opts) {
+    const slot = opts?.slot;
     const bytes = fromBase64(text);
     if (!bytes) return failure(ERROR_CODES.FORMAT, 'not a base64 save string');
     let record;

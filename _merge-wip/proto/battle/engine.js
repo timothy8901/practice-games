@@ -7,12 +7,17 @@
  * Singles only for the prototype. Side 0 is always the player.
  *
  * Event types emitted (all have `type`; most have `side` and a creature name):
- * 'turn', 'switch', 'move', 'charge', 'miss', 'decoy-pop', 'blocked',
- * 'ward-readout', 'effectiveness', 'damage', 'crit', 'faint', 'status', 'stat',
- * 'heal', 'mend-spent', 'mend-pending', 'mend-cancelled', 'ability', 'glint',
- * 'scrap-cost', 'read', 'reveal', 'capture-shake', 'capture', 'capture-fail',
- * 'run', 'stance', 'item', 'ward-suppressed', 'type-shift', 'exp', 'levelup',
- * 'learn', 'learn-offer', 'payout', 'blackout', 'replace-needed', 'end', 'message'.
+ * 'turn', 'switch', 'move', 'charge', 'miss', 'decoy', 'decoy-pop', 'guard', 'blocked'
+ * (reason: 'ward' | 'immune' | 'guard' | 'consecutive-guard' | 'hp-full' | 'no-mends' |
+ * 'heal-pending' | 'sodden'), 'ward-readout', 'effectiveness', 'damage', 'crit',
+ * 'faint', 'status', 'stat', 'heal', 'mend-spent', 'mend-pending', 'mend-cancelled',
+ * 'ability', 'glint', 'scrap-cost', 'read', 'reveal', 'capture-shake', 'capture',
+ * 'capture-fail', 'run', 'stance', 'item', 'ward-suppressed', 'type-shift', 'exp',
+ * 'levelup', 'learn', 'learn-offer', 'payout', 'blackout', 'replace-needed', 'end', 'message'.
+ *
+ * API (architecture draft section 5.1): `createBattle(setup, rng?)`, `battle.state()`,
+ * `battle.availableActions(side)` (alias `legal`), `battle.submit(actions)` (alias
+ * `step`), `battle.read(side)`, `battle.setCaptureStance(on)`, `battle.result()`.
  *
  * @module proto/battle/engine
  */
@@ -353,6 +358,7 @@ export class Battle {
       };
     });
     if (this.kind === 'wild' && this.sides[1].trainer) throw new RangeError('createBattle: a wild battle has no foe trainer');
+    if (this.kind === 'trainer' && !this.sides[1].trainer) this.sides[1].trainer = { name: 'Trainer' };
     this.stance = this.kind === 'wild' ? !!opts.captureStance : false;
     this.wardBadge = [false, false];
     for (const side of this.sides) {
@@ -443,8 +449,8 @@ export class Battle {
         guarding: s.vol.guarding,
         boostBlocked: this.turn <= s.vol.boostBlockUntil,
         trapped: s.vol.trap > 0,
-        charging: s.vol.charging ? s.vol.charging.move : null,
-        pendingHeal: s.vol.pendingHeal ? s.vol.pendingHeal.turns : null,
+        charging: s.vol.charging ? s.party[s.active].moves[s.vol.charging.move].id : null,
+        pendingHeal: s.vol.pendingHeal ? Math.max(0, s.vol.pendingHeal.until - this.turn) : null,
         wardSuppressed: s.vol.wardSuppressed,
         party: s.party.map((c) => ({
           uid: c.uid, name: c.nickname, speciesId: c.speciesId, level: c.level, hp: c.hp, maxHp: c.stats.hp,
@@ -524,6 +530,15 @@ export class Battle {
       if (it.heal) out.items.push({ id: it.id, name: it.name || it.id, count: 1, selectable: c.hp < c.stats.hp, reason: c.hp < c.stats.hp ? null : 'HP is full.' });
     }
     return out;
+  }
+
+  /**
+   * Alias of {@link Battle#availableActions} (the architecture draft calls the
+   * legal-action query `legal()`).
+   * @param {number} [side=0]
+   */
+  legal(side = 0) {
+    return this.availableActions(side);
   }
 
   _switchOptions(side, forced) {
@@ -702,6 +717,18 @@ export class Battle {
     return this._flush();
   }
 
+  /**
+   * Alias of {@link Battle#submit} that also accepts a single player action
+   * (`step(action)`); the foe's action then comes from `foeAi`.
+   * @param {any|any[]} action
+   * @returns {any[]} events
+   */
+  step(action) {
+    if (Array.isArray(action)) return this.submit(action);
+    if (this.phase === 'replace' && !this.pendingReplace.includes(0)) return this.submit([undefined, action]);
+    return this.submit([action]);
+  }
+
   _validate(side, a) {
     if (!a || typeof a !== 'object') throw new BattleError('NO_ACTION', `Side ${side} submitted no action.`);
     const s = this.sides[side];
@@ -825,7 +852,8 @@ export class Battle {
     if (itemId === 'crackdust') {
       s.bag.crackdust--;
       const foeSide = this.sides[1 - side];
-      foeSide.vol.wardSuppressed = CRACKDUST_TURNS;
+      // +1: the counter ticks down at the end of the turn Crackdust is thrown, so the Ward stays down for the next CRACKDUST_TURNS full turns.
+      foeSide.vol.wardSuppressed = CRACKDUST_TURNS + 1;
       this._emit({ type: 'item', side, item: 'crackdust', text: `Crackdust scatters over ${this.foeOf(side).nickname}.` });
       this._emit({ type: 'ward-suppressed', side: 1 - side, target: this.foeOf(side).nickname, turns: CRACKDUST_TURNS, text: `${this.foeOf(side).nickname}'s Ward is suppressed for ${CRACKDUST_TURNS} turns.` });
       return;
@@ -954,6 +982,10 @@ export class Battle {
         this._emit({ type: 'blocked', side, target: user.nickname, reason: 'hp-full', text: `${user.nickname}'s HP is already full.` });
         return;
       }
+      if (e.recovery.delay > 0 && v.pendingHeal) {
+        this._emit({ type: 'blocked', side, target: user.nickname, reason: 'heal-pending', text: `${user.nickname}'s eye panel is already bright. ${move.name} failed.` });
+        return;
+      }
       if (user.mends <= 0) {
         this._emit({ type: 'blocked', side, target: user.nickname, reason: 'no-mends', text: `${user.nickname} has no Mends left. ${move.name} failed.` });
         return;
@@ -961,7 +993,8 @@ export class Battle {
       user.mends--;
       this._emit({ type: 'mend-spent', side, user: user.nickname, remaining: user.mends, text: `${user.nickname} spends a Mend (${user.mends} left).` });
       if (e.recovery.delay > 0) {
-        v.pendingHeal = { turns: e.recovery.delay, fraction: e.recovery.fraction, cancelledBy: e.recovery.cancelledBy || null, move: move.id };
+        // Heals at the end of the turn `delay` turns after this one (Vesper Mend: panel brightens now, heal at the end of next turn).
+        v.pendingHeal = { until: this.turn + e.recovery.delay, fraction: e.recovery.fraction, cancelledBy: e.recovery.cancelledBy || null, move: move.id };
         this._emit({ type: 'mend-pending', side, user: user.nickname, turns: e.recovery.delay, text: `${user.nickname}'s eye panel brightens.` });
       } else {
         this._heal(side, Math.floor(user.stats.hp * e.recovery.fraction), move.id);
@@ -1259,13 +1292,10 @@ export class Battle {
         v.trap--;
         if (v.trap === 0 && !isFainted(c)) this._emit({ type: 'status', side: s.index, target: c.nickname, kind: 'trap', action: 'cure', text: `${c.nickname} is free of the trap.` });
       }
-      if (!isFainted(c) && v.pendingHeal) {
-        v.pendingHeal.turns--;
-        if (v.pendingHeal.turns <= 0) {
-          const p = v.pendingHeal;
-          v.pendingHeal = null;
-          this._heal(s.index, Math.floor(c.stats.hp * p.fraction), p.move);
-        }
+      if (!isFainted(c) && v.pendingHeal && this.turn >= v.pendingHeal.until) {
+        const p = v.pendingHeal;
+        v.pendingHeal = null;
+        this._heal(s.index, Math.floor(c.stats.hp * p.fraction), p.move);
       }
       if (v.wardSuppressed > 0) {
         v.wardSuppressed--;
@@ -1355,7 +1385,7 @@ export class Battle {
       const amount = gains.get(c.uid);
       if (!amount) continue;
       const r = gainExp(c, amount);
-      this.expReport.push({ uid: c.uid, name: c.nickname, amount, from: r.from, to: r.to, learned: r.learned, offers: r.offers });
+      this.expReport.push({ uid: c.uid, name: c.nickname, amount, from: r.from, to: r.to, levelsGained: r.to - r.from, learned: r.learned, offers: r.offers });
       if (r.to > r.from) {
         this._emit({ type: 'levelup', creature: c.nickname, uid: c.uid, from: r.from, to: r.to, stats: r.statsAfter, text: `${c.nickname} grew to Lv${r.to}.` });
         for (const mv of r.learned) this._emit({ type: 'learn', creature: c.nickname, uid: c.uid, move: mv, text: `${c.nickname} learned ${getMove(mv).name}.` });
@@ -1394,7 +1424,7 @@ export class Battle {
     lines.push(types.length ? `Types that get through: ${types.join(', ')}.` : 'No type gets through directly.');
     lines.push(`Indirect damage that works: ${indirect.join(', ')}.`);
     if (s.bag.crackdust > 0) lines.push(`You carry Crackdust (${s.bag.crackdust}).`);
-    return { type: 'ward-readout', side, target: target.nickname, ward: ability.name, wardKind: ability.ward.kind, canLand, outOfPp, types, indirect, crackdust: s.bag.crackdust > 0, text: lines.join(' ') };
+    return { type: 'ward-readout', side, target: target.nickname, targetTypes: target.types.slice(), ward: ability.name, wardId: ability.id, wardKind: ability.ward.kind, canLand, outOfPp, types, indirect, crackdust: s.bag.crackdust > 0, text: lines.join(' ') };
   }
 
   // ---- events ------------------------------------------------------------------------
@@ -1426,10 +1456,12 @@ function outcomeText(outcome, b) {
 }
 
 /**
- * Creates a battle. See {@link Battle} for the options.
- * @param {ConstructorParameters<typeof Battle>[0]} opts
+ * Creates a battle. See {@link Battle} for the options. The rng may be passed
+ * inside `setup` (`setup.rng`) or as the second argument (`createBattle(setup, rng)`).
+ * @param {ConstructorParameters<typeof Battle>[0]} setup
+ * @param {ConstructorParameters<typeof Battle>[0]['rng']} [rng]
  * @returns {Battle}
  */
-export function createBattle(opts) {
-  return new Battle(opts);
+export function createBattle(setup, rng) {
+  return new Battle(rng ? { ...setup, rng } : setup);
 }

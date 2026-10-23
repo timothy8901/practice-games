@@ -566,3 +566,378 @@ describe('derived sprite edge cases', () => {
     assert.equal(ok.ox, -1);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Verifier additions: ranges, calls before init, unicode, malformed options,
+// rapid repeated calls, boundaries and cross-process goldens for derived art.
+// ---------------------------------------------------------------------------
+
+/** FNV-1a of a string's UTF-8 bytes. */
+const strHash = (s) => fnv1a(new TextEncoder().encode(s));
+/** JSON-ish rendering for assertion messages that survives BigInt and undefined. */
+const show = (v) => (v === undefined ? 'undefined' : JSON.stringify(v, (k, x) => (typeof x === 'bigint' ? `${x}n` : x)));
+
+const UNI_PAL = {
+  '✦': '#fff', '♥': '#f00', '★': '#ff0', '☾': '#88f',
+  '☀': '#fa0', '▲': '#0f0', 'é': '#0ff', 'ñ': '#f0f',
+};
+const UNI = ['✦♥★', '☾☀▲', 'é.ñ'];
+
+describe('rgbToHsl stays inside its documented ranges', () => {
+  it('never reports saturation above 1 (float overshoot on near-white tints)', () => {
+    for (const hex of ['#fbfbff', '#fefeff', '#fffefe', '#010100', '#000001']) {
+      const { h, s, l } = rgbToHsl(hex);
+      assert.ok(s >= 0 && s <= 1, `${hex} s=${s}`);
+      assert.ok(l >= 0 && l <= 1, `${hex} l=${l}`);
+      assert.ok(h >= 0 && h < 360, `${hex} h=${h}`);
+    }
+    assert.equal(rgbToHsl('#fbfbff').s, 1);
+  });
+  it('holds over a dense sweep of the cube and still round-trips', () => {
+    for (let r = 0; r < 256; r += 3) for (let g = 0; g < 256; g += 5) for (let b = 0; b < 256; b += 7) {
+      const hsl = rgbToHsl({ r, g, b });
+      assert.ok(hsl.h >= 0 && hsl.h < 360 && hsl.s >= 0 && hsl.s <= 1 && hsl.l >= 0 && hsl.l <= 1, `${r},${g},${b}`);
+      const back = hslToRgb(hsl);
+      assert.ok(back.r === r && back.g === g && back.b === b, `${r},${g},${b} -> ${JSON.stringify(back)}`);
+    }
+  });
+});
+
+describe('calls before any canvas exists (Node, no factory)', () => {
+  afterEach(() => setCanvasFactory(null));
+
+  it('pure API works, canvas-backed calls fail with one clear message and leave ctx untouched', () => {
+    setCanvasFactory(null);
+    const s = decodeSprite(ARROW, PAL);
+    const atlas = buildAtlas([s]);
+    const ctx = fakeContext();
+    ctx.globalAlpha = 0.7;
+    assert.throws(() => drawSprite(ctx, s, 0, 0, { alpha: 0.5, flipX: true }), /no canvas implementation/);
+    assert.throws(() => drawAtlasFrame(ctx, atlas, 0, 0, 0), /no canvas implementation/);
+    assert.throws(() => makePattern(['r'], PAL), /no canvas implementation/);
+    assert.throws(() => makePattern(s, ctx), /no canvas implementation/, 'a caller ctx still needs the sprite canvas');
+    assert.throws(() => s.canvas, /no canvas implementation/);
+    assert.throws(() => atlas.canvas, /no canvas implementation/);
+    assert.equal(ctx.calls.length, 0);
+    assert.equal(ctx.globalAlpha, 0.7);
+    assert.equal(ctx.depth, 0);
+    // nothing pure was poisoned by the failures
+    assert.equal(decodeSprite(ARROW, PAL), s);
+    assert.equal(paletteSwap(s, { r: '#000' }).palette.r, '#000000');
+    assert.deepEqual(opaqueBounds(silhouette(s, '#fff')), { x: 0, y: 0, w: 4, h: 3 });
+  });
+
+  it('becomes drawable the moment a factory is installed, and fails again when it is removed', () => {
+    setCanvasFactory(null);
+    const s = decodeSprite(ARROW, PAL);
+    const ctx = fakeContext();
+    assert.throws(() => drawSprite(ctx, s, 0, 0), /no canvas implementation/);
+    const created = [];
+    setCanvasFactory(fakeFactory(created));
+    drawSprite(ctx, s, 0, 0);
+    assert.equal(ctx.calls.length, 1);
+    assert.equal(created.length, 1);
+    assert.equal(makePattern(s).rep, 'repeat');
+    setCanvasFactory(null);
+    assert.throws(() => drawSprite(ctx, s, 0, 0), /no canvas implementation/);
+    assert.throws(() => makePattern(s), /no canvas implementation/);
+  });
+
+  it('a factory whose canvas has no 2d context fails cleanly and does not poison later factories', () => {
+    setCanvasFactory((w, h) => ({ width: w, height: h, getContext: () => null }));
+    const s = decodeSprite(ARROW, PAL);
+    assert.throws(() => s.canvas, /could not acquire a 2d context/);
+    assert.throws(() => makePattern(s), /could not acquire a 2d context/);
+    assert.throws(() => drawSprite(fakeContext(), s, 0, 0), /could not acquire a 2d context/);
+    const created = [];
+    setCanvasFactory(fakeFactory(created));
+    assert.equal(s.canvas.width, 4);
+    assert.equal(makePattern(s).src, s.canvas);
+    assert.equal(created.length, 2);
+  });
+
+  it('a throwing factory propagates its error and nothing stale is cached', () => {
+    let calls = 0;
+    setCanvasFactory(() => { calls++; throw new Error('synthetic factory failure'); });
+    const s = decodeSprite(ARROW, PAL);
+    assert.throws(() => s.canvas, /synthetic factory failure/);
+    assert.throws(() => s.canvas, /synthetic factory failure/);
+    assert.equal(calls, 2, 'retried, not cached as a failure');
+    setCanvasFactory(fakeFactory());
+    assert.equal(s.canvas.height, 3);
+  });
+
+  it('createPattern returning null is reported and not cached', () => {
+    let nulls = 1;
+    setCanvasFactory((w, h) => {
+      const ctx = fakeContext();
+      ctx.createPattern = (src, rep) => (nulls-- > 0 ? null : { src, rep });
+      return { width: w, height: h, getContext: () => ctx };
+    });
+    const s = decodeSprite(ARROW, PAL);
+    assert.throws(() => makePattern(s), /createPattern returned null/);
+    const p = makePattern(s);
+    assert.equal(p.rep, 'repeat');
+    assert.equal(makePattern(s), p);
+  });
+});
+
+describe('unicode art', () => {
+  it('BMP symbols and accented letters are ordinary palette characters (golden)', () => {
+    const s = decodeSprite(UNI, UNI_PAL, { outline: '#000', scale: 2 });
+    assert.equal(s.w, 10);
+    assert.equal(s.h, 10);
+    assert.equal(fnv1a(s.pixels), '621dc605');
+    assert.equal(s.palette['@'], '#000000', 'outline char is picked from the ASCII pool');
+    const again = decodeSprite(s.rows, s.palette);
+    assert.deepEqual(again.pixels, s.pixels, 'rows/palette reproduce the pixels');
+    assert.equal(again.ox, 0, 'the draw offset is not part of rows/palette');
+    const plain = decodeSprite(UNI, UNI_PAL);
+    assert.equal(decodeSprite(plain.rows, plain.palette), plain, 'undecorated art round-trips to the same object');
+    assert.deepEqual(at(paletteSwap(s, { '♥': '#000' }), 4, 2), rgba('#000000'));
+    assert.deepEqual(at(silhouette(s, '#123456'), 2, 2), rgba('#123456'));
+  });
+  it('palette keys are case-sensitive and may be any single code unit', () => {
+    const s = decodeSprite(['rRｒ'], { r: '#f00', R: '#0f0', 'ｒ': '#00f' });
+    assert.deepEqual(at(s, 0, 0), rgba('#ff0000'));
+    assert.deepEqual(at(s, 1, 0), rgba('#00ff00'));
+    assert.deepEqual(at(s, 2, 0), rgba('#0000ff'));
+  });
+  it('names invisible and combining characters precisely in errors', () => {
+    assert.throws(() => decodeSprite(['é'], { e: '#f00' }), /unknown palette character "́" at row 0, column 1/);
+    assert.throws(() => decodeSprite(['r‏r'], { r: '#f00' }), /unknown palette character "\\u200f" at row 0, column 1/);
+    assert.throws(() => decodeSprite(['r　r'], { r: '#f00' }), /unknown palette character "\\u3000" at row 0, column 1/);
+    assert.throws(() => decodeSprite(['r‍r'], { r: '#f00' }), /unknown palette character "\\u200d" at row 0, column 1/);
+    assert.throws(() => decodeSprite('﻿r\nrr', { r: '#f00' }), /unknown palette character "\\ufeff" at row 0, column 0/);
+    assert.throws(() => decodeSprite(['r'], new Map([['\u{1F600}', '#f00']])), /single character.*UTF-16/);
+    assert.throws(() => decodeSprite(['r'], { 'é́': '#f00' }), /single character/);
+  });
+  it('treats a surrogate pair as two pixels when the halves are palette keys (one pixel = one code unit)', () => {
+    const s = decodeSprite(['\u{1F600}'], { '\ud83d': '#f00', '\ude00': '#0f0' });
+    assert.equal(s.w, 2);
+    assert.deepEqual(at(s, 0, 0), rgba('#ff0000'));
+    assert.deepEqual(at(s, 1, 0), rgba('#00ff00'));
+  });
+});
+
+describe('malformed options', () => {
+  const base = () => decodeSprite(ARROW, PAL);
+
+  it('non-object opts are treated as no options', () => {
+    for (const v of [0, '', false, null, undefined, NaN, 5, 'flipX']) {
+      assert.equal(decodeSprite(ARROW, PAL, v), base(), `opts=${String(v)}`);
+    }
+  });
+  it('rejects every non-positive-integer scale', () => {
+    for (const v of [Infinity, -Infinity, NaN, 2n, '2', [2], {}, -0, 1.0000001, true, 0, -1]) {
+      assert.throws(() => decodeSprite(ARROW, PAL, { scale: v }), RangeError, `scale=${String(v)}`);
+    }
+    assert.equal(decodeSprite(ARROW, PAL, { scale: 1 }), base());
+  });
+  it('rejects malformed tints and ignores empty ones', () => {
+    for (const v of [5, true, [], {}, { color: 5 }, { color: '#fff', amount: '1' }, { color: '#fff', amount: 1n }, { amount: 0.5 }]) {
+      assert.throws(() => decodeSprite(ARROW, PAL, { tint: v }), TypeError, `tint=${show(v)}`);
+    }
+    for (const v of [0, '', false, null, undefined, { color: '#fff', amount: 0 }, { color: '#fff', amount: -3 }]) {
+      assert.equal(decodeSprite(ARROW, PAL, { tint: v }), base(), `tint=${show(v)}`);
+    }
+  });
+  it('rejects malformed outlines and ignores empty ones', () => {
+    for (const v of [{}, [], true, 1, 'black', '#12']) {
+      assert.throws(() => decodeSprite(ARROW, PAL, { outline: v }), TypeError, `outline=${show(v)}`);
+    }
+    for (const v of ['', 0, false, null, undefined]) {
+      assert.equal(decodeSprite(ARROW, PAL, { outline: v }), base(), `outline=${show(v)}`);
+    }
+    assert.equal(decodeSprite(ARROW, PAL, { outlineCorners: true }), base(), 'corners without outline is a no-op');
+  });
+  it('flips follow JS truthiness, so odd values flip rather than throw', () => {
+    assert.equal(decodeSprite(ARROW, PAL, { flipX: 'no' }), decodeSprite(ARROW, PAL, { flipX: true }));
+    assert.equal(decodeSprite(ARROW, PAL, { flipY: 0 }), base());
+  });
+  it('validates atlas options strictly', () => {
+    const s = base();
+    for (const v of ['1', NaN, Infinity, 1.5, -1, true, [1]]) {
+      assert.throws(() => buildAtlas([s], { padding: v }), RangeError, `padding=${String(v)}`);
+    }
+    assert.equal(buildAtlas([s], { padding: -0 }).w, 4, '-0 is zero padding');
+    for (const v of ['7', NaN, 0, 0.5, -5, true, null, undefined].filter((v) => v !== null && v !== undefined)) {
+      assert.throws(() => buildAtlas([s], { maxWidth: v }), RangeError, `maxWidth=${String(v)}`);
+    }
+    assert.equal(buildAtlas([s], { maxWidth: Infinity }).w, buildAtlas([s]).w);
+    const tiles = [0, 1, 2, 3].map((i) => decodeSprite(['rr', 'rr'], { r: rgbToHex(i * 10, 0, 0) }));
+    assert.deepEqual(buildAtlas(tiles, { maxWidth: 7.9 }).frames, buildAtlas(tiles, { maxWidth: 7 }).frames, 'fractional maxWidth floors');
+    for (const bad of [[null], [s, 'x'], new Set([s]), [undefined], [{ ...s }]]) {
+      assert.throws(() => buildAtlas(bad), TypeError);
+    }
+    assert.equal(buildAtlas(Object.freeze([s])).frames.length, 1);
+  });
+  it('drawAtlasFrame requires an integer index', () => {
+    setCanvasFactory(fakeFactory());
+    try {
+      const atlas = buildAtlas([base(), decodeSprite(['bb'], PAL)]);
+      const ctx = fakeContext();
+      for (const bad of ['0', '1', [0], true, 2, -1, 0.5, 1n]) {
+        assert.throws(() => drawAtlasFrame(ctx, atlas, bad, 0, 0), RangeError, `index ${String(bad)}`);
+      }
+      drawAtlasFrame(ctx, atlas, -0, 0, 0);
+      drawAtlasFrame(ctx, atlas, 1, 0, 0);
+      assert.equal(ctx.calls.length, 2);
+    } finally {
+      setCanvasFactory(null);
+    }
+  });
+  it('paletteSwap rejects non-string Map keys and odd mapping containers', () => {
+    const s = base();
+    assert.throws(() => paletteSwap(s, new Map([[1, '#000']])), TypeError);
+    assert.throws(() => paletteSwap(s, new Map([[null, '#000']])), TypeError);
+    assert.throws(() => paletteSwap(s, 'r'), TypeError);
+    assert.throws(() => paletteSwap(s, 42), TypeError);
+    assert.equal(paletteSwap(s, {}), s, 'empty mapping is the identity');
+    assert.equal(paletteSwap(s, new Map()), s);
+  });
+});
+
+describe('rapid repeated calls', () => {
+  afterEach(() => setCanvasFactory(null));
+
+  it('cycling derived sprites does not grow the cache past the distinct variants', () => {
+    const s = decodeSprite(ARROW, PAL);
+    const maps = [{ r: '#111' }, { r: '#222' }, { '#00ff00': null }, { b: '#ffffff80' }];
+    const firsts = maps.map((m) => paletteSwap(s, m));
+    const sils = ['#000', '#fff', '#f00'].map((c) => silhouette(s, c));
+    const outs = ['#000', '#fff'].map((c) => outlineSprite(s, c));
+    const size = spriteCacheSize();
+    const t0 = performance.now();
+    for (let i = 0; i < 20000; i++) {
+      assert.equal(paletteSwap(s, maps[i % 4]), firsts[i % 4]);
+      assert.equal(silhouette(s, ['#000', '#fff', '#f00'][i % 3]), sils[i % 3]);
+      assert.equal(outlineSprite(s, i & 1 ? '#fff' : '#000'), outs[i & 1]);
+    }
+    const ms = performance.now() - t0;
+    assert.equal(spriteCacheSize(), size, 'no growth');
+    assert.ok(ms < 2000, `60k derived calls took ${ms.toFixed(0)}ms`);
+  });
+
+  it('fresh but structurally equal inputs every frame still hit the content cache', () => {
+    const s = decodeSprite(ARROW, PAL);
+    const size = spriteCacheSize();
+    for (let i = 0; i < 5000; i++) {
+      assert.equal(decodeSprite(ARROW.map((r) => r), { ...PAL }, { flipX: false }), s);
+    }
+    assert.equal(spriteCacheSize(), size);
+  });
+
+  it('10k draws with mixed options leave the context state exactly as found', () => {
+    setCanvasFactory(fakeFactory());
+    const s = decodeSprite(ARROW, PAL, { outline: '#000' });
+    const atlas = buildAtlas([s, decodeSprite(ARROW, PAL)]);
+    const ctx = fakeContext();
+    ctx.globalAlpha = 0.37;
+    const r = rng(11);
+    let expected = 0;
+    for (let i = 0; i < 10000; i++) {
+      const alpha = r() < 0.1 ? 0 : r() * 1.5;
+      const opts = { alpha, flipX: r() < 0.5, flipY: r() < 0.5, scale: r() < 0.2 ? 0 : 1 + Math.floor(r() * 3), snap: r() < 0.5 };
+      if (opts.alpha > 0 && opts.scale > 0) expected++;
+      if (i & 1) drawSprite(ctx, s, r() * 480 - 20, r() * 270 - 20, opts);
+      else drawAtlasFrame(ctx, atlas, i % 2, r() * 480, r() * 270, opts);
+      assert.equal(ctx.globalAlpha, 0.37);
+      assert.equal(ctx.depth, 0);
+    }
+    assert.equal(ctx.calls.length, expected);
+    assert.equal(ctx.imageSmoothingEnabled, false);
+  });
+
+  it('interleaving clearSpriteCache with decodes always yields correct pixels', () => {
+    const ref = decodeSprite(ARROW, PAL, { outline: '#000', scale: 2 }).pixels.slice();
+    for (let i = 0; i < 1000; i++) {
+      if (i % 97 === 0) clearSpriteCache();
+      const s = decodeSprite(ARROW, PAL, { outline: '#000', scale: 2 });
+      assert.deepEqual(s.pixels, ref);
+      assert.equal(decodeSprite(ARROW, PAL, { outline: '#000', scale: 2 }), s);
+    }
+  });
+});
+
+describe('boundaries', () => {
+  it('a sprite of exactly MAX_PIXELS is allowed and correct', () => {
+    const s = decodeSprite(['r'], PAL, { scale: 4096 });
+    assert.equal(s.w * s.h, MAX_PIXELS);
+    assert.equal(s.pixels.length, MAX_PIXELS * 4);
+    assert.deepEqual(at(s, 0, 0), rgba('#ff0000'));
+    assert.deepEqual(at(s, 4095, 4095), rgba('#ff0000'));
+    assert.throws(() => decodeSprite(['rr'], PAL, { scale: 4096 }), RangeError);
+    assert.throws(() => outlineSprite(s, '#000'), RangeError);
+    assert.throws(() => buildAtlas([s], { padding: 1 }), RangeError, 'gutters push it over');
+    assert.equal(buildAtlas([s], { padding: 0 }).w, 4096);
+    clearSpriteCache();
+  });
+  it('one-pixel-wide and one-pixel-tall sprites at the 4096 edge work', () => {
+    const wide = decodeSprite(['r'.repeat(4096)], PAL, { flipX: true });
+    const tall = decodeSprite(new Array(4096).fill('r'), PAL, { flipY: true });
+    assert.equal(wide.w, 4096);
+    assert.equal(wide.h, 1);
+    assert.equal(tall.w, 1);
+    assert.equal(tall.h, 4096);
+    assert.deepEqual(opaqueBounds(wide), { x: 0, y: 0, w: 4096, h: 1 });
+    assert.throws(() => decodeSprite(['r'.repeat(4097)], PAL, { scale: 4096 }), RangeError);
+    clearSpriteCache();
+  });
+  it('a 1x1 sprite survives every transform', () => {
+    const s = decodeSprite(['r'], PAL, { flipX: true, flipY: true, outline: '#000', outlineCorners: true, scale: 3, tint: { color: '#fff', amount: 0.5 } });
+    assert.equal(s.w, 9);
+    assert.equal(s.ox, -3);
+    assert.deepEqual(at(s, 4, 4), rgba('#ff8080'));
+    assert.deepEqual(at(s, 0, 0), rgba('#000000'));
+    assert.deepEqual(opaqueBounds(s), { x: 0, y: 0, w: 9, h: 9 });
+    const o = outlineSprite(s, '#0f0');
+    assert.equal(o.w, 11);
+    assert.equal(o.ox, -4);
+  });
+  it('alpha extremes', () => {
+    assert.equal(opaqueBounds(silhouette(decodeSprite(ARROW, PAL), '#ff000000')), null, 'alpha-0 silhouette is empty');
+    assert.equal(silhouette(decodeSprite(ARROW, PAL), '#ff0000ff').palette.r, '#ff0000');
+    assert.equal(rgbToHex(0, 0, 0, 254.5), '#000000', '254.5 rounds to opaque and drops the alpha pair');
+    assert.equal(rgbToHex(0, 0, 0, 0.49), '#00000000');
+    assert.equal(lerpColor('#00000000', '#ffffffff', 1), '#ffffff');
+    assert.equal(recolorHSL('#12345600', 180), '#56341200');
+  });
+});
+
+describe('determinism of derived sprites and colour math (goldens)', () => {
+  it('paletteSwap, silhouette and outlineSprite match their golden hashes', () => {
+    const base = decodeSprite(ARROW, PAL);
+    const sw = paletteSwap(base, { r: '#123456', '#00ff00': null, b: '#abcdef40' });
+    assert.equal(fnv1a(sw.pixels), '7bdd0f8a');
+    assert.equal(sw.key.slice(0, 20), '4x3@0,0|babcdef40g--');
+    const sil = silhouette(decodeSprite(ARROW, PAL, { outline: '#000', scale: 2 }), '#10203080');
+    assert.equal(sil.w, 12);
+    assert.equal(sil.h, 10);
+    assert.equal(sil.ox, -2);
+    assert.equal(fnv1a(sil.pixels), '259b1145');
+    const out2 = outlineSprite(outlineSprite(base, '#000'), '#fff', { corners: true });
+    assert.equal(out2.w, 8);
+    assert.equal(out2.h, 7);
+    assert.equal(out2.ox, -2);
+    assert.equal(fnv1a(out2.pixels), '61117f6b');
+    const atlas = buildAtlas([sw, sil, out2, decodeSprite(UNI, UNI_PAL, { outline: '#000', scale: 2 }), base, sw], { padding: 2, maxWidth: 40 });
+    assert.equal(atlas.w, 26);
+    assert.equal(atlas.h, 31);
+    assert.equal(fnv1a(atlas.pixels), '90de6c3a');
+    assert.deepEqual(atlas.frames.map((f) => [f.x, f.y]), [[2, 26], [2, 2], [14, 14], [2, 14], [8, 26], [2, 26]]);
+  });
+  it('recolorHSL, lerpColor and rgbToHsl sweeps match their golden hashes', () => {
+    let sweep = '';
+    for (const c of ['#e8873a', '#4a7bd0', '#808080', '#ff000080']) {
+      for (let i = 0; i < 360; i += 7) sweep += recolorHSL(c, i, (i % 5 - 2) / 10, (i % 3 - 1) / 10);
+    }
+    assert.equal(strHash(sweep), '429014b');
+    let lerps = '';
+    for (let i = 0; i <= 100; i++) lerps += lerpColor('#1d2430', '#f2c14e80', i / 100);
+    assert.equal(strHash(lerps), '343c4aca');
+    let hsls = '';
+    for (let i = 0; i < 256; i += 5) hsls += JSON.stringify(rgbToHsl({ r: i, g: 255 - i, b: (i * 7) % 256 }));
+    assert.equal(strHash(hsls), '2947c2f8');
+  });
+});

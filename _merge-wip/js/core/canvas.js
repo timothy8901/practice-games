@@ -77,8 +77,8 @@ export const MODES = Object.freeze(['integer', 'fit']);
 
 /**
  * @typedef {object} DisplayOptions
- * @property {number} [width=480]            Native buffer width in game px (positive integer).
- * @property {number} [height=270]           Native buffer height in game px (positive integer).
+ * @property {number} [width=480]            Native buffer width in game px (positive safe integer).
+ * @property {number} [height=270]           Native buffer height in game px (positive safe integer).
  * @property {HTMLElement} parent            Sized element the visible canvas is appended to and
  *                                           measured against (its `clientWidth/Height`; the
  *                                           window's inner size when it is `<body>`/`<html>`).
@@ -124,7 +124,8 @@ export const MODES = Object.freeze(['integer', 'fit']);
  *                                             `toGame`, for positioning DOM overlays.
  * @property {(fn: ResizeListener) => () => void} onResize Subscribe; returns an unsubscribe.
  * @property {(color?: string|null) => void} clear Fill the buffer with `color` (defaults to the
- *                                             letterbox colour; `null` → `clearRect`).
+ *                                             letterbox colour; `null` → `clearRect`; any other
+ *                                             non-string is a TypeError).
  * @property {() => void} destroy              Detach listeners/observers and remove the canvas.
  */
 
@@ -160,10 +161,11 @@ function assertMode(mode) {
 /**
  * @param {number} width
  * @param {number} height
- * @throws {RangeError} when either dimension is not a positive integer.
+ * @throws {RangeError} when either dimension is not a positive safe integer (numeric strings,
+ *                      floats, bigints and values beyond `Number.MAX_SAFE_INTEGER` are rejected).
  */
 function assertSize(width, height) {
-  if (!Number.isInteger(width) || width <= 0 || !Number.isInteger(height) || height <= 0) {
+  if (!Number.isSafeInteger(width) || width <= 0 || !Number.isSafeInteger(height) || height <= 0) {
     throw new RangeError(`Native size must be positive integers, got ${String(width)}x${String(height)}`);
   }
 }
@@ -209,8 +211,8 @@ function toFinite(value, fallback) {
  * @param {number} [spec.maxBackingPixels=Infinity] Cap on backing-store area (device px²);
  *                                   non-finite or non-positive values mean "no cap".
  * @returns {Layout}
- * @throws {RangeError} for a non-positive-integer native size.
- * @throws {TypeError} for an unknown mode.
+ * @throws {RangeError} for a native size that is not a positive safe integer.
+ * @throws {TypeError} for an unknown mode (or a `null` spec).
  */
 export function computeLayout({
   width = DEFAULT_WIDTH,
@@ -362,11 +364,14 @@ function toggleMediaListener(query, fn, on) {
  * @returns {Display}
  * @throws {Error} when no DOM is available (Node without an injected `env`) or 2D canvas
  *                 contexts cannot be created.
- * @throws {TypeError} when `parent` is not an element, `mode` is unknown, or `background`,
- *                 `dpr` or `onResize` have the wrong type.
- * @throws {RangeError} when `width`/`height` are not positive integers.
+ * @throws {TypeError} when `options` is not an object, `parent` is not an element, `mode` is
+ *                 unknown, or `background`, `dpr` or `onResize` have the wrong type.
+ * @throws {RangeError} when `width`/`height` are not positive safe integers.
  */
 export function createDisplay(options = {}) {
+  if (options === null || typeof options !== 'object') {
+    throw new TypeError('createDisplay() expects an options object');
+  }
   const {
     width = DEFAULT_WIDTH,
     height = DEFAULT_HEIGHT,
@@ -621,6 +626,9 @@ export function createDisplay(options = {}) {
         ctx.clearRect(0, 0, width, height);
         return;
       }
+      // Browsers silently ignore invalid fillStyle assignments, which would fill with whatever
+      // colour the game last used; fail loudly instead.
+      assertColor(color, 'clear()');
       ctx.fillStyle = color;
       ctx.fillRect(0, 0, width, height);
     },

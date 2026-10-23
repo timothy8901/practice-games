@@ -966,13 +966,19 @@ describe('createClock: tide', () => {
   });
 
   it('fires onTideChange for sub-minute crossings as well', () => {
-    const clock = clockAt(109.9);
+    // The rising crossing of tide = 0.2 sits at minute acos(0.6) / 2pi * period = 109.9498.
+    const crossing = (Math.acos(1 - 2 * DEFAULT_LOW_TIDE) / (2 * Math.PI)) * TIDE_PERIOD_MINUTES;
+    assert.ok(crossing > 109.9 && crossing < 109.98, `crossing at ${crossing}`);
+    const clock = clockAt(109.5);
     const events = [];
-    clock.onTideChange((e) => events.push(e.state));
-    clock.update(50);
+    clock.onTideChange((e) => events.push([e.previous, e.state, clock.total]));
+    clock.update(400); // -> 109.9, still low
     assert.deepEqual(events, []);
-    clock.update(100);
-    assert.deepEqual(events, ['rising']);
+    clock.update(80); // -> 109.98: crossed without touching a whole minute
+    assert.deepEqual(events, [['low', 'rising', 109.98]]);
+    assert.equal(clock.tideState, 'rising');
+    clock.update(20); // -> 110.0: the whole-minute step must not report it again
+    assert.equal(events.length, 1);
   });
 
   it('honours custom thresholds for state, isLowTide and isHighTide', () => {
@@ -1007,8 +1013,12 @@ describe('createClock: moon and spring tides', () => {
     const clock = clockAt(0, { seed: 'moon' });
     const starts = [];
     let was = clock.isSpringTide;
-    for (let day = 0; day < 365; day++) {
+    for (let day = 1; day <= 365; day++) {
+      // skipTo(0) at 00:00 is a no-op by contract, so hop through noon to reach the next midnight.
+      clock.skipTo(720, { silent: true });
       clock.skipTo(0, { silent: true });
+      assert.equal(clock.day, day);
+      assert.equal(clock.minute, 0);
       const is = clock.isSpringTide;
       if (is && !was) starts.push(clock.day);
       was = is;
@@ -1179,7 +1189,12 @@ describe('createClock: serialize() and restore()', () => {
     assert.equal(clock.tidesToday[0].minute, 10);
     assert.equal(clock.serialize().seed, 'foo');
     clock.restore({ version: 1, total: 0, speed: 1, paused: false, realClock: false, seed: 42 });
-    assert.deepEqual(clock.tidesToday.map((e) => e.minute)[0], scheduleForSeed(42).tideOffset);
+    const { tideOffset } = scheduleForSeed(42);
+    assert.ok(tideOffset > HALF_PERIOD, 'seed 42 is chosen so a high water precedes the first low of day 0');
+    assert.deepEqual(clock.tidesToday.map((e) => [e.minute, e.kind]), [
+      [tideOffset - HALF_PERIOD, 'high'], [tideOffset, 'low'], [tideOffset + HALF_PERIOD, 'high'], [tideOffset + TIDE_PERIOD_MINUTES, 'low'],
+    ]);
+    assert.equal(clock.tidesToday.find((e) => e.kind === 'low').minute, tideOffset);
   });
 
   it('fires nothing and resets tide tracking', () => {
@@ -1189,9 +1204,10 @@ describe('createClock: serialize() and restore()', () => {
     clock.onMinute(() => hits++);
     clock.onDayStart(() => hits++);
     clock.onTideChange((e) => tides.push(e.state));
-    clock.restore({ version: 1, total: 3 * MINUTES_PER_DAY + HALF_PERIOD, speed: 1, paused: false, realClock: false, seed: null });
+    clock.restore({ version: 1, total: 6 * TIDE_PERIOD_MINUTES + HALF_PERIOD, speed: 1, paused: false, realClock: false, seed: null });
     assert.equal(hits, 0);
     assert.deepEqual(tides, []);
+    assert.equal(clock.day, 3);
     assert.equal(clock.tideState, 'high');
     clock.update(minutes(1));
     assert.equal(hits, 1);
@@ -1324,7 +1340,11 @@ describe('createClock: real-clock mode', () => {
     clock.setRealClock(false);
     assert.equal(clock.realClock, false);
     assert.equal(clock.total, realTimeToTotal(ms));
-    assert.equal(clock.dateLabel(), 'Sun, Spring 15', 'the game calendar resumes from the absolute day number');
+    const realDay = realDayOf(2026, 9, 23);
+    assert.equal(clock.day, realDay);
+    const cal = gameCalendar(realDay);
+    assert.equal(cal.dayName, 'Fri', 'real-clock day numbering keeps the weekday');
+    assert.equal(clock.dateLabel(), `${cal.dayName}, ${cal.dateText}`, 'the game calendar resumes from the absolute day number');
     clock.update(1000);
     assertClose(clock.total, realTimeToTotal(ms) + 1);
     assert.equal(hits, 1);

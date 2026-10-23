@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>time.js demo</title>
+  <link rel="icon" href="data:,">
+  <style>
+    html, body { margin: 0; height: 100%; background: #111; display: grid; place-items: center; }
+    canvas { width: 960px; height: 540px; image-rendering: pixelated; image-rendering: crisp-edges; }
+  </style>
+</head>
+<body>
+  <canvas id="game" width="480" height="270"></canvas>
+  <script type="module">
+    // Demo + browser smoke test for js/core/time.js: imports the pure module in a real browser,
+    // runs an accelerated clock, and renders sky, tide and moon from its getters.
+    // Keys: 1-4 speed (1x, 10x, 60x, 600x); Space pause; R toggle real clock; T skip to dawn.
+    import { createClock, PHASE_TABLE, TIDE_PERIOD_MINUTES } from '../../js/core/time.js';
+
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
+
+    const params = new URLSearchParams(location.search);
+    const seed = params.get('seed') ?? 'demo';
+    const clock = createClock({ seed, startMinute: Number(params.get('start') ?? 5 * 60 + 30) });
+    clock.setSpeed(Number(params.get('speed') ?? 60));
+
+    const log = [];
+    const note = (s) => { log.push(s); if (log.length > 6) log.shift(); };
+    clock.onHour((e) => note(`hour ${String(e.hour).padStart(2, '0')}:00`));
+    clock.onDayStart((e) => note(`day ${e.day} ${e.dayName} ${e.season} y${e.year}`));
+    clock.onTideChange((e) => note(`tide ${e.previous} -> ${e.state}`));
+
+    const SKY = { night: ['#0b1026', '#1b1f3b'], dawn: ['#3b2a5a', '#f28c6b'], morning: ['#6fb7e9', '#cfe9ff'], midday: ['#4fa3e3', '#bfe3ff'], afternoon: ['#5ea7df', '#ffe0a8'], dusk: ['#4b2d63', '#ff9b54'], evening: ['#1a1a40', '#4a3a6b'] };
+
+    /** Pixel-font-free label for the demo page. */
+    function label(text, x, y, color = '#fff', size = 12) {
+      ctx.fillStyle = color;
+      ctx.font = `${size}px monospace`;
+      ctx.textBaseline = 'top';
+      ctx.fillText(text, x, y);
+    }
+
+    function draw() {
+      const s = clock.snapshot();
+      const [top, bottom] = SKY[s.phase];
+      const g = ctx.createLinearGradient(0, 0, 0, 170);
+      g.addColorStop(0, top);
+      g.addColorStop(1, bottom);
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, 480, 270);
+      // Night veil follows daylight.
+      ctx.fillStyle = `rgba(5, 8, 30, ${(1 - s.daylight) * 0.45})`;
+      ctx.fillRect(0, 0, 480, 270);
+      // Moon: lit fraction from moonPhase (0 new, 0.5 full).
+      const lit = 0.5 - 0.5 * Math.cos(Math.PI * 2 * s.moonPhase);
+      ctx.fillStyle = '#f4f1d0';
+      ctx.beginPath(); ctx.arc(420, 40, 14, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = top;
+      ctx.beginPath(); ctx.arc(420 - (1 - lit) * 20, 40, 14, 0, Math.PI * 2); ctx.fill();
+      // Sea: height from tide, spring/neap amplitude from tideRange.
+      const shore = 170;
+      const level = shore + 40 - s.tide * 40 * s.tideRange;
+      ctx.fillStyle = '#c9b27c';
+      ctx.fillRect(0, shore, 480, 100);
+      ctx.fillStyle = '#2f6f9f';
+      ctx.fillRect(0, Math.round(level), 480, 270 - level);
+      ctx.fillStyle = '#9fd3ef';
+      for (let x = 0; x < 480; x += 24) ctx.fillRect(x + ((s.total * 7) % 24), Math.round(level), 10, 2);
+      // HUD.
+      label(`${s.time}  ${s.date}  (${s.phase})`, 8, 8, '#fff', 14);
+      label(`tide ${s.tide.toFixed(2)} ${s.tideState}${s.isSpringTide ? ' SPRING' : ''}  low in ${Math.round(s.nextLowTide)}m  high in ${Math.round(s.nextHighTide)}m`, 8, 28);
+      label(`moon ${s.moonPhase.toFixed(2)}  range ${s.tideRange.toFixed(2)}  daylight ${s.daylight.toFixed(2)}  x${s.speed}${s.paused ? ' PAUSED' : ''}${s.realClock ? ' REAL' : ''}`, 8, 44);
+      const tides = clock.tidesToday.map((t) => `${t.kind[0].toUpperCase()}${t.time}`).join('  ');
+      label(`today: ${tides}`, 8, 60);
+      log.forEach((line, i) => label(line, 8, 80 + i * 13, '#ffe9a8', 11));
+      // Day strip with phase bands and the current minute marker.
+      const y = 254;
+      for (let i = 0; i < PHASE_TABLE.length; i++) {
+        const a = PHASE_TABLE[i].start;
+        const b = i + 1 < PHASE_TABLE.length ? PHASE_TABLE[i + 1].start : 1440;
+        ctx.fillStyle = SKY[PHASE_TABLE[i].phase][1];
+        ctx.fillRect(Math.round(a / 3), y, Math.ceil((b - a) / 3), 10);
+      }
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(Math.round(s.minute / 3), y - 2, 2, 14);
+    }
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key === '1') clock.setSpeed(1);
+      if (e.key === '2') clock.setSpeed(10);
+      if (e.key === '3') clock.setSpeed(60);
+      if (e.key === '4') clock.setSpeed(600);
+      if (e.key === ' ') clock.paused ? clock.resume() : clock.pause();
+      if (e.key === 'r') clock.setRealClock(!clock.realClock);
+      if (e.key === 't' && !clock.realClock) clock.skipTo(5 * 60);
+    });
+
+    let last = performance.now();
+    let frames = 0;
+    function frame(now) {
+      const dt = now - last;
+      last = now;
+      clock.update(dt);
+      draw();
+      frames += 1;
+      requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+
+    window.__time = {
+      clock,
+      log,
+      state: () => ({ frames, ...clock.snapshot(), tidesToday: clock.tidesToday.map((t) => `${t.kind}@${t.time}`), log: log.slice() }),
+      period: TIDE_PERIOD_MINUTES,
+    };
+  </script>
+</body>
+</html>

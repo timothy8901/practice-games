@@ -1,0 +1,159 @@
+{
+  "v": 1,
+  "run": {
+    "seedCode": "DRIFT-K7Q2-MD7F",
+    "seed": 187025336,
+    "dial": "drift",
+    "toggles": [],
+    "challenges": [
+      "one-heart"
+    ],
+    "dialChangedMidRun": false,
+    "gen": {
+      "version": 1,
+      "salt": 1452986978,
+      "wards": {},
+      "abilities": {},
+      "discs": {},
+      "shuffles": {}
+    }
+  },
+  "settings": {
+    "volumes": {
+      "master": 0.8,
+      "music": 0.7,
+      "sfx": 0.9
+    },
+    "muted": false,
+    "textSpeed": "normal",
+    "minutesPerDay": 24,
+    "realClock": false,
+    "scale": "integer",
+    "bindings": null,
+    "reducedMotion": false,
+    "fps30": false,
+    "autoAnchor": {},
+    "skipAnims": false
+  },
+  "clock": {
+    "version": 1,
+    "total": 1120,
+    "speed": 1,
+    "paused": false,
+    "realClock": false,
+    "seed": 187025336
+  },
+  "weather": {
+    "today": "clear",
+    "tomorrow": "clear",
+    "intensity": 0
+  },
+  "player": {
+    "name": "Pell",
+    "species": "",
+    "pronouns": "they",
+    "look": {
+      "fur": 0,
+      "marks": 0,
+      "outfit": 0
+    },
+    "mapId": "harbor",
+    "x": 3,
+    "y": 4,
+    "facing": "down",
+    "tool": null,
+    "lastTool": null,
+    "toolRing": [],
+    "title": ""
+  },
+  "party": [],
+  "box": [],
+  "yard": [],
+  "bag": {
+    "pockets": {
+      "items": [],
+      "tools": [],
+      "catch": [],
+      "keepsakes": [],
+      "key": []
+    },
+    "capacity": {
+      "items": 0,
+      "tools": 0,
+      "catch": 0,
+      "keepsakes": 0,
+      "key": 0
+    }
+  },
+  "wallet": {
+    "main": 120,
+    "starsalt": 0,
+    "anchors": 0,
+    "purse": 0
+  },
+  "loans": {
+    "tier": 1,
+    "paid": 0,
+    "builds": [],
+    "scaffold": 0,
+    "commissions": [],
+    "commons": {
+      "jar": 0,
+      "built": []
+    },
+    "residentShares": []
+  },
+  "flags": {
+    "sp.arrived": true
+  },
+  "counters": {
+    "sys.uid": 1
+  },
+  "threads": {},
+  "letters": {
+    "delivered": 0,
+    "read": [],
+    "today": null
+  },
+  "npcs": {},
+  "maps": {},
+  "fieldLog": {
+    "forms": {},
+    "tells": {}
+  },
+  "collections": {
+    "fish": {},
+    "bugs": {},
+    "relics": {},
+    "donated": []
+  },
+  "badges": [],
+  "pendingShifts": [],
+  "pendingScript": null,
+  "cutscene": null,
+  "battleBookmark": null,
+  "rng": {
+    "loot": [
+      1,
+      2,
+      3,
+      4
+    ]
+  },
+  "stats": {
+    "playMs": 0,
+    "steps": 40,
+    "battles": 0,
+    "catches": 0,
+    "forecasts": 0,
+    "rerolls": 0,
+    "anchors": 0,
+    "wardWalls": 0,
+    "blackouts": 0,
+    "summitAttempts": 0,
+    "fishCaught": 0,
+    "treesShaken": 0,
+    "lettersRead": 0
+  },
+  "log": []
+}

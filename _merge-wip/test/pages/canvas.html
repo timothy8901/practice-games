@@ -272,7 +272,10 @@
       const n2 = resizeCount;
       const Lfit = display.setMode('fit');
       check('setMode(fit) fills one axis and notifies', display.mode === 'fit' && resizeCount === n2 + 1 && (near(Lfit.destWidth, Lfit.backingWidth, 1) || near(Lfit.destHeight, Lfit.backingHeight, 1)), JSON.stringify(Lfit));
-      check('setMode(fit) scale is fractional here', !Lfit.integer && !Number.isInteger(Lfit.pixelScale), String(Lfit.pixelScale));
+      // 800x540 CSS is only a fractional fit when the backing store is not an exact multiple of
+      // 480x270 (e.g. at dpr 3 it is 2400x1620 = x5 exactly), so derive the expectation.
+      const fitRef = computeLayout({ cssWidth: 800, cssHeight: 540, dpr, mode: 'fit' });
+      check('setMode(fit) matches computeLayout and reports `integer` honestly', sameLayout(Lfit, fitRef) && Lfit.integer === (Number.isInteger(Lfit.pixelScale) && Lfit.pixelScale >= 1), `${Lfit.pixelScale} integer=${Lfit.integer}`);
       check('setMode with the same mode is a no-op', display.setMode('fit') === Lfit && resizeCount === n2 + 1);
       let threw = false;
       try { display.setMode('bogus'); } catch (e) { threw = e instanceof TypeError; }

@@ -18,7 +18,13 @@
  *
  * Coordinates passed to the draw functions are the top-left corner of the first
  * line's glyph cell (cap height), in logical pixels; they are rounded to whole
- * pixels so upscaled output stays crisp.
+ * pixels so upscaled output stays crisp. Effects paint back to front: shadow
+ * (of the outlined shape), outline, then the fill colour.
+ *
+ * Text is normalised before layout (NFC, line endings, zero-width and
+ * variation-selector characters stripped), so decomposed accents and
+ * emoji-style symbols such as "♥\uFE0F" draw with their bitmap glyphs.
+ * Unknown characters draw as a box; `hasGlyph` tells you in advance.
  */
 
 /** Pixel character used in glyph rows. */
@@ -47,7 +53,19 @@ function parseGlyph(src, cellH, descent) {
     for (let i = 0; i < w; i++) b = (b << 1) | (r[i] === ON ? 1 : 0);
     return b;
   });
-  return { w, h: padded.length, rows: padded, bits, ink: bits.some((b) => b !== 0) };
+  return freezeGlyph({ w, h: padded.length, rows: padded, bits, ink: bits.some((b) => b !== 0) });
+}
+
+/**
+ * Freeze a glyph record and its arrays so font data cannot be mutated by
+ * callers (the atlas cache keys on glyph identity).
+ * @param {Glyph} g
+ * @returns {Glyph}
+ */
+function freezeGlyph(g) {
+  Object.freeze(g.rows);
+  Object.freeze(g.bits);
+  return Object.freeze(g);
 }
 
 /* ------------------------------------------------------------------------ */
@@ -278,9 +296,11 @@ const SMALL_SRC = {
 /**
  * Characters that are drawn as another character in every font (typographic
  * variants, whitespace variants, uppercase accents the fonts do not carry).
- * @type {Record<string, string>}
+ * A Map (not a plain object) so keys like 'constructor' cannot resolve to
+ * `Object.prototype` members.
+ * @type {Map<string, string>}
  */
-const ALIASES = {
+const ALIASES = new Map(Object.entries({
   ' ': ' ', // nbsp
   ' ': ' ', // thin space
   '‘': "'", '’': "'", '‚': "'",
@@ -299,16 +319,16 @@ const ALIASES = {
   'Ú': 'U', 'Ù': 'U', 'Û': 'U', 'Ü': 'U', 'Ñ': 'N', 'Ç': 'C',
   'ë': 'é', 'â': 'á', 'ä': 'á', 'í': 'i', 'ì': 'i', 'î': 'i', 'ï': 'i',
   'ó': 'o', 'ò': 'o', 'ô': 'o', 'ú': 'u', 'ù': 'u', 'û': 'u', 'ç': 'c',
-};
+}));
 
 /**
  * Characters the small font lacks are drawn as these main-font equivalents
  * (uppercase for letters, base vowel for accents).
- * @type {Record<string, string>}
+ * @type {Map<string, string>}
  */
-const SMALL_FALLBACKS = {
+const SMALL_FALLBACKS = new Map(Object.entries({
   'é': 'E', 'è': 'E', 'ê': 'E', 'á': 'A', 'à': 'A', 'ü': 'U', 'ö': 'O', 'ñ': 'N',
-};
+}));
 
 /* ------------------------------------------------------------------------ */
 /* Font definitions                                                          */
@@ -348,14 +368,14 @@ function buildFont(name, src, m) {
   const glyphs = new Map();
   for (const [ch, g] of Object.entries(src)) glyphs.set(ch, parseGlyph(g, m.cellH, m.descent));
   const blank = '.'.repeat(m.spaceW);
-  glyphs.set(' ', {
+  glyphs.set(' ', freezeGlyph({
     w: m.spaceW,
     h: m.cellH,
     rows: Array.from({ length: m.cellH }, () => blank),
     bits: new Array(m.cellH).fill(0),
     ink: false,
-  });
-  return {
+  }));
+  return Object.freeze({
     name,
     cellW: m.cellW,
     cellH: m.cellH,
@@ -366,7 +386,7 @@ function buildFont(name, src, m) {
     spaceW: m.spaceW,
     glyphs,
     fallback: parseGlyph(m.fallback, m.cellH, m.descent),
-  };
+  });
 }
 
 /**
@@ -395,9 +415,9 @@ export const FONT_NAMES = Object.freeze(Object.keys(FONTS));
  */
 export function getFont(font = 'main') {
   if (typeof font === 'object' && font !== null && font.glyphs instanceof Map) return font;
-  const def = FONTS[/** @type {'main'|'small'} */ (font)];
-  if (!def) throw new RangeError(`font: unknown font '${String(font)}' (expected ${FONT_NAMES.join('|')})`);
-  return def;
+  // Own-property check only: 'constructor' / '__proto__' must not resolve to Object.prototype members.
+  if (typeof font === 'string' && Object.hasOwn(FONTS, font)) return FONTS[/** @type {'main'|'small'} */ (font)];
+  throw new RangeError(`font: unknown font '${String(font)}' (expected ${FONT_NAMES.join('|')})`);
 }
 
 /**
@@ -409,12 +429,14 @@ export function getFont(font = 'main') {
  */
 export function getGlyph(ch, font = 'main') {
   const def = getFont(font);
-  const c = ALIASES[ch] ?? ch;
+  const key = typeof ch === 'string' ? ch : ch === null || ch === undefined ? '' : String(ch);
+  const c = ALIASES.get(key) ?? key;
   const direct = def.glyphs.get(c);
   if (direct) return direct;
   if (def.name === 'small') {
-    const alt = SMALL_FALLBACKS[c] ?? c.toUpperCase();
-    const g = alt.length === 1 ? def.glyphs.get(alt) : undefined;
+    const alt = SMALL_FALLBACKS.get(c) ?? c.toUpperCase();
+    // toUpperCase may expand ('ß' -> 'SS'); only single characters are glyphs.
+    const g = Array.from(alt).length === 1 ? def.glyphs.get(alt) : undefined;
     if (g) return g;
   }
   return def.fallback;
@@ -448,19 +470,23 @@ export function glyphRows(ch, font = 'main') {
 /* ------------------------------------------------------------------------ */
 
 /**
- * Normalise arbitrary input into drawable text: coerces to string, unifies
- * line endings to '\n', expands tabs to two spaces and strips other control
- * characters. `null`/`undefined` become ''.
+ * Normalise arbitrary input into drawable text: coerces to string, composes
+ * Unicode to NFC (so a decomposed 'e' + U+0301 draws as 'é'), unifies line
+ * endings (CRLF, CR, NEL, LS, PS) to '\n', expands tabs to two spaces and
+ * strips control characters, zero-width characters, soft hyphens, variation
+ * selectors (e.g. the U+FE0F after an emoji-style ♥) and stray combining
+ * marks. `null`/`undefined` become ''.
  * @param {unknown} text
  * @returns {string}
  */
 export function normalizeText(text) {
   if (text === null || text === undefined) return '';
   return String(text)
-    .replace(/\r\n?/g, '\n')
+    .normalize('NFC')
+    .replace(/\r\n?|[\u0085\u2028\u2029]/g, '\n')
     .replace(/\t/g, '  ')
     // eslint-disable-next-line no-control-regex
-    .replace(/[\u0000-\u0009\u000b-\u001f\u007f]/g, '');
+    .replace(/[\u0000-\u0009\u000b-\u001f\u007f-\u009f\u00ad\u0300-\u036f\u200b-\u200f\u2060\ufe00-\ufe0f\ufeff]/g, '');
 }
 
 /**
@@ -530,44 +556,70 @@ function runWidth(font, cs, letterSpacing) {
  * @returns {string[]}
  */
 function wrapParagraph(font, para, max, letterSpacing) {
-  const fits = (s) => runWidth(font, chars(s), letterSpacing) <= max;
+  const step = font.gap + letterSpacing;
+  /** Width of run A followed by run B (an empty run contributes nothing, not even a step). */
+  const joinW = (wa, na, wb, nb) => (na === 0 ? wb : nb === 0 ? wa : wa + step + wb);
   /** @type {string[]} */
   const out = [];
   let line = '';
+  let lineW = 0; // unscaled width of `line`, tracked incrementally so wrapping is O(n)
+  let lineN = 0; // characters in `line`
   let open = false; // the current line has been started (may still be '' at paragraph start)
   let swallow = false; // after a soft wrap, drop the spaces that caused it
+  const start = (text, w, n) => {
+    line = text;
+    lineW = w;
+    lineN = n;
+    open = true;
+  };
+  const flush = () => {
+    // Only plain spaces are trimmed (nbsp is content); a line that was nothing but spaces is dropped.
+    const t = line.replace(/ +$/, '');
+    if (t !== '') out.push(t);
+    line = '';
+    lineW = 0;
+    lineN = 0;
+    open = false;
+  };
   for (const word of para.split(' ')) {
     if (swallow && word === '') continue;
     swallow = false;
-    const candidate = open ? `${line} ${word}` : word;
-    if (fits(candidate)) {
-      line = candidate;
-      open = true;
-      continue;
+    const wcs = chars(word);
+    const wordW = runWidth(font, wcs, letterSpacing);
+    if (open) {
+      const candW = joinW(joinW(lineW, lineN, font.spaceW, 1), lineN + 1, wordW, wcs.length);
+      if (candW <= max) {
+        start(`${line} ${word}`, candW, lineN + 1 + wcs.length);
+        continue;
+      }
+      flush();
+      if (word === '') {
+        // A space that overflowed the line: it (and any run of spaces after it) is swallowed.
+        swallow = true;
+        continue;
+      }
     }
-    if (open) out.push(line.trimEnd());
-    line = '';
-    open = false;
-    if (word === '') {
-      swallow = true;
-      continue;
-    }
-    if (fits(word)) {
-      line = word;
-      open = true;
+    if (wordW <= max) {
+      start(word, wordW, wcs.length);
       continue;
     }
     // A single word wider than the line: break it by characters.
-    let chunk = '';
-    for (const c of chars(word)) {
-      if (chunk.length && !fits(chunk + c)) {
-        out.push(chunk);
-        chunk = '';
+    /** @type {string[]} */
+    let chunk = [];
+    let chunkW = 0;
+    for (const c of wcs) {
+      const cw = getGlyph(c, font).w;
+      const nextW = chunk.length ? chunkW + step + cw : cw;
+      if (chunk.length && nextW > max) {
+        out.push(chunk.join(''));
+        chunk = [];
+        chunkW = cw;
+      } else {
+        chunkW = nextW;
       }
-      chunk += c;
+      chunk.push(c);
     }
-    line = chunk;
-    open = true;
+    start(chunk.join(''), chunkW, chunk.length);
   }
   if (open || out.length === 0) out.push(line);
   return out;
@@ -768,7 +820,8 @@ function buildAtlas(font, color) {
     x += g.w + 1;
   }
   const canvas = createCanvas(Math.max(1, x), font.cellH + font.descent);
-  const ctx = /** @type {OffscreenCanvasRenderingContext2D} */ (canvas.getContext('2d'));
+  const ctx = /** @type {OffscreenCanvasRenderingContext2D|null} */ (canvas.getContext('2d'));
+  if (!ctx) throw new Error('font: could not get a 2D context for the glyph atlas');
   ctx.fillStyle = color;
   for (const [g, gx] of frames) {
     for (let r = 0; r < g.h; r++) {
@@ -842,11 +895,12 @@ export function glyphCacheSize(font = 'main') {
  * @property {number} [scale=1]
  * @property {string} [color='#ffffff'] CSS colour the glyphs are tinted with.
  * @property {'left'|'center'|'right'} [align='left'] Which edge of each line `x` anchors.
- * @property {boolean|string|{color?: string, dx?: number, dy?: number}} [shadow]
- *   Drop shadow: `true` for a 1px dark shadow down-right, a colour string, or
- *   an explicit spec (offsets in unscaled pixels).
- * @property {boolean|string|{color?: string, width?: number}} [outline]
- *   8-neighbour outline: `true` for 1px black, a colour string, or a spec.
+ * @property {boolean|string|number|{color?: string, dx?: number, dy?: number}} [shadow]
+ *   Drop shadow: `true` for a 1px dark shadow down-right, a colour string, a
+ *   number (offset for both axes) or an explicit spec (offsets in unscaled
+ *   pixels). Drawn beneath the outline and covers the outline's footprint.
+ * @property {boolean|string|number|{color?: string, width?: number}} [outline]
+ *   8-neighbour outline: `true` for 1px black, a colour string, a width, or a spec.
  * @property {number} [maxWidth] Wrap to this many scaled pixels.
  * @property {number} [letterSpacing=0] Extra unscaled pixels between glyphs.
  * @property {number} [lineSpacing=0] Extra unscaled pixels between lines.
@@ -863,7 +917,15 @@ function shadowSpec(v) {
   const base = { color: 'rgba(0,0,0,0.6)', dx: 1, dy: 1 };
   if (v === true) return base;
   if (typeof v === 'string') return { ...base, color: v };
-  return { ...base, ...v };
+  const spec = typeof v === 'number'
+    ? { ...base, dx: v, dy: v }
+    : typeof v === 'object'
+      ? { color: v.color ?? base.color, dx: v.dx ?? base.dx, dy: v.dy ?? base.dy }
+      : null;
+  if (!spec) throw new TypeError('font: shadow must be a boolean, colour string, number or {color, dx, dy}');
+  if (typeof spec.color !== 'string') throw new TypeError('font: shadow colour must be a CSS colour string');
+  if (!Number.isFinite(spec.dx) || !Number.isFinite(spec.dy)) throw new RangeError(`font: shadow offsets must be finite, got ${spec.dx},${spec.dy}`);
+  return spec;
 }
 
 /**
@@ -876,9 +938,15 @@ function outlineSpec(v) {
   const base = { color: '#000000', width: 1 };
   if (v === true) return base;
   if (typeof v === 'string') return { ...base, color: v };
-  const width = v.width === undefined ? 1 : v.width;
-  if (!Number.isInteger(width) || width < 1) throw new RangeError(`font: outline width must be an integer >= 1, got ${width}`);
-  return { color: v.color ?? base.color, width };
+  const spec = typeof v === 'number'
+    ? { ...base, width: v }
+    : typeof v === 'object'
+      ? { color: v.color ?? base.color, width: v.width ?? base.width }
+      : null;
+  if (!spec) throw new TypeError('font: outline must be a boolean, colour string, number or {color, width}');
+  if (typeof spec.color !== 'string') throw new TypeError('font: outline colour must be a CSS colour string');
+  if (!Number.isInteger(spec.width) || spec.width < 1) throw new RangeError(`font: outline width must be an integer >= 1, got ${spec.width}`);
+  return spec;
 }
 
 /**
@@ -909,7 +977,9 @@ function blitLayout(ctx, layout, atlas, ox, oy, limit) {
 }
 
 /**
- * Draw a prepared layout: outline pass, shadow pass, then the main colour.
+ * Draw a prepared layout back to front: shadow (of the outlined shape, when an
+ * outline is set), then the outline, then the main colour. All options are
+ * validated before anything is drawn.
  * @param {CanvasRenderingContext2D} ctx
  * @param {TextLayout} layout
  * @param {number} x
@@ -922,29 +992,37 @@ function paintLayout(ctx, layout, x, y, o, limit) {
   const color = o.color === undefined ? '#ffffff' : o.color;
   if (typeof color !== 'string') throw new TypeError('font: color must be a CSS colour string');
   if (o.alpha !== undefined && !(o.alpha >= 0 && o.alpha <= 1)) throw new RangeError(`font: alpha must be within 0..1, got ${o.alpha}`);
+  const outline = outlineSpec(o.outline);
+  const shadow = shadowSpec(o.shadow);
   if (limit <= 0 || layout.glyphCount === 0) return;
   const s = layout.scale;
   const ox = Math.round(x);
   const oy = Math.round(y);
+  const r = outline ? outline.width : 0;
   const prevAlpha = ctx.globalAlpha;
   ctx.imageSmoothingEnabled = false;
   if (o.alpha !== undefined) ctx.globalAlpha = prevAlpha * o.alpha;
-  const outline = outlineSpec(o.outline);
-  if (outline) {
-    const atlas = getAtlas(layout.font, outline.color);
-    const r = outline.width;
-    for (let dy = -r; dy <= r; dy++) {
-      for (let dx = -r; dx <= r; dx++) {
-        if (dx || dy) blitLayout(ctx, layout, atlas, ox + dx * s, oy + dy * s, limit);
+  try {
+    if (shadow) {
+      const atlas = getAtlas(layout.font, shadow.color);
+      const sx = ox + Math.round(shadow.dx * s);
+      const sy = oy + Math.round(shadow.dy * s);
+      for (let dy = -r; dy <= r; dy++) {
+        for (let dx = -r; dx <= r; dx++) blitLayout(ctx, layout, atlas, sx + dx * s, sy + dy * s, limit);
       }
     }
+    if (outline) {
+      const atlas = getAtlas(layout.font, outline.color);
+      for (let dy = -r; dy <= r; dy++) {
+        for (let dx = -r; dx <= r; dx++) {
+          if (dx || dy) blitLayout(ctx, layout, atlas, ox + dx * s, oy + dy * s, limit);
+        }
+      }
+    }
+    blitLayout(ctx, layout, getAtlas(layout.font, color), ox, oy, limit);
+  } finally {
+    ctx.globalAlpha = prevAlpha;
   }
-  const shadow = shadowSpec(o.shadow);
-  if (shadow) {
-    blitLayout(ctx, layout, getAtlas(layout.font, shadow.color), ox + Math.round(shadow.dx * s), oy + Math.round(shadow.dy * s), limit);
-  }
-  blitLayout(ctx, layout, getAtlas(layout.font, color), ox, oy, limit);
-  ctx.globalAlpha = prevAlpha;
 }
 
 /**
@@ -977,9 +1055,10 @@ function metricsOf(l) {
  * @param {DrawOptions} [opts]
  * @returns {TextSize} The measured size of what was laid out.
  */
-export function drawText(ctx, text, x, y, opts = {}) {
-  const layout = layoutText(text, opts);
-  paintLayout(ctx, layout, x, y, opts, layout.glyphCount);
+export function drawText(ctx, text, x, y, opts) {
+  const o = opts ?? {};
+  const layout = layoutText(text, o);
+  paintLayout(ctx, layout, x, y, o, layout.glyphCount);
   return metricsOf(layout);
 }
 
@@ -997,10 +1076,12 @@ export function drawText(ctx, text, x, y, opts = {}) {
  * @param {DrawOptions} [opts]
  * @returns {TextSize & {shown: number, total: number, done: boolean}}
  */
-export function drawTextTyped(ctx, text, x, y, visibleChars, opts = {}) {
-  const layout = layoutText(text, opts);
-  const n = visibleChars === Infinity ? layout.glyphCount : Number.isFinite(visibleChars) ? Math.floor(visibleChars) : 0;
+export function drawTextTyped(ctx, text, x, y, visibleChars, opts) {
+  const o = opts ?? {};
+  const layout = layoutText(text, o);
+  const v = typeof visibleChars === 'number' ? visibleChars : Number(visibleChars);
+  const n = v === Infinity ? layout.glyphCount : Number.isFinite(v) ? Math.floor(v) : 0;
   const shown = Math.min(Math.max(0, n), layout.glyphCount);
-  paintLayout(ctx, layout, x, y, opts, shown);
+  paintLayout(ctx, layout, x, y, o, shown);
   return { ...metricsOf(layout), shown, total: layout.glyphCount, done: shown >= layout.glyphCount };
 }

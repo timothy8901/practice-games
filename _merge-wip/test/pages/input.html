@@ -55,6 +55,8 @@ let repeatCount = 0;
 let repeatStart = 0;
 let repeatFramesLeft = 0;
 let skipTouch = false;
+let ptrBefore = { x: 0, y: 0 };
+const ptrUnchanged = () => input.pointer.x === ptrBefore.x && input.pointer.y === ptrBefore.y;
 
 const keyEv = (type, code, key = '') => {
   const ev = new KeyboardEvent(type, { code, key, bubbles: true, cancelable: true });
@@ -115,29 +117,51 @@ const repeatStep = () => {
     keyEv('keyup', 'ArrowDown');
   }
 };
+const touchForced = /[?&]touch(=|&|$)/.test(location.search);
+const touchOff = /[?&]touch=(0|false)(&|$)/.test(location.search);
 const touchSteps = [
   () => {
-    if (!dpadEl() || !input.touchVisible) { skipTouch = true; pass('touch overlay hidden (no coarse pointer, no ?touch=1)'); return; }
+    if (touchOff) { skipTouch = true; check(!document.querySelector('.wsp-touch') && !input.touchVisible, '?touch=0: no overlay DOM at all'); return; }
+    if (touchForced) { check(Boolean(dpadEl()) && input.touchVisible, '?touch=1: overlay built and visible from boot'); return; }
+    const coarse = matchMedia('(pointer: coarse)').matches;
+    if (coarse) { check(Boolean(dpadEl()) && input.touchVisible, 'coarse pointer: overlay built and visible from boot'); return; }
+    check(!document.querySelector('.wsp-touch'), 'desktop: overlay DOM not created (contract: shown only on touch devices or ?touch=1)');
+    // A first real touch on the canvas builds and shows it (auto mode).
+    ptrEv(canvas, 'pointerdown', { pointerId: 20, pointerType: 'touch', ...canvasCenter() });
+    ptrEv(window, 'pointerup', { pointerId: 20, pointerType: 'touch', ...canvasCenter() });
+    check(Boolean(dpadEl()) && input.touchVisible && input.lastDevice === 'touch', 'first touch builds and shows the overlay');
+  },
+  () => {
+    if (skipTouch) return;
+    ptrBefore = { x: input.pointer.x, y: input.pointer.y };
     const r = dpadEl().getBoundingClientRect();
     ptrEv(dpadEl(), 'pointerdown', { pointerId: 9, pointerType: 'touch', clientX: r.left + r.width * 0.9, clientY: r.top + r.height / 2 });
   },
   () => {
     if (skipTouch) return;
     check(input.pressed('right') && input.lastDevice === 'touch', 'd-pad touch -> right pressed, lastDevice touch');
+    check(ptrUnchanged(), 'd-pad press did not move the game pointer');
     check(getComputedStyle(document.querySelector('.wsp-touch')).position === 'fixed', 'overlay stylesheet applied');
     check(getComputedStyle(dpadEl()).pointerEvents === 'auto' && getComputedStyle(document.querySelector('.wsp-touch')).pointerEvents === 'none', 'overlay passes pointer events through except on controls');
     const r = dpadEl().getBoundingClientRect();
     ptrEv(dpadEl(), 'pointermove', { pointerId: 9, pointerType: 'touch', clientX: r.left + r.width * 0.85, clientY: r.top + r.height * 0.85 });
   },
-  () => { if (skipTouch) return; check(input.held('right') && input.pressed('down'), 'd-pad slide -> diagonal'); ptrEv(dpadEl(), 'pointerup', { pointerId: 9, pointerType: 'touch', clientX: 0, clientY: 0 }); },
+  () => { if (skipTouch) return; check(input.held('right') && input.pressed('down'), 'd-pad slide -> diagonal'); check(ptrUnchanged(), 'd-pad slide did not move the game pointer'); ptrEv(dpadEl(), 'pointerup', { pointerId: 9, pointerType: 'touch', clientX: 0, clientY: 0 }); },
   () => {
     if (skipTouch) return;
     check(input.released('right') && input.released('down'), 'd-pad lift -> released');
+    check(ptrUnchanged(), 'd-pad lift did not move the game pointer');
     const r = aBtn().getBoundingClientRect();
     ptrEv(aBtn(), 'pointerdown', { pointerId: 10, pointerType: 'touch', clientX: r.left + 5, clientY: r.top + 5 });
   },
   () => { if (skipTouch) return; check(input.pressed('confirm') && aBtn().classList.contains('is-on'), 'A button -> confirm (+ pressed style)'); ptrEv(aBtn(), 'pointerup', { pointerId: 10, pointerType: 'touch' }); },
-  () => { if (skipTouch) return; check(input.released('confirm') && !aBtn().classList.contains('is-on'), 'A button release'); },
+  () => { if (skipTouch) return; check(input.released('confirm') && !aBtn().classList.contains('is-on'), 'A button release'); keyEv('keydown', 'KeyQ'); keyEv('keyup', 'KeyQ'); },
+  () => {
+    if (skipTouch) return;
+    const forced = touchForced || matchMedia('(pointer: coarse)').matches;
+    check(forced ? input.touchVisible : !input.touchVisible, forced ? 'forced overlay ignores keyboard input' : 'auto overlay hides again on keyboard input');
+    check(document.querySelectorAll('.wsp-touch').length === 1, 'overlay DOM built exactly once');
+  },
 ];
 const finish = () => {
   results.done = true;

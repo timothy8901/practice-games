@@ -29,7 +29,7 @@
 </head>
 <body>
 <h1>Wildshift creature sheet</h1>
-<p class="sub">32x32 palette-indexed string art, left-front 3/4 view, drawn at 3x. Front (bonded: Heartmark drawn at runtime in comet magenta), second frame or back view, then the k-fill silhouette test. Scrapling and Vesperay's concept art is the unbonded look; the mark is shown here only to check the anchor.</p>
+<p class="sub">32x32 palette-indexed string art, left-front 3/4 view, drawn at 3x. Left: front (bonded: Heartmark drawn at runtime in comet magenta; the idle checkbox alternates the two idle frames). Right: back view (player side in battle). Below: the k-fill silhouette test. 15 named creatures + the 7 Sloshkin-family forms + the Star-touched Sloshkin variant. Scrapling and Vesperay's concept art is the unbonded look; the mark is shown here only to check the anchor.</p>
 <div class="ctl">
   <label><input type="checkbox" id="anim" checked> animate idle</label>
   <label><input type="checkbox" id="hm" checked> show Heartmark</label>
@@ -78,7 +78,7 @@
     art.append(c1, c2);
     const keys = new Set(sp.rows.join('').replace(/\./g, ''));
     card.append(art);
-    card.insertAdjacentHTML('beforeend', `<div class="name">${name}</div><div class="type">${sp.type} · ${keys.size} keys · HM ${sp.heartmark.x},${sp.heartmark.y}</div><div class="feat">${sp.feature}</div><div class="caption">${sp.back ? 'right: back view' : sp.idle2 ? 'right: idle frame 2' : ''}</div>`);
+    card.insertAdjacentHTML('beforeend', `<div class="name">${sp.displayName || name}</div><div class="type">${sp.type} · ${keys.size} keys · HM ${sp.heartmark.x},${sp.heartmark.y}</div><div class="feat">${sp.feature}</div><div class="caption">${sp.back ? 'right: back view' : sp.idle2 ? 'right: idle frame 2' : ''}</div>`);
     grid.append(card);
     cards.push({ name, sp, c1, c2 });
   }
@@ -111,7 +111,7 @@
 
   // Silhouette row (wraps to 11 per line so it fits a 960px viewport)
   const sil = document.getElementById('sil');
-  const PER = 11, CW = 82, CH = 84;
+  const PER = 12, CW = 78, CH = 84;
   const lines = Math.ceil(ORDER.length / PER);
   sil.width = PER * CW + 8; sil.height = lines * 2 * CH + 8;
   const sctx = sil.getContext('2d');
@@ -129,7 +129,7 @@
     const dark = decodeSprite(silhouette(base, MASTER.k), null, { scale: 2 });
     drawSprite(sctx, dark, x + 2, y0 + CH + 2);
     sctx.fillStyle = '#94b0c2';
-    sctx.fillText(name, x + 2, y0 + CH * 2 - 4);
+    sctx.fillText(sp.displayName ? 'Star-touched' : name, x + 2, y0 + CH * 2 - 4);
   });
 
   // palette legend

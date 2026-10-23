@@ -87,13 +87,14 @@ const GRADES = [
   { h: 0, mul: [0.30, 0.36, 0.60], scr: [0.08, 0.10, 0.20], sat: 0.70, lamp: 1, night: 1 },      // deep night
   { h: 4.25, mul: [0.30, 0.36, 0.60], scr: [0.08, 0.10, 0.20], sat: 0.70, lamp: 1, night: 1 },
   { h: 5.25, mul: [0.38, 0.46, 0.72], scr: [0.08, 0.10, 0.20], sat: 0.78, lamp: 1, night: 0.8 }, // night
-  { h: 6.5, mul: [0.84, 0.74, 0.86], scr: [0.14, 0.08, 0.10], sat: 0.95, lamp: 0.6, night: 0.2 }, // dawn
+  { h: 6.5, mul: [0.92, 0.78, 0.72], scr: [0.10, 0.07, 0.12], sat: 0.95, lamp: 0.6, night: 0.2 }, // dawn (peach over a cool floor)
   { h: 7.75, mul: [0.97, 0.96, 1.0], scr: [0.04, 0.04, 0.06], sat: 1.0, lamp: 0, night: 0 },    // morning
   { h: 9.5, mul: [1, 1, 1], scr: [0, 0, 0], sat: 1, lamp: 0, night: 0 },                        // day
   { h: 15.5, mul: [1, 1, 1], scr: [0, 0, 0], sat: 1, lamp: 0, night: 0 },
   { h: 17.25, mul: [1.04, 0.93, 0.76], scr: [0.08, 0.04, 0.0], sat: 1.05, lamp: 0.25, night: 0 }, // golden
-  { h: 18.5, mul: [0.76, 0.56, 0.74], scr: [0.12, 0.05, 0.12], sat: 0.95, lamp: 0.9, night: 0.3 }, // dusk
-  { h: 19.75, mul: [0.38, 0.46, 0.72], scr: [0.08, 0.10, 0.20], sat: 0.78, lamp: 1, night: 0.8 }, // night
+  { h: 18.25, mul: [0.98, 0.78, 0.62], scr: [0.08, 0.04, 0.06], sat: 1.0, lamp: 0.75, night: 0.15 }, // sunset (amber, never magenta)
+  { h: 19.25, mul: [0.48, 0.54, 0.80], scr: [0.06, 0.08, 0.18], sat: 0.85, lamp: 1, night: 0.6 }, // blue hour
+  { h: 20.0, mul: [0.38, 0.46, 0.72], scr: [0.08, 0.10, 0.20], sat: 0.78, lamp: 1, night: 0.85 }, // night
   { h: 22.5, mul: [0.38, 0.46, 0.72], scr: [0.08, 0.10, 0.20], sat: 0.78, lamp: 1, night: 1 },
   { h: 24, mul: [0.30, 0.36, 0.60], scr: [0.08, 0.10, 0.20], sat: 0.70, lamp: 1, night: 1 },
 ];
@@ -159,6 +160,12 @@ function derivedTiles() {
   d.foam_e = { ...foam, name: 'foam_e', frames: foam.frames.map(rotateCW) };
   d.foam_s = { ...foam, name: 'foam_s', frames: foam.frames.map(flipV) };
   d.foam_w = { ...foam, name: 'foam_w', frames: foam.frames.map((f) => rotateCW(rotateCW(rotateCW(f)))) };
+  for (const base of ['ripple', 'fringe']) {
+    const t = TILES[`${base}_n`];
+    d[`${base}_e`] = { ...t, name: `${base}_e`, frames: t.frames.map(rotateCW) };
+    d[`${base}_s`] = { ...t, name: `${base}_s`, frames: t.frames.map(flipV) };
+    d[`${base}_w`] = { ...t, name: `${base}_w`, frames: t.frames.map((f) => rotateCW(rotateCW(rotateCW(f)))) };
+  }
   const shelf = TILES.shelf_n;
   d.shelf_e = { ...shelf, name: 'shelf_e', frames: shelf.frames.map(rotateCW) };
   d.shelf_s = { ...shelf, name: 'shelf_s', frames: shelf.frames.map(flipV) };
@@ -311,7 +318,8 @@ function expandHouse(p) {
  * @param {{w:number,h:number,ground:string[],props:object[]}} map
  * @param {ReturnType<typeof createTileset>} tileset
  * @param {{frame?:number, hour?:number, weather?:'clear'|'fog'|'rain', tide?:number,
- *          camX?:number, camY?:number, view?:{x:number,y:number,w:number,h:number},
+ *          camX?:number, camY?:number, view?:{x:number,y:number,w:number,h:number} (map viewport;
+ *          the Skyband draws in the `skybandH` px directly above it),
  *          lighthouseStage?:number, lighthouseLit?:boolean, lamps?:'auto'|'on'|'off',
  *          skyband?:boolean, skybandH?:number}} opts
  */
@@ -366,10 +374,18 @@ export function drawMap(ctx, map, tileset, opts = {}) {
       if (t.water && !t.self) {
         const n = info(x, y - 1), e = info(x + 1, y), s = info(x, y + 1), w = info(x - 1, y);
         const land = (q) => q && !q.water;
-        if (land(n)) ctx.drawImage(tileset.sprite('foam_n', foamF, g).canvas, px, py);
-        if (land(s)) ctx.drawImage(tileset.sprite('foam_s', foamF + 1, g).canvas, px, py);
-        if (land(e)) ctx.drawImage(tileset.sprite('foam_e', foamF + 2, g).canvas, px, py);
-        if (land(w)) ctx.drawImage(tileset.sprite('foam_w', foamF, g).canvas, px, py);
+        const edge = t.tile === 'river' ? 'ripple' : 'foam'; // surf on the sea, a ripple on the river bank
+        if (land(n)) ctx.drawImage(tileset.sprite(`${edge}_n`, foamF, g).canvas, px, py);
+        if (land(s)) ctx.drawImage(tileset.sprite(`${edge}_s`, foamF + 1, g).canvas, px, py);
+        if (land(e)) ctx.drawImage(tileset.sprite(`${edge}_e`, foamF + 2, g).canvas, px, py);
+        if (land(w)) ctx.drawImage(tileset.sprite(`${edge}_w`, foamF, g).canvas, px, py);
+      }
+      if (t.tile === 'path' || t.tile === 'sand') {
+        const turf = (q) => q && (q.tile.startsWith('grass') || q.tile === 'tallgrass' || q.tile.startsWith('flowers')) && !q.cliffTop;
+        if (turf(info(x, y - 1))) ctx.drawImage(tileset.sprite('fringe_n', 0, g, (x * 5 + y) & 1).canvas, px, py);
+        if (turf(info(x, y + 1))) ctx.drawImage(tileset.sprite('fringe_s', 0, g, (x * 3 + y) & 1).canvas, px, py);
+        if (turf(info(x + 1, y))) ctx.drawImage(tileset.sprite('fringe_e', 0, g, (x + y * 7) & 2).canvas, px, py);
+        if (turf(info(x - 1, y))) ctx.drawImage(tileset.sprite('fringe_w', 0, g, (x + y * 5) & 2).canvas, px, py);
       }
       if (t.cliffTop) {
         const isTop = (q) => q && q.cliffTop;
@@ -438,7 +454,8 @@ export function drawMap(ctx, map, tileset, opts = {}) {
       case 'tree': {
         const kind = it.kind || 'alder';
         const name = kind === 'fruit' ? (it.fruit === false ? 'tree_fruit_bare' : 'tree_fruit') : `tree_${kind}`;
-        drawProp(name, 0, it.x, it.y, true);
+        // wind: a slow 4-frame sway, phase-shifted per tree so a grove never moves in lockstep
+        drawProp(name, Math.floor(frame / 22) + it.x + it.y, it.x, it.y, true);
         break;
       }
       case 'bush': drawProp('bush', 0, it.x, it.y, true); break;
@@ -507,8 +524,8 @@ export function drawMap(ctx, map, tileset, opts = {}) {
   // ---- weather (never above 35% opacity, never over the Skyband/UI)
   drawWeather(ctx, tileset, view, weather, frame, g);
 
-  // ---- Skyband
-  if (skyH > 0) drawSkyband(ctx, tileset, { x: view.x, y: 0, w: view.w, h: skyH, hour, frame, weather, grade: g });
+  // ---- Skyband (the strip directly above the view)
+  if (skyH > 0) drawSkyband(ctx, tileset, { x: view.x, y: view.y - skyH, w: view.w, h: skyH, hour, frame, weather, grade: g });
 }
 
 let shadePatternCache = null;
@@ -576,8 +593,9 @@ const SKY = [
   { h: 9.5, c: ['#3FA7D6', '#7EC4CF', '#B8CFE0'] },
   { h: 15.5, c: ['#3FA7D6', '#7EC4CF', '#C9D8E0'] },
   { h: 17.25, c: ['#4A7FB0', '#C9A87A', '#FFE29A'] },
-  { h: 18.5, c: ['#2B3A67', '#B5527A', '#F3C178'] },
-  { h: 19.75, c: ['#141B33', '#1E2A4F', '#2B3A67'] },
+  { h: 18.25, c: ['#2B3A67', '#B5583F', '#F3C178'] },
+  { h: 19.25, c: ['#141B33', '#1E2A4F', '#3B4A6B'] },
+  { h: 20.0, c: ['#141B33', '#1E2A4F', '#2B3A67'] },
   { h: 22.5, c: ['#141B33', '#1E2A4F', '#2B3A67'] },
   { h: 24, c: ['#141B33', '#182040', '#1E2A4F'] },
 ];

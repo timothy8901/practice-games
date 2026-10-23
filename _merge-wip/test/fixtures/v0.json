@@ -1,0 +1,19 @@
+{
+  "player": { "name": "Pell", "mapId": "harbor", "x": 3, "y": 4, "facing": "left" },
+  "wallet": { "main": 120 },
+  "party": [
+    {
+      "uid": "c1", "speciesId": "sloshkin", "familyId": "slosh", "nickname": "Slosh", "level": 5, "hp": 20,
+      "stats": { "hp": 20, "atk": 7, "def": 6, "spa": 5, "spd": 6, "spe": 8 },
+      "moves": [ { "id": "splash", "pp": 10, "maxPp": 10 } ]
+    }
+  ],
+  "flags": { "sp.arrived": true },
+  "counters": { "sys.uid": 1 },
+  "npcs": { "wren": { "met": true, "talks": 2 } },
+  "maps": { "harbor": { "visited": true } },
+  "threads": { "wren-roof": { "beat": 1 } },
+  "fieldLog": { "forms": { "sloshkin": { "seen": true, "held": true } } },
+  "letters": { "delivered": 2, "read": [1] },
+  "stats": { "steps": 40 }
+}

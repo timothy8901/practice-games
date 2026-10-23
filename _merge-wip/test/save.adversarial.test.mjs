@@ -107,8 +107,12 @@ describe('adversarial: contract surface', () => {
         sys.autosave(value); sys.list(value === null || typeof value !== 'object' ? undefined : value); sys.isValidSlot(value);
       }, `argument ${String(value)}`);
     }
-    assert.deepEqual(sys.list({ all: true }).map((e) => e.state), ['empty', 'empty', 'empty', 'empty', 'empty', 'empty'],
-      'nothing got written by bad calls');
+    // `{}` and `[]` are valid payloads (the boundaries suite relies on that), so `save(1, value)` and
+    // `autosave(value)` legitimately wrote manual:1, auto:1 and auto:2. Every call with a bad slot or
+    // bad data wrote nothing.
+    assert.deepEqual(sys.list({ all: true }).map((e) => e.state), ['ok', 'empty', 'empty', 'ok', 'ok', 'empty'],
+      'only the calls with object-like data wrote');
+    assert.deepEqual(sys.load(1).data, [], 'the last valid payload written to manual:1');
   });
 });
 
@@ -1084,5 +1088,255 @@ describe('adversarial: helpers', () => {
     s.clear();
     assert.equal(s.length, 0);
     assert.equal(s.usage, 0);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------------
+// Verifier additions: option bags, sequence monotonicity, list/load consistency, sloppy backends
+// ---------------------------------------------------------------------------------------------------
+
+describe('adversarial: option bags that are not objects', () => {
+  it('treats null, primitives and arrays as "no options" everywhere instead of throwing', () => {
+    const sys = createSaveSystem({ storage: new Map(), now: () => 1 });
+    const text = toBase64(encodeRecord({ version: 1, time: 0, seq: 1, kind: 'manual', slot: 'manual:1', data: { a: 1 } }).record);
+    for (const opts of [null, undefined, 0, 1, '', 'summary', true, false, [], () => {}, Symbol('o'), 10n]) {
+      const label = typeof opts === 'symbol' ? 'symbol' : String(opts);
+      assert.doesNotThrow(() => {
+        assert.equal(sys.save(1, { v: 1, summary: 'from-data' }, opts).ok, true, `save ${label}`);
+        assert.equal(sys.peek(1).summary, 'from-data', `summary derived when opts is ${label}`);
+        assert.equal(sys.autosave({ v: 2 }, opts).ok, true, `autosave ${label}`);
+        assert.equal(sys.importString(text, opts).ok, true, `importString ${label}`);
+        assert.equal(sys.importString(text, opts).slot, undefined, `importString ${label} saves nothing`);
+        assert.ok(Array.isArray(sys.list(opts)), `list ${label}`);
+        assert.equal(decodeRecord(encodeRecord({ version: 1, time: 0, seq: 1, kind: 'manual', slot: 'manual:1', data: {} }).record, opts).ok, true);
+      }, label);
+    }
+    assert.equal(sys.list(null).length, sys.list().length);
+    assert.equal(sys.list([]).length, sys.list().length);
+    assert.equal(sys.list({ all: 1 }).length, 6, 'all is truthy');
+    assert.equal(encodeRecord(null).error.code, ERROR_CODES.INVALID_DATA);
+    assert.equal(encodeRecord().error.code, ERROR_CODES.INVALID_DATA);
+    assert.doesNotThrow(() => createMemoryStorage(null).setItem('k', 'v'));
+  });
+});
+
+describe('adversarial: sequence numbers stay strictly increasing', () => {
+  it('never reuses a sequence number after the newest slot is removed or everything is cleared', () => {
+    const sys = createSaveSystem({ storage: new Map(), now: () => 0 });
+    const seen = [];
+    const record = (r) => { assert.equal(r.ok, true); seen.push(r.seq ?? r.saved.seq); };
+    record(sys.save(1, { n: 1 }));
+    record(sys.save(2, { n: 2 }));
+    sys.remove(2);
+    record(sys.save(3, { n: 3 }));
+    sys.remove(3);
+    sys.remove(1);
+    record(sys.autosave({ n: 4 }));
+    sys.clearAll();
+    record(sys.save(1, { n: 5 }));
+    sys.remove(1);
+    record(sys.importString(toBase64(encodeRecord({ version: 1, time: 0, seq: 999, kind: 'manual', slot: 'manual:1', data: { imported: true } }).record), { slot: 2 }));
+    sys.remove(2);
+    record(sys.autosave({ n: 7 }));
+    for (let i = 1; i < seen.length; i++) assert.ok(seen[i] > seen[i - 1], `seq ${seen[i]} after ${seen[i - 1]}`);
+    assert.deepEqual(seen, [1, 2, 3, 4, 5, 6, 7]);
+  });
+
+  it('a failed write does not consume a number, and a staged leftover can never outrank the next write', () => {
+    const map = new Map();
+    let failFinal = false;
+    const storage = adapter(map, {
+      setItem: (k, v) => { map.set(k, failFinal && !k.endsWith('.tmp') ? 'garbage' : String(v)); },
+    });
+    const sys = createSaveSystem({ storage, now: () => 0 });
+    assert.equal(sys.save(1, { n: 1 }).seq, 1);
+    assert.equal(sys.save(2, { n: 2 }).seq, 2);
+    sys.remove(2);
+    failFinal = true;
+    const failed = sys.save(2, { n: 'lost' });
+    assert.equal(failed.error.code, ERROR_CODES.VERIFY);
+    assert.ok(map.has('save.manual:2.tmp'), 'staged copy kept for recovery');
+    failFinal = false;
+    const next = sys.save(2, { n: 'kept' });
+    assert.equal(next.ok, true);
+    assert.equal(next.seq, 3, 'number after the highest ever issued, not after what storage holds');
+    assert.equal(map.has('save.manual:2.tmp'), false, 'a successful commit clears the leftover');
+    const fresh = createSaveSystem({ storage: map, now: () => 0 });
+    assert.deepEqual(fresh.recover(), []);
+    assert.deepEqual(fresh.load(2).data, { n: 'kept' });
+  });
+
+  it('refuses, without throwing, to issue a sequence number beyond the safe integer range', () => {
+    const map = new Map([['save.manual:1', craft(header({ seq: Number.MAX_SAFE_INTEGER }), '{"a":1}')]]);
+    const sys = createSaveSystem({ storage: map, now: () => 0 });
+    assert.equal(sys.peek(1).state, 'ok');
+    const r = sys.save(2, { a: 2 });
+    assert.equal(r.ok, false);
+    assert.equal(r.error.code, ERROR_CODES.SERIALIZE);
+    assert.equal(r.error.slot, 'manual:2');
+    assert.equal(map.size, 1, 'nothing written');
+  });
+});
+
+describe('adversarial: list/peek/latest agree with load', () => {
+  const scalar = (over = {}) => craft(header(over), '"not an object"');
+
+  it('a checksum-valid record with an unloadable payload is corrupt everywhere, not just on load', () => {
+    const map = new Map([
+      ['save.manual:1', scalar()],
+      ['save.manual:2', craft(header({ slot: 'manual:2', seq: 2 }), '{"a":1}\n{"trailing":true}')],
+      ['save.auto:2', scalar({ kind: 'auto', slot: 'auto:2', seq: 7 })],
+    ]);
+    const sys = createSaveSystem({ storage: map, now: () => 0 });
+    for (const slot of [1, 2, 'auto:2']) {
+      assert.equal(sys.load(slot).error.code, ERROR_CODES.CORRUPT, `load ${slot}`);
+      assert.equal(sys.peek(slot).state, 'corrupt', `peek ${slot}`);
+      assert.equal(sys.peek(slot).error.code, ERROR_CODES.CORRUPT, `peek error ${slot}`);
+      assert.equal(sys.exportString(slot), null, `export ${slot}`);
+    }
+    assert.deepEqual(sys.list(), []);
+    assert.equal(sys.latest(), null, 'latest() never points at a slot load() would refuse');
+    // Autosave reclaims the unreadable auto slot before touching the empty one after it.
+    assert.equal(sys.autosave({ n: 1 }).slot, 'auto:1');
+    assert.equal(sys.autosave({ n: 2 }).slot, 'auto:2');
+    assert.equal(sys.autosave({ n: 3 }).slot, 'auto:3');
+    assert.equal(sys.latest().slot, 'auto:3');
+    assert.equal(sys.latest().seq, 3, 'crafted seq 7 on a corrupt slot did not leak into numbering');
+  });
+
+  it('recover() never promotes a staged record whose payload could not be loaded', () => {
+    const map = new Map([
+      ['save.manual:1', encodeRecord({ version: 1, time: 0, seq: 1, kind: 'manual', slot: 'manual:1', data: { real: true } }).record],
+      ['save.manual:1.tmp', scalar({ seq: 50 })],
+      ['save.manual:3.tmp', scalar({ slot: 'manual:3', seq: 50 })],
+    ]);
+    const sys = createSaveSystem({ storage: map });
+    assert.deepEqual(sys.recover(), []);
+    assert.deepEqual(sys.load(1).data, { real: true });
+    assert.equal(sys.peek(3).state, 'empty');
+    assert.equal(map.has('save.manual:1.tmp'), false, 'bad staged copies are discarded');
+    assert.equal(map.has('save.manual:3.tmp'), false);
+  });
+
+  it('every entry list() returns loads, for any mix of good, bad and foreign slot contents', () => {
+    const good = (slot, seq) => encodeRecord({ version: 1, time: 0, seq, kind: slot.split(':')[0], slot, data: { slot } }).record;
+    const map = new Map([
+      ['save.manual:1', good('manual:1', 1)],
+      ['save.manual:2', 'plain text'],
+      ['save.manual:3', scalar({ slot: 'manual:3' })],
+      ['save.auto:1', good('auto:1', 4)],
+      ['save.auto:2', good('auto:2', 3).slice(0, -3)],
+      ['save.auto:3', 12345],
+    ]);
+    const sys = createSaveSystem({ storage: map });
+    const listed = sys.list();
+    assert.deepEqual(listed.map((e) => e.slot), ['manual:1', 'auto:1']);
+    for (const entry of listed) assert.deepEqual(sys.load(entry.slot).data, { slot: entry.slot });
+    assert.equal(sys.latest().slot, 'auto:1');
+    assert.deepEqual(sys.list({ all: true }).map((e) => e.state), ['ok', 'corrupt', 'corrupt', 'ok', 'corrupt', 'corrupt']);
+  });
+});
+
+describe('adversarial: input handling', () => {
+  it('accepts frozen and sealed input, never mutates it, and never hands the same object back twice', () => {
+    const sys = createSaveSystem({ storage: new Map(), now: () => 0 });
+    const data = Object.freeze({ a: Object.freeze([1, 2]), summary: Object.freeze({ s: 1 }) });
+    const snapshot = JSON.stringify(data);
+    assert.equal(sys.save(1, data).ok, true);
+    assert.equal(sys.autosave(Object.seal({ b: 1 })).ok, true);
+    assert.equal(JSON.stringify(data), snapshot);
+    const first = sys.load(1).data;
+    const second = sys.load(1).data;
+    assert.notEqual(first, second);
+    assert.notEqual(first, data);
+    first.a.push(3);
+    assert.deepEqual(sys.load(1).data.a, [1, 2], 'mutating a loaded copy changes nothing stored');
+    assert.deepEqual(sys.peek(1).summary, { s: 1 });
+  });
+
+  it('works with a unicode prefix and keeps keys exact', () => {
+    const map = new Map();
+    const sys = createSaveSystem({ storage: map, prefix: '✦ゲーム/', now: () => 0 });
+    assert.equal(sys.save(1, { ok: true }).ok, true);
+    assert.deepEqual([...map.keys()], ['✦ゲーム/manual:1']);
+    assert.deepEqual(createSaveSystem({ storage: map, prefix: '✦ゲーム/' }).load(1).data, { ok: true });
+    assert.equal(createSaveSystem({ storage: map, prefix: '✦ゲーム' }).peek(1).state, 'empty', 'prefixes do not overlap');
+  });
+});
+
+describe('adversarial: sloppy and hostile backends', () => {
+  it('a backend that silently drops writes yields verify errors and leaves nothing behind', () => {
+    const map = new Map();
+    const storage = adapter(map, { setItem: () => {} });
+    const sys = createSaveSystem({ storage, now: () => 0 });
+    const r = sys.save(1, { a: 1 });
+    assert.equal(r.ok, false);
+    assert.equal(r.error.code, ERROR_CODES.VERIFY);
+    assert.equal(r.error.slot, 'manual:1');
+    assert.equal(sys.autosave({ a: 1 }).error.code, ERROR_CODES.VERIFY);
+    assert.equal(map.size, 0);
+    assert.equal(sys.load(1).error.code, ERROR_CODES.EMPTY);
+  });
+
+  it('a backend that answers reads with promises or other non-strings never throws and never counts as ok', () => {
+    const map = new Map();
+    const storage = adapter(map, { getItem: (k) => (map.has(k) ? Promise.resolve(map.get(k)) : null) });
+    const sys = createSaveSystem({ storage, now: () => 0 });
+    const r = sys.save(1, { a: 1 });
+    assert.equal(r.ok, false);
+    assert.equal(r.error.code, ERROR_CODES.VERIFY, 'the read-back is not the record that was written');
+    assert.equal(map.has('save.manual:1.tmp'), false);
+    assert.equal(sys.peek(1).state, 'empty', 'the direct write was never attempted');
+    map.set('save.manual:1', 'anything');
+    assert.equal(sys.peek(1).state, 'corrupt');
+    assert.equal(sys.peek(1).size, null);
+    assert.equal(sys.load(1).error.code, ERROR_CODES.CORRUPT);
+    assert.equal(sys.latest(), null);
+  });
+
+  it('a backend whose reads throw only for the staging key fails the save cleanly and keeps the old record', () => {
+    const map = new Map();
+    const storage = adapter(map, { getItem: (k) => { if (k.endsWith('.tmp')) throw new Error('tmp denied'); return map.has(k) ? map.get(k) : null; } });
+    const sys = createSaveSystem({ storage, now: () => 0 });
+    // Construction ran recover(), which could not read the staging keys: that must be silent.
+    map.set('save.manual:1', encodeRecord({ version: 1, time: 0, seq: 1, kind: 'manual', slot: 'manual:1', data: { old: true } }).record);
+    const r = sys.save(1, { fresh: true });
+    assert.equal(r.ok, false);
+    assert.equal(r.error.code, ERROR_CODES.STORAGE);
+    assert.deepEqual(sys.load(1).data, { old: true });
+    assert.equal(map.has('save.manual:1.tmp'), false, 'the unreadable staging copy was removed');
+  });
+});
+
+describe('adversarial: quota boundaries', () => {
+  it('a record that exactly fills the remaining room succeeds; one character more fails with quota', () => {
+    const data = { pad: 'p'.repeat(100) };
+    const size = createSaveSystem({ storage: new Map(), now: () => 0 }).save(1, data).size;
+    const key = 'q.manual:1';
+    const exact = createMemoryStorage({ quota: key.length + size });
+    const sysExact = createSaveSystem({ storage: exact, prefix: 'q.', now: () => 0 });
+    assert.equal(sysExact.save(1, data).ok, true, 'no room for staging, direct write fits exactly');
+    assert.equal(exact.usage, exact.length === 1 ? key.length + size : -1);
+    const short = createMemoryStorage({ quota: key.length + size - 1 });
+    const sysShort = createSaveSystem({ storage: short, prefix: 'q.', now: () => 0 });
+    const r = sysShort.save(1, data);
+    assert.equal(r.ok, false);
+    assert.equal(r.error.code, ERROR_CODES.QUOTA);
+    assert.equal(short.length, 0, 'nothing partially written');
+    assert.equal(sysShort.load(1).error.code, ERROR_CODES.EMPTY);
+  });
+
+  it('quota failures during autosave rotation keep every other autosave slot intact', () => {
+    const storage = createMemoryStorage({ quota: 1200 });
+    const sys = createSaveSystem({ storage, now: () => 0, manualSlots: 0 });
+    assert.equal(sys.autosave({ n: 1 }).ok, true);
+    assert.equal(sys.autosave({ n: 2 }).ok, true);
+    const before = sys.list().map((e) => [e.slot, e.seq]);
+    const r = sys.autosave({ huge: 'h'.repeat(5000) });
+    assert.equal(r.error.code, ERROR_CODES.QUOTA);
+    assert.equal(r.error.slot, 'auto:3', 'the empty slot was the target');
+    assert.deepEqual(sys.list().map((e) => [e.slot, e.seq]), before);
+    assert.equal(storage.length, 2, 'no staging key left behind');
+    assert.equal(sys.autosave({ n: 3 }).slot, 'auto:3', 'the rotation target is unchanged after a failure');
   });
 });
