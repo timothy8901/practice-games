@@ -191,7 +191,7 @@ export const TRAINERS = Object.freeze([
   trainer({
     id: 'lowmoor-tibby', name: 'Tibby', title: 'Pavilion Regular', class: 'route', sprite: 'trainerVest', kind: 'dormouse',
     map: 'lowmoor', post: 'lowmoor-pavilion-bench', postName: 'the bench inside the old ferry pavilion', region: 'lowmoor', band: 'night', declinable: true,
-    party: [mon('tossup', 7, ['tap', 'sure-pinch', 'settle']), mon('scrapling', 8, ['tap', 'knuckle', 'shadowbox']), mon('wirewhisk', 9, ['arc-ping', 'tap', 'jolt'])],
+    party: [mon('tossup', 7, ['tap', 'sure-pinch', 'settle']), mon('scrapling', 8, ['tap', 'knuckle', 'shadowbox']), mon('wirewhisk', 8, ['arc-ping', 'fizz', 'tap'])],
     tacticTag: 'three-deep; Wirewhisk pings your moves first',
     lines: {
       intro: 'I have sat on this bench every evening for eleven years. Three creatures. No waiting. Unless you would rather not.',

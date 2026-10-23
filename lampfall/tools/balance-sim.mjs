@@ -11,7 +11,8 @@
  *  - posted boss Shifts (`party[i].bossShift`) are applied here, at the end of the turn the data
  *    names, on the trainer's own creature (cards rolled at the Flux base odds, or 100%);
  *  - the Relay Spire is played as three rounds of two player creatures each, no repeats;
- *  - the Summit is played as one run: three fights in a row, no heal between, +5 PP per move;
+ *  - the Summit is played as one run: three fights in a row, no Waystone between, +5 PP per move;
+ *    the player's bag is used between fights (Revives on the fainted, Full Salves on the lowest);
  *  - arena weather (`onEntry`, the Weather Spire cycle) and held items are not modelled (the engine
  *    has neither yet); both are small and symmetric enough that the targets carry a margin.
  *
@@ -119,13 +120,12 @@ export function pickMoves(speciesId, level, discs = []) {
     || opts.find((m) => m.category === 'status' && m.effect.status && CHIP_KINDS.includes(m.effect.status.kind))
     || opts.find((m) => m.category === 'status' && m.effect.stat && m.effect.stat.some((x) => x.target === 'self' && x.stages > 0 && ['atk', 'spa'].includes(x.stat)));
   if (util && picked.length < 4) picked.push(util.id);
-  for (const h of hits) {
-    if (picked.length >= 4) break;
-    if (!picked.includes(h.id) && !covered.has(h.type)) { picked.push(h.id); covered.add(h.type); }
-  }
-  for (const h of hits) {
-    if (picked.length >= 4) break;
-    if (!picked.includes(h.id)) picked.push(h.id);
+  while (picked.length < 4) {
+    const rest = hits.filter((h) => !picked.includes(h.id));
+    if (!rest.length) break;
+    const next = rest.sort((a, b) => hitScore(b) * (covered.has(b.type) ? 1 : 1.25) - hitScore(a) * (covered.has(a.type) ? 1 : 1.25))[0];
+    picked.push(next.id);
+    covered.add(next.type);
   }
   return picked.slice(0, 4);
 }
@@ -413,11 +413,12 @@ export const STARTER_LINES = Object.freeze({
 export const PARTIES = Object.freeze({
   turn: { curve: 7, starterStage: 0, members: ['tossup', 'wirewhisk', 'mudfist'], discs: [], items: [['salve', 25], ['salve', 25]], crackdust: 0 },
   ward: { curve: 13, starterStage: 1, members: ['tossup', 'wirewhisk', 'mudfist', 'chillnub'], discs: ['spore-drift'], items: [['salve', 25], ['salve', 25]], crackdust: 2 },
-  weather: { curve: 19, starterStage: 1, members: ['tossup', 'wirewhisk', 'mudfist', 'chillnub', 'sootling'], discs: ['spore-drift'], items: [['tonic', 70], ['salve', 25]], crackdust: 0 },
+  weather: { curve: 19, starterStage: 1, members: ['wirewhisk', 'mudfist', 'chillnub', 'sootling', 'sedgehare'], discs: ['spore-drift'], items: [['tonic', 70], ['salve', 25]], crackdust: 0 },
   hollow: { curve: 26, starterStage: 2, members: ['coilcrest', 'rimeplate', 'sootling', 'rushling', 'bilgebob'], discs: ['spore-drift', 'flashover'], items: [['tonic', 70], ['tonic', 70]], crackdust: 0 },
   relay: { curve: 33, starterStage: 2, members: ['coilcrest', 'rimeplate', 'emberjaw', 'rushling', 'duskwisp'], discs: ['spore-drift', 'flashover', 'gale-cut'], items: [['tonic', 70], ['tonic', 70]], crackdust: 0 },
   mirror: { curve: 40, starterStage: 2, members: ['coilcrest', 'floeback', 'emberjaw', 'gillwick', 'duskowl'], discs: ['spore-drift', 'flashover', 'gale-cut', 'hoarfrost'], items: [['tonic', 70], ['tonic', 70]], crackdust: 0 },
-  summit: { curve: 47, starterStage: 2, members: ['coilcrest', 'floeback', 'caldermaw', 'strandrunner', 'duskowl'], discs: ['spore-drift', 'flashover', 'gale-cut', 'hoarfrost', 'drowned-bell', 'plumbline'], items: [['tonic', 70], ['tonic', 70], ['full-salve', 9999], ['full-salve', 9999]], crackdust: 0 },
+  summit: { curve: 47, starterStage: 2, members: ['coilcrest', 'floeback', 'caldermaw', 'strandrunner', 'duskowl'], discs: ['spore-drift', 'flashover', 'gale-cut', 'hoarfrost', 'drowned-bell', 'plumbline'], items: [['tonic', 70], ['tonic', 70], ['tonic', 70], ['tonic', 70]], crackdust: 0,
+    between: { revive: 3, fullSalve: 4 } },
 });
 
 /** Party for a fight, starter variant, optionally at another curve (route trainers). */
@@ -452,13 +453,14 @@ export function simulateSpire(spireId, n = 200, seed = 'balance') {
   const res = { id: spireId, trainer: tr.id, n: 0, wins: 0, turns: 0, byStarter: {} };
   for (const st of STARTERS) {
     let w = 0;
+    const plan = sp.theme.kind === 'relay' ? relayPlan(buildParty(spireId, st), tr, sp) : null;
     for (let i = 0; i < n; i++) {
       const rng = makeRng(`${seed}:${spireId}:${st}:${i}`);
       const party = buildParty(spireId, st);
       const items = itemRows(spireId, party);
       let win;
       let turns;
-      if (sp.theme.kind === 'relay') ({ win, turns } = playRelay(party, tr, sp, rng, items));
+      if (sp.theme.kind === 'relay') ({ win, turns } = playRelay(party, tr, sp, rng, items, null, plan));
       else {
         const r = playBattle(party, trainerParty(tr), { rng, trainer: tr, source: 'spire', items, crackdust: PARTIES[spireId].crackdust });
         win = r.outcome === 'win';
@@ -476,25 +478,75 @@ export function simulateSpire(spireId, n = 200, seed = 'balance') {
   return res;
 }
 
-/** The Relay Spire: three rounds (slots from the theme rule), two fresh player creatures each. */
-function playRelay(party, tr, sp, rng, items) {
+/**
+ * The Relay Spire: three rounds (slots from the theme rule), two fresh player creatures each. The
+ * player reads the posted rounds and splits the party so the weakest round is as strong as it can be.
+ */
+export function playRelay(party, tr, sp, rng, items, stats = null, plan = null) {
   const foes = trainerParty(tr);
-  const used = new Set();
+  const rounds = sp.theme.rule.rounds;
+  plan ||= relayPlan(party, tr, sp);
   let turns = 0;
   let bag = items;
-  for (const round of sp.theme.rule.rounds) {
-    const roundFoes = round.slots.map((i) => foes[i]);
-    // pick the two unused creatures with the best summed matchup against this round
-    const free = party.map((c, i) => i).filter((i) => !used.has(i));
-    const score = (i) => roundFoes.reduce((a, f) => a + matchup(party[i], f), 0);
-    const pick = free.sort((a, b) => score(b) - score(a)).slice(0, sp.theme.rule.playerPerRound);
-    pick.forEach((i) => used.add(i));
-    const r = playBattle(pick.map((i) => party[i]), roundFoes, { rng: rng.fork(`round${round.n}`), trainer: tr, source: 'spire', items: bag });
+  for (let k = 0; k < rounds.length; k++) {
+    const round = rounds[k];
+    const r = playBattle(plan[k].map((i) => party[i]), round.slots.map((i) => foes[i]), { rng: rng.fork(`round${round.n}`), trainer: tr, source: 'spire', items: bag });
     turns += r.turns;
     bag = r.items;
+    if (stats) {
+      const key = `r${round.n}:${plan[k].map((i) => party[i].speciesId).join('+')}`;
+      stats[key] ||= [0, 0];
+      stats[key][1]++;
+      if (r.outcome === 'win') stats[key][0]++;
+    }
     if (r.outcome !== 'win') return { win: false, turns };
   }
   return { win: true, turns };
+}
+
+/**
+ * The player's Relay plan: try every pair of the party against every posted round a few times
+ * (the player knows their own creatures), then deal the party so the product of the three round
+ * odds is highest.
+ */
+export function relayPlan(party, tr, sp, tries = 12) {
+  const rounds = sp.theme.rule.rounds;
+  const per = sp.theme.rule.playerPerRound;
+  const odds = new Map();
+  const est = (pair, k) => {
+    const key = `${pair.join(',')}|${k}`;
+    if (!odds.has(key)) {
+      let w = 0;
+      for (let t = 0; t < tries; t++) {
+        const foes = trainerParty(tr);
+        const mine = pair.map((i) => mon(party[i].speciesId, party[i].level, party[i].moves.map((m) => m.id)));
+        const r = playBattle(mine, rounds[k].slots.map((i) => foes[i]), { rng: makeRng(`plan:${key}:${t}`), trainer: tr, source: 'spire' });
+        if (r.outcome === 'win') w++;
+      }
+      odds.set(key, (w + 0.5) / (tries + 1));
+    }
+    return odds.get(key);
+  };
+  return bestSplit(party.map((c, i) => i), rounds.length, per, (pair, k) => est(pair, k));
+}
+
+/** Every way to deal `ids` into `nRounds` groups of `per`; keeps the split with the best product of odds. */
+function bestSplit(ids, nRounds, per, odds) {
+  let best = null;
+  let bestP = -1;
+  const rec = (k, left, acc, p) => {
+    if (p <= bestP) return;
+    if (k === nRounds) { bestP = p; best = acc.slice(); return; }
+    const combos = [];
+    const pick = (start, cur) => {
+      if (cur.length === per) { combos.push(cur.slice()); return; }
+      for (let i = start; i < left.length; i++) { cur.push(left[i]); pick(i + 1, cur); cur.pop(); }
+    };
+    pick(0, []);
+    for (const c of combos) rec(k + 1, left.filter((x) => !c.includes(x)), [...acc, c], p * odds(c, k));
+  };
+  rec(0, ids, [], 1);
+  return best;
 }
 
 /** The Summit run: Bastien, Cass, Idris in a row; no heal between, +5 PP per move. */
@@ -507,6 +559,7 @@ export function simulateSummit(n = 200, seed = 'balance') {
       const rng = makeRng(`${seed}:summit:${st}:${i}`);
       let party = buildParty('summit', st);
       let items = itemRows('summit', party);
+      const kit = { ...PARTIES.summit.between };
       let won = true;
       for (const step of SUMMIT.order) {
         res.reached[step.trainer]++;
@@ -515,10 +568,14 @@ export function simulateSummit(n = 200, seed = 'balance') {
         res.turns += r.turns;
         res.fights++;
         if (r.outcome !== 'win') { won = false; break; }
-        party = r.party.map((c) => {
-          const out = { ...c, status: null, moves: c.moves.map((m) => ({ ...m, pp: Math.min(m.maxPp, m.pp + ppTop) })) };
-          return out;
-        });
+        party = r.party.map((c) => ({ ...c, status: null, moves: c.moves.map((m) => ({ ...m, pp: Math.min(m.maxPp, m.pp + ppTop) })) }));
+        // the bag between fights: Revives on the fainted (half HP), then Full Salves on the lowest
+        for (const c of party) if (c.hp <= 0 && kit.revive > 0) { kit.revive--; c.hp = Math.floor(c.stats.hp / 2); }
+        for (const c of party.filter((x) => x.hp > 0 && x.hp < x.stats.hp * 0.5).sort((a, b) => a.hp / a.stats.hp - b.hp / b.stats.hp)) {
+          if (kit.fullSalve <= 0) break;
+          kit.fullSalve--;
+          c.hp = c.stats.hp;
+        }
         items = r.items;
       }
       if (won) w++;

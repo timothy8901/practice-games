@@ -9,7 +9,7 @@
 import { sp, e, family as fam, anchors } from './_helpers.js';
 
 export const forms = Object.freeze([
-  sp('sootling', 'Sootling', ['Kiln'], 'caldermaw', 1, [50, 56, 44, 67, 44, 39], 'ember-core',
+  sp('sootling', 'Sootling', ['Kiln'], 'caldermaw', 1, [54, 56, 44, 67, 50, 45], 'ember-core',
     [[1, 'tap'], [1, 'ember-lick'], [8, 'scorch'], [14, 'settle'], [20, 'slag-burst'], [26, 'kiln-maw'], [32, 'flashover']],
     'ember-lick', 160, 54, 'slow', {
       roleTag: 'rival_lead', smallForm: true,

@@ -204,7 +204,8 @@ export function validateData(DATA, opts = {}) {
     }
   }
   if (!opts.hooks && list('abilities').some((a) => typeof a.hook === 'string')) warn('abilities', '*', 'battle/abilityHooks not present: hook keys unchecked');
-  if (num(tuning.wardCount) && wards !== tuning.wardCount) err('abilities', '*', `${wards} Ward abilities, tuning.wardCount is ${tuning.wardCount}`);
+  // Only enforce once the real abilities table is in (the day-1 placeholder has a single row).
+  if (num(tuning.wardCount) && list('abilities').length > 1 && wards !== tuning.wardCount) err('abilities', '*', `${wards} Ward abilities, tuning.wardCount is ${tuning.wardCount}`);
 
   // ---- items -------------------------------------------------------------------------------------
   for (const it of list('items')) {

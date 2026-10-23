@@ -9,7 +9,7 @@
 import { sp, e, family as fam, anchors } from './_helpers.js';
 
 export const forms = Object.freeze([
-  sp('chillnub', 'Chillnub', ['Rime'], 'rimeplate', 1, [61, 50, 67, 44, 50, 28], 'stillcoat',
+  sp('chillnub', 'Chillnub', ['Rime'], 'rimeplate', 1, [63, 50, 67, 50, 60, 28], 'stillcoat',
     [[1, 'tap'], [1, 'frost-nip'], [8, 'settle'], [14, 'shard-fling'], [17, 'floe-ram'], [20, 'plate-toss'], [26, 'rime-lock'], [32, 'hoarfrost']],
     'frost-nip', 160, 52, 'medium-slow', {
       roleTag: 'ward', ward: true, smallForm: true,

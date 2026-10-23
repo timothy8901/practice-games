@@ -709,10 +709,11 @@ export function cellEdges(A, i, tide) {
  * @typedef {Object} TileRenderer
  * @property {(map: object) => void} setMap
  * @property {() => object|null} analysis
- * @property {(rect: {x: number, y: number, w: number, h: number}, tide: string, grade: object, bc?: Partial<BakeCtx>) => number} missing
+ * @property {(rect: {x: number, y: number, w: number, h: number}, camX: number, camY: number, tide: string, grade: object) => number} missing
  *   count of visible chunk layers not baked for this key (0 = ready)
- * @property {(rect: object, tide: string, grade: object, opts?: {ring?: boolean, bc?: Partial<BakeCtx>}) => void} request   queue the missing ones (visible first, then a ring)
- * @property {(rect: object, tide: string, grade: object, bc?: Partial<BakeCtx>) => number} bakeNow   bake every missing visible chunk synchronously
+ * @property {(rect: object, camX: number, camY: number, tide: string, grade: object, opts?: {ring?: boolean}) => void} request   queue the missing ones (visible first, then a ring)
+ * @property {(pairs: Array<[string, object]>) => void} want   queued work for other (tide, grade) pairs is dropped when popped
+ * @property {(rect: object, camX: number, camY: number, tide: string, grade: object) => number} bakeNow   bake every missing visible chunk synchronously
  * @property {(budgetMs?: number) => number} pump   bake queued chunks within a budget; returns how many
  * @property {(ctx: any, layer: number, rect: object, camX: number, camY: number, tide: string, grade: object) => number} drawLayer
  * @property {(ctx: any, layer: number, rect: object, camX: number, camY: number, tide: string, grade: object, ms: number) => number} drawAnimated
@@ -1032,9 +1033,9 @@ export function createTileRenderer(opts = {}) {
       queued.clear();
     },
 
-    missing(rect, tide, grade) {
+    missing(rect, camX, camY, tide, grade) {
       if (!A) return 0;
-      const R = visibleRange(rect, rect.camX ?? 0, rect.camY ?? 0, false);
+      const R = visibleRange(rect, camX, camY, false);
       let n = 0;
       for (let cy = R.y0; cy <= R.y1; cy++) for (let cx = R.x0; cx <= R.x1; cx++) {
         for (let L = 0; L < LAYER_COUNT; L++) {
@@ -1045,13 +1046,13 @@ export function createTileRenderer(opts = {}) {
       return n;
     },
 
-    request(rect, tide, grade, o = {}) {
+    request(rect, camX, camY, tide, grade, o = {}) {
       if (!A) return;
       const g = gradeIndex(grade);
       wanted.add(g * 3 + TIDE_INDEX[tide]);
       wanted.add(g * 3 + TIDE_CANON);
       for (const pass of o.ring === false ? [false] : [false, true]) {
-        const R = visibleRange(rect, rect.camX ?? 0, rect.camY ?? 0, pass);
+        const R = visibleRange(rect, camX, camY, pass);
         for (let cy = R.y0; cy <= R.y1; cy++) for (let cx = R.x0; cx <= R.x1; cx++) {
           for (let L = 0; L < LAYER_COUNT; L++) {
             if (!layerUsed(cx, cy, L)) continue;
@@ -1074,9 +1075,9 @@ export function createTileRenderer(opts = {}) {
       }
     },
 
-    bakeNow(rect, tide, grade) {
+    bakeNow(rect, camX, camY, tide, grade) {
       if (!A) return 0;
-      const R = visibleRange(rect, rect.camX ?? 0, rect.camY ?? 0, false);
+      const R = visibleRange(rect, camX, camY, false);
       let n = 0;
       for (let cy = R.y0; cy <= R.y1; cy++) for (let cx = R.x0; cx <= R.x1; cx++) {
         for (let L = 0; L < LAYER_COUNT; L++) {

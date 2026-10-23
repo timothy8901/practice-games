@@ -7,8 +7,8 @@
 import { sp, e, family as fam, anchors } from './_helpers.js';
 
 export const forms = Object.freeze([
-  sp('wirewhisk', 'Wirewhisk', ['Bolt'], 'wirewhisk', 1, [45, 40, 45, 70, 55, 95], 'tailhum',
-    [[1, 'tap'], [1, 'arc-ping'], [3, 'fizz'], [6, 'jolt'], [12, 'static-net'], [18, 'updraft'], [24, 'shell-rattle'], [30, 'mirror-step'], [36, 'gale-cut']],
+  sp('wirewhisk', 'Wirewhisk', ['Bolt'], 'wirewhisk', 1, [45, 40, 45, 62, 55, 88], 'tailhum',
+    [[1, 'tap'], [1, 'arc-ping'], [3, 'fizz'], [9, 'jolt'], [12, 'static-net'], [18, 'updraft'], [24, 'shell-rattle'], [30, 'mirror-step'], [36, 'gale-cut']],
     'arc-ping', 190, 55, 'medium-fast', {
       roleTag: 'scout',
       sprite: 'drawn', size: 32, palette: 'kyahorw', heartmarkHighlight: 'y', idle: 'squash',
