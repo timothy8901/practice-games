@@ -3,10 +3,10 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   SCHEMA_VERSION, PARTY_MAX, MOVE_SLOTS, STAT_COUNTERS, POCKET_IDS, DEFAULT_DIAL, WORLDGEN_LABEL,
-  createNewWorld, validateWorld, worldDefaults, creatureDefaults, settingsDefaults, isPlainObject,
+  createNewWorld, validateWorld, worldDefaults, creatureDefaults, settingsDefaults, isPlainObject, NEW_GAME_START_MINUTE, tideSeedFor,
 } from '../js/state/schema.js';
 import { encodeSeedCode, makeRng } from '../js/core/rng.js';
-import { CLOCK_STATE_VERSION, DEFAULT_START_MINUTE } from '../js/core/time.js';
+import { CLOCK_STATE_VERSION } from '../js/core/time.js';
 
 const CODE = encodeSeedCode({ dial: 'FLUX', seed: 12345, toggles: [] });
 
@@ -48,8 +48,8 @@ describe('createNewWorld', () => {
     const w = createNewWorld({ seedCode: CODE });
     assert.equal(w.v, SCHEMA_VERSION);
     assert.equal(w.clock.version, CLOCK_STATE_VERSION);
-    assert.equal(w.clock.total, DEFAULT_START_MINUTE);
-    assert.equal(w.clock.seed, w.run.seed);
+    assert.equal(w.clock.total, NEW_GAME_START_MINUTE, 'the arrival, 17:40 on day 1 (GDD-00 §12)');
+    assert.equal(w.clock.seed, tideSeedFor(), 'the GDD tide seed, not the run seed');
     assert.equal(w.clock.realClock, false);
   });
 
@@ -118,8 +118,8 @@ describe('createNewWorld', () => {
   it('exposes fresh default records each call', () => {
     const a = worldDefaults();
     const b = worldDefaults();
-    a.bag.pockets.items.push({ id: 'x', n: 1 });
-    assert.equal(b.bag.pockets.items.length, 0);
+    a.bag.pockets.medicine.push({ id: 'x', n: 1 });
+    assert.equal(b.bag.pockets.medicine.length, 0);
     assert.notEqual(settingsDefaults(), settingsDefaults());
     assert.equal(creatureDefaults().level, 1);
   });
@@ -142,9 +142,10 @@ describe('validateWorld', () => {
     w.flags['sp.arrived'] = true;
     w.flags['np.wren.met'] = 1;
     w.counters['sys.uid'] = 3;
-    w.letters = { delivered: 3, read: [1, 3], today: 2 };
-    w.npcs.wren = { met: true, talks: 2, lastTalkDay: 1, lastPorchDay: -1, nickname: null, affinity: 1, favours: [], saidLines: { hi: 1 }, remembered: { roof: 'red' } };
-    w.maps.harbor = { visited: true, picked: { 'a:1': 0 }, trees: {}, cracks: { c1: true }, reach: { r1: 0.5 }, opened: ['chest-1'] };
+    w.letters = { ...w.letters, delivered: 4, read: [1, 3], today: 3, got: [1, 21, 3, 22], mailbox: [3], counter: 22, carrying: [21], pinned: ['ph-shell'], keeperDay: 1, familyDay: 1 };
+    w.npcs.wren = { met: true, talks: 2, lastTalkDay: 1, lastPorchDay: -1, nickname: null, affinity: 1, favours: [], saidLines: { hi: 1 }, remembered: { roof: 'red' }, gifts: { pear: { n: 1, lastDay: 1 } }, nicknameChoice: 'decline', lastLineId: 'hi', lingerDay: 1, lastGiftDay: 1 };
+    w.dayPage = { day: 1, base: { catches: 0 }, earned: 300, paid: 100, notes: ['k1'], last: { day: 0 } };
+    w.maps.harbor = { visited: true, picked: { 'a:1': 0 }, trees: {}, cracks: { c1: true }, reach: { r1: 0.5 }, reachAt: { r1: 1200 }, opened: ['chest-1'] };
     w.threads['wren-roof'] = { beat: 1, done: false, startedDay: 0, lastAdvancedDay: 1 };
     w.fieldLog.forms.sloshkin = { seen: true, read: false, held: true, ability: null };
     w.loans.builds.push({ id: 'roof', tier: 1, startedDay: 0, readyDay: 1, choice: null, done: false });
@@ -175,7 +176,7 @@ describe('validateWorld', () => {
     w.yard.push('ghost');
     const problems = validateWorld(w);
     const expect = (re) => assert.ok(problems.some((p) => re.test(p)), `expected a problem matching ${re}, got:\n${problems.join('\n')}`);
-    expect(/^world\.v: expected integer 1\.\.1/);
+    expect(new RegExp(`^world\\.v: expected integer 1\\.\\.${SCHEMA_VERSION}\\b`));
     expect(/^world\.wallet\.main: expected non-negative integer/);
     expect(/^world\.player\.facing: expected up\|down\|left\|right/);
     expect(/^world\.flags\.arrived: flag id lacks a namespace/);
@@ -194,6 +195,36 @@ describe('validateWorld', () => {
     expect(/^world\.party\[4\]\.status/);
     expect(/^world\.party\[5\]\.trained\.atk: expected integer 0\.\.252/);
     expect(/^world\.yard\[0\]: unknown creature uid "ghost"/);
+  });
+
+  it('checks the v4 letter channels against what arrived', () => {
+    const w = createNewWorld({ seedCode: CODE });
+    w.letters = {
+      ...w.letters, delivered: 3, got: [1, 21, 1], read: [5], today: 7, counter: 30, mailbox: [9, 9], carrying: [21, 40],
+      doors: [21], awaiting: [22], returned: [21, 21],
+    };
+    const problems = validateWorld(w);
+    const expect = (re) => assert.ok(problems.some((p) => re.test(p)), `expected a problem matching ${re}, got:\n${problems.join('\n')}`);
+    expect(/^world\.letters\.got: duplicate entries/);
+    expect(/^world\.letters\.read: letter 5 was never delivered/);
+    expect(/^world\.letters\.today: letter 7 was never delivered/);
+    expect(/^world\.letters\.counter: letter 30 was never delivered/);
+    expect(/^world\.letters\.mailbox: letter 9 was never delivered/);
+    expect(/^world\.letters\.mailbox: duplicate entries/);
+    expect(/^world\.letters\.carrying: letter 40 was never delivered/);
+    expect(/^world\.letters\.carrying: letter 21 was already handed in/);
+    expect(/^world\.letters\.awaiting: letter 22 was never handed in at a door/);
+    expect(/^world\.letters\.returned: duplicate entries/);
+    w.letters = { ...w.letters, got: [1, 2], delivered: 5, read: [], today: null, counter: null, mailbox: [], carrying: [], doors: [], awaiting: [], returned: [] };
+    assert.deepEqual(validateWorld(w), ['world.letters.delivered: 5 does not match got.length 2']);
+    w.letters = { ...w.letters, got: [0], delivered: 1 };
+    assert.deepEqual(validateWorld(w), ['world.letters.got: letter numbers start at 1']);
+    w.npcs.wren = { ...w.npcs.wren, nicknameChoice: 'maybe' };
+    w.dayPage = { ...w.dayPage, notes: Array.from({ length: 41 }, () => 'x'), earned: -1 };
+    w.letters = { ...w.letters, got: [], delivered: 0 };
+    const more = validateWorld(w);
+    assert.ok(more.some((p) => p.startsWith('world.dayPage.notes: expected string[] (max 40)')), more.join('\n'));
+    assert.ok(more.some((p) => p.startsWith('world.dayPage.earned: expected non-negative integer')), more.join('\n'));
   });
 
   it('rejects values JSON cannot carry before shape checking', () => {
@@ -226,8 +257,8 @@ describe('validateWorld', () => {
   it('resolves ids against a registry when one is given', () => {
     const w = createNewWorld({ seedCode: CODE, lease: { mapId: 'harbor', tool: 'rod', toolRing: ['rod'] } });
     w.party.push(creature('c1', { moves: [{ id: 'splash', pp: 1, maxPp: 1 }], heldItem: 'berry', shiftlog: ['sloshkin'] }));
-    w.bag.pockets.items.push({ id: 'berry', n: 2 });
-    w.npcs.wren = { met: false, talks: 0, lastTalkDay: -1, lastPorchDay: -1, nickname: null, affinity: 0, favours: [], saidLines: {}, remembered: {} };
+    w.bag.pockets.medicine.push({ id: 'berry', n: 2 });
+    w.npcs.wren = { met: false, talks: 0, lastTalkDay: -1, lastPorchDay: -1, nickname: null, affinity: 0, favours: [], saidLines: {}, remembered: {}, gifts: {}, nicknameChoice: null, lastLineId: null, lingerDay: -1, lastGiftDay: -1 };
     w.badges.push('spire-1');
     w.pendingScript = 'arrival';
     const known = {
@@ -238,12 +269,12 @@ describe('validateWorld', () => {
     assert.deepEqual(validateWorld(w, registry), []);
     w.player.mapId = 'nowhere';
     w.party[0].speciesId = 'dragon';
-    w.bag.pockets.items[0].id = 'rock';
+    w.bag.pockets.medicine[0].id = 'rock';
     w.badges.push('spire-9');
     const problems = validateWorld(w, registry);
     assert.ok(problems.includes('world.player.mapId: unknown maps id "nowhere"'), problems.join('\n'));
     assert.ok(problems.includes('world.party[0].speciesId: unknown species id "dragon"'), problems.join('\n'));
-    assert.ok(problems.includes('world.bag.pockets.items[0].id: unknown items id "rock"'), problems.join('\n'));
+    assert.ok(problems.includes('world.bag.pockets.medicine[0].id: unknown items id "rock"'), problems.join('\n'));
     assert.ok(problems.includes('world.badges[1]: unknown trainers id "spire-9"'), problems.join('\n'));
     assert.deepEqual(validateWorld(w, { has: () => { throw new Error('boom'); } }), [], 'a throwing registry is treated as knowing everything');
   });

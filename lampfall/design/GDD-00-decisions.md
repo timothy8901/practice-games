@@ -623,8 +623,8 @@ Every menu works with a d-pad and two buttons; targets ≥ 44 px; no hover; inpu
 | Content | Count |
 |---|---|
 | Creature forms | **42** (40 in 14 Shift families + Stillox + Vagary); Star-touched as palette variants |
-| Techniques | **64** (12 types × 4 + 15 signatures + Plumbline; Scrap separate, no slot) — the prototype's 54 plus 10 |
-| Abilities | **25** (the prototype's 26 with `prism-ward` merged into `glasshide`), incl. the Wards Glasshide, Mirrorveil, Stillcoat |
+| Techniques | **64** (12 types × 4 + 15 signatures + Plumbline; Scrap separate, no slot) — the prototype's 53 plus Scrap, plus 11 new (manifest ruling 1) |
+| Abilities | **25** (the prototype's 25 with `prism-ward` merged into `glasshide`, plus the new `dusksight`; manifest ruling 2), incl. the Wards Glasshide, Mirrorveil, Stillcoat |
 | Types | 12 (Plain, Grit, Brine, Kiln, Moss, Bolt, Rime, Gust, Stone, Rust, Glass, Hollow) + Star; the chart as written |
 | Items | **26** (3 wicks, 6 medicine, 2 cures, Crackdust, Still Knot, 6 type tilts, 6 held items, Isolde's Lantern) + **12 discs** |
 | Trainer rosters | **65** (30 route, Pip, 6 leaders, 6 Long Road, 2 Keepers, Champion, Linnet ×4, Wick ×2, Merrow, Varga, Corin ×3, 8 Porch Duel neighbors) |
@@ -658,7 +658,7 @@ Every chapter writes in the §14 formats of `ARCHITECTURE-DRAFT.md` (kebab-case 
 |---|---|---|---|
 | 1 | `GDD-01-world.md` | the 24 maps as §14.4 string grids (legends, props, every tree and porch, triggers, warps with tide masks for short ways, Waystones, nodes, dig sites, reaches); §14.11 encounter tables per map with day / night / tide weights and Errant routes | §4 order, levels, tide windows, wade rule, any-tide reachability; no wild in town but the reeds |
 | 2 | `GDD-02-economy.md` | clock and tide constants, the day-1 seed, `data/tuning.js` (every constant with range), `data/loans.js`, `data/dials.js`, §14.9 shops with hours, §14.12 item rows with prices, the economy-sim model and test | §5–§7 every number; ladder 278,000; Relighting day 11–16 |
-| 3 | `GDD-03-creatures.md` | 42 forms as §14.1 rows (stats from `proto/battle/species.js`, four anchors, `mustNotReadAs`); 14 families as §14.2 Shift tables with per-dial weights; Star-touched palettes; 25 abilities; sprite briefs for the 16 undrawn forms | §8 roster, Sloshkin pools, Wards on four forms, windows 8/20/34 |
+| 3 | `GDD-03-creatures.md` | 42 forms as §14.1 rows (stats from `proto/battle/species.js`, four anchors, `mustNotReadAs`); 14 families as §14.2 Shift tables with per-dial weights; Star-touched palettes; 25 abilities; sprite briefs for the 20 undrawn forms (manifest ruling 6) | §8 roster, Sloshkin pools, Wards on four forms, windows 8/20/34 |
 | 4 | `GDD-04-battle.md` | 64 moves as §14.3 rows; the rules sheet (damage, capture, EXP formulas); 65 rosters as §14.10 with payouts and script ids; Spire gimmicks, dossiers and aces; the Long Road, Summit and the Reading's 7 phases as data | §8 rules and rulings; singles; story battles never wall |
 | 5 | `GDD-05-town-life.md` | trees, bees, digging, the Glint; 18 fish, 10 bugs, 18 finds as §14.12 collection rows (tells, windows, habitats, each find's town letter); Crate, Wanted Today, Commons board and projects, Porch Duel slate, Day Page, weather, festivals; `tuning.creatureBonuses`; furniture, clothes, roofs | §9 and its Crossovers tables; bonuses never locks |
 | 6 | `GDD-06-cast.md` | every resident and isle NPC as a §14.5 module: schedule, home, topics with conds, lines (generic, night, porch, weather, lead-type and Shift tags), memory with 5-day no-repeat, gifts, Porch Duel creature | §10 species, renames, hours; "Warden" is Augusta only |

@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { MIGRATIONS, migrateWorld, fillDefaults } from '../js/state/migrate.js';
-import { SCHEMA_VERSION, createNewWorld, validateWorld, worldDefaults } from '../js/state/schema.js';
+import { SCHEMA_VERSION, createNewWorld, validateWorld, worldDefaults, lettersDefaults, npcMemoryDefaults, dayPageDefaults } from '../js/state/schema.js';
 import { createSaveSystem } from '../js/core/save.js';
 
 const fixture = (name) => JSON.parse(readFileSync(fileURLToPath(new URL(`./fixtures/${name}`, import.meta.url)), 'utf8'));
@@ -48,14 +48,61 @@ describe('migrateWorld', () => {
     assert.deepEqual(w.maps.harbor.opened, []);
     assert.equal(w.threads['wren-roof'].done, false);
     assert.deepEqual(w.fieldLog.forms.sloshkin, { seen: true, read: false, held: true, ability: null });
-    assert.deepEqual(w.letters, { delivered: 2, read: [1], today: null });
+    assert.deepEqual(w.letters, { ...lettersDefaults(), delivered: 2, read: [1], today: null, got: [1, 2] }, 'v4: got = 1..delivered');
     assert.equal(w.stats.steps, 40);
     assert.equal(w.stats.battles, 0);
     assert.deepEqual(w.flags, { 'sp.arrived': true });
   });
 
-  it('passes the v1 fixture through unchanged', () => {
-    const current = fixture('v1.json');
+  it('upgrades the v1 fixture to v2: weather gains its forecast keys, everything else is kept', () => {
+    const v1 = fixture('v1.json');
+    const res = migrateWorld(v1);
+    assert.equal(res.ok, true);
+    assert.equal(res.from, 1);
+    assert.equal(res.migrated, true);
+    assert.deepEqual(validateWorld(res.world), []);
+    assert.deepEqual(res.world.weather, {
+      day: 0, today: v1.weather.today, lead: v1.weather.today, current: v1.weather.today, onset: 0,
+      tomorrow: v1.weather.tomorrow, intensity: v1.weather.intensity, forecast: null, outlook: null, pinned: null,
+    });
+    // the 1 -> 2 step itself touches nothing else (later steps add their own keys)
+    const { weather: _a, v: _b, ...rest } = MIGRATIONS[1](JSON.parse(JSON.stringify(v1)), 1);
+    const { weather: _c, v: _d, ...rest1 } = v1;
+    assert.deepEqual(rest, rest1, 'no other key changes');
+    // a v1 save whose weather sub-tree is damaged still migrates to defaults
+    const broken = migrateWorld({ ...v1, weather: { today: '', tomorrow: 7, intensity: 3 } });
+    assert.equal(broken.ok, true);
+    assert.equal(broken.world.weather.today, 'clear');
+    assert.equal(broken.world.weather.tomorrow, 'clear');
+    assert.equal(broken.world.weather.intensity, 0);
+    assert.deepEqual(validateWorld(broken.world), []);
+    assert.equal(migrateWorld({ ...v1, weather: null }).world.weather.day, 0);
+  });
+
+  it('upgrades a v3 world to v4: letters record what arrived, npc memory and the Day Page tally gain defaults', () => {
+    const v4 = createNewWorld({ seedCode: 'MIG-V4' });
+    const v3 = JSON.parse(JSON.stringify(v4));
+    v3.v = 3;
+    v3.letters = { delivered: 3, read: [1], today: 3 };
+    v3.npcs = { wren: { met: true, talks: 2, lastTalkDay: 1, lastPorchDay: -1, nickname: 'Keeper', affinity: 1, favours: [], saidLines: { g1: 1 }, remembered: {} } };
+    delete v3.dayPage;
+    const res = migrateWorld(v3);
+    assert.equal(res.ok, true);
+    assert.equal(res.from, 3);
+    assert.deepEqual(validateWorld(res.world), []);
+    assert.deepEqual(res.world.letters, { ...lettersDefaults(), delivered: 3, read: [1], today: 3, got: [1, 2, 3], mailbox: [3] });
+    assert.deepEqual(res.world.npcs.wren, { ...npcMemoryDefaults(), met: true, talks: 2, lastTalkDay: 1, nickname: 'Keeper', affinity: 1, saidLines: { g1: 1 } });
+    assert.deepEqual(res.world.dayPage, dayPageDefaults());
+    // a read `today` is no longer in the mailbox; a bad `today` is dropped; a bad count becomes 0
+    const read = migrateWorld({ ...v3, letters: { delivered: 2, read: [2], today: 2 } }).world.letters;
+    assert.deepEqual([read.got, read.mailbox, read.today], [[1, 2], [], 2]);
+    const bad = migrateWorld({ ...v3, letters: { delivered: -4, read: [], today: 9 } }).world.letters;
+    assert.deepEqual([bad.delivered, bad.got, bad.mailbox, bad.today], [0, [], [], null]);
+    assert.deepEqual(validateWorld(migrateWorld({ ...v3, letters: null }).world), []);
+  });
+
+  it(`passes the current (v${SCHEMA_VERSION}) fixture through unchanged`, () => {
+    const current = fixture(`v${SCHEMA_VERSION}.json`);
     const res = migrateWorld(current);
     assert.equal(res.ok, true);
     assert.equal(res.migrated, false);

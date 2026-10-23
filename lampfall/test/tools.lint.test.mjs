@@ -103,9 +103,9 @@ test('DOM globals are banned in pure dirs only', () => {
 });
 
 test('documented exceptions move a write out of the problems list', () => {
-  const ex = EXCEPTIONS[0];
+  const ex = EXCEPTIONS[0] ?? { file: 'debug/hook.js', key: 'wallet', lane: 'TEST', reason: 'synthetic exception' };
   const excepted = [];
-  const problems = lintSource(ex.file, `world.${ex.key}.x = 1;`, { excepted });
+  const problems = lintSource(ex.file, `world.${ex.key}.x = 1;`, { excepted, exceptions: [ex] });
   assert.deepEqual(problems, []);
   assert.equal(excepted.length, 1);
   for (const e of EXCEPTIONS) assert.ok(e.lane && e.reason, 'every exception names a lane and a reason');

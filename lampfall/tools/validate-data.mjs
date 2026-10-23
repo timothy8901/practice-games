@@ -54,6 +54,8 @@ export const ENTITY_KINDS = Object.freeze(['npc', 'tree', 'rock', 'crack', 'sign
  * @property {((rows: string[]) => {x: number, y: number, w: number, h: number}|null)|null} [opaqueBounds]
  * @property {{TRACKS?: Record<string, any>, CUES?: Record<string|number, any>}|null} [tracks]
  * @property {Record<string, string>} [legend]   DEFAULT_LEGEND override (derived from tilesets otherwise)
+ * @property {Record<string, {ids: readonly string[], optional?: readonly string[], extras?: 'warn'|'allow', kind?: readonly string[]}>|null} [manifest]
+ *   `ids.manifest.MANIFEST`; when set, authored tables are compared with it (warnings only)
  */
 
 /**
@@ -125,6 +127,7 @@ export function validateData(DATA, opts = {}) {
     }
   }
   if (!opts.sprites && list('species').length) warn('species', '*', 'art/creatures not present: sprite, palette and heartmark rules skipped');
+  const speciesIdSet = new Set(list('species').map((sp) => sp.id));
   for (const fam of list('families')) {
     const id = fam.id;
     const forms = new Set(familyForms.get(id) ?? []);
@@ -139,8 +142,18 @@ export function validateData(DATA, opts = {}) {
           const pool = pools?.[dir];
           if (!Array.isArray(pool)) { err('families', id, `shiftTable.${form}.${dir} must be an array`); continue; }
           for (const e of pool) {
-            if (!e || !forms.has(e.form)) err('families', id, `shiftTable.${form}.${dir} -> '${e?.form}' is not a form of this family`);
-            if (!num(e?.w) || e.w <= 0) err('families', id, `shiftTable.${form}.${dir} -> '${e?.form}' weight must be > 0`);
+            // Pools may name forms of OTHER families (GDD-00 §8: Sloshkin's pools include Lumenveil, Mudfist,
+            // Rushling and Chillnub); the target only has to be a real species.
+            if (!e || !speciesIdSet.has(e.form)) err('families', id, `shiftTable.${form}.${dir} -> '${e?.form}' is not a known species`);
+            // Weight: one number > 0, or per-dial weights {drift, flux, freefall} each >= 0 with at least one > 0
+            // (a 0 means the form never appears on that dial).
+            const w = e?.w;
+            if (num(w)) { if (w <= 0) err('families', id, `shiftTable.${form}.${dir} -> '${e?.form}' weight must be > 0`); }
+            else if (w && typeof w === 'object') {
+              const dials = ['drift', 'flux', 'freefall'];
+              if (dials.some((d) => !num(w[d]) || w[d] < 0)) err('families', id, `shiftTable.${form}.${dir} -> '${e?.form}' per-dial weights need drift, flux and freefall >= 0`);
+              else if (dials.every((d) => w[d] === 0)) err('families', id, `shiftTable.${form}.${dir} -> '${e?.form}' is 0 on every dial`);
+            } else err('families', id, `shiftTable.${form}.${dir} -> '${e?.form}' weight must be a number or {drift, flux, freefall}`);
           }
         }
       }
@@ -600,7 +613,51 @@ export function validateData(DATA, opts = {}) {
     if (!setFlags.has(f)) warnings.push(`${where}: flag '${f}' is read but never set by a script or letter (a system may set it)`);
   }
 
-  return { errors, warnings };
+  const notes = [];
+  if (opts.manifest) {
+    const m = checkManifest(DATA, opts.manifest);
+    warnings.push(...m.warnings);
+    notes.push(...m.notes);
+  }
+
+  return { errors, warnings, notes };
+}
+
+/**
+ * Compares each DATA table with the id manifest (`js/data/ids.manifest.js` MANIFEST). A table counts
+ * as authored once it holds at least one manifest id; until then it gets a note, not a warning, so the
+ * placeholder tables stay quiet. For an authored table, every missing manifest id (except `optional`
+ * ones) and every id the manifest does not list (unless `extras: 'allow'`) is a warning. Warnings, not
+ * errors, until the content lanes land.
+ * @param {Record<string, any>} DATA
+ * @param {Record<string, {ids: readonly string[], optional?: readonly string[], extras?: 'warn'|'allow', kind?: readonly string[]}>} manifest
+ * @returns {{warnings: string[], notes: string[]}}
+ */
+export function checkManifest(DATA, manifest) {
+  const warnings = [];
+  const notes = [];
+  const MAX_LISTED = 20;
+  const listIds = (a) => (a.length > MAX_LISTED ? `${a.slice(0, MAX_LISTED).join(', ')} (+${a.length - MAX_LISTED} more)` : a.join(', '));
+  for (const [table, spec] of Object.entries(manifest)) {
+    const raw = DATA[table];
+    if (raw === undefined) { notes.push(`manifest: DATA has no '${table}' table yet (${spec.ids.length} manifest ids)`); continue; }
+    let rows = Array.isArray(raw) ? raw : Object.keys(raw).map((id) => ({ id }));
+    if (spec.kind) rows = rows.filter((r) => spec.kind.includes(r?.kind));
+    const have = rows.map((r) => r?.id).filter((id) => typeof id === 'string');
+    const want = new Set(spec.ids);
+    if (!have.some((id) => want.has(id))) {
+      notes.push(`manifest: '${table}' not yet authored (0 of ${spec.ids.length} manifest ids; ${have.length} other ids)`);
+      continue;
+    }
+    const haveSet = new Set(have);
+    const optional = new Set(spec.optional ?? []);
+    const missing = spec.ids.filter((id) => !haveSet.has(id) && !optional.has(id));
+    if (missing.length) warnings.push(`${table}:*: missing ${missing.length} manifest id(s): ${listIds(missing)}`);
+    if (spec.extras !== 'allow') {
+      for (const id of have) if (!want.has(id)) warnings.push(`${table}:${id}: id is not in js/data/ids.manifest.js`);
+    }
+  }
+  return { warnings, notes };
 }
 
 /**
@@ -690,6 +747,7 @@ export async function loadOptions() {
   const palette = await optional('js/art/palette.js', notes);
   const pixelart = await optional('js/core/pixelart.js', notes);
   const tracks = await optional('js/audio/tracks/index.js', notes);
+  const manifest = await optional('js/data/ids.manifest.js', notes);
   return {
     notes,
     opts: {
@@ -702,6 +760,7 @@ export async function loadOptions() {
       master: palette?.MASTER ?? null,
       opaqueBounds: typeof pixelart?.opaqueBounds === 'function' ? pixelart.opaqueBounds : null,
       tracks: tracks ? { TRACKS: tracks.TRACKS, CUES: tracks.CUES } : null,
+      manifest: manifest?.MANIFEST ?? null,
     },
   };
 }
@@ -717,7 +776,8 @@ export async function main(argv = process.argv.slice(2)) {
     ? await import(pathToFileURL(resolve(argv[di + 1])).href)
     : await import('../js/data/index.js');
   const { opts, notes } = await loadOptions();
-  const { errors, warnings } = validateData(DATA, { ...opts, ...(DEFAULT_LEGEND ? { legend: DEFAULT_LEGEND } : {}) });
+  const { errors, warnings, notes: dataNotes } = validateData(DATA, { ...opts, ...(DEFAULT_LEGEND ? { legend: DEFAULT_LEGEND } : {}) });
+  notes.push(...dataNotes);
   if (wi >= 0) {
     const file = argv[wi + 1];
     if (!file) errors.push('world: --world needs a file path');

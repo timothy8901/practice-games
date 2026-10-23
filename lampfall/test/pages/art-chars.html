@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>Character Contact Sheet</title>
+<style>
+  :root { --ink: #141b33; --deep: #2b3a67; --paper: #f4f1e6; --rule: #c9a77c; --v: #94b0c2; }
+  html, body { margin: 0; background: var(--ink); color: var(--paper); font: 12px/1.4 ui-monospace, Menlo, Consolas, monospace; }
+  body { padding: 10px 16px 24px; }
+  h1 { font-size: 13px; letter-spacing: .12em; text-transform: uppercase; margin: 0 0 2px; color: var(--rule); }
+  h2 { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; margin: 16px 0 6px; color: var(--rule); }
+  p.sub { margin: 0 0 8px; color: var(--v); max-width: 1100px; }
+  .ctl { margin: 0 0 8px; color: var(--v); } .ctl label { margin-right: 12px; }
+  canvas { image-rendering: pixelated; image-rendering: crisp-edges; display: block; }
+  .flex { display: flex; flex-wrap: wrap; gap: 8px; }
+  figure { margin: 0; text-align: center; color: var(--v); font-size: 10px; }
+  figcaption { margin-top: 2px; max-width: 160px; }
+  .row { display: flex; align-items: flex-end; gap: 6px; margin-bottom: 3px; }
+  .row .name { width: 132px; flex: none; color: var(--paper); font-weight: 700; font-size: 11px; line-height: 1.2; padding-bottom: 4px; }
+  .row .name small { display: block; color: var(--v); font-weight: 400; }
+  .strip { display: flex; gap: 2px; align-items: flex-end; }
+  .gap { width: 6px; flex: none; }
+  .anim { outline: 1px solid var(--rule); }
+  .hdr { display: flex; gap: 2px; color: var(--v); font-size: 10px; margin: 0 0 2px 138px; }
+  .hdr span { display: inline-block; text-align: center; flex: none; }
+  .exprs { display: flex; gap: 2px; }
+  .card { display: grid; grid-template-columns: 110px repeat(8, auto); gap: 2px 4px; align-items: end; }
+  .card .lbl { color: var(--paper); font-size: 11px; padding-bottom: 4px; }
+  #err { color: #ff8a8a; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<h1>Character contact sheet · LAMPFALL</h1>
+<p class="sub">ART-CHARS lane. 16-wide palette-indexed string art (js/art/chars) and 48x48 busts (js/art/portraits.js), decoded by js/core/pixelart.js. Everything at <b id="zl">3</b>x (<code>?zoom=4</code>, <code>?only=wren,corin</code>). Animated cells (outlined) walk at 12 fps. Size-as-character: Ansel 16x32, Odile 16x28, the rest 16x24 on the same tile baseline.</p>
+<div class="ctl">
+  <label><input type="checkbox" id="anim" checked> animate</label>
+  <label>backdrop <select id="bg"><option value="#4e6e5d">grass</option><option value="#c9b48a">sand</option><option value="#7a5a36">boards</option><option value="#2b3a67">night</option></select></label>
+  <label><input type="checkbox" id="outline"> silhouettes</label>
+</div>
+<div id="err"></div>
+
+<h2>Line-up on the tile grid (1x and 3x)</h2>
+<div id="lineup"></div>
+
+<h2>Portraits (48x48 busts; main cast: neutral / happy / worried / surprised)</h2>
+<div class="flex" id="portraits"></div>
+
+<h2>Lease card: 6 species x 8 fur palettes (walking toward you)</h2>
+<div class="card" id="card"></div>
+<h2>Lease card options: markings, eye shapes, blush, outfit (red panda, pine marten, opossum)</h2>
+<div id="options"></div>
+
+<h2>Cast overworld frames</h2>
+<div class="hdr" id="hdr"></div>
+<div id="rows"></div>
+
+<script type="module">
+  import { decodeSprite, drawSprite, silhouette } from '../../js/core/pixelart.js';
+  import * as C from '../../js/art/chars/index.js';
+
+  const q = new URLSearchParams(location.search);
+  const S = Number(q.get('zoom') || 3);
+  document.getElementById('zl').textContent = S;
+  const only = q.get('only') ? q.get('only').split(',') : null;
+  const errBox = document.getElementById('err');
+  const errors = [];
+  const fail = (m) => { errors.push(m); errBox.textContent = errors.join('\n'); };
+  window.addEventListener('error', (e) => fail(String(e.message)));
+  const animBox = document.getElementById('anim'), bgSel = document.getElementById('bg'), outBox = document.getElementById('outline');
+  const ids = Object.keys(C.CHAR_SPRITES).filter((id) => !only || only.includes(id));
+  const cells = []; // {c, draw(ctx, t, on)}
+  const canvas = (w, h, cls) => { const c = document.createElement('canvas'); c.width = w; c.height = h; if (cls) c.className = cls; return c; };
+  const paint = (ctx, rows, pal, x = 0, y = 0, scale = S) => {
+    let sp = decodeSprite(rows, pal, { scale });
+    if (outBox.checked) sp = silhouette(sp, '#1a1c2c');
+    drawSprite(ctx, sp, x, y);
+  };
+
+  // ---- line-up -------------------------------------------------------------
+  {
+    const root = document.getElementById('lineup');
+    const W = 480, H = 64;
+    const c1 = canvas(W, H), c3 = canvas(W * 3, H * 3);
+    root.append(c1, document.createElement('br'), c3);
+    const order = ids.filter((id) => id !== 'route-trainer');
+    cells.push({ draw(_, t, on) {
+      for (const [c, s] of [[c1, 1], [c3, 3]]) {
+        const ctx = c.getContext('2d');
+        // 16px tiles: boards then grass, a dark line on the tile row
+        for (let ty = 0; ty < H / 16; ty++) for (let tx = 0; tx < W / 16; tx++) {
+          ctx.fillStyle = ((tx + ty) & 1) ? '#4e6e5d' : '#557763';
+          ctx.fillRect(tx * 16 * s, ty * 16 * s, 16 * s, 16 * s);
+        }
+        order.forEach((id, i) => {
+          const ch = C.CHAR_SPRITES[id];
+          const tx = i * 16 + 2 * 0, ty = 48; // standing on the bottom tile row
+          if (tx + 16 > W) return;
+          const off = C.drawOffset(ch.body);
+          const step = on ? C.walkStep(t + i * 37, 83) : 0;
+          const facing = 'down';
+          paint(ctx, C.frame(ch.body, facing, step), on ? (C.animatedPalette(C.CHARACTERS[id].palette, t) || ch.palette) : ch.palette, (tx + off.x) * s, (ty - 16 + off.y + 8) * s, s);
+        });
+      }
+    } });
+  }
+
+  // ---- portraits -------------------------------------------------------------
+  try {
+    const P = await import('../../js/art/portraits.js');
+    const root = document.getElementById('portraits');
+    const list = P.PORTRAIT_IDS || Object.keys(P.PORTRAITS);
+    for (const id of list) {
+      if (only && !only.includes(id)) continue;
+      const fig = document.createElement('figure');
+      const ex = document.createElement('div'); ex.className = 'exprs';
+      for (const e of P.expressionsOf(id)) {
+        const c = canvas(48 * S, 48 * S);
+        const p = P.portrait(id, e);
+        drawSprite(c.getContext('2d'), decodeSprite(p.rows, p.palette, { scale: S }), 0, 0);
+        c.title = `${id} ${e}`;
+        ex.append(c);
+      }
+      fig.append(ex);
+      const ch = C.CHARACTERS[id];
+      fig.insertAdjacentHTML('beforeend', `<figcaption>${ch ? ch.name : id} · ${P.expressionsOf(id).join(' / ')}</figcaption>`);
+      root.append(fig);
+    }
+  } catch (e) { fail('portraits: ' + (e && e.stack || e)); }
+
+  // ---- lease card grid ------------------------------------------------------
+  {
+    const root = document.getElementById('card');
+    for (const sp of C.PLAYER_SPECIES) {
+      const lbl = document.createElement('div'); lbl.className = 'lbl'; lbl.textContent = C.SPECIES_INFO[sp].name; root.append(lbl);
+      C.FUR_PALETTES[sp].forEach((fp, i) => {
+        const fig = document.createElement('figure');
+        const c = canvas(16 * S, 24 * S, 'anim'); fig.append(c);
+        fig.insertAdjacentHTML('beforeend', `<figcaption>${fp.name}</figcaption>`);
+        root.append(fig);
+        const card = { species: sp, fur: i };
+        cells.push({ c, draw(ctx, t, on) { const L = C.playerLook(card); paint(ctx, C.frame(L.body, 'down', on ? C.walkStep(t + i * 50, 83) : 0), L.palette); } });
+      });
+    }
+  }
+  {
+    const root = document.getElementById('options');
+    const variants = [
+      ['plain', {}], ['mask', { markings: ['mask'] }], ['socks', { markings: ['socks'] }], ['stripe', { markings: ['stripe'] }],
+      ['freckles', { markings: ['freckles'] }], ['blaze', { markings: ['blaze'] }], ['sleepy eyes', { eyes: 'sleepy' }], ['bright eyes', { eyes: 'bright' }],
+      ['blush', { blush: true }], ['apron', { outfit: 'apron' }], ['all', { markings: ['mask', 'socks', 'stripe', 'freckles', 'blaze'], blush: true, eyes: 'bright' }],
+    ];
+    for (const sp of ['red-panda', 'pine-marten', 'opossum']) {
+      const row = document.createElement('div'); row.className = 'row';
+      row.insertAdjacentHTML('beforeend', `<div class="name">${C.SPECIES_INFO[sp].name}</div>`);
+      const strip = document.createElement('div'); strip.className = 'strip';
+      for (const [name, v] of variants) {
+        const fig = document.createElement('figure');
+        const card = { species: sp, fur: sp === 'pine-marten' ? 2 : 0, ...v };
+        const cs = ['down', 'left', 'up'].map(() => canvas(16 * S, 24 * S));
+        const g = document.createElement('div'); g.className = 'strip'; cs.forEach((c) => g.append(c));
+        fig.append(g); fig.insertAdjacentHTML('beforeend', `<figcaption>${name}</figcaption>`);
+        strip.append(fig, Object.assign(document.createElement('div'), { className: 'gap' }));
+        ['down', 'left', 'up'].forEach((f, k) => cells.push({ c: cs[k], draw(ctx) { const L = C.playerLook(card); paint(ctx, C.frame(L.body, f, 0), L.palette); } }));
+      }
+      row.append(strip); root.append(row);
+    }
+  }
+
+  // ---- cast rows -------------------------------------------------------------
+  const COLS = [
+    ...['down', 'up', 'left', 'right'].map((f) => ({ facing: f, step: 'anim', label: f[0].toUpperCase() + '~', anim: true })),
+    { gap: true },
+    ...['down', 'up', 'left'].flatMap((f) => [0, 1, 2, 3].map((s) => ({ facing: f, step: s, label: f[0].toUpperCase() + s }))),
+    { gap: true },
+    { facing: 'sit', label: 'sit' },
+    { facing: 'fish', label: 'fish~', w: 24, step: 'cast', anim: true },
+    ...[0, 1, 2, 3].map((s) => ({ facing: 'fish', label: 'f' + s, w: 24, step: s })),
+    { facing: 'hang', label: 'pose', poseOnly: true },
+  ];
+  const hdr = document.getElementById('hdr');
+  for (const col of COLS) {
+    const s = document.createElement('span');
+    s.style.width = col.gap ? '6px' : ((col.w || 16) * S) + 'px';
+    s.textContent = col.label || '';
+    hdr.append(s);
+  }
+  const rowsRoot = document.getElementById('rows');
+  for (const id of ids) {
+    const ch = C.CHAR_SPRITES[id];
+    const body = ch.body;
+    const row = document.createElement('div'); row.className = 'row';
+    row.insertAdjacentHTML('beforeend', `<div class="name">${ch.name}<small>${ch.species} · ${C.CHARACTERS[id].body} · ${body.w}x${body.h}</small></div>`);
+    const strip = document.createElement('div'); strip.className = 'strip';
+    for (const col of COLS) {
+      if (col.gap) { const d = document.createElement('div'); d.className = 'gap'; strip.append(d); continue; }
+      const c = canvas((col.w || 16) * S, body.h * S, col.anim ? 'anim' : '');
+      strip.append(c);
+      if (col.poseOnly && !(body.poses && (body.poses.hang || body.poses.perch))) { c.style.visibility = 'hidden'; continue; }
+      cells.push({ c, draw(ctx, t, on) {
+        const castSeq = [[1, 260], [2, 200], [0, 1400], [3, 220], [0, 120], [3, 220], [0, 600]];
+        const castLen = castSeq.reduce((a, [, d]) => a + d, 0);
+        let ct = on ? t % castLen : 1e9, castStep = 0;
+        for (const [f, d] of castSeq) { if (ct < d) { castStep = f; break; } ct -= d; }
+        const st = col.step === 'anim' ? (on ? C.walkStep(t, 83) : 0) : col.step === 'cast' ? castStep : col.step || 0;
+        const facing = col.poseOnly ? (body.poses.hang ? 'hang' : 'perch') : col.facing;
+        const pal = on ? (C.animatedPalette(C.CHARACTERS[id].palette, t) || ch.palette) : ch.palette;
+        paint(ctx, C.frame(body, facing, st), id === 'player' ? ch.palette : pal);
+      } });
+    }
+    row.append(strip); rowsRoot.append(row);
+  }
+
+  const t0 = performance.now();
+  let frames = 0;
+  function render(now) {
+    const t = Math.max(0, now - t0), on = animBox.checked;
+    for (const cell of cells) {
+      const ctx = cell.c ? cell.c.getContext('2d') : null;
+      if (ctx) { ctx.fillStyle = bgSel.value; ctx.fillRect(0, 0, cell.c.width, cell.c.height); }
+      try { cell.draw(ctx, t, on); } catch (e) { fail(String(e && e.stack || e)); cell.draw = () => {}; }
+    }
+    frames++;
+  }
+  (function loop(now) { render(now); requestAnimationFrame(loop); })(performance.now());
+  window.__sheet = { characters: ids.length, cells: cells.length, errors, frames: () => frames };
+</script>
+</body>
+</html>

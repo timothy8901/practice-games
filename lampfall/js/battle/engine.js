@@ -98,32 +98,58 @@ const ENGINE_DEFAULTS = Object.freeze({
  */
 export const DEFAULTS = Object.freeze({ ...EFFECT_DEFAULTS, ...CREATURE_DEFAULTS, ...ABILITY_DEFAULTS, ...DATA_DEFAULTS, ...ENGINE_DEFAULTS });
 
-/** Convenience names for the defaults most callers and tests read. */
+// Convenience names for the defaults most callers and tests read (each equals its DEFAULTS key).
+/** `DEFAULTS.evasionMult`. */
 export const EVASION_MULT = DEFAULTS.evasionMult;
+/** `DEFAULTS.evasionCap`. */
 export const EVASION_CAP = DEFAULTS.evasionCap;
+/** `DEFAULTS.stageCap`. */
 export const STAGE_CAP = DEFAULTS.stageCap;
+/** `DEFAULTS.critRates`. */
 export const CRIT_RATES = DEFAULTS.critRates;
+/** `DEFAULTS.critMult`. */
 export const CRIT_MULT = DEFAULTS.critMult;
+/** `DEFAULTS.stab`. */
 export const STAB = DEFAULTS.stab;
+/** `DEFAULTS.scrapCost`. */
 export const SCRAP_COST = DEFAULTS.scrapCost;
+/** `DEFAULTS.chip`. */
 export const CHIP = DEFAULTS.chip;
+/** `DEFAULTS.trapTurns`. */
 export const TRAP_TURNS = DEFAULTS.trapTurns;
+/** `DEFAULTS.crackdustTurns`. */
 export const CRACKDUST_TURNS = DEFAULTS.crackdustTurns;
+/** `DEFAULTS.plumblineBlockTurns`. */
 export const PLUMBLINE_BLOCK_TURNS = DEFAULTS.plumblineBlockTurns;
+/** `DEFAULTS.captureFailBonus`. */
 export const CAPTURE_FAIL_BONUS = DEFAULTS.captureFailBonus;
+/** `DEFAULTS.captureFailCap`. */
 export const CAPTURE_FAIL_CAP = DEFAULTS.captureFailCap;
+/** `DEFAULTS.lantern`. */
 export const LANTERN = DEFAULTS.lantern;
+/** `DEFAULTS.captureBands`. */
 export const CAPTURE_BANDS = DEFAULTS.captureBands;
+/** `DEFAULTS.benchShare`. */
 export const BENCH_SHARE = DEFAULTS.benchShare;
+/** `DEFAULTS.yardShare`. */
 export const YARD_SHARE = DEFAULTS.yardShare;
+/** `DEFAULTS.catchUpStep`. */
 export const CATCH_UP_STEP = DEFAULTS.catchUpStep;
+/** `DEFAULTS.catchUpCap`. */
 export const CATCH_UP_CAP = DEFAULTS.catchUpCap;
+/** `DEFAULTS.dampStart`. */
 export const DAMP_START = DEFAULTS.dampStart;
+/** `DEFAULTS.dampFactor`. */
 export const DAMP_FACTOR = DEFAULTS.dampFactor;
+/** `DEFAULTS.blackoutRate`. */
 export const BLACKOUT_RATE = DEFAULTS.blackoutRate;
+/** `DEFAULTS.blackoutCap`. */
 export const BLACKOUT_CAP = DEFAULTS.blackoutCap;
+/** `DEFAULTS.trainerExpMult`. */
 export const TRAINER_EXP_MULT = DEFAULTS.trainerExpMult;
+/** `DEFAULTS.maxTurns`. */
 export const MAX_TURNS = DEFAULTS.maxTurns;
+/** `DEFAULTS.mendsPerBattle`. */
 export const MENDS_PER_BATTLE = DEFAULTS.mendsPerBattle;
 
 /** The three Chaos dial positions. */

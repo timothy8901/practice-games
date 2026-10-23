@@ -16,6 +16,7 @@ import { tokenDevice } from '../core/input.js';
 import { validateWorld } from '../state/schema.js';
 import * as clockSys from '../systems/clockSys.js';
 import { setFlag } from '../systems/flags.js';
+import * as wallet from '../systems/wallet.js';
 
 /** Hooks that belong to another lane, with the lane that owns the real implementation. */
 export const LANE_HOOKS = Object.freeze({
@@ -81,7 +82,8 @@ export function fallbackGive(world, itemId, n) {
 }
 
 /**
- * Day-1 `earn`: adds to the main wallet (negative amounts spend; the balance never drops below 0).
+ * `earn`: adds to the main wallet through `systems/wallet.adjust` (negative amounts spend; the
+ * balance never drops below 0).
  * @param {object} world
  * @param {number} amount
  * @returns {number} new balance
@@ -89,8 +91,7 @@ export function fallbackGive(world, itemId, n) {
 export function fallbackEarn(world, amount) {
   const delta = Math.trunc(Number(amount));
   if (!Number.isFinite(delta)) throw new TypeError('__game.earn: amount must be a finite number');
-  world.wallet.main = Math.max(0, world.wallet.main + delta);
-  return world.wallet.main;
+  return wallet.adjust(/** @type {any} */ (world), delta).balance;
 }
 
 /**

@@ -1282,6 +1282,8 @@ export const family = {
 };
 ```
 
+**Amendment (GDD-00 §8):** pool entries may name forms of other families (the target must be a real species), and `w` may be a single number > 0 or per-dial weights `{ drift, flux, freefall }` (each ≥ 0, at least one > 0; 0 = never on that dial). `tools/validate-data.mjs` enforces both.
+
 ### 14.3 Move — `js/data/moves/<type>.js`
 
 ```js

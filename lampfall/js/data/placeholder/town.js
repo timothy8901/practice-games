@@ -8,7 +8,7 @@
 
 /** @type {ReadonlyArray<import('../index.js').Item>} */
 export const ITEMS = Object.freeze([
-  { id: 'ph-lantern', name: 'PLACEHOLDER Lantern', pocket: 'catch', price: 250, sell: 125, stack: 20, use: 'capture:1', oneOfAKind: false, text: 'Shows the odds before you commit.' },
+  { id: 'ph-lantern', name: 'PLACEHOLDER Lantern', pocket: 'tools', price: 250, sell: 125, stack: 20, use: 'capture:1', oneOfAKind: false, text: 'Shows the odds before you commit.' },
 ]);
 
 /** @type {ReadonlyArray<import('../index.js').NpcDef>} */

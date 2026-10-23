@@ -83,7 +83,7 @@ describe('strict write guard', () => {
     assert.equal(s.strict, true);
     assert.throws(() => { s.world.wallet.main = 5; }, StrictWriteError);
     assert.throws(() => { s.world.party.push({}); }, StrictWriteError);
-    assert.throws(() => { s.world.bag.pockets.items.push({ id: 'x', n: 1 }); }, StrictWriteError);
+    assert.throws(() => { s.world.bag.pockets.medicine.push({ id: 'x', n: 1 }); }, StrictWriteError);
     assert.throws(() => { delete s.world.flags['sp.x']; }, StrictWriteError);
     assert.throws(() => { s.world.flags['sp.x'] = true; }, (e) => e instanceof StrictWriteError && e.path === 'flags.sp.x');
     assert.throws(() => { Object.defineProperty(s.world.wallet, 'main', { value: 1 }); }, StrictWriteError);
@@ -92,7 +92,7 @@ describe('strict write guard', () => {
     s.tx('ok', (w) => {
       w.wallet.main = 5;
       w.party.push({ uid: 'c1' });
-      w.bag.pockets.items.push({ id: 'x', n: 1 });
+      w.bag.pockets.medicine.push({ id: 'x', n: 1 });
       w.flags['sp.x'] = true;
       delete w.flags['sp.x'];
       w.log.unshift('a');
@@ -106,8 +106,9 @@ describe('strict write guard', () => {
     const s = createStore(world(), { strict: true });
     assert.equal(s.world.wallet, s.world.wallet);
     assert.equal(s.world.wallet.main, 0);
-    assert.equal(JSON.stringify(s.world.wallet), '{"main":0,"starsalt":0,"anchors":0,"purse":0}');
-    assert.deepEqual(Object.keys(s.world.letters), ['delivered', 'read', 'today']);
+    assert.equal(JSON.stringify(s.world.wallet), JSON.stringify(s.raw().wallet));
+    assert.deepEqual(Object.keys(s.world.wallet).slice(0, 4), ['main', 'starsalt', 'anchors', 'purse']);
+    assert.deepEqual(Object.keys(s.world.letters).slice(0, 4), ['delivered', 'read', 'today', 'got']);
     assert.equal(Array.isArray(s.world.party), true);
     assert.notEqual(s.world, s.raw(), 'exposed world is the proxy');
   });

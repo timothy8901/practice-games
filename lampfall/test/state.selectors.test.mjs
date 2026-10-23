@@ -120,8 +120,8 @@ describe('run selectors', () => {
 
   it('itemCount sums stacks across pockets', () => {
     const w = world();
-    w.bag.pockets.items.push({ id: 'berry', n: 3 });
-    w.bag.pockets.catch.push({ id: 'berry', n: 2 }, { id: 'rod', n: 1 });
+    w.bag.pockets.medicine.push({ id: 'berry', n: 3 });
+    w.bag.pockets.wicks.push({ id: 'berry', n: 2 }, { id: 'rod', n: 1 });
     assert.equal(sel.itemCount(w, 'berry'), 5);
     assert.equal(sel.itemCount(w, 'rod'), 1);
     assert.equal(sel.itemCount(w, 'none'), 0);
@@ -140,7 +140,7 @@ describe('run selectors', () => {
     w.fieldLog.forms.sloshkin.held = true;
     assert.equal(sel.fieldLogState(w, 'sloshkin'), 'held');
     const ms = sel.mapState(w, 'nowhere');
-    assert.deepEqual(ms, { visited: false, picked: {}, trees: {}, cracks: {}, reach: {}, opened: [] });
+    assert.deepEqual(ms, { visited: false, picked: {}, trees: {}, cracks: {}, reach: {}, reachAt: {}, opened: [] });
     assert.equal('nowhere' in w.maps, false, 'reading never writes');
     w.maps.harbor = { ...ms, visited: true };
     assert.equal(sel.mapState(w, 'harbor').visited, true);

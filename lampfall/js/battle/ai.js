@@ -57,9 +57,12 @@ export const DEFAULTS = Object.freeze({
 
 /** Profile names. */
 export const AI_PROFILES = Object.freeze(Object.keys(DEFAULTS.profiles));
+/** Profiles by name (the table tools/validate-data checks trainer `ai` fields against). */
+export const PROFILES = DEFAULTS.profiles;
 
-/** Prototype names kept for callers and tests. */
+/** Prototype name: the 'trainer' profile's heal threshold. */
 export const HEAL_THRESHOLD = DEFAULTS.profiles.trainer.healThreshold;
+/** Prototype name: the 'trainer' profile's evasion uses per battle. */
 export const MAX_EVASION_USES = DEFAULTS.profiles.trainer.maxEvasionUses;
 
 /**

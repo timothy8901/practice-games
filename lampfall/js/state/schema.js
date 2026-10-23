@@ -14,10 +14,50 @@
  */
 
 import { makeRng, hashString, decodeSeedCode } from '../core/rng.js';
-import { CLOCK_STATE_VERSION, DEFAULT_START_MINUTE } from '../core/time.js';
+import { CLOCK_STATE_VERSION, DEFAULT_START_MINUTE, MINUTES_PER_DAY, TIDE_PERIOD_MINUTES, scheduleForSeed } from '../core/time.js';
+
+/**
+ * Minute of day a new run starts at on game day 1: 17:40, the arrival, the instant the rising tide
+ * closes the mainland causeway behind the player (GDD-00 §5 tide model, §12 "0:30 | 17:40 (held)").
+ * `systems/clockSys` owns the clock from here on. [GDD]
+ */
+export const NEW_GAME_START_MINUTE = 17 * 60 + 40;
+/** Minute of day of game day 1's (lower) low water, 16:40 (GDD-00 §5 "Day 1 is seeded"). [GDD] */
+export const DAY1_LOW_MINUTE = 16 * 60 + 40;
+/** Prefix of the clock seeds {@link tideSeedFor} searches. */
+export const TIDE_SEED_PREFIX = 'lampfall:tide:';
+/** @type {Map<number, string>} */
+const TIDE_SEED_CACHE = new Map();
+
+/**
+ * The core/time clock seed whose tide schedule (`scheduleForSeed(seed).tideOffset`) puts a low at
+ * `day1Low` on game day 1: the first `'lampfall:tide:<i>'` that hashes to the right offset. Every run
+ * shares it (the run seed never shapes the tide), so `world.clock.seed`, the live clock and
+ * `state/selectors` agree from `createNewWorld` on. Pure and memoized. Lives here, not in
+ * `systems/clockSys` (which re-exports it), because state may not import systems (§13.5).
+ * @param {number} [day1Low=DAY1_LOW_MINUTE] integer minute of day 0..1439
+ * @returns {string}
+ * @throws {TypeError} on a bad minute; Error if no seed is found (cannot happen for the core hash)
+ */
+export function tideSeedFor(day1Low = DAY1_LOW_MINUTE) {
+  if (!Number.isInteger(day1Low) || day1Low < 0 || day1Low >= MINUTES_PER_DAY) {
+    throw new TypeError(`tideSeedFor: day1Low must be an integer minute 0..1439, got ${day1Low}`);
+  }
+  const offset = day1Low % TIDE_PERIOD_MINUTES;
+  const hit = TIDE_SEED_CACHE.get(offset);
+  if (hit !== undefined) return hit;
+  for (let i = 0; i < 200_000; i++) {
+    const seed = `${TIDE_SEED_PREFIX}${i}`;
+    if (scheduleForSeed(seed).tideOffset === offset) {
+      TIDE_SEED_CACHE.set(offset, seed);
+      return seed;
+    }
+  }
+  throw new Error(`tideSeedFor: no seed found for tide offset ${offset}`);
+}
 
 /** Version stamped on `world.v`; bump together with a new entry in `migrate.MIGRATIONS`. */
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 5;
 
 /** Maximum party size. */
 export const PARTY_MAX = 6;
@@ -29,6 +69,10 @@ export const TRAINED_MAX = 252;
 export const LEVEL_MAX = 100;
 /** Number of Day Page lines kept in `world.log`. */
 export const LOG_MAX = 60;
+/** Number of notes kept in `world.dayPage.notes`. */
+export const DAY_NOTES_MAX = 40;
+/** Answers the player can give a neighbor's nickname for them (GDD-00 §12, v4). */
+export const NICKNAME_CHOICES = Object.freeze(['accept', 'decline', 'counter']);
 
 /** Stat keys, in canonical order. */
 export const STAT_KEYS = Object.freeze(['hp', 'atk', 'def', 'spa', 'spd', 'spe']);
@@ -43,12 +87,13 @@ export const SCALE_MODES = Object.freeze(['integer', 'fit']);
 /** Auto-anchor presets accepted per creature in `settings.autoAnchor`. */
 export const AUTO_ANCHOR_MODES = Object.freeze(['auto-anchor', 'auto-up']);
 /** Namespaces a flag id must start with (§3.1 / §8.1). */
-export const FLAG_NAMESPACES = Object.freeze(['sp.', 'th.', 'np.', 'sys.', 'seen.']);
+export const FLAG_NAMESPACES = Object.freeze(['lit.', 'sp.', 'th.', 'np.', 'sys.', 'seen.', 'stamp.']);
 /**
- * Bag pockets that exist from day one. The data lane may add more through `systems/bag`; these are
- * the ones the schema guarantees. // [GDD: final pocket list]
+ * Bag pockets that exist from day one (GDD-00 §13 Satchel tabs: Wicks, Medicine, Discs, Finds, Held,
+ * Keepsakes, plus the untabbed `tools` pocket that holds the tool-ring items). Versions 1-2 used
+ * `items/tools/catch/keepsakes/key`; `migrate` step 2 -> 3 folds those into these.
  */
-export const POCKET_IDS = Object.freeze(['items', 'tools', 'catch', 'keepsakes', 'key']);
+export const POCKET_IDS = Object.freeze(['wicks', 'medicine', 'discs', 'finds', 'held', 'keepsakes', 'tools']);
 /** Stat counters tracked in `world.stats`, in display order. */
 export const STAT_COUNTERS = Object.freeze([
   'playMs', 'steps', 'battles', 'catches', 'forecasts', 'rerolls', 'anchors', 'wardWalls', 'blackouts',
@@ -128,6 +173,8 @@ export const WORLDGEN_LABEL = 'worldgen';
  * @property {number} intensity   0..1, today's strength (particles, overlays, effect multipliers)
  * @property {WeatherForecast|null} forecast   today's forecast as Augusta posted it at dawn
  * @property {WeatherForecast|null} outlook    tomorrow's forecast (Day Page "Tomorrow:" line)
+ * @property {{day: number, kind: string}|null} pinned   a later day whose weather is set in advance
+ *   (Wren's small talk sets tomorrow's weather); cleared once that day has passed
  */
 
 /**
@@ -137,7 +184,7 @@ export const WORLDGEN_LABEL = 'worldgen';
  * @property {number} odds        integer 1..10: "7 in 10"
  * @property {number} minute      minute of day of the tide the forecast names (integer 0..1439)
  * @property {'low'|'high'} tide  which tide it names
- * @property {string} part        day-part word for that tide ('morning' | 'afternoon' | 'evening' | 'night')
+ * @property {string} part        the day-part's tide word for that tide ('dawn' | 'morning' | 'midday' | 'afternoon' | 'evening' | 'night')
  */
 
 /**
@@ -169,17 +216,37 @@ export const WORLDGEN_LABEL = 'worldgen';
  */
 
 /**
- * @typedef {Object} Bag
- * @property {Record<string, ItemStack[]>} pockets    pocket id -> stacks
- * @property {Record<string, number>} capacity        pocket id -> max stacks (0 = unlimited)
+ * Overflow basket left on the map at the player's feet when the satchel is full (systems/bag).
+ * @typedef {Object} Basket
+ * @property {string} id          'b' + sequence
+ * @property {string} mapId
+ * @property {number} x
+ * @property {number} y
+ * @property {number} day         economy day it was left (systems/bag)
+ * @property {ItemStack[]} items
  */
 
 /**
+ * @typedef {Object} Bag
+ * @property {Record<string, ItemStack[]>} pockets    pocket id -> stacks
+ * @property {Record<string, number>} capacity        pocket id -> max stacks in that pocket (0 = only the shared satchel limit)
+ * @property {number} extraSlots                     satchel slots added by builds (base and max are tuning: bagSlotsBase / bagSlotsMax)
+ * @property {Basket[]} baskets                      overflow baskets lying on maps
+ * @property {number} basketSeq                      last basket sequence number used
+ */
+
+/**
+ * Currencies are `main`, `starsalt`, `anchors`, `purse` (§15.4); the other keys are the wallet's own
+ * bookkeeping (systems/wallet, v3).
  * @typedef {Object} Wallet
  * @property {number} main
  * @property {number} starsalt
  * @property {number} anchors
- * @property {number} purse
+ * @property {number} purse            Keeper's Purse: blackout refund still owed
+ * @property {number} purseGlints      Glints left that pay the purse back (equal shares)
+ * @property {number} starsaltDay      economy day `starsaltBought` counts for (-1 = never)
+ * @property {number} starsaltBought   Starsalt bought on `starsaltDay` (shared daily cap)
+ * @property {string[]} anchorGrants   anchor grants already applied ('@start', spire ids)
  */
 
 /**
@@ -200,7 +267,20 @@ export const WORLDGEN_LABEL = 'worldgen';
  * @property {number} scaffold      scaffold stage shown in town
  * @property {string[]} commissions chosen commission ids
  * @property {{jar: number, built: string[]}} commons
- * @property {string[]} residentShares
+ * @property {string[]} residentShares   finished lead-thread ids already credited
+ * @property {string[]} errands          First Night Errand ids already credited (v3)
+ * @property {string[]} spireShares      spire ids whose share was credited (v3)
+ * @property {Array<{tier: number, day: number}>} tally   split sticks on the tally wall, in order (v3)
+ * @property {Array<{day: number, amount: number, source: string}>} log   recent credits: pace line, today by source (v3)
+ */
+
+/**
+ * Shop bookkeeping (systems/shops, v3). Day-scoped counters reset lazily when `day` changes.
+ * @typedef {Object} ShopsState
+ * @property {number} day                        economy day the counters belong to (-1 = never)
+ * @property {Record<string, number>} sold       '<shopId>/<itemId>' -> bought today (per-row qty limits)
+ * @property {Record<string, number>} wantedSold itemId -> sold today at the Wanted Today rate
+ * @property {ItemStack[]} crate                 Consignment Crate contents, sold overnight
  */
 
 /**
@@ -212,10 +292,25 @@ export const WORLDGEN_LABEL = 'worldgen';
  */
 
 /**
+ * Letters state (GDD-00 §11: Keeper, family and town channels plus two event letters; written only
+ * by systems/letters). Letter numbers `n` are the content's global, contiguous 1..N numbering;
+ * arrival order is not `n` order (a family letter can arrive before the next Keeper letter), so
+ * `got` (v4) lists what has arrived.
  * @typedef {Object} LettersState
- * @property {number} delivered      count of letters delivered so far (letters are 1..n contiguous)
+ * @property {number} delivered      count of letters delivered so far (always `got.length`)
  * @property {number[]} read         letter numbers read
- * @property {number|null} today     letter number waiting in the mailbox, or `null`
+ * @property {number|null} today     the Keeper letter that arrived this morning, or `null`
+ * @property {number[]} got          letter numbers delivered, in arrival order (v4)
+ * @property {number[]} mailbox      delivered to the mailbox and not yet collected (v4)
+ * @property {number|null} counter   family letter waiting at Hesper's counter, or `null` (v4)
+ * @property {number[]} carrying     family letters in the satchel, not yet taken to their door (v4)
+ * @property {number[]} doors        family letters handed in at their door (v4)
+ * @property {number[]} awaiting     handed in at a dark porch; the heirloom waits for the porch to light (v4)
+ * @property {number[]} returned     family letters whose heirloom has come home (v4)
+ * @property {string[]} pinned       find ids pinned on Barnaby's string wall (v4)
+ * @property {number} keeperDay      core day of the last Keeper letter delivery, -1 before any (v4)
+ * @property {number} familyDay      core day of the last family letter arrival, -1 before any (v4)
+ * @property {number} townDay        core day of the last town letter by morning post, -1 before any (v4)
  */
 
 /**
@@ -229,6 +324,11 @@ export const WORLDGEN_LABEL = 'worldgen';
  * @property {string[]} favours
  * @property {Record<string, number>} saidLines     line id -> day said
  * @property {Record<string, any>} remembered       script `remember` op values (JSON only)
+ * @property {Record<string, {n: number, lastDay: number}>} gifts   item id -> times given and last core day (v4)
+ * @property {'accept'|'decline'|'counter'|null} nicknameChoice   how the player answered this neighbor's nickname (v4)
+ * @property {string|null} lastLineId               the line said most recently (Linger skips it) (v4)
+ * @property {number} lingerDay                     core day the Linger second topic was last used, -1 never (v4)
+ * @property {number} lastGiftDay                   core day of the last gift, -1 never (v4)
  */
 
 /**
@@ -238,6 +338,7 @@ export const WORLDGEN_LABEL = 'worldgen';
  * @property {Record<string, number>} trees       tree key -> regrow day
  * @property {Record<string, boolean>} cracks     crack key -> opened
  * @property {Record<string, number>} reach       fishing reach id -> health 0..1
+ * @property {Record<string, number>} reachAt     fishing reach id -> total minute its health was last set (recovery runs from here; v5)
  * @property {string[]} opened                    one-shot trigger / chest ids
  */
 
@@ -259,6 +360,28 @@ export const WORLDGEN_LABEL = 'worldgen';
  * @property {Record<string, {n: number}>} bugs
  * @property {Record<string, {n: number, cleaned: boolean}>} relics
  * @property {string[]} donated
+ * @property {Record<string, number>} patientBest   fish id -> best size landed in Patient mode (its own record board; v5)
+ * @property {number} cleanedDay                    core day of the Kiln lead's clean-on-the-spot, -1 never (v5)
+ */
+
+/**
+ * Encounter bookkeeping (written only by systems/encounter, v5).
+ * @typedef {Object} EncounterState
+ * @property {number} steps      steps since the last wild encounter (the "never chain instantly" floor)
+ * @property {Record<string, {seen: boolean, downDay: number|null, downBadges: number|null, downPlayMs: number|null}>} errants
+ *   Errant species -> seen (shown on the map) and when it was last beaten or caught (null = up)
+ */
+
+/**
+ * The running Day Page tally (written only by systems/dayPage, v4): a stats snapshot at day start,
+ * amounts noted from domain events, and the last summary (for the porch-bench re-read).
+ * @typedef {Object} DayPageState
+ * @property {number} day                    core day the tally covers, -1 before the first day starts
+ * @property {Record<string, number>} base   `world.stats` counters at day start
+ * @property {number} earned                 buttons earned today
+ * @property {number} paid                   buttons paid toward the loans today
+ * @property {string[]} notes                short note ids noted today (max DAY_NOTES_MAX)
+ * @property {Record<string, any>|null} last the last Day Page summary, or null
  */
 
 /**
@@ -331,6 +454,7 @@ export const WORLDGEN_LABEL = 'worldgen';
  * @property {Bag} bag
  * @property {Wallet} wallet
  * @property {LoanState} loans
+ * @property {ShopsState} shops
  * @property {Record<string, boolean|number|string>} flags   namespaced: `sp.` `th.<thread>.` `np.<npc>.` `sys.` `seen.<scriptId>`
  * @property {Record<string, number>} counters
  * @property {Record<string, ThreadState>} threads
@@ -347,6 +471,8 @@ export const WORLDGEN_LABEL = 'worldgen';
  * @property {Record<string, number[]>} rng      saved states of STATEFUL forks only (§9)
  * @property {Stats} stats
  * @property {string[]} log                      last 60 Day Page lines (Archive)
+ * @property {DayPageState} dayPage              today's Day Page tally (v4)
+ * @property {EncounterState} encounter          step floor and Errant state (v5)
  */
 
 // ---------------------------------------------------------------------------------------------
@@ -411,12 +537,27 @@ export function npcMemoryDefaults() {
   return {
     met: false, talks: 0, lastTalkDay: -1, lastPorchDay: -1, nickname: null, affinity: 0,
     favours: [], saidLines: {}, remembered: {},
+    gifts: {}, nicknameChoice: null, lastLineId: null, lingerDay: -1, lastGiftDay: -1,
   };
+}
+
+/** @returns {LettersState} */
+export function lettersDefaults() {
+  return {
+    delivered: 0, read: [], today: null,
+    got: [], mailbox: [], counter: null, carrying: [], doors: [], awaiting: [], returned: [], pinned: [],
+    keeperDay: -1, familyDay: -1, townDay: -1,
+  };
+}
+
+/** @returns {DayPageState} */
+export function dayPageDefaults() {
+  return { day: -1, base: {}, earned: 0, paid: 0, notes: [], last: null };
 }
 
 /** @returns {MapState} */
 export function mapStateDefaults() {
-  return { visited: false, picked: {}, trees: {}, cracks: {}, reach: {}, opened: [] };
+  return { visited: false, picked: {}, trees: {}, cracks: {}, reach: {}, reachAt: {}, opened: [] };
 }
 
 /** @returns {ThreadState} */
@@ -434,7 +575,7 @@ export function fieldLogEntryDefaults() {
  * @returns {WeatherState}
  */
 export function weatherStateDefaults() {
-  return { day: 0, today: 'clear', lead: 'clear', current: 'clear', onset: 0, tomorrow: 'clear', intensity: 0, forecast: null, outlook: null };
+  return { day: 0, today: 'clear', lead: 'clear', current: 'clear', onset: 0, tomorrow: 'clear', intensity: 0, forecast: null, outlook: null, pinned: null };
 }
 
 /** @returns {Settings} */
@@ -511,8 +652,8 @@ export function worldDefaults() {
     party: [],
     box: [],
     yard: [],
-    bag: { pockets, capacity },
-    wallet: { main: 0, starsalt: 0, anchors: 0, purse: 0 },
+    bag: { pockets, capacity, extraSlots: 0, baskets: [], basketSeq: 0 },
+    wallet: { main: 0, starsalt: 0, anchors: 0, purse: 0, purseGlints: 0, starsaltDay: -1, starsaltBought: 0, anchorGrants: [] },
     loans: {
       tier: 1,
       paid: 0,
@@ -521,15 +662,20 @@ export function worldDefaults() {
       commissions: [],
       commons: { jar: 0, built: [] },
       residentShares: [],
+      errands: [],
+      spireShares: [],
+      tally: [],
+      log: [],
     },
+    shops: { day: -1, sold: {}, wantedSold: {}, crate: [] },
     flags: {},
     counters: {},
     threads: {},
-    letters: { delivered: 0, read: [], today: null },
+    letters: lettersDefaults(),
     npcs: {},
     maps: {},
     fieldLog: { forms: {}, tells: {} },
-    collections: { fish: {}, bugs: {}, relics: {}, donated: [] },
+    collections: { fish: {}, bugs: {}, relics: {}, donated: [], patientBest: {}, cleanedDay: -1 },
     badges: [],
     pendingShifts: [],
     pendingScript: null,
@@ -538,6 +684,8 @@ export function worldDefaults() {
     rng: {},
     stats: zeroCounters(),
     log: [],
+    dayPage: dayPageDefaults(),
+    encounter: { steps: 0, errants: {} },
   };
 }
 
@@ -625,7 +773,10 @@ export function createNewWorld(opts) {
 
   // --- clock mirrors settings so clockSys.optionsFrom(world) is self-contained ---
   world.clock.realClock = world.settings.realClock === true;
-  world.clock.seed = seed;
+  // The GDD tide (day 1's low at 16:40) for every run, and the arrival at 17:40: the run seed feeds
+  // every other stream but never the tide (systems/clockSys notes). Selectors read this seed directly.
+  world.clock.seed = tideSeedFor();
+  world.clock.total = NEW_GAME_START_MINUTE;
 
   return world;
 }
@@ -655,6 +806,7 @@ const nonNegInt = (v) => isInt(v) && v >= 0;
 const unit = (v) => isNum(v) && v >= 0 && v <= 1;
 const strArray = (v) => Array.isArray(v) && v.every(isStr);
 const intArray = (v) => Array.isArray(v) && v.every(isInt);
+const isStackList = (v) => Array.isArray(v) && v.every((s) => isPlainObject(s) && isStr(s.id) && isInt(s.n) && s.n >= 1);
 /** A posted forecast (see the WeatherForecast typedef); exact keys, nothing extra. */
 const FORECAST_KEYS = Object.freeze(['kind', 'minute', 'odds', 'part', 'tide']);
 const isWeatherForecast = (f) => isPlainObject(f)
@@ -754,6 +906,7 @@ const WORLD_SPEC = {
     intensity: [unit, '0..1'],
     forecast: [isNullOr(isWeatherForecast), 'null or {kind, odds 1..10, minute 0..1439, tide low|high, part}'],
     outlook: [isNullOr(isWeatherForecast), 'null or {kind, odds 1..10, minute 0..1439, tide low|high, part}'],
+    pinned: [isNullOr((p) => isPlainObject(p) && Object.keys(p).sort().join() === 'day,kind' && isInt(p.day) && p.day >= 1 && isStr(p.kind) && p.kind !== ''), 'null or {day >= 1, kind}'],
   },
   player: {
     name: [isStr, 'string'],
@@ -773,10 +926,16 @@ const WORLD_SPEC = {
   box: [Array.isArray, 'array'],
   yard: [strArray, 'string[]'],
   bag: {
-    pockets: { $record: [(v) => Array.isArray(v) && v.every((s) => isPlainObject(s) && isStr(s.id) && isInt(s.n) && s.n >= 1), 'ItemStack[] with n >= 1'] },
+    pockets: { $record: [isStackList, 'ItemStack[] with n >= 1'] },
     capacity: { $record: [nonNegInt, 'non-negative integer'] },
+    extraSlots: [nonNegInt, 'non-negative integer'],
+    baskets: [(v) => Array.isArray(v) && v.every((b) => isPlainObject(b) && isStr(b.id) && b.id.length > 0 && isStr(b.mapId) && isInt(b.x) && isInt(b.y) && isInt(b.day) && isStackList(b.items)), 'Basket[]'],
+    basketSeq: [nonNegInt, 'non-negative integer'],
   },
-  wallet: { main: [nonNegInt, 'non-negative integer'], starsalt: [nonNegInt, 'non-negative integer'], anchors: [nonNegInt, 'non-negative integer'], purse: [nonNegInt, 'non-negative integer'] },
+  wallet: {
+    main: [nonNegInt, 'non-negative integer'], starsalt: [nonNegInt, 'non-negative integer'], anchors: [nonNegInt, 'non-negative integer'], purse: [nonNegInt, 'non-negative integer'],
+    purseGlints: [nonNegInt, 'non-negative integer'], starsaltDay: [(v) => isInt(v) && v >= -1, 'integer >= -1'], starsaltBought: [nonNegInt, 'non-negative integer'], anchorGrants: [strArray, 'string[]'],
+  },
   loans: {
     tier: [(v) => isInt(v) && v >= 1, 'integer >= 1'],
     paid: [nonNegInt, 'non-negative integer'],
@@ -785,22 +944,40 @@ const WORLD_SPEC = {
     commissions: [strArray, 'string[]'],
     commons: { jar: [nonNegInt, 'non-negative integer'], built: [strArray, 'string[]'] },
     residentShares: [strArray, 'string[]'],
+    errands: [strArray, 'string[]'],
+    spireShares: [strArray, 'string[]'],
+    tally: [(v) => Array.isArray(v) && v.every((t) => isPlainObject(t) && isInt(t.tier) && t.tier >= 1 && isInt(t.day)), 'Array<{tier, day}>'],
+    log: [(v) => Array.isArray(v) && v.every((e) => isPlainObject(e) && isInt(e.day) && nonNegInt(e.amount) && isStr(e.source)), 'Array<{day, amount, source}>'],
+  },
+  shops: {
+    day: [(v) => isInt(v) && v >= -1, 'integer >= -1'],
+    sold: { $record: [nonNegInt, 'non-negative integer'] },
+    wantedSold: { $record: [nonNegInt, 'non-negative integer'] },
+    crate: [isStackList, 'ItemStack[] with n >= 1'],
   },
   flags: { $record: [(v) => isBool(v) || isNum(v) || isStr(v), 'boolean|number|string'] },
   counters: { $record: [isNum, 'number'] },
   threads: { $record: { beat: [nonNegInt, 'non-negative integer'], done: [isBool, 'boolean'], startedDay: [isInt, 'integer'], lastAdvancedDay: [isInt, 'integer'] } },
-  letters: { delivered: [nonNegInt, 'non-negative integer'], read: [intArray, 'integer[]'], today: [isNullOr(isInt), 'integer|null'] },
+  letters: {
+    delivered: [nonNegInt, 'non-negative integer'], read: [intArray, 'integer[]'], today: [isNullOr(isInt), 'integer|null'],
+    got: [intArray, 'integer[]'], mailbox: [intArray, 'integer[]'], counter: [isNullOr(isInt), 'integer|null'],
+    carrying: [intArray, 'integer[]'], doors: [intArray, 'integer[]'], awaiting: [intArray, 'integer[]'], returned: [intArray, 'integer[]'],
+    pinned: [strArray, 'string[]'], keeperDay: [isInt, 'integer'], familyDay: [isInt, 'integer'], townDay: [isInt, 'integer'],
+  },
   npcs: {
     $record: {
       met: [isBool, 'boolean'], talks: [nonNegInt, 'non-negative integer'], lastTalkDay: [isInt, 'integer'], lastPorchDay: [isInt, 'integer'],
       nickname: [isNullOr(isStr), 'string|null'], affinity: [isNum, 'number'], favours: [strArray, 'string[]'],
       saidLines: { $record: [isInt, 'integer'] }, remembered: { $record: [() => true, 'any'] },
+      gifts: { $record: { n: [nonNegInt, 'non-negative integer'], lastDay: [isInt, 'integer'] } },
+      nicknameChoice: [isNullOr(oneOf(NICKNAME_CHOICES)), `${NICKNAME_CHOICES.join('|')}|null`],
+      lastLineId: [isNullOr(isStr), 'string|null'], lingerDay: [isInt, 'integer'], lastGiftDay: [isInt, 'integer'],
     },
   },
   maps: {
     $record: {
       visited: [isBool, 'boolean'], picked: { $record: [isInt, 'integer'] }, trees: { $record: [isInt, 'integer'] },
-      cracks: { $record: [isBool, 'boolean'] }, reach: { $record: [isNum, 'number'] }, opened: [strArray, 'string[]'],
+      cracks: { $record: [isBool, 'boolean'] }, reach: { $record: [isNum, 'number'] }, reachAt: { $record: [isNum, 'number'] }, opened: [strArray, 'string[]'],
     },
   },
   fieldLog: {
@@ -812,6 +989,8 @@ const WORLD_SPEC = {
     bugs: { $record: { n: [nonNegInt, 'non-negative integer'] } },
     relics: { $record: { n: [nonNegInt, 'non-negative integer'], cleaned: [isBool, 'boolean'] } },
     donated: [strArray, 'string[]'],
+    patientBest: { $record: [nonNeg, 'number >= 0'] },
+    cleanedDay: [isInt, 'integer'],
   },
   badges: [strArray, 'string[]'],
   pendingShifts: [strArray, 'string[]'],
@@ -821,6 +1000,20 @@ const WORLD_SPEC = {
   rng: { $record: [(v) => Array.isArray(v) && v.length === 4 && v.every((n) => isInt(n) && n >= 0 && n < 2 ** 32) && v.some((n) => n !== 0), '4 uint32 (not all zero)'] },
   stats: Object.fromEntries(STAT_COUNTERS.map((k) => [k, [nonNeg, 'number >= 0']])),
   log: [(v) => strArray(v) && v.length <= LOG_MAX, `string[] (max ${LOG_MAX})`],
+  dayPage: {
+    day: [isInt, 'integer'], base: { $record: [isNum, 'number'] }, earned: [nonNegInt, 'non-negative integer'],
+    paid: [nonNegInt, 'non-negative integer'], notes: [(v) => strArray(v) && v.length <= DAY_NOTES_MAX, `string[] (max ${DAY_NOTES_MAX})`],
+    last: [isNullOr(isPlainObject), 'object|null'],
+  },
+  encounter: {
+    steps: [nonNegInt, 'non-negative integer'],
+    errants: {
+      $record: {
+        seen: [isBool, 'boolean'], downDay: [isNullOr(isInt), 'integer|null'],
+        downBadges: [isNullOr(nonNegInt), 'non-negative integer|null'], downPlayMs: [isNullOr(nonNeg), 'number >= 0|null'],
+      },
+    },
+  },
 };
 
 /**
@@ -972,14 +1165,39 @@ export function validateWorld(world, data) {
 
   // --- internal consistency ---
   if (isPlainObject(w.letters)) {
-    if (Array.isArray(w.letters.read) && isInt(w.letters.delivered)) {
-      for (const n of w.letters.read) {
-        if (isInt(n) && (n < 1 || n > w.letters.delivered)) out.push(`world.letters.read: letter ${n} was never delivered`);
-      }
-      if (new Set(w.letters.read).size !== w.letters.read.length) out.push('world.letters.read: duplicate entries');
+    const L = w.letters;
+    // `got` (v4) lists delivered letters; a record without it falls back to the v1 rule (1..delivered).
+    /** @type {(n: number) => boolean} */
+    let wasDelivered = () => true;
+    if (Array.isArray(L.got)) {
+      const got = new Set(L.got);
+      wasDelivered = (n) => got.has(n);
+      if (got.size !== L.got.length) out.push('world.letters.got: duplicate entries');
+      if (isInt(L.delivered) && L.delivered !== L.got.length) out.push(`world.letters.delivered: ${L.delivered} does not match got.length ${L.got.length}`);
+      if (L.got.some((n) => isInt(n) && n < 1)) out.push('world.letters.got: letter numbers start at 1');
+    } else if (isInt(L.delivered)) {
+      wasDelivered = (n) => n >= 1 && n <= L.delivered;
     }
-    if (isInt(w.letters.today) && isInt(w.letters.delivered) && (w.letters.today < 1 || w.letters.today > w.letters.delivered)) {
-      out.push(`world.letters.today: letter ${w.letters.today} was never delivered`);
+    if (Array.isArray(L.read)) {
+      for (const n of L.read) {
+        if (isInt(n) && !wasDelivered(n)) out.push(`world.letters.read: letter ${n} was never delivered`);
+      }
+      if (new Set(L.read).size !== L.read.length) out.push('world.letters.read: duplicate entries');
+    }
+    if (isInt(L.today) && !wasDelivered(L.today)) out.push(`world.letters.today: letter ${L.today} was never delivered`);
+    if (isInt(L.counter) && !wasDelivered(L.counter)) out.push(`world.letters.counter: letter ${L.counter} was never delivered`);
+    for (const key of ['mailbox', 'carrying', 'doors']) {
+      if (!Array.isArray(L[key])) continue;
+      for (const n of L[key]) if (isInt(n) && !wasDelivered(n)) out.push(`world.letters.${key}: letter ${n} was never delivered`);
+      if (new Set(L[key]).size !== L[key].length) out.push(`world.letters.${key}: duplicate entries`);
+    }
+    for (const key of ['awaiting', 'returned']) {
+      if (!Array.isArray(L[key]) || !Array.isArray(L.doors)) continue;
+      for (const n of L[key]) if (isInt(n) && !L.doors.includes(n)) out.push(`world.letters.${key}: letter ${n} was never handed in at a door`);
+      if (new Set(L[key]).size !== L[key].length) out.push(`world.letters.${key}: duplicate entries`);
+    }
+    if (Array.isArray(L.carrying) && Array.isArray(L.doors)) {
+      for (const n of L.carrying) if (L.doors.includes(n)) out.push(`world.letters.carrying: letter ${n} was already handed in`);
     }
   }
   if (isPlainObject(w.flags)) {
@@ -1020,6 +1238,12 @@ export function validateWorld(world, data) {
       for (const [pocket, stacks] of Object.entries(w.bag.pockets)) {
         if (Array.isArray(stacks)) stacks.forEach((s, i) => isPlainObject(s) && ref(`world.bag.pockets.${pocket}[${i}].id`, 'items', s.id));
       }
+    }
+    if (isPlainObject(w.bag) && Array.isArray(w.bag.baskets)) {
+      w.bag.baskets.forEach((b, bi) => isPlainObject(b) && Array.isArray(b.items) && b.items.forEach((s, i) => isPlainObject(s) && ref(`world.bag.baskets[${bi}].items[${i}].id`, 'items', s.id)));
+    }
+    if (isPlainObject(w.shops) && Array.isArray(w.shops.crate)) {
+      w.shops.crate.forEach((s, i) => isPlainObject(s) && ref(`world.shops.crate[${i}].id`, 'items', s.id));
     }
     if (isPlainObject(w.npcs)) for (const id of Object.keys(w.npcs)) ref(`world.npcs.${id}`, 'npcs', id);
     if (isPlainObject(w.maps)) for (const id of Object.keys(w.maps)) ref(`world.maps.${id}`, 'maps', id);

@@ -1,0 +1,261 @@
+{
+  "v": 5,
+  "run": {
+    "seedCode": "DRIFT-K7Q2-MD7F",
+    "seed": 187025336,
+    "dial": "drift",
+    "toggles": [],
+    "challenges": [
+      "one-heart"
+    ],
+    "dialChangedMidRun": false,
+    "gen": {
+      "version": 1,
+      "salt": 1452986978,
+      "wards": {},
+      "abilities": {},
+      "discs": {},
+      "shuffles": {}
+    }
+  },
+  "settings": {
+    "volumes": {
+      "master": 0.8,
+      "music": 0.7,
+      "sfx": 0.9
+    },
+    "muted": false,
+    "textSpeed": "normal",
+    "minutesPerDay": 24,
+    "realClock": false,
+    "scale": "integer",
+    "bindings": null,
+    "reducedMotion": false,
+    "fps30": false,
+    "autoAnchor": {},
+    "skipAnims": false
+  },
+  "clock": {
+    "version": 1,
+    "total": 1120,
+    "speed": 1,
+    "paused": false,
+    "realClock": false,
+    "seed": 187025336
+  },
+  "weather": {
+    "day": 3,
+    "today": "rain",
+    "lead": "overcast",
+    "current": "overcast",
+    "onset": 900,
+    "tomorrow": "fog",
+    "intensity": 0.6,
+    "forecast": {
+      "kind": "rain",
+      "odds": 7,
+      "minute": 930,
+      "tide": "low",
+      "part": "afternoon"
+    },
+    "outlook": {
+      "kind": "fog",
+      "odds": 6,
+      "minute": 420,
+      "tide": "high",
+      "part": "morning"
+    },
+    "pinned": null
+  },
+  "player": {
+    "name": "Pell",
+    "species": "",
+    "pronouns": "they",
+    "look": {
+      "fur": 0,
+      "marks": 0,
+      "outfit": 0
+    },
+    "mapId": "harbor",
+    "x": 3,
+    "y": 4,
+    "facing": "down",
+    "tool": null,
+    "lastTool": null,
+    "toolRing": [],
+    "title": ""
+  },
+  "party": [],
+  "box": [],
+  "yard": [],
+  "bag": {
+    "pockets": {
+      "wicks": [],
+      "medicine": [],
+      "discs": [],
+      "finds": [],
+      "held": [],
+      "keepsakes": [],
+      "tools": []
+    },
+    "capacity": {
+      "wicks": 0,
+      "medicine": 0,
+      "discs": 0,
+      "finds": 0,
+      "held": 0,
+      "keepsakes": 0,
+      "tools": 0
+    },
+    "extraSlots": 0,
+    "baskets": [],
+    "basketSeq": 0
+  },
+  "wallet": {
+    "main": 120,
+    "starsalt": 0,
+    "anchors": 0,
+    "purse": 0,
+    "purseGlints": 0,
+    "starsaltDay": -1,
+    "starsaltBought": 0,
+    "anchorGrants": []
+  },
+  "loans": {
+    "tier": 1,
+    "paid": 0,
+    "builds": [],
+    "scaffold": 0,
+    "commissions": [],
+    "commons": {
+      "jar": 0,
+      "built": []
+    },
+    "residentShares": [],
+    "errands": [],
+    "spireShares": [],
+    "tally": [],
+    "log": []
+  },
+  "shops": {
+    "day": -1,
+    "sold": {},
+    "wantedSold": {},
+    "crate": []
+  },
+  "flags": {
+    "sp.arrived": true
+  },
+  "counters": {
+    "sys.uid": 1
+  },
+  "threads": {},
+  "letters": {
+    "delivered": 3,
+    "read": [
+      1
+    ],
+    "today": 2,
+    "got": [
+      1,
+      21,
+      2
+    ],
+    "mailbox": [
+      2
+    ],
+    "counter": null,
+    "carrying": [
+      21
+    ],
+    "doors": [],
+    "awaiting": [],
+    "returned": [],
+    "pinned": [],
+    "keeperDay": 1,
+    "familyDay": 1,
+    "townDay": -1
+  },
+  "npcs": {
+    "wren": {
+      "met": true,
+      "talks": 3,
+      "lastTalkDay": 1,
+      "lastPorchDay": 0,
+      "nickname": "Keeper",
+      "affinity": 2,
+      "favours": [],
+      "saidLines": {
+        "g1": 1
+      },
+      "remembered": {},
+      "gifts": {
+        "pear": {
+          "n": 1,
+          "lastDay": 1
+        }
+      },
+      "nicknameChoice": "accept",
+      "lastLineId": "g1",
+      "lingerDay": -1,
+      "lastGiftDay": 1
+    }
+  },
+  "maps": {},
+  "fieldLog": {
+    "forms": {},
+    "tells": {}
+  },
+  "collections": {
+    "fish": {},
+    "bugs": {},
+    "relics": {},
+    "donated": [],
+    "patientBest": {},
+    "cleanedDay": -1
+  },
+  "badges": [],
+  "pendingShifts": [],
+  "pendingScript": null,
+  "cutscene": null,
+  "battleBookmark": null,
+  "rng": {
+    "loot": [
+      1,
+      2,
+      3,
+      4
+    ]
+  },
+  "stats": {
+    "playMs": 0,
+    "steps": 40,
+    "battles": 0,
+    "catches": 0,
+    "forecasts": 0,
+    "rerolls": 0,
+    "anchors": 0,
+    "wardWalls": 0,
+    "blackouts": 0,
+    "summitAttempts": 0,
+    "fishCaught": 0,
+    "treesShaken": 0,
+    "lettersRead": 0
+  },
+  "log": [],
+  "dayPage": {
+    "day": 1,
+    "base": {
+      "catches": 0,
+      "forecasts": 0
+    },
+    "earned": 450,
+    "paid": 300,
+    "notes": [],
+    "last": null
+  },
+  "encounter": {
+    "steps": 0,
+    "errants": {}
+  }
+}

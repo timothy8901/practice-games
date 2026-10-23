@@ -34,7 +34,7 @@ export function randomParty(rng, opts = {}) {
   for (let i = 0; i < size; i++) {
     const speciesId = rng.pick(pool);
     const level = rng.int(opts.minLevel ?? 5, opts.maxLevel ?? 60);
-    party.push(makeCreature({ speciesId, level, rng, nickname: `${speciesId}-${i}` }));
+    party.push(makeCreature({ speciesId, level, rng, nickname: `${speciesId}-${i}`, uid: `c${rng.int(1, 2 ** 30)}` }));
   }
   return party;
 }

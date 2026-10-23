@@ -45,6 +45,7 @@ export const OWNERS = Object.freeze({
   bag: ['systems/bag.js'],
   wallet: ['systems/wallet.js'],
   loans: ['systems/loans.js'],
+  shops: ['systems/shops.js'],
   flags: ['systems/flags.js'],
   counters: ['systems/flags.js'],
   threads: ['systems/threads.js'],
@@ -61,6 +62,8 @@ export const OWNERS = Object.freeze({
   rng: ['state/rngs.js'],
   stats: ['systems/stats.js'],
   log: ['systems/dayPage.js'],
+  dayPage: ['systems/dayPage.js'],
+  encounter: ['systems/encounter.js'],
 });
 
 /**
@@ -68,9 +71,7 @@ export const OWNERS = Object.freeze({
  * writes are reported as "excepted" in the summary instead of failing; delete the entry with the fix.
  * @type {ReadonlyArray<Readonly<{file: string, key: string, lane: string, reason: string}>>}
  */
-export const EXCEPTIONS = Object.freeze([
-  Object.freeze({ file: 'debug/hook.js', key: 'wallet', lane: 'BOOT', reason: 'day-1 fallbackEarn until systems/wallet.earn lands; switch __game.earn to it' }),
-]);
+export const EXCEPTIONS = Object.freeze([]);
 
 /** STATE modules that construct, fill or migrate whole worlds; they may write any key. */
 export const WORLD_BUILDERS = Object.freeze(['state/schema.js', 'state/migrate.js', 'state/persist.js', 'state/store.js']);

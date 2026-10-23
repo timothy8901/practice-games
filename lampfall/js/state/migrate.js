@@ -30,8 +30,8 @@ function migrate0to1(data) {
 
 /**
  * v1 -> v2 (SYS-TIME): `world.weather` grows from `{today, tomorrow, intensity}` to the full
- * WeatherState (`day, lead, current, onset, forecast, outlook`). A v1 save never rolled a forecast,
- * so `day` is 0 and `systems/weather.update` rolls the current day on the first tick after loading;
+ * WeatherState (`day, lead, current, onset, forecast, outlook, pinned`). A v1 save never rolled a forecast,
+ * so `day` is 0 (and `pinned` null) and `systems/weather.update` rolls the current day on the first tick after loading;
  * `lead` and `current` take the saved `today` so nothing changes on screen until then.
  * @param {Record<string, any>} data
  * @returns {Record<string, any>}
@@ -57,9 +57,110 @@ function migrate1to2(data) {
  * never edit an existing step once a save in the wild carries that version.
  * @type {Readonly<Record<number, (data: Record<string, any>, fromVersion: number) => Record<string, any>>>}
  */
+/**
+ * Pocket renames applied by {@link migrate2to3}: version-2 pocket id -> version-3 pocket id.
+ * `systems/bag.normalize` later moves any stack whose item row names a different pocket.
+ */
+export const POCKET_RENAMES_V3 = Object.freeze({ items: 'medicine', catch: 'wicks', key: 'keepsakes', tools: 'tools', keepsakes: 'keepsakes' });
+
+/**
+ * v2 -> v3 (RULES-ECON): the satchel gets the GDD-00 pockets (`wicks medicine discs finds held
+ * keepsakes tools`); old pockets fold in through {@link POCKET_RENAMES_V3} (an unknown old pocket keeps
+ * its name; same-id stacks merge). The wallet, loans and the new `shops` key gain their bookkeeping
+ * fields from {@link fillDefaults}; nothing else changes.
+ * @param {Record<string, any>} data
+ * @returns {Record<string, any>}
+ */
+function migrate2to3(data) {
+  if (isPlainObject(data.bag) && isPlainObject(data.bag.pockets)) {
+    /** @type {Record<string, Array<{id: string, n: number}>>} */
+    const pockets = {};
+    /** @type {Record<string, number>} */
+    const capacity = {};
+    const oldCap = isPlainObject(data.bag.capacity) ? data.bag.capacity : {};
+    for (const [pocket, stacks] of Object.entries(data.bag.pockets)) {
+      const to = Object.prototype.hasOwnProperty.call(POCKET_RENAMES_V3, pocket) ? POCKET_RENAMES_V3[pocket] : pocket;
+      const list = pockets[to] ?? (pockets[to] = []);
+      if (Array.isArray(stacks)) {
+        for (const st of stacks) {
+          if (!isPlainObject(st) || typeof st.id !== 'string' || !Number.isInteger(st.n) || st.n < 1) continue;
+          const same = list.find((x) => x.id === st.id);
+          if (same) same.n += st.n;
+          else list.push({ id: st.id, n: st.n });
+        }
+      }
+      if (!(to in capacity)) capacity[to] = Number.isInteger(oldCap[pocket]) && oldCap[pocket] >= 0 && !(pocket in POCKET_RENAMES_V3) ? oldCap[pocket] : 0;
+    }
+    data.bag = { ...data.bag, pockets, capacity };
+  }
+  data.v = 3;
+  return data;
+}
+
+/**
+ * v3 -> v4 (SYS-TOWN): letters arrive on three channels (GDD-00 §11), so `world.letters` records
+ * which letters arrived (`got`) instead of assuming 1..delivered. A v3 save delivered letters in
+ * order, so `got` is `1..delivered`, and an unread `today` is still in the mailbox. The other new
+ * letter keys, the new NpcMemory keys (`gifts`, `nicknameChoice`, `lastLineId`, `lingerDay`,
+ * `lastGiftDay`) and the new `dayPage` key come from {@link fillDefaults}.
+ * @param {Record<string, any>} data
+ * @returns {Record<string, any>}
+ */
+function migrate3to4(data) {
+  if (isPlainObject(data.letters)) {
+    const L = data.letters;
+    const delivered = Number.isInteger(L.delivered) && L.delivered >= 0 ? L.delivered : 0;
+    if (!Array.isArray(L.got)) {
+      const read = Array.isArray(L.read) ? L.read : [];
+      const today = Number.isInteger(L.today) && L.today >= 1 && L.today <= delivered ? L.today : null;
+      data.letters = {
+        ...L,
+        delivered,
+        today,
+        got: Array.from({ length: delivered }, (_, i) => i + 1),
+        mailbox: today !== null && !read.includes(today) ? [today] : [],
+      };
+    }
+  }
+  data.v = 4;
+  return data;
+}
+
+/**
+ * v4 -> v5 (SYS-GATHER / SYS-WORLD): fishing reaches recover from the time their health was set
+ * (`maps[].reachAt`), the Patient record board and the Kiln clean day join `collections`, and the new
+ * `encounter` key holds the step floor and Errant state. A v4 save never fished a reach with a
+ * timestamp, so every stored reach health is stamped "now" (`clock.total`): it recovers from the
+ * moment of loading, which is never harsher than the old fixed value. The rest is defaults.
+ * @param {Record<string, any>} data
+ * @returns {Record<string, any>}
+ */
+function migrate4to5(data) {
+  const now = isPlainObject(data.clock) && typeof data.clock.total === 'number' && Number.isFinite(data.clock.total) && data.clock.total >= 0 ? data.clock.total : 0;
+  if (isPlainObject(data.maps)) {
+    for (const m of Object.values(data.maps)) {
+      if (!isPlainObject(m)) continue;
+      const at = isPlainObject(m.reachAt) ? { ...m.reachAt } : {};
+      if (isPlainObject(m.reach)) for (const id of Object.keys(m.reach)) if (typeof at[id] !== 'number') at[id] = now;
+      m.reachAt = at;
+    }
+  }
+  if (isPlainObject(data.collections)) {
+    const c = data.collections;
+    if (!isPlainObject(c.patientBest)) c.patientBest = {};
+    if (!Number.isInteger(c.cleanedDay)) c.cleanedDay = -1;
+  }
+  if (!isPlainObject(data.encounter)) data.encounter = { steps: 0, errants: {} };
+  data.v = 5;
+  return data;
+}
+
 export const MIGRATIONS = Object.freeze({
   0: migrate0to1,
   1: migrate1to2,
+  2: migrate2to3,
+  3: migrate3to4,
+  4: migrate4to5,
 });
 
 /**

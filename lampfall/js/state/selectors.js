@@ -270,12 +270,15 @@ export function itemCount(world, itemId) {
 }
 
 /**
- * Letters delivered but not yet read, ascending.
+ * Letters delivered but not yet read, ascending. Uses `letters.got` (v4: letters arrive on three
+ * channels, out of number order); a record without it falls back to `1..delivered`.
  * @param {World} world
  * @returns {number[]}
  */
 export function unreadLetters(world) {
   const read = new Set(world?.letters?.read ?? []);
+  const got = world?.letters?.got;
+  if (Array.isArray(got)) return got.filter((n) => !read.has(n)).sort((a, b) => a - b);
   const out = [];
   for (let n = 1; n <= (world?.letters?.delivered ?? 0); n++) if (!read.has(n)) out.push(n);
   return out;
@@ -288,7 +291,7 @@ export function unreadLetters(world) {
  * @returns {import('./schema.js').MapState}
  */
 export function mapState(world, mapId) {
-  return world?.maps?.[mapId] ?? { visited: false, picked: {}, trees: {}, cracks: {}, reach: {}, opened: [] };
+  return world?.maps?.[mapId] ?? { visited: false, picked: {}, trees: {}, cracks: {}, reach: {}, reachAt: {}, opened: [] };
 }
 
 /**

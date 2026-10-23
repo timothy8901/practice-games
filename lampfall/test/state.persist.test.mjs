@@ -62,7 +62,7 @@ describe('autosave / saveManual / load', () => {
     assert.equal(res.ok, true, JSON.stringify(res.error));
     assert.equal(res.slot, 'auto:1');
     assert.equal(res.place, 'harbor');
-    assert.equal(res.time, '18:40');
+    assert.equal(res.time, '17:40'); // a new run starts at the arrival (GDD-00 §12)
     assert.equal(res.day, 0);
     assert.equal(res.reason, 'map:enter');
     assert.equal(G.store.dirty(), false);

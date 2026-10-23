@@ -27,16 +27,16 @@ function newWorld() {
 
 /** Fake bindings that apply the obvious rule to the real world and log every call. */
 function fakeSystems(log = []) {
-  const stack = (w, item) => w.bag.pockets.items.find((s) => s.id === item);
+  const stack = (w, item) => w.bag.pockets.medicine.find((s) => s.id === item);
   return {
     log,
-    give(w, item, n) { log.push(['give', item, n]); const s = stack(w, item); if (s) s.n += n; else w.bag.pockets.items.push({ id: item, n }); return { ok: true }; },
+    give(w, item, n) { log.push(['give', item, n]); const s = stack(w, item); if (s) s.n += n; else w.bag.pockets.medicine.push({ id: item, n }); return { ok: true }; },
     take(w, item, n) {
       log.push(['take', item, n]);
       const s = stack(w, item);
       if (!s || s.n < n) return { ok: false };
       s.n -= n;
-      if (s.n === 0) w.bag.pockets.items.splice(w.bag.pockets.items.indexOf(s), 1);
+      if (s.n === 0) w.bag.pockets.medicine.splice(w.bag.pockets.medicine.indexOf(s), 1);
       return { ok: true };
     },
     earn(w, a) { log.push(['earn', a]); w.wallet.main += a; },
@@ -158,7 +158,7 @@ test('choice: no answer takes the default; an out-of-range answer throws', () =>
 test('if / cond picks then or else and resumes after the block', () => {
   for (const [count, expected] of [[1, 'PLACEHOLDER Keeper: Keep that lit.'], [0, 'PLACEHOLDER Keeper: Hm.']]) {
     const w = newWorld();
-    if (count) w.bag.pockets.items.push({ id: 'ph-lantern', n: count });
+    if (count) w.bag.pockets.medicine.push({ id: 'ph-lantern', n: count });
     const ops = [{ op: 'if', cond: { hasItem: 'ph-lantern' }, then: ['PLACEHOLDER Keeper: Keep that lit.'], else: ['PLACEHOLDER Keeper: Hm.'] }, 'Done.'];
     const reqs = drive(createRunner(ops, ctxFor(w)));
     assert.deepEqual(reqs.map((q) => q.text), [expected.split(': ')[1], 'Done.']);
@@ -207,7 +207,7 @@ test('give / take / earn / spend / addCreature / remember / thread / beat go thr
     { op: 'addCreature', species: 'ph-pip', level: 5, nick: 'Pip' }, { op: 'remember', npc: 'ph-keeper', key: 'gift', value: 'pear' },
     { op: 'thread', id: 'ph-thread' }, { op: 'beat', thread: 'ph-thread', to: 2 },
   ], ctx));
-  assert.deepEqual(w.bag.pockets.items, [{ id: 'ph-lantern', n: 2 }]);
+  assert.deepEqual(w.bag.pockets.medicine, [{ id: 'ph-lantern', n: 2 }]);
   assert.equal(w.wallet.main, 30);
   assert.equal(w.party[0].nickname, 'Pip');
   assert.equal(w.threads['ph-thread'].beat, 2);
@@ -218,14 +218,14 @@ test('give / take / earn / spend / addCreature / remember / thread / beat go thr
 test('take ask yields a request; true takes, false leaves the bag alone', () => {
   for (const [answer, left] of [[true, 1], [false, 2]]) {
     const w = newWorld();
-    w.bag.pockets.items.push({ id: 'ph-lantern', n: 2 });
+    w.bag.pockets.medicine.push({ id: 'ph-lantern', n: 2 });
     const ctx = ctxFor(w);
     const r = createRunner([{ op: 'take', item: 'ph-lantern', ask: true }, { op: 'if', cond: { hasItem: 'ph-lantern', n: 2 }, then: ['kept'], else: ['gave'] }], ctx);
     const req = r.step();
     assert.equal(req.op, 'take');
     assert.equal(req.ask, true);
     assert.equal(r.step(answer).text, answer ? 'gave' : 'kept');
-    assert.equal(w.bag.pockets.items[0].n, left);
+    assert.equal(w.bag.pockets.medicine[0].n, left);
     assert.equal(r.vars._took, answer);
   }
 });

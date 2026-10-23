@@ -59,7 +59,7 @@ test('flag (truthy or is), counter ranges, seen', () => {
 
 test('hasItem, wallet, tool', () => {
   const w = worldAt();
-  w.bag.pockets.catch.push({ id: 'ph-lantern', n: 2 });
+  w.bag.pockets.wicks.push({ id: 'ph-lantern', n: 2 });
   w.wallet.main = 500;
   w.player.tool = 'ph-lantern';
   assert.equal(ev(w, { hasItem: 'ph-lantern' }), true);
