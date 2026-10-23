@@ -300,6 +300,49 @@ export function hintFor(input, hints) {
 }
 
 /**
+ * The keeper's desk under a card: dark oak planks with grain, a warm lamp pool top-left and an
+ * inkwell. Cheap fills only (drawn every frame).
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} ms
+ */
+export function drawDesk(ctx, ms = 0) {
+  const planks = ['#3A2618', '#432C1C', '#3E2819', '#47301E'];
+  for (let i = 0; i < 9; i++) {
+    const y = i * 30;
+    ctx.fillStyle = planks[i % planks.length];
+    ctx.fillRect(0, y, 480, 30);
+    ctx.fillStyle = '#2C1C12';
+    ctx.fillRect(0, y + 29, 480, 1);
+    ctx.fillStyle = '#4E3622';
+    for (let k = 0; k < 6; k++) {
+      const gx = (i * 131 + k * 89) % 470;
+      ctx.fillRect(gx, y + 6 + ((k * 7) % 18), 26 + ((k * 13) % 30), 1);
+    }
+  }
+  // lamp pool: concentric dithered amber rings, steady (a lamp, not a flicker)
+  const cx = 40, cy = 26;
+  for (let r = 150; r > 0; r -= 30) {
+    ctx.globalAlpha = 0.05 + (150 - r) / 1500;
+    ctx.fillStyle = PALETTE.porchAmber;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, r * 1.4, r, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  // vignette at the bottom edge
+  ctx.globalAlpha = 0.25;
+  ctx.fillStyle = PALETTE.nightInk;
+  ctx.fillRect(0, 250, 480, 20);
+  ctx.globalAlpha = 1;
+  // inkwell and quill at the top right
+  ctx.fillStyle = '#1E2236'; ctx.fillRect(440, 14, 18, 14); ctx.fillRect(442, 10, 14, 4);
+  ctx.fillStyle = '#3B4A6B'; ctx.fillRect(443, 11, 12, 2);
+  ctx.fillStyle = PALETTE.paperShade;
+  for (let i = 0; i < 18; i++) ctx.fillRect(452 - i, 2 + i, 2, 1);
+  void ms;
+}
+
+/**
  * Wraps a seed code typed by hand into a canonical upper-case form (no validation).
  * @param {string} s
  */

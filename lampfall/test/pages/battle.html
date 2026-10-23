@@ -15,7 +15,7 @@
   <script type="module">
     // Battle / Forecast harness [SCN-BATTLE]. Boots a small G around the real scene stack, input,
     // store, rngs, music director and the real battle tables (scenes/battleData.js), then runs
-    // scripted scenarios. `?scenario=capture|water|ward|levelup|forecast|blackout|forecastOnly|trainer`
+    // scripted scenarios. `?scenario=capture|water|sure|ward|levelup|forecast|blackout|forecastOnly|trainer|pp|stance|read|summit|wicks`
     // starts one directly; `?noanim=1` collapses animations; `?sound=1` unmutes.
     // Harness hook: window.__bt = {run(name), state(), events, until(pred, ms), press(action, n), G}.
     import { createInput } from '../../js/core/input.js';
@@ -170,6 +170,31 @@
         give({ speciesId: 'puddlepip', level: 3, nickname: 'PIP' });
         store.tx('harness.cash', (w) => wallet.earn(w, 3000, { data }));
         return startBattle(G, { kind: 'trainer', trainerId: 'osric-spire' });
+      },
+      // verifier scenarios: PP / Scrap, Capture Stance, Read before and after, a Summit loss, every wick
+      pp() {
+        give({ speciesId: 'sloshkin', level: 12, nickname: 'PUDDLE', moves: ['tap', 'salt-spray', 'undertow'] });
+        store.tx('harness.pp', (w) => { const m = w.party[0].moves; m[0].pp = 1; m[1].pp = 0; m[2].pp = 0; });
+        return startBattle(G, { kind: 'wild', wild: { speciesId: 'stillox', level: 14 } });
+      },
+      stance() {
+        give({ speciesId: 'caldermaw', level: 40, nickname: 'Cinder' });
+        items([['tallow-wick', 3]]);
+        return startBattle(G, { kind: 'wild', wild: { speciesId: 'tossup', level: 3 } });
+      },
+      read() {
+        give({ speciesId: 'scrapling', level: 9, nickname: 'Rivet' });
+        return startBattle(G, { kind: 'wild', wild: { speciesId: 'rillfin', level: 5 } });
+      },
+      summit() {
+        give({ speciesId: 'puddlepip', level: 3, nickname: 'PIP' });
+        store.tx('harness.cash', (w) => wallet.earn(w, 3000, { data }));
+        return startBattle(G, { kind: 'trainer', trainerId: 'idris-champion' });
+      },
+      wicks() {
+        give({ speciesId: 'sloshkin', level: 20, nickname: 'PUDDLE' });
+        items([['tallow-wick', 2], ['brass-wick', 2], ['skyglass-wick', 2], ['isoldes-lantern', 1]]);
+        return startBattle(G, { kind: 'wild', wild: { speciesId: 'stillox', level: 30 } });
       },
       trainer() {
         give({ speciesId: 'sloshkin', level: 9, nickname: 'PUDDLE' });
