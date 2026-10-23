@@ -37,7 +37,7 @@ export default {
   props: [],
   entities: [],
   triggers: [],
-  warps: [{ x: 6, y: 17, kind: 'door', to: { mapId: 'pellwick', x: 5, y: 20, facing: 'down' }, sfx: 'doorOpen' }],
+  warps: [{ x: 6, y: 17, kind: 'door', to: { mapId: 'pellwick', x: 4, y: 19, facing: 'down' }, sfx: 'doorOpen' }],
   spawns: [],
   regions: {},
   markers: { 'from-door': { x: 6, y: 16, facing: 'up' } },

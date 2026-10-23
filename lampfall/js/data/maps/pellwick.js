@@ -52,16 +52,16 @@ export default {
     'DDDSSSbbSrrrrrrrrrrrRRRRrrrrrrrRRzRRRNNRrrrrrrrrrrrrGGGGPPPPGGGG', // 13
     'DDSSqqqqqrrrrrrrrrrrPPPPPPPPPPPPPPPPPOOPPPPPPPPPPPPPPPPPPGGGSSSS', // 14
     'DDSCCqqqqCCCCCCCCCCGGG111111G^^^^^^^GOOGGGGGGG333333GGGGGGGASDDD', // 15
-    'DDSCGqqqqqGGG,GGG5555G111111G^^^^^^^GOOG66666G333333G5555GGASDDD', // 16
-    'DDSC,ffffG,G,G,GG}}}$G111111G^^^^^^^GOOG66666G333333G5555GGASDDD', // 17
-    'DDSC,ssff,GGG,G,G$+$}Gw[[[w[G]s]]]s]GOOG#%%%#Gw[[[w[G}}}#GGASDDD', // 18
-    'DDSSC@s?????G1111___GG[w!w[wGs]s@sdsGOOG%#+#%G[w!w[wG#+#}GGASDDD', // 19
-    'DDSSCff?????,1111GGGGGG___GGGGG___GGGOOGG___GGG___GGG___GGGASDDD', // 20
-    'DDSCGG,${{{$G%%%#POOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOASDDD', // 21
-    'DDSCGGG{$+${G#+#%PGGGGGGGGGOgggggggggggggggggggggO77777GGGGASDDD', // 22
-    'DDSSCGGG___GG___GPGGGG5555GOg**ggggggggggggggg**gO777774444ASDDD', // 23
-    'DDDSC,GG,GGGGGGGGP,GGG5555GOg*&gggOOOOOOOOgggg&*gO#%%%#%%%#ASDDD', // 24
-    'DDDSSCGGGPPPPPPPPPGGGG}}}#GOggggggOOOOOOOOgggggggO%#+#%#+#%ASDDD', // 25
+    'DDSCfffffqGGG,GGG5555G111111G^^^^^^^GOOG66666G333333G5555GGASDDD', // 16
+    'DDSCssfffG,G,G,GG}}}$G111111G^^^^^^^GOOG66666G333333G5555GGASDDD', // 17
+    'DDSC@sfff,GGG,G,G$+$}Gw[[[w[G]s]]]s]GOOG#%%%#Gw[[[w[G}}}#GGASDDD', // 18
+    'DDSCfff?????G1111___GG[w!w[wGs]s@sdsGOOG%#+#%G[w!w[wG#+#}GGASDDD', // 19
+    'DDSCfff?????,1111GGGGGG___GGGGG___GGGOOGG___GGG___GGG___GGGASDDD', // 20
+    'DDSCGGP${{{$G%%%#POOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOASDDD', // 21
+    'DDSCGGP{$+${G#+#%PGGGGGGGGGOgggggggggggggggggggggO77777GGGGASDDD', // 22
+    'DDSSCGPG___GG___GPGGGG5555GOg**ggggggggggggggg**gO777774444ASDDD', // 23
+    'DDDSC,PG,GGGGGGGGP,GGG5555GOg*&gggOOOOOOOOgggg&*gO#%%%#%%%#ASDDD', // 24
+    'DDDSSCPPPPPPPPPPPPGGGG}}}#GOggggggOOOOOOOOgggggggO%#+#%#+#%ASDDD', // 25
     'DDDSCGGGGGGG,,GG77777G#+#}GOggggggOOOOOOOOgggggggOG___GGGGGASDDD', // 26
     'DDSSCGG,GGGGG,GG77777G___GGOggggggOOOOOOOOgggggggOfffffffGGASDDD', // 27
     'DDSC,GG,GGGGGGGG#%%%#GGGGGGOgggggggggggggggg&*gggOfffffffqqqSDDD', // 28
@@ -70,11 +70,11 @@ export default {
     'DDDSCCCCCCHCAAAAAGGGGGGOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOqqqXXXX', // 31
     'DDDSSCCCCCHCAAAAAA5555G44444GGG22222GOOG5555G5555G555555555qSDDD', // 32
     'DDDDSCCCCCHC"AAAKA5555G44444GGG22222GOOG5555G5555G555555555ASDDD', // 33
-    'DDDDMMqMMMMAAAWWKW}}}$G#%%%#GGGw[[[wGOOG}}}#G$}}}G}}}#s]]]sASDDD', // 34
-    'DDDMMqqMMMMMMMMMKW$+$}G%#+#%GGG[w!w[GOOG#+#}G}$+$G#+#}]s@s]ASDDD', // 35
-    'DDDMqqMMMMMM~MMMKM___WGG___GGGGG___GGOOG___GGG___G___GGGGGGASDDD', // 36
-    'DDDqqMMYYMMMMMMMKOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOSDDD', // 37
-    'eeeq~MMMYYYMMMMMKOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOSDDD', // 38
+    'DDDDMMMMqqqAAAWWKW}}}$G#%%%#GGGw[[[wGOOG}}}#G$}}}G}}}#s]]]sASDDD', // 34
+    'DDDMMMqqqMMMMMMMKW$+$}G%#+#%GGG[w!w[GOOG#+#}G}$+$G#+#}]s@s]ASDDD', // 35
+    'DDDMMqqMMMMM~MMMKM___WGG___GGGGG___GGOOG___GGG___G___GGGGGGASDDD', // 36
+    'DDDMqqMYYMMMMMMMKOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOSDDD', // 37
+    'qeeqqMMMYYYMMMMMKOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOSDDD', // 38
     'DDDDMMMMMMYYMMMMKWHQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQSDDD', // 39
     'DDDDDMYMMMMMMMYYKWHQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQSDDD', // 40
     'DDDDDDMMM~MMYMMYWWHQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQSDDD', // 41
@@ -105,14 +105,14 @@ export default {
     '....................................L..L........................', // 14
     '................................................................', // 15
     '........o.......................................................', // 16
-    '................o...............................................', // 17
+    '................................................................', // 17
     '................................................................', // 18
     '............|...................................................', // 19
     '............|...................................................', // 20
     '............|.....................................L.............', // 21
-    '.....y......|.............L.........L..L........................', // 22
+    '............|.............L.........L..L........................', // 22
     '............|...................................................', // 23
-    '....y.||./.|||/||...............................................', // 24
+    '....y..|./.|||/||...............................................', // 24
     '................................................................', // 25
     '...............................................L................', // 26
     '....y...........................................................', // 27
@@ -124,7 +124,7 @@ export default {
     '.............................|=.....=...........................', // 33
     '.............................|=.....=...........................', // 34
     '.........ll..................|=.....=...........................', // 35
-    '.....o........o..............|..................................', // 36
+    '..............o..............|..................................', // 36
     '................................................................', // 37
     '.............l..o...L.........L.............L........L..........', // 38
     '.......l.........l......cc...(..............c(..........cc......', // 39
@@ -140,8 +140,8 @@ export default {
   overlay: null,
   collision: null,
   props: [
-    { art: 'lighthouse-dark', x: 5, y: 19 },
-    { art: 'lighthouse-scaffold', x: 5, y: 19, cond: { loan: { tier: { gte: 2 } } } },
+    { art: 'lighthouse-dark', x: 4, y: 18 },
+    { art: 'lighthouse-scaffold', x: 4, y: 18, cond: { loan: { tier: { gte: 2 } } } },
   ],
   entities: [
     // ---- named trees: 95 fruit (native fruit per seed), 6 purse, 4 bee ----
@@ -300,7 +300,7 @@ export default {
     { kind: 'boat', id: 'oyster-boat', x: 44, y: 4, art: 'boat', note: 'the Bracks\' oyster boat, nameboard missing (thread The Oyster Boat)' },
     { kind: 'boat', id: 'maud-punt', x: 35, y: 44, art: 'punt', verb: 'ferry', note: 'Maud\'s ferry 05:00-01:00' },
     { kind: 'boat', id: 'carnival-raft', x: 52, y: 46, art: 'carnival-raft', verb: 'shop', shop: 'carnival-raft', cond: { flag: 'sp.raft-docked' }, note: 'ART REQUEST carnival-raft; moored at the Old Pier from day 3' },
-    { kind: 'sign', id: 'sign-lowmoor-stones', x: 4, y: 35, art: 'signpost', text: 'Lowmoor by the stones. Dry two hours either side of low water. Mind the time.' },
+    { kind: 'sign', id: 'sign-lowmoor-stones', x: 11, y: 35, art: 'signpost', text: 'Lowmoor by the stones. Dry two hours either side of low water. Mind the time.' },
     { kind: 'sign', id: 'sign-lowmoor-boardwalk', x: 19, y: 5, art: 'signpost', text: 'Lowmoor the long way: over the marsh boardwalk. Any tide.' },
     { kind: 'sign', id: 'sign-the-bar', x: 8, y: 14, art: 'signpost', text: 'The Bar. Dry only at the day\'s lower low. It does not wait for you.' },
     { kind: 'sign', id: 'sign-causeway', x: 59, y: 33, art: 'signpost', text: 'Mainland causeway. Dry an hour either side of low water. Last walker crossed: you.' },
@@ -309,7 +309,7 @@ export default {
     { kind: 'sign', id: 'sign-old-quay', x: 59, y: 41, art: 'signpost', text: 'Old Quay. Under water but for the spring lows.' },
     { kind: 'sign', id: 'sign-river-stones', x: 32, y: 10, art: 'signpost', text: 'Stepping stones: low water only. The bridge is just upstream.' },
     { kind: 'sign', id: 'sign-north-creek', x: 34, y: 6, art: 'signpost', text: 'North Creek. Dry since the weir went in. Ask the heron.' },
-    { kind: 'sign', id: 'sign-lighthouse', x: 7, y: 20, art: 'signpost', text: 'Pell Point Light. Unlit thirty years.' },
+    { kind: 'sign', id: 'sign-lighthouse', x: 8, y: 17, art: 'signpost', text: 'Pell Point Light. Unlit thirty years.' },
   ],
   triggers: [
     { x: 10, y: 24, kind: 'use', id: 'mailbox', verb: 'mailbox' },
@@ -349,7 +349,7 @@ export default {
     { x: 48, y: 19, kind: 'door', to: { mapId: 'int-post-office', x: 6, y: 8, facing: 'up' }, sfx: 'doorOpen' },
     { x: 32, y: 19, kind: 'door', to: { mapId: 'int-archive', x: 8, y: 10, facing: 'up' }, sfx: 'doorOpen' },
     { x: 56, y: 25, kind: 'door', to: { mapId: 'int-yard-shed', x: 7, y: 8, facing: 'up' }, sfx: 'doorOpen' },
-    { x: 5, y: 19, kind: 'door', to: { mapId: 'int-lighthouse', x: 6, y: 16, facing: 'up' }, sfx: 'doorOpen' },
+    { x: 4, y: 18, kind: 'door', to: { mapId: 'int-lighthouse', x: 6, y: 16, facing: 'up' }, sfx: 'doorOpen' },
     { x: 0, y: 38, kind: 'edge', to: { mapId: 'lowmoor', x: 46, y: 22, facing: 'left' }, via: 'short-way', tideWindow: 120, note: 'Lowmoor stones from the point flats (GDD-00 §4: +-2 h)' },
     { x: 13, y: 0, kind: 'edge', to: { mapId: 'lowmoor', x: 46, y: 4, facing: 'left' }, via: 'long-way', note: 'river footbridge + marsh boardwalk, any tide' },
     { x: 6, y: 0, w: 2, kind: 'edge', to: { mapId: 'the-bar', x: 1, y: 12, facing: 'right' }, via: 'the-bar', tideWindow: 90, lowerLow: true, openFlag: 'lit.bar', note: 'the Bar road (tile-gated); any tide after the Relighting' },
@@ -380,7 +380,7 @@ export default {
     'the-point': { x: 3, y: 14, w: 16, h: 20 },
     'keepers-cottage': { x: 6, y: 19, w: 7, h: 6 },
     'keepers-orchard': { x: 5, y: 25, w: 11, h: 6 },
-    'lighthouse': { x: 4, y: 15, w: 5, h: 6 },
+    'lighthouse': { x: 4, y: 14, w: 5, h: 7 },
     'green': { x: 27, y: 21, w: 23, h: 11 },
     'first-orchard': { x: 28, y: 22, w: 7, h: 9 },
     'commons-square': { x: 34, y: 24, w: 8, h: 4 },
@@ -443,7 +443,7 @@ export default {
     'door-dark-8': { x: 43, y: 9, facing: 'up' },
     'door-yard-shed': { x: 56, y: 25, facing: 'up' },
     'door-anchorage': { x: 56, y: 35, facing: 'up' },
-    'door-lighthouse': { x: 5, y: 19, facing: 'up' },
+    'door-lighthouse': { x: 4, y: 18, facing: 'up' },
     'wren-yard': { x: 52, y: 27, facing: 'down' },
     'wren-causeway': { x: 57, y: 30, facing: 'right' },
     'ambrose-bench': { x: 56, y: 29, facing: 'up' },
@@ -458,7 +458,7 @@ export default {
     'augusta-wardens-step': { x: 42, y: 20, facing: 'down' },
     'augusta-commons-board': { x: 37, y: 25, facing: 'up' },
     'ansel-launch': { x: 50, y: 9, facing: 'down' },
-    'ansel-creek': { x: 44, y: 6, facing: 'up' },
+    'ansel-creek': { x: 47, y: 5, facing: 'up' },
     'ansel-weir': { x: 52, y: 7, facing: 'right' },
     'piling': { x: 50, y: 10, facing: 'down', onSolid: true },
     'wick-burrow': { x: 12, y: 34, facing: 'down' },
@@ -480,10 +480,10 @@ export default {
     'corin-step': { x: 10, y: 23, facing: 'left' },
     'corin-archive-step': { x: 31, y: 20, facing: 'down' },
     'corin-reeds': { x: 42, y: 14, facing: 'up' },
-    'corin-stones': { x: 3, y: 37, facing: 'left' },
+    'corin-stones': { x: 5, y: 37, facing: 'left' },
     'corin-dock': { x: 16, y: 36, facing: 'down' },
     'linnet-porch': { x: 14, y: 23, facing: 'down' },
-    'linnet-vault-to': { x: 11, y: 22, facing: 'left' },
+    'linnet-vault-to': { x: 11, y: 23, facing: 'left' },
     'dimity-lamp': { x: 10, y: 22, facing: 'down', onSolid: true },
     'thatch-roof': { x: 9, y: 19, facing: 'down', onSolid: true },
     'maud-berth': { x: 34, y: 43, facing: 'right' },
@@ -494,13 +494,13 @@ export default {
     'anchorage-counter': { x: 56, y: 36, facing: 'up' },
     'varga-raft': { x: 51, y: 46, facing: 'down' },
     'dov-stall': { x: 40, y: 26, facing: 'down' },
-    'arrival-start': { x: 63, y: 30, facing: 'left' },
-    'causeway-foam': { x: 61, y: 30, facing: 'left' },
-    'lease-card-player': { x: 58, y: 30, facing: 'left' },
+    'arrival-start': { x: 63, y: 30, facing: 'left', tide: 'low' },
+    'causeway-foam': { x: 61, y: 30, facing: 'left', tide: 'low' },
+    'lease-card-player': { x: 58, y: 31, facing: 'left' },
     'starter-sloshkin': { x: 59, y: 29, facing: 'left' },
     'starter-scrapling': { x: 59, y: 31, facing: 'left' },
-    'starter-reedkit': { x: 58, y: 32, facing: 'up' },
-    'starter-kneel': { x: 58, y: 31, facing: 'right' },
+    'starter-reedkit': { x: 59, y: 30, facing: 'left' },
+    'starter-kneel': { x: 58, y: 30, facing: 'right' },
     'cottage-porch': { x: 9, y: 23, facing: 'down' },
     'cottage-door-inside-step': { x: 9, y: 23, facing: 'up' },
     'wick-errands': { x: 10, y: 25, facing: 'up' },
@@ -520,7 +520,7 @@ export default {
     'ludo-sale': { x: 51, y: 21, facing: 'up' },
     'yard-payment': { x: 52, y: 29, facing: 'up' },
     'porchlight-player': { x: 9, y: 24, facing: 'up' },
-    'prismoth-lamp': { x: 11, y: 23, facing: 'left' },
+    'prismoth-lamp': { x: 10, y: 23, facing: 'up' },
     'corin-slip': { x: 9, y: 23, facing: 'up' },
     'night-fishing': { x: 30, y: 41, facing: 'down' },
     'glowing-flats': { x: 9, y: 37, facing: 'down', tide: 'low' },
@@ -536,14 +536,14 @@ export default {
     'market-stall-3': { x: 46, y: 28, facing: 'down' },
     'shift-fair': { x: 40, y: 25, facing: 'down' },
     'linnet-ferry-leaves': { x: 34, y: 42, facing: 'down' },
-    'point-skywatch': { x: 7, y: 21, facing: 'up' },
-    'lighthouse-door': { x: 5, y: 20, facing: 'up' },
+    'point-skywatch': { x: 5, y: 20, facing: 'up' },
+    'lighthouse-door': { x: 4, y: 19, facing: 'up' },
     'relighting-juniper': { x: 9, y: 25, facing: 'left' },
-    'relighting-crowd-1': { x: 7, y: 22, facing: 'up' },
-    'relighting-crowd-2': { x: 8, y: 21, facing: 'up' },
+    'relighting-crowd-1': { x: 6, y: 19, facing: 'up' },
+    'relighting-crowd-2': { x: 7, y: 18, facing: 'left' },
     'crossing-start': { x: 7, y: 14, facing: 'up' },
-    'engine-watch': { x: 5, y: 16, facing: 'up' },
-    'point-dawn': { x: 9, y: 26, facing: 'left' },
+    'engine-watch': { x: 6, y: 16, facing: 'up' },
+    'point-dawn': { x: 8, y: 27, facing: 'left' },
     'weir-wheel': { x: 52, y: 6, facing: 'right' },
     'bell-dig': { x: 56, y: 44, facing: 'down', tide: 'low', spring: true },
     'tamsin-boat': { x: 44, y: 5, facing: 'up' },
@@ -565,7 +565,7 @@ export default {
   ],
   town: true,
   dig: { spots: [[40, 4], [45, 5], [49, 4], [15, 27], [6, 22], [30, 30], [46, 30], [57, 11], [61, 7], [25, 4], [15, 32], [58, 20], [33, 30], [11, 18], [44, 22], [24, 28]] },
-  flats: { spots: [[4, 34], [5, 34], [7, 34], [8, 34], [9, 34], [10, 34], [14, 34], [15, 34], [17, 34], [3, 35], [4, 35], [7, 35], [8, 35], [11, 35], [12, 35], [13, 35], [14, 35], [15, 35], [17, 35], [3, 36], [6, 36], [7, 36], [8, 36], [9, 36], [10, 36], [11, 36], [13, 36], [15, 36], [17, 36], [21, 36], [5, 37], [6, 37], [7, 37], [8, 37], [9, 37], [10, 37], [11, 37], [12, 37], [13, 37], [14, 37], [15, 37], [5, 38], [6, 38], [7, 38], [8, 38], [9, 38], [10, 38], [11, 38], [12, 38], [14, 38], [15, 38], [4, 39], [5, 39], [6, 39], [8, 39], [9, 39], [10, 39], [11, 39], [12, 39], [13, 39], [14, 39], [15, 39], [5, 40], [6, 40], [7, 40], [8, 40], [9, 40], [10, 40], [11, 40], [12, 40], [13, 40], [14, 40], [15, 40], [17, 40], [6, 41], [7, 41], [8, 41], [10, 41], [12, 41], [13, 41], [14, 41], [15, 41], [16, 41], [17, 41], [8, 42], [9, 42], [10, 42], [11, 42], [12, 42], [13, 42], [14, 42], [15, 42], [16, 42], [17, 42]], glint: true, skyglass: true, cockles: { item: 'cockle' } },
+  flats: { spots: [[4, 34], [5, 34], [6, 34], [7, 34], [14, 34], [15, 34], [17, 34], [3, 35], [4, 35], [5, 35], [12, 35], [13, 35], [14, 35], [15, 35], [17, 35], [3, 36], [4, 36], [7, 36], [8, 36], [9, 36], [10, 36], [11, 36], [13, 36], [15, 36], [17, 36], [21, 36], [3, 37], [6, 37], [7, 37], [8, 37], [9, 37], [10, 37], [11, 37], [12, 37], [13, 37], [14, 37], [15, 37], [5, 38], [6, 38], [7, 38], [8, 38], [9, 38], [10, 38], [11, 38], [12, 38], [14, 38], [15, 38], [4, 39], [5, 39], [6, 39], [8, 39], [9, 39], [10, 39], [11, 39], [12, 39], [13, 39], [14, 39], [15, 39], [5, 40], [6, 40], [7, 40], [8, 40], [9, 40], [10, 40], [11, 40], [12, 40], [13, 40], [14, 40], [15, 40], [17, 40], [6, 41], [7, 41], [8, 41], [10, 41], [12, 41], [13, 41], [14, 41], [15, 41], [16, 41], [17, 41], [8, 42], [9, 42], [10, 42], [11, 42], [12, 42], [13, 42], [14, 42], [15, 42], [16, 42], [17, 42]], glint: true, skyglass: true, cockles: { item: 'cockle' } },
   bugSpots: [
     { x: 57, y: 3, habitat: 'orchard' },
     { x: 61, y: 5, habitat: 'orchard' },

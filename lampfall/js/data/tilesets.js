@@ -17,7 +17,8 @@
  *  - `roof`        roof colour family (ROOF_COLOUR_IDS) for roof tiles; `roofFrom:'player'` = the
  *                  colour picked at the payment ceremony.
  *  - `litArt`      art shown when the tile's light is on (windows, the lighthouse, the lens).
- *  - `layer`       'detail' when the art is drawn over a ground tile (fences, rocks, trees, crates).
+ *  - `layer`       'detail' when the art is drawn over a ground tile (fences, rocks, trees, crates);
+ *                  a non-solid detail tile omits `tide` and `water` so the ground tile's apply.
  *
  * `spawn` is set on every tile whose id would otherwise match a keyword spawn class by name
  * (`grass`, `water`, `mud`), so lawns never roll encounters: only `spawn:'grass'` cover (tall grass,
@@ -64,6 +65,12 @@ function t(id, char, art, o = {}) {
     glow: o.glow ?? false,
   };
   for (const [k, v] of Object.entries(o)) if (!(k in row)) row[k] = v;
+  // A non-solid decoration drawn over a ground tile (seaweed on the flats, glasswort, a gate) leaves
+  // `tide` and `water` undefined so world/tilemap falls through to the ground tile beneath it.
+  if ((o.layer === 'detail' || o.layer === 'overlay') && !o.solid) {
+    if (!('tide' in o)) delete row.tide;
+    if (!('water' in o)) delete row.water;
+  }
   return Object.freeze(row);
 }
 
@@ -126,7 +133,7 @@ export const TILESETS = Object.freeze([
   t('lagoon', 'u', 'water-lagoon', sea({ anim: { frames: 4, fps: 4 } })),
   t('tannin-water', 'j', 'water-tannin', sea({ anim: { frames: 4, fps: 4 } })),
   t('hot-spring', 'J', 'water-spring', sea({ verb: 'look', anim: { frames: 4, fps: 3 } })),
-  t('mud-water', null, 'water-mud', sea()),
+  t('mud-water', null, 'water-mud', sea({ spawn: 'water' })),
   t('shoal', null, 'shoal', sea({ anim: { frames: 4, fps: 4 }, layer: 'detail' })),
   t('lily-pads', null, 'lily-pads', sea({ layer: 'detail' })),
   t('tidepool', '~', 'tidepool', { water: true, verb: 'look', sfx: WET }),
@@ -179,8 +186,8 @@ export const TILESETS = Object.freeze([
   t('bean-rows', '=', 'bean-rows', prop({ verb: 'look' })),
   t('flowers', '*', 'flowers-a'),
   t('flowers-b', '&', 'flowers-b'),
-  t('glasswort', 'i', 'glasswort', { layer: 'detail' }),
-  t('seaweed', 'l', 'seaweed', { layer: 'detail', sfx: WET }),
+  t('glasswort', 'i', 'glasswort', { layer: 'detail', spawn: 'marsh' }),
+  t('seaweed', 'l', 'seaweed', { layer: 'detail', sfx: WET, spawn: 'shore' }),
 
   // --- buildings: walls, windows, doors ------------------------------------------------------------
   t('wall-timber', '#', 'wall-timber', solid()),

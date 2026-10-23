@@ -8,7 +8,8 @@
  *
  *  - **World.** The hourly day-part theme from `tracks.CUES` (`themeForHour`; the Lantern Market waltz
  *    on its night in its place), with the `night`, `perc`, `tide` and `rain` stems set by clock, tide
- *    and weather and the season as the music intensity. A map's `music` field overrides the hourly
+ *    and weather (a weather kind's own `stems` list from `systems/weather` data counts too) and the
+ *    season as the music intensity. A map's `music` field overrides the hourly
  *    track. A theme change *on the hour* waits for the next bar line of the playing track (capped by
  *    `HOUR_QUANTIZE_MAX_MS`) and crossfades over two bars of the incoming theme (`CUES.world.fade`).
  *  - **Battle.** `battle:start` picks the battle track by kind (wild / trainer / spire / summit); the
@@ -31,6 +32,9 @@
  * It also creates the sound-effect router (`audio/sfxMap.js`) on the same bus unless `{sfx: false}`.
  *
  * Every tunable number is in {@link DEFAULTS} and may be overridden with `createMusicDirector(G, {tuning})`.
+ * Ids that arrive from scripts, maps or payloads are looked up as own keys only ({@link trackOf}), so a
+ * prototype key (`'constructor'`) is never a track, cue, stem or scene.
+ *
  * The pure parts ({@link decide}, {@link pickWorldTrack}, {@link worldStems}, {@link stemsFor},
  * {@link battleKindOf}, {@link planHourCrossfade}, {@link trackLengthMs}) are exported for tests.
  *
@@ -968,10 +972,11 @@ export function createMusicDirector(G, opts = {}) {
       };
     },
     history: () => hist.map((h) => ({ ...h })),
-    sting(id, o = {}) { try { checkUnlock(); return playSting(id, o); } catch { return false; } },
-    play(track, o = {}) {
+    sting(id, o) { try { checkUnlock(); return playSting(id, isPlainObject(o) ? o : {}); } catch { return false; } },
+    play(track, o) {
       if (track !== null && !trackOf(track)) return;
-      state.override = { track, fade: typeof o.fade === 'number' && Number.isFinite(o.fade) ? o.fade : undefined };
+      const fade = isPlainObject(o) ? o.fade : undefined;
+      state.override = { track, fade: typeof fade === 'number' && Number.isFinite(fade) ? Math.max(0, fade) : undefined };
       call(() => reconcile('override'));
     },
     release() { state.override = null; call(() => reconcile('override')); },

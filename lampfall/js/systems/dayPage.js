@@ -79,12 +79,14 @@ export const DEFAULTS = Object.freeze({
   dayPageLogLines: LOG_MAX,
   /** *Tomorrow:* lists at most this many items. */
   tomorrowMax: 8,
-  /**
-   * Minutes after `dayStartMinute` during which an overnight with no `toDay` still means "this
-   * morning" when it has not been written ({@link nextMorning}; the 06:00 anchor, the wake from Sleep).
-   */
-  overnightGraceMinutes: 60,
 });
+
+/**
+ * Minutes after `dayStartMinute` during which an overnight with no `toDay` still means "this
+ * morning" ({@link nextMorning}: the 06:00 anchor, the wake from Sleep). An engineering margin for
+ * a frame that crosses 06:00, not a designer number; `opts.graceMinutes` overrides it.
+ */
+export const OVERNIGHT_GRACE_MINUTES = 60;
 
 /** Every tuning key this module reads (letters/threads/schedule keys are listed by those modules). */
 export const TUNING_KEYS = Object.freeze(Object.keys(DEFAULTS));
@@ -96,7 +98,6 @@ const SPEC = {
   dayStartMinute: [(v) => isInt(v) && v >= 0 && v < MINUTES_PER_DAY, 'minute 0..1439'],
   dayPageLogLines: [(v) => isInt(v) && v >= 0 && v <= LOG_MAX, `integer 0..${LOG_MAX}`],
   tomorrowMax: [(v) => isInt(v) && v >= 1, 'integer >= 1'],
-  overnightGraceMinutes: [(v) => isInt(v) && v >= 0 && v <= 18 * 60, 'integer 0..1080'],
 };
 /** @type {WeakMap<object, any>} */
 const CACHE = new WeakMap();
@@ -172,27 +173,21 @@ export function pageDay(world, opts = {}, data = null) {
 
 /**
  * The core day an overnight called now leads into, when the caller does not say (`ctx.toDay`):
- *  - before 06:00 it is this morning (Sleep after midnight; the 05:40 builds anchor);
- *  - within `overnightGraceMinutes` after 06:00, when this morning's page has not been written (the
- *    tally is still on an earlier day), it is this morning: the call comes at the 06:00 anchor or
- *    just after a Sleep that skipped to dawn (clockSys.rest wakes at 06:00);
- *  - otherwise it is tomorrow (Sleep from 21:00). A morning missed altogether is not written late:
- *    like the letters, it never accrues (GDD-00 §11), so an evening call never drifts a day behind.
- * A new world opens the arrival day's tally (core day 0, which has no morning of its own); with no
- * tally at all (`day < 0`) the call counts as an evening one.
+ * this morning until {@link OVERNIGHT_GRACE_MINUTES} after 06:00 (Sleep after midnight, the 05:40 builds
+ * anchor, the 06:00 anchor, the wake from a Sleep that skipped to dawn — clockSys.rest wakes at
+ * 06:00), tomorrow after that (Sleep is offered from 21:00). A second call for a morning already
+ * written therefore returns `'already'` instead of running tomorrow early, and a morning missed
+ * altogether is never written late: like the letters it does not accrue (GDD-00 §11).
  * @param {World} world
  * @param {any} data
- * @param {{tuning?: any}} [opts]
+ * @param {{tuning?: any, graceMinutes?: number}} [opts]
  * @returns {number}
  */
 export function nextMorning(world, data, opts = {}) {
   const t = tuningOf(data, opts);
   const cur = coreDay(world);
-  const minute = minuteNow(world);
-  if (minute < t.dayStartMinute) return cur;
-  const D = world?.dayPage;
-  const unwritten = D && isInt(D.day) && D.day >= 0 && D.day < cur;
-  return unwritten && minute < t.dayStartMinute + t.overnightGraceMinutes ? cur : cur + 1;
+  const grace = isInt(opts.graceMinutes) && opts.graceMinutes >= 0 ? opts.graceMinutes : OVERNIGHT_GRACE_MINUTES;
+  return minuteNow(world) < t.dayStartMinute + grace ? cur : cur + 1;
 }
 
 /**

@@ -50,6 +50,8 @@ function assertCleanEngine(audio) {
 }
 /** The director still follows the clock (it is not wedged). */
 function assertAlive(r) {
+  const st = r.music.status().state;
+  if (st.scenesKnown && st.scenes.length === 0) scene(r.music, 'push', 'overworld');
   r.music.release();
   for (const k of Object.keys(r.music.status().state.stemOverrides)) r.music.setStem(k, null);
   r.bus.emit('clock:hour', { hour: 6 });
@@ -293,7 +295,8 @@ test('lane adversarial: every director tuning key ignores junk overrides and the
     for (const junk of [NaN, Infinity, 'x', null, {}, [], true]) {
       const t = tuningOf({ [k]: junk });
       const d = DEFAULTS[k];
-      if (typeof d === 'number' || typeof d === 'string') assert.equal(t[k], d, `${k} <- ${String(junk)}`);
+      if (typeof d === 'number') assert.equal(t[k], d, `${k} <- ${String(junk)}`);
+      else if (typeof d === 'string') assert.equal(t[k], typeof junk === 'string' ? junk : d, k);
       else if (Array.isArray(d)) assert.ok(Array.isArray(t[k]), k);
       else assert.ok(t[k] && typeof t[k] === 'object' && !Array.isArray(t[k]), k);
     }

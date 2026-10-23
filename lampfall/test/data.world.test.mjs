@@ -107,7 +107,8 @@ test('tilesets: unique ids and chars, art resolves (or is an art request), lawns
   for (const t of TILESETS) {
     assert.ok(!ids.has(t.id), `dup id ${t.id}`); ids.add(t.id);
     if (t.char) { assert.ok(!chars.has(t.char), `dup char ${t.char}`); chars.add(t.char); }
-    for (const k of ['solid', 'water', 'tide', 'verb', 'sfx', 'anim', 'glow']) assert.ok(k in t, `${t.id}.${k}`);
+    const fallsThrough = (t.layer === 'detail' || t.layer === 'overlay') && !t.solid;
+    for (const k of ['solid', 'water', 'tide', 'verb', 'sfx', 'anim', 'glow']) if (!(fallsThrough && (k === 'water' || k === 'tide'))) assert.ok(k in t, `${t.id}.${k}`);
     assert.ok(resolveTileId(t.art) || PROP_ART[t.art] || ART_REQUESTS.includes(t.art), `${t.id}: art '${t.art}'`);
     if (/grass|mud/.test(t.id) && !t.spawn) assert.fail(`${t.id} matches a spawn keyword by name and needs an explicit spawn`);
   }
@@ -167,7 +168,7 @@ test('pellwick: every warp reachable; short ways tide-gated, long way open at an
   const short = pw.warps.find((w) => w.via === 'short-way');
   const long = pw.warps.find((w) => w.via === 'long-way');
   const bar = pw.warps.find((w) => w.via === 'the-bar');
-  assert.equal(rpw.tileAt(short.x, short.y).id, 'stepping-stones');
+  assert.equal(rpw.tileAt(short.x + 1, short.y).id, 'stepping-stones');
   assert.ok(!reachHigh.has(`${short.x},${short.y}`), 'the stones are under at high tide');
   assert.ok(reachHigh.has(`${long.x},${long.y}`), 'the boardwalk is open at high tide');
   assert.equal(rpw.tileAt(bar.x, bar.y).id, 'bar-road');
