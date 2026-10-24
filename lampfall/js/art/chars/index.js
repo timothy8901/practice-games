@@ -175,7 +175,11 @@ export function artDefOf(body, palette) {
 }
 /** Every character as an atlas table keyed by charArtId. */
 export function charArtTable() {
-  return Object.fromEntries(Object.values(CHAR_SPRITES).map((c) => [charArtId(c.id), artDefOf(c.body, c.palette)]));
+  return {
+    ...Object.fromEntries(Object.values(CHAR_SPRITES).map((c) => [charArtId(c.id), artDefOf(c.body, c.palette)])),
+    'char-trainerVest': artDefOf(BODIES.trainerVest, PALETTES.routeTrainer),
+    'char-trainerCoat': artDefOf(BODIES.trainerCoat, PALETTES.routeTrainer),
+  };
 }
 registerArt(charArtTable(), { source: 'chars', kind: 'char', replace: true });
 // Narrative names and harbor residents share the established animal rigs.

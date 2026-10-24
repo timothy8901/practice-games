@@ -63,6 +63,16 @@ describe('arrivalPoint', () => {
 });
 
 describe('createNpcDriver: walking to a placement', () => {
+  it('routes around a solid bench instead of permanently blocking a door approach', () => {
+    const ents = createEntities(map);
+    const npc = ents.add(createEntity({ id: 'odile', kind: 'npc', x: 2, y: 4 }));
+    ents.add(createEntity({ id: 'bench', kind: 'prop', x: 3, y: 4 }));
+    const drv = createNpcDriver(npc);
+    drv.setPlacement({ mapId: 'lane', x: 5, y: 4, facing: 'left' });
+    const seen = run(drv, ents, { map, ents, tideState: 'low', cache: createPathCache() });
+    assert.equal(seen.at(-1), 'arrived');
+    assert.deepEqual([npc.x, npc.y], [5, 4]);
+  });
   it('walks through the wall gap to the target and reports arrived once, facing as placed', () => {
     const ents = createEntities(map);
     const npc = ents.add(createEntity({ id: 'wren', kind: 'npc', x: 1, y: 0 }));

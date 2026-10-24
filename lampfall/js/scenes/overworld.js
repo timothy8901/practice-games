@@ -1117,6 +1117,7 @@ export function createOverworldScene(G) {
       const events = player.update(dt, { ents, map, passable, tideState: baseTide });
       for (const ev of events) {
         if (ev.type === 'step') onStep(ev);
+        else if (ev.type === 'turn') writePlayer();
         else if (ev.type === 'bump') onBump(ev);
         if (changing) break;
       }

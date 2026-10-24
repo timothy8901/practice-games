@@ -300,6 +300,7 @@ export function createBattleScene(G) {
     if (!SPEEDS.includes(n)) return;
     speedPref = n;
     queue.speed = n;
+    G.store?.tx?.('battle:speed', w => { w.settings.battleSpeed = n; });
   }
 
   function cycleSpeed() {
@@ -1049,6 +1050,7 @@ export function createBattleScene(G) {
     fx.length = 0;
     knownHp.clear();
     queue.clear();
+    speedPref = SPEEDS.includes(world()?.settings?.battleSpeed) ? world().settings.battleSpeed : speedPref;
     queue.speed = speedPref;
     queue.instant = instant();
     curtain = 1;

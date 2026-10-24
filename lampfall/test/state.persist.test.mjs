@@ -459,3 +459,28 @@ describe('summarize', () => {
     assert.equal(summarize(null).name, '');
   });
 });
+
+// Reproduced by entering the dock tutorial through ordinary new-game inputs.
+it('defers a story autosave throughout a battle without a false failure, then writes when safe', () => {
+  const G = makeG({ top: 'cutscene', battle: true });
+  const p = make();
+  p.attach(G);
+  G.bus.emit('battle:start', { kind: 'story' });
+  assert.equal(p.status().failed, false);
+  assert.equal(p.status().retryPending, true);
+  assert.deepEqual(G.events, []);
+  p.tick(G, RETRY_MS * 20);
+  assert.deepEqual(G.events, [], 'a long battle is not a failed retry');
+  G.scenes.battle = false;
+  G.scenes.transitioning = true;
+  p.tick(G, RETRY_MS * 20);
+  assert.deepEqual(G.events, []);
+  G.scenes.transitioning = false;
+  p.tick(G, 17);
+  assert.equal(G.events.length, 1);
+  assert.equal(G.events[0][0], 'ok');
+  assert.equal(G.events[0][1].reason, 'battle:start:story');
+  assert.equal(p.status().failed, false);
+  assert.equal(p.status().retryPending, false);
+  assert.equal(p.latest().state, 'ok');
+});

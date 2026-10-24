@@ -561,6 +561,7 @@ export default {
   // 19:30 — the first payment (runs when loan 1 clears: beads, the THWAP, the split stick, the roof)
   // ---------------------------------------------------------------------------------------------
   'first-payment': [
+    warpTo(P, 'yard-payment', 'up'),
     tp('wren', P, 'wren-yard'),
     tp('ambrose', P, 'ambrose-bench'),
     '* The yard by lamplight. The abacus beads are still swinging on their wires. Shavings have settled on everything, including Wren.',
@@ -645,6 +646,7 @@ export default {
   // 26:00 — the Thatch tie off your roof (the dawn build)
   // ---------------------------------------------------------------------------------------------
   'thatch-first-roof': [
+    warpTo(P, 'porchlight-player', 'up'),
     cam(P, 'thatch-roof', 600),
     sfx('dawn'),
     '* Twenty to six. A flock of finches comes over the cottage in a single whirring sheet and settles on your roof, every one of them carrying something: a reed, a peg, a twist of tarred string.',
@@ -660,6 +662,7 @@ export default {
   // 26:30 — "One for you. It's… a little late." K1
   // ---------------------------------------------------------------------------------------------
   'hesper-k1': [
+    warpTo(P, 'porchlight-player', 'down'),
     tp('hesper', P, 'hesper-cottage-gate'),
     face('hesper', 'player'),
     '* Six o\'clock. Hesper is at your gate. She has a letter in one feeler and the expression of a snail who has had a long night with the envelopes and would like to tell you about all of them.',

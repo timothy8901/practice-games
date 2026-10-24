@@ -24,6 +24,7 @@ import { drawTypeChip, drawCurrency, drawBar } from '../ui/widgets.js';
 import { openConfirm } from '../ui/confirm.js';
 import { t } from '../data/strings.js';
 import * as bagSys from '../systems/bag.js';
+import { itemOf } from '../systems/econ.js';
 import * as partySys from '../systems/party.js';
 import * as creatureSys from '../systems/creature.js';
 import { TUNING } from '../data/tuning.js';
@@ -113,9 +114,8 @@ export function createBagScene(G) {
   function stacks(pocket) {
     const w = G.world;
     if (!w?.bag?.pockets) return [];
-    const L = look();
     return bagSys.pocketList(w, pocket).map((s, i) => {
-      const row = L.itemOrNull(s.id) ?? { id: s.id, name: s.id, pocket };
+      const row = itemOf(G.data, s.id) ?? { id: s.id, name: s.id, pocket };
       return { id: `${s.id}#${i}`, label: row.name ?? s.id, value: s.n > 1 || row.stack > 1 ? t('bag.count', { n: s.n }) : '', marker: pocket !== 'keepsakes' && row.oneOfAKind ? '★' : undefined, data: { id: s.id, row, n: s.n, pocket } };
     });
   }

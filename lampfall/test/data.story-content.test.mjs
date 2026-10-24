@@ -132,6 +132,34 @@ test('first-payment event runs once and the legacy dusk id forwards to the real 
   assert.equal(STORY_SCRIPTS.relighting[0].script, 'the-relighting');
 });
 
+test('a first loan paid from an indoor ledger stages its ceremony at the yard', () => {
+  const w = fresh(); w.player.mapId = 'int-pells';
+  const r = drive('first-payment', w);
+  const first = r.requests[0];
+  const yard = MAPS_BY_ID.pellwick.markers['yard-payment'];
+  assert.deepEqual(first, { id: first.id, op: 'warp', mapId: 'pellwick', x: yard.x, y: yard.y, facing: 'up' });
+});
+
+test('Dimity leaves the cottage door approach clear after the first payment', () => {
+  const w = fresh(); w.flags['sp.first-payment'] = true;
+  const at = whereIs(NPCS_BY_ID.dimity, w, data);
+  const door = MAPS_BY_ID.pellwick.markers['porch-keepers-cottage-step'];
+  assert.equal(at.mapId, 'pellwick');
+  assert.notDeepEqual({ x: at.x, y: at.y }, { x: door.x, y: door.y });
+  assert.deepEqual({ x: at.x, y: at.y }, { x: 10, y: 23 });
+});
+
+test('overnight roof work and the first letter stage outside even when the Keeper sleeps indoors', () => {
+  for (const id of ['thatch-first-roof', 'hesper-k1']) {
+    const w = fresh(); w.player.mapId = 'int-cottage';
+    const first = drive(id, w).requests[0];
+    const porch = MAPS_BY_ID.pellwick.markers['porchlight-player'];
+    assert.equal(first.op, 'warp', id);
+    assert.equal(first.mapId, 'pellwick', id);
+    assert.deepEqual({ x: first.x, y: first.y }, { x: porch.x, y: porch.y });
+  }
+});
+
 test('optional battle and forecast triggers remain available when declined or visited early', () => {
   const repeat = ['linnet-brackenford-before', 'linnet-gate-before', 'corin-first-forecast', 'passenger-perch', 'pip-before', 'wick-long-road-before'];
   for (const id of repeat) for (const t of Object.values(STORY_TRIGGERS).flat().filter((t) => t.script === id)) assert.equal(t.once, false, id);

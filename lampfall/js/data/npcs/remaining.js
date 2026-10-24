@@ -96,7 +96,7 @@ const residents = [
 ];
 
 const folk = [
-  person('dimity', 'Dimity', 'rosy maple moth', P, 'porch-keepers-cottage-step', ["Tomorrow: a tide, a letter, and whatever you choose to leave open.", "You came home. I kept your place.", "Your seed remembers. So do I."], { group: 'fixture', absent: { not: { flag: 'sp.first-payment' } } }),
+  person('dimity', 'Dimity', 'rosy maple moth', P, 'dimity-porch', ["Tomorrow: a tide, a letter, and whatever you choose to leave open.", "You came home. I kept your place.", "Your seed remembers. So do I."], { group: 'fixture', absent: { not: { flag: 'sp.first-payment' } } }),
   person('maud', 'Maud Tallis', 'greylag goose', 'lowmoor', 'maud-practice-table', ["Every dock, every tide. Ask before you pay. Ask again before you leave.", "A reroll buys another reading, not a promise.", "Some passengers want the far shore. Some want a quiet crossing. Both pay the same."], { group: 'leader', schedule: [at(hm(1), P, 'maud-berth', { pose: 'sleep' }), at(hm(5), 'lowmoor', 'maud-practice-table'), at(hm(18), P, 'maud-berth')], topics: [topic('practice', 'maud-practice-table', 10, { once: true, cond: { not: { flag: 'sp.reroll-taught' } } })] }),
   person('osric', 'Osric Penhallow', 'tortoise', 'spire-ward', 'osric-dais', ["A Ward is a question. Read which question before you answer.", "I cut the stone. The creature decides whether it is heavy.", "Granite holds for a very long time. That isn't always kindness."], { group: 'leader' }),
   person('ines', 'Ines Calloway', 'crested newt', 'spire-weather', 'ines-dais', ["Weather is posted three turns ahead. Bring a coat and a plan.", "The steam comes out whether we look at it or not. Looking helps.", "At the spa, everyone gets the same towel. Even champions."], { group: 'leader' }),

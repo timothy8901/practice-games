@@ -198,6 +198,13 @@ export function createNpcDriver(ent, opts = {}) {
     const from = { x: ent.x, y: ent.y }, to = { x: gx, y: gy };
     const po = { tideState: ctx.tideState, mover: 'npc', maxLen: T('maxLen') };
     path = ctx.cache ? findPathCached(ctx.cache, ctx.map, from, to, po) : findPath(ctx.map, from, to, po);
+    // Tile-only cached routes can cross benches and other solid field props. Re-route around
+    // those props; actors still use the existing wait/settle rules, including an occupied goal.
+    const blocked = (x, y) => (x !== gx || y !== gy) && ctx.ents.near(x, y, 0)
+      .some((e) => e.solid && e !== ent && e.kind !== 'npc' && e.kind !== 'player');
+    if (path) for (let i = 0; i < path.length; i += 2) {
+      if (blocked(path[i], path[i + 1])) { path = findPath(ctx.map, from, to, { ...po, blocked }); break; }
+    }
     pathIdx = 0; pathGx = gx; pathGy = gy; pathVariant = v;
     ent.path = /** @type {number[]|null} */ (path);
     if (!path) return false;

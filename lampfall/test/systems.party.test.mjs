@@ -380,3 +380,12 @@ describe('applyOutcome', () => {
     assert.deepEqual(validateWorld(store.world, REG), []);
   });
 });
+
+
+it('records a gifted starter as Held in the Field Log', () => {
+  const w = world();
+  const result = P.giveCreature(w, { species: 'sloshkin', level: 5 }, DATA, makeRng(42));
+  assert.equal(result.ok, true);
+  assert.equal(w.fieldLog.forms.sloshkin.held, true);
+  assert.equal(w.fieldLog.forms.sloshkin.seen, true);
+});

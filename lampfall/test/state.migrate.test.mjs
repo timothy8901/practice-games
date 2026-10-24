@@ -192,3 +192,10 @@ describe('fillDefaults', () => {
     assert.deepEqual(fillDefaults(42), worldDefaults());
   });
 });
+
+
+it('recovers owned starter entries from saves made before gift registration', () => {
+  const out = fillDefaults({ party: [{ uid: 'c1', speciesId: 'sloshkin' }] });
+  assert.equal(out.fieldLog.forms.sloshkin.held, true);
+  assert.equal(out.fieldLog.forms.sloshkin.seen, true);
+});

@@ -525,6 +525,7 @@ export default {
     'linnet-porch': { x: 14, y: 23, facing: 'down' },
     'linnet-vault-to': { x: 11, y: 23, facing: 'left' },
     'dimity-lamp': { x: 10, y: 22, facing: 'down', onSolid: true },
+    'dimity-porch': { x: 10, y: 23, facing: 'left' },
     'thatch-roof': { x: 9, y: 19, facing: 'down', onSolid: true, npc: 'the-thatch' },
     'maud-berth': { x: 34, y: 43, facing: 'right' },
     'maud-punt': { x: 35, y: 44, facing: 'left', water: true },

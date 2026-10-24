@@ -22,3 +22,11 @@ Verification:
 - No Pages publication, main-branch merge or deployment.
 
 Optional future polish: bespoke sprites for minor isle residents that share existing animal rigs; broader manual balance playthroughs and real device/controller coverage. No known blocker remains in the tested opening/field/finale paths.
+
+2026-10-24 — Ordinary-input browser playtest and bug-only repairs:
+- Fresh Flux run FLUX-4KNZ-CH4G through Day 4 and Lowmoor, with no granted resources, forced story flags, debug warps or simulated time. Source map navigation aids were used. Separate earlier-save replay verified fixes.
+- Cleared loan 1 using errands and sales; lit porch, built roof overnight, read K1; caught/named Tossup, won Pip battle and reached level 6, caught a natural Puddlepip after reducing it to 1 HP with Capture Stance; donated Grey Mullet. Storage, healing, settings, manual saves, reload and export/import exercised.
+- Fixed 13 reproduced issues: false busy autosave error; native fruit; gathered-item labels; starter Held registration/backfill; battle-speed persistence; turn facing; Archive donation; payment/roof/letter map staging; Dimity blocking the door; indoor rain; NPC routes crossing props; missing generic trainer art; save-transfer overlay alignment. No balance or cosmetic polish was applied.
+- Final full check: 4,167 tests passed across 151 files, data/ownership/art/module imports passed. Production content has 0 errors/0 pending tables. Routes 50/50. Main save validates without problems; two historical missing-art warnings were resolved, no page or console errors.
+- Feedback and exact limits: qa/HUMAN-PLAYTEST.md. The entire natural campaign, every Spire/thread/Shift, physical touch/controller hardware and non-Chromium browsers remain unverified. Prior fixture finale evidence is separate from this playthrough.
+- Existing pre-playtest Relighting event correction preserved. No deployment or main merge.

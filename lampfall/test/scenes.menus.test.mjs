@@ -21,6 +21,8 @@ import { createClock } from '../js/core/time.js';
 import * as clockSys from '../js/systems/clockSys.js';
 import * as partySys from '../js/systems/party.js';
 import * as bagSys from '../js/systems/bag.js';
+import * as fieldLog from '../js/systems/fieldLog.js';
+import { DATA_CONTENT } from '../js/data/content.js';
 import { makeRng } from '../js/core/rng.js';
 import { TUNING } from '../js/data/tuning.js';
 import { readExt, resetExtCache } from '../js/scenes/menuKit.js';
@@ -478,6 +480,22 @@ test('save/load: export opens one textarea-free panel under Node and backs out c
   assert.equal(s.panel, 'list');
 });
 
+test('save transfer: textarea follows the letterboxed game frame and stays clear of buttons', () => {
+  const G = makeG(); G.persist.saveManual(G, 1);
+  const previous = globalThis.document;
+  const ta = { style: {}, setAttribute() {}, addEventListener() {}, focus() {}, select() {}, remove() {} };
+  globalThis.document = { createElement: () => ta, body: { appendChild() {} } };
+  try {
+    G.display = { canvas: { getBoundingClientRect: () => ({ left: 0, top: 0, width: 1280, height: 800 }) },
+      toClient: (x, y) => ({ clientX: 160 + x * 2, clientY: 130 + y * 2 }) };
+    G.push('saveLoad', { mode: 'transfer' }); press(G, 'confirm'); press(G, 'confirm');
+    assert.equal(ta.style.left, '216px'); assert.equal(ta.style.top, '282px');
+    assert.equal(ta.style.width, '848px'); assert.equal(ta.style.height, '216px');
+    assert.ok(parseInt(ta.style.top) + parseInt(ta.style.height) < 514, 'does not cover the button row');
+    G.scenes.clear();
+  } finally { if (previous === undefined) delete globalThis.document; else globalThis.document = previous; }
+});
+
 test('menuKit.fitText: fits a label on one line with an ellipsis, leaves short ones alone', async () => {
   const { fitText } = await import('../js/scenes/menuKit.js');
   const { measureText } = await import('../js/core/font.js');
@@ -486,4 +504,24 @@ test('menuKit.fitText: fits a label on one line with an ellipsis, leaves short o
   assert.ok(cut.endsWith('…'));
   assert.ok(measureText(cut).w <= 84);
   assert.equal(measureText(cut).lines, 1);
+});
+
+test('Archive desk: a carried catch can be kept or donated once, consuming one specimen', () => {
+  const G = makeG(); G.data = createRegistry(DATA_CONTENT);
+  G.store.tx('test:catch', (w) => {
+    w.clock.totalMinutes = 10 * 60;
+    fieldLog.recordFish(w, 'grey-mullet', 38.4);
+    bagSys.give(w, 'grey-mullet', 2, { data: G.data });
+  });
+  G.push('shop', { shop: 'archive-desk' });
+  assert.match(top(G).debugText(), /\[donate\].*\n> Grey Mullet/);
+  press(G, 'confirm');
+  assert.equal(top(G).name, 'confirm');
+  top(G).update(1000); press(G, 'confirm'); // safe default: Keep
+  assert.equal(bagSys.count(G.world, 'grey-mullet'), 2);
+  assert.equal(fieldLog.isDonated(G.world, 'grey-mullet'), false);
+  press(G, 'confirm'); top(G).update(1000); press(G, 'right'); press(G, 'confirm');
+  assert.equal(fieldLog.isDonated(G.world, 'grey-mullet'), true);
+  assert.equal(bagSys.count(G.world, 'grey-mullet'), 1);
+  assert.doesNotMatch(top(G).debugText(), /> Grey Mullet/);
 });

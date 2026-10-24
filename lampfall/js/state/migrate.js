@@ -204,6 +204,15 @@ export function fillDefaults(data) {
   merged.maps = fillRecord(merged.maps, mapStateDefaults);
   merged.threads = fillRecord(merged.threads, threadStateDefaults);
   if (isPlainObject(merged.fieldLog)) merged.fieldLog.forms = fillRecord(merged.fieldLog.forms, fieldLogEntryDefaults);
+  // Older gifts and starters were added without recording their owned form.
+  const owned = ['party', 'box'].flatMap(key => Array.isArray(merged[key]) ? merged[key] : []);
+  for (const c of owned) {
+    if (isPlainObject(merged.fieldLog) && isPlainObject(merged.fieldLog.forms) && isPlainObject(c) && typeof c.speciesId === 'string' && c.speciesId) {
+      const entry = merged.fieldLog.forms[c.speciesId] ??= fieldLogEntryDefaults();
+      entry.seen = true;
+      entry.held = true;
+    }
+  }
   return merged;
 }
 

@@ -328,12 +328,14 @@ export function createSaveLoadScene(G) {
     if (!canvas || typeof canvas.getBoundingClientRect !== 'function') return;
     const b = canvas.getBoundingClientRect();
     const sx = b.width / 480, sy = b.height / 270;
-    const key = `${b.left},${b.top},${b.width},${b.height}`;
+    const a = G.display.toClient?.(TEXT_RECT.x, TEXT_RECT.y) ?? { clientX: b.left + TEXT_RECT.x * sx, clientY: b.top + TEXT_RECT.y * sy };
+    const z = G.display.toClient?.(TEXT_RECT.x + TEXT_RECT.w, TEXT_RECT.y + TEXT_RECT.h) ?? { clientX: b.left + (TEXT_RECT.x + TEXT_RECT.w) * sx, clientY: b.top + (TEXT_RECT.y + TEXT_RECT.h) * sy };
+    const key = `${a.clientX},${a.clientY},${z.clientX},${z.clientY}`;
     if (key === lastRect) return;
     lastRect = key;
     Object.assign(textarea.style, {
-      left: `${Math.round(b.left + TEXT_RECT.x * sx)}px`, top: `${Math.round(b.top + TEXT_RECT.y * sy)}px`,
-      width: `${Math.round(TEXT_RECT.w * sx)}px`, height: `${Math.round(TEXT_RECT.h * sy)}px`,
+      left: `${Math.round(a.clientX)}px`, top: `${Math.round(a.clientY)}px`,
+      width: `${Math.round(z.clientX - a.clientX)}px`, height: `${Math.round(z.clientY - a.clientY)}px`,
     });
   }
 

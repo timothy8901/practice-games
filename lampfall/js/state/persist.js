@@ -214,6 +214,7 @@ export function createPersist(opts) {
   let lastOk = null;
   /** @type {{kind: 'auto'|'manual', slot: string|number|null, reason: string, ms: number}|null} */
   let retry = null;
+  let pendingAuto = null;
   let routeAcc = 0;
 
   function build() {
@@ -277,6 +278,12 @@ export function createPersist(opts) {
         return fail(G, { ...base, error: err(PERSIST_ERRORS.NO_STORE, 'no store to save') }, kind, slot, isRetry);
       }
       const scenes = G.scenes;
+      if (kind === 'auto' && (sceneTransitioning(scenes) || sceneOnStack(scenes, 'battle'))) {
+        // A story checkpoint can arrive after its battle/transition was pushed. Keep it pending;
+        // this is a scheduling constraint, not a failed storage write.
+        pendingAuto = reason;
+        return { ...base, error: err(PERSIST_ERRORS.BUSY, 'autosave queued until the scene is ready'), deferred: true };
+      }
       if (sceneTransitioning(scenes)) {
         return fail(G, { ...base, error: err(PERSIST_ERRORS.BUSY, 'cannot save during a transition') }, kind, slot, isRetry);
       }
@@ -297,6 +304,7 @@ export function createPersist(opts) {
       G.store.clean?.();
       routeAcc = 0;
       retry = null;
+      pendingAuto = null;
       lastError = null;
       const ok = { ...base, ok: true, slot: res.slot };
       lastOk = ok;
@@ -386,6 +394,11 @@ export function createPersist(opts) {
   function tick(G, ms) {
     try {
       if (!(ms > 0) || !G?.store) return;
+      if (pendingAuto !== null && !sceneTransitioning(G.scenes) && !sceneOnStack(G.scenes, 'battle')) {
+        const reason = pendingAuto;
+        pendingAuto = null;
+        write(G, 'auto', null, reason, false);
+      }
       if (retry) {
         retry.ms -= ms;
         if (retry.ms <= 0) {
@@ -450,7 +463,7 @@ export function createPersist(opts) {
       clear: () => writeMarker('1'),
       check: () => sawDirtyMarker,
     }),
-    status: () => ({ failed: lastError !== null, lastError, retryPending: retry !== null, lastOk }),
+    status: () => ({ failed: lastError !== null, lastError, retryPending: retry !== null || pendingAuto !== null, lastOk }),
     setNoRewind(on) {
       const next = on === true;
       if (next === noRewind) return;

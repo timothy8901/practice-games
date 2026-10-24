@@ -530,3 +530,24 @@ describe('determinism and validity', () => {
     assert.equal(Object.values(a.collections.relics).reduce((s, r) => s + r.n, 0) >= 4, true);
   });
 });
+
+
+describe('authored Pellwick orchard', () => {
+  it('resolves native-fruit map trees consistently, yields three fruit, then regrows', async () => {
+    const { DATA_CONTENT } = await import('../js/data/content.js');
+    const map = DATA_CONTENT.maps.find(row => row.id === 'pellwick');
+    const world = makeWorld();
+    const ctx = { data: DATA_CONTENT, day: 1, lead: null };
+    const rng = makeRng(42);
+    const tree = map.entities.find(row => row.id === 'tree-turnstone');
+    assert.equal(G.treeState(world, map, tree, ctx).fruitLeft, 3);
+    const drops = [0, 1, 2].map(() => G.shakeTree(world, map, tree, rng, ctx).fruit);
+    assert.ok(drops.every(drop => drop?.n === 1));
+    assert.ok(drops.every(drop => drop.id === drops[0].id));
+    assert.ok(DATA_CONTENT.collections.some(row => row.id === drops[0].id && row.origin === 'native'));
+    assert.equal(G.shakeTree(world, map, tree, rng, ctx).fruit, null);
+    assert.equal(G.treeState(world, map, tree, { ...ctx, day: 3 }).fruitLeft, 3);
+    const other = map.entities.find(row => row.id === 'tree-curlew');
+    assert.equal(G.shakeTree(world, map, other, rng, ctx).fruit.id, drops[0].id);
+  });
+});

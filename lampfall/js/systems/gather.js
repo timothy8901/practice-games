@@ -533,6 +533,14 @@ function treeDefOf(map, tree) {
   return (Array.isArray(map?.entities) ? map.entities : []).find((e) => e && e.kind === 'tree' && e.id === tree) ?? null;
 }
 
+/** Resolve authored native-fruit trees from the run seed without consuming the loot stream. */
+function treeFruit(world, def, ctx) {
+  if (def.fruit) return def.fruit;
+  if (def.fruitFrom !== 'native') return null;
+  const pool = collectionRows(ctx?.data, 'fruit').filter(row => row.origin === 'native').map(row => row.id).sort();
+  return pool.length ? makeRng(world.run.seed).fork('worldgen:native-fruit').pick(pool) : null;
+}
+
 /**
  * Fruit slots taken from a tree since it last regrew.
  * @param {MapState} m
@@ -573,7 +581,7 @@ export function treeState(world, map, tree, ctx) {
   const regrowDay = Number.isInteger(m.trees?.[def.id]) ? m.trees[def.id] : 0;
   const ripeDay = regrowDay + Math.max(0, t.fruitRipeDays - t.regrowDaysDefault);
   let fruitLeft = 0;
-  if (def.fruit && day >= regrowDay) fruitLeft = Math.max(0, t.fruitPerTree - takenSlots(/** @type {MapState} */ ({ picked: m.picked ?? {} }), def.id).length);
+  if (treeFruit(world, def, ctx) && day >= regrowDay) fruitLeft = Math.max(0, t.fruitPerTree - takenSlots(/** @type {MapState} */ ({ picked: m.picked ?? {} }), def.id).length);
   return {
     fruitLeft,
     ripe: fruitLeft > 0 && day >= ripeDay,
@@ -636,7 +644,8 @@ export function shakeTree(world, map, tree, rng, ctx) {
     return res;
   }
 
-  if (def.fruit) {
+  const fruit = treeFruit(world, def, ctx);
+  if (fruit) {
     const regrowDay = Number.isInteger(m.trees[def.id]) ? m.trees[def.id] : 0;
     if (day >= regrowDay) {
       const taken = takenSlots(m, def.id);
@@ -645,7 +654,7 @@ export function shakeTree(world, map, tree, rng, ctx) {
         const n = lb.shakeAllFruit ? left : 1;
         const ripeDay = regrowDay + Math.max(0, t.fruitRipeDays - t.regrowDaysDefault);
         const ripe = day >= ripeDay;
-        const row = rowOf(ctx?.data, 'collections', def.fruit);
+        const row = rowOf(ctx?.data, 'collections', fruit);
         const base = typeof row?.price === 'number' ? row.price : 0;
         const value = ripe ? (typeof row?.ripePrice === 'number' ? row.ripePrice : Math.round(base * t.fruitRipeMult)) : base;
         let slot = 0;
@@ -658,9 +667,9 @@ export function shakeTree(world, map, tree, rng, ctx) {
           m.trees[def.id] = day + t.regrowDaysDefault;
           for (const s of taken) delete m.picked[`${def.id}#f${s}`];
         }
-        res.fruit = { id: def.fruit, n, ripe, value };
-        if (typeof ctx?.give === 'function') ctx.give(def.fruit, n);
-        res.events.push({ type: 'fruit', treeId: def.id, id: def.fruit, n, ripe, value });
+        res.fruit = { id: fruit, n, ripe, value };
+        if (typeof ctx?.give === 'function') ctx.give(fruit, n);
+        res.events.push({ type: 'fruit', treeId: def.id, id: fruit, n, ripe, value });
       }
     }
   }

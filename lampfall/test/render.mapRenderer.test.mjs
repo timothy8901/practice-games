@@ -81,6 +81,18 @@ describe('drawFrame', () => {
     assert.deepEqual(FULL_RECT, { x: 0, y: 0, w: 480, h: 270 });
     assert.deepEqual(MAP_RECT, { x: 0, y: 40, w: 480, h: 230 });
   });
+  it('keeps outdoor precipitation out of interiors and restores it outside', () => {
+    const s = scene(12 * 60, { weather: 'storm' });
+    const r = createMapRenderer();
+    s.view.map = { ...s.map, indoor: true };
+    for (let i = 0; i < 10; i++) { s.view.time += 100; r.drawFrame(null, s.view); }
+    assert.equal(r.fx.stats().emitters, 0);
+    assert.equal(r.fx.stats().particles, 0);
+    const outside = harbor();
+    s.view.map = outside;
+    s.view.time += 100; r.drawFrame(null, s.view);
+    assert.ok(r.fx.stats().emitters > 0);
+  });
   it('a grade change shows the old complete chunk set until the new one is baked and warm', () => {
     const s = scene(12 * 60);
     const r = createMapRenderer({ budgetMs: 0.001 });

@@ -23,6 +23,7 @@ import { nextUid as nextCounterUid } from './flags.js';
 import * as creature from './creature.js';
 import * as exp from './exp.js';
 import { setAutoAnchor } from './settings.js';
+import { markHeld } from './fieldLog.js';
 
 /** @typedef {import('../state/schema.js').World} World */
 /** @typedef {import('../state/schema.js').Creature} Creature */
@@ -263,7 +264,9 @@ export function giveCreature(world, spec, data, rng = null, opts = {}) {
     rng,
     tuning: opts.tuning,
   }, data);
-  return addCreature(world, c, data, { ...opts, caught: opts.caught !== false });
+  const result = addCreature(world, c, data, { ...opts, caught: opts.caught !== false });
+  if (result.ok) markHeld(world, speciesId, { data, bus: opts.bus });
+  return result;
 }
 
 // ---------------------------------------------------------------------------------------------

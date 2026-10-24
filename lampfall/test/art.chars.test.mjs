@@ -8,9 +8,15 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as C from '../js/art/chars/index.js';
 import * as P from '../js/art/portraits.js';
+import { TRAINERS } from '../js/data/trainers.js';
+import { artDef } from '../js/art/atlas.js';
 
 const HEX = /^#[0-9a-f]{6}([0-9a-f]{2})?$/i;
 const FACINGS = ['down', 'up', 'left', 'right'];
+
+test('every trainer body used by the field has registered character art', () => {
+  for (const t of TRAINERS) assert.ok(artDef(`char-${t.sprite || t.npc || 'trainerVest'}`), t.id);
+});
 
 function framesOf(b) {
   const out = [];

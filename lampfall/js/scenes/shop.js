@@ -34,6 +34,7 @@ import { getCreatureIcon } from '../art/creatures/index.js';
 import { t } from '../data/strings.js';
 import * as shops from '../systems/shops.js';
 import * as bag from '../systems/bag.js';
+import * as fieldLog from '../systems/fieldLog.js';
 import { itemOf } from '../systems/econ.js';
 import { POCKET_IDS } from '../state/schema.js';
 import { reducedMotion, skipAnims, framesMs } from './scriptHost.js';
@@ -163,6 +164,16 @@ export function createShopScene(G) {
     return out;
   }
 
+  function donationRows() {
+    return satchelStacks(G.world).flatMap((s) => {
+      const it = itemOf(G.data, s.id);
+      if (!['fish', 'bug', 'relic'].includes(it?.kind) || !fieldLog.isLogged(it)
+        || fieldLog.collectedCount(G.world, s.id) < 1 || fieldLog.isDonated(G.world, s.id)) return [];
+      return [{ id: s.id, label: it.name ?? s.id, enabled: true,
+        data: { item: s.id, row: it, mode: 'donate', have: s.n, price: 0, pocket: s.pocket } }];
+    });
+  }
+
   function crateContents() {
     return (G.world.shops.crate ?? []).map((s) => {
       const it = itemOf(G.data, s.id);
@@ -172,7 +183,7 @@ export function createShopScene(G) {
 
   function refresh() {
     const tab = tabs.active;
-    const rows = crate ? (tab === 'in' ? crateContents() : crateRows()) : tab === 'sell' ? sellRows() : buyRows();
+    const rows = crate ? (tab === 'in' ? crateContents() : crateRows()) : tab === 'donate' ? donationRows() : tab === 'sell' ? sellRows() : buyRows();
     for (const r of rows) if (r.data.mode === 'buy') r.data.wanted = false;
     list.setItems(rows);
     wanted = !crate && shop ? shops.wantedToday(G.world, shop, undefined, ctx()) : [];
@@ -183,6 +194,10 @@ export function createShopScene(G) {
     if (!item) return;
     const d = item.data;
     if (!crate && !open) { say(closedText(), 'warn'); emit('ui:blocked'); return; }
+    if (d.mode === 'donate') {
+      ask('donate', `Donate one ${d.row.name ?? d.item} to the Archive? It leaves your satchel.`, ['Keep', 'Donate'], 0, { item: d.item, n: 1 });
+      return;
+    }
     if (d.mode === 'buy') {
       if (d.soldOut) { say(d.reason, 'warn'); emit('ui:blocked'); return; }
       if (G.world.wallet.main < d.price) { say(t('shop.cantAfford'), 'warn'); emit('ui:blocked'); return; }
@@ -296,6 +311,14 @@ export function createShopScene(G) {
     emit('ui:blocked');
   }
 
+  function doDonate(itemId) {
+    const res = G.store.tx('archive:donate', (w) => fieldLog.donate(w, itemId, {
+      ...ctx(), take: (id, n) => bag.take(w, id, n, { ...ctx(), source: 'archive' }).ok,
+    }));
+    if (res.ok) { emit('ui:confirm'); say('A place in the Archive. Thank you.'); refresh(); }
+    else { emit('ui:blocked'); say('No specimen to donate.', 'warn'); }
+  }
+
   function closedText() {
     const h = shop?.hours ?? [0, 0];
     return t('shop.closed', { open: formatMinute(h[0]), close: formatMinute(h[1]) });
@@ -333,7 +356,7 @@ export function createShopScene(G) {
       shownWallet = G.world.wallet.main;
       const tabDefs = crate
         ? [{ id: 'deposit', label: 'Deposit' }, { id: 'in', label: 'In the crate' }] // str
-        : [{ id: 'buy', label: t('shop.buy') }, { id: 'sell', label: t('shop.sell') }];
+        : [{ id: shop.id === 'archive-desk' ? 'donate' : 'buy', label: shop.id === 'archive-desk' ? 'Donate' : t('shop.buy') }, { id: 'sell', label: t('shop.sell') }];
       tabs = createTabs({ tabs: tabDefs, rect: { x: 16, y: 62, w: 448 }, input: G.input, dpad: true, active: params.mode === 'sell' ? 'sell' : undefined, onChange: () => { refresh(); list.select(0); emit('ui:cursor'); } });
       list = createList({
         rect: { x: LIST_RECT.x + 4, y: LIST_RECT.y + 3, w: LIST_RECT.w - 10, h: 7 * ROW_H },
@@ -356,6 +379,7 @@ export function createShopScene(G) {
       if (pc.kind === 'buyDear') doBuy(pc.item, pc.n, true);
       else if (pc.kind === 'sellKeepsake') doSell(pc.item, pc.n, true);
       else if (pc.kind === 'crateKeepsake') doDeposit(pc.item, pc.n, true);
+      else if (pc.kind === 'donate') doDonate(pc.item);
     },
     update(dt) {
       stateT += dt;
@@ -468,7 +492,7 @@ export function createShopScene(G) {
     } else {
       const price = d.mode === 'sell' && d.wanted ? d.wantedPrice : d.price;
       const label = d.mode === 'deposit' || d.mode === 'withdraw' ? `${formatNumber(price)}◉ ea at dawn` : `${formatNumber(price)}◉`; // str
-      drawText(c, label, right, y + 5, { align: 'right', color: d.mode === 'buy' && !d.canAfford ? PALETTE.r : ink });
+      drawText(c, d.mode === 'donate' ? 'One specimen' : label, right, y + 5, { align: 'right', color: d.mode === 'buy' && !d.canAfford ? PALETTE.r : ink });
       if (d.mode === 'buy' && d.left !== null && d.left !== undefined && d.left < 20) drawText(c, `${d.left} left`, right - measureText(label).w - 8, y + 6, { align: 'right', font: 'small', color: COLORS.paper.inkFaint }); // str
     }
   }
@@ -540,7 +564,7 @@ export function createShopScene(G) {
       drawText(c, `At dawn: ${formatNumber(shops.crateEstimate(G.world, ctx()))}◉`, FOOT.x + FOOT.w - 8, T0 + 12, { align: 'right', font: 'small', color: COLORS.paper.inkSoft }); // str
     }
     if (!d) {
-      drawText(c, crate && tabs.active === 'in' ? 'The crate is empty.' : tabs.active === 'sell' ? 'Nothing here this counter buys.' : 'Nothing on the shelf.', L, T0 + 4, { color: COLORS.paper.inkFaint }); // str
+      drawText(c, crate && tabs.active === 'in' ? 'The crate is empty.' : tabs.active === 'donate' ? 'Bring an undonated fish, bug or find in your satchel.' : tabs.active === 'sell' ? 'Nothing here this counter buys.' : 'Nothing on the shelf.', L, T0 + 4, { color: COLORS.paper.inkFaint }); // str
       return;
     }
     const it = d.row ?? {};

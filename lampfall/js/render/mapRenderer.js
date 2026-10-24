@@ -242,8 +242,8 @@ export function createMapRenderer(opts = {}) {
     const dt = lastTime === null ? 16.7 : Math.max(0, Math.min(100, ms - lastTime));
     lastTime = ms;
     const camX = Math.round(view.camera.x), camY = Math.round(view.camera.y);
-    const wname = view.weather || 'clear';
     const indoor = !!map.indoor;
+    const wname = indoor ? 'clear' : view.weather || 'clear';
     const grade = gradeFor(view.minute, wname, indoor);
     const tide = tideVariant(view.tide ?? 'mid');
     if (view.flags !== lastFlags || view.tier !== lastTier || view.roof !== lastRoof) {
@@ -370,7 +370,7 @@ export function createMapRenderer(opts = {}) {
     T.lights = nowMs() - tm; tm = nowMs();
     // ---- weather
     weatherOpt.weather = wname; weatherOpt.grade = g; weatherOpt.zones = zones; weatherOpt.rect = rect;
-    weatherOpt.reducedMotion = !!view.reducedMotion; weatherOpt.clearVisuals = !!view.clearVisuals; weatherOpt.lowPower = !!view.lowPower;
+    weatherOpt.reducedMotion = !!view.reducedMotion; weatherOpt.clearVisuals = indoor || !!view.clearVisuals; weatherOpt.lowPower = !!view.lowPower;
     weather.update(weatherOpt);
     fx.update(dt);
     if (wname === 'fog' && !view.clearVisuals) {
