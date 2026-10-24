@@ -52,7 +52,7 @@ event('opening-corin', 'flag:set:seen.wick-keeper', 'corin-reading-glass', no('s
 event('loan-one-cleared', 'loan:tier:2', 'first-payment');
 event('lamp-room-offer', 'loan:tier:7', 'lamp-room-offered');
 event('lamp-room-finished', 'loan:built:lamp-room', 'lamp-room-built');
-event('relighting-dusk', 'relighting:due', 'the-relighting', no('sp.relighting'));
+event('relighting-dusk', 'relighting:due', 'relighting', no('sp.relighting'));
 event('first-roof', 'loan:built:bedsit', 'thatch-first-roof');
 event('first-keeper-letter', 'letter:delivered:1', 'hesper-k1');
 event('fifty-six-letters', 'letters:late-delivery', 'late-delivery-party');
