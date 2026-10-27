@@ -205,7 +205,7 @@ describe('constants and mode helpers', () => {
   test('native size and modes match the contract', () => {
     assert.equal(DEFAULT_WIDTH, 480);
     assert.equal(DEFAULT_HEIGHT, 270);
-    assert.deepEqual([...MODES], ['integer', 'fit']);
+    assert.deepEqual([...MODES], ['integer', 'fit', 'auto']);
     assert.ok(Object.isFrozen(MODES));
   });
 
@@ -978,5 +978,30 @@ describe('createDisplay: destroy()', () => {
     const d = createDisplay({ env, parent });
     parent.removeChild(d.canvas);
     assert.doesNotThrow(() => d.destroy());
+  });
+});
+
+describe("computeLayout: 'auto' mode", () => {
+  test('stays pixel-perfect when the whole-number scale fills the screen (1080p monitor)', () => {
+    const l = computeLayout({ cssWidth: 1920, cssHeight: 1080, dpr: 1, mode: 'auto' });
+    assert.equal(l.integer, true);
+    assert.equal(l.pixelScale, 4);
+  });
+  test('fills a phone in landscape instead of leaving the frame at half size', () => {
+    const l = computeLayout({ cssWidth: 844, cssHeight: 390, dpr: 2, mode: 'auto' });
+    const fill = l.destHeight / l.backingHeight;
+    assert.ok(fill > 0.99, `frame fills the height (got ${fill})`);
+    assert.equal(l.integer, false);
+    const asInteger = computeLayout({ cssWidth: 844, cssHeight: 390, dpr: 2, mode: 'integer' });
+    assert.equal(asInteger.pixelScale, 2);
+  });
+  test('uses the whole-number scale exactly at the threshold and fit just below it', () => {
+    // fit 2.5 -> whole 2 fills 0.8 of it: integer. fit 2.6 -> 0.77: fit.
+    assert.equal(computeLayout({ cssWidth: 1200, cssHeight: 675, dpr: 1, mode: 'auto' }).pixelScale, 2);
+    assert.equal(computeLayout({ cssWidth: 1248, cssHeight: 702, dpr: 1, mode: 'auto' }).integer, false);
+  });
+  test('below native size it falls back to fit like the other modes', () => {
+    const l = computeLayout({ cssWidth: 320, cssHeight: 180, dpr: 1, mode: 'auto' });
+    assert.ok(l.pixelScale < 1);
   });
 });

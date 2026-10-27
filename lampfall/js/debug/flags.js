@@ -15,7 +15,7 @@
  * @property {number} speed           simulation multiplier, clamped to [0.25, 64]
  * @property {boolean|'auto'} touch   force the touch overlay on (`1`) or off (`0`); `auto` otherwise
  * @property {string|null} slot       save slot to load at boot (`auto:1`, `manual:2`)
- * @property {'integer'|'fit'|null} scale  display scaling mode override
+ * @property {'integer'|'fit'|'auto'|null} scale  display scaling mode override
  * @property {boolean} mute           start with audio muted
  * @property {boolean} noanim         every transition and animation runs at 0 ms
  * @property {boolean} strict         wrap the world in a write-guard Proxy outside `store.tx`
@@ -98,7 +98,7 @@ export function parseFlags(search) {
   flags.slot = SLOT_RE.test(slot) ? slot : null;
 
   const scale = (params.get('scale') ?? '').trim().toLowerCase();
-  flags.scale = scale === 'integer' || scale === 'fit' ? scale : null;
+  flags.scale = scale === 'integer' || scale === 'fit' || scale === 'auto' ? scale : null;
 
   const scene = (params.get('scene') ?? '').trim();
   flags.scene = NAME_RE.test(scene) ? scene : null;

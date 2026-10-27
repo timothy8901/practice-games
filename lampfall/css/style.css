@@ -29,8 +29,13 @@ html, body {
   inset: 0;
   pointer-events: none;
 }
-/* Touch button chrome: the overlay elements are created by core/input; these only tune the host. */
-#touch > * {
+/* Touch button chrome: the overlay elements are created by core/input; these only tune the host.
+   The overlay root covers the whole screen, so it must stay click-through (its d-pad and buttons
+   opt back in themselves); otherwise no tap ever reaches a menu on the canvas. */
+#touch > .wsp-touch {
+  pointer-events: none;
+}
+#touch > :not(.wsp-touch) {
   pointer-events: auto;
 }
 noscript {
@@ -47,5 +52,19 @@ noscript {
 @media (prefers-reduced-motion: reduce) {
   :root {
     --reduced-motion: 1;
+  }
+}
+/* While the touch controls are showing, keep the game out from under them: side gutters in
+   landscape (the d-pad's width plus its padding, both sides so the frame stays centred) and a
+   band below in portrait. The canvas observes #stage, so the frame re-fits on its own. */
+@media (orientation: landscape) {
+  body:has(#touch > .wsp-touch:not([hidden])) #stage {
+    left: max(calc(clamp(120px, 26vmin, 184px) + 28px), env(safe-area-inset-left));
+    right: max(calc(clamp(120px, 26vmin, 184px) + 28px), env(safe-area-inset-right));
+  }
+}
+@media (orientation: portrait) {
+  body:has(#touch > .wsp-touch:not([hidden])) #stage {
+    bottom: calc(clamp(120px, 26vmin, 184px) + 40px);
   }
 }

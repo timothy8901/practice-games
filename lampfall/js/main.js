@@ -123,7 +123,7 @@ export function boot(env = {}) {
     width: config.NATIVE_W,
     height: config.NATIVE_H,
     parent: stage,
-    mode: flags.scale ?? 'integer',
+    mode: flags.scale ?? 'auto',
     onResize: (layout) => { if (G) G.bus.emit('display:resize', layout); },
   });
   const input = createInput({ canvas: display.canvas, display, touchParent: touchHost, touch: flags.touch });

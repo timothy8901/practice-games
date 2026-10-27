@@ -83,7 +83,7 @@ export const STATUS_KINDS = Object.freeze(['burn', 'poison', 'chill', 'numb']);
 /** Text speeds accepted by `settings.textSpeed`. */
 export const TEXT_SPEEDS = Object.freeze(['slow', 'normal', 'fast', 'instant']);
 /** Display scale modes accepted by `settings.scale` (see core/canvas). */
-export const SCALE_MODES = Object.freeze(['integer', 'fit']);
+export const SCALE_MODES = Object.freeze(['integer', 'fit', 'auto']);
 /** Auto-anchor presets accepted per creature in `settings.autoAnchor`. */
 export const AUTO_ANCHOR_MODES = Object.freeze(['auto-anchor', 'auto-up']);
 /** Namespaces a flag id must start with (§3.1 / §8.1). */
@@ -141,7 +141,7 @@ export const WORLDGEN_LABEL = 'worldgen';
  * @property {'slow'|'normal'|'fast'|'instant'} textSpeed
  * @property {number} minutesPerDay   real minutes per in-game day (> 0)
  * @property {boolean} realClock
- * @property {'integer'|'fit'} scale
+ * @property {'integer'|'fit'|'auto'} scale
  * @property {object|null} bindings   core/input `saveBindings()` JSON, or `null` for defaults
  * @property {boolean} reducedMotion
  * @property {boolean} fps30
@@ -599,7 +599,7 @@ export function settingsDefaults() {
     textSpeed: 'normal',
     minutesPerDay: 24,
     realClock: false,
-    scale: 'integer',
+    scale: 'auto',                     // pixel-perfect when it fills the screen, else fill (phones)
     bindings: null,
     reducedMotion: false,
     fps30: false,

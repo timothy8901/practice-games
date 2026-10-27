@@ -318,7 +318,7 @@ test('settings: the GDD-09 §6 extras are rows too (captions, screen scale, batt
   const rows = Object.fromEntries(M.settingRows().map((r) => [r.id, r]));
   assert.equal(rows.captions.target, 'ext');
   assert.equal(rows.scale.target, 'world');
-  assert.deepEqual(rows.scale.options.map((o) => o.value), ['integer', 'fit']);
+  assert.deepEqual(rows.scale.options.map((o) => o.value), ['auto', 'integer', 'fit']);
   assert.equal(rows.fps30.kind, 'toggle');
   assert.equal(rows.skipAnims.kind, 'toggle');
   assert.deepEqual(M.worldPatch(rows.scale, 'fit', {}), { scale: 'fit' });

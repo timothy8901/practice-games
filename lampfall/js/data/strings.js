@@ -914,6 +914,7 @@ export const STRINGS = Object.freeze({
   'settings.touchLayout.one': 'One-handed',
   'settings.wakePoint': 'Wake after a blackout at',
   'settings.scale': 'Screen scale',
+  'settings.scale.auto': 'Best for this screen',
   'settings.scale.integer': 'Pixel-perfect',
   'settings.scale.fit': 'Fill the window',
   'settings.fps30': 'Battery saver (30 fps)',

@@ -697,7 +697,7 @@ export function settingRows() {
     { id: 'clearVisuals', section: 'sight', label: t('settings.clearVisuals'), kind: 'toggle', target: 'ext', options: ON_OFF(),
       note: t('settings.clearVisualsNote') },
     { id: 'scale', section: 'sight', label: t('settings.scale'), kind: 'choice', target: 'world',
-      options: ['integer', 'fit'].map((v) => ({ value: v, label: t(`settings.scale.${v}`) })),
+      options: ['auto', 'integer', 'fit'].map((v) => ({ value: v, label: t(`settings.scale.${v}`) })),
       note: 'Pixel-perfect keeps every pixel square; Fill the window uses all of the screen.' }, // str
     { id: 'fps30', section: 'sight', label: t('settings.fps30'), kind: 'toggle', target: 'world', options: ON_OFF(),
       note: 'The world draws at 30 frames a second; characters move the same. Takes hold at the next start.' }, // str

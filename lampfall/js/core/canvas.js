@@ -9,6 +9,9 @@
  *   size the display falls back to fractional "fit" scaling so the whole frame stays visible.
  * - `'fit'` mode: fractional uniform scale that fills the parent as much as possible while
  *   keeping the aspect ratio (bars only on one axis).
+ * - `'auto'` mode (the default for new saves): `'integer'` when the whole-number scale still fills
+ *   at least `AUTO_MIN_FILL` of the fitted size, else `'fit'`. A phone whose integer scale would
+ *   leave the frame at half size gets the full screen; a 1080p monitor stays pixel-perfect.
  *
  * BROWSER-ONLY at use time: `createDisplay()` needs a DOM. Importing this module under Node is
  * safe because nothing touches `window`/`document` until `createDisplay()` is called, and the
@@ -29,9 +32,12 @@ export const DEFAULT_WIDTH = 480;
 /** Native buffer height in game pixels. */
 export const DEFAULT_HEIGHT = 270;
 /** Supported scaling modes. */
-export const MODES = Object.freeze(['integer', 'fit']);
+export const MODES = Object.freeze(['integer', 'fit', 'auto']);
 
-/** @typedef {'integer'|'fit'} DisplayMode */
+/** In `'auto'` mode, the share of the fitted size the whole-number scale must reach to be used. */
+export const AUTO_MIN_FILL = 0.8;
+
+/** @typedef {'integer'|'fit'|'auto'} DisplayMode */
 
 /**
  * The result of laying the native buffer out inside the visible canvas. Immutable; a new one is
@@ -244,7 +250,7 @@ export function computeLayout({
   const widthLimited = scaleX <= scaleY;
   const fitScale = widthLimited ? scaleX : scaleY;
   const wholeScale = Math.floor(fitScale);
-  const useWhole = mode === 'integer' && wholeScale >= 1;
+  const useWhole = wholeScale >= 1 && (mode === 'integer' || (mode === 'auto' && wholeScale / fitScale >= AUTO_MIN_FILL));
   const pixelScale = useWhole ? wholeScale : fitScale;
 
   let destWidth;
