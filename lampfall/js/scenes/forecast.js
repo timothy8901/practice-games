@@ -16,7 +16,7 @@
  *  - a 0.5 s input lock on open that ignores held buttons; no timer anywhere;
  *  - deferral: with `deferrable`, cancel is "Later" (the window waits for the next Waystone or home).
  *
- * Params `{uid, deferrable?, atHome?, force?, onDone?}`; pops with `{outcome, result}` where outcome is
+ * Params `{uid, deferrable?, atHome?, force?, onDone?, onClose?}` (onClose: called once after it pops); pops with `{outcome, result}` where outcome is
  * 'accepted' | 'anchored' | 'later' | 'closed'.
  * @module scenes/forecast
  */
@@ -209,6 +209,8 @@ export function createForecastScene(G) {
     const r = { outcome: kind, result: result ?? null };
     if (G.scenes.top && G.scenes.top() === scene) G.scenes.pop(r);
     if (params && typeof params.onDone === 'function') params.onDone(r);
+    // dayFlow's deferred-Forecast queue waits on onClose; without it Sleep and Waystones never finish.
+    if (params && typeof params.onClose === 'function') params.onClose(r);
   }
 
   function onCancel() {

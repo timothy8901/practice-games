@@ -263,7 +263,7 @@ describe('validateWorld', () => {
     w.pendingScript = 'arrival';
     const known = {
       species: ['sloshkin'], families: ['slosh'], abilities: [''], moves: ['splash'], items: ['berry', 'rod'],
-      maps: ['harbor'], npcs: ['wren'], trainers: ['spire-1'], scripts: ['arrival'], threads: [],
+      maps: ['harbor'], npcs: ['wren'], spires: ['spire-1'], scripts: ['arrival'], threads: [],
     };
     const registry = { has: (table, id) => (known[table] ?? []).includes(id) };
     assert.deepEqual(validateWorld(w, registry), []);
@@ -275,7 +275,7 @@ describe('validateWorld', () => {
     assert.ok(problems.includes('world.player.mapId: unknown maps id "nowhere"'), problems.join('\n'));
     assert.ok(problems.includes('world.party[0].speciesId: unknown species id "dragon"'), problems.join('\n'));
     assert.ok(problems.includes('world.bag.pockets.medicine[0].id: unknown items id "rock"'), problems.join('\n'));
-    assert.ok(problems.includes('world.badges[1]: unknown trainers id "spire-9"'), problems.join('\n'));
+    assert.ok(problems.includes('world.badges[1]: unknown spires id "spire-9"'), problems.join('\n'));
     assert.deepEqual(validateWorld(w, { has: () => { throw new Error('boom'); } }), [], 'a throwing registry is treated as knowing everything');
   });
 

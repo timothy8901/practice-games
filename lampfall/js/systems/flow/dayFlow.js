@@ -335,7 +335,7 @@ export function resolvePendingForecasts(G, where) {
       if (!uid) { resolve(opened); return; }
       if (!(G.world.pendingShifts ?? []).includes(uid)) { nextOne(); return; }
       opened++;
-      G.push('forecast', { uid, where, deferred: true, onClose: nextOne });
+      G.push('forecast', { uid, where, atHome: where === 'home', deferred: true, onClose: nextOne });
     };
     nextOne();
   });

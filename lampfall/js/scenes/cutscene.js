@@ -436,7 +436,7 @@ export function createCutsceneScene(G) {
         return;
       }
       if (op === 'battleAfter') { step(pendingChild?.result ?? null); return; }
-      if (op === 'forecast') { step(result?.formId ?? (typeof result === 'string' ? result : null)); return; }
+      if (op === 'forecast') { step(result?.result?.formId ?? result?.formId ?? (typeof result === 'string' ? result : null)); return; }
       step();
     },
     update(dt) {

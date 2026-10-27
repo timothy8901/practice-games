@@ -1278,7 +1278,16 @@ export function validateWorld(world, data) {
     if (isPlainObject(w.maps)) for (const id of Object.keys(w.maps)) ref(`world.maps.${id}`, 'maps', id);
     if (isPlainObject(w.threads)) for (const id of Object.keys(w.threads)) ref(`world.threads.${id}`, 'threads', id);
     if (isPlainObject(w.fieldLog) && isPlainObject(w.fieldLog.forms)) for (const id of Object.keys(w.fieldLog.forms)) ref(`world.fieldLog.forms.${id}`, 'species', id);
-    if (Array.isArray(w.badges)) w.badges.forEach((id, i) => ref(`world.badges[${i}]`, 'trainers', id));
+    // Badges are Spire ids (battleFlow pushes trainer.spire): known when a spires table has the row or a
+    // trainer row names that Spire (the shipped registry has no spires table).
+    if (Array.isArray(w.badges)) {
+      const spireKnown = (id) => {
+        if (has('spires', id)) return true;
+        if (typeof data.list !== 'function') return false;
+        try { return data.list('trainers').some((t) => t && t.spire === id); } catch { return true; }
+      };
+      w.badges.forEach((id, i) => { if (isStr(id) && id !== '' && !spireKnown(id)) out.push(`world.badges[${i}]: unknown spires id ${JSON.stringify(id)}`); });
+    }
     if (isStr(w.pendingScript)) ref('world.pendingScript', 'scripts', w.pendingScript);
     if (isPlainObject(w.cutscene)) ref('world.cutscene.scriptId', 'scripts', w.cutscene.scriptId);
   }
