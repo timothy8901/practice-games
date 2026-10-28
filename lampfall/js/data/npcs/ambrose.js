@@ -136,7 +136,7 @@ export default {
       line('g5', 'Sit down. Standing makes the yard nervous.'),
       line('g6', 'I built half the roofs you can see from here. Can\'t see any of them. Doesn\'t matter. I know where they are.'),
       line('g7', 'People ask if I miss my eyes. I miss reading the paper. I don\'t miss reading the bills.'),
-      line('g8', 'Hm.'),
+      line('g8', 'Hm. ~ That\'s a whole sentence, at my age. Wren can translate.'),
     ],
     known: pool([
       ['k1', 'You. ~ I know the walk. Bad laces.'],

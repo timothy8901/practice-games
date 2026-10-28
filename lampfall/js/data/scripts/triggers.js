@@ -1,6 +1,7 @@
 /** Story overlays: a marker is a trigger cell; conditions make every completed beat inert. */
 import { deepFreeze } from '../ids.js';
 import { mk } from './_stage.js';
+import { SPIRES } from '../spires.js';
 const flag = (id) => ({ flag: id });
 const no = (id) => ({ not: flag(id) });
 const all = (...conds) => ({ all: conds });
@@ -44,10 +45,17 @@ trigger('hollis-gate', 'summit-gate-player', 'summit-gate', all({ badge: 6 }, no
 trigger('the-bar', 'linnet-gate', 'linnet-gate-before', all({ badge: 6 }, no('sp.linnet-gate')));
 trigger('the-bar', 'wick-long-road', 'wick-long-road-before', no('sys.trainer.wick-long-road'), 'use');
 trigger('lantern-stack', 'perch-front', 'passenger-perch', all(flag('sp.credits-seen'), no('sp.passenger-caught')), 'use');
+// Merged from the story chapter: first entry into each Spire, and Hollis's parcel at the Bar head.
+// (A save that already holds the badge never gets the challenger's welcome.)
+for (const s of SPIRES) trigger(s.map, 'from-door', `story-spire-${s.id}-enter`, all({ not: { seen: `story-spire-${s.id}-enter` } }, { not: { badge: s.id } }), 'enter', `spire-${s.id}-door`);
+trigger('the-bar', 'from-pellwick', 'story-ration-ledger', { not: { hasItem: 'ration-ledger' } }, 'enter', 'ration-ledger');
 export const STORY_TRIGGERS = deepFreeze(Object.fromEntries([...new Set(rows.map((r) => r.mapId))].map((id) => [id, rows.filter((r) => r.mapId === id).map(({ mapId, ...r }) => r)])));
 
 const events = [];
 function event(id, event, script, cond, once = true) { events.push({ id, event, script, ...(cond ? { cond } : {}), once }); }
+// One script per event (systems/flow/eventScripts takes the first matching row), so each Spire's
+// badge beat sits ahead of the generic badge row; Act II still opens on the next clock/map row.
+for (const s of SPIRES) event(`badge-${s.id}`, `badge:won:${s.id}`, `story-spire-${s.id}-badge`);
 event('opening-corin', 'flag:set:seen.wick-keeper', 'corin-reading-glass', no('sp.reading-glass'));
 event('loan-one-cleared', 'loan:tier:2', 'first-payment');
 event('lamp-room-offer', 'loan:tier:7', 'lamp-room-offered');
@@ -70,6 +78,9 @@ for (const evt of ['day:start', 'clock:hour', 'map:enter']) {
 }
 event('first-badge-act', 'badge:won', 'act-2-open', all({ badge: 1 }, no('sp.act-2')));
 event('after-linnet-return', 'flag:set:sp.linnet-returned', 'comet-brightens', no('sp.act-3'));
+event('first-forecast-anywhere', 'shift:resolved', 'story-first-forecast-noted', no('sp.first-forecast'));
+// After the credits, one dark house reopens a night (houses 2-8; the counter stops it at seven).
+event('dark-house-night', 'clock:hour:20', 'dark-house-reopens', all(flag('lit.fleetHome'), flag('sp.credits-seen'), { counter: 'sys.dark-houses-reopened', lte: 6 }), false);
 export const EVENT_SCRIPTS = deepFreeze(events);
 
 /** Prefix hooks the host installs on flag:set. Each value names its existing system function. */

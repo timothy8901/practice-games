@@ -7,6 +7,8 @@
  * entry (`once` / `repeatDays` honoured through `npcs[id].saidLines`); (4) the schedule pose line
  * (`lines[pose]`); (5) porch talk at the porch trigger inside the porch window, then the phase line
  * (`lines[phase]`, the fallback half of (4));
+ * (5b) context lines: the tagged pools in CONTEXT_POOLS through systems/memory.pickLine (tags and
+ * cond checked; only a line not said within `tuning.noRepeatDays`);
  * (6) the memory-filtered generic pool (`lines.generic`, excluding ids said within
  * `tuning.noRepeatDays`; the least recently said wins; `linger` skips `lastLineId`); (7) the
  * default line. Line sources return an inline `say` script. No randomness.
@@ -19,6 +21,13 @@ import { evalCond } from './cond.js';
 import * as sel from '../state/selectors.js';
 import { noRepeatDays, porchWindow } from '../data/tuning.js';
 import { t } from '../data/strings.js';
+import * as memory from '../systems/memory.js';
+
+/** Line pools read through memory.pickLine (tags + cond), after porch talk, before phase lines. */
+// `act`, `market`, `creek`, `nickname`, `declined` and `letters` are story / situation pools whose
+// every line carries a cond or tag (cast modules); without them here no resolver step could reach them.
+export const CONTEXT_POOLS = Object.freeze(['known', 'gift', 'shift', 'weather', 'lead', 'tide', 'lit', 'unlit', 'loan', 'badge',
+  'act', 'market', 'creek', 'nickname', 'declined', 'letters']);
 
 /** @typedef {import('../state/schema.js').World} World */
 /** @typedef {import('../data/registry.js').Registry} Registry */
@@ -75,7 +84,10 @@ export const SOURCE_ORDER = Object.freeze(['thread', 'favour', 'topic', 'schedul
  * @returns {Resolved}
  */
 function line(npcId, who, lineId, text, source) {
-  return { scriptId: `${npcId}#${lineId}`, source, lineId, ops: [{ op: 'say', who, text }, { op: 'end' }] };
+  // a pool line written `* ...` is narration, as in script shorthand (ops.parseShorthand): the
+  // marker is stripped so it never reaches the dialogue box as a literal asterisk
+  const say = typeof text === 'string' && text.startsWith('* ') ? { op: 'say', text: text.slice(2) } : { op: 'say', who, text };
+  return { scriptId: `${npcId}#${lineId}`, source, lineId, ops: [say, { op: 'end' }] };
 }
 
 /**
@@ -169,6 +181,18 @@ function resolveNpc(world, data, target) {
   if ((target.atPorch || target.pose === 'porch') && inPorchWindow(minute)) {
     const r = pick('porch', 'porch');
     if (r) return r;
+  }
+
+  // (5b) context lines: the tagged / conditioned pools (weather, lead type, gifts, known, tide,
+  // lit / unlit, loan tier, badges, Shifts) through systems/memory.pickLine, which checks every
+  // line's tags and cond. Only a line not said within `noRepeatDays` is taken, so each one is a
+  // fresh remark and the phase / generic pools below still carry ordinary repeat talk.
+  if (CONTEXT_POOLS.some((p) => Array.isArray(lines[p]) && lines[p].length)) {
+    const picked = memory.pickLine(npc, world, data, {
+      pools: CONTEXT_POOLS, atPorch: Boolean(target.atPorch), pose: target.pose ?? null,
+      linger: Boolean(target.linger), lastLineId: target.lastLineId,
+    });
+    if (picked && !picked.repeat) return line(npcId, npcId, picked.lineId, picked.text, 'generic');
   }
   { const r = pick(sel.phase(world), 'schedule'); if (r) return r; }
 
