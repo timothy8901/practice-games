@@ -171,12 +171,56 @@ function migrate4to5(data) {
   return data;
 }
 
+/** EXP floors of the v5 curve (8·L² everywhere) and the v6 curve (8·L² through Lv8, then (3·L³ − 512)/2; audit MID-06). */
+const V5_EXP = (L) => (L <= 1 ? 0 : 8 * L * L);
+const V6_EXP = (L) => (L <= 1 ? 0 : L <= 8 ? 8 * L * L : Math.floor((3 * L ** 3 - 512) / 2));
+/** Badge gifts (pocket, item) that v5 never handed over (audit MID-08): the third, fifth and sixth Spires. */
+const V6_BADGE_GIFTS = Object.freeze({ weather: ['tools', 'scouting-prism'], relay: ['tools', 'weatherglass'], mirror: ['discs', 'disc-plumbline'] });
+
+/**
+ * 5 -> 6: the EXP curve steepened from Lv9 (MID-06). Every creature keeps its level and its progress
+ * through it: EXP is rebased from the old curve's band onto the new one, so nobody stalls under a floor
+ * that moved. Saves that already hold a Spire badge receive the gift v5 never gave (MID-08).
+ * @param {Record<string, any>} data
+ * @returns {Record<string, any>}
+ */
+function migrate5to6(data) {
+  for (const list of ['party', 'box']) {
+    for (const c of Array.isArray(data[list]) ? data[list] : []) {
+      if (!isPlainObject(c) || !Number.isInteger(c.level) || c.level < 2 || typeof c.exp !== 'number' || !Number.isFinite(c.exp)) continue;
+      const L = Math.min(100, c.level);
+      const lo = V6_EXP(L);
+      const hi = L >= 100 ? lo + 1 : V6_EXP(L + 1);
+      if (c.exp >= lo && c.exp < hi) continue;
+      const olo = V5_EXP(L);
+      const ohi = V5_EXP(L + 1);
+      const frac = L < 100 && c.exp >= olo && c.exp < ohi ? (c.exp - olo) / (ohi - olo) : 0;
+      c.exp = lo + Math.floor(frac * (hi - lo));
+    }
+  }
+  const pockets = isPlainObject(data.bag) && isPlainObject(data.bag.pockets) ? data.bag.pockets : null;
+  if (pockets) {
+    const baskets = Array.isArray(data.bag.baskets) ? data.bag.baskets : [];
+    const held = (id) => Object.values(pockets).some((l) => Array.isArray(l) && l.some((st) => st && st.id === id))
+      || baskets.some((b) => b && Array.isArray(b.items) && b.items.some((st) => st && st.id === id));
+    for (const badge of Array.isArray(data.badges) ? data.badges : []) {
+      const gift = V6_BADGE_GIFTS[badge];
+      if (!gift || held(gift[1])) continue;
+      if (!Array.isArray(pockets[gift[0]])) pockets[gift[0]] = [];
+      pockets[gift[0]].push({ id: gift[1], n: 1 });
+    }
+  }
+  data.v = 6;
+  return data;
+}
+
 export const MIGRATIONS = Object.freeze({
   0: migrate0to1,
   1: migrate1to2,
   2: migrate2to3,
   3: migrate3to4,
   4: migrate4to5,
+  5: migrate5to6,
 });
 
 /**

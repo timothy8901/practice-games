@@ -57,7 +57,7 @@ export function tideSeedFor(day1Low = DAY1_LOW_MINUTE) {
 }
 
 /** Version stamped on `world.v`; bump together with a new entry in `migrate.MIGRATIONS`. */
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 
 /** Maximum party size. */
 export const PARTY_MAX = 6;

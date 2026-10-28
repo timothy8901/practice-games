@@ -27,6 +27,7 @@ import * as wallet from '../systems/wallet.js';
 import * as party from '../systems/party.js';
 import * as memory from '../systems/memory.js';
 import * as threads from '../systems/threads.js';
+import { TUNING } from '../data/tuning.js';
 
 /** Host ops the dialogue scene performs itself (everything else goes back to a cutscene). */
 export const DIALOGUE_OPS = Object.freeze(['say', 'choice', 'nickname', 'letter', 'openShop', 'toast', 'playSfx', 'take']);
@@ -180,7 +181,8 @@ export function scriptSystems(G) {
     take: (w, item, n, c) => bag.take(w, item, n, { data, bus, source: 'script', confirm: c?.confirm === true }),
     earn: (w, amount) => wallet.earn(w, amount, { data, bus, source: 'script' }),
     spend: (w, amount) => wallet.spend(w, amount, { data, bus, source: 'script' }),
-    addCreature: (w, spec, c) => party.giveCreature(w, { species: spec.species, level: spec.level, nick: spec.nick ?? undefined }, data, c?.rng ?? null, { bus }),
+    // tuning: scripted creatures (the starter) sit on the shipped EXP curve, not exp.js's prototype default
+    addCreature: (w, spec, c) => party.giveCreature(w, { species: spec.species, level: spec.level, nick: spec.nick ?? undefined }, data, c?.rng ?? null, { bus, tuning: TUNING }),
     remember: (w, npc, key, value) => memory.remember(w, npc, key, value),
     setBeat: (w, threadId, beat) => (beat === null || beat === undefined
       ? threads.advance(w, data, threadId, { bus })

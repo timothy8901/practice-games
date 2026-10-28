@@ -8,6 +8,7 @@
  */
 import * as config from './config.js';
 import { parseFlags, debugEnabled } from './debug/flags.js';
+import { displayFilterFor } from './ui/theme.js';
 import { installDebugHook } from './debug/hook.js';
 import { createDisplay } from './core/canvas.js';
 import { createInput } from './core/input.js';
@@ -27,6 +28,8 @@ import { DATA_CONTENT, CONTENT_STATUS } from './data/content.js';
 import { createRegistry } from './data/registry.js';
 import * as eventScripts from './systems/flow/eventScripts.js';
 import * as dayFlow from './systems/flow/dayFlow.js';
+import * as stamps from './systems/stamps.js';
+import { STAMPS } from './data/town.js';
 import { installStoryHooks } from './systems/flow/storyHooks.js';
 import * as settingsSys from './systems/settings.js';
 import * as clockSys from './systems/clockSys.js';
@@ -217,6 +220,9 @@ export function boot(env = {}) {
   function applyDeviceSettings() {
     const s = G.world.settings;
     display.setMode?.(flags.scale ?? s.scale);
+    // LG-RN102: High contrast and the one-handed touch layout take effect at once
+    try { if (display.canvas && display.canvas.style) display.canvas.style.filter = displayFilterFor(s); } catch { /* no CSS filters */ }
+    input.setTouchLayout?.(s.touchLayout === 'one' ? 'one' : 'two');
     if (s.bindings) input.loadBindings?.({ version: 1, bindings: s.bindings });
     else input.resetBindings?.();
     settingsSys.writeMirror(deviceStorage, s);
@@ -231,6 +237,7 @@ export function boot(env = {}) {
   installStoryHooks(G);
   eventScripts.install(G);
   dayFlow.install(G);
+  stamps.install(G, { rows: STAMPS });   // Journal stamp counters (the registry has no stamps table)
   G.music = createMusicDirector(G, { signalOf: signalOfWorld });
   G.bus.on('toast', (payload) => {
     if (typeof payload === 'string') G.toasts.show(payload);
