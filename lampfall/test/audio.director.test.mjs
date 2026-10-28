@@ -193,7 +193,7 @@ test('director: boots silent with an empty scene stack, then follows title -> ov
   assert.equal(audio.of('playMusic')[0][2].fade, CUES.title.fade);
   assert.equal(audio.stems.get('night'), true);
   assert.equal(audio.stems.get('tide'), true);
-  assert.equal(audio.stems.get('perc.hat'), false, 'title perc fan-out off');
+  assert.equal(audio.stems.get('perc'), false, 'title perc off (one prefix stem)');
   scene(music, 'push', 'saveLoad');
   assert.deepEqual(audio.plays(), ['title'], 'modal over title keeps the theme');
   scene(music, 'pop', 'saveLoad', 'title');
@@ -257,7 +257,7 @@ test('director: a 24-hour sweep plays each day-part theme once, in order, with i
 test('director: night / perc / tide / rain stems follow clock, tide and weather', () => {
   const { audio, bus, clock } = rig({ hour: 2, tide: 0.1 });
   assert.equal(audio.stems.get('night'), true);
-  assert.equal(audio.stems.get('perc.hat'), false, '01:00–05:00 drops the brushes');
+  assert.equal(audio.stems.get('perc'), false, '01:00–05:00 drops the brushes');
   assert.equal(audio.stems.get('tide'), false);
   bus.emit('tide:change', { state: 'high', previous: 'mid', tide: 0.85 });
   assert.equal(audio.stems.get('tide'), true);
@@ -272,7 +272,7 @@ test('director: night / perc / tide / rain stems follow clock, tide and weather'
   bus.emit('weather:change', { kind: 'fog' });
   assert.equal(audio.stems.get('rain'), false);
   bus.emit('clock:hour', { hour: 5 });
-  assert.equal(audio.stems.get('perc.hat'), true);
+  assert.equal(audio.stems.get('perc'), true);
   assert.equal(audio.stems.get('night'), false);
 });
 
@@ -301,7 +301,7 @@ test('director: battle start/hp/end — track by kind, tense at <=25%, victory s
   assert.equal(music.status().track, 'battle_spire');
   assert.equal(audio.of('playMusic').at(-1)[2].fade, CUES.battle.fade);
   assert.equal(audio.stems.get('tense'), false);
-  assert.equal(audio.stems.get('perc.kick'), true);
+  assert.equal(audio.stems.get('perc'), true);
   bus.emit('battle:hp', { hp: 30, maxHp: 100 });
   assert.equal(audio.stems.get('tense'), false);
   bus.emit('battle:event', { event: { type: 'damage', side: 0, target: 'x', amount: 5, hp: 25, maxHp: 100, source: 'party' } });

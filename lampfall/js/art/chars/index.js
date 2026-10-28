@@ -22,7 +22,8 @@
 // Size-as-character: cells are 16 wide; height is 24 for almost everyone,
 // 28 for Odile and 32 for Ansel (oy = 24 - h). Wick, the Thatch and Dimity are
 // small inside the standard cell; Tully, Bryony and Augusta are wide (wide
-// torso masks) and low (squat). Draw at tile (x, y - 8) + (ox, oy).
+// torso masks) and low (squat). Hesper and Barnaby are 24 wide (ox -4, centred on their tile:
+// her long foot, his claws out of the neck ring). Draw at tile (x, y - 8) + (ox, oy).
 // Fish frames are fishW (24) wide: draw at x + fishOx so the figure keeps its
 // tile and the rod reaches over the water. Right-facing frames are pre-flipped.
 import { HEADS, TORSOS, TAILS, EXTRAS, LEGS, BIRDLEGS, MASK_WIDE, buildMammal, torsoVariant } from './mammals.js';

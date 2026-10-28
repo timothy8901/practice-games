@@ -275,8 +275,10 @@ export function theme(id, { title, bpm, key, scale, bars, melody, melodyInst = '
     layers: {
       core:   { inst: 'pad',   gain: padGain, default: true,  role: 'core',   pattern: padLayer(bars) },
       melody: { inst: melodyInst, gain: melodyGain ?? MELODY_GAIN[melodyInst] ?? 0.8, default: true, role: 'melody', pattern: melody },
-      // bass preset peaks at 0.55 (the hottest pitched voice): 0.6 keeps it under the tune, not on top of it
-      bass:   { inst: 'bass',  gain: 0.6,  default: true,  role: 'bass',   pattern: bassLayer(bars, { style: bass }) },
+      // bass preset peaks at 0.55 (the hottest pitched voice). The prototype's 0.6 still made it the largest RMS
+      // contributor of every hour (solo ~0.15 vs 0.06–0.13 for the tunes) and kept the master limiter busy;
+      // 0.5 (−1.6 dB) sits it under the tune (w3 mix polish, measured in test/pages/audio-mix.html).
+      bass:   { inst: 'bass',  gain: 0.5,  default: true,  role: 'bass',   pattern: bassLayer(bars, { style: bass }) },
       perc:   { inst: 'kit',   gain: 0.6,  default: true,  role: 'perc',   pattern: percLayer(perc, n) },
       night:  { inst: 'glass', gain: 0.65, default: false, role: 'night',  pattern: nightLayer(bars, { steps: nightSteps }) },
       tide:   { inst: 'pad',   gain: 0.45, default: false, role: 'tide',   pattern: tideLayer(bars) },
@@ -299,7 +301,9 @@ export function battle(id, { title, bpm, key, scale, bars, melody, counter, perc
   const layers = {
     core:   { inst: 'pluck', gain: 0.5, default: true, role: 'core', pattern: pulseLayer(bars) },
     melody: { inst: 'pluck', gain: 0.8, default: true, role: 'melody', pattern: melody },
-    bass:   { inst: 'bass',  gain: 0.7, default: true, role: 'bass', pattern: bassLayer(bars, { style: bass, v: 0.8 }) },
+    // 0.55 (prototype 0.7): the driving bass solo measured ~0.19 RMS, five times the tune, and with the kick it
+    // set every battle peak (dry 0.95–1.2) — trimmed so the lead and the creature cries read over it (w3 mix polish)
+    bass:   { inst: 'bass',  gain: 0.55, default: true, role: 'bass', pattern: bassLayer(bars, { style: bass, v: 0.8 }) },
     perc:   { inst: 'kit',   gain: 0.8, default: true, role: 'perc', pattern: percLayer(perc, n) },
     tense:  { inst: 'glass', gain: 0.5, default: false, role: 'tense', pattern: tenseLayer(n) },
     ...extra,

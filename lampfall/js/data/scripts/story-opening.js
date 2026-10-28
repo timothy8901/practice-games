@@ -246,12 +246,23 @@ export default {
   'linnet-dock-after': [
     '* The Caldermaw sits on the end of the dock like a hill that has decided to stay. It is still steaming. It is still, unmistakably, looking at Linnet the way the Sootling did.',
     'Linnet: Did you SEE that? It\'s ENORMOUS. ~ Same mark. Look. Right there, same place. It\'s still Cinder.',
-    'Corin: Same mark, every shape. ~ Keeper, you held. That is the first lesson and most people never learn it.',
+    // battleFlow records how the hold-out ended (sys.holdout.linnet-dock = 'held' | 'fell'); a save from
+    // before the flag existed reads as held
+    { op: 'if', cond: { flag: 'sys.holdout.linnet-dock', is: 'fell' },
+      then: ['Corin: Same mark, every shape. ~ You did not hold, Keeper. Nobody holds the first time. But you stood in front of a hill and read it, and that is where the first lesson starts.'],
+      else: ['Corin: Same mark, every shape. ~ Keeper, you held. That is the first lesson and most people never learn it.'] },
     flag('sp.dock-battle'),
     // checkpoint after the hold-out, so a quit here does not replay the dock (FH-04)
     { op: 'save', reason: 'hold-out' },
-    '* {nick:c1} looks at the Caldermaw, then at you, and you feel it decide that it is not afraid of anything that size any more. Corin looks it over: singed, not hurt.',
-    toast('Held out three turns: +100 EXP.'),
+    { op: 'if', cond: { flag: 'sys.holdout.linnet-dock', is: 'fell' },
+      then: [
+        '* {nick:c1} picks itself up off the planks and shakes, and looks at the Caldermaw, then at you. It is not afraid of anything that size any more; it has already been knocked flat by one. Corin looks it over: singed, not hurt.',
+        toast('Stood your ground: +100 EXP.'),
+      ],
+      else: [
+        '* {nick:c1} looks at the Caldermaw, then at you, and you feel it decide that it is not afraid of anything that size any more. Corin looks it over: singed, not hurt.',
+        toast('Held out three turns: +100 EXP.'),
+      ] },
     sfx('wave'),
     tp('maud', P, 'maud-punt-dock'),
     '* Out on the dark water a punt glides past with a lamp at its prow. A grey goose leans on the pole and calls across the flats.',

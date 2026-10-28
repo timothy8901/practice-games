@@ -545,6 +545,9 @@ export function duelSlate(world, table, opts = {}) {
     prev1 = new Set(r.picked.map((n) => n.npc));
     if (d === day) out = r;
   }
+  // no evening to draw yet (a world whose clock reads before day 0's 06:00 post, e.g. a fixture
+  // swapped in with store.replace): an empty slate rather than reading `.picked` of null
+  if (!out) return { day, gameDay: day + 1, offers: [], payout, creatures };
   const o = /** @type {{picked: any[], visitor: any}} */ (out);
   /** @type {DuelOffer[]} */
   const offers = o.picked.map((n) => ({ kind: 'neighbour', npc: n.npc, trainer: n.trainer, porch: n.porch, creatures, payout }));

@@ -141,7 +141,10 @@ export default {
     { id: 1, cond: { all: [{ flag: 'sp.tamsin-arrived' }, { lowTide: true }] }, script: 'th-oyster-boat-1', where: { mapId: 'pellwick', x: 8, y: 34 },
       when: 'Any low tide once dark house 1 is open, on the point flats.', topic: 'Race you to the sparkles.',
       choices: [{ key: `th.${T}.sparkles`, options: ['raced', 'gave'] }] },
-    { id: 2, cond: { hour: [8, 18] }, script: 'th-oyster-boat-2', advance: { days: 1 }, where: { mapId: 'pellwick', x: 30, y: 5 },
+    // Tamsin's place: the beat lands at the boat in the north creek (her `tamsin-boat` spot, 44,5), not
+    // wherever she is talked to between 08:00 and 18:00
+    { id: 2, cond: { all: [{ hour: [8, 18] }, { map: 'pellwick' }, { inRegion: 'north-creek' }] }, script: 'th-oyster-boat-2', advance: { days: 1 },
+      where: { mapId: 'pellwick', x: 44, y: 5 },
       when: 'A day after beat 1, 08:00-18:00, in the dry north creek.', topic: 'The boat in the creek.',
       choices: [{ key: `th.${T}.search`, options: ['help', 'why'] }] },
     { id: 3, cond: { map: 'drownwood' }, script: 'th-oyster-boat-3', advance: { days: 1 }, where: { mapId: 'drownwood', x: 24, y: 16 },

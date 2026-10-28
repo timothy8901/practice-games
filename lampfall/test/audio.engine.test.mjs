@@ -340,6 +340,81 @@ test('renderSfx: every sound at every extreme renders (volume 0 included) and is
   });
 });
 
+test('renderCry: every cry wave, the snap / tail / shimmer / motif variants and junk params render; length follows the plan', async (t) => {
+  const { cryPlan, CRY_WAVES } = await import('../js/core/audio.js');
+  await withFakeAudio(t, async (a) => {
+    const variants = [
+      ...CRY_WAVES.map((wave) => ({ base: 62, slide: 5, wave })),
+      { base: 69, slide: 12, wave: 'square', snap: true, tail: true, shimmer: true },
+      { base: 60, motif: [69, 67, 66, 62] },
+      null, { base: 'x', slide: NaN, wave: 'kazoo' },
+    ];
+    for (const p of variants) {
+      for (const o of [{}, { volume: 0 }, { volume: 2, semitones: -4, pan: 1 }, { pitch: 'y', pan: -1 }]) {
+        const buf = await a.renderCry(p, o);
+        assert.equal(buf.length, Math.ceil((cryPlan(p).end + 0.4) * 44100), JSON.stringify(p));
+        assert.ok(FakeOfflineAudioContext.last.starts.length > 0, 'something sounded');
+      }
+    }
+  });
+});
+
+test('cry: ducks the music bus by CRY_DUCK under the cry and brings it back; overlapping cries re-hold', async (t) => {
+  const { CRY_DUCK, dbToGain, cryPlan } = await import('../js/core/audio.js');
+  await withFakeAudio(t, async (a) => {
+    await a.unlock();
+    const ctx = a.context;
+    const musicFilter = ctx.nodes.find((n) => n.kind === 'biquad');
+    const duck = musicFilter.outputs[0];
+    assert.equal(duck.kind, 'gain', 'the music filter feeds the duck gain');
+    assert.equal(duck.gain.value, 1);
+    const { MUSIC_HEADROOM_DB } = await import('../js/core/audio.js');
+    const headroom = duck.outputs[0];
+    assert.equal(headroom.kind, 'gain');
+    assert.ok(Math.abs(headroom.gain.value - dbToGain(MUSIC_HEADROOM_DB)) < 1e-9, 'fixed music headroom after the duck');
+    assert.ok(MUSIC_HEADROOM_DB < 0 && MUSIC_HEADROOM_DB >= -6);
+    const params = { base: 62, slide: 4, wave: 'triangle', tail: true };
+    const r = a.cry(params, { volume: 0.9 });
+    assert.ok(r, 'cry played');
+    const lows = duck.gain.events.filter((e) => e.kind === 'lin' && Math.abs(e.v - dbToGain(CRY_DUCK.db)) < 1e-9);
+    assert.equal(lows.length, 1, 'one ramp down to the duck level');
+    assert.ok(Math.abs(lows[0].t - (r.time + CRY_DUCK.attack)) < 1e-9);
+    const back = duck.gain.events.at(-1);
+    assert.equal(back.kind, 'lin');
+    assert.equal(back.v, 1, 'the music comes back to unity');
+    assert.ok(Math.abs(back.t - (r.time + cryPlan(params).end + CRY_DUCK.release)) < 1e-9);
+    assert.ok(CRY_DUCK.db < 0 && CRY_DUCK.db >= -12, 'a dip, not a mute');
+    // a second cry while the first is still ducking: no throw, ends back at unity later
+    ctx.currentTime += 0.1;
+    assert.ok(a.cry(params));
+    assert.equal(duck.gain.events.at(-1).v, 1);
+    assert.ok(duck.gain.events.at(-1).t > back.t);
+    // a delayed cry: the duck holds the music's level until the cry starts instead of dipping from the call
+    ctx.currentTime += 5;
+    const n0 = duck.gain.events.length;
+    const rd = a.cry(params, { delay: 1 });
+    assert.ok(rd, 'delayed cry played');
+    const fresh = duck.gain.events.slice(n0);
+    const lowD = fresh.find((e) => e.kind === 'lin' && Math.abs(e.v - dbToGain(CRY_DUCK.db)) < 1e-9);
+    assert.ok(Math.abs(lowD.t - (rd.time + CRY_DUCK.attack)) < 1e-9);
+    const holdAtStart = fresh.find((e) => e.kind === 'set' && Math.abs(e.t - rd.time) < 1e-9);
+    assert.ok(holdAtStart, 'level held until the delayed cry starts');
+    assert.ok(holdAtStart.v > dbToGain(CRY_DUCK.db), 'held at the undipped level');
+    // sfx slider off: the cry is silent, so the music must not dip; sfx quieter than music: a shallower dip
+    ctx.currentTime += 5;
+    a.setVolume({ sfx: 0, music: 0.8 });
+    let n1 = duck.gain.events.length;
+    a.cry(params);
+    assert.equal(duck.gain.events.slice(n1).filter((e) => e.kind === 'lin' && e.v < 1).length, 0, 'no duck with sfx off');
+    ctx.currentTime += 5;
+    a.setVolume({ sfx: 0.4, music: 0.8 });
+    n1 = duck.gain.events.length;
+    a.cry(params);
+    const shallow = duck.gain.events.slice(n1).find((e) => e.kind === 'lin' && e.v < 1);
+    assert.ok(shallow && shallow.v > dbToGain(CRY_DUCK.db) && shallow.v < 1, 'shallower duck when sfx is under music');
+  });
+});
+
 test('renderTrack: every instrument survives extreme notes, durations and velocities', async (t) => {
   await withFakeAudio(t, async (a) => {
     const pattern = [

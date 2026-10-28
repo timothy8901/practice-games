@@ -41,6 +41,7 @@ import * as flags from '../flags.js';
 import * as stats from '../stats.js';
 import * as clockSys from '../clockSys.js';
 import { curveLevel as selectCurveLevel, minuteOfDay } from '../../state/selectors.js';
+import { PORCH_DUELS } from '../../data/town.js';
 
 // ---------------------------------------------------------------------------------------------
 // Tuning
@@ -134,6 +135,9 @@ const HEAL_ITEMS = Object.freeze(['salve', 'tonic', 'full-salve']);
 const BATTLE_MEDICINE = Object.freeze([...HEAL_ITEMS, 'ether', 'full-ether', 'poultice', 'warm-shawl']);
 /** Revives target a fainted party member through the field Satchel. */
 const FIELD_ONLY_MEDICINE = Object.freeze(['revive']);
+/** Flag prefix recording how a hold-out battle ended (`sys.holdout.<trainerId>` = 'held' | 'fell'). */
+export const HOLDOUT_FLAG_PREFIX = 'sys.holdout.';
+
 /** Trainer classes whose losses never cost buttons (data/trainers mirrors this as `blackout: false`). */
 const NO_BLACKOUT_CLASSES = Object.freeze(['keeper', 'champion', 'porch', 'mentor', 'friend', 'faction']);
 
@@ -212,6 +216,7 @@ function held(world, itemId, data) {
  * @property {'full'|null} caughtLost
  * @property {{lost: number, refund: number, summit: boolean, free: boolean, wake: 'porch'|'waystone'}|null} blackout
  * @property {number} payout
+ * @property {boolean} [held]   a hold-out battle: true when the turns ran out with someone standing (or a win)
  * @property {string|null} badge
  * @property {number} starsalt
  * @property {number} spireShare
@@ -229,6 +234,11 @@ function held(world, itemId, data) {
 /** @param {any} world @returns {number} */
 function battlesSoFar(world) {
   return Number.isInteger(world?.stats?.battles) ? world.stats.battles : 0;
+}
+
+/** The scale a visiting duellist borrows: the duel table's party size by badges, party-median levels. */
+function visitorScale() {
+  return { by: 'party-median', sizeByBadges: PORCH_DUELS.partySizeByBadges, min: 3, max: 50 };
 }
 
 /**
@@ -273,10 +283,16 @@ export function buildBattle(G, setup, data) {
   }
 
   const reading = setup.source === 'reading';
-  const story = reading || setup.source === 'story' || !!(trainer && trainer.story);
-  const source = setup.source ?? (trainer ? (trainer.expSource ?? 'route') : 'route');
-  const summit = !!setup.summit || !!(trainer && (trainer.class === 'keeper' || trainer.class === 'champion'));
-  const blackoutAllowed = !summit && !story && setup.onLose !== 'script' && !(trainer && (trainer.blackout === false || NO_BLACKOUT_CLASSES.includes(trainer.class)));
+  // a Porch Duel (GDD-05 §8): a neighbour's porch-* row (class 'porch'), or a visitor (a beaten
+  // leader or a route trainer) fought on the Archive porch with `setup.porchDuel`. Friendly: scaled to
+  // the party median, never a blackout, no trainer payout (storyHooks pays the duel purse), no
+  // defeated flag, no Spire, Summit, Relay or story rules.
+  const porchDuel = !!trainer && (trainer.class === 'porch' || setup.porchDuel === true);
+  const visitorDuel = porchDuel && trainer.class !== 'porch';
+  const story = !porchDuel && (reading || setup.source === 'story' || !!(trainer && trainer.story));
+  const source = setup.source ?? (porchDuel ? 'duel' : trainer ? (trainer.expSource ?? 'route') : 'route');
+  const summit = !porchDuel && (!!setup.summit || !!(trainer && (trainer.class === 'keeper' || trainer.class === 'champion')));
+  const blackoutAllowed = !porchDuel && !summit && !story && setup.onLose !== 'script' && !(trainer && (trainer.blackout === false || NO_BLACKOUT_CLASSES.includes(trainer.class)));
   const dial = world.run.dial || 'flux';
   const oneHeart = Array.isArray(world.run.challenges) && world.run.challenges.includes('one-heart');
 
@@ -287,7 +303,7 @@ export function buildBattle(G, setup, data) {
     roster = [first];
   }
   // the Relay Spire (spires.js theme.rule.rounds): this round's two picks, no repeats across rounds (MID-05)
-  const relay = trainer ? relayRule(trainer, data) : null;
+  const relay = trainer && !porchDuel ? relayRule(trainer, data) : null;
   const relayRound = relay ? Math.max(1, Math.min(relay.rounds.length, Number.isInteger(setup.relay?.round) ? setup.relay.round : 1)) : 0;
   const relayUsed = relay && Array.isArray(setup.relay?.used) ? setup.relay.used.filter((u) => typeof u === 'string') : [];
   if (relay && !oneHeart) {
@@ -331,18 +347,24 @@ export function buildBattle(G, setup, data) {
   let foeSlots = [];
   if (trainer) {
     const rng = G.rngs.fresh(`trainerTeams:${trainer.id}`);
-    // a party-median scaled trainer (Porch Duels) fields `scale.sizeByBadges[badges]` creatures, the last ones
-    const sizes = trainer.scale && Array.isArray(trainer.scale.sizeByBadges) ? trainer.scale.sizeByBadges : null;
+    // a party-median scaled trainer (Porch Duels) fields `scale.sizeByBadges[badges]` creatures, the last ones;
+    // a visitor has no `scale` of its own and takes the duel table's (PORCH_DUELS.partySizeByBadges)
+    const scale = visitorDuel ? visitorScale() : trainer.scale;
+    const sizes = scale && Array.isArray(scale.sizeByBadges) ? scale.sizeByBadges : null;
     const size = sizes && sizes.length ? sizes[Math.min((world.badges || []).length, sizes.length - 1)] : 0;
     const from = size > 0 && size < trainer.party.length ? trainer.party.length - size : 0;
     // party slots in play: a Relay round's posted slots, or the last `size` of a scaled party
     foeSlots = relay ? relay.rounds[relayRound - 1].slots.filter((k) => Number.isInteger(k) && trainer.party[k]) : trainer.party.map((e, k) => k).slice(from);
     const entries = foeSlots.map((k) => trainer.party[k]);
     foes = entries.map((e, i) => {
-      const level = trainer.scale ? Math.max(1, medianLevel(world, trainer.scale) + (e.levelOffset ?? 0)) : e.level;
+      // a visitor's slots sit around the median like a neighbour's (-1 / 0 / +1, the ace last)
+      const offset = e.levelOffset ?? (visitorDuel ? Math.max(-1, 1 - (entries.length - 1 - i)) : 0);
+      const level = scale ? Math.max(1, medianLevel(world, scale) + offset) : e.level;
       const c = creature.makeCreature({ uid: `t${battleId}.${i}`, speciesId: e.species, level, moves: e.moves, nickname: e.nick, heldItem: e.held, rng, wild: false, tuning }, data);
       c.wild = false;
       // a posted boss Shift (GDD-04 §1.4) rides on the battle copy; the engine posts and lands it
+      // (a Spire's set pieces stay at the Spire: a visiting leader brings neither)
+      if (visitorDuel) return creature.serialize(c);
       return { ...creature.serialize(c), ...(e.onEntry ? { onEntry: { ...e.onEntry } } : {}), ...(e.bossShift ? { bossShift: e.bossShift } : {}) };
     });
   } else {
@@ -363,7 +385,7 @@ export function buildBattle(G, setup, data) {
   const profile = trainer ? (AI_PROFILES.includes(trainer.ai) ? trainer.ai : 'trainer') : 'wild';
   const session = /** @type {BattleSession} */ ({
     battle: /** @type {any} */ (null), setup, data, tuning, battleId, trainer, kind: setup.kind, source, summit, story, blackoutAllowed, dial,
-    expModel: {}, pendingCapture: { grade: null }, applied: null, startPayload: {}, porchDuel: trainer?.class === 'porch',
+    expModel: {}, pendingCapture: { grade: null }, applied: null, startPayload: {}, porchDuel,
     snapshot, relay: null,
   });
   if (relay) {
@@ -384,7 +406,7 @@ export function buildBattle(G, setup, data) {
     list: (table) => data.list(table).map((r) => table === 'abilities' ? abilityAtTime(r) : r),
     get: (table, id) => table === 'abilities' ? abilityAtTime(data.get(table, id)) : data.get(table, id),
   } : data;
-  const spire = trainer?.spire ? row(data, 'spires', trainer.spire) : null;
+  const spire = trainer?.spire && !porchDuel ? row(data, 'spires', trainer.spire) : null;
   const battle = createBattle({
     sides: [
       { party: mine, trainer: { name: playerName, items: medicine }, bag: { crackdust: held(world, 'crackdust', data), lanterns }, glint: world.wallet.main },
@@ -392,21 +414,21 @@ export function buildBattle(G, setup, data) {
         ? { party: foes, trainer: { id: trainer.id, name: session.relay ? session.relay.name : trainer.name, title: trainer.title,
           // a Relay's heal items last across its rounds; only the last round pays
           items: (Array.isArray(setup.relay?.foeItems) && relay ? setup.relay.foeItems : (trainer.items || [])).map((x) => ({ ...x })),
-          payout: session.relay && !session.relay.final ? 0 : trainer.payout, tacticTag: trainer.tacticTag } }
+          payout: porchDuel || (session.relay && !session.relay.final) ? 0 : trainer.payout, tacticTag: trainer.tacticTag } }
         : { party: foes },
     ],
     kind: setup.kind,
     data: engineData,
     dial,
     rules: dialRulesFor(dial, data, { story }),
-    holdOut: setup.holdOut ?? trainer?.holdOut ?? null,
+    holdOut: porchDuel ? null : setup.holdOut ?? trainer?.holdOut ?? null,
     readingPhases: reading ? (readingSpec ? readingSpec.phases : setup.wild?.readingPhases) : null,
     readingRng: readingSpec ? (i, d) => G.rngs.fresh(`reading:${readingSpec.from + i}:${readingSpec.draw + d}`) : null,
     readingPostAt: readingSpec ? readingSpec.postAt : undefined,
     weatherKinds: data.weatherKinds ?? null,
     weatherCycle: spire?.theme?.kind === 'weather' ? spire.theme.rule : null,
     bossShiftOdds: shiftOdds && ['up', 'side', 'down'].every((k) => Number.isFinite(shiftOdds[k])) ? shiftOdds : null,
-    bossShiftRng: trainer ? (i) => G.rngs.fresh(`bossShift:${trainer.id}:${foeSlots[i] ?? i}`) : null,
+    bossShiftRng: trainer && !visitorDuel ? (i) => G.rngs.fresh(`bossShift:${trainer.id}:${foeSlots[i] ?? i}`) : null,
     restat: (c) => { creature.recomputeStats(c, data, { tuning }); },
     curveLevel: Number.isFinite(curve) ? curve : null,
     summit,
@@ -438,14 +460,14 @@ export function buildBattle(G, setup, data) {
     stats.inc(w, 'battles', 1, { bus: G.bus });
     if (trainer) {
       w.battleBookmark = {
-        kind: summit ? 'summit' : trainer.spire ? 'spire' : 'trainer', trainerId: trainer.id,
+        kind: summit ? 'summit' : porchDuel ? 'duel' : trainer.spire ? 'spire' : 'trainer', trainerId: trainer.id,
         mapId: w.player?.mapId ?? '', x: w.player?.x ?? 0, y: w.player?.y ?? 0, battles: battlesSoFar(w),
       };
     }
   });
   const lead = battle.active(0);
   session.startPayload = {
-    kind: summit ? 'summit' : trainer?.spire ? 'spire' : story ? 'story' : setup.kind, source, summit, spire: !!trainer?.spire, story,
+    kind: summit ? 'summit' : trainer?.spire && !porchDuel ? 'spire' : story ? 'story' : setup.kind, source, summit, spire: !!trainer?.spire && !porchDuel, story,
     trainerId: trainer ? trainer.id : null, battleId, hp: lead.hp, maxHp: lead.stats.hp, porchDuel: session.porchDuel,
   };
   return session;
@@ -916,7 +938,12 @@ export function applyBattleResult(G, session, opts = {}) {
     }
 
     const midRelay = !!(session.relay && !session.relay.final);
-    if (r.outcome === 'win' && trainer && midRelay) {
+    if (session.porchDuel && trainer) {
+      // a Porch Duel settles nothing here: no defeated flag (the neighbour duels again another
+      // evening), no trainer payout or badge (storyHooks pays the purse on battle:end {porchDuel}),
+      // no blackout; win or lose, the party walks off the porch healed (PORCH_DUELS.stakes)
+      party.heal(w, { tuning, bus });
+    } else if (r.outcome === 'win' && trainer && midRelay) {
       // a Relay round won: nothing is settled until the last round (no flag, payout, badge or script)
       const rl = /** @type {NonNullable<BattleSession['relay']>} */ (session.relay);
       post.relay = { round: rl.round, of: rl.of, next: rl.round + 1, used: [...new Set([...rl.used, ...rl.picks])] };
@@ -977,6 +1004,14 @@ export function applyBattleResult(G, session, opts = {}) {
       }
     } else if (r.outcome === 'holdout' && trainer) {
       post.script = trainer.scripts?.afterWin ?? null;
+    }
+    // a hold-out battle (the dock) records how it ended, so the after-script narrates it honestly:
+    // `sys.holdout.<trainerId>` = 'held' (the turns ran out with someone standing, or a win) or 'fell'
+    const holdOutTurns = session.porchDuel ? null : (session.setup.holdOut ?? trainer?.holdOut ?? null);
+    if (trainer && Number.isInteger(holdOutTurns) && holdOutTurns > 0 && !midRelay) {
+      const held = r.outcome === 'holdout' || r.outcome === 'win';
+      flags.setFlag(w, `${HOLDOUT_FLAG_PREFIX}${trainer.id}`, held ? 'held' : 'fell', { bus });
+      post.held = held;
     }
     // GDD-00 §6: story battles cost nothing and never wall progress, so the party leaves them healed
     // (the dock hold-out, the reeds lesson, story trainers). The Summit and the Reading keep their own rules.

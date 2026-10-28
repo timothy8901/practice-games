@@ -31,6 +31,7 @@ import * as loans from '../systems/loans.js';
 import * as dayPageSys from '../systems/dayPage.js';
 import { lowsOn } from '../systems/schedule.js';
 import { reducedMotion, skipAnims, framesMs } from './scriptHost.js';
+import { shiftTideRows } from '../systems/flow/shiftTide.js';
 
 /** Page geometry (GDD-09 §3.22). */
 export const PAGE = Object.freeze({ x: 64, y: 16, w: 352, h: 238 });
@@ -79,6 +80,9 @@ export function tomorrowLine(it, ctx = {}) {
   switch (it.kind) {
     case 'build': line = fill(TOMORROW.build, { build: `the ${words(it.id)}` }); break; // str
     case 'forecast': {
+      // after the Relighting the window is chalked a tide ahead with its three cards drawn (lit.shiftTide)
+      const chalked = ctx.world && ctx.data ? shiftTideRow(ctx.world, ctx.data, it.id) : null;
+      if (chalked) { line = chalked.text; break; }
       const lows = ctx.world ? nextLowWord(ctx.world) : '';
       line = fill(TOMORROW.forecast, { nick: p.nickname ?? 'a creature', time: lows || 'next' }); // str
       break;
@@ -93,6 +97,14 @@ export function tomorrowLine(it, ctx = {}) {
     default: line = TOMORROW[it.kind] ? fill(TOMORROW[it.kind], { ...p, id: it.id }) : words(it.kind);
   }
   return line.charAt(0).toUpperCase() + line.slice(1);
+}
+
+/**
+ * The Shift Tide row of one pending window (systems/flow/shiftTide), or null before the Relighting.
+ * @param {any} world @param {any} data @param {string} uid
+ */
+function shiftTideRow(world, data, uid) {
+  try { return shiftTideRows(world, data).find((r) => r.uid === uid) ?? null; } catch { return null; }
 }
 
 /**

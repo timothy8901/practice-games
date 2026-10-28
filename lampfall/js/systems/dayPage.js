@@ -51,7 +51,8 @@ import { MINUTES_PER_DAY } from '../core/time.js';
 /** @typedef {{emit: (evt: string, payload?: any) => any}} Bus */
 
 /** Collaborator steps of the overnight, in the order they run (see the module comment). */
-export const OVERNIGHT_STEPS = Object.freeze(['builds', 'regrow', 'reaches', 'cracks', 'glint', 'wanted', 'crate', 'weather', 'purse']);
+// `bench`: the cottage rooms' overnight work (systems/flow/rooms.settleBenches: Workshop, Greenhouse)
+export const OVERNIGHT_STEPS = Object.freeze(['builds', 'regrow', 'reaches', 'cracks', 'glint', 'wanted', 'crate', 'bench', 'weather', 'purse']);
 
 /** Rng label per step (`<label>:<day>`); steps not listed use `<step>:<day>`. */
 export const STEP_STREAMS = Object.freeze({ glint: 'glint', weather: 'weather', cracks: 'cracks', wanted: 'shop:wanted', regrow: 'regrow' });

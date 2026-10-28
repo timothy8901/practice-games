@@ -354,7 +354,8 @@ test('LG-PF2: currentObjective follows the story, the yard and the Spires', asyn
   set({ 'sp.starter-chosen': true });
   let o = currentObjective(G.world, data);
   assert.equal(o.mapId, 'pellwick'); assert.match(o.text, /Wick/);
-  set({ 'seen.wick-keeper': true, 'sp.reading-glass': true, 'sp.errands-started': true });
+  // the errands start after the dock (sp.dock-battle); without it the dock-retry trigger is the beat
+  set({ 'seen.wick-keeper': true, 'sp.reading-glass': true, 'sp.dock-battle': true, 'sp.errands-started': true });
   o = currentObjective(G.world, data);
   assert.match(o.text, /Errand/); assert.equal(o.mapId, 'pellwick');
   assert.ok(Number.isInteger(o.x) && Number.isInteger(o.y));

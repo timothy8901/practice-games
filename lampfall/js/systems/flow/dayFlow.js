@@ -33,6 +33,7 @@ import * as shops from '../shops.js';
 import * as weather from '../weather.js';
 import * as party from '../party.js';
 import * as eventScripts from './eventScripts.js';
+import * as rooms from './rooms.js';
 import * as letters from '../letters.js';
 import * as bag from '../bag.js';
 import * as flags from '../flags.js';
@@ -129,6 +130,7 @@ export function restNight(world, clock, kind, ctx) {
       hooks: {
         builds: (w, d, s) => { order.push('builds'); return loans.landDue(w, { data: d, bus: s.bus, now: s.now }); },
         crate: (w, d, s) => { order.push('crate'); return shops.settleCrate(w, { data: d, bus: s.bus, now: s.now }); },
+        bench: (w, d, s) => rooms.settleBenches(w, d, { bus: s.bus }),
       },
     });
     report.overnight = night;
@@ -413,6 +415,7 @@ export function install(G) {
           hooks: {
             builds: (ww, d, s) => loans.landDue(ww, { data: d, bus: s.bus, now: s.now }),
             crate: (ww, d, s) => shops.settleCrate(ww, { data: d, bus: s.bus, now: s.now }),
+            bench: (ww, d, s) => rooms.settleBenches(ww, d, { bus: s.bus }),
           },
         });
         postDuelSlate(w, G.data, { bus: G.bus });
@@ -461,7 +464,7 @@ export function letterHands(data, bus = null) {
 export function eveningLetter(G) {
   if (!G?.world?.letters || !G.store) return { family: null, reason: 'no-world' };
   const res = G.store.tx('letters:evening', (w) => letters.deliverEvening(w, G.data, { bus: G.bus, tuning: TUNING }));
-  if (res && res.family !== null) G.bus?.emit?.('toast', { text: 'Hesper has a letter on the counter for you.', icon: 'read' }); // str
+  if (res && res.family !== null) G.bus?.emit?.('toast', { text: t('toast.familyLetter'), icon: 'read' });
   return res;
 }
 

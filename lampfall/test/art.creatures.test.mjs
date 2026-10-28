@@ -117,9 +117,14 @@ describe('ported prototype forms', () => {
     for (const s of drawn) {
       const p = PROTO[protoName(s.id)];
       const r = CREATURE_SPRITES[s.id];
-      assert.deepEqual([...r.rows], p.rows, `${s.id} front`);
-      assert.deepEqual([...r.idle2], p.idle2, `${s.id} idle2`);
-      assert.deepEqual([...r.back], p.back, `${s.id} back`);
+      // `revised` frames were repainted in the art director's second pass (true backs, silhouettes); the
+      // rest stay pixel-for-pixel, and a revised frame must actually differ from the prototype.
+      const rev = new Set(r.revised ?? []);
+      for (const ch of rev) assert.ok(['rows', 'idle2', 'back'].includes(ch), `${s.id} revised '${ch}'`);
+      for (const [f, label] of [['rows', 'front'], ['idle2', 'idle2'], ['back', 'back']]) {
+        if (rev.has(f)) assert.notDeepEqual([...r[f]], p[f], `${s.id} ${label} is listed as revised but unchanged`);
+        else assert.deepEqual([...r[f]], p[f], `${s.id} ${label}`);
+      }
       assert.deepEqual({ ...r.heartmarks[r.mark] }, p.heartmark, `${s.id} mark`);
       assert.equal(r.source, 'drawn');
       assert.equal(SPRITE_NAME_BY_ID[s.id], protoName(s.id));

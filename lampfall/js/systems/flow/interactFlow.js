@@ -40,6 +40,8 @@ import { hasAliveParty } from '../../state/selectors.js';
 import { markTrigger } from '../../world/warps.js';
 import { PORCH_DUELS } from '../../data/town.js';
 import { duelSlate, postedDuels } from '../townCommon.js';
+import { shiftTideRows } from './shiftTide.js';
+import * as rooms from './rooms.js';
 
 /** @typedef {import('../../world/interact.js').ContextAction} ContextAction */
 
@@ -248,12 +250,12 @@ async function sentinel(G, action, host) {
     return done('challenge', { scene: 'dialogue', defeated: true, sentinelId: row.id });
   }
   if (!hasAliveParty(G.world)) {
-    toast(G, host, 'Bring a rested companion. The Waystones heal your party.');
+    toast(G, host, t('common.restedCompanion'));
     return fail('challenge', 'no-party');
   }
   let foeName = row.foe.species;
   try { foeName = G.data.tryGet('species', row.foe.species)?.name ?? foeName; } catch { /* id */ }
-  const pick = await ask(G, host, { title: row.name, body: `A stone sentinel holds the gap: ${foeName} Lv${row.foe.level}. Read it, then answer it.`, // str
+  const pick = await ask(G, host, { title: row.name, body: t('sentinel.ask', { name: foeName, level: row.foe.level }),
     options: ['Come back later', 'Challenge'], defaultIndex: 0 });
   if (pick !== 1) return fail('challenge', 'declined');
   const setup = {
@@ -278,7 +280,7 @@ async function challenge(G, action, host) {
     return done('challenge', { scene: 'dialogue', defeated: true });
   }
   if (!hasAliveParty(G.world)) {
-    toast(G, host, 'Bring a rested companion. The Waystones heal your party.');
+    toast(G, host, t('common.restedCompanion'));
     return fail('challenge', 'no-party');
   }
   const levels = trainer.party.map((c) => c.level);
@@ -286,9 +288,9 @@ async function challenge(G, action, host) {
     options: ['Come back later', 'Challenge'], defaultIndex: 0 });
   if (pick !== 1) return fail('challenge', 'declined');
   const setup = { kind: 'trainer', trainerId: id, source: trainer.expSource ?? (trainer.spire ? 'spire' : 'route') };
-  if (host.startBattle) {
-    G.push('dialogue', { who: trainer.npc ?? trainer.name, text: trainer.lines.intro, onDone: () => host.startBattle(setup) });
-  } else G.push('battle', { setup });
+  // the battle scene's trainer-in speaks `lines.intro`; a dialogue here as well printed it twice
+  if (host.startBattle) host.startBattle(setup);
+  else G.push('battle', { setup });
   return done('challenge', { scene: 'battle', trainerId: id });
 }
 
@@ -486,7 +488,7 @@ function hesperCounter(G, action, host) {
   const handed = deliverCarriedTo(G, 'porch-post-office', host);
   const got = G.store.tx('letters:carry', (w) => letters.carry(w, G.data, laneCtx(G)));
   if (!got.ok) {
-    if (!handed.length) toast(G, host, carryingText(G) || 'Nothing for you tonight.'); // str
+    if (!handed.length) toast(G, host, carryingText(G) || t('letters.nothingTonight'));
     return fail('hesperCounter', got.reason);
   }
   G.push('letter', { n: got.n, from: 'counter' });
@@ -501,6 +503,7 @@ export function boardContent(G, kind) {
   const tides = clockSys.tidesForDay(Math.max(1, day), G.data).filter((e) => e.kind === 'low' || e.type === 'low' || e.low === true);
   const lows = (tides.length ? tides : clockSys.nextLows(w, 2, G.data)).map((e) => formatMinute(((e.minute ?? e.total ?? 0) % 1440 + 1440) % 1440));
   const windows = clockSys.tideWindows(w, { data: G.data });
+  const shiftTide = shiftTideRows(w, G.data);
   const winLine = (kind2, label) => {
     const win = windows[kind2];
     if (!win) return null;
@@ -516,6 +519,8 @@ export function boardContent(G, kind) {
     winLine('spur', 'The Bar to the spur'), // str
     winLine('bar', 'The Bar to Shardcrown'), // str
     (w.pendingShifts || []).length ? t('hud.shiftsPending', { n: w.pendingShifts.length }) : null,
+    // after the Relighting (lit.shiftTide): one chalked row per pending window, its three cards drawn
+    ...shiftTide.map((r) => r.text),
   ].filter(Boolean);
   const pace = loans.paceEstimate(w, ctx);
   const st = loans.status(w, ctx);
@@ -532,7 +537,8 @@ export function boardContent(G, kind) {
     w.weather && w.weather.outlook ? `Tomorrow: ${weather.forecastText(w.weather.outlook, G.data)}` : null, // str
     ...duelSlipLines(G),
   ].filter(Boolean);
-  if (kind === 'tide') return { title: t('board.tideTable'), lines: tide };
+  // `shiftTide`: the same rows with their cards, for the board scene's three card icons (GDD-09 §3)
+  if (kind === 'tide') return { title: t('board.tideTable'), lines: tide, shiftTide };
   if (kind === 'commons') return { title: t('board.commons'), lines: commons };
   if (kind === 'ledger') return { title: 'Ledger Board', lines: ledger }; // str
   return { title: 'The gate boards', sections: [{ title: 'Ledger', lines: ledger }, { title: t('board.tideTable'), lines: tide }, { title: t('board.commons'), lines: commons }] }; // str
@@ -694,7 +700,7 @@ export function carryingText(G) {
   if (!Number.isInteger(n)) return '';
   const row = letters.letterByN(G.data, n);
   if (!row) return '';
-  return `You're carrying ${letters.labelOf(G.data, row)} for ${porchLabel(G, row.door)}.`; // str
+  return t('letters.carrying', { label: letters.labelOf(G.data, row), place: porchLabel(G, row.door) });
 }
 
 /**
@@ -707,18 +713,18 @@ export function carryingText(G) {
  */
 export function doorLines(G, res, row) {
   const label = letters.labelOf(G.data, row);
-  const out = [`${label} delivered. ${row.to ? `To ${row.to}.` : ''}`.trim()]; // str
+  const out = [row.to ? t('letters.deliveredTo', { label, to: row.to }) : t('letters.delivered', { label })];
   const r = res.reward;
   if (r) {
-    if (r.item) out.push(`Juniper brings the ${itemName(G, r.item)} home from her back room.`); // str
-    if (r.lightsPorch) out.push('The porch lamp comes on.'); // str
+    if (r.item) out.push(t('letters.heirloomHome', { item: itemName(G, r.item) }));
+    if (r.lightsPorch) out.push(t('letters.porchLit'));
     if (r.creature) {
       let name = r.creature.species;
       try { name = G.data.tryGet('species', r.creature.species)?.name ?? name; } catch { /* id */ }
-      out.push(`A ${name} follows it up the step and stays with you.`); // str
+      out.push(t('letters.follows', { name }));
     }
   } else if (res.returned === false && row.heirloom) {
-    out.push(`The house is dark. The ${itemName(G, row.heirloom)} will wait until its porch is lit.`); // str
+    out.push(t('letters.heirloomWaits', { item: itemName(G, row.heirloom) }));
   }
   return out;
 }
@@ -765,9 +771,76 @@ function gallery(G, action, host) {
     });
     const name = lead.nickname || (G.data.has('species', lead.speciesId) ? G.data.get('species', lead.speciesId).name : 'your lead');
     G.bus.emit('creature:bond', { uid: lead.uid, from: r.from, to: r.to, source: 'gallery' });
-    return done('gallery', { bond: r.to, scene: say(G, `You hang ${name}'s Shiftlog strip under Odile's canvases. ${name} looks at it for a long time. (+1 Bond)`) }); // str
+    return done('gallery', { bond: r.to, scene: say(G, t('gallery.strip', { name })) });
   }
-  return done('gallery', { scene: say(G, `The Gallery: Odile's canvases, the tally wall, ${framed} plate frame${framed === 1 ? '' : 's'} of Held forms. Every six Held forms frames another.`) }); // str
+  return done('gallery', { scene: say(G, t('gallery.look', { n: framed })) });
+}
+
+// ---- the cottage rooms at work (GDD-00 §7; systems/flow/rooms) --------------------------------
+
+/** The Workshop's fossil bench: one fossil for the night, cleaned (+40%) by morning. */
+async function workshopBench(G, action, host) {
+  const w = G.world;
+  if (!loans.roomBuilt(w, 'workshop')) return done('workshop', { scene: say(G, VERB_LINES.workshop) });
+  const on = flags.getFlag(w, rooms.BENCH_FOSSIL_FLAG);
+  if (on) return done('workshop', { scene: say(G, t('room.workshop.busy', { item: rowName(G, on) })) });
+  const list = rooms.benchFossils(w, G.data).slice(0, 4);
+  if (!list.length) return done('workshop', { scene: say(G, t('room.workshop.noFossil')) });
+  const pick = await ask(G, host, { title: t('room.workshop.title'), body: t('room.workshop.ask'), options: [t('room.notNow'), ...list.map((f) => f.name)], defaultIndex: 0 });
+  if (!Number.isInteger(pick) || pick < 1 || pick > list.length) return fail('workshop', 'declined');
+  const r = G.store.tx('room:fossil', (ww) => rooms.benchFossil(ww, G.data, list[pick - 1].id, { bus: G.bus }));
+  if (!r.ok) { toast(G, host, t('room.cannot')); return fail('workshop', r.reason); }
+  return done('workshop', { benched: r.id, scene: say(G, t('room.workshop.left', { item: list[pick - 1].name })) });
+}
+
+/** The Workshop polisher: a skyglass relic and a type, a type tilt by morning. */
+async function polisher(G, action, host) {
+  const w = G.world;
+  if (!loans.roomBuilt(w, 'workshop')) return done('polish', { scene: say(G, VERB_LINES.polish) });
+  const on = flags.getFlag(w, rooms.BENCH_TILT_FLAG);
+  if (on) return done('polish', { scene: say(G, t('room.polish.busy', { item: rowName(G, on) })) });
+  const relics = rooms.polishRelics(w, G.data);
+  if (!relics.length) return done('polish', { scene: say(G, t('room.polish.noRelic')) });
+  const relic = relics[0];
+  const tilts = rooms.tiltChoices(G.data);
+  const pick = await ask(G, host, { title: t('room.polish.title'), body: t('room.polish.ask', { item: relic.name }), options: [t('room.notNow'), ...tilts.map((x) => x.type)], defaultIndex: 0 });
+  if (!Number.isInteger(pick) || pick < 1 || pick > tilts.length) return fail('polish', 'declined');
+  const r = G.store.tx('room:polish', (ww) => rooms.benchTilt(ww, G.data, relic.id, tilts[pick - 1].id, { bus: G.bus }));
+  if (!r.ok) { toast(G, host, t('room.cannot')); return fail('polish', r.reason); }
+  return done('polish', { tilt: r.tilt, scene: say(G, t('room.polish.left', { item: relic.name, type: tilts[pick - 1].type })) });
+}
+
+/** The Greenhouse bench: a party creature and its favourite fruit overnight, +1 Bond once. */
+async function greenhouseBench(G, action, host) {
+  const w = G.world;
+  if (!loans.roomBuilt(w, 'greenhouse')) return done('graft', { scene: say(G, VERB_LINES.graft) });
+  const on = flags.getFlag(w, rooms.BENCH_BOND_FLAG);
+  if (on) return done('graft', { scene: say(G, t('room.greenhouse.busy')) });
+  const ready = (w.party ?? []).filter((c) => c && !flags.hasFlag(w, `${rooms.BOND_NIGHT_PREFIX}${c.uid}`))
+    .map((c) => ({ c, fruit: rooms.favouriteFruit(w, G.data, c) })).filter((x) => x.fruit).slice(0, 4);
+  if (!ready.length) return done('graft', { scene: say(G, t('room.greenhouse.none')) });
+  const pick = await ask(G, host, { title: t('room.greenhouse.title'), body: t('room.greenhouse.ask'), options: [t('room.notNow'), ...ready.map((x) => x.c.nickname ?? x.c.speciesId)], defaultIndex: 0 });
+  if (!Number.isInteger(pick) || pick < 1 || pick > ready.length) return fail('graft', 'declined');
+  const x = ready[pick - 1];
+  const r = G.store.tx('room:bond', (ww) => rooms.benchBond(ww, G.data, x.c.uid, { bus: G.bus }));
+  if (!r.ok) { toast(G, host, t('room.cannot')); return fail('graft', r.reason); }
+  return done('graft', { uid: x.c.uid, scene: say(G, t('room.greenhouse.left', { nick: x.c.nickname ?? x.c.speciesId, item: x.fruit.name })) });
+}
+
+/** The loft telescope: the Errants on the wing tonight, seen or not. */
+function loftTelescope(G, action, host) {
+  if (!loans.roomBuilt(G.world, 'porch-loft')) return done('loft', { scene: say(G, VERB_LINES.loft) });
+  const seen = rooms.telescopeView(G.world, G.data);
+  const text = seen.length
+    ? t('room.loft.errants', { list: seen.map((e) => t('room.loft.errant', { name: e.name, place: e.place })).join('; ') })
+    : t('room.loft.none');
+  return done('loft', { errants: seen, scene: say(G, text) });
+}
+
+/** A collection or item row's display name. */
+function rowName(G, id) {
+  for (const table of ['collections', 'items']) { try { if (G.data.has(table, id)) return G.data.get(table, id).name ?? id; } catch { /* next */ } }
+  return id;
 }
 
 // ---- Porch Duel visitors (GDD-05 §8: beaten leaders and route trainers on the Archive porch) ----
@@ -787,14 +860,15 @@ export function visitorDuelOffer(G, table = PORCH_DUELS) {
 
 async function visitorDuel(G, offer, host) {
   const tr = G.data.get('trainers', offer.trainer);
-  if (!hasAliveParty(G.world)) { toast(G, host, 'Bring a rested companion. The Waystones heal your party.'); return fail('knock', 'no-party'); } // str
-  const pick = await ask(G, host, { title: 'Porch Duel', // str
-    body: `${tr.name} is on tonight's Porch Duel slate and waiting under the lamp. Friendly, ${offer.creatures === 1 ? 'one creature' : `${offer.creatures} creatures`}, ${offer.payout.toLocaleString('en-US')}◉. Nothing lost.`, // str
-    options: ['Not tonight', 'Duel'], defaultIndex: 0 }); // str
+  if (!hasAliveParty(G.world)) { toast(G, host, t('common.restedCompanion')); return fail('knock', 'no-party'); }
+  const pick = await ask(G, host, { title: t('duel.title'),
+    body: t('duel.visitorAsk', { trainer: tr.name, n: offer.creatures, amount: offer.payout.toLocaleString('en-US') }),
+    options: [t('duel.notTonight'), t('duel.go')], defaultIndex: 0 });
   if (pick !== 1) return fail('knock', 'declined');
   G.store.tx('duel:visitor', (w) => flags.setFlag(w, 'sys.duel.visitor-fought', offer.gameDay, { bus: G.bus }));
   const setup = { kind: 'trainer', trainerId: offer.trainer, source: 'duel', porchDuel: true };
-  if (host && host.startBattle) G.push('dialogue', { who: tr.npc ?? tr.name, text: tr.lines?.intro ?? '', onDone: () => host.startBattle(setup) });
+  // the intro is the battle scene's (trainer-in), said once
+  if (host && host.startBattle) host.startBattle(setup);
   else G.push('battle', { setup });
   return done('knock', { scene: 'battle', trainerId: offer.trainer, duel: true });
 }
@@ -813,7 +887,7 @@ export function duelSlipLines(G) {
       ...slate.offers.filter((o) => o.kind !== 'neighbour' && o.trainer === posted.visitor)]
     : slate.offers;
   const slip = PORCH_DUELS.slip || {};
-  if (!offers.length) return [slip.none || 'No duels posted tonight.']; // str
+  if (!offers.length) return [slip.none || t('duel.none')];
   const nameOf = (o) => {
     const npc = o.npc && G.data.has('npcs', o.npc) ? G.data.get('npcs', o.npc) : null;
     if (npc && npc.name) return npc.name;
@@ -822,17 +896,17 @@ export function duelSlipLines(G) {
   const n = slate.creatures;
   const pay = slate.payout.toLocaleString('en-US');
   return [slip.header || 'Porch Duels tonight', ...offers.map((o) => (o.taken
-    ? `${nameOf(o)}: fought. ${pay}◉ in your pocket.` // str
-    : `${nameOf(o)}: ${porchesOf(G.data).find((p) => p.id === o.porch)?.npcId === o.npc && o.npc ? 'home porch' : porchLabel(G, o.porch)}, after seven. ${n === 1 ? 'One creature' : `${n} creatures`}, friendly. ${pay}◉.`))]; // str
+    ? t('duel.fought', { name: nameOf(o), amount: pay })
+    : t('duel.offer', { name: nameOf(o), place: porchesOf(G.data).find((p) => p.id === o.porch)?.npcId === o.npc && o.npc ? t('duel.homePorch') : porchLabel(G, o.porch), n, amount: pay })))];
 }
 
 /** "Juniper Pell's porch" for a porch row with a resident, else the porch id in words. */
 export function porchLabel(G, porchId) {
   const row = porchesOf(G.data).find((p) => p.id === porchId);
   const npc = row && row.npcId && G.data.has('npcs', row.npcId) ? G.data.get('npcs', row.npcId) : null;
-  if (npc && npc.name) return `${npc.name}'s porch`; // str
-  if (porchId === (TUNING.homePorchId ?? 'porch-keepers-cottage')) return 'your own porch'; // str
-  return `the ${String(porchId).replace(/^porch-/, '').split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')} porch`; // str
+  if (npc && npc.name) return t('porch.of', { name: npc.name });
+  if (porchId === (TUNING.homePorchId ?? 'porch-keepers-cottage')) return t('porch.own');
+  return t('porch.named', { name: String(porchId).replace(/^porch-/, '').split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') });
 }
 
 /**
@@ -999,6 +1073,10 @@ export const VERB_HANDLERS = Object.freeze({
   ferry,
   knock,
   gallery,
+  workshop: workshopBench,
+  polish: polisher,
+  graft: greenhouseBench,
+  loft: loftTelescope,
   waystone,
   bed,
   ledger: sceneVerb,

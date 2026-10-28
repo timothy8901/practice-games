@@ -653,6 +653,48 @@ export function kilnClean(world, findId, ctx) {
   return { ok: true, id: findId, mult };
 }
 
+/**
+ * The Workshop bench (GDD-00 §7 rooms): a fossil left overnight comes back cleaned, worth
+ * `findCleanMult` (+40%) to Barnaby. Marks the find cleaned in the log (the record is made when
+ * missing). Rows opt in with `group: 'fossil'` (or `cleanable: true`). Emits `fieldLog:cleaned {id, mult}`.
+ * @param {World} world
+ * @param {string} findId
+ * @param {LaneCtx} [ctx]
+ * @returns {{ok: true, id: string, mult: number} | {ok: false, id: string, reason: 'not-cleanable'}}
+ */
+export function benchClean(world, findId, ctx) {
+  assertId(findId, 'find id');
+  const row = rowOf(ctx?.data, 'collections', findId);
+  if (row && !(row.group === 'fossil' || row.cleanable === true)) return { ok: false, id: findId, reason: 'not-cleanable' };
+  if (!world.collections.relics[findId]) world.collections.relics[findId] = { n: 0, cleaned: false };
+  world.collections.relics[findId].cleaned = true;
+  const mult = tuningOf(tuningSource(ctx)).findCleanMult;
+  ctx?.bus?.emit('fieldLog:cleaned', { id: findId, mult, bench: true });
+  return { ok: true, id: findId, mult };
+}
+
+/**
+ * Whether a find has a cleaned specimen waiting (the Workshop bench or a Kiln lead cleaned it).
+ * @param {World} world @param {string} findId
+ * @returns {boolean}
+ */
+export function hasCleaned(world, findId) {
+  return world?.collections?.relics?.[findId]?.cleaned === true;
+}
+
+/**
+ * The cleaned specimen leaves (sold): the find's `cleaned` mark is spent, so the next copy sells at
+ * the plain price. Call inside a tx.
+ * @param {World} world @param {string} findId
+ * @returns {boolean} whether a cleaned specimen was there
+ */
+export function spendCleaned(world, findId) {
+  const rec = world?.collections?.relics?.[findId];
+  if (!rec || rec.cleaned !== true) return false;
+  rec.cleaned = false;
+  return true;
+}
+
 // ---------------------------------------------------------------------------------------------
 // Completion
 // ---------------------------------------------------------------------------------------------

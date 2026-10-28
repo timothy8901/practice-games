@@ -128,9 +128,9 @@ async function run() {
       const expect = themeForHour(h % 24);
       check(`hour ${String(h % 24).padStart(2, '0')}:00 -> ${expect}`, engine.nowPlaying()?.id === expect, `got ${engine.nowPlaying()?.id}`);
     }
-    if (h % 24 === 3) check('03:00 quiet hours drop the brushes (perc.hat off)', !engine.getStems().includes('perc.hat'));
+    if (h % 24 === 3) check('03:00 quiet hours drop the brushes (perc off)', !engine.getStems().includes('perc'));
     if (h % 24 === 22) check('22:00 night bells on', engine.getStems().includes('night'));
-    if (h % 24 === 12) check('12:00 night bells off, brushes on', !engine.getStems().includes('night') && engine.getStems().includes('perc.kick'));
+    if (h % 24 === 12) check('12:00 night bells off, brushes on', !engine.getStems().includes('night') && engine.getStems().includes('perc'));
   }
   const switches = music.history().filter((e) => e.action === 'play' && e.reason === 'hour');
   check('24-hour sweep: 8 on-the-hour crossfades', switches.length === 8, `got ${switches.length}`);

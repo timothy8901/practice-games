@@ -183,8 +183,8 @@ test('authored Spire trainer posts present a challenge and hand off the chosen r
   let requested;
   const result = await doInteraction(G, action, { ...field.host, ask: async () => 1, startBattle: (setup) => { requested = setup; } });
   assert.equal(result.ok, true);
-  const intro = G.calls.at(-1);
-  assert.equal(intro[1], 'dialogue'); intro[2].onDone();
+  // the intro is spoken once, by the battle scene's trainer-in: no dialogue is pushed before it
+  assert.ok(!G.calls.some((c) => c[1] === 'dialogue' && c[2]?.text === TRAINERS.find((tr) => tr.id === 'maud-spire').lines.intro));
   assert.deepEqual(requested, { kind: 'trainer', trainerId: 'maud-spire', source: 'spire' });
 });
 

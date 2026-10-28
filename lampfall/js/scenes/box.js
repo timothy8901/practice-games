@@ -10,8 +10,13 @@
  * confirm with **Keep it** focused and is never offered for the last party member. Moving the last
  * conscious party creature into storage is refused with the reason (systems/party rules).
  *
- * Every change goes through `systems/party` (`swap`, `toBox`, `fromBox`, `release`) inside a tx;
- * cancel never changes anything.
+ * **Training Yard** (GDD-00 §7 rooms; GDD-02 §3): once the Yard is built (the room commission, or the
+ * Commons project on the green from badge 5), a stored creature's actions add *To the Yard* / *Off the
+ * Yard* (`party.toYard` / `fromYard`, at most `YARD_CAP` = 3); creatures on the Yard earn 25% of the
+ * party's battle EXP and wear a chalk tag in their cell.
+ *
+ * Every change goes through `systems/party` (`swap`, `toBox`, `fromBox`, `release`, `toYard`,
+ * `fromYard`) inside a tx; cancel never changes anything.
  * @module scenes/box
  */
 import { drawText } from '../core/font.js';
@@ -22,6 +27,8 @@ import { drawIcon } from '../ui/icons.js';
 import { openConfirm } from '../ui/confirm.js';
 import { confirmSpec, t } from '../data/strings.js';
 import * as partySys from '../systems/party.js';
+import * as loansSys from '../systems/loans.js';
+import * as expSys from '../systems/exp.js';
 import { TUNING } from '../data/tuning.js';
 import { boxCapacity, typesOf, chipId, lookOf, BOX_CELLAR } from './menuModel.js';
 import {
@@ -32,6 +39,30 @@ import {
 const PARTY_X = 8, PARTY_Y = 22, PARTY_W = 136, PARTY_H = 30;
 const GRID_X = 156, GRID_Y = 22, COLS = 8, ROWS = 5, CELL_W = 38, CELL_H = 36;
 const PARTY_MAX = 6;
+
+/** Whether the Training Yard stands: the room commission, or the Commons project on the green. */
+export function yardBuilt(world) {
+  return loansSys.roomBuilt(world, 'training-yard') || world?.flags?.['sys.commons.training-yard-green'] === true;
+}
+
+/** Training Yard places (exp tuning `YARD_CAP`, GDD 3). */
+export function yardCap() {
+  try { return expSys.tuningOf(TUNING).YARD_CAP; } catch { return 3; }
+}
+
+/**
+ * The Yard row of a stored creature's actions: on / off the Yard, or why not. Pure.
+ * @param {any} world
+ * @param {any} c   a stored creature
+ * @returns {{id: 'yard', label: string, enabled: boolean, reason?: string, on: boolean}}
+ */
+export function yardAction(world, c) {
+  const on = (world?.yard ?? []).includes(c.uid);
+  if (!yardBuilt(world)) return { id: 'yard', label: t('box.yard.to'), enabled: false, reason: t('box.yard.unbuilt'), on: false };
+  if (on) return { id: 'yard', label: t('box.yard.off'), enabled: true, on: true };
+  const full = (world?.yard ?? []).length >= yardCap();
+  return { id: 'yard', label: t('box.yard.to'), enabled: !full, reason: full ? t('box.yard.full', { n: yardCap() }) : undefined, on: false };
+}
 
 /**
  * @param {any} G
@@ -89,6 +120,8 @@ export function createBoxScene(G) {
     actions = [
       { id: 'move', label: 'Move', enabled: true }, // str
       { id: 'summary', label: t('party.summary'), enabled: inParty, reason: 'Summaries live on the Party page.' }, // str
+      // the Training Yard: stored creatures only (party.toYard refuses a party member)
+      ...(inParty ? [] : [yardAction(world(), c)]),
       { id: 'release', label: 'Release', enabled: !last, reason: 'Your last companion stays with you.' }, // str
     ];
     const r = (inParty ? partyRect(partyFocus.index) : cellRect(gridFocus.index));
@@ -106,6 +139,16 @@ export function createBoxScene(G) {
     if (!c) { mode = 'grid'; return; }
     if (id === 'move') { hand = { from: area === 'party' ? 'party' : 'box', uid: c.uid }; mode = 'grid'; sfx(G, 'confirm'); return; }
     if (id === 'summary') { mode = 'grid'; G.push('party', { summary: c.uid }); return; }
+    if (id === 'yard') {
+      mode = 'grid';
+      const on = (world().yard ?? []).includes(c.uid);
+      const r = G.store.tx(on ? 'box:from-yard' : 'box:to-yard', (w) => (on
+        ? partySys.fromYard(w, c.uid, { bus: G.bus })
+        : partySys.toYard(w, c.uid, { bus: G.bus, tuning: TUNING })));
+      if (r?.ok) { sfx(G, 'confirm'); toast(G, t(on ? 'box.yard.left' : 'box.yard.joined', { nick: c.nickname })); }
+      else { sfx(G, 'blocked'); toast(G, r?.reason === 'yard-full' ? t('box.yard.full', { n: yardCap() }) : t('box.yard.stayed')); }
+      return;
+    }
     if (id === 'release') {
       busy = true;
       const spec = confirmSpec('release', { nick: c.nickname });
@@ -265,6 +308,8 @@ export function createBoxScene(G) {
       if (c) {
         drawCreatureIcon(ctx, G, c, r.x + 10, r.y + 6, { grey: (c.hp | 0) <= 0, dim: ghost });
         drawText(ctx, String(c.level), r.x + r.w - 3, r.y + r.h - 8, { font: 'small', color: skin.soft, align: 'right' });
+        // on the Training Yard: a chalk tag in the corner
+        if ((w?.yard ?? []).includes(c.uid)) drawText(ctx, t('box.yard.tag'), r.x + 3, r.y + r.h - 8, { font: 'small', color: skin.accent });
       }
       if (here) drawCursorAt(ctx, r.x + 1, r.y + 2, ms, skin);
     });
@@ -306,6 +351,11 @@ export function createBoxScene(G) {
     drawText(ctx, `${c.hp}/${c.stats?.hp ?? 0}`, box.x + 228, box.y + 22, { font: 'small', color: skin.text });
     if (c.heldItem) drawText(ctx, `${t('summary.held')}: ${lookOf(G.data).itemOrNull(c.heldItem)?.name ?? c.heldItem}`, box.x + box.w - 8, box.y + 7, { color: skin.soft, align: 'right', maxWidth: 70 });
     if (hand) drawText(ctx, 'In hand', box.x + box.w - 8, box.y + 22, { color: skin.accent, align: 'right' }); // str
+    // on the Training Yard: the top-right line (the held item's, when it has none; else beside the name)
+    else if ((world()?.yard ?? []).includes(c.uid)) {
+      if (!c.heldItem) drawText(ctx, t('box.yard.onYard'), box.x + box.w - 8, box.y + 7, { color: skin.accent, align: 'right' });
+      else drawText(ctx, t('box.yard.tag'), box.x + 150, box.y + 7, { color: skin.accent, align: 'right' });
+    }
   }
 
   function drawActions(ctx, skin) {
@@ -371,7 +421,7 @@ export function createBoxScene(G) {
     draw,
     debugText() {
       const w = world();
-      return [`Storage ${w?.box?.length ?? 0}/${cap}`, `area: ${area} ${area === 'party' ? partyFocus.index : gridFocus.index}`, hand ? `hand: ${hand.uid}` : 'hand: empty',
+      return [`Storage ${w?.box?.length ?? 0}/${cap}`, `yard: ${yardBuilt(w) ? `${(w?.yard ?? []).length}/${yardCap()}` : 'unbuilt'}`, `area: ${area} ${area === 'party' ? partyFocus.index : gridFocus.index}`, hand ? `hand: ${hand.uid}` : 'hand: empty',
         `party: ${(w?.party ?? []).map((c) => c.nickname).join(', ')}`, `box: ${(w?.box ?? []).map((c) => c.nickname).join(', ')}`].join('\n');
     },
     get hand() { return hand; },

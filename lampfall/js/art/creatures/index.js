@@ -103,6 +103,8 @@ function record(id, e, familyId) {
     heartmarks, heartmarksIdle2, heartmarksBack,
   };
   if (e.conceptSize) r.conceptSize = e.conceptSize;
+  // art-director second pass: frames repainted on top of the approved prototype (polish backlog)
+  if (Array.isArray(e.revised)) r.revised = Object.freeze(e.revised.slice());
   if (keys.includes('m')) r.reserved = 'vagary';
   return Object.freeze(r);
 }

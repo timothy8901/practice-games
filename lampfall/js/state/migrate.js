@@ -214,6 +214,98 @@ function migrate5to6(data) {
   return data;
 }
 
+/** Smallest epoch-day count a pre-LG-RN70 Real Clock save carried (systems/clockSys LEGACY_REAL_TOTAL_MIN ÷ 1440). */
+export const LEGACY_REAL_DAY_MIN = 10_960;
+const MINUTES_PER_DAY = 1440;
+/** Records whose values are day stamps (`npcs[*].saidLines`, `maps[*].picked` / `trees`). */
+const DAY_RECORDS = new Set(['saidLines', 'picked', 'trees']);
+/** Records whose values are total-minute stamps (`maps[*].reachAt`). */
+const MINUTE_RECORDS = new Set(['reachAt']);
+/** World keys that hold no day stamps (the clock is rebased on its own). */
+const NO_STAMPS = new Set(['v', 'clock', 'rng', 'settings', 'stats', 'log', 'run', 'flags', 'counters']);
+const isDayKey = (k) => k === 'day' || /Day$/.test(k);
+/** Flags whose value is a day stamp (loans relightFlag = a clock day; letters LATE_DELIVERY_FLAG = a GDD day). */
+const DAY_FLAGS = new Set(['sys.relighting-due', 'sp.late-delivery']);
+
+/**
+ * Calls `visit(holder, key, kind)` for every day stamp (`day`, `*Day`, a saidLines / picked / trees
+ * value) and total-minute stamp (a reachAt value) under `node`.
+ * @param {any} node
+ * @param {(holder: any, key: string|number, kind: 'day'|'minute') => void} visit
+ * @param {string} [parentKey]
+ */
+function walkStamps(node, visit, parentKey = '') {
+  if (Array.isArray(node)) {
+    for (const v of node) if (v && typeof v === 'object') walkStamps(v, visit, parentKey);
+    return;
+  }
+  if (!isPlainObject(node)) return;
+  for (const k of Object.keys(node)) {
+    const v = node[k];
+    if (typeof v === 'number') {
+      if (DAY_RECORDS.has(parentKey) || isDayKey(k)) visit(node, k, 'day');
+      else if (MINUTE_RECORDS.has(parentKey)) visit(node, k, 'minute');
+    } else if (v && typeof v === 'object') walkStamps(v, visit, k);
+  }
+}
+
+/**
+ * Whether a clock state is a Real Clock save written before LG-RN70 (its total holds the epoch day).
+ * @param {any} clock
+ * @returns {boolean}
+ */
+export function isLegacyRealClock(clock) {
+  return isPlainObject(clock) && clock.realClock === true && typeof clock.total === 'number' && Number.isFinite(clock.total)
+    && clock.total >= LEGACY_REAL_DAY_MIN * MINUTES_PER_DAY;
+}
+
+/**
+ * 6 -> 7 (Real Clock across sessions, LG-RN70 follow-up): `clock.realOffset` holds the run-relative
+ * calendar offset so the days that pass between sessions count (null until core/time writes it). A
+ * legacy Real Clock save, whose `clock.total` held the epoch day, is rebased onto the run's own day
+ * count: D whole days (the earliest day stamp in the save, so it lands on day 0) come off
+ * `clock.total` and off every day stamp written on that count (letters, loans builds / tally / log,
+ * threads, npc memory and saidLines, shops, the wallet's Starsalt day, gather picks and regrowth,
+ * weather, the Day Page, the Kiln's cleanedDay, creatures' caughtDay, Errants, baskets, the Porch Duel,
+ * Relighting and Late Delivery flags), and `realOffset` becomes D days so the wall clock keeps the same run day. Stamps below the
+ * epoch range (-1 = never, 0 defaults) are left alone.
+ * @param {Record<string, any>} data
+ * @returns {Record<string, any>}
+ */
+function migrate6to7(data) {
+  const clock = isPlainObject(data.clock) ? data.clock : null;
+  if (clock && isLegacyRealClock(clock)) {
+    const min = LEGACY_REAL_DAY_MIN;
+    const days = [];
+    const minutes = [];
+    for (const key of Object.keys(data)) {
+      if (NO_STAMPS.has(key)) continue;
+      walkStamps(data[key], (holder, k, kind) => {
+        const v = holder[k];
+        if (!Number.isInteger(v)) return;
+        if (kind === 'day' && v >= min) days.push([holder, k]);
+        else if (kind === 'minute' && v >= min * MINUTES_PER_DAY) minutes.push([holder, k]);
+      }, key);
+    }
+    // flags that hold a day: the Porch Duel slate (sys.duel.*), the Relighting's dusk day and the
+    // Late Delivery day (left on the epoch count, the Relighting would never come due)
+    const flags = isPlainObject(data.flags) ? data.flags : {};
+    for (const k of Object.keys(flags)) {
+      if ((k.startsWith('sys.duel.') || DAY_FLAGS.has(k)) && Number.isInteger(flags[k]) && flags[k] >= min) days.push([flags, k]);
+    }
+    const today = Math.floor(clock.total / MINUTES_PER_DAY);
+    const D = Math.min(today, ...days.map(([h, k]) => h[k]));
+    for (const [h, k] of days) h[k] -= D;
+    for (const [h, k] of minutes) h[k] -= D * MINUTES_PER_DAY;
+    clock.total -= D * MINUTES_PER_DAY;
+    clock.realOffset = D * MINUTES_PER_DAY;
+  } else if (clock && !('realOffset' in clock)) {
+    clock.realOffset = null;
+  }
+  data.v = 7;
+  return data;
+}
+
 export const MIGRATIONS = Object.freeze({
   0: migrate0to1,
   1: migrate1to2,
@@ -221,6 +313,7 @@ export const MIGRATIONS = Object.freeze({
   3: migrate3to4,
   4: migrate4to5,
   5: migrate5to6,
+  6: migrate6to7,
 });
 
 /**

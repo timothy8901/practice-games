@@ -586,10 +586,13 @@ export function simulate(profileOrId, opts = {}) {
       if (hits) earn(day, 'wanted', hits * (tuning.wantedTodayMult - 1) * (0.6 * tuning.stackByKind.fruit * NATIVE.ripePrice + 0.4 * WANTED_SINGLE), totalAt(d, 9 * H), false);
 
       // ---- evening and night: Porch Duels, night fishing, moths, the night low ----
+      // As the game pays them (systems/flow/storyHooks on battle:end {porchDuel, outcome: 'win'}): one
+      // purse per opponent per evening, at most `porchDuelsPerDay` offers (two neighbours and the
+      // visitor once a badge brings visitors: PORCH_DUELS.visitorsLive), 30 × the posted curve by
+      // badges held. The purse is not a trainer payout, so the Lucky Button does not multiply it.
       if (d >= P.duelsFrom) {
         const n = Math.min(tuning.porchDuelsPerDay, at('duels'));
-        const mult = luckyButton ? ITEM.get('lucky-button').held.payoutMult : 1;
-        earn(day, 'duels', n * tuning.porchDuelPerCurve * duelCurve[Math.min(badges.length, duelCurve.length - 1)] * mult, totalAt(d, 21 * H), false);
+        earn(day, 'duels', n * tuning.porchDuelPerCurve * duelCurve[Math.min(badges.length, duelCurve.length - 1)], totalAt(d, 21 * H), false);
         if (n > 0) day.fights.push({ duels: n, badges: badges.length });
         day.paused += PAUSED_MINUTES.duel * n;
       }

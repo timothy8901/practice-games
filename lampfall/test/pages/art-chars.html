@@ -33,7 +33,7 @@
 </head>
 <body>
 <h1>Character contact sheet · LAMPFALL</h1>
-<p class="sub">ART-CHARS lane. 16-wide palette-indexed string art (js/art/chars) and 48x48 busts (js/art/portraits.js), decoded by js/core/pixelart.js. Everything at <b id="zl">3</b>x (<code>?zoom=4</code>, <code>?only=wren,corin</code>). Animated cells (outlined) walk at 12 fps. Size-as-character: Ansel 16x32, Odile 16x28, the rest 16x24 on the same tile baseline.</p>
+<p class="sub">ART-CHARS lane. Palette-indexed string art (16 wide; Hesper and Barnaby 24 wide, centred on their tile with ox -4) (js/art/chars) and 48x48 busts (js/art/portraits.js), decoded by js/core/pixelart.js. Everything at <b id="zl">3</b>x (<code>?zoom=4</code>, <code>?only=wren,corin</code>). Animated cells (outlined) walk at 12 fps. Size-as-character: Ansel 16x32, Odile 16x28, Hesper and Barnaby 24x24, the rest 16x24 on the same tile baseline.</p>
 <div class="ctl">
   <label><input type="checkbox" id="anim" checked> animate</label>
   <label>backdrop <select id="bg"><option value="#4e6e5d">grass</option><option value="#c9b48a">sand</option><option value="#7a5a36">boards</option><option value="#2b3a67">night</option></select></label>
@@ -179,10 +179,12 @@
     ...[0, 1, 2, 3].map((s) => ({ facing: 'fish', label: 'f' + s, w: 24, step: s })),
     { facing: 'hang', label: 'pose', poseOnly: true },
   ];
+  // wide bodies (24 x 24) would be cropped by a 16-wide cell: size every walk cell to the widest body shown
+  const maxBodyW = Math.max(16, ...ids.map((id) => C.CHAR_SPRITES[id].body.w || 16));
   const hdr = document.getElementById('hdr');
   for (const col of COLS) {
     const s = document.createElement('span');
-    s.style.width = col.gap ? '6px' : ((col.w || 16) * S) + 'px';
+    s.style.width = col.gap ? '6px' : (Math.max(col.w || 16, maxBodyW) * S) + 'px';
     s.textContent = col.label || '';
     hdr.append(s);
   }
@@ -195,7 +197,7 @@
     const strip = document.createElement('div'); strip.className = 'strip';
     for (const col of COLS) {
       if (col.gap) { const d = document.createElement('div'); d.className = 'gap'; strip.append(d); continue; }
-      const c = canvas((col.w || 16) * S, body.h * S, col.anim ? 'anim' : '');
+      const c = canvas(Math.max(col.w || 16, maxBodyW) * S, body.h * S, col.anim ? 'anim' : '');
       strip.append(c);
       if (col.poseOnly && !(body.poses && (body.poses.hang || body.poses.perch))) { c.style.visibility = 'hidden'; continue; }
       cells.push({ c, draw(ctx, t, on) {

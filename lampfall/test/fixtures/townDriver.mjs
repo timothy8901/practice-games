@@ -139,6 +139,11 @@ export function driveThread(G, threadId, o = {}) {
     if (o.setup) o.setup(G, st.beat + 1);
     const beat = def.beats.find((b) => b.id === st.beat + 1);
     const npc = beat.npcId ?? def.npcId;
+    // stand where the beat happens (a beat cond can read the player's map and region: oyster-boat 2)
+    if (beat.where && Number.isInteger(beat.where.x) && Number.isInteger(beat.where.y)
+      && (G.world.player.x !== beat.where.x || G.world.player.y !== beat.where.y + 1 || G.world.player.mapId !== beat.where.mapId)) {
+      G.store.tx('test:place', (w) => { w.player.mapId = beat.where.mapId ?? 'pellwick'; w.player.x = beat.where.x; w.player.y = beat.where.y + 1; });
+    }
     const top = threads.beatTopics(G.world, G.data, npc, { atPorch: true, tuning: TUNING }).find((t) => t.threadId === threadId);
     if (top) {
       G.store.tx('test:map', (w) => { w.player.mapId = beat.where?.mapId ?? 'pellwick'; });

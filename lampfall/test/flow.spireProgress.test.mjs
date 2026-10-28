@@ -307,8 +307,8 @@ describe('MID-15: the dais Challenge chip', () => {
     const res = await I.doInteraction(G, { kind: 'tile', verb: 'challenge', targetId: 'spire-dais', target: { id: 'spire-dais', verb: 'challenge' } }, host);
     assert.equal(res.ok, true);
     assert.equal(res.trainerId, 'osric-spire');
-    const dlg = G.pushed.find(([name]) => name === 'dialogue');
-    dlg[1].onDone();
+    // the battle starts at once: its trainer-in speaks the intro (no pre-battle dialogue repeating it)
+    assert.equal(G.pushed.find(([name]) => name === 'dialogue'), undefined);
     assert.equal(setup.trainerId, 'osric-spire');
   });
 

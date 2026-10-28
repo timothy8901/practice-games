@@ -9,6 +9,7 @@
  * anchors `{head, chest, back, tail}` for each frame. `mark` names the anchor the prototype drew.
  * Ported pixel-for-pixel from `proto/creatures/sprites.js` (art-directed): Tossup.
  * Star-touched: `tossup` (palette remap in `./index.js` from the family's `starPalette`).
+ * Art-director second pass (`revised`): a true back (the crab's shell and stalks from behind, the cup whole).
  * Pure data: imports nothing.
  * @module art/creatures/tossup
  */
@@ -20,7 +21,7 @@ export const FAMILY = 'tossup';
 export const SPRITES = Object.freeze({
   // Tossup (Plain, stage 1): a hermit crab living in a chipped blue-banded teacup
   'tossup': {
-    source: 'drawn', size: 32, keys: 'kwvebahu', highlight: 'y', idle: 'squash', mark: 'head',
+    source: 'drawn', size: 32, keys: 'kwvebahu', highlight: 'y', idle: 'squash', mark: 'head', revised: ['back'],
     anchors: { head: { x: 14, y: 8 }, chest: { x: 10, y: 12 }, back: { x: 20, y: 16 }, tail: { x: 24, y: 15 } },
     anchorsIdle2: { head: { x: 14, y: 9 }, chest: { x: 10, y: 13 }, back: { x: 20, y: 17 }, tail: { x: 24, y: 16 } },
     anchorsBack: { head: { x: 17, y: 8 }, chest: { x: 21, y: 12 }, back: { x: 11, y: 16 }, tail: { x: 7, y: 15 } },
@@ -96,21 +97,21 @@ export const SPRITES = Object.freeze({
       '................................',
       '................................',
       '................................',
-      '...............kwk.kwk..........',
+      '...............kek.kek..........',
       '...............kkk.kkk..........',
       '..............kak.kak...........',
       '.............kaakkaak...........',
-      '..........kkkkaaaaaakkk.........',
-      '........kkeeekaaaaaakeekk.......',
-      '......keeeeeekaaaaaakeeeek......',
-      '.....kvwwwkkwwwwwwwwkaakwwk.....',
-      '.kkkkkbbbbeebbbbbbbkaaaakkkk....',
-      'kvvvvkbbbbkkbbbbbbkhaaahhaaak...',
-      'kekkvkwwwwwwwwwwwkhhaaahkkkaak..',
-      'ke.kvkwwwwwwwwwwkkhaaakk..kkak..',
-      'ke.kvkvwwwwwwwwwkkhhhkk...kaak..',
-      'ke.kvkvvwwwwwwwwwwkkkkwwwkakk...',
-      'kvvvvkvvvwwwwwwwwwwwwwwwkkkk....',
+      '..........kkkhaaaaaahkk.........',
+      '........kkekhaahhaahhkeekk......',
+      '......keeekhhahhhhahhhkeeek.....',
+      '.....kvwwwkkhhhhhhhhkkwwwwk.....',
+      '.kkkkkbbbbeebbbbbbbbbbbbbbk.....',
+      'kvvvvkbbbbkkbbbbbbbbbbbbbbk.....',
+      'kekkvkwwwwwwwwwwwwwwwwwwwwk.....',
+      'ke.kvkwwwwwwwwwwwwwwwwwwwwk.....',
+      'ke.kvkvwwwwwwwwwwwwwwwwwwwk.....',
+      'ke.kvkvvwwwwwwwwwwwwwwwwwk......',
+      'kvvvvkvvvwwwwwwwwwwwwwwwwk......',
       'kkkkkkevvvwwwwwwwwwwwwwwk.......',
       '....keevvvwwwwwwwwwwwwwk........',
       '....keeevvvwwwwwwwwwwvk.........',

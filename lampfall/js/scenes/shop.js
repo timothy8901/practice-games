@@ -149,11 +149,23 @@ export function pinDonatedFinds(G) {
  */
 export function archiveSell(G, itemId, n) {
   const ctx = { data: G.data, bus: G.bus };
-  return G.store.tx('archive:sell', (w) => fieldLog.sellDuplicates(w, itemId, n, {}, {
-    ...ctx,
-    take: (id, k) => bag.take(w, id, k, { ...ctx, source: 'archive' }).ok,
-    earn: (amount, source) => wallet.earn(w, amount, { ...ctx, source }),
-  }));
+  return G.store.tx('archive:sell', (w) => {
+    const lane = {
+      ...ctx,
+      take: (id, k) => bag.take(w, id, k, { ...ctx, source: 'archive' }).ok,
+      earn: (amount, source) => wallet.earn(w, amount, { ...ctx, source }),
+    };
+    // a cleaned specimen (Workshop bench / Kiln lead) goes first, at the +40% price; the rest plain
+    if (Number.isInteger(n) && n >= 1 && fieldLog.hasCleaned(w, itemId)) {
+      const first = fieldLog.sellDuplicates(w, itemId, 1, { cleaned: true }, lane);
+      if (!first.ok) return first;
+      fieldLog.spendCleaned(w, itemId);
+      if (n === 1) return first;
+      const rest = fieldLog.sellDuplicates(w, itemId, n - 1, {}, lane);
+      return rest.ok ? { ...rest, n, amount: first.amount + rest.amount, cleaned: 1 } : { ...first, cleaned: 1 };
+    }
+    return fieldLog.sellDuplicates(w, itemId, n, {}, lane);
+  });
 }
 
 /**
@@ -414,7 +426,7 @@ export function createShopScene(G) {
     const res = archiveDonate(G, itemId);
     if (!res.ok) { emit('ui:blocked'); say('No specimen to donate.', 'warn'); return; }
     emit('ui:confirm');
-    say(res.pinned ? 'Pinned on the string wall. Oh, look where the string goes.' : 'A place in the Archive. Thank you.'); // str
+    say(t(res.pinned ? 'archive.donatedPinned' : 'archive.placed'));
     refresh();
     // the find's town letter arrives on the spot: the cork board, the new string, then the letter
     if (res.letter !== null && typeof G.push === 'function') G.push('letter', { n: res.letter, from: 'wall' });
@@ -422,14 +434,14 @@ export function createShopScene(G) {
 
   function doArchiveSell(itemId, n) {
     const res = archiveSell(G, itemId, n);
-    if (res.ok) { sold += n; emit('sfx', { name: 'coin' }); say(`${formatNumber(res.amount ?? 0)}◉. A duplicate, for the drawers.`); refresh(); return; } // str
+    if (res.ok) { sold += n; emit('sfx', { name: 'coin' }); say(t('archive.dupSold', { amount: formatNumber(res.amount ?? 0) })); refresh(); return; }
     emit('ui:blocked');
-    say(res.reason === 'not-donated' ? 'Donate the first one. I only buy duplicates.' : String(res.reason), 'warn'); // str
+    say(res.reason === 'not-donated' ? t('archive.donateFirst') : String(res.reason), 'warn');
   }
 
   function doRefine(itemId, n) {
     const res = G.store.tx('shop:refine', (w) => shops.refine(w, shop.id, itemId, n, ctx()));
-    if (res.ok) { emit('sfx', { name: 'coin' }); say(`${res.got} Starsalt. One for one, as promised.`); refresh(); return; } // str
+    if (res.ok) { emit('sfx', { name: 'coin' }); say(t('raft.refined', { n: res.got })); refresh(); return; }
     emit('ui:blocked');
     say(res.reason === 'closed' ? closedText() : String(res.reason), 'warn');
   }
@@ -467,7 +479,7 @@ export function createShopScene(G) {
       }
       open = crate || shops.isOpen(G.world, shop, ctx());
       if (shop.id === 'archive-desk') {
-        try { if (pinDonatedFinds(G).length) emit('toast', { text: 'Barnaby has been busy: new strings on the wall, and letters in your mailbox.', icon: 'read' }); } catch (e) { console.warn('archive: pins', e); } // str
+        try { if (pinDonatedFinds(G).length) emit('toast', { text: t('archive.busy'), icon: 'read' }); } catch (e) { console.warn('archive: pins', e); }
       }
       bought = 0; sold = 0; qty = null; pendingConfirm = null; message = ''; messageMs = 0;
       state = 'browse'; stateT = 0;
@@ -475,7 +487,7 @@ export function createShopScene(G) {
       const tabDefs = crate
         ? [{ id: 'deposit', label: 'Deposit' }, { id: 'in', label: 'In the crate' }] // str
         : [{ id: shop.id === 'archive-desk' ? 'donate' : 'buy', label: shop.id === 'archive-desk' ? 'Donate' : t('shop.buy') },
-          shops.refineRule(shop) ? { id: 'refine', label: 'Refine' } : { id: 'sell', label: t('shop.sell') }]; // str
+          shops.refineRule(shop) ? { id: 'refine', label: t('shop.refine') } : { id: 'sell', label: t('shop.sell') }];
       tabs = createTabs({ tabs: tabDefs, rect: { x: 16, y: 62, w: 448 }, input: G.input, dpad: true, active: params.mode === 'sell' ? 'sell' : undefined, onChange: () => { refresh(); list.select(0); emit('ui:cursor'); } });
       list = createList({
         rect: { x: LIST_RECT.x + 4, y: LIST_RECT.y + 3, w: LIST_RECT.w - 10, h: 7 * ROW_H },
@@ -611,7 +623,7 @@ export function createShopScene(G) {
       drawText(c, d.reason === t('shop.dailyCap') ? 'Cap reached' : t('shop.soldOut'), right, y + 6, { align: 'right', font: 'small', color: COLORS.role.disabled }); // str
     } else {
       const price = d.mode === 'sell' && d.wanted ? d.wantedPrice : d.price;
-      const label = d.mode === 'refine' ? `${d.gives} Starsalt each` : d.mode === 'deposit' || d.mode === 'withdraw' ? `${formatNumber(price)}◉ ea at dawn` : `${formatNumber(price)}◉`; // str
+      const label = d.mode === 'refine' ? t('shop.refineEach', { n: d.gives }) : d.mode === 'deposit' || d.mode === 'withdraw' ? t('shop.crateEach', { price: formatNumber(price) }) : t('shop.price', { price: formatNumber(price) });
       drawText(c, d.mode === 'donate' ? 'One specimen' : label, right, y + 5, { align: 'right', color: d.mode === 'buy' && !d.canAfford ? PALETTE.r : ink });
       if (d.mode === 'buy' && d.left !== null && d.left !== undefined && d.left < 20) drawText(c, `${d.left} left`, right - measureText(label).w - 8, y + 6, { align: 'right', font: 'small', color: COLORS.paper.inkFaint }); // str
     }
@@ -684,7 +696,7 @@ export function createShopScene(G) {
       drawText(c, `At dawn: ${formatNumber(shops.crateEstimate(G.world, ctx()))}◉`, FOOT.x + FOOT.w - 8, T0 + 12, { align: 'right', font: 'small', color: COLORS.paper.inkSoft }); // str
     }
     if (!d) {
-      drawText(c, crate && tabs.active === 'in' ? 'The crate is empty.' : tabs.active === 'donate' ? 'Bring an undonated fish, bug or find in your satchel.' : tabs.active === 'refine' ? 'Bring skyglass relics from the glowing flats at a night low.' : tabs.active === 'sell' ? (shop?.id === 'archive-desk' ? 'Barnaby buys duplicates of finds you have donated.' : 'Nothing here this counter buys.') : 'Nothing on the shelf.', L, T0 + 4, { color: COLORS.paper.inkFaint }); // str
+      drawText(c, t(crate && tabs.active === 'in' ? 'shop.empty.crate' : tabs.active === 'donate' ? 'shop.empty.donate' : tabs.active === 'refine' ? 'shop.empty.refine' : tabs.active === 'sell' ? (shop?.id === 'archive-desk' ? 'shop.empty.archiveSell' : 'shop.empty.sell') : 'shop.empty.shelf'), L, T0 + 4, { color: COLORS.paper.inkFaint });
       return;
     }
     const it = d.row ?? {};
@@ -768,10 +780,10 @@ export function createShopScene(G) {
     }
     drawText(c, t('shop.qty', { n: q.n }), R.x + R.w / 2, R.y + 27, { align: 'center', color: COLORS.paper.ink });
     const pv = previewOf(q.item, q.n);
-    const totalTxt = q.mode === 'withdraw' ? `of ${q.max}` : q.mode === 'refine' ? `${q.n * (q.item.gives ?? 1)} Starsalt` : t('shop.total', { total: formatNumber(pv.total) }); // str
+    const totalTxt = q.mode === 'withdraw' ? t('shop.ofMax', { max: q.max }) : q.mode === 'refine' ? t('shop.refineTotal', { n: q.n * (q.item.gives ?? 1) }) : t('shop.total', { total: formatNumber(pv.total) });
     drawText(c, totalTxt, R.x + R.w / 2, R.y + 39, { align: 'center', font: 'small', color: COLORS.paper.inkSoft });
     if (q.mode === 'buy' || q.mode === 'sell' || q.mode === 'archive') drawText(c, t('shop.after', { n: `${formatNumber(pv.after)}◉` }), R.x + R.w / 2, R.y + 47, { align: 'center', font: 'small', color: pv.after < 0 ? PALETTE.r : COLORS.paper.inkSoft });
-    const label = q.mode === 'buy' ? t('shop.buy') : q.mode === 'sell' || q.mode === 'archive' ? t('shop.sell') : q.mode === 'refine' ? 'Refine' : q.mode === 'deposit' ? 'Crate it' : 'Take back'; // str
+    const label = q.mode === 'buy' ? t('shop.buy') : q.mode === 'sell' || q.mode === 'archive' ? t('shop.sell') : q.mode === 'refine' ? t('shop.refine') : q.mode === 'deposit' ? t('shop.crateIt') : t('shop.takeBack');
     const ok = { ...B.ok, y: R.y + R.h - 20 };
     const locked = qtyLock > 0;
     c.fillStyle = locked ? COLORS.wax.dark : COLORS.wax.fill;

@@ -237,16 +237,150 @@ const DORMER = blit(ROOF_BODY, [
   '...hsssssssss...',
   '...kkkkkkkkkk...',
 ], 0, 2);
-for (const c of ROOF_COLOURS) {
-  const pal = { k: 'ink', d: `${c}0`, s: `${c}1`, b: `${c}2`, l: `${c}3` };
-  def(`roof-${c}-ridge`, pal, ROOF_RIDGE);
-  def(`roof-${c}-body`, pal, ROOF_BODY);
-  def(`roof-${c}-eave`, pal, ROOF_EAVE);
-  for (const part of ['ridge', 'eave']) {
-    const rows = part === 'ridge' ? ROOF_RIDGE : ROOF_EAVE;
-    def(`roof-${c}-${part}-l`, pal, rows.map((r) => (r[0] === '.' ? r : 'kl' + r.slice(2))));
-    def(`roof-${c}-${part}-r`, pal, rows.map((r) => (r[0] === '.' ? r : r.slice(0, 14) + 'dk')));
+
+/*
+ * Roof massing (polish backlog: "houses have one massing so streets repeat"). The roof autotile picks
+ * ridge / eave and the -l / -r ends per cell, and each house wears one roof colour, so each colour
+ * carries its own massing in its end and ridge pieces:
+ *   slate, moss, teal: hipped ends (a lit / shaded hip face, a capped hip line); moss adds tufts,
+ *     teal is standing-seam copper (vertical seams) instead of shingle courses;
+ *   red: a front cross-gable at the left end (plastered gable, bargeboards, a round vent), gable verge right;
+ *   blue: the same cross-gable at the right end;
+ *   ochre, dark: gable verges with a wood bargeboard and a finial; dark adds ridge vents;
+ *   straw (thatch): rounded eyebrow ends, a scalloped ridge roll and a ragged fringe at the eave.
+ * Every end is drawn on the 16x32 ridge+eave pair (combined) and split back into the two cells.
+ */
+const ROOF_PAIR = [...ROOF_RIDGE, ...ROOF_EAVE];
+const LIGHTER = { d: 's', s: 'b', b: 'l', l: 'l' };
+const DARKER = { l: 'b', b: 's', s: 'd', d: 'd' };
+/** @param {string[]} rows @param {number} x @param {number} y @param {string} ch */
+const setPx = (rows, x, y, ch) => { if (y >= 0 && y < rows.length && x >= 0 && x < 16) rows[y] = rows[y].slice(0, x) + ch + rows[y].slice(x + 1); };
+const mirrorRows = (rows) => rows.map((r) => [...r].reverse().join(''));
+/** Standing-seam copper: vertical seams every 4 px instead of staggered courses. */
+const seamed = (rows) => rows.map((r, y) => [...r].map((ch, x) => (ch === '.' || ch === 'k' || y < 4 ? ch : x % 4 === 0 ? 'l' : x % 4 === 3 ? 'd' : y % 6 === 5 ? 's' : 'b')).join(''));
+/** A hipped left end on a 32-row pair: silhouette cut back from the ridge end, lit hip face, capped hip line. */
+function hipLeft(pair, { face = LIGHTER } = {}) {
+  const r = pair.slice();
+  for (let y = 2; y < 31; y++) {
+    const sil = Math.max(0, Math.round(7 - (y - 2) * 0.7));     // back hip: the silhouette
+    const hx = Math.round(7 - (y - 2) * (7 / 28));              // front hip line, ridge end to eave corner
+    for (let x = 0; x < 16; x++) {
+      const ch = r[y][x];
+      if (ch === '.') continue;
+      if (x < sil) setPx(r, x, y, '.');
+      else if (x === sil && y < 30) setPx(r, x, y, 'k');
+      else if (x < hx && ch !== 'k') setPx(r, x, y, face[ch] || ch);
+      else if (x === hx && ch !== 'k') setPx(r, x, y, 'l');
+      else if (x === hx + 1 && ch !== 'k') setPx(r, x, y, 'd');
+    }
   }
+  return r;
+}
+/** A gable verge on the left: wood bargeboard down the end, finial at the ridge, the eave overhang. */
+function vergeLeft(pair) {
+  const r = pair.slice();
+  for (let y = 2; y < 31; y++) {
+    if (r[y][0] === '.') continue;
+    setPx(r, 0, y, 'k'); setPx(r, 1, y, y < 30 ? 'w' : 'k'); setPx(r, 2, y, y < 30 ? 'm' : r[y][2]);
+  }
+  setPx(r, 1, 1, 'k'); setPx(r, 1, 0, 'k'); setPx(r, 0, 1, 'k'); setPx(r, 2, 1, 'k'); setPx(r, 1, 2, 'w'); // finial
+  return r;
+}
+/**
+ * A front cross-gable on the left end: a plastered triangle under bargeboards. The whole gable sits in
+ * the eave cell (apex on its top row) so it stays one piece on roofs taller than ridge + eave, where
+ * the autotile puts plain body cells between the two ends (art-director pass: it used to split there).
+ */
+function crossGableLeft(pair) {
+  const r = vergeLeft(pair);
+  const ax = 8, ay = 17;
+  for (let y = ay; y < 30; y++) {
+    const half = Math.round((y - ay) * 0.42);
+    for (let x = 0; x < 16; x++) {
+      const d = Math.abs(x - ax);
+      if (d > half + 2) continue;
+      if (d > half) setPx(r, x, y, d === half + 2 ? 'k' : 'w');          // bargeboard (2 px) under ink
+      else if (d === half) setPx(r, x, y, 'm');                           // the board's shadow on the plaster
+      else setPx(r, x, y, y > 27 ? 'q' : x < ax ? 'h' : 'p');            // plaster, lit left
+    }
+  }
+  setPx(r, ax, ay - 1, 'k'); setPx(r, ax, ay, 'w'); // apex finial (eave cell, row 0)
+  // round vent / attic window
+  for (const [x, y, ch] of [[7, 23, 'k'], [8, 23, 'k'], [9, 23, 'k'], [6, 24, 'k'], [10, 24, 'k'], [6, 25, 'k'], [10, 25, 'k'], [7, 26, 'k'], [8, 26, 'k'], [9, 26, 'k'],
+    [7, 24, 'a'], [8, 24, 'e'], [9, 24, 'a'], [7, 25, 'a'], [8, 25, 'a'], [9, 25, 'a'], [8, 27, 'm']]) setPx(r, x, y, ch);
+  for (let x = 0; x < 16; x++) if (r[30][x] !== '.') setPx(r, x, 30, 'k');
+  return r;
+}
+/** Thatch: rounded eyebrow end, ragged fringe below the eave line. */
+function thatchLeft(pair) {
+  const r = pair.slice();
+  for (let y = 2; y < 31; y++) {
+    const cut = y < 8 ? Math.round(5 - Math.sqrt(Math.max(0, 25 - (8 - y) * (8 - y) * 0.9))) + 1 : 0;
+    for (let x = 0; x < cut; x++) setPx(r, x, y, '.');
+    if (r[y][cut] && r[y][cut] !== '.') setPx(r, cut, y, 'k');
+    if (r[y][cut + 1] && r[y][cut + 1] !== '.' && y < 29) setPx(r, cut + 1, y, 'l');
+  }
+  return r;
+}
+/** Thatch body/ridge texture: combed straw strokes, a scalloped ridge roll, a fringe on the eave. */
+function thatchPair(pair) {
+  const r = pair.map((row, y) => [...row].map((ch, x) => (ch === '.' || ch === 'k' || y < 4 ? ch : (x * 3 + y * 5) % 7 === 0 ? 'd' : (x + y * 2) % 5 === 0 ? 'l' : y % 4 === 3 ? 's' : 'b')).join(''));
+  for (let x = 0; x < 16; x++) { setPx(r, x, 2, 'k'); setPx(r, x, 3, x % 4 === 1 ? 'k' : 'l'); setPx(r, x, 4, x % 4 === 1 ? 'd' : 'l'); setPx(r, x, 5, 'd'); }
+  for (let x = 0; x < 16; x++) { setPx(r, x, 29, x % 3 === 0 ? 'd' : 's'); setPx(r, x, 30, x % 3 === 1 ? '.' : 'k'); setPx(r, x, 31, x % 3 === 2 ? 'k' : '.'); }
+  return r;
+}
+/** Moss tufts on the courses (lit tops), sparse and stable. */
+const mossy = (pair) => pair.map((row, y) => [...row].map((ch, x) => (ch === '.' || ch === 'k' || y < 5 || y > 28 ? ch : (x * 7 + y * 11) % 23 === 0 ? 'g' : (x * 7 + y * 11) % 23 === 1 ? 'G' : ch)).join(''));
+/** Ridge vents for tar roofs: small capped pipes on the ridge line. */
+function vented(pair) {
+  const r = pair.slice();
+  for (const [x, y, ch] of [[5, 0, 'k'], [6, 0, 'k'], [7, 0, 'k'], [4, 1, 'k'], [5, 1, 'l'], [6, 1, 'b'], [7, 1, 's'], [8, 1, 'k'], [5, 2, 'k'], [6, 2, 'd'], [7, 2, 'k']]) setPx(r, x, y, ch);
+  return r;
+}
+const STYLE = {
+  slate: { mid: (p) => p, left: hipLeft, right: hipLeft },
+  moss: { mid: mossy, left: hipLeft, right: hipLeft },
+  teal: { mid: seamed, left: hipLeft, right: hipLeft },
+  red: { mid: (p) => p, left: crossGableLeft, right: vergeLeft },
+  blue: { mid: (p) => p, left: vergeLeft, right: crossGableLeft },
+  ochre: { mid: (p) => p, left: vergeLeft, right: vergeLeft },
+  dark: { mid: (p) => p, ridgeMid: vented, left: vergeLeft, right: vergeLeft },
+  straw: { mid: thatchPair, left: thatchLeft, right: thatchLeft },
+};
+const split = (pair) => [pair.slice(0, 16), pair.slice(16, 32)];
+/** The left end of a body cell for an end treatment: hip face + hip line at x 4, or the verge board. */
+function bodyEnd(rows, left, face = LIGHTER) {
+  return rows.map((row) => [...row].map((ch, x) => {
+    if (ch === '.') return ch;
+    if (x === 0) return 'k';
+    if (left === hipLeft) return x < 4 && ch !== 'k' ? (face[ch] || ch) : x === 4 && ch !== 'k' ? 'l' : x === 5 && ch !== 'k' ? 'd' : ch;
+    if (left === thatchLeft) return x === 1 ? 'l' : ch;
+    return x === 1 ? 'w' : x === 2 ? 'm' : ch;                       // verge / cross-gable: the bargeboard
+  }).join(''));
+}
+for (const c of ROOF_COLOURS) {
+  const pal = { k: 'ink', d: `${c}0`, s: `${c}1`, b: `${c}2`, l: `${c}3`, w: 'wd2', m: 'wd0', h: 'pl3', p: 'pl2', q: 'pl1', a: 'pane0', e: 'pane1', g: 'moss2', G: 'moss3' };
+  const st = STYLE[c] || STYLE.slate;
+  const mid = st.mid(ROOF_PAIR);
+  const [ridge, eave] = split(mid);
+  def(`roof-${c}-ridge`, pal, st.ridgeMid ? split(st.ridgeMid(mid))[0] : ridge);
+  const body = c === 'teal' ? seamed(ROOF_BODY) : c === 'straw' ? thatchPair([...ROOF_BODY, ...ROOF_BODY]).slice(8, 24)
+    : c === 'moss' ? mossy([...ROOF_BODY, ...ROOF_BODY]).slice(8, 24) : ROOF_BODY;
+  def(`roof-${c}-body`, pal, body);
+  def(`roof-${c}-eave`, pal, eave);
+  const [rl, el] = split(st.left(mid));
+  // the right end: the left treatment on the mirrored pair, shaded (it faces away from the light)
+  const rightRaw = st.right === hipLeft ? hipLeft(mirrorRows(mid), { face: DARKER }) : st.right(mirrorRows(mid));
+  const [rr, er] = split(mirrorRows(rightRaw));
+  def(`roof-${c}-ridge-l`, pal, rl);
+  def(`roof-${c}-eave-l`, pal, el);
+  def(`roof-${c}-ridge-r`, pal, rr);
+  def(`roof-${c}-eave-r`, pal, er);
+  // body ends for roofs taller than ridge + eave (the hip line / bargeboard carried straight down);
+  // they take effect once the roof autotile asks for `-body-l` / `-body-r` (it uses plain body today)
+  const bl = bodyEnd(body, st.left);
+  def(`roof-${c}-body-l`, pal, bl);
+  def(`roof-${c}-body-r`, pal, mirrorRows(bodyEnd(mirrorRows(body), st.right, DARKER)));
   def(`roof-${c}-dormer`, { ...pal, h: 'pl3', p: 'pl2', a: 'pane0', e: 'pane1', m: 'wd0' }, DORMER);
   def(`roof-${c}-dormer-lit`, { ...pal, h: 'pl3', p: 'pl2', a: '!wglow', e: '!amber', m: 'wd0' }, DORMER);
 }

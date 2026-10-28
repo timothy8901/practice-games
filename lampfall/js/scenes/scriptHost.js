@@ -27,6 +27,8 @@ import * as wallet from '../systems/wallet.js';
 import * as party from '../systems/party.js';
 import * as memory from '../systems/memory.js';
 import * as threads from '../systems/threads.js';
+import * as loans from '../systems/loans.js';
+import * as battleFlow from '../systems/flow/battleFlow.js';
 import { TUNING } from '../data/tuning.js';
 
 /** Host ops the dialogue scene performs itself (everything else goes back to a cutscene). */
@@ -184,9 +186,14 @@ export function scriptSystems(G) {
     // tuning: scripted creatures (the starter) sit on the shipped EXP curve, not exp.js's prototype default
     addCreature: (w, spec, c) => party.giveCreature(w, { species: spec.species, level: spec.level, nick: spec.nick ?? undefined }, data, c?.rng ?? null, { bus, tuning: TUNING }),
     remember: (w, npc, key, value) => memory.remember(w, npc, key, value),
-    setBeat: (w, threadId, beat) => (beat === null || beat === undefined
-      ? threads.advance(w, data, threadId, { bus })
-      : threads.setBeat(w, data, threadId, beat, { bus })),
+    // a finished lead thread pays its resident share here (loans credits each thread once, and
+    // storyHooks pays only a `thread:done` that came back without a result, so never twice)
+    setBeat: (w, threadId, beat) => {
+      const o = { bus, tuning: TUNING, loans: { residentShare: (ww, id) => loans.residentShare(ww, id, { data, bus, tuning: TUNING }) } };
+      return beat === null || beat === undefined ? threads.advance(w, data, threadId, o) : threads.setBeat(w, data, threadId, beat, o);
+    },
+    // the Summit Bell's decline: the battle flow's own rule (the runner default clears the same flags)
+    restartSummit: (w) => battleFlow.restartSummit(w, { data, bus }),
   };
 }
 

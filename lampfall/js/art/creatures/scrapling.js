@@ -10,6 +10,7 @@
  * Ported pixel-for-pixel from `proto/creatures/sprites.js` (art-directed): Scrapling, Mudfist.
  * Drawn from the GDD-03 §8 sprite briefs: Knuckleback, Cragmitt.
  * Star-touched: `scrapling` (palette remap in `./index.js` from the family's `starPalette`).
+ * Art-director second pass (`revised`): Mudfist gets a true back (the fist seen from behind the body).
  * Pure data: imports nothing.
  * @module art/creatures/scrapling
  */
@@ -130,7 +131,7 @@ export const SPRITES = Object.freeze({
   },
   // Mudfist (Grit, stage 1): one oversized knuckled mud fist carried in front of a lumpy mud body; thumb folded across the front
   'mudfist': {
-    source: 'drawn', size: 32, keys: 'kcahuw', highlight: 'y', idle: 'squash', mark: 'head',
+    source: 'drawn', size: 32, keys: 'kcahuw', highlight: 'y', idle: 'squash', mark: 'head', revised: ['back'],
     anchors: { head: { x: 16, y: 7 }, chest: { x: 11, y: 13 }, back: { x: 24, y: 12 }, tail: { x: 27, y: 18 } },
     anchorsIdle2: { head: { x: 16, y: 8 }, chest: { x: 11, y: 14 }, back: { x: 24, y: 13 }, tail: { x: 27, y: 19 } },
     anchorsBack: { head: { x: 15, y: 7 }, chest: { x: 20, y: 13 }, back: { x: 7, y: 12 }, tail: { x: 4, y: 18 } },
@@ -215,22 +216,22 @@ export const SPRITES = Object.freeze({
       '....kuuhhhaaaaaaaaaaaaak........',
       '...kuuuhhhaaaaaaaaaaaaak........',
       '...kuuuhhhhaaaaaaaaaahak........',
-      '...kuuuuhhhhaaaaaaaahhak........',
-      '..kuuukuhhhhhhhhhhhhhhcak.......',
-      '..kuuuuuuhhhhhhhhhhhhhhak.......',
-      '.kuuuuuuuhhhhhhhkkkhkkkhkkk.kkk.',
-      '.kuuuuuuuuhhuhhkaackaackaackaack',
-      '.kuuuuuuuuhhhhkhhaakhaakhaakhaak',
-      '.kuuuuuuuuuhhhkuhhakhhakhhakhhak',
-      '.kuuuuuhuuuhhhkuhhhkhhakhhakhhak',
-      '.kuuuuuuuuuuhhkuuhhkuhhkuhhkuhhk',
-      '.kuuuuuuuuuuuhkuuuhkuhhkuhhkuhhk',
-      '..kuuuuuuuuuuukuuuukuuhkuuhkuuhk',
-      '..kuuuukuuuuuukuuukkkkkkkkkkkkkk',
-      '...kuuukkuuuuukuukhaaaaaaaaaaack',
-      '....kuuk.kuuuuukukhhaaaaaaaaaaak',
-      '.....kk..kuukuukkkuhhhhhhhhhhhhk',
-      '..........kkkkk..kkkkkkkkkkkkkk.',
+      '...kuuuuhhhhaaaaaaaahhak.kkkkkk.',
+      '..kuuukuhhhhhhhhhhhhhhcakcakcakk',
+      '..kuuuuuuhhhhhhhhhhhhhhakahcahak',
+      '.kuuuuuuuhhhhhhhhhhhhhhakhhahhak',
+      '.kuuuuuuuuhhuhhhhhhhhhhakhhhhhak',
+      '.kuuuuuuuuhhhhhhhhhhhhhakhhhhhak',
+      '.kuuuuuuuuuhhhhhhhhhhhakaahhhhak',
+      '.kuuuuuhuuuhhhhhhhhhhhakaahhhhak',
+      '.kuuuuuuuuuuhhhhhhhhhhakhaahhhak',
+      '.kuuuuuuuuuuuhhhhhhhhakkhhhhhhuk',
+      '..kuuuuuuuuuuuhhhhhhhakkuhhhhhuk',
+      '..kuuuukuuuuuuhhhhhhak.kuuhhhuuk',
+      '...kuuukkuuuuuuhhhhak..kuuuuuuuk',
+      '....kuuk.kuuuuukuhhak...kuuuuuk.',
+      '.....kk..kuukuuk.kkk.....kkkkk..',
+      '..........kkkkk.................',
       '................................',
       '................................',
       '................................',

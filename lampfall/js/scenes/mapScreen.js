@@ -8,7 +8,8 @@ import { TILES, DEFAULT_LEGEND } from '../data/tilesets.js';
 import { loadMap } from '../world/tilemap.js';
 import * as clockSys from '../systems/clockSys.js';
 import { litPorchCount, inRect } from './flowKit.js';
-import { currentObjective } from './menuModel.js';
+// the HUD chip's picker, so the map's objective marker agrees with the chip
+import { objectiveFor } from '../ui/objectiveChip.js';
 import { lanternPathTo, walkLanternPath } from '../systems/flow/interactFlow.js';
 
 /** Local-map label colours: cream text on a night-ink shadow, the objective ring in porch amber. */
@@ -157,7 +158,7 @@ export function createMapScreenScene(G) {
     name: 'mapScreen', opaque: true,
     enter() {
       selected = Math.max(0, NODES.findIndex((n) => n.id === currentRegion())); local = false; ms = 0; refresh();
-      try { objective = currentObjective(G.world, G.data); } catch { objective = null; }
+      try { objective = objectiveFor(G.world, G.data); } catch { objective = null; }
     },
     update(dt) { ms += dt; },
     handleInput(input) {

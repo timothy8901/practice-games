@@ -5,8 +5,11 @@
  * the shared score-writing helpers in `compose.js`, and this index, which keeps the prototype's
  * exports and bodies verbatim (`TRACKS`, `CUES`, `DAY_PARTS`, `themeForHour`, `twoBarsMs`, `toEngine`,
  * `stemLayers`, `defaultStems`, `applyStems`, `signalSting`, `worldCue`, plus the DSL helpers `midi`,
- * `P`, `at`, `rep`, `cat` and `SIGNAL_CHIMES`). Every note is exactly what the music director verified;
- * `test/audio.tracks.test.mjs` deep-compares each track and each `toEngine()` result with the prototype.
+ * `P`, `at`, `rep`, `cat` and `SIGNAL_CHIMES`). Every note is what the music director verified, except the
+ * w3 mix-polish deltas (design/polish-backlog.md Audio): theme bass 0.6 → 0.5, battle bass 0.7 → 0.55, the
+ * thinned h_dusk / h_late_morning tunes and the busier h_midday tune, and kits played as one engine `kit`
+ * layer. `test/audio.tracks.test.mjs` deep-compares each track and each `toEngine()` result with the
+ * prototype plus exactly those deltas; `test/pages/audio-mix.html` measures the levels.
  *
  * Two additions, neither of which changes a note or a rule:
  *  - the exported tables are deep-frozen (data convention §8.1): tracks, layers, patterns, notes and
@@ -166,16 +169,14 @@ export const CUES = {
 for (let h = 0; h < 24; h++) Object.defineProperty(CUES, h, { value: themeForHour(h), enumerable: false });
 deepFreeze(CUES);
 
-/** Drum note -> engine preset. The data uses one 'kit' layer; the engine wants one layer per drum voice. */
-const KIT_VOICES = { 36: 'kick', 38: 'snare', 42: 'hat', 37: 'snare' };
-
 /**
  * Adapts a track definition to the shape js/core/audio.js `defineTrack` accepts:
  *   {bpm, key, scale, bars, beatsPerBar, stepsPerBar, layers: {name: {inst, pattern, gain, stem, pan, humanize}}}
- * - 'kit' layers are split into `<name>.kick` / `<name>.snare` / `<name>.hat` (the engine has no kit preset);
- *   `stemLayers(track, 'perc')` returns the full list of engine layer names a stem controls.
+ * - 'kit' layers stay one engine layer on the engine's `kit` preset, which picks kick / snare / hat per note
+ *   (core/audio `kitVoice`: 36 kick, 37 rim = snare at 0.6 velocity, 38 snare, 42 hat), so every engine layer
+ *   name is the score's own layer name. (The prototype split a kit into `<name>.kick` / `.snare` / `.hat`
+ *   layers; the merged layer plays the same notes at the same velocities — test/audio.tracks.test.mjs checks.)
  * - `default:false` layers become `stem:true` (start muted, toggled with setStem).
- * - `rim` (37) hits are sent to the snare preset at low velocity.
  * - `loop: false` (stings) is forwarded; the engine plays those once and reports `oneShot` / `remaining` in nowPlaying().
  * @param {TrackDef} track
  * @param {{humanize?: number}} [opts]
@@ -188,13 +189,7 @@ export function toEngine(track, { humanize = 0.35 } = {}) {
   for (const [name, L] of Object.entries(track.layers)) {
     const base = { gain: L.gain ?? 1, stem: L.default === false || TOGGLABLE.has(L.role), pan: L.pan ?? PAN[L.role] ?? 0, humanize: L.humanize ?? humanize };
     if (L.inst === 'kit') {
-      const groups = {};
-      for (const e of L.pattern) {
-        const voice = KIT_VOICES[Array.isArray(e.n) ? e.n[0] : e.n] || 'hat';
-        const isRim = e.n === 37;
-        (groups[voice] ||= []).push({ t: e.t, n: Array.isArray(e.n) ? e.n[0] : e.n, d: e.d, v: isRim ? e.v * 0.6 : e.v });
-      }
-      for (const [voice, pattern] of Object.entries(groups)) layers[`${name}.${voice}`] = { ...base, inst: voice, pattern, humanize: 0.2 };
+      layers[name] = { ...base, inst: 'kit', pattern: L.pattern.map(e => ({ t: e.t, n: Array.isArray(e.n) ? e.n[0] : e.n, d: e.d, v: e.v })), humanize: 0.2 };
     } else {
       layers[name] = { ...base, inst: L.inst, pattern: L.pattern.map(e => ({ t: e.t, n: e.n, d: e.d, v: e.v })) };
     }
@@ -206,17 +201,13 @@ const TOGGLABLE = new Set(['perc', 'night', 'tide', 'rain', 'tense']);
 const PAN = { melody: 0.12, bass: 0, core: 0, perc: -0.1, night: -0.25, tide: 0.2, rain: 0.3, counter: -0.3, bells: 0.25, brass: 0, tense: 0.35, pad: 0 };
 
 /**
- * Engine layer names a stem name controls on a track (handles the kit split).
+ * Engine layer names a stem name controls on a track: the layer itself (kits are one engine layer now).
  * @param {TrackDef} track
  * @param {string} stem
  * @returns {string[]} empty when the track has no such layer
  */
 export function stemLayers(track, stem) {
-  const L = track.layers[stem];
-  if (!L) return [];
-  if (L.inst !== 'kit') return [stem];
-  const voices = new Set(L.pattern.map(e => KIT_VOICES[Array.isArray(e.n) ? e.n[0] : e.n] || 'hat'));
-  return [...voices].map(v => `${stem}.${v}`);
+  return Object.hasOwn(track.layers, stem) ? [stem] : [];
 }
 
 /**
@@ -225,13 +216,12 @@ export function stemLayers(track, stem) {
  * @returns {string[]}
  */
 export function defaultStems(track) {
-  const on = [];
-  for (const [name, L] of Object.entries(track.layers)) if (L.default !== false) on.push(...stemLayers(track, name));
-  return on;
+  return Object.entries(track.layers).filter(([, L]) => L.default !== false).map(([name]) => name);
 }
 
 /**
- * Applies a {stem: bool} map to the engine for a track, fanning kit stems out to their engine layers.
+ * Applies a {stem: bool} map to the engine for a track: one `setStem(name, on)` per stem the track has
+ * (the engine's prefix stems mean `setStem('perc', …)` would also reach any `perc.*` layer).
  * `engine` needs `setStem(name, on)`. Returns the engine layer names touched.
  * @param {{setStem: (name: string, on: boolean) => any}} engine
  * @param {TrackDef} track
@@ -241,7 +231,9 @@ export function defaultStems(track) {
 export function applyStems(engine, track, state) {
   const touched = [];
   for (const [stem, on] of Object.entries(state)) {
-    for (const name of stemLayers(track, stem)) { engine.setStem(name, Boolean(on)); touched.push(name); }
+    if (!Object.hasOwn(track.layers, stem)) continue;
+    engine.setStem(stem, Boolean(on));
+    touched.push(stem);
   }
   return touched;
 }

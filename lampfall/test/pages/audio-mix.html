@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>Audio Mix Meter</title>
+<style>
+  :root { --bg: #14181f; --panel: #1d232d; --ink: #e8edf3; --dim: #8e9ab0; --accent: #f2b84b; --ok: #6fd18a; --bad: #ff6b6b; }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 16px; background: var(--bg); color: var(--ink); font: 13px/1.4 system-ui, sans-serif; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--dim); margin: 18px 0 8px; }
+  button { background: var(--accent); color: #1a1408; border: 0; border-radius: 6px; padding: 7px 10px; cursor: pointer; font: inherit; font-weight: 600; }
+  .wrap { overflow-x: auto; }
+  table { border-collapse: collapse; font: 12px/1.3 ui-monospace, monospace; }
+  th, td { padding: 3px 8px; text-align: right; border-bottom: 1px solid #2a3240; white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; }
+  .pass { color: var(--ok); } .fail { color: var(--bad); }
+  #status { color: var(--dim); }
+</style>
+</head>
+<body>
+<h1>Score mix meter</h1>
+<p id="status">Offline renders of every day-part theme, battle theme, the indoor variant and creature cries over battle music.
+Dry = before the compressor/limiter/soft clip (ceiling 0.95 kept); wet = as heard at unity sliders.</p>
+<button id="run">Measure</button>
+<h2>Full mixes</h2><div class="wrap"><table id="mix"></table></div>
+<h2>Stems (dry, solo)</h2><div class="wrap"><table id="stems"></table></div>
+<h2>Indoor variant</h2><div class="wrap"><table id="indoor"></table></div>
+<h2>Cries over battle music (game default sliders)</h2><div class="wrap"><table id="cries"></table></div>
+<script type="module">
+// Level meter for the score (GDD-09 §10, design/polish-backlog.md Audio). Results land on window.__mix.
+// ?quick=1 renders 8 bars instead of the whole loop.
+import { createAudio, softClipCurve, volumeToGain, cryPlan } from '../../js/core/audio.js';
+import * as ENGINE from '../../js/core/audio.js';
+import { TRACKS, DAY_PARTS, toEngine, worldCue } from '../../js/audio/tracks/index.js';
+import { DEFAULTS as DIRECTOR } from '../../js/audio/director.js';
+import { cryParams } from '../../js/audio/cries.js';
+import { SPECIES } from '../../js/data/species/index.js';
+
+const qs = new URLSearchParams(location.search);
+const quick = qs.has('quick');
+/** ?phase=mix,stems,cries limits a run (indoor needs mix). */
+const phases = new Set((qs.get('phase') || 'mix,stems,indoor,cries').split(','));
+/** ?tracks=h_dusk,battle_wild limits mixes, stems and indoor to those tracks (and cries to those battles). */
+const only = qs.get('tracks') ? new Set(qs.get('tracks').split(',')) : null;
+const want = (id) => !only || only.has(id);
+const SR = 44100;
+const RealOAC = globalThis.OfflineAudioContext;
+/** OfflineAudioContext whose compressors and soft clip are plain gains: the engine's own graph, minus dynamics. */
+class DryOAC extends RealOAC {
+  createDynamicsCompressor() {
+    const g = this.createGain();
+    for (const k of ['threshold', 'knee', 'ratio', 'attack', 'release', 'reduction']) Object.defineProperty(g, k, { value: { value: 0 } });
+    return g;
+  }
+  createWaveShaper() { const g = this.createGain(); g.curve = null; g.oversample = 'none'; return g; }
+}
+const a = createAudio();
+for (const id of Object.keys(TRACKS)) a.defineTrack(id, toEngine(TRACKS[id]));
+
+const db = (x) => x > 0 ? 20 * Math.log10(x) : -Infinity;
+const r3 = (x) => Math.round(x * 1000) / 1000;
+const r1 = (x) => Math.round(x * 10) / 10;
+function chans(buf) { return Array.from({ length: buf.numberOfChannels }, (_, i) => buf.getChannelData(i)); }
+/** peak / rms over [from, to) samples of a stereo buffer */
+function level(ch, from = 0, to = ch[0].length) {
+  let peak = 0, sum = 0, n = 0;
+  for (const c of ch) for (let i = from; i < to; i++) { const v = c[i]; const x = v < 0 ? -v : v; if (x > peak) peak = x; sum += v * v; n++; }
+  return { peak, rms: n ? Math.sqrt(sum / n) : 0 };
+}
+/** 50 ms window RMS envelope (mono sum of squares over channels). */
+function envelope(ch, from, to, win = Math.round(SR * 0.05)) {
+  const out = [];
+  for (let s = from; s + win <= to; s += win) { let sum = 0; for (const c of ch) for (let i = s; i < s + win; i++) sum += c[i] * c[i]; out.push(Math.sqrt(sum / (win * ch.length))); }
+  return out;
+}
+/** Gain-reduction stats (wet vs dry, 50 ms windows where the dry signal is audible). Std is the pumping depth. */
+function reduction(dry, wet, from, to) {
+  const d = envelope(dry, from, to), w = envelope(wet, from, to);
+  const gr = [];
+  for (let i = 0; i < d.length; i++) if (d[i] > 0.01) gr.push(db(w[i] / d[i]));
+  if (!gr.length) return { mean: 0, max: 0, std: 0 };
+  const mean = gr.reduce((s, x) => s + x, 0) / gr.length;
+  const std = Math.sqrt(gr.reduce((s, x) => s + (x - mean) ** 2, 0) / gr.length);
+  return { mean: r1(mean), max: r1(Math.min(...gr)), std: r1(std) };
+}
+/** Two cascaded one-pole high-passes (12 dB/oct) — weights a level toward where a cry lives, away from the bass. */
+function highpass(ch, fc = 300) {
+  const rc = 1 / (2 * Math.PI * fc), dt = 1 / SR, k = rc / (rc + dt);
+  return ch.map((c) => { let x = Float32Array.from(c); for (let pass = 0; pass < 2; pass++) { const y = new Float32Array(x.length); for (let i = 1; i < x.length; i++) y[i] = k * (y[i - 1] + x[i] - x[i - 1]); x = y; } return x; });
+}
+function over(ch, thr, from, to) { let n = 0, t = 0; for (const c of ch) for (let i = from; i < to; i++) { t++; if (Math.abs(c[i]) > thr) n++; } return t ? n / t : 0; }
+
+async function render(id, o, dry) {
+  globalThis.OfflineAudioContext = dry ? DryOAC : RealOAC;
+  try { return await a.renderTrack(id, { sampleRate: SR, ...o }); } finally { globalThis.OfflineAudioContext = RealOAC; }
+}
+function loopEnd(id, bars, sr = SR) { const t = TRACKS[id]; const spb = t.stepsPerBar || 16; return Math.floor((0.05 + bars * spb * 60 / t.bpm / 4) * sr); }
+function barsOf(id) { return quick ? Math.min(8, TRACKS[id].bars) : TRACKS[id].bars; }
+
+/** World stems for a day-part at its middle hour, clear weather, mid tide. */
+function partStems(id, hour) { return worldCue({ hour, weekday: 2, weather: 'clear', tide: 0.5, season: 'spring', place: 'town' }).stems; }
+/** A track's own default stems spelled out (toggled roles such as perc start muted in the engine unless listed). */
+function defaultsOf(id) { return Object.fromEntries(Object.entries(TRACKS[id].layers).map(([k, L]) => [k, L.default !== false])); }
+const BATTLES = ['battle_wild', 'battle_trainer', 'battle_spire', 'summit'];
+const DEFAULT_SLIDERS = { master: volumeToGain(0.8), music: volumeToGain(0.7), sfx: volumeToGain(0.9) };
+
+async function measureMix(id, stems, extra = {}) {
+  const t1 = performance.now();
+  const bars = barsOf(id);
+  const o = { bars, stems, ...extra };
+  const [dryB, wetB] = [await render(id, o, true), await render(id, o, false)];
+  const dry = chans(dryB), wet = chans(wetB);
+  const end = Math.min(loopEnd(id, bars), dry[0].length);
+  const from = Math.floor(0.05 * SR);
+  const L = level(dry, from, end), W = level(wet, from, end);
+  // the same music through the master chain at the game's default sliders (schema: master 0.8, music 0.7)
+  const game = await mixOver(dryB, null, 0, DEFAULT_SLIDERS);
+  const G = level(game, from, end);
+  console.log('mix', id, Math.round(performance.now() - t1), 'ms');
+  return { id, bars, dryPeak: r3(L.peak), dryRms: r3(L.rms), wetPeak: r3(W.peak), wetRms: r3(W.rms), overComp: r3(over(dry, 0.2, from, end)), overLim: r3(over(dry, 0.631, from, end)), gr: reduction(dry, wet, from, end), gamePeak: r3(G.peak), gameRms: r3(G.rms) };
+}
+/** Stems render 8 bars at 22.05 kHz (relative levels; a full-rate run of every stem takes minutes). */
+const STEM_SR = 22050;
+async function measureStem(id, stem) {
+  const bars = Math.min(8, TRACKS[id].bars);
+  const stems = Object.fromEntries(Object.keys(TRACKS[id].layers).map(k => [k, k === stem]));
+  const b = await render(id, { bars, stems, sampleRate: STEM_SR }, true);
+  const ch = chans(b);
+  const end = Math.min(loopEnd(id, bars, STEM_SR), ch[0].length);
+  const L = level(ch, Math.floor(0.05 * STEM_SR), end);
+  return { id, stem, peak: r3(L.peak), rms: r3(L.rms) };
+}
+
+/** The engine's master chain rebuilt for an overlay (same settings as core/audio buildGraph). */
+function masterChain(oc) {
+  const ceiling = oc.createGain(); ceiling.gain.value = 0.95; ceiling.connect(oc.destination);
+  const shaper = oc.createWaveShaper(); shaper.curve = softClipCurve(); shaper.oversample = '2x'; shaper.connect(ceiling);
+  const mk = (s) => { const c = oc.createDynamicsCompressor(); for (const k of Object.keys(s)) c[k].value = s[k]; return c; };
+  const limiter = mk({ threshold: -4, knee: 0, ratio: 20, attack: 0.001, release: 0.06 }); limiter.connect(shaper);
+  const comp = mk({ threshold: -14, knee: 10, ratio: 3, attack: 0.004, release: 0.18 }); comp.connect(limiter);
+  return comp;
+}
+async function mixOver(bedDry, cryDry, at, { music, sfx, master }, duckLen = 0, withCry = true) {
+  const oc = new RealOAC(2, bedDry.length, SR);
+  const input = masterChain(oc);
+  const m = oc.createGain(); m.gain.value = master; m.connect(input);
+  const src = oc.createBufferSource(); src.buffer = bedDry; const mg = oc.createGain(); mg.gain.value = music / 0.95; src.connect(mg); mg.connect(m); src.start(0);
+  // the engine's music duck under a cry (core/audio CRY_DUCK, when it has one), on the same timing
+  const duck = ENGINE.CRY_DUCK;
+  if (cryDry && duck && duckLen > 0) {
+    const d = oc.createGain(); mg.disconnect(); mg.connect(d); d.connect(m);
+    const g = ENGINE.dbToGain(duck.db), t = at + 0.02;
+    // core/audio cry(): ramps from the call (5 ms before the cry) to the low level at cry start + attack
+    const hi = t + Math.max(duck.attack, duckLen);
+    d.gain.setValueAtTime(1, t - 0.005); d.gain.linearRampToValueAtTime(g, t + duck.attack);
+    d.gain.setValueAtTime(g, hi); d.gain.linearRampToValueAtTime(1, hi + duck.release);
+  }
+  if (cryDry && withCry) { const c = oc.createBufferSource(); c.buffer = cryDry; const cg = oc.createGain(); cg.gain.value = sfx / 0.95; c.connect(cg); cg.connect(m); c.start(at); }
+  return chans(await oc.startRendering());
+}
+async function renderCryDry(params, o) {
+  globalThis.OfflineAudioContext = DryOAC;
+  try { return await a.renderCry(params, { sampleRate: SR, ...o }); } finally { globalThis.OfflineAudioContext = RealOAC; }
+}
+
+function table(el, rows, cols) {
+  el.innerHTML = `<thead><tr>${cols.map(c => `<th>${c[0]}</th>`).join('')}</tr></thead><tbody>${rows.map(r => `<tr>${cols.map(c => `<td class="${c[2] ? c[2](r) : ''}">${c[1](r)}</td>`).join('')}</tr>`).join('')}</tbody>`;
+}
+
+async function run() {
+  const t0 = performance.now();
+  const status = document.getElementById('status');
+  const out = { quick, mixes: [], stems: [], indoor: [], cries: [], ms: 0 };
+  // full mixes: day parts at their middle hour, battles with their default stems
+  for (let p = 0; p < DAY_PARTS.length && phases.has('mix'); p++) {
+    const id = DAY_PARTS[p].id; if (!want(id)) continue; status.textContent = `mix ${id}`;
+    out.mixes.push({ ...(await measureMix(id, partStems(id, p * 3 + 1))), part: `${String(p * 3).padStart(2, '0')}-${String(p * 3 + 3).padStart(2, '0')}` });
+  }
+  if (phases.has('mix')) for (const id of BATTLES.filter(want)) { status.textContent = `mix ${id}`; out.mixes.push({ ...(await measureMix(id, defaultsOf(id))), part: 'battle' }); }
+  console.log('mixes done', Math.round(performance.now() - t0));
+  // headroom sweep: the same dry music through the master chain at unity with a fixed music trim (dB)
+  if (phases.has('sweep')) for (const id of ['h_morning', 'h_midday', 'h_dusk', 'battle_trainer', 'summit'].filter(want)) {
+    status.textContent = `sweep ${id}`;
+    const bars = barsOf(id); const stems = id.startsWith('h_') ? partStems(id, DAY_PARTS.findIndex(t => t.id === id) * 3 + 1) : defaultsOf(id);
+    const dryB = await render(id, { bars, stems }, true); const dry = chans(dryB);
+    const from = Math.floor(0.05 * SR), end = Math.min(loopEnd(id, bars), dry[0].length);
+    for (const trim of [0, -2, -3, -4, -5, -6]) {
+      const g = 10 ** (trim / 20);
+      const wet = await mixOver(dryB, null, 0, { master: 1, music: g, sfx: 1 });
+      const W = level(wet, from, end); const scaled = dry.map(c => c.map(v => v * g));
+      out.sweep = out.sweep || [];
+      out.sweep.push({ id, trim, wetPeak: r3(W.peak), wetRms: r3(W.rms), overLimWet: r3(over(wet, 0.6, from, end)), gr: reduction(scaled, wet, from, end) });
+    }
+  }
+  // stems
+  // every default-on stem of every theme and battle; the toggled world stems (night/tide/rain) on two themes
+  if (phases.has('stems')) for (const id of [...DAY_PARTS.map(t => t.id), ...BATTLES]) for (const stem of Object.keys(TRACKS[id].layers)) {
+    if (!want(id) || (TRACKS[id].layers[stem].default === false && !['h_midday', 'h_night', ...BATTLES].includes(id))) continue;
+    status.textContent = `stem ${id}.${stem}`; out.stems.push(await measureStem(id, stem));
+  }
+  // indoor: the world theme filtered to INDOOR_INTENSITY with INDOOR_STEMS_OFF off, against the outdoor mix
+  if (phases.has('indoor')) for (const p of [2, 4, 6]) {
+    const id = DAY_PARTS[p].id; if (!want(id)) continue; status.textContent = `indoor ${id}`;
+    const st = partStems(id, p * 3 + 1);
+    const inside = { ...st }; for (const k of DIRECTOR.INDOOR_STEMS_OFF) if (k in inside) inside[k] = false;
+    const outdoor = out.mixes.find(m => m.id === id) ?? await measureMix(id, st);
+    const m = await measureMix(id, inside, { intensity: DIRECTOR.INDOOR_INTENSITY });
+    out.indoor.push({ id, outWet: outdoor.wetRms, inWet: m.wetRms, inPeak: m.wetPeak, deltaDb: r1(db(m.wetRms / outdoor.wetRms)) });
+  }
+  console.log('stems+indoor done', Math.round(performance.now() - t0));
+  // cries over battle music at the game's default sliders (schema: master 0.8, music 0.7, sfx 0.9) and at unity
+  const sliders = { def: DEFAULT_SLIDERS, unity: { master: 1, music: 1, sfx: 1 } };
+  const rows = Object.values(SPECIES);
+  const picks = [];
+  const seenType = new Set();
+  // one form per primary type: the lowest stage and the highest stage (the extremes of the base-note range)
+  for (const s of rows) { const ty = String(s.types?.[0] ?? 'plain').toLowerCase(); if (!seenType.has(ty)) { seenType.add(ty); picks.push(s); } }
+  for (const s of rows) { if (Number(s.stage) >= 2 && !picks.some(p => p.stage >= 2 && String(p.types?.[0]).toLowerCase() === String(s.types?.[0]).toLowerCase())) picks.push(s); }
+  if (phases.has('cries')) for (const bid of ['battle_wild', 'battle_trainer', 'battle_spire'].filter(want)) {
+    const bars = Math.min(4, TRACKS[bid].bars);
+    const bed = await render(bid, { bars, stems: defaultsOf(bid) }, true);
+    const at = 2.0;
+    const plains = {};
+    for (const [sname, sl] of Object.entries(sliders)) plains[sname] = await mixOver(bed, null, at, sl);
+    for (const [why, o] of [['sendOut', { volume: 0.9, pan: -0.35 }], ['faint', { volume: 0.8, semitones: -4, pan: 0.35 }]]) {
+      if (why === 'faint' && bid !== 'battle_trainer') continue;
+      for (const sp of picks) {
+        status.textContent = `cry ${sp.id} over ${bid}`;
+        const params = cryParams(sp, { bonded: why === 'sendOut' && sp.stage === 0 });
+        const cry = await renderCryDry(params, o);
+        const plan = cryPlan(params);
+        for (const [sname, sl] of Object.entries(sliders)) {
+          if (sname === 'unity' && why === 'faint') continue;
+          const plain = plains[sname];
+          const mixed = await mixOver(bed, cry, at, sl, plan.end);
+          // the same bed with the same duck and no cry: the difference is the cry alone, as the chain passes it
+          const ducked = ENGINE.CRY_DUCK ? await mixOver(bed, cry, at, sl, plan.end, false) : plain;
+          // the window the cry actually sounds in (renderCry starts it 20 ms in)
+          const from = Math.floor((at + 0.02) * SR), to = Math.min(plain[0].length, Math.floor((at + 0.02 + plan.end) * SR));
+          const diff = mixed.map((c, i) => c.map((v, j) => v - ducked[i][j]));
+          const cryL = level(diff, from, to), bedL = level(ducked, from, to), mixL = level(mixed, from, to);
+          const hd = highpass(diff.map(c => c.subarray(from - 2000, to))), hp = highpass(ducked.map(c => c.subarray(from - 2000, to)));
+          const hpCry = level(hd, 2000, hd[0].length), hpBed = level(hp, 2000, hp[0].length);
+          // the cry's own (dry) level at these sliders, so masking by the chain shows up as a gap
+          const cd = chans(cry).map(c => c.map(v => v * sl.sfx * sl.master / 0.95));
+          const own = level(cd, 0, cd[0].length);
+          out.cries.push({ battle: bid, species: sp.id, type: params.wave, base: params.base, why, sliders: sname, snrDb: r1(db(cryL.rms / bedL.rms)), snrHpDb: r1(db(hpCry.rms / hpBed.rms)), cryRms: r3(cryL.rms), cryOwnRms: r3(own.rms), bedRms: r3(bedL.rms), mixPeak: r3(mixL.peak), cryPeakDry: r3(own.peak) });
+        }
+      }
+    }
+  }
+  out.ms = Math.round(performance.now() - t0);
+  window.__mix = out;
+  table(document.getElementById('mix'), out.mixes, [['track', r => r.id], ['hours', r => r.part], ['dry peak', r => r.dryPeak], ['dry rms', r => r.dryRms], ['wet peak', r => r.wetPeak, r => r.wetPeak > 0.7 ? 'fail' : 'pass'], ['wet rms', r => r.wetRms], ['>comp', r => r.overComp], ['>lim', r => r.overLim], ['GR mean dB', r => r.gr.mean], ['GR max dB', r => r.gr.max], ['GR std dB', r => r.gr.std], ['game peak', r => r.gamePeak], ['game rms', r => r.gameRms]]);
+  table(document.getElementById('stems'), out.stems, [['track', r => r.id], ['stem', r => r.stem], ['peak', r => r.peak], ['rms', r => r.rms]]);
+  table(document.getElementById('indoor'), out.indoor, [['track', r => r.id], ['outdoor rms', r => r.outWet], ['indoor rms', r => r.inWet], ['indoor peak', r => r.inPeak], ['Δ dB', r => r.deltaDb]]);
+  table(document.getElementById('cries'), out.cries.filter(c => c.sliders === 'def'), [['battle', r => r.battle], ['species', r => r.species], ['wave', r => r.type], ['why', r => r.why], ['SNR dB', r => r.snrDb], ['SNR >300Hz dB', r => r.snrHpDb, r => r.snrHpDb < 0 ? 'fail' : 'pass'], ['mix peak', r => r.mixPeak, r => r.mixPeak > 0.95 ? 'fail' : 'pass']]);
+  status.textContent = `done in ${(out.ms / 1000).toFixed(1)} s`;
+  return out;
+}
+window.__runMix = run;
+document.getElementById('run').addEventListener('click', run);
+</script>
+</body>
+</html>

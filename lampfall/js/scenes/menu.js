@@ -19,7 +19,9 @@ import { createFocus } from '../ui/focus.js';
 import { drawCurrency } from '../ui/widgets.js';
 import { t } from '../data/strings.js';
 import { formatTime, day as dayOf } from '../state/selectors.js';
-import { MENU_ITEMS as MODEL_ITEMS, pauseRows, placeName, isNoRewind, currentObjective } from './menuModel.js';
+import { MENU_ITEMS as MODEL_ITEMS, pauseRows, placeName, isNoRewind } from './menuModel.js';
+// the HUD chip's picker, so the pause menu names the same objective as the chip (optional 'meet-*' beats rank last)
+import { objectiveFor } from '../ui/objectiveChip.js';
 import { prefsOf, skinOf, drawSkinPanel, createSlide, drawGlyph, drawCursorAt, drawHints, fitText, sfx, toast } from './menuKit.js';
 
 /** Menu entries in order (`{label, scene}`); Save is always last. */
@@ -41,7 +43,7 @@ export function createMenuScene(G) {
   let rows = pauseRows(G.world);
   let ms = 0;
   /** @type {{text: string}|null} */ let objective = null;
-  const readObjective = () => { try { objective = currentObjective(G.world, G.data); } catch { objective = null; } };
+  const readObjective = () => { try { objective = objectiveFor(G.world, G.data); } catch { objective = null; } };
   const focus = createFocus({ cols: 1, wrap: true, index: 0, items: [] });
 
   let layoutKey = '';

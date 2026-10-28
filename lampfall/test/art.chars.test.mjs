@@ -30,7 +30,8 @@ function framesOf(b) {
 
 test('every body: 4 facings x 4 frames, sit, 4 fish frames, all on-size', () => {
   for (const [id, b] of Object.entries(C.BODIES)) {
-    assert.equal(b.w, 16, `${id} width`);
+    // size-as-character: 16 wide, or 24 wide centred on the tile (ox -4) for the wide cast (Hesper)
+    assert.ok(b.w === 16 || (b.w === 24 && b.ox === -4), `${id} width ${b.w} ox ${b.ox}`);
     assert.ok([24, 28, 32].includes(b.h), `${id} height ${b.h}`);
     assert.equal(b.oy, 24 - b.h, `${id} oy keeps the feet on the tile`);
     for (const f of FACINGS) assert.equal(b[f].length, 4, `${id}.${f} has 4 frames`);
@@ -170,7 +171,7 @@ test('walk cycles move: frames 1 and 3 differ from the idle frame for walkers', 
 });
 
 test('portraits: 48x48, letters in palette, four expressions for the main cast', () => {
-  const main = ['wren', 'corin', 'linnet', 'juniper', 'hesper', 'wick', 'ambrose', 'idris'];
+  const main = ['wren', 'corin', 'linnet', 'juniper', 'hesper', 'wick', 'ambrose', 'idris', 'maud', 'tully'];
   for (const id of main) assert.deepEqual(P.expressionsOf(id), ['neutral', 'happy', 'worried', 'surprised'], id);
   for (const id of P.PORTRAIT_IDS) {
     const exprs = P.expressionsOf(id);
@@ -194,7 +195,7 @@ test('every named resident and Spire leader has a bust', () => {
     'seraphine', 'hollis', 'agathe', 'teo', 'dov', 'bastien', 'cass', 'idris', 'pip'];
   for (const id of need) assert.ok(P.portrait(id), `bust for ${id}`);
   assert.equal(P.portrait('nobody'), null);
-  assert.equal(P.portrait('tully', 'happy').expr, 'neutral', 'falls back to neutral');
+  assert.equal(P.portrait('osric', 'happy').expr, 'neutral', 'falls back to neutral');
 });
 
 test('Linnet has no purple in her fur (brown ramp)', () => {

@@ -22,7 +22,7 @@ import * as sel from '../state/selectors.js';
 import { noRepeatDays, porchWindow } from '../data/tuning.js';
 import { t } from '../data/strings.js';
 import * as memory from '../systems/memory.js';
-import { beatBlock } from '../systems/threads.js';
+import { beatTopics } from '../systems/threads.js';
 
 /** Line pools read through memory.pickLine (tags + cond), after porch talk, before phase lines. */
 // `act`, `market`, `creek`, `nickname`, `declined` and `letters` are story / situation pools whose
@@ -114,6 +114,25 @@ export function resolveScript(world, data, target) {
   return { scriptId, source: 'default', ops: [{ op: 'say', text: t('npc.default') }, { op: 'end' }] };
 }
 
+/** @type {WeakMap<object, Set<string>>} */
+const BEAT_SCRIPTS = new WeakMap();
+
+/**
+ * Every script a thread beat runs (`threads[*].beats[*].script`), cached per registry.
+ * @param {Registry} data
+ * @returns {Set<string>}
+ */
+export function threadBeatScripts(data) {
+  const key = data && typeof data === 'object' ? data : null;
+  if (key && BEAT_SCRIPTS.has(key)) return /** @type {Set<string>} */ (BEAT_SCRIPTS.get(key));
+  const out = new Set();
+  let list = [];
+  try { list = typeof data?.list === 'function' ? data.list('threads') : Array.isArray(data?.threads) ? data.threads : []; } catch { list = []; }
+  for (const th of list) for (const b of Array.isArray(th?.beats) ? th.beats : []) if (typeof b?.script === 'string') out.add(b.script);
+  if (key) BEAT_SCRIPTS.set(key, out);
+  return out;
+}
+
 /**
  * The NPC branch of {@link resolveScript}.
  * @param {World} world
@@ -130,24 +149,24 @@ function resolveNpc(world, data, target) {
   const holds = (cond) => cond === undefined || evalCond(world, cond, cctx);
   const script = (id, extra) => ({ scriptId: id, ops: data.get('scripts', id), ...extra });
 
-  // (1) life thread: the next beat, under the thread rules (systems/threads `beatBlock`: its cond,
-  // involvement, one beat a day, `advance.days` spacing and weekday), and a porch beat only at the
-  // porch. Before, any talk anywhere ran the beat on its cond alone, so a beat could follow the last
-  // one the same day (oyster-boat 2 straight after 1).
-  if (npc.threadId && data.has('threads', npc.threadId)) {
-    const thread = data.get('threads', npc.threadId);
-    const state = world.threads?.[thread.id] ?? { beat: 0, done: false };
-    if (!state.done) {
-      const next = thread.beats.find((b) => b.id === state.beat + 1);
-      const atPorch = Boolean(target.atPorch) || target.pose === 'porch';
-      if (next && (next.porch !== true || atPorch) && holds(next.cond) && data.has('scripts', next.script)
-        && beatBlock(world, data, thread) === null) return script(next.script, { source: 'thread', beat: next.id });
-    }
+  // (1) life thread: the highest-priority eligible beat this NPC carries (systems/threads
+  // `beatTopics`: the thread rules of `beatBlock` — cond, involvement, one beat a day, `advance.days`
+  // spacing such as Mudlark's two days, weekday — plus porch beats only at the porch, and a beat's own
+  // `npcId`: Ambrose carries Fence 3, Maud carries Ember Grub 3, not the thread's owner). Before, any
+  // talk anywhere ran the owner's next beat on its cond alone.
+  {
+    const atPorch = Boolean(target.atPorch) || target.pose === 'porch';
+    const beat = beatTopics(world, data, npcId, { atPorch })[0];
+    if (beat && data.has('scripts', beat.script)) return script(beat.script, { source: 'thread', beat: beat.beat });
   }
 
   const topics = Array.isArray(npc.topics) ? npc.topics : [];
   const said = mem?.saidLines ?? {};
+  const beatScripts = threadBeatScripts(data);
   const eligible = (topic) => {
+    // a thread beat's script plays only through (1), under the thread pacing: a topic hook pointing
+    // at one (Ambrose's 'fence-posts', Maud's 'ember-grub-crossing') would skip one-beat-a-day
+    if (beatScripts.has(topic.script)) return false;
     if (!holds(topic.cond)) return false;
     if (!data.has('scripts', topic.script)) return false;
     const last = said[topic.id];

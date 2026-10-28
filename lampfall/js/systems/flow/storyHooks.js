@@ -6,6 +6,7 @@ import * as flags from '../flags.js';
 import { duelPayout, duelEvening, PORCH_DUEL_FLAG_PREFIX, PORCH_DUEL_DONE_PREFIX } from '../townCommon.js';
 import { TUNING } from '../../data/tuning.js';
 import { PORCH_DUELS } from '../../data/town.js';
+import { t } from '../../data/strings.js';
 const INSTALLED = new WeakMap();
 
 /**
@@ -36,18 +37,17 @@ export function installStoryHooks(G) {
     }
   }));
   offs.push(G.bus.on('thread:done', (p) => {
-    if (!p || p.share !== true || p.result != null || typeof p.threadId !== 'string') return;
-    const res = G.store.tx('story:resident-share', world => loans.residentShare(world, p.threadId, ctx()));
+    if (!p || p.share !== true || typeof p.threadId !== 'string') return;
+    // a caller that injected loans.residentShare (scriptHost) already paid: only the toast is left
+    const res = p.result != null ? p.result : G.store.tx('story:resident-share', world => loans.residentShare(world, p.threadId, ctx()));
     if (res && res.ok) {
-      const text = res.to === 'jar'
-        ? `${res.credited.toLocaleString('en-US')}◉ into the Commons Jar from a neighbour.` // str
-        : `A neighbour paid a notch on your loan: ${res.credited.toLocaleString('en-US')}◉.`; // str
+      const text = t(res.to === 'jar' ? 'toast.shareJar' : 'toast.shareLoan', { amount: res.credited.toLocaleString('en-US') });
       G.bus.emit('toast', { text, icon: 'star' });
     }
   }));
   const frames = () => {
     const res = G.store.tx('gallery:frames', world => loans.galleryFrames(world, ctx()));
-    if (res && res.ok && res.paid > 0) G.bus.emit('toast', { text: `A new frame in the Gallery: ${res.paid.toLocaleString('en-US')}◉.`, icon: 'star' }); // str
+    if (res && res.ok && res.paid > 0) G.bus.emit('toast', { text: t('toast.galleryFrame', { amount: res.paid.toLocaleString('en-US') }), icon: 'star' });
   };
   offs.push(G.bus.on('battle:end', (p) => {
     if (!p || p.porchDuel !== true || p.outcome !== 'win') return;
@@ -66,7 +66,7 @@ export function installStoryHooks(G) {
     const amount = duelPayout(G.world, PORCH_DUELS, TUNING.porchDuelPerCurve);
     if (amount <= 0) return;
     G.store.tx('duel:payout', world => wallet.earn(world, amount, { data: G.data, bus: G.bus, source: 'duel' }));
-    G.bus.emit('toast', { text: `A friendly duel, a fair purse: ${amount.toLocaleString('en-US')}◉.`, icon: 'coin' }); // str
+    G.bus.emit('toast', { text: t('toast.duelPurse', { amount: amount.toLocaleString('en-US') }), icon: 'coin' });
   }));
   offs.push(G.bus.on('fieldLog:held', (p) => { if (!p || p.first !== false) frames(); }));
   offs.push(G.bus.on('loan:built', (p) => { if (p && p.id === 'gallery') frames(); }));

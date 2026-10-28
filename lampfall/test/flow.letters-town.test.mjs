@@ -290,7 +290,9 @@ describe('LG-RN66 and LG-RN33', () => {
 
 describe('the Porch Duel slate (GDD-05 §8)', () => {
   const NEIGHBOURS = PORCH_DUELS.neighbours.map((n) => n.npc);
-  const LIVE = { ...PORCH_DUELS, visitorsLive: true }; // visitors once battleFlow fights them as duels
+  const LIVE = { ...PORCH_DUELS, visitorsLive: true }; // battleFlow fights visitors as duels (setup.porchDuel)
+  const OFF = { ...PORCH_DUELS, visitorsLive: false };
+  it('visitors are live in the shipped table', () => { assert.equal(PORCH_DUELS.visitorsLive, true); });
   it('three offers from met neighbours, a visitor once a leader is beaten, never three days running', () => {
     const G = makeGame('DUELS');
     npcsMet(G, NEIGHBOURS);
@@ -310,7 +312,7 @@ describe('the Porch Duel slate (GDD-05 §8)', () => {
       assert.deepEqual(duelSlate(G.world, PORCH_DUELS, { day, data: G.data }), s, 'deterministic');
     }
     G.store.tx('badge', (w) => { w.badges.push('turn'); });
-    assert.ok(duelSlate(G.world, PORCH_DUELS, { day: 3, data: G.data }).offers.every((o) => o.kind === 'neighbour'), 'visitors wait for visitorsLive');
+    assert.ok(duelSlate(G.world, OFF, { day: 3, data: G.data }).offers.every((o) => o.kind === 'neighbour'), 'visitors wait for visitorsLive');
     const s = duelSlate(G.world, LIVE, { day: 3, data: G.data });
     assert.equal(s.offers.filter((o) => o.kind === 'neighbour').length, 2);
     const v = s.offers.find((o) => o.kind !== 'neighbour');
@@ -370,13 +372,23 @@ describe('the Porch Duel slate (GDD-05 §8)', () => {
     assert.ok(boardContent(G, 'commons').lines.includes(lines[1]));
     assert.equal(visitorDuelOffer(G, LIVE), null, 'not before seven');
     at(G, 6, 20);
-    assert.equal(visitorDuelOffer(G), null, 'no visitors while visitorsLive is false');
+    assert.equal(visitorDuelOffer(G, OFF), null, 'no visitors while visitorsLive is false');
     const v = visitorDuelOffer(G, LIVE);
     assert.ok(v && v.trainer && v.kind !== 'neighbour');
-    // with visitors off, the Commons board is just the board
-    const r = await doInteraction(G, { verb: 'commons', target: { def: {} } }, { ask: async () => 1, startBattle: () => {} });
-    assert.notEqual(r.duel, true);
-    assert.ok(Array.isArray(r.content.lines));
+    assert.deepEqual(visitorDuelOffer(G), v, 'the shipped table offers the visitor');
+    // the Commons lamp offers tonight's visitor as a Porch Duel; the battle starts straight away
+    // (its intro is the battle scene's) with setup.porchDuel
+    let setup = null;
+    const pushed = [];
+    const G2 = Object.create(G, { push: { value: (...a) => pushed.push(a) } });
+    const r = await doInteraction(G2, { verb: 'commons', target: { def: {} } }, { ask: async () => 1, startBattle: (s) => { setup = s; } });
+    assert.equal(r.duel, true);
+    assert.deepEqual(setup, { kind: 'trainer', trainerId: v.trainer, source: 'duel', porchDuel: true });
+    assert.ok(!pushed.some((p) => p[0] === 'dialogue'), 'no pre-battle dialogue');
+    // fought tonight: the board is just the board
+    const r2 = await doInteraction(G, { verb: 'commons', target: { def: {} } }, { ask: async () => 1, startBattle: () => {} });
+    assert.notEqual(r2.duel, true);
+    assert.ok(Array.isArray(r2.content.lines));
   });
 });
 

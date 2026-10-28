@@ -13,7 +13,8 @@
 //                              expressions as named variants). Not done at import: busts build lazily.
 //
 // Main cast (four expressions): Wren, Corin, Linnet, Juniper, Hesper, Wick,
-// Ambrose, Idris. Residents sit on a cream plate; isle folk, Spire leaders,
+// Ambrose, Idris, Maud, Tully (the last two through the furBust / birdBust spec
+// builders, which take `expr`). Residents sit on a cream plate; isle folk, Spire leaders,
 // the Summit and the Champion on a night-blue plate (n / v).
 // Changes on adoption: Corin is a tawny owl and Idris a great northern diver
 // (GDD-00 §10); Linnet's shadow fur uses the brown ramp (CHAR_RAMPS), not p.
@@ -472,6 +473,7 @@ function outfit(kind, { collar = true } = {}) {
  */
 function furBust(s) {
   const FUR = ['L', 'F', 'f', 'D'];
+  const xp = s.expr || 'neutral'; // expression (main-cast specs pass one; everyone else stays neutral)
   const cx = 24, hy = s.headY ?? 20, hrx = s.headRx ?? 12, hry = s.headRy ?? 11.5;
   const ears = G(), head = G(), face = G();
   const ex = s.earX ?? 10;
@@ -520,17 +522,18 @@ function furBust(s) {
   if (s.mottle) tint(head, 'Ff', 'R', (x, y) => (x * 7 + y * 5) % 13 === 0 && y < my - 2);
   const ey = s.eyeY ?? hy - 2, edx = s.eyeDx ?? 6, ew = s.eyeW ?? 3, eh = s.eyeH ?? 4;
   if (s.eyeRing) { ball(face, cx - edx + ew / 2 - 1, ey + eh / 2, ew / 2 + 1.6, eh / 2 + 1.2, [s.eyeRing, s.eyeRing, s.eyeRing]); ball(face, cx + edx - ew / 2 + 1, ey + eh / 2, ew / 2 + 1.6, eh / 2 + 1.2, [s.eyeRing, s.eyeRing, s.eyeRing]); }
-  eyeX(face, cx - edx - 1, ey, ew, eh, 'neutral', { E: 'E', W: 'W', iris: s.iris });
-  eyeX(face, cx + edx - ew + 1, ey, ew, eh, 'neutral', { E: 'E', W: 'W', iris: s.iris });
-  if (s.lids) { rect(face, cx - edx - 1, ey, ew, 1, 'f'); rect(face, cx + edx - ew + 1, ey, ew, 1, 'f'); }
-  if (s.brows !== false) { browX(face, cx - edx - 1, ey - 2, ew, 'l', 'neutral', s.browCh || 'D'); browX(face, cx + edx - ew + 1, ey - 2, ew, 'r', 'neutral', s.browCh || 'D'); }
+  eyeX(face, cx - edx - 1, ey, ew, eh, xp, { E: 'E', W: 'W', iris: s.iris });
+  eyeX(face, cx + edx - ew + 1, ey, ew, eh, xp, { E: 'E', W: 'W', iris: s.iris });
+  if (s.lids && xp !== 'happy') { rect(face, cx - edx - 1, ey - (xp === 'surprised' ? 1 : 0), ew, 1, 'f'); rect(face, cx + edx - ew + 1, ey - (xp === 'surprised' ? 1 : 0), ew, 1, 'f'); }
+  if (s.brows !== false) { browX(face, cx - edx - 1, ey - 2, ew, 'l', xp, s.browCh || 'D'); browX(face, cx + edx - ew + 1, ey - 2, ew, 'r', xp, s.browCh || 'D'); }
   const nw = s.noseW ?? 3, ny = my - (mz.noseUp ?? 3);
   rect(face, cx - Math.floor(nw / 2), ny, nw, s.noseH ?? 2, 'N'); px(face, cx - Math.floor(nw / 2), ny, s.noseHi || 'n');
-  if (s.mouth !== false) { seg(face, cx, ny + 2, cx, ny + 3, 'm'); mouthX(face, cx, ny + 3, 'neutral', { line: 'm', w: 2 }); }
+  if (s.mouth !== false) { seg(face, cx, ny + 2, cx, ny + 3, 'm'); mouthX(face, cx, ny + 3, xp, { line: 'm', w: 2 }); }
   if (s.chinSpot) ball(face, cx, my + mry + 1, 3, 2, ['H', 'M', 'M']);
   if (s.whiskers) pxs(face, [[cx - 5, my], [cx - 3, my - 1], [cx + 5, my], [cx + 3, my - 1], [cx - 4, my + 2], [cx + 4, my + 2]], 'm');
   if (s.beard) ball(face, cx, my + mry + 3, 3.5, 4, ['M', 'M', 'm']);
-  if (s.blush) blushX(face, cx - edx - 3, cx + edx + 3, ey + eh + 2, 'neutral', 'P');
+  if (s.blush || xp === 'happy') blushX(face, cx - edx - 3, cx + edx + 3, ey + eh + 2, xp, 'P');
+  if (xp === 'worried') sweatX(face, cx + hrx - 2, ey - 1);
   const body = outfit(s.outfit || 'coat');
   const extra = G();
   if (s.extra) s.extra(extra, { cx, hy, hrx, hry, ey, my, face, head });
@@ -540,6 +543,7 @@ function furBust(s) {
 /** A bird bust from a spec (neutral): head ball, beak type, crest / patches. */
 function birdBust(s) {
   const FUR = ['L', 'F', 'f', 'D'];
+  const xp = s.expr || 'neutral';
   const cx = 24, hy = s.headY ?? 20, hrx = s.headRx ?? 12.5, hry = s.headRy ?? 12;
   const back = G(), head = G(), face = G(), beak = G();
   if (s.neck !== false) ball(head, cx, hy + 12, s.neckRx ?? 9, 7, FUR);
@@ -548,8 +552,11 @@ function birdBust(s) {
   if (s.patch) s.patch(face, { cx, hy, hrx, hry });
   const ey = s.eyeY ?? hy - 2, edx = s.eyeDx ?? 7, ew = s.eyeW ?? 3, eh = s.eyeH ?? 3;
   if (s.eyeRing) { ball(face, cx - edx + 0.5, ey + eh / 2, ew / 2 + 1.5, eh / 2 + 1.5, [s.eyeRing, s.eyeRing, s.eyeRing]); ball(face, cx + edx - 0.5, ey + eh / 2, ew / 2 + 1.5, eh / 2 + 1.5, [s.eyeRing, s.eyeRing, s.eyeRing]); }
-  eyeX(face, cx - edx - 1, ey, ew, eh, 'neutral', { E: s.E || 'E', W: 'W', iris: s.iris });
-  eyeX(face, cx + edx - ew + 1, ey, ew, eh, 'neutral', { E: s.E || 'E', W: 'W', iris: s.iris });
+  eyeX(face, cx - edx - 1, ey, ew, eh, xp, { E: s.E || 'E', W: 'W', iris: s.iris });
+  eyeX(face, cx + edx - ew + 1, ey, ew, eh, xp, { E: s.E || 'E', W: 'W', iris: s.iris });
+  // feathered brows only when the face moves (birds read neutral without them)
+  if (xp === 'worried' || xp === 'surprised') { browX(face, cx - edx - 1, ey - 2, ew, 'l', xp, 'D'); browX(face, cx + edx - ew + 1, ey - 2, ew, 'r', xp, 'D'); }
+  if (xp === 'worried') sweatX(face, cx + hrx - 2, ey - 1);
   const by = s.beakY ?? hy + 2;
   const T = s.beak || 'short';
   if (T === 'short') { poly(beak, [[cx - 4, by], [cx + 4, by], [cx, by + 7]], 'X'); }
@@ -559,6 +566,10 @@ function birdBust(s) {
   else if (T === 'tube') { poly(beak, [[cx - 3, by], [cx + 3, by], [cx + 1, by + 8], [cx - 1, by + 8]], 'X'); rect(beak, cx - 1, by, 2, 3, 'x'); }
   tint(beak, 'X', 'x', (x, y) => x > cx || y > by + (T === 'dagger' || T === 'hook' ? 10 : 5));
   pxs(beak, [[cx - 2, by + 1], [cx - 1, by + 2]], 'W');
+  // the bill opens a little: a gape line when happy, a dark gap when surprised
+  const gy = by + (T === 'dagger' || T === 'hook' ? 7 : 4);
+  if (xp === 'surprised') { rect(beak, cx - 2, gy, 4, 2, 'K'); }
+  else if (xp === 'happy') { seg(beak, cx - 3, gy, cx + 3, gy, 'x'); px(beak, cx - 4, gy - 1, 'x'); px(beak, cx + 4, gy - 1, 'x'); }
   const body = outfit(s.outfit || 'coat');
   const extra = G();
   if (s.extra) s.extra(extra, { cx, hy, hrx, hry, ey, by, face, head });
@@ -620,9 +631,9 @@ BUSTS.augusta = () => furBust({
   ears: 'none', headRx: 12.5, headRy: 11.5, muzzle: { rx: 8, ry: 5.5, dy: 7 }, eyeY: 17, eyeW: 4, eyeH: 4, eyeDx: 7, whiskers: true, mottle: true, noseW: 5,
   outfit: 'coat', extra: hat.warden,
 });
-BUSTS.tully = () => furBust({
+BUSTS.tully = (expr = 'neutral') => furBust({
   ears: 'small', earX: 11, headRx: 14, headRy: 11, muzzle: { rx: 8, ry: 5, dy: 7 }, eyeW: 3, eyeH: 3, eyeY: 19, noseW: 7, noseH: 3, noseUp: 4,
-  outfit: 'jersey', extra: hat.headband,
+  outfit: 'jersey', extra: hat.headband, expr,
 });
 BUSTS.bryony = () => furBust({
   ears: 'small', earX: 9, headRx: 12, headRy: 11, muzzle: { rx: 6, ry: 4, dy: 7 }, eyeY: 18, eyeRing: 'M', blush: true,
@@ -818,7 +829,8 @@ BUSTS.odile = () => {
 };
 
 // Isle folk, Spire leaders, Summit, Champion -------------------------------------
-BUSTS.maud = () => birdBust({ headRx: 12, beak: 'broad', beakY: 21, eyeY: 17, outfit: 'coat', extra: hat.souwester });
+// the sou'wester sits pushed back so the brim clears her eyes (it used to hide them); 3 rows keeps the crown's dome inside the plate
+BUSTS.maud = (expr = 'neutral') => birdBust({ headRx: 12, beak: 'broad', beakY: 21, eyeY: 17, outfit: 'coat', extra: (g, o) => hat.souwester(g, { ...o, hy: o.hy - 3 }), expr });
 BUSTS.osric = () => {
   const FUR = ['L', 'F', 'f', 'D'];
   const shell = G(), head = G(), face = G();
@@ -959,7 +971,7 @@ BUSTS.cass = () => furBust({
 // palettes -------------------------------------------------------------------------
 const P = {};
 P.augusta = { ...PORCH, K: '#262a33', k: '#141b33', L: '#b0b8c0', F: '#8a929c', f: '#646c78', D: '#464c58', R: '#5a606c', H: '#e0e2e4', M: '#c8ccd0', m: '#9aa0a8', N: '#2a2a33', n: '#4a4a55', E: '#141b33', W: '#f6f1e3', Q: '#3b4a6b', C: '#2b3a67', c: '#1e2a4a', Y: '#d9a441', y: '#f2d27a', a: '#8a6a1e', P: '#d9a3a0', S: '#3a3f4f' };
-P.tully = { ...PORCH, K: '#2a2018', k: '#141b33', L: '#a8927a', F: '#8a7560', f: '#6a5644', D: '#4a3c2e', H: '#d4c4ac', M: '#b8a48c', m: '#8e7a64', N: '#2e2620', n: '#4e4038', E: '#141b33', W: '#f6f1e3', Q: '#d8584a', C: '#c0453a', c: '#8e2f2a', P: '#d9907a' };
+P.tully = { ...PORCH, K: '#2a2018', k: '#141b33', L: '#a8927a', F: '#8a7560', f: '#6a5644', D: '#4a3c2e', H: '#d4c4ac', M: '#b8a48c', m: '#8e7a64', N: '#2e2620', n: '#4e4038', E: '#141b33', W: '#f6f1e3', Q: '#d8584a', C: '#c0453a', c: '#8e2f2a', P: '#d9907a', G: '#9fc7d6' };
 P.bryony = { ...PORCH, K: '#2e241c', k: '#141b33', L: '#ab9a82', F: '#8c7a64', f: '#6a5a48', D: '#4a3e30', H: '#ece0c8', M: '#d4c3a3', m: '#a8977c', N: '#2e241c', n: '#4e4034', E: '#141b33', W: '#f6f1e3', Q: '#f2e8d0', C: '#e8dcc0', c: '#bfb090', Y: '#e6c46e', y: '#b8963e', R: '#c0453a', P: '#d9907a' };
 P.thessaly = { ...PORCH, K: '#2e3242', k: '#141b33', L: '#aeb6c6', F: '#8a94a8', f: '#646e84', D: '#464e62', H: '#f4efe6', M: '#e6e0d4', m: '#bcb6aa', N: '#e89aa8', n: '#f6c0c8', P: '#e89aa8', E: '#141b33', W: '#f6f1e3', Q: '#e0a050', C: '#c98a3a', c: '#9a6a2a', Y: '#d9a441', a: '#7a5a36' };
 P.tamsin = { ...PORCH, K: '#1e1e28', k: '#2a3a33', L: '#a8a8b4', F: '#8a8a96', f: '#5f5f70', D: '#3e3e4a', H: '#f6f1e3', M: '#f1eee6', m: '#c8c4cc', N: '#1e1e28', n: '#3e3e48', R: '#24222c', E: '#141b33', W: '#f6f1e3', Q: '#6a8e7c', C: '#4e6e5d', c: '#3a5246' };
@@ -975,7 +987,7 @@ P.ansel = { ...PORCH, K: '#2a3340', k: '#1e2433', Q: '#3b4a7a', L: '#b8c8d4', F:
 P.odile = { ...PORCH, K: '#5a2a3a', k: '#1e3a40', L: '#f6b8c8', F: '#e98aa6', f: '#c0607e', M: '#e6e2c4', m: '#c2c09a', N: '#8a9a86', n: '#5e6e5c', E: '#7a1e2c', R: '#c03a3a', W: '#f6f1e3', Q: '#4f9aa4', C: '#2f7c86', c: '#1f5a62', Y: '#f2c14e', o: '#4f8fd9', P: '#e98aa6', a: '#8a6a3a' };
 P.odile = { ...P.odile, Q: '#f8f2e2', C: '#f4ecd6', c: '#cfc3a4' };
 P.odile = { ...P.odile, U: '#4f9aa4', J: '#2f7c86', j: '#1f5a62' };
-P.maud = { ...ISLE, K: '#2a241e', k: '#141b33', L: '#b0a898', F: '#8a8070', f: '#625a4e', D: '#443e36', E: '#141b33', W: '#f6f1e3', X: '#e88a3a', x: '#b8602a', Q: '#f2c858', C: '#e6b43a', c: '#b8862a', Y: '#e6b43a', y: '#b8862a', a: '#8a6a1e' };
+P.maud = { ...ISLE, K: '#2a241e', k: '#141b33', L: '#b0a898', F: '#8a8070', f: '#625a4e', D: '#443e36', E: '#141b33', W: '#f6f1e3', X: '#e88a3a', x: '#b8602a', Q: '#f2c858', C: '#e6b43a', c: '#b8862a', Y: '#e6b43a', y: '#b8862a', a: '#8a6a1e', G: '#9fc7d6' };
 P.maud.J = '#443e36';
 P.osric = { ...ISLE, K: '#2a2a18', k: '#141b33', L: '#aaa874', F: '#8a8a5a', f: '#666a40', D: '#3a3e22', M: '#e8d8a8', m: '#bca878', N: '#2a2a18', E: '#141b33', W: '#f6f1e3', H: '#b08a4e', T: '#8a6a3a', t: '#5e4626', r: '#3a2a16', Q: '#ddd6c4', C: '#c9c2b0', c: '#9e9684', Y: '#d9a441', S: '#7a7a84' };
 P.osric.J = '#44482a'; P.osric.j = '#4e3420';
@@ -1028,14 +1040,17 @@ const MAIN = {
   corin: [corin, CORIN_PAL],
   idris: [idris, IDRIS_PAL],
   wick: [wick, WICK_PAL],
+  // promoted from single busts (wave-3 art pass): the spec builders take the expression
+  maud: [(e) => BUSTS.maud(e), null],
+  tully: [(e) => BUSTS.tully(e), null],
 };
 const SINGLE = {
   ludo: [BUSTS.ludo, P.ludo], barnaby: [BUSTS.barnaby, P.barnaby], dimity: [BUSTS.dimity, P.dimity],
-  augusta: [BUSTS.augusta, P.augusta], ansel: [BUSTS.ansel, P.ansel], tully: [BUSTS.tully, P.tully],
+  augusta: [BUSTS.augusta, P.augusta], ansel: [BUSTS.ansel, P.ansel],
   odile: [BUSTS.odile, P.odile], bryony: [BUSTS.bryony, P.bryony], thessaly: [BUSTS.thessaly, P.thessaly],
   tamsin: [BUSTS.tamsin, P.tamsin], isolde: [BUSTS.isolde, P.isolde], thatch: [BUSTS.thatch, P.thatch],
   pip: [BUSTS.pip, P.pip],
-  maud: [BUSTS.maud, P.maud], osric: [BUSTS.osric, P.osric], ines: [BUSTS.ines, P.ines], wendel: [BUSTS.wendel, P.wendel],
+  osric: [BUSTS.osric, P.osric], ines: [BUSTS.ines, P.ines], wendel: [BUSTS.wendel, P.wendel],
   ada: [BUSTS.ada, P.ada], ivo: [BUSTS.ivo, P.ivo], seraphine: [BUSTS.seraphine, P.seraphine], hollis: [BUSTS.hollis, P.hollis],
   agathe: [BUSTS.agathe, P.agathe], teo: [BUSTS.teo, P.teo], dov: [BUSTS.dov, P.dov],
   bastien: [BUSTS.bastien, P.bastien], cass: [BUSTS.cass, P.cass],
@@ -1061,7 +1076,7 @@ export function portrait(id, expr = 'neutral') {
   const key = id + '|' + e;
   if (cache.has(key)) return cache.get(key);
   let out = null;
-  if (MAIN[id]) { const [fn, pal] = MAIN[id]; out = { w: N, h: N, rows: fn(e), palette: pal, expr: e }; }
+  if (MAIN[id]) { const [fn, pal] = MAIN[id]; out = { w: N, h: N, rows: fn(e), palette: pal || P[id], expr: e }; }
   else if (SINGLE[id]) { const [fn, pal] = SINGLE[id]; out = { w: N, h: N, rows: fn(), palette: pal, expr: e }; }
   if (out) { Object.freeze(out.rows); out = Object.freeze(out); }
   cache.set(key, out);

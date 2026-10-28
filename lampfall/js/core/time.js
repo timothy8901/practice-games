@@ -581,6 +581,10 @@ export function realCalendar(day) {
  * @property {boolean} paused
  * @property {boolean} realClock
  * @property {string|number|null} seed
+ * @property {number|null} [realOffset] Real Clock with `realRelative` only: the run's calendar offset
+ *   (wall-clock minutes minus `total`, a whole number of days). `restore()` keeps it while the wall
+ *   clock has not gone back past `total`, so the days that pass between sessions count; written only
+ *   while the clock follows real time run-relatively.
  */
 
 /**
@@ -963,7 +967,10 @@ export function createClock(options = {}) {
 
   /** @returns {ClockState} */
   function serialize() {
-    return { version: CLOCK_STATE_VERSION, total, speed, paused, realClock, seed };
+    const out = { version: CLOCK_STATE_VERSION, total, speed, paused, realClock, seed };
+    // the run-relative calendar offset, so a reload days later counts the days that passed
+    if (realClock && realRelative) out.realOffset = realOffset;
+    return out;
   }
 
   /** @param {ClockState} state */
@@ -985,7 +992,13 @@ export function createClock(options = {}) {
     const nextSpeed = checkNumber('clock.restore: state.speed', state.speed, { min: 0 });
     const nextPaused = checkBoolean('clock.restore: state.paused', state.paused);
     seedKey('clock.restore: state.seed', state.seed);
-    const nextOffset = nextRealClock && realRelative ? realAnchorFor(nextTotal) : 0; // may throw: nothing changed yet
+    // Run-relative Real Clock: keep the saved calendar offset while the wall clock has not gone back
+    // past the saved total (the days between sessions then count: the next update() walks there,
+    // firing every boundary); otherwise re-anchor so the clock never runs backwards.
+    const savedOffset = state.realOffset;
+    const keepOffset = nextRealClock && realRelative && Number.isSafeInteger(savedOffset) && savedOffset % MINUTES_PER_DAY === 0
+      && realTimeToTotal(now()) - savedOffset >= nextTotal;
+    const nextOffset = !(nextRealClock && realRelative) ? 0 : keepOffset ? savedOffset : realAnchorFor(nextTotal); // may throw: nothing changed yet
     realOffset = nextOffset;
     seed = state.seed ?? null;
     ({ tideOffset, moonOffset } = scheduleForSeed(seed));

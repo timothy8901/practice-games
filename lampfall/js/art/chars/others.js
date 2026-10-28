@@ -239,8 +239,34 @@ export function buildCrab() {
   const left = legged({ body: CRAB.leftBody, legs: CRAB.downLegs, legsY: 21 });
   const sit = frame([CRAB.downBody, 0, 1], [CRAB.downLegs.idle, 0, 22]);
   const fish = withRod(left[0], { handX: 9, handY: 18 });
-  return { w: 16, h: 24, ox: 0, oy: 0, down, up, left, right: left.map(flipH), sit, fish: fish[0], fishFrames: fish, fishW: FISH_W, fishOx: FISH_OX };
+  // Size-as-character (porchlight-cast: Barnaby is wide): a 24-wide cell (ox -4) with the mismatched
+  // claws pushed out of the neck ring, big left claw (6x5) and small right claw (4x4).
+  const wide = (fr, bigLeft, small = true) => {
+    const g = blank(24, fr.length);
+    stamp(g, fr, 4, 0);
+    const bump = fr === sit ? 1 : 0;
+    if (bigLeft === true) stamp(g, CRAB.clawBig, 0, 14 + bump); else if (bigLeft === false) stamp(g, CRAB.clawBig.map((r) => [...r].reverse().join('')), 18, 14 + bump);
+    if (small && bigLeft === true) stamp(g, CRAB.clawSmall, 19, 16 + bump); else if (small && bigLeft === false) stamp(g, CRAB.clawSmall, 1, 16 + bump);
+    return rows(g);
+  };
+  const W = { down: down.map((f) => wide(f, true)), up: up.map((f) => wide(f, false)), left: left.map((f) => wide(f, true, false)) };
+  return { w: 24, h: 24, ox: -4, oy: 0, down: W.down, up: W.up, left: W.left, right: W.left.map(flipH), sit: wide(sit, true), fish: fish[0], fishFrames: fish, fishW: FISH_W, fishOx: FISH_OX };
 }
+// the claws, open pincers facing outward (left-side orientation; mirrored for the right)
+CRAB.clawBig = [
+  'KKK...',
+  'KRRK..',
+  'KRrRKK',
+  'KRRRRK',
+  'KrRRrK',
+  '.KKKK.',
+];
+CRAB.clawSmall = [
+  '.KK.',
+  'KRrK',
+  'KRRK',
+  '.KK.',
+];
 
 // ---------------------------------------------------------------------------
 // HESPER COIL, garden snail. Limbless; a canvas mail satchel where the shell
@@ -336,14 +362,59 @@ SNAIL.left = [
 ];
 SNAIL.leftA = SNAIL.left.map((r, i) => (i >= 20 && i <= 22 ? '.' + r.slice(0, 15) : r));
 SNAIL.leftB = SNAIL.left.map((r, i) => (i === 21 ? r.slice(1) + '.' : r));
+// Size-as-character (porchlight-cast: Hesper is wide): a 24-wide cell (ox -4, centred on her tile).
+// The front / back views widen the satchel dome and the foot skirt; the profile is redrawn long, the
+// foot trailing well behind the satchel the way a snail actually travels.
+SNAIL.left24 = [
+  '........................',
+  '........................',
+  '........................',
+  '........................',
+  '........................',
+  '........................',
+  '........................',
+  '........................',
+  '........................',
+  '........................',
+  '..........KMMK..........',
+  '.KK.KK..KKKMMKKK........',
+  'KEEKEEKKCCCCCCCCKK......',
+  'KXXKFKKCCCCCCCCCCCK.....',
+  '.KXFKCCCCCCAACCCCCcK....',
+  '..KFKCCCCCCAACCCCCcK....',
+  '..KFKcCCCCCCCCCCCccK....',
+  '..KFKccCCCCCCCCCcccK....',
+  '..KFFKcccccccccccccK....',
+  '.KFFFFKKKKKKKKKKKKKFK...',
+  'KLFFFFFFFFFFFFFFFFFFFK..',
+  'KLLFFFFFFFFFFfffffffffK.',
+  'KLLFFFFFFFFFfffffffffffK',
+  '.KKKKKKKKKKKKKKKKKKKKKK.',
+];
+/** Inserts `n` copies of column `at` (a stretch that keeps the outline and shading bands). */
+const stretchCols = (rows, at, n) => rows.map((r) => r.slice(0, at) + r[at].repeat(n) + r.slice(at));
+/** 16 -> 24: dome rows widen 2 + 2 and pad, foot rows widen 4 + 4, the stalks just re-centre. */
+function widenSnail(fr, { domeFrom, footFrom, right }) {
+  return fr.map((r, y) => {
+    if (y >= footFrom) return stretchCols(stretchCols([r], right, 4), 2, 4)[0];
+    if (y >= domeFrom) return '..' + stretchCols(stretchCols([r], right, 2), 2, 2)[0] + '..';
+    return '....' + r + '....';
+  });
+}
 export function buildSnail() {
-  const down = [SNAIL.down, SNAIL.downA, SNAIL.down, SNAIL.downB];
-  const up = [SNAIL.up, SNAIL.downA.map((r, i) => (i >= 20 ? r : SNAIL.up[i])), SNAIL.up, SNAIL.downB.map((r, i) => (i >= 20 ? r : SNAIL.up[i]))];
-  const left = [SNAIL.left, SNAIL.leftA, SNAIL.left, SNAIL.leftB];
-  // sit: she is always sitting; fish: rod propped in the satchel strap
-  const sit = SNAIL.down;
-  const fish = withRod(SNAIL.left, { rod: true, handX: 11, handY: 15 });
-  return { w: 16, h: 24, ox: 0, oy: 0, down, up, left, right: left.map(flipH), sit, fish: fish[0], fishFrames: fish, fishW: FISH_W, fishOx: FISH_OX };
+  const wd = (f) => widenSnail(f, { domeFrom: 8, footFrom: 18, right: 13 });
+  const wu = (f) => widenSnail(f, { domeFrom: 13, footFrom: 19, right: 12 });
+  const dn = [SNAIL.down, SNAIL.downA, SNAIL.down, SNAIL.downB].map(wd);
+  const upBase = wu(SNAIL.up);
+  const down = dn;
+  const up = [upBase, dn[1].map((r, i) => (i >= 20 ? r : upBase[i])), upBase, dn[3].map((r, i) => (i >= 20 ? r : upBase[i]))];
+  const L = SNAIL.left24;
+  const left = [L, L.map((r, i) => (i >= 20 && i <= 22 ? '.' + r.slice(0, 23) : r)), L, L.map((r, i) => (i === 21 ? r.slice(1) + '.' : r))];
+  // sit: she is always sitting; fish: rod propped in the satchel strap. The long profile already fills
+  // the 24-wide fishing cell, so it is stamped at 0 (same place on the tile as her walk frames).
+  const sit = dn[0];
+  const fish = [0, 1, 2, 3].map((phase) => { const g = blank(FISH_W, 24); stamp(g, L, 0, 0); drawRod(g, 12, 14, phase, { rod: true, water: 21 }); return rows(g); });
+  return { w: 24, h: 24, ox: -4, oy: 0, down, up, left, right: left.map(flipH), sit, fish: fish[0], fishFrames: fish, fishW: FISH_W, fishOx: FISH_OX };
 }
 
 // ---------------------------------------------------------------------------

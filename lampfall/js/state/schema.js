@@ -57,7 +57,7 @@ export function tideSeedFor(day1Low = DAY1_LOW_MINUTE) {
 }
 
 /** Version stamped on `world.v`; bump together with a new entry in `migrate.MIGRATIONS`. */
-export const SCHEMA_VERSION = 6;
+export const SCHEMA_VERSION = 7;
 
 /** Maximum party size. */
 export const PARTY_MAX = 6;
@@ -169,6 +169,8 @@ export const WORLDGEN_LABEL = 'worldgen';
  * @property {boolean} paused
  * @property {boolean} realClock
  * @property {string|number|null} seed
+ * @property {number|null} [realOffset]  Real Clock: wall-clock minutes minus `total` (whole days), so the
+ *   days between sessions count (v7; absent or null when the clock does not follow real time)
  */
 
 /**
@@ -649,6 +651,7 @@ export function worldDefaults() {
       paused: false,
       realClock: false,
       seed: null,
+      realOffset: null,
     },
     weather: weatherStateDefaults(),
     player: {
@@ -920,6 +923,9 @@ const WORLD_SPEC = {
     paused: [isBool, 'boolean'],
     realClock: [isBool, 'boolean'],
     seed: [(v) => v === null || isStr(v) || isNum(v), 'string|number|null'],
+    // Real Clock's run-relative calendar offset (core/time; v7): a whole number of days in minutes, or
+    // null. Optional: core/time writes it only while the clock follows real time.
+    realOffset: [(v) => v === null || (Number.isSafeInteger(v) && v % 1440 === 0), 'null or whole days in minutes', { optional: true }],
   },
   weather: {
     day: [nonNegInt, 'non-negative integer'],
@@ -1064,6 +1070,8 @@ function checkSpec(path, value, spec, out) {
   }
   for (const key of Object.keys(spec)) {
     if (!(key in value)) {
+      // a leaf spec `[pred, desc, {optional: true}]` may be absent (core/time writes it only sometimes)
+      if (Array.isArray(spec[key]) && spec[key][2] && spec[key][2].optional === true) continue;
       out.push(`${path}.${key}: missing`);
       continue;
     }

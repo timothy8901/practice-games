@@ -14,7 +14,7 @@
  * Beyond the contract: a `kit` preset (one drum layer, GM-style notes pick kick/snare/hat), `rhodes`
  * and `brass` presets, scale-name aliases (`majorPentatonic`), prefix stems (`setStem('perc', on)`
  * covers `perc.kick`, `perc.hat`, …; any layer can be toggled, not only ones flagged `stem: true`),
- * one-shot tracks (`loop: false`) and offline renders (`renderSfx`, `renderTrack`) for level checks.
+ * one-shot tracks (`loop: false`) and offline renders (`renderSfx`, `renderCry`, `renderTrack`) for level checks.
  *
  * Defaults worth knowing: layers named `night`/`tide`/`rain`/`battle`/`tense`/`storm` (or `night.*` …)
  * start muted unless the layer passes `stem` explicitly; stem state is global and carries across
@@ -1287,6 +1287,21 @@ function swell(ctx, dest, t0, { gain, attack, release, freq, peakFreq, q = 0.8, 
 // Creature cries (GDD-09 §10.5): audio.cry({base, slide, wave, tail})
 // ───────────────────────────────────────────────────────────────────────────────────────────────
 
+/**
+ * Music duck under a creature cry: the music bus dips by `db` (ramping over `attack` s from the call), holds
+ * while the cry sounds and comes back over `release` s, so a cry reads over driving battle music without the
+ * cry itself having to be loud enough to hit the limiter (w3 mix polish; measured in test/pages/audio-mix.html).
+ */
+export const CRY_DUCK = Object.freeze({ db: -6, attack: 0.02, release: 0.18 });
+
+/**
+ * Fixed music-bus headroom (dB) ahead of the master compressor. The compressor's automatic make-up gain (~+5.6 dB
+ * at −14 dB / 3:1) lets every bass and kick transient through its 4 ms attack hot, so at unity sliders the
+ * score peaked at 0.74–0.81 and sat on the limiter / soft clip; 3 dB of headroom puts the day-part themes'
+ * peaks near 0.6 with no limiting, and leaves sfx and cries that much clearer over the music (w3 mix polish).
+ */
+export const MUSIC_HEADROOM_DB = -3;
+
 /** Cry waveforms (`saw` is the WebAudio sawtooth; `sawNoise` adds a noise rasp for Rust). */
 export const CRY_WAVES = Object.freeze(['sine', 'triangle', 'square', 'saw', 'sawNoise']);
 
@@ -1351,7 +1366,9 @@ function playCry(ctx, dest, t0, plan, p) {
       continue;
     }
     const type = n.wave === 'saw' || n.wave === 'sawNoise' ? 'sawtooth' : n.wave;
-    const level = (type === 'sine' ? 0.3 : type === 'triangle' ? 0.32 : 0.16) * n.gain * p.gain;
+    // levels by waveform RMS (sine 0.71, triangle 0.58, square 1, saw 0.58 of peak): the saw was written at the
+    // square's 0.16 and measured ~8 dB under the other cries over battle music; 0.26 brings it level with square
+    const level = (type === 'sine' ? 0.3 : type === 'triangle' ? 0.32 : type === 'sawtooth' ? 0.26 : 0.16) * n.gain * p.gain;
     const g = mkGain(ctx, out, 0);
     adsr(g.gain, a, { a: 0.012, d: n.dur * 0.35, s: 0.55, r: n.dur * 0.35, peak: level, hold: n.dur * 0.6 });
     const osc = mkOsc(ctx, g, type, f0, a, a + n.dur + 0.05);
@@ -1996,6 +2013,7 @@ function mkCompressor(ctx, s) {
  * @property {GainNode} muteGain
  * @property {GainNode} sfxBus
  * @property {GainNode} musicVol
+ * @property {GainNode} musicDuck Dips under creature cries ({@link CRY_DUCK}); 1 otherwise.
  * @property {BiquadFilterNode} musicFilter Music enters here (intensity low-pass).
  * @property {DynamicsCompressorNode} compressor
  * @property {DynamicsCompressorNode} limiter
@@ -2003,7 +2021,7 @@ function mkCompressor(ctx, s) {
  */
 
 /**
- * Build the master chain: buses → master → mute → compressor → limiter → soft clip → ceiling →
+ * Build the master chain (music: filter → cry duck → headroom → music volume): buses → master → mute → compressor → limiter → soft clip → ceiling →
  * analyser → destination. The analyser sits last so visualizers read exactly what is heard (the
  * compressor's attack can overshoot 1.0 for a few samples; the soft clip catches that).
  * @param {BaseAudioContext} ctx
@@ -2027,8 +2045,10 @@ function buildGraph(ctx) {
   const master = mkGain(ctx, muteGain, 1);
   const sfxBus = mkGain(ctx, master, 1);
   const musicVol = mkGain(ctx, master, 1);
-  const musicFilter = mkFilter(ctx, musicVol, 'lowpass', 20000, 0.5);
-  return { master, muteGain, sfxBus, musicVol, musicFilter, compressor, limiter, analyser };
+  const musicHeadroom = mkGain(ctx, musicVol, dbToGain(MUSIC_HEADROOM_DB));
+  const musicDuck = mkGain(ctx, musicHeadroom, 1);
+  const musicFilter = mkFilter(ctx, musicDuck, 'lowpass', 20000, 0.5);
+  return { master, muteGain, sfxBus, musicVol, musicDuck, musicFilter, compressor, limiter, analyser };
 }
 
 /**
@@ -2231,6 +2251,8 @@ function createPlayer(ctx, dest, track, startTime, { stems, intensity, offline =
  *   oneShot: boolean, remaining: number|null, stems: string[], intensity: number}|{id: string,
  *   pending: true}|null} nowPlaying
  * @property {(name: string, opts?: SfxOptions & {sampleRate?: number, seed?: number}) => Promise<AudioBuffer>} renderSfx
+ * @property {(params: object, opts?: SfxOptions & {sampleRate?: number, seed?: number}) => Promise<AudioBuffer>} renderCry
+ *   Offline render of one creature cry through the sfx bus and master chain (level checks; no rate limit).
  * @property {(id: string, opts?: {bars?: number, sampleRate?: number, stems?: string[]|Record<string, boolean>,
  *   intensity?: number}) => Promise<AudioBuffer>} renderTrack Offline render (at most 10 minutes; stems as in
  *   `setStem`, layers flagged `stem` stay muted unless listed).
@@ -2497,6 +2519,25 @@ export function createAudio() {
         warnOnce(`audio.cry: ${err && err.message}`);
         return null;
       }
+      try {
+        // duck the music under the cry (overlapping cries re-hold from wherever the duck is now). The depth follows
+        // the sliders: full when sfx is at least as loud as music, none when sfx is off (a silent cry must not
+        // make the music dip), proportionally in between.
+        const d = graph.musicDuck.gain;
+        const mg = volumeToGain(vol.music), sg = volumeToGain(vol.sfx);
+        const depth = mg > 0 ? clamp(sg / mg, 0, 1) : 0;
+        if (!(depth > 0)) return { name: 'cry', time: t0, duration: plan.end, plan };
+        const low = dbToGain(CRY_DUCK.db * depth);
+        const v0 = clamp(num(d.value, 1), 0, 1);
+        hold(d, now);
+        // a delayed cry (`delay`): the music keeps its level until the cry starts, then dips over `attack`
+        if (t0 > now + CRY_DUCK.attack) d.setValueAtTime(v0, t0);
+        d.linearRampToValueAtTime(low, t0 + CRY_DUCK.attack);
+        d.setValueAtTime(low, t0 + Math.max(CRY_DUCK.attack, plan.end));
+        d.linearRampToValueAtTime(1, t0 + Math.max(CRY_DUCK.attack, plan.end) + CRY_DUCK.release);
+      } catch {
+        /* automation conflict: the cry still plays, the music just does not dip */
+      }
       return { name: 'cry', time: t0, duration: plan.end, plan };
     },
 
@@ -2588,6 +2629,19 @@ export function createAudio() {
       const pan = clamp(num(o.pan, 0), -1, 1);
       const dest = pan ? mkPan(oc, g.sfxBus, pan) : g.sfxBus;
       def.play(oc, dest, 0.02, { pitch: pitchMult(o), gain: clamp(num(o.volume, 1), 0, 2), rand: makeLcg(num(o.seed, 1)) });
+      return oc.startRendering();
+    },
+    async renderCry(params, options) {
+      const o = opts(options);
+      const OAC = globalThis.OfflineAudioContext || globalThis.webkitOfflineAudioContext;
+      if (typeof OAC !== 'function') throw new Error('renderCry: OfflineAudioContext is not available');
+      const plan = cryPlan(params);
+      const sampleRate = clamp(num(o.sampleRate, 44100), 8000, 96000);
+      const oc = new OAC(2, Math.ceil((plan.end + 0.4) * sampleRate), sampleRate);
+      const g = buildGraph(oc);
+      const pan = clamp(num(o.pan, 0), -1, 1);
+      const dest = pan ? mkPan(oc, g.sfxBus, pan) : g.sfxBus;
+      playCry(oc, dest, 0.02, plan, { pitch: pitchMult(o), gain: clamp(num(o.volume, 1), 0, 2), rand: makeLcg(num(o.seed, 1)) });
       return oc.startRendering();
     },
     async renderTrack(id, options) {
