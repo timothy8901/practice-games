@@ -13,7 +13,7 @@
  */
 
 import {
-  tp, warpTo, cam, camHome, face, emote, flag, errand, wait, sfx, music, toast, call, label, go, END, byDial,
+  mk, tp, warpTo, cam, camHome, face, emote, flag, errand, wait, sfx, music, toast, call, label, go, END, byDial,
 } from './_stage.js';
 
 const P = 'pellwick';
@@ -119,9 +119,9 @@ export default {
   // 4:00 — three on the last dry stones; one picks you
   // ---------------------------------------------------------------------------------------------
   'starter-choice': [
-    { op: 'spawn', who: 'stone-sloshkin', artId: 'sloshkin', x: 59, y: 29 },
-    { op: 'spawn', who: 'stone-scrapling', artId: 'scrapling', x: 59, y: 31 },
-    { op: 'spawn', who: 'stone-reedkit', artId: 'reedkit', x: 59, y: 30 },
+    { op: 'spawn', who: 'stone-sloshkin', artId: 'sloshkin', ...mk(P, 'starter-sloshkin') },
+    { op: 'spawn', who: 'stone-scrapling', artId: 'scrapling', ...mk(P, 'starter-scrapling') },
+    { op: 'spawn', who: 'stone-reedkit', artId: 'reedkit', ...mk(P, 'starter-reedkit') },
     cam(P, 'starter-reedkit', 600),
     '* On the last dry stones, where the lantern light reaches, three small creatures sit and watch you. None of them runs.',
     '* A Sloshkin, round and damp, blowing bubbles at the tide. A Scrapling, all knuckles and grit, turning a pebble over and over. A Reedkit, ears up, so still it might be part of the marsh.',
@@ -149,7 +149,7 @@ export default {
     ] },
     { op: 'choice', prompt: 'Stay beside it?', options: [
       { text: 'Stay.', goto: 'stay' },
-      { text: 'Kneel by another.', then: ['* It follows you anyway, a step behind, while you kneel by the next one.'], goto: 'kneel' },
+      { text: 'Kneel by another.', then: ['* It follows you anyway, a step behind, while you kneel by the next one.', go('kneel')] },
     ], defaultIndex: 0 },
     label('stay'),
     'Wren: That one picked you. ~ They do the picking. We just stand in the right place.',
@@ -434,7 +434,7 @@ export default {
       '* On the quay, by the bollards, someone has left a canvas sack tied with tarred string. A tag on it, in a goose\'s careful hand: POST OFFICE. CAME ON MY PUNT. DON\'T DROP IT. — M.T.',
       '* It is heavier than it looks. Something inside it shifts like paper settling.',
       { op: 'give', item: 'mail-sack', n: 1 },
-      'Wick: Number four! ~ Hesper\'s been waiting for that sack since before I hatched. Mum says.',
+      '* Number four on Wick\'s list. By the look of the tag, somebody has been waiting for this sack for a very long time.',
       { op: 'goto', id: 'done' },
     ] },
     tp('hesper', P, 'hesper-post-step'),
@@ -505,7 +505,7 @@ export default {
     '* A grey heron stands at the bow of a launch that has not floated in a long time, looking down at a river that runs past the end of the creek and not into it.',
     'Ansel: You\'re the one with Wick\'s list. ~ Number six. "Ask Ansel what\'s biting." Nothing\'s biting in the creek. Something\'s biting in the river.',
     'Ansel: Ansel Stalk. ~ Watch the shadows, not the float. Every fish has a tell: a shape, a sound, a word for it. Learn three of the same and you\'ll know it every time.',
-    { op: 'camera', to: [50, 10], ms: 700 },
+    cam(P, 'piling', 700),
     '* By the old piling, a shadow turns in the brown water. Its tail splits into two neat points.',
     'Ansel: Forked tail, by the piling. Don\'t rush it.',
     'Ansel: Cast past it. It\'ll come and look. It\'ll nudge it, twice. Feint, feint. Then the third time it means it, and you\'ll hear it. ~ Plip.',
@@ -530,7 +530,7 @@ export default {
     'Pip: My Wirewhisk\'s fast. Arc Ping goes first, every time; that\'s just how it\'s wired. ~ Battle? Two hundred buttons if you win. Don\'t tell Maud I bet.',
     { op: 'choice', options: [
       { text: 'Battle.', goto: 'fight' },
-      { text: 'Not tonight.', then: ['Pip: Fair. The bollards and I will be here. We\'re always here. ~ We\'re very reliable.'], goto: 'out' },
+      { text: 'Not tonight.', then: ['Pip: Fair. The bollards and I will be here. We\'re always here. ~ We\'re very reliable.', go('out')] },
     ], defaultIndex: 0 },
     label('fight'),
     { op: 'startBattle', trainer: 'pip' },
@@ -596,9 +596,9 @@ export default {
     'Dimity: Oh, good. ~ It\'s warm. Somebody paid for warm.',
     'Dimity: Dimity. I keep the page. Whatever happens in a day, I write it down when you sit or sleep: buttons, people, catches, Shifts. And tomorrow. Always tomorrow.',
     'Dimity: I\'ll keep the save too. If it ever fails I\'ll say so, in red. It won\'t. ~ I\'m very careful.',
-    tp('wick', P, 'cottage-porch', 1, 1),
+    tp('wick', P, 'wick-errands'), // (10,25), below the mailbox: cottage-porch +1,+1 is the mailbox itself
     'Wick: Keeper. ~ Your porch is on. That\'s eight. Augusta will have to change the board.',
-    { op: 'spawn', who: 'lamp-prismoth', artId: 'prismoth', x: 10, y: 23 },
+    { op: 'spawn', who: 'lamp-prismoth', artId: 'prismoth', ...mk(P, 'prismoth-lamp') },
     '* Another wing at the lamp. Larger, glassy, catching the light in a lattice that shivers every few seconds. It does not land. It looks at the light like it wants to drink it.',
     'Wick: A Prismoth! They come to lamps. Mum says the light calls them. ~ Read it! Go on!',
     sfx('blocked'),
@@ -634,7 +634,7 @@ export default {
     'Barnaby: (Don\'t step on the cockles.) ~ It\'s you! The Keeper! Out at the night low! Oh, you\'re a natural. (I\'m out at every low. It\'s the provenance.)',
     'Barnaby: That\'s skyglass under there, all through the mud. Bits of comet. They hum; put your ear down. ~ (Not literally. You\'ll get mud in it.)',
     'Barnaby: At a night low the bigger pieces come up near the surface. Three a night, no more. Dig where the glow is thickest.',
-    { op: 'camera', to: [11, 38], ms: 600 },
+    cam(P, 'glint-hint', 600),
     '* Further out, something glints that is not cyan: a hard brass gleam, just under the mud.',
     'Barnaby: And THAT is the Glint. One a day, somewhere on the flats. Somebody\'s purse, or a lot of somebodies\'. It gets bigger every day. (Nobody knows why. I have a string for it.)',
     camHome(400),

@@ -231,13 +231,53 @@ export function learnableAt(sp, level) {
 }
 
 /**
- * Whether a form's learnset contains a move.
+ * Whether a form can learn a move: its learnset or its disc list `flags.teachable` (GDD-03 §6.2).
+ * Read by Shifts (a move the new form can learn keeps its slot), Memory relearn and disc teaching.
  * @param {SpeciesInfo} sp
  * @param {string} moveId
  * @returns {boolean}
  */
 export function canLearn(sp, moveId) {
   return sp.learnset.some((e) => e.move === moveId) || (Array.isArray(sp.flags?.teachable) && sp.flags.teachable.includes(moveId));
+}
+
+/**
+ * Where a creature stands for a disc (the learner strip): already knows the move, its current form
+ * can be taught it ({@link canLearn}), or not. A form missing from `data` reads as `'cannot'`.
+ * @param {Pick<Creature, 'speciesId'|'moves'>} c
+ * @param {string} moveId
+ * @param {any} data
+ * @returns {'knows'|'can'|'cannot'}
+ */
+export function canTeach(c, moveId, data) {
+  if ((c?.moves ?? []).some((m) => m.id === moveId)) return 'knows';
+  const sp = c ? dataLookup(data).speciesOrNull(c.speciesId) : null;
+  return sp && canLearn(sp, moveId) ? 'can' : 'cannot';
+}
+
+/**
+ * Teaches a move by disc (systems/bag `teach` effect) with the rules checked here, not only in the
+ * menu: refuses an unknown move, a move already known, a move the current form cannot learn
+ * ({@link canTeach}), a full set without a valid `opts.replaceIndex`, and a replacement aimed at the
+ * Heartmark technique; otherwise {@link learnMove}. Nothing changes on a refusal.
+ * @param {Creature} c
+ * @param {string} moveId
+ * @param {any} data
+ * @param {TuningOpts & {replaceIndex?: number}} [opts]
+ * @returns {{ok: true, move: string, replaced: string|null}|{ok: false, reason: 'unknown-move'|'knows'|'cannot-learn'|'full'|'heartmark'}}
+ */
+export function teachMove(c, moveId, data, opts = {}) {
+  if (typeof moveId !== 'string' || !dataLookup(data).moveOrNull(moveId)) return { ok: false, reason: 'unknown-move' };
+  const state = canTeach(c, moveId, data);
+  if (state === 'knows') return { ok: false, reason: 'knows' };
+  if (state === 'cannot') return { ok: false, reason: 'cannot-learn' };
+  const full = c.moves.length >= tuningOf(opts.tuning).MOVE_SLOTS;
+  const i = opts.replaceIndex;
+  if (full && !(Number.isInteger(i) && /** @type {number} */ (i) >= 0 && /** @type {number} */ (i) < c.moves.length)) return { ok: false, reason: 'full' };
+  const replaced = full ? c.moves[/** @type {number} */ (i)].id : null;
+  if (full && replaced === c.heartmark) return { ok: false, reason: 'heartmark' };
+  if (!learnMove(c, moveId, data, opts)) return { ok: false, reason: 'full' };
+  return { ok: true, move: moveId, replaced };
 }
 
 /**
@@ -419,13 +459,18 @@ export function drawMark(rng, opts = {}) {
   return { x: x === 0 ? 0 : x, y: y === 0 ? 0 : y }; // never -0 (JSON round-trips must be equal)
 }
 
+/**
+ * The four Heartmark body anchors, in roll order (GDD-00 §14; the same list as
+ * `art/heartmark.ANCHOR_KEYS` and the schema's `mark.anchor` values; pure rules never import js/art).
+ */
+const MARK_ANCHORS = Object.freeze(['head', 'chest', 'back', 'tail']);
+
 /** A lifetime body-part choice; old saves can still carry a legacy x/y offset. */
 export function drawBodyMark(uid, rng) {
-  const anchors = ['head', 'chest', 'back', 'tail'];
   let hash = 0x811c9dc5;
   for (const ch of `heartmark:${uid}`) { hash ^= ch.charCodeAt(0); hash = Math.imul(hash, 0x01000193); }
-  const index = creatureStream(rng, 'mark', uid)?.int(0, anchors.length - 1) ?? ((hash >>> 0) % anchors.length);
-  return { x: 0, y: 0, anchor: anchors[index] };
+  const index = creatureStream(rng, 'mark', uid)?.int(0, MARK_ANCHORS.length - 1) ?? ((hash >>> 0) % MARK_ANCHORS.length);
+  return { x: 0, y: 0, anchor: MARK_ANCHORS[index] };
 }
 
 /**
@@ -467,7 +512,7 @@ export function buildTypeQueue(formTypes, typeNames, rng, opts = {}) {
  * @property {string} [nickname]               default: the form's name
  * @property {Rng|null} [rng]                  Heartmark placement + Unfixed loop (forked by label + uid)
  * @property {Partial<StatBlock>} [trained]
- * @property {string|null} [heldItem]          a held item whose row has `blocksShifts: true` sets `stillKnot`
+ * @property {string|null} [heldItem]          a held item whose row stops Shifts ({@link itemBlocksShift}) sets `stillKnot`
  * @property {number} [bond]
  * @property {string[]} [moves]                explicit move ids (max MOVE_SLOTS)
  * @property {string|null} [heartmark]         default: the form's fixed Heartmark technique
@@ -521,9 +566,8 @@ export function makeCreature(opts, data) {
   }
 
   const rng = opts.rng || null;
-  const anchors = ['head', 'chest', 'back', 'tail'];
   const mark = opts.mark && Number.isInteger(opts.mark.x) && Number.isInteger(opts.mark.y)
-    ? { x: opts.mark.x, y: opts.mark.y, ...(anchors.includes(opts.mark.anchor) ? { anchor: opts.mark.anchor } : {}) }
+    ? { x: opts.mark.x, y: opts.mark.y, ...(MARK_ANCHORS.includes(opts.mark.anchor) ? { anchor: opts.mark.anchor } : {}) }
     : drawBodyMark(opts.uid, rng);
   const typeQueue = isUnfixedAbility(look.ability(sp.ability))
     ? buildTypeQueue(sp.types, look.typeNames(), creatureStream(rng, 'unfixed', opts.uid), opts)
@@ -588,13 +632,26 @@ function clampInt(v, lo, hi) {
 }
 
 /**
+ * Whether an item row stops every Shift while held (the Still Knot, GDD-00 §8). Item rows spell it
+ * `held: {blocksShift: true}` (data/items.js, battle/heldItems); the older rule spelling
+ * `blocksShifts: true` on the row (and the `held.blocksShifts` / row `blocksShift` variants the party
+ * screen also reads) is accepted, so fixtures and older content keep working.
+ * @param {any} row   an item row (null/undefined = not a Knot)
+ * @returns {boolean}
+ */
+export function itemBlocksShift(row) {
+  if (!row || typeof row !== 'object') return false;
+  const held = row.held && typeof row.held === 'object' ? row.held : null;
+  return row.blocksShifts === true || row.blocksShift === true || held?.blocksShift === true || held?.blocksShifts === true;
+}
+
+/**
  * @param {import('./exp.js').DataLookup} look
  * @param {string|null} itemId
  */
 function blocksShifts(look, itemId) {
   if (!itemId) return false;
-  const row = look.itemOrNull(itemId);
-  return !!(row && (row.blocksShifts === true || row.held?.blocksShift === true));
+  return itemBlocksShift(look.itemOrNull(itemId));
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -824,7 +881,7 @@ export function addBond(c, pips, opts = {}) {
 }
 
 /**
- * Sets (or clears, with null) the held item. `stillKnot` follows the item row's `blocksShifts`.
+ * Sets (or clears, with null) the held item. `stillKnot` follows the item row ({@link itemBlocksShift}).
  * On a world creature use `party.setHeldItem`, which also brings `pendingShifts` in line.
  * @param {Creature} c
  * @param {string|null} itemId
@@ -864,7 +921,7 @@ export function serialize(c) {
  * Rebuilds a creature from {@link serialize} output (or an older snapshot), self-healing: unknown
  * keys dropped, numbers clamped, a missing level read off the EXP, EXP clamped into the level's
  * band on the creature's own curve ({@link growthOf}), Memory ids that are not moves dropped, statuses outside the schema's kinds cleared, an empty move list given the fallback move,
- * `stillKnot` false without a held item (and following a known item row's `blocksShifts`), an
+ * `stillKnot` false without a held item (and following a known item row, {@link itemBlocksShift}), an
  * Unfixed creature's `types` reset to its form's (the loop position is `typeIndex`, wrapped into
  * the loop), and stats recomputed from base + level + trained.
  * @param {Record<string, any>} rec
@@ -937,7 +994,7 @@ export function deserialize(rec, data, opts = {}) {
     heartmark,
     heartmarkStab: rec.heartmarkStab === true,
     mark: rec.mark && Number.isInteger(rec.mark.x) && Number.isInteger(rec.mark.y)
-      ? { x: rec.mark.x, y: rec.mark.y, ...(['head', 'chest', 'back', 'tail'].includes(rec.mark.anchor) ? { anchor: rec.mark.anchor } : {}) }
+      ? { x: rec.mark.x, y: rec.mark.y, ...(MARK_ANCHORS.includes(rec.mark.anchor) ? { anchor: rec.mark.anchor } : {}) }
       : { x: 0, y: 0 },
     starTouched: rec.starTouched === true,
     shiftlog: shiftlog.length ? shiftlog : [sp.id],
