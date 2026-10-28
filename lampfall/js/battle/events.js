@@ -76,6 +76,8 @@ export const EVENT_FIELDS = Object.freeze({
   item: Object.freeze({ side: 'side', item: 'string', text: 'string' }),
   'ward-suppressed': Object.freeze({ side: 'side', target: 'string', turns: 'number', text: 'string' }),
   'type-shift': Object.freeze({ side: 'side', who: 'string', current: 'string', next: 'array', text: 'string' }),
+  'shift-posted': Object.freeze({ side: 'side', who: 'string', uid: 'any', cards: 'array', turnsLeft: 'number', text: 'string' }),
+  'boss-shift': Object.freeze({ side: 'side', who: 'string', uid: 'any', from: 'string', to: 'string', dir: 'string', types: 'array', text: 'string' }),
   'weather-start': Object.freeze({ kind: 'string', name: 'string', turnsLeft: '?number', posted: 'array', source: 'string', rule: 'string', text: 'string' }),
   'weather-tick': Object.freeze({ kind: 'string', name: 'string', turnsLeft: '?number', posted: 'array', text: 'string' }),
   'weather-end': Object.freeze({ kind: 'string', name: 'string', text: 'string' }),
@@ -198,6 +200,15 @@ export function checkEvent(ev) {
 /** @typedef {{type: 'ward-suppressed', side: Side, target: string, turns: number, text: string}} WardSuppressedEvent  side = the Ward holder */
 /** @typedef {{type: 'type-shift', side: Side, who: string, current: string, next: string[], text: string}} TypeShiftEvent */
 /**
+ * @typedef {{type: 'shift-posted', side: Side, who: string, uid: any, cards: Array<{dir: 'up'|'side'|'down', form: string, name: string, odds: number}>,
+ *   turnsLeft: number, text: string}} ShiftPostedEvent  a posted boss Shift's Forecast strip (GDD-04 §1.4); turnsLeft 0 = it lands now
+ */
+/**
+ * @typedef {{type: 'boss-shift', side: Side, who: string, uid: any, from: string, to: string, dir: string, types: string[], text: string,
+ *   name?: string, toName?: string, hp?: number, maxHp?: number, fromTypes?: string[], fromMaxHp?: number}} BossShiftEvent
+ *   the posted Shift landed: `who` is the name before, `name` after (an un-nicknamed creature takes its form's name), `to` the new form (HP fraction kept)
+ */
+/**
  * @typedef {{type: 'weather-start', kind: string, name: string, turnsLeft: number|null, posted: Array<{turn: number, kind: string|null, name: string|null}>,
  *   source: 'setup'|'cycle'|'entry'|'move', rule: string, text: string, side?: Side}} WeatherStartEvent
  *   turnsLeft counts the coming turn (null = until something replaces it); posted = the strip for the next turns; rule = the kind's one-line effect
@@ -219,6 +230,6 @@ export function checkEvent(ev) {
  * @typedef {MessageEvent|TurnEvent|SwitchEvent|MoveEvent|ChargeEvent|MissEvent|DecoyEvent|DecoyPopEvent|GuardEvent|BlockedEvent|
  *   WardReadoutEvent|EffectivenessEvent|DamageEvent|CritEvent|FaintEvent|StatusEvent|StatEvent|HealEvent|MendSpentEvent|MendPendingEvent|
  *   MendCancelledEvent|AbilityEvent|GlintEvent|ScrapCostEvent|ReadEvent|RevealEvent|CaptureShakeEvent|CaptureEvent|CaptureFailEvent|
- *   RunEvent|StanceEvent|ItemEvent|WardSuppressedEvent|TypeShiftEvent|WeatherStartEvent|WeatherTickEvent|WeatherEndEvent|HeldItemEvent|ExpEvent|LevelUpEvent|LearnEvent|LearnOfferEvent|PayoutEvent|
+ *   RunEvent|StanceEvent|ItemEvent|WardSuppressedEvent|TypeShiftEvent|ShiftPostedEvent|BossShiftEvent|WeatherStartEvent|WeatherTickEvent|WeatherEndEvent|HeldItemEvent|ExpEvent|LevelUpEvent|LearnEvent|LearnOfferEvent|PayoutEvent|
  *   BlackoutEvent|ReplaceNeededEvent|EndEvent} BattleEvent
  */

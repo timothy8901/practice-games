@@ -281,3 +281,16 @@ export function surfaceFor(style) {
     band: COLORS.focus.bandOnPaper, hover: COLORS.focus.hoverOnPaper, rule: COLORS.paper.rule, dark: false,
   };
 }
+
+/** CSS filter the display canvas wears under High contrast (GDD-09 §6), on top of the menu skins. */
+export const HIGH_CONTRAST_FILTER = 'contrast(1.3) saturate(1.15)';
+
+/**
+ * The display canvas filter for a settings object (LG-RN102): High contrast lifts contrast on
+ * every screen (field, dialogue, battle), while the menus also swap to their night-ink skin.
+ * @param {{highContrast?: boolean}|null|undefined} settings
+ * @returns {string} a CSS `filter` value ('' when off)
+ */
+export function displayFilterFor(settings) {
+  return settings && settings.highContrast === true ? HIGH_CONTRAST_FILTER : '';
+}

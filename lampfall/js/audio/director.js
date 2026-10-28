@@ -675,10 +675,13 @@ export function createMusicDirector(G, opts = {}) {
     if (!a || !s) return;
     const muted = Boolean(s.muted) || Boolean(ctxG.flags && ctxG.flags.mute);
     const vol = s.volumes && typeof s.volumes === 'object' ? s.volumes : null;
-    const sig = JSON.stringify([vol, muted]);
+    // the ambience slider (LG-RN102): world.settings.ambience (mirrored), or volumes.ambience
+    const amb = typeof s.ambience === 'number' ? s.ambience : vol && typeof vol.ambience === 'number' ? vol.ambience : null;
+    const sig = JSON.stringify([vol, muted, amb]);
     if (sig === lastSettings) return;
     lastSettings = sig;
     if (vol && typeof a.setVolume === 'function') call(() => a.setVolume({ master: vol.master, music: vol.music, sfx: vol.sfx }));
+    if (amb !== null && typeof a.setAmbience === 'function') call(() => a.setAmbience(amb));
     if (typeof a.mute === 'function') call(() => a.mute(muted));
   }
 

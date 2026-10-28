@@ -142,7 +142,17 @@ const OVERLAY_CSS = [
   '.wsp-touch__btn--menu{top:max(12px,env(safe-area-inset-top));right:max(12px,env(safe-area-inset-right));width:auto;height:auto;',
   'padding:7px 14px;border-radius:999px;font-size:13px;letter-spacing:.12em}',
   '.wsp-touch__btn.is-on{background:rgba(255,255,255,.7);color:#121428;text-shadow:none;transform:scale(.94)}',
+  // one-handed (GDD-09 §6 touch layout): every control in a right-thumb arc, the d-pad above A/B/MENU
+  '.wsp-touch--one .wsp-touch__dpad{left:auto;right:max(var(--wsp-pad),env(safe-area-inset-right));',
+  'bottom:calc(max(var(--wsp-pad),env(safe-area-inset-bottom)) + var(--wsp-b)*2.2)}',
+  '.wsp-touch--one .wsp-touch__btn--b{right:calc(max(var(--wsp-pad),env(safe-area-inset-right)) + var(--wsp-b)*1.1);',
+  'bottom:calc(max(var(--wsp-pad),env(safe-area-inset-bottom)) + var(--wsp-b)*.1)}',
+  '.wsp-touch--one .wsp-touch__btn--menu{top:auto;bottom:max(var(--wsp-pad),env(safe-area-inset-bottom));',
+  'right:calc(max(var(--wsp-pad),env(safe-area-inset-right)) + var(--wsp-b)*2.25)}',
 ].join('');
+
+/** Touch layouts (GDD-09 §6): two-handed (default) or one-handed. */
+export const TOUCH_LAYOUTS = Object.freeze(['two', 'one']);
 
 /**
  * @typedef {Object<string, string[]>} Bindings  Map of action name to token list.
@@ -227,6 +237,8 @@ const OVERLAY_CSS = [
  * @property {(on: boolean) => void} setEnabled        Ignore all input while false (releases everything).
  * @property {boolean} enabled
  * @property {(v: boolean|'auto') => void} setTouchVisible Force the overlay on/off or return to auto.
+ * @property {(layout: 'two'|'one') => 'two'|'one'} setTouchLayout Two-handed or one-handed touch controls.
+ * @property {() => 'two'|'one'} touchLayout The current touch layout.
  * @property {boolean} touchVisible
  * @property {(on: boolean) => void} setVibrationEnabled
  * @property {boolean} vibrationEnabled
@@ -501,6 +513,8 @@ export function createInput(options = {}) {
   const overlayAllowed = touch !== false || touchPref.visible; // the URL flag beats `touch: false`
   /** @type {ReturnType<typeof createTouchOverlay>|null} */
   let overlay = null;
+  /** @type {'two'|'one'} */
+  let touchLayout = 'two';
 
   function ensureOverlay() {
     if (overlay || destroyed || !overlayAllowed) return overlay;
@@ -510,6 +524,7 @@ export function createInput(options = {}) {
       fixed: !touchParent,
       onToken: (token, down) => (down ? tokenDown(token, 'touch') : tokenUp(token)),
     });
+    overlay.setLayout?.(touchLayout);
     return overlay;
   }
 
@@ -952,6 +967,12 @@ export function createInput(options = {}) {
     showOverlay(Boolean(value));
   }
 
+  function setTouchLayout(layout) {
+    touchLayout = layout === 'one' ? 'one' : 'two';
+    if (overlay) overlay.setLayout?.(touchLayout);
+    return touchLayout;
+  }
+
   function destroy() {
     for (const off of subs.splice(0)) off();
     releaseAll();
@@ -998,6 +1019,8 @@ export function createInput(options = {}) {
     lastPressedToken: () => lastToken,
     setEnabled,
     setTouchVisible,
+    setTouchLayout,
+    touchLayout: () => touchLayout,
     setVibrationEnabled: (on) => {
       vibrationEnabled = Boolean(on);
     },
@@ -1036,11 +1059,12 @@ export function createInput(options = {}) {
  */
 function createTouchOverlay({ doc, parent, fixed, onToken }) {
   if (!doc || !parent || typeof doc.createElement !== 'function') {
-    return { visible: false, setVisible() {}, release() {}, destroy() {}, owns: () => false };
+    return { visible: false, setVisible() {}, setLayout() {}, release() {}, destroy() {}, owns: () => false };
   }
   ensureOverlayStyle(doc);
   const root = doc.createElement('div');
-  root.className = fixed ? 'wsp-touch' : 'wsp-touch wsp-touch--abs';
+  const baseClass = fixed ? 'wsp-touch' : 'wsp-touch wsp-touch--abs';
+  root.className = baseClass;
   root.setAttribute('aria-hidden', 'true');
 
   const dpad = doc.createElement('div');
@@ -1155,6 +1179,10 @@ function createTouchOverlay({ doc, parent, fixed, onToken }) {
       } catch {
         return false;
       }
+    },
+    /** Two-handed (default) or one-handed: one-handed moves every control into a right-thumb arc. */
+    setLayout(layout) {
+      root.className = layout === 'one' ? `${baseClass} wsp-touch--one` : baseClass;
     },
     /** Lift every finger (focus loss); emits the matching release tokens. */
     release() {

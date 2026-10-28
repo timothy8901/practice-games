@@ -202,17 +202,73 @@ export function ferryFare(world) {
 function talk(G, action, host) {
   const e = action.target;
   const npcId = (e && e.npcId) || action.targetId;
+  // A Spire's second leader (the Relay twins: Ada holds the post, Ivo stands beside her) offers the
+  // same challenge until the Spire is won (MID-15).
+  const spireTr = spireTrainer(G, host);
+  if (spireTr && Array.isArray(spireTr.npcs) && spireTr.npcs.includes(npcId) && spireTr.npc !== npcId && !G.world.flags[`sys.trainer.${spireTr.id}`]) {
+    return challenge(G, { ...action, verb: 'challenge', payload: { ...(action.payload || {}), trainerId: spireTr.id } }, host);
+  }
   if (host && host.faceToward) host.faceToward(e && e.id ? e.id : npcId);
   const pose = host && host.npcPose ? host.npcPose(npcId) : null;
   G.push('dialogue', { target: { kind: 'npc', id: npcId, pose: pose || undefined, mapId: host && host.mapId ? host.mapId : G.world.player.mapId } });
   return done('talk', { scene: 'dialogue', npcId });
 }
 
+/** The spires row of the Spire map the player stands in (MapDef `spire`), or null. */
+function spireRow(G, host, spireId) {
+  const id = spireId ?? host?.mapDef?.spire ?? null;
+  if (typeof id !== 'string') return null;
+  try { return G.data.tryGet('spires', id) ?? null; } catch { return null; }
+}
+
+/** The leader row of this Spire map, or null. */
+function spireTrainer(G, host) {
+  const sp = spireRow(G, host);
+  if (!sp || typeof sp.trainer !== 'string') return null;
+  try { return G.data.tryGet('trainers', sp.trainer) ?? null; } catch { return null; }
+}
+
+/**
+ * A Spire sentinel (spires.js `order` entry of kind 'sentinel', placed by the map as a prop with
+ * `sentinel: <id>`): a teaching battle against the posted foe. Capture is refused, nothing is lost,
+ * and a win sets `sys.trainer.<id>` so the stone steps out of the gap (the prop's cond) and the lesson
+ * is posted (battleFlow).
+ */
+async function sentinel(G, action, host) {
+  const d = def(action);
+  const sp = spireRow(G, host, d.spire);
+  const row = sp && Array.isArray(sp.order) ? sp.order.find((o) => o && o.kind === 'sentinel' && o.id === d.sentinel) : null;
+  if (!row || !row.foe) return fail('challenge', 'unknown-sentinel');
+  if (G.world.flags[`sys.trainer.${row.id}`]) {
+    say(G, row.lesson, row.name);
+    return done('challenge', { scene: 'dialogue', defeated: true, sentinelId: row.id });
+  }
+  if (!hasAliveParty(G.world)) {
+    toast(G, host, 'Bring a rested companion. The Waystones heal your party.');
+    return fail('challenge', 'no-party');
+  }
+  let foeName = row.foe.species;
+  try { foeName = G.data.tryGet('species', row.foe.species)?.name ?? foeName; } catch { /* id */ }
+  const pick = await ask(G, host, { title: row.name, body: `A stone sentinel holds the gap: ${foeName} Lv${row.foe.level}. Read it, then answer it.`, // str
+    options: ['Come back later', 'Challenge'], defaultIndex: 0 });
+  if (pick !== 1) return fail('challenge', 'declined');
+  const setup = {
+    kind: 'wild', wild: { speciesId: row.foe.species, level: row.foe.level, moves: row.foe.moves ? [...row.foe.moves] : undefined },
+    source: 'story', capture: false, sentinel: { id: row.id, name: row.name, lesson: row.lesson },
+  };
+  if (host.startBattle) host.startBattle(setup);
+  else G.push('battle', { setup });
+  return done('challenge', { scene: 'battle', sentinelId: row.id });
+}
+
 async function challenge(G, action, host) {
-  const id = action.payload?.trainerId ?? def(action).trainerId;
-  const trainer = G.data.tryGet('trainers', id);
+  if (def(action).sentinel) return sentinel(G, action, host);
+  let id = action.payload?.trainerId ?? def(action).trainerId;
+  // the dais tile (tilesets `spire-dais`, verb challenge) stands for this Spire's leader (MID-15)
+  if (!id && action.kind === 'tile') id = spireTrainer(G, host)?.id;
+  const trainer = id ? G.data.tryGet('trainers', id) : null;
   if (!trainer) return fail('challenge', 'unknown-trainer');
-  if (host.faceToward) host.faceToward(action.targetId);
+  if (host.faceToward && action.kind !== 'tile') host.faceToward(action.targetId);
   if (G.world.flags[`sys.trainer.${id}`]) {
     say(G, trainer.lines.win, trainer.npc ?? trainer.name);
     return done('challenge', { scene: 'dialogue', defeated: true });
@@ -528,6 +584,7 @@ async function pay(G, action, host) {
     Object.assign(params, {
       rooms: prompt.rooms, roomTier: prompt.tier, roomFirst: prompt.roomFirst,
       onRoom: (roomId) => G.store.tx('loan:commission', (ww) => loans.chooseCommission(ww, roomId, ctx)),
+      roomPrompt: () => loans.commissionPrompt(G.world, null, ctx),
     });
   }
   if (hasScene(G, 'ceremony')) G.push('ceremony', params);
@@ -624,6 +681,52 @@ export function knockText(G, porchId, npcId, lit) {
   const out = /\s/.test(activity) && !/^festival:/.test(activity) ? activity : '';
   if (lit) return out ? t('knock.awayLitDoing', { name, activity: out }) : t('knock.awayLit', { name });
   return out ? t('knock.awayDarkDoing', { name, activity: out }) : t('knock.awayDark', { name });
+}
+
+// ---- Lantern-paths (MID-09; GDD-00 §4/§7: the second seal) ------------------------------------
+
+/** Seals needed before Ludo has lit the Lantern-paths. */
+export const LANTERN_PATH_BADGES = 2;
+/** Where a Lantern-path home lands: your porch step. */
+export const LANTERN_HOME = Object.freeze({ mapId: 'pellwick', x: 9, y: 23, facing: 'down' });
+
+/**
+ * Where a Lantern-path to `mapId` would land, or why it cannot: the second seal opens them; a
+ * Waystone must have been visited on foot (Ludo lights the ones with your footprints round them);
+ * Pellwick is home (your porch). Pure.
+ * @param {any} world
+ * @param {any} data
+ * @param {string} mapId
+ * @returns {{ok: true, home: boolean, stone: string|null, to: {mapId: string, x: number, y: number, facing: string}}
+ *   | {ok: false, reason: 'locked'|'no-stone'|'unlit'}}
+ */
+export function lanternPathTo(world, data, mapId) {
+  if (badgeCount(world) < LANTERN_PATH_BADGES) return { ok: false, reason: 'locked' };
+  if (mapId === LANTERN_HOME.mapId) return { ok: true, home: true, stone: null, to: { ...LANTERN_HOME } };
+  const map = data && data.has && data.has('maps', mapId) ? data.get('maps', mapId) : null;
+  const stone = map ? (map.entities || []).find((e) => e && e.waystone) : null;
+  if (!stone) return { ok: false, reason: 'no-stone' };
+  if ((world?.flags ?? {})[`sys.waystone.${stone.id}`] == null) return { ok: false, reason: 'unlit' };
+  // beside the stone, on its west side (every authored Waystone keeps that tile clear)
+  return { ok: true, home: false, stone: stone.id, to: { mapId: map.id, x: stone.x - 1, y: stone.y, facing: 'right' } };
+}
+
+/**
+ * Walks a Lantern-path: instantly, at any tide. With a field host the host travels (fade, map
+ * enter); without one (the map screen) the player is placed and the field reloads the map when it
+ * resumes.
+ * @param {any} G
+ * @param {string} mapId
+ * @param {any} [host]
+ * @returns {{verb: string, ok: boolean, reason?: string}}
+ */
+export function walkLanternPath(G, mapId, host) {
+  const r = lanternPathTo(G.world, G.data, mapId);
+  if (!r.ok) return fail('lanternPath', r.reason);
+  if (host && typeof host.travel === 'function') host.travel({ ...r.to }, { kind: 'lantern' });
+  else G.store.tx('lantern:path', (w) => { w.player.mapId = r.to.mapId; w.player.x = r.to.x; w.player.y = r.to.y; w.player.facing = r.to.facing; });
+  G.bus.emit('lantern:path', { mapId: r.to.mapId, home: r.home, stone: r.stone });
+  return done('lanternPath', { mapId: r.to.mapId, home: r.home });
 }
 
 async function waystone(G, action, host) {

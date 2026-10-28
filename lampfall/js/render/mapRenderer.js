@@ -99,6 +99,21 @@ export function lutKey(minute, weather, indoor) {
  */
 
 /**
+ * Path view (the Read view) next state for the `pathView` setting (GDD-09 §6, LG-RN102). Hold:
+ * shown exactly while the Read button is held. Toggle: a press flips it. Pure; the field scene
+ * feeds it the Read button's press edge and held state each frame.
+ * @param {'hold'|'toggle'|string|undefined} mode
+ * @param {boolean} on       shown now
+ * @param {{pressed?: boolean, held?: boolean}} read   the Read button this frame
+ * @returns {boolean}
+ */
+export function pathViewNext(mode, on, read) {
+  const r = read || {};
+  if (mode === 'hold') return Boolean(r.held || r.pressed);
+  return r.pressed ? !on : Boolean(on);
+}
+
+/**
  * @param {{budgetMs?: number, maxChunks?: number, maxCombos?: number, fxSeed?: string}} [opts]
  */
 export function createMapRenderer(opts = {}) {

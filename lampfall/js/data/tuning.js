@@ -283,11 +283,18 @@ export const TUNING = freeze({
 
   // ===== EXP and windows (systems/exp; GDD-00 §8 EXP) ===========================================
   MAX_LEVEL: 100,
-  GROWTH_CURVES: {                     // cumulative EXP to reach level L = 8 × L² on every curve [fixed formula]
-    fast: { num: [0, 8, 0, 0], den: 1 },
-    'medium-fast': { num: [0, 8, 0, 0], den: 1 },
-    'medium-slow': { num: [0, 8, 0, 0], den: 1 },
-    slow: { num: [0, 8, 0, 0], den: 1 },
+  // Cumulative EXP to reach level L, the same on every curve: GDD-00's 8 × L² through Lv8 (night one's
+  // check holds exactly: Lv5 200, Lv7 392, Lv8 512), then (3·L³ − 512) / 2 from Lv9 (joins at 512).
+  // Why the step (MID-06): KO EXP = yield × foe level ÷ 5 grows with level as fast as 8 × L² does
+  // (16·L a level), so every KO was worth the same share of a level at any level: about 2.8 levels
+  // per trainer KO of a yield-150 form, and parties reached Lv89 by the Mirror Spire (curve 40).
+  // A cubic above Lv8 makes a level cost ~4.5·L² while a KO pays ~yield·L/5, so parties settle on the
+  // posted curve: tools/balance-sim.mjs --only progression, gated by test/data.progression.test.mjs.
+  GROWTH_CURVES: {
+    fast: { num: [0, 8, 0, 0], den: 1, steps: [{ from: 9, num: [3, 0, 0, -512], den: 2 }] },
+    'medium-fast': { num: [0, 8, 0, 0], den: 1, steps: [{ from: 9, num: [3, 0, 0, -512], den: 2 }] },
+    'medium-slow': { num: [0, 8, 0, 0], den: 1, steps: [{ from: 9, num: [3, 0, 0, -512], den: 2 }] },
+    slow: { num: [0, 8, 0, 0], den: 1, steps: [{ from: 9, num: [3, 0, 0, -512], den: 2 }] },
   },
   EXP_DIVISOR: 5,                      // KO EXP = yield × foe level ÷ 5 [fixed]
   TRAINER_EXP_MULT: 1.5,               // trainer battles ×1.5 [fixed]

@@ -377,6 +377,22 @@ export default {
     { area: 'grass', table: 'pellwick-reeds', rate: 0.1, reeds: true },
     { area: { x: 29, y: 11, w: 14, h: 2 }, table: 'pellwick-reach', rate: 0, via: 'hook', note: 'never stepped: reaches hook this table through fishing (reaches[].creatureTable)' },
   ],
+  // building names on the local map (scenes/mapScreen; LG-PF2): `text` is a strings key, x,y the
+  // tile the label centres on (above or below the building so neighbours never overlap)
+  labels: [
+    { text: 'map.label.cottage', x: 9, y: 25 },
+    { text: 'map.label.lighthouse', x: 6, y: 13 },
+    { text: 'map.label.pells', x: 24, y: 16 },
+    { text: 'map.label.archive', x: 32, y: 21 },
+    { text: 'map.label.wardens', x: 41, y: 16 },
+    { text: 'map.label.postOffice', x: 49, y: 21 },
+    { text: 'map.label.commons', x: 38, y: 28 },
+    { text: 'map.label.yard', x: 54, y: 24 },
+    { text: 'map.label.anchorage', x: 56, y: 37 },
+    { text: 'map.label.ferry', x: 35, y: 45 },
+    { text: 'map.label.dock', x: 15, y: 43 },
+    { text: 'map.label.stones', x: 61, y: 31 },
+  ],
   regions: {
     'lowmoor-long-way': { x: 13, y: 0, w: 10, h: 7 },
     'marsh-reeds': { x: 9, y: 3, w: 11, h: 11 },

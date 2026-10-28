@@ -43,7 +43,7 @@ import {
 } from './battleAnims.js';
 import {
   buildBattle, applyBattleResult, createDeferredBus, prepareAction, captureMenu, bagMenu, noteEvents, expDisplay,
-  applyExpEvent, learnOffered, nameCaught, installBattleDebug,
+  applyExpEvent, learnOffered, nameCaught, installBattleDebug, relayRule, relayChoices, relayDefaultPicks, relayNextSetup,
 } from '../systems/flow/battleFlow.js';
 import { resolveBattleData } from './battleData.js';
 
@@ -267,6 +267,14 @@ export function createBattleScene(G) {
   const intro = { rustle: 0, place: 'grass' };
   /** @type {{kind: string, name: string, turnsLeft: number|null, posted: any[]}|null} */
   let weatherState = null;
+  /** posted boss-Shift strips by creature ('shift-posted' until its 'boss-shift'; GDD-04 §1.4): a strip
+   * belongs to its creature, so it shows only while that creature stands on the field (never over the
+   * foe that replaced a fainted or recalled one) and comes back with it */
+  /** @type {Map<any, {side: number, uid: any, who: string, cards: Array<{dir: string, name: string, odds: number}>, turnsLeft: number}>} */
+  const postedStrips = new Map();
+  /** foe forms still shown before their queued 'boss-shift' plays (uid -> the form before) */
+  /** @type {Map<any, {speciesId: string, types: string[], name: string, maxHp: number|null}>} */
+  const formShown = new Map();
   let levelFlashMs = 0;
 
   const queue = createAnimQueue({
@@ -320,11 +328,20 @@ export function createBattleScene(G) {
     m.speciesId = c.speciesId;
     m.level = side === 0 ? (expDisplay(session, c.uid)?.level ?? c.level) : c.level;
     m.maxHp = c.maxHp;
+    // the engine state is already past a queued boss Shift: show the form it had until the Shift plays
+    const before = formShown.get(c.uid);
     const hp = knownHp.has(`${side}:${c.uid}`) ? knownHp.get(`${side}:${c.uid}`) : c.hp;
     if (!opts.keepHp) { m.hp = hp; m.shownHp = hp; m.toHp = hp; m.hpT = 1; }
     m.status = c.status;
     m.types = c.types.slice();
     m.uid = c.uid;
+    if (before) {
+      m.name = before.name; m.speciesId = before.speciesId; m.types = before.types.slice();
+      if (before.maxHp && !opts.keepHp) {
+        const h = Math.round((hp * before.maxHp) / Math.max(1, c.maxHp));
+        m.maxHp = before.maxHp; m.hp = h; m.shownHp = h; m.toHp = h;
+      }
+    }
     m.mark = real.mark ?? null;
     m.starTouched = !!real.starTouched;
     m.lit = side === 0 ? true : !real.wild;
@@ -487,6 +504,8 @@ export function createBattleScene(G) {
     ended(ev) {
       emitBus('battle:end', { outcome: ev.outcome, kind: session.kind, trainerId: session.trainer ? session.trainer.id : null, summit: session.summit });
       const tr = session.trainer;
+      // a Relay round won with more to come: the twins keep their parting words for the last one
+      if (session.relay && !session.relay.final && ev.outcome === 'win') return session.relay.round < session.relay.of ? `Round ${session.relay.round} of ${session.relay.of} won. No healing between rounds.` : null; // str
       if (tr && (ev.outcome === 'win' || ev.outcome === 'loss') && tr.lines) {
         // the trainer steps back in with their parting words
         trainerFx.show = true; trainerFx.out = false; trainerFx.slide = 0;
@@ -499,6 +518,24 @@ export function createBattleScene(G) {
     },
     runAway(side) { sides[side].recalling = true; sides[side].recallT = 0; },
     weather(ev) { weatherState = ev ? { kind: ev.kind, name: ev.name, turnsLeft: ev.turnsLeft, posted: Array.isArray(ev.posted) ? ev.posted : [] } : null; },
+    shiftStrip(ev) {
+      const side = ev && Number.isInteger(ev.side) ? ev.side : 1;
+      if (ev) postedStrips.set(ev.uid, { side, uid: ev.uid, who: ev.who, cards: Array.isArray(ev.cards) ? ev.cards : [], turnsLeft: ev.turnsLeft });
+      else postedStrips.delete(sides[1].uid);   // taken down: the Shift landed (or a Reading phase opened) on the creature shown
+    },
+    reform(ev) {
+      formShown.delete(ev.uid);
+      postedStrips.delete(ev.uid);
+      const m = sides[ev.side];
+      if (m.uid !== ev.uid) return;
+      m.speciesId = ev.to;
+      m.types = Array.isArray(ev.types) ? ev.types.slice() : m.types;
+      if (typeof ev.name === 'string') m.name = ev.name;
+      if (Number.isFinite(ev.maxHp) && Number.isFinite(ev.hp)) {
+        m.maxHp = ev.maxHp; m.hp = ev.hp; m.shownHp = ev.hp; m.toHp = ev.hp; m.hpT = 1;
+        knownHp.set(`${ev.side}:${ev.uid}`, ev.hp);
+      }
+    },
   };
 
   // ------------------------------------------------------------------------------------------
@@ -718,8 +755,18 @@ export function createBattleScene(G) {
   // ------------------------------------------------------------------------------------------
 
   function enqueue(events) {
+    noteShifts(events);
     for (const ev of events) queue.push(animFor(ev, view));
     mode = 'busy';
+  }
+
+  /** Remembers the form each queued 'boss-shift' leaves, so the sprite changes when the Shift plays, not before. @param {any[]} events */
+  function noteShifts(events) {
+    for (const ev of events) {
+      if (ev.type !== 'boss-shift' || formShown.has(ev.uid)) continue;
+      const types = Array.isArray(ev.fromTypes) ? ev.fromTypes : [];
+      formShown.set(ev.uid, { speciesId: ev.from, types, name: typeof ev.who === 'string' ? ev.who : ev.from, maxHp: Number.isFinite(ev.fromMaxHp) ? ev.fromMaxHp : null });
+    }
   }
 
   function act(action) {
@@ -917,6 +964,12 @@ export function createBattleScene(G) {
     }
     for (const uid of p.windowsOpened || []) await offerWindow(uid);
     flushDeferred();
+    if (p.relay && p.outcome === 'win') {
+      // the Relay (MID-05): pick the next round's two, then the next round starts in this same scene
+      const next = await relayPick(p.relay);
+      enter({ ...params, setup: next });
+      return;
+    }
     if (p.blackout) {
       await blackoutFade(p.blackout);
     }
@@ -925,6 +978,67 @@ export function createBattleScene(G) {
     const result = p;
     if (G.scenes.top && G.scenes.top() === scene) G.scenes.pop({ result });
     if (params && typeof params.onDone === 'function') params.onDone(result);
+  }
+
+  /**
+   * The Relay's between-rounds screen: choose who fights the next round (no repeats until you run
+   * dry), open the satchel (between-fight bag use: the Relay heals nothing between rounds), begin.
+   * Also opens before round 1 (`rp.next` 1), so the first pair is chosen against the posted rounds too.
+   * @param {{round: number, of: number, next: number, used: string[]}} rp
+   * @param {(picks: string[]) => any} [makeSetup]   the chosen round's setup (default: the round after `session`)
+   * @returns {Promise<any>} the next round's setup
+   */
+  function relayPick(rp, makeSetup) {
+    return new Promise((resolve) => {
+      const rule = relayRule(session.trainer, data);
+      const done = session;
+      const setupFor = typeof makeSetup === 'function' ? makeSetup : (picks) => relayNextSetup(done, picks);
+      const o = { kind: 'relay', title: `Round ${rp.next} of ${rp.of}`, rows: [], focus: null, picks: [], per: 2, note: '', busy: false, resolve: null }; // str
+      const build = () => {
+        const ch = relayChoices(world(), rule, rp.used);
+        o.per = Math.max(1, ch.per);
+        o.picks = o.picks.filter((u) => ch.rows.some((r) => r.uid === u && r.ok)).slice(0, o.per);
+        if (!o.picks.length) o.picks = relayDefaultPicks(world(), rule, rp.used);
+        o.dry = ch.dry;
+        o.rows = ch.rows.map((r) => ({ id: r.uid, uid: r.uid, label: r.nickname, enabled: r.ok, reason: r.reason || '', fresh: r.fresh }));
+        o.rows.push({ id: 'satchel', label: 'Open the satchel', enabled: true }); // str
+        o.rows.push({ id: 'begin', label: `Begin round ${rp.next}`, enabled: true }); // str
+        o.rows.forEach((r, i) => { r.rect = { x: 112, y: 66 + i * 15, w: 256, h: 13 }; });
+        const keep = o.focus ? o.focus.index : 0;
+        o.focus = createFocus({ cols: 1, wrap: true, items: o.rows });
+        if (keep > 0 && keep < o.rows.length) o.focus.index = keep;
+        o.focus.on('blocked', (fe) => { sfx('blocked', { pitch: -5 }); if (fe?.item?.reason) o.note = fe.item.reason; });
+        o.focus.on('change', () => sfx('blip'));
+        o.focus.on('cancel', () => sfx('cancel'));
+        o.focus.on('activate', (fe) => {
+          if (o.busy) return;
+          const row = fe.item;
+          if (row.id === 'satchel') {
+            o.busy = true;
+            o.awaitBag = true;
+            G.push('bag', { pocket: 'medicine' });
+            return;
+          }
+          if (row.id === 'begin') {
+            if (!o.picks.length) { o.note = 'Choose who fights this round.'; sfx('blocked', { pitch: -5 }); return; } // str
+            sfx('confirm');
+            overlay = null;
+            resolve(setupFor(o.picks.slice()));
+            return;
+          }
+          const at = o.picks.indexOf(row.uid);
+          if (at >= 0) o.picks.splice(at, 1);
+          else if (o.picks.length < o.per) o.picks.push(row.uid);
+          else { o.picks.shift(); o.picks.push(row.uid); }
+          o.note = '';
+          sfx('confirm');
+        });
+      };
+      o.refresh = () => { o.busy = false; o.awaitBag = false; build(); };
+      build();
+      overlay = o;
+      mode = 'modal';
+    });
   }
 
   /** @returns {Promise<void>} */
@@ -975,17 +1089,20 @@ export function createBattleScene(G) {
       const portrait = portraitSprite(trainer.npc || trainer.portrait) || null;
       queue.push({
         name: 'trainer-in', skippable: true, run: function* run() {
-          trainerFx.show = true; trainerFx.x = 480; trainerFx.portrait = portrait; trainerFx.name = trainer.name; trainerFx.title = trainer.title;
+          const name = session.relay ? session.relay.name : trainer.name;
+          trainerFx.show = true; trainerFx.x = 480; trainerFx.portrait = portrait; trainerFx.name = name; trainerFx.title = trainer.title;
           trainerFx.slide = 0;
           yield frames(18);
-          const ms = view.say(`${trainer.name}: “${trainer.lines?.intro || t('battle.trainer', { trainer: trainer.name })}”`); // str
+          // a Relay round after the first names the round instead of repeating the twins' opening
+          const ms = session.relay && session.relay.round > 1 ? view.say(session.relay.label)
+            : view.say(`${name}: “${trainer.lines?.intro || t('battle.trainer', { trainer: name })}”`); // str
           yield Math.max(ms, 900);
           trainerFx.out = true;
           yield frames(12);
           trainerFx.show = false;
           view.sendOut(1);
           emitBus('battle:event', { event: { type: 'switch', side: 1, from: '', to: foe.name, text: '' } });
-          const m2 = view.say(`${trainer.name} sends out ${foe.name}.`); // str
+          const m2 = view.say(`${session.relay ? session.relay.name : trainer.name} sends out ${foe.name}.`); // str
           yield frames(20);
           view.glint(1);
           yield Math.max(frames(10), m2 - frames(20));
@@ -1069,10 +1186,24 @@ export function createBattleScene(G) {
       mode = 'error';
       return;
     }
+    // the Relay (MID-05): round 1's pair is picked too, before anything is sent out (One Heart has only its one)
+    const oneHeart = Array.isArray(world()?.run?.challenges) && world().run.challenges.includes('one-heart');
+    if (session.relay && session.relay.round === 1 && !session.setup.relay && !oneHeart) {
+      for (const s of [0, 1]) { sides[s].present = false; sides[s].hidden = true; }
+      postedStrips.clear();
+      formShown.clear();
+      const base = session.setup;
+      relayPick({ round: 0, of: session.relay.of, next: 1, used: [] }, (picks) => ({ ...base, relay: { round: 1, used: [], picks } }))
+        .then((next) => enter({ ...params, setup: next }));
+      return;
+    }
     sides[0].present = false;
     sides[1].present = false;
     sides[0].hidden = true;
     sides[1].hidden = !!session.trainer;
+    postedStrips.clear();
+    formShown.clear();
+    noteShifts(session.battle.intro);
     syncSide(0);
     syncSide(1);
     sides[0].present = false;
@@ -1230,7 +1361,7 @@ export function createBattleScene(G) {
       if (input.pressed('confirm') || input.pressed('cancel') || (ptr && ptr.justDown)) { const r = overlay.resolve; overlay = null; mode = 'end'; r(); }
       return;
     }
-    if (overlay && (overlay.kind === 'learn' || overlay.kind === 'naming')) {
+    if (overlay && (overlay.kind === 'learn' || overlay.kind === 'naming' || overlay.kind === 'relay')) {
       if (!overlay.busy) overlay.focus.handle(input);
       return;
     }
@@ -1275,6 +1406,7 @@ export function createBattleScene(G) {
     drawFoeBox(ctx);
     drawPlayerBox(ctx);
     if (weatherState) drawWeather(ctx);
+    if (visibleStrip()) drawShiftStrip(ctx);
     if (lanternFx.show) drawMeter(ctx);
     drawSpeedChip(ctx);
     drawPanelArea(ctx);
@@ -1802,6 +1934,36 @@ export function createBattleScene(G) {
     }
   }
 
+  /** The strip of the creature on the field, if it posted one that has not landed (null while it faints, is recalled or is not out). */
+  function visibleStrip() {
+    for (const st of postedStrips.values()) {
+      const m = sides[st.side];
+      if (m && m.uid === st.uid && m.present && !m.hidden && !m.fainting && !m.recalling) return st;
+    }
+    return null;
+  }
+
+  /** The posted boss-Shift strip (GDD-04 §1.4): every card with its odds, under the foe's box, until it lands. */
+  function drawShiftStrip(ctx) {
+    const sh = /** @type {NonNullable<ReturnType<typeof visibleStrip>>} */ (visibleStrip());
+    const x = L.foeBox.x;
+    const y = L.foeBox.y + L.foeBox.h + 4;
+    const when = sh.turnsLeft <= 0 ? 'Shifts now' : sh.turnsLeft === 1 ? 'Shifts at the end of next turn' : `Shifts in ${sh.turnsLeft} turns`; // str
+    const title = `Forecast: ${when}`; // str
+    drawPanel(ctx, { x, y, w: Math.max(120, measureText(title, { font: 'small' }).w + 12), h: 12 }, 'dark');
+    drawText(ctx, title, x + 6, y + 3, { color: COLORS.dark.text, font: 'small' });
+    let px = x;
+    let py = y + 14;
+    for (const k of sh.cards) {
+      const txt = `${k.dir[0].toUpperCase()}${k.dir.slice(1)}: ${k.name} ${k.odds}%`;
+      const pw = measureText(txt, { font: 'small' }).w + 8;
+      if (px + pw > x + 190 && px > x) { px = x; py += 13; }
+      drawPanel(ctx, { x: px, y: py, w: pw, h: 11 }, 'paper', { shadow: false });
+      drawText(ctx, txt, px + 4, py + 3, { color: k.dir === 'down' ? BERRY : INK, font: 'small' });
+      px += pw + 2;
+    }
+  }
+
   function drawSpeedChip(ctx) {
     const r = L.speed;
     ctx.fillStyle = COLORS.night.ink;
@@ -1819,6 +1981,7 @@ export function createBattleScene(G) {
     else if (overlay.kind === 'learn') drawLearn(ctx);
     else if (overlay.kind === 'naming') drawNaming(ctx);
     else if (overlay.kind === 'slip') drawSlip(ctx);
+    else if (overlay.kind === 'relay') drawRelay(ctx);
   }
 
   function drawPartyList(ctx) {
@@ -1943,6 +2106,32 @@ export function createBattleScene(G) {
       yy += measureText(text, { maxWidth: w - 28 }).h + 4;
     }
     if (Math.floor(elapsed / 500) % 2 === 0) drawText(ctx, TYPE.more, x + w - 12, y + h, { color: PALETTE.waxRed });
+  }
+
+  /** The Relay's between-rounds pick (MID-05). */
+  function drawRelay(ctx) {
+    drawDim(ctx, W, H);
+    const o = overlay;
+    const h = o.rows.length * 15 + 52;
+    drawPanel(ctx, { x: 100, y: 30, w: 280, h }, 'paper', { title: o.title });
+    drawText(ctx, o.dry ? `Out of fresh faces: anyone may come back. Choose ${o.per}.` : `Choose ${o.per} who have not fought yet. No healing between rounds.`, 112, 44, { color: SOFT, font: 'small', maxWidth: 256 }); // str
+    const party = world().party;
+    o.rows.forEach((r, i) => {
+      const focused = o.focus.index === i;
+      if (focused) { ctx.fillStyle = COLORS.focus.bandOnPaper; ctx.fillRect(r.rect.x, r.rect.y, r.rect.w, r.rect.h); }
+      const picked = r.uid && o.picks.includes(r.uid);
+      if (r.uid) {
+        const c = party.find((x) => x.uid === r.uid);
+        drawText(ctx, picked ? '[x]' : '[ ]', r.rect.x + 2, r.rect.y + 3, { color: r.enabled ? INK : FAINT, font: 'small' });
+        drawText(ctx, r.label, r.rect.x + 22, r.rect.y + 3, { color: r.enabled ? INK : SOFT });
+        if (c) drawText(ctx, `Lv${c.level}  ${Math.max(0, c.hp)}/${c.stats.hp}`, r.rect.x + r.rect.w - 4, r.rect.y + 3, { color: c.hp > 0 ? SOFT : BERRY, font: 'small', align: 'right' });
+        if (!r.enabled && r.reason) drawText(ctx, r.reason, r.rect.x + 120, r.rect.y + 3, { color: FAINT, font: 'small' });
+      } else {
+        drawText(ctx, r.label, r.rect.x + 4, r.rect.y + 3, { color: INK });
+      }
+    });
+    if (o.note) drawText(ctx, o.note, 112, 30 + h - 12, { color: BERRY, font: 'small' });
+    o.focus.drawCursor(ctx, { style: 'paper', ring: false });
   }
 
   function drawLearn(ctx) {
@@ -2100,7 +2289,7 @@ export function createBattleScene(G) {
     enter(p) { enter(p); bindSpeedKeys(); },
     exit() { exit(); unbindSpeedKeys(); },
     pause() {},
-    resume() {},
+    resume() { if (overlay && overlay.kind === 'relay' && overlay.awaitBag) overlay.refresh(); },
     update,
     handleInput,
     draw,
@@ -2112,6 +2301,8 @@ export function createBattleScene(G) {
     get overlay() { return overlay ? overlay.kind : null; },
     get overlayState() { return overlay; },
     get post() { return post; },
+    /** The display model of a side (what the screen shows, which may trail the engine during animations). @param {number} side */
+    shown(side) { const m = sides[side]; return { speciesId: m.speciesId, name: m.name, types: m.types.slice(), hp: m.hp, maxHp: m.maxHp, strip: visibleStrip() ? { ...visibleStrip() } : null }; },
     get log() { return log.text; },
     get speed() { return queue.speed; },
     setSpeed,

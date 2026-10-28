@@ -19,7 +19,7 @@ import { createFocus } from '../ui/focus.js';
 import { drawCurrency } from '../ui/widgets.js';
 import { t } from '../data/strings.js';
 import { formatTime, day as dayOf } from '../state/selectors.js';
-import { MENU_ITEMS as MODEL_ITEMS, pauseRows, placeName, isNoRewind } from './menuModel.js';
+import { MENU_ITEMS as MODEL_ITEMS, pauseRows, placeName, isNoRewind, currentObjective } from './menuModel.js';
 import { prefsOf, skinOf, drawSkinPanel, createSlide, drawGlyph, drawCursorAt, drawHints, fitText, sfx, toast } from './menuKit.js';
 
 /** Menu entries in order (`{label, scene}`); Save is always last. */
@@ -27,6 +27,8 @@ export const MENU_ITEMS = Object.freeze(MODEL_ITEMS.map((it) => Object.freeze({ 
 
 /** Column geometry (GDD-09 §3.24). */
 export const MENU_RECT = Object.freeze({ x: 320, y: 24, w: 140 });
+/** The "Next:" slip left of the column (LG-PF2): the current objective in one or two lines. */
+export const OBJECTIVE_RECT = Object.freeze({ x: 12, y: 24, w: 296, h: 34 });
 const ROW_H = 14;
 const HEAD_H = 20;
 
@@ -38,6 +40,8 @@ export function createMenuScene(G) {
   const slide = createSlide({ dx: 12 });
   let rows = pauseRows(G.world);
   let ms = 0;
+  /** @type {{text: string}|null} */ let objective = null;
+  const readObjective = () => { try { objective = currentObjective(G.world, G.data); } catch { objective = null; } };
   const focus = createFocus({ cols: 1, wrap: true, index: 0, items: [] });
 
   let layoutKey = '';
@@ -87,6 +91,7 @@ export function createMenuScene(G) {
       layout();
       focus.set(0, { force: true });
       ms = 0;
+      readObjective();
       slide.open(prefsOf(G));
     },
     exit() {},
@@ -94,6 +99,7 @@ export function createMenuScene(G) {
     resume() {
       G.input?.flush?.();
       layout();
+      readObjective();
     },
     update(dt) {
       ms += dt;
@@ -116,6 +122,12 @@ export function createMenuScene(G) {
       ctx.fillRect(0, 0, 480, 270);
       ctx.globalAlpha = prefs.reduced ? a : 1;
       layout(off);
+      if (objective && objective.text) {
+        const O = OBJECTIVE_RECT;
+        drawSkinPanel(ctx, { x: O.x - off, y: O.y, w: O.w, h: O.h }, skin, 'notice');
+        drawText(ctx, t('menu.next'), O.x - off + 8, O.y + 6, { color: skin.accent, font: 'small' });
+        drawText(ctx, objective.text, O.x - off + 34, O.y + 6, { color: skin.text, font: 'small', maxWidth: O.w - 42 });
+      }
       const x = MENU_RECT.x + off, y = MENU_RECT.y;
       const h = HEAD_H + rows.length * ROW_H + 40;
       drawSkinPanel(ctx, { x, y, w: MENU_RECT.w, h }, skin, 'paper');
@@ -168,7 +180,9 @@ export function createMenuScene(G) {
       drawHints(ctx, G.input, [['confirm', 'Open'], ['cancel', 'Close']], { x: x + MENU_RECT.w - 4, y: hy }); // str
       ctx.restore();
     },
-    debugText: () => [t('menu.heading'), ...rows.map((r, i) => `${i === focus.index ? '>' : ' '} ${r.label}${r.locked ? ' (locked)' : ''}`)].join('\n'),
+    debugText: () => [t('menu.heading'), ...rows.map((r, i) => `${i === focus.index ? '>' : ' '} ${r.label}${r.locked ? ' (locked)' : ''}`), ...(objective ? [`${t('menu.next')} ${objective.text}`] : [])].join('\n'),
+    /** The objective line shown left of the column (LG-PF2). */
+    get objective() { return objective; },
     isBusy: () => slide.phase === 'in' || slide.phase === 'out',
     /** Test/harness view of the column. */
     get index() { return focus.index; },

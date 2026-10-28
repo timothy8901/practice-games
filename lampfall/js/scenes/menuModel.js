@@ -16,6 +16,8 @@ import { t, has } from '../data/strings.js';
 import { TYPE_CHART as FALLBACK_CHART, ORDINARY_TYPES as FALLBACK_ORDINARY } from '../data/types.js';
 import { pickAnchor } from '../art/heartmark.js';
 import { boxCapacity as partyBoxCapacity } from '../systems/party.js';
+import { evalCond } from '../script/cond.js';
+import * as loansSys from '../systems/loans.js';
 
 /** @typedef {import('../state/schema.js').World} World */
 /** @typedef {import('../state/schema.js').Creature} Creature */
@@ -506,6 +508,116 @@ export function placeName(mapId, data) {
     }
   } catch { /* unknown table */ }
   return mapId.split(/[-_]/).filter(Boolean).map((w) => w[0].toUpperCase() + w.slice(1)).join(' ');
+}
+
+// ---------------------------------------------------------------------------------------------
+// The current objective (LG-PF2): one line and one pin, driven by game state
+// ---------------------------------------------------------------------------------------------
+
+/** The yard counter on Pellwick, where loans are paid and rooms are picked. */
+export const YARD_COUNTER = Object.freeze({ mapId: 'pellwick', x: 52, y: 28 });
+
+const tableRows = (data, table) => {
+  try {
+    if (data && typeof data.list === 'function') return data.list(table) ?? [];
+    const v = data?.[table];
+    return Array.isArray(v) ? v : v && typeof v === 'object' ? Object.values(v) : [];
+  } catch { return []; }
+};
+const rowOf = (data, table, id) => tableRows(data, table).find((r) => r && r.id === id) ?? null;
+
+/** Cond keys that mark a beat as unlocked by progress (not just "not seen yet"). */
+const GATE_KEYS = Object.freeze(['flag', 'seen', 'badge', 'loan', 'party', 'hasItem', 'counter']);
+
+/**
+ * Whether a cond asks for some progress outside a `not` (a flag, a seal, a loan tier …). A beat
+ * guarded only by negations ("not seen yet") is a place to discover, not an objective, unless the
+ * player is already on its map.
+ * @param {any} cond
+ * @returns {boolean}
+ */
+export function hasProgressGate(cond) {
+  if (!cond || typeof cond !== 'object') return false;
+  if (Array.isArray(cond)) return cond.some(hasProgressGate);
+  if ('not' in cond) return false;
+  if (Array.isArray(cond.all)) return cond.all.some(hasProgressGate);
+  if (Array.isArray(cond.any)) return cond.any.some(hasProgressGate);
+  return GATE_KEYS.some((k) => k in cond);
+}
+
+/**
+ * The story beats that are ready right now: every story trigger cell (`story-*`, from
+ * data/scripts/triggers) whose cond holds and that has not fired, the player's map first, then
+ * Pellwick, then the rest, each in authoring (story) order. `enter` cells (the arrival) are skipped,
+ * and so are beats elsewhere that only wait to be discovered ({@link hasProgressGate}).
+ * @param {World} world
+ * @param {any} data
+ * @returns {Array<{id: string, script: string, mapId: string, x: number, y: number}>}
+ */
+export function readyBeats(world, data) {
+  const here = world?.player?.mapId ?? null;
+  const maps = tableRows(data, 'maps').filter((m) => m && Array.isArray(m.triggers));
+  const order = [...maps.filter((m) => m.id === here), ...maps.filter((m) => m.id !== here && m.id === 'pellwick'), ...maps.filter((m) => m.id !== here && m.id !== 'pellwick')];
+  const out = [];
+  for (const m of order) {
+    const opened = world?.maps?.[m.id]?.opened ?? [];
+    for (const tr of m.triggers) {
+      if (!tr || typeof tr.id !== 'string' || !tr.id.startsWith('story-') || !tr.script || tr.kind === 'enter') continue;
+      if (tr.once !== false && opened.includes(tr.id)) continue;
+      if (m.id !== here && !hasProgressGate(tr.cond)) continue;
+      let ok = false;
+      try { ok = Boolean(evalCond(world, tr.cond ?? true, { data, mapId: m.id })); } catch { ok = false; }
+      if (ok) out.push({ id: tr.id.slice('story-'.length), script: tr.script, mapId: m.id, x: tr.x, y: tr.y });
+    }
+  }
+  return out;
+}
+
+/**
+ * What to do next, as one line and (when it has a place) a pin for the map (LG-PF2). In order: the
+ * story beat that is ready (nearest first: this map, then Pellwick), Wren waiting on a room, a loan
+ * the satchel can clear, the next Spire, else saving for the open loan.
+ * @param {World} world
+ * @param {any} data
+ * @returns {{kind: 'story'|'room'|'loan'|'spire'|'save'|'done', text: string, mapId: string|null, x: number|null, y: number|null}}
+ */
+export function currentObjective(world, data) {
+  const ctx = { data };
+  // no starter yet (before or after the arrival walk): the causeway, never "Next seal: Turn Spire"
+  const noStarter = world?.flags && !world.flags['sp.starter-chosen'] && (world.flags['sp.arrived'] || !(world.party?.length));
+  if (noStarter) {
+    return { kind: 'story', text: t('objective.story.starter'), mapId: 'pellwick', x: 58, y: 30 };
+  }
+  const beat = readyBeats(world, data)[0];
+  if (beat) {
+    const key = has(`objective.story.${beat.id}`) ? `objective.story.${beat.id}` : has(`objective.story.${beat.script}`) ? `objective.story.${beat.script}` : null;
+    const text = key ? t(key) : t('objective.story', { place: placeName(beat.mapId, data) });
+    return { kind: 'story', text, mapId: beat.mapId, x: beat.x, y: beat.y };
+  }
+  try {
+    const pick = loansSys.pendingPickTier(world, ctx);
+    if (pick !== null) return { kind: 'room', text: t('objective.room', { n: pick }), ...YARD_COUNTER };
+    if (!loansSys.isPaidOff(world, ctx)) {
+      const owed = loansSys.balance(world, ctx);
+      const tier = world?.loans?.tier ?? 1;
+      if (owed > 0 && (world?.wallet?.main ?? 0) >= owed) return { kind: 'loan', text: t('objective.loanReady', { n: tier }), ...YARD_COUNTER };
+    }
+  } catch { /* loans tables missing in a fixture */ }
+  const won = new Set(world?.badges ?? []);
+  const spire = tableRows(data, 'spires').filter((r) => r && !won.has(r.id)).sort((a, b) => (a.n ?? 0) - (b.n ?? 0))[0];
+  if (spire) {
+    const isle = tableRows(data, 'maps').find((m) => m && m.id === spire.isle) ?? null;
+    const door = isle ? (isle.warps ?? []).find((w) => w && w.to && w.to.mapId === spire.map) : null;
+    const isleName = rowOf(data, 'regions', spire.isle)?.name ?? placeName(spire.isle, data);
+    return {
+      kind: 'spire', text: t('objective.spire', { spire: spire.name ?? spire.id, isle: isleName, level: spire.curveLevel ?? '?' }),
+      mapId: door ? isle.id : null, x: door ? door.x : null, y: door ? door.y : null,
+    };
+  }
+  try {
+    if (!loansSys.isPaidOff(world, ctx)) return { kind: 'save', text: t('objective.save', { n: world?.loans?.tier ?? 1 }), ...YARD_COUNTER };
+  } catch { /* no loans */ }
+  return { kind: 'done', text: t('objective.done'), mapId: null, x: null, y: null };
 }
 
 /**

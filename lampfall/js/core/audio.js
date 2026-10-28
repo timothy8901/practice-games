@@ -296,6 +296,33 @@ export function volumeToGain(v) {
   return c * c;
 }
 
+/** Default ambience slider (GDD-09 §6: ambience 70%); at the default the authored mix is unchanged. */
+export const AMBIENCE_DEFAULT = 0.7;
+/** Music layers that are ambience (waves, wind, rain, the night bells): scaled by the ambience bus. */
+export const AMBIENT_LAYERS = Object.freeze(['night', 'tide', 'rain', 'storm']);
+/** One-shot sfx that are ambience (waves, rain, thunder, fireflies, the night and dawn beds). */
+export const AMBIENT_SFX = Object.freeze(['wave', 'rain', 'thunder', 'firefly', 'night', 'dawn']);
+
+/**
+ * Whether a track layer belongs to the ambience bus (`night`, `tide.low`, `rain` …).
+ * @param {string} name
+ * @returns {boolean}
+ */
+export function isAmbientLayer(name) {
+  return typeof name === 'string' && AMBIENT_LAYERS.includes(name.split('.')[0]);
+}
+
+/**
+ * Gain multiplier of the ambience bus for a slider value (LG-RN102): 0 silences ambience, the
+ * default leaves the authored mix alone, 100% lifts it.
+ * @param {number} v slider 0..1
+ * @returns {number}
+ */
+export function ambienceScale(v) {
+  const g = volumeToGain(v);
+  return g <= 0 ? 0 : g / volumeToGain(AMBIENCE_DEFAULT);
+}
+
 /**
  * Equal-power fade curve for `setValueCurveAtTime`.
  * @param {number} n Number of samples (≥ 2).
@@ -1975,7 +2002,7 @@ function scheduleFade(param, t0, sec, from, to) {
  * @param {number} startTime
  * @param {{stems: Map<string, boolean>, intensity: number, offline?: boolean}} opts
  */
-function createPlayer(ctx, dest, track, startTime, { stems, intensity, offline = false }) {
+function createPlayer(ctx, dest, track, startTime, { stems, intensity, offline = false, ambience = () => 1 }) {
   const out = mkGain(ctx, dest, offline ? 1 : 0);
   const layers = track.layers.map((def) => ({ def, gain: mkGain(ctx, out, 0), target: NaN }));
   const clock = createStepClock({
@@ -1987,7 +2014,8 @@ function createPlayer(ctx, dest, track, startTime, { stems, intensity, offline =
   let stopAt = Infinity;
   let stopping = false;
 
-  const layerTarget = (def, st, inten) => (resolveStem(def.name, st, !def.stem) && inten >= def.minIntensity ? def.gain : 0);
+  const layerTarget = (def, st, inten) => (resolveStem(def.name, st, !def.stem) && inten >= def.minIntensity
+    ? def.gain * (isAmbientLayer(def.name) ? ambience() : 1) : 0);
 
   /**
    * Move each layer's gain to what the stems/intensity ask for. Only layers whose target changed are
@@ -2097,6 +2125,8 @@ function createPlayer(ctx, dest, track, startTime, { stems, intensity, offline =
  * @property {() => Promise<boolean>} unlock Create/resume the context (call from a user gesture).
  * @property {(v: {master?: number, music?: number, sfx?: number}) => {master: number, music: number, sfx: number}} setVolume
  * @property {() => {master: number, music: number, sfx: number}} getVolume
+ * @property {(v: number) => number} setAmbience  the ambience bus 0..1 (ambient layers and one-shots)
+ * @property {() => number} getAmbience
  * @property {(on?: boolean) => boolean} mute
  * @property {() => boolean} isMuted
  * @property {(name: string, opts?: SfxOptions) => {name: string, time: number, duration: number}|null} sfx
@@ -2164,6 +2194,8 @@ export function createAudio() {
   /** Explicit stem overrides (name → on). Layers without an entry use their definition's default. */
   const stems = new Map();
   const vol = { master: 1, music: 0.8, sfx: 1 };
+  let ambience = AMBIENCE_DEFAULT; // the ambience bus (GDD-09 §6), separate from setVolume's three
+  const ambienceNow = () => ambienceScale(ambience);
   const limiter = createRateLimiter({ minInterval: 0.02, maxBurst: 20, window: 0.1 });
   const warned = new Set();
   let muted = false;
@@ -2308,6 +2340,15 @@ export function createAudio() {
       return { ...vol };
     },
     getVolume() { return { ...vol }; },
+    setAmbience(v) {
+      const n = num(v, NaN);
+      if (Number.isFinite(n)) {
+        ambience = clamp(n, 0, 1);
+        if (ctx) for (const p of players) p.applyMix(stems, intensity, 0.3);
+      }
+      return ambience;
+    },
+    getAmbience() { return ambience; },
     mute(on = true) {
       muted = Boolean(on);
       applyVolumes(0.02);
@@ -2330,7 +2371,7 @@ export function createAudio() {
       }
       const now = ctx.currentTime;
       if (!limiter.allow(key, now)) return null;
-      const gain = clamp(num(o.volume, 1), 0, 2);
+      const gain = clamp(num(o.volume, 1), 0, 2) * (AMBIENT_SFX.includes(key) ? ambienceNow() : 1);
       if (!(gain > 0)) return null;
       const pan = clamp(num(o.pan, 0), -1, 1);
       const t0 = now + SFX_LATENCY + clamp(num(o.delay, 0), 0, MAX_SFX_DELAY);
@@ -2369,7 +2410,7 @@ export function createAudio() {
       const now = ctx.currentTime;
       if (current && current.track === track && !current.stopping && !current.ended(now) && !restart) return true;
       const fadeSec = Math.max(0, fade) / 1000;
-      const player = createPlayer(ctx, graph.musicFilter, track, now + 0.05, { stems, intensity });
+      const player = createPlayer(ctx, graph.musicFilter, track, now + 0.05, { stems, intensity, ambience: ambienceNow });
       // Rapid switching: players already fading out are retired quickly so at most one long crossfade
       // runs at a time (otherwise every switch would add another fully scheduled track).
       for (const p of players) if (p.stopping) p.fadeOut(now, CHURN_FADE_SEC);

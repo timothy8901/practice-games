@@ -79,6 +79,12 @@ describe('the engine honours the contract', () => {
     add(weather.submit([{ type: 'move', move: 0 }]));
     assert.ok(ofType(weather.log, 'held-item').some((e) => e.consumed), 'the berry is used up');
     assert.ok(ofType(learn.log, 'learn-offer').length >= 1);
+    // a posted boss Shift (GDD-04 §1.4): the strip at the end of turn 1, the Shift at the end of turn 2
+    const boss = mk('puddlepip', 30, ['settle']);
+    boss.bossShift = { postAt: 1, shiftAt: 2, odds: 100, cards: [{ dir: 'up', form: 'sloshkin' }] };
+    const shifty = duel(mk('stillox', 30, ['settle']), boss, { foeAi: () => ({ type: 'move', move: 0 }) });
+    add(shifty.submit([{ type: 'move', move: 0 }]));
+    add(shifty.submit([{ type: 'move', move: 0 }]));
     const missing = EVENT_TYPES.filter((t) => !seen.has(t));
     assert.deepEqual(missing, [], `never emitted: ${missing.join(', ')}`);
   });

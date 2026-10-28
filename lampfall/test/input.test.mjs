@@ -1112,6 +1112,22 @@ describe('destroy', () => {
 // ---------------------------------------------------------------------------------------------
 
 describe('touch overlay', () => {
+  it('one-handed layout moves every control into the right-thumb arc and back (LG-RN102)', () => {
+    const early = harness({});
+    assert.equal(early.input.setTouchLayout('one'), 'one', 'a layout set before the overlay exists is kept');
+    const h = harness({ touch: true });
+    const root = h.overlayRoot();
+    assert.equal(h.input.touchLayout(), 'two');
+    assert.ok(!root.classList.contains('wsp-touch--one'));
+    assert.equal(h.input.setTouchLayout('one'), 'one');
+    assert.ok(root.classList.contains('wsp-touch--one'));
+    assert.ok(root.classList.contains('wsp-touch'));
+    assert.equal(h.input.setTouchLayout('bogus'), 'two');
+    assert.ok(!root.classList.contains('wsp-touch--one'));
+    const css = h.doc.head.children.find((c) => c.id === 'wsp-touch-style').textContent;
+    assert.match(css, /\.wsp-touch--one \.wsp-touch__dpad\{left:auto;right:/);
+  });
+
   it('builds the DOM once per document and shows when forced', () => {
     const h = harness({ touch: true });
     const root = h.overlayRoot();

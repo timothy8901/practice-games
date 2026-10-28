@@ -26,6 +26,7 @@ export function createFakeAudio({ ready = true, throwOn = [] } = {}) {
     unlock() { api.ready = true; if (pending) { current = pending; pending = null; } return Promise.resolve(true); },
     setVolume(v) { maybeThrow('setVolume'); calls.push(['setVolume', { ...v }]); vol = { ...vol, ...v }; return { ...vol }; },
     getVolume: () => ({ ...vol }),
+    setAmbience(v) { maybeThrow('setAmbience'); calls.push(['setAmbience', v]); return v; },
     mute(on = true) { maybeThrow('mute'); calls.push(['mute', Boolean(on)]); muted = Boolean(on); return muted; },
     isMuted: () => muted,
     sfx(name, o) { maybeThrow('sfx'); calls.push(['sfx', name, o]); return api.ready ? { name, time: 0, duration: 0.1 } : null; },

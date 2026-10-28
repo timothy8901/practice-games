@@ -215,3 +215,26 @@ test('a new No Rewind run tells persist to drop to one autosave slot at once (LG
     assert.deepEqual([...G.world.run.challenges], challenges);
   }
 });
+
+test('the Pellwick cottage shows the THWAP roof colour and grows outside over the loans (MID-13)', async () => {
+  const { cottageRoofArt, cottageGrowth } = await import('../js/scenes/overworld.js');
+  const { fakeCtx, installFakeCanvas } = await import('./ui.fakes.mjs');
+  const pixelart = await import('../js/core/pixelart.js');
+  installFakeCanvas(pixelart);
+  const G = fakeG(); const scene = startField(G, 9, 24);
+  const draw = () => { const ctx = fakeCtx(); scene.draw(ctx); return ctx.calls.filter((c) => c[0] === 'fillRect').map((c) => c[1]); };
+  assert.equal(cottageRoofArt(G.world), 'slate');
+  assert.ok(!draw().includes('#9FD4C8'), 'no greenhouse before it is built');
+  G.store.tx('test:builds', (w) => {
+    w.loans.builds.push({ id: 'bedsit', tier: 1, startedDay: 0, readyDay: 1, choice: 'harbor-red', done: true });
+    w.loans.builds.push({ id: 'cottage', tier: 2, startedDay: 1, readyDay: 2, choice: 'ochre', done: true });
+    w.loans.builds.push({ id: 'greenhouse', tier: 3, startedDay: 2, readyDay: 3, choice: 'moss', done: true });
+    w.loans.builds.push({ id: 'workshop', tier: 4, startedDay: 3, readyDay: 9, choice: null, done: false });
+  });
+  assert.equal(cottageRoofArt(G.world), 'moss', 'the latest landed build\'s choice, through the roof art map');
+  assert.deepEqual(cottageGrowth(G.world), ['bedsit', 'cottage', 'greenhouse'], 'only landed builds show');
+  const fills = draw();
+  assert.ok(fills.includes('#9FD4C8'), 'the greenhouse glass is drawn on the exterior');
+  assert.ok(fills.includes('#6B4F3A'), 'the cottage chimney is drawn');
+  assert.ok(!fills.includes('#7A5230'), 'the unbuilt workshop is not');
+});

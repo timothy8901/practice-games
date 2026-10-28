@@ -101,6 +101,33 @@ function fadeMs(G, ms = TRANSITION_MS) {
   return G.flags && G.flags.noanim ? 0 : ms;
 }
 
+/**
+ * The Keeper's Cottage roof art colour (MID-13): the latest landed build's roof `choice` (the colour
+ * picked at its THWAP; landed builds without one take the default), through the ceremony's art map.
+ * @param {any} world
+ * @returns {string} art colour (palette ROOF_COLOURS)
+ */
+export function cottageRoofArt(world) {
+  const builds = world && world.loans && Array.isArray(world.loans.builds) ? world.loans.builds : [];
+  const done = builds.filter((x) => x && x.done && (typeof x.choice === 'string' || typeof x.roof === 'string'));
+  const last = done.length ? done[done.length - 1] : null;
+  const c = last ? (last.choice ?? last.roof) : null;
+  return c ? (ROOF_ART[c] || c) : 'slate';
+}
+
+/**
+ * What the Keeper's Cottage shows outside (MID-13, pillar 7 "progress you can see from the
+ * porch"): one feature per landed build, in landing order (bedsit, cottage, the four rooms…).
+ * @param {any} world
+ * @returns {string[]} build ids
+ */
+export function cottageGrowth(world) {
+  const builds = world && world.loans && Array.isArray(world.loans.builds) ? world.loans.builds : [];
+  const out = [];
+  for (const b of builds) if (b && b.done && typeof b.id === 'string' && !out.includes(b.id)) out.push(b.id);
+  return out;
+}
+
 /** 12-hour clock text through strings (`hud.time.am/pm`). */
 export function clockText(minute) {
   const m = ((Math.floor(minute) % MINUTES_PER_DAY) + MINUTES_PER_DAY) % MINUTES_PER_DAY;
@@ -678,6 +705,16 @@ export function createOverworldScene(G) {
 
   function afterBattle(post) {
     if (!post) return;
+    if (post.summitBell) {
+      // a Summit loss never sends you home (MID-10): the Bell holds your place at whoever beat you
+      // (Drift / Flux), or Freefall starts the climb again at the hall door
+      const sb = post.summitBell;
+      let def = null;
+      try { def = G.data.get('maps', sb.mapId); } catch { def = null; }
+      const m = def?.markers?.[sb.marker] ?? def?.markers?.['from-door'] ?? null;
+      if (m) travel({ mapId: sb.mapId, x: m.x, y: m.y, facing: m.facing || 'up', near: true }, { kind: 'summit-bell' });
+      if (sb.line) toast(sb.line);
+    }
     if (post.blackout) {
       // battleFlow already healed the party and advanced the blackout hour.
       toast('"You came home carried. I kept your place."'); // str
@@ -1209,6 +1246,7 @@ export function createOverworldScene(G) {
       if (G.perf) { G.perf.chunks = stats0.chunks; G.perf.entities = stats0.sprites; }
       c.save();
       c.beginPath(); c.rect(R.x, R.y, R.w, R.h); c.clip();
+      drawCottageGrowth(c, R);
       drawPorchLamps(c, R, minute);
       drawGlintAndSparkles(c, R);
       drawBugs(c, R);
@@ -1290,9 +1328,52 @@ export function createOverworldScene(G) {
 
   // ---- draw helpers --------------------------------------------------------------------------------------------
   function roofColour() {
-    const b = (G.world.loans && Array.isArray(G.world.loans.builds) ? G.world.loans.builds : []).filter((x) => x.done && x.roof);
-    const c = b.length ? b[b.length - 1].roof : null;
-    return c ? (ROOF_ART[c] || c) : 'slate';
+    return cottageRoofArt(G.world);
+  }
+
+  /**
+   * The cottage's exterior growth over the seven loans (MID-13), drawn over the baked tiles on
+   * Pellwick: the bedsit's patched gable, the cottage's chimney and second window, and one
+   * visible addition per commissioned room.
+   */
+  function drawCottageGrowth(c, R) {
+    if (mapId !== 'pellwick') return;
+    const grown = cottageGrowth(G.world);
+    if (!grown.length) return;
+    const reg = mapDef && mapDef.regions && mapDef.regions['keepers-cottage'];
+    const ox = R.x + ((reg ? reg.x : 6) + 1) * TILE - camera.x; // roof left edge (x 7)
+    const oy = R.y + (reg ? reg.y : 19) * TILE - camera.y;      // roof top (y 19)
+    if (ox > R.x + R.w + 32 || oy > R.y + R.h + 32 || ox < R.x - 128 || oy < R.y - 96) return;
+    const px = (x, y, w, h, col) => { c.fillStyle = col; c.fillRect(Math.round(ox + x), Math.round(oy + y), w, h); };
+    const glow = lampsLit(gradeFor(minuteOfDay(G.world), weatherKind(), false)) ? PALETTE.porchAmber : '#3B4A6B';
+    for (const id of grown) {
+      switch (id) {
+        case 'bedsit': // new boards on the gable, a tidy door frame
+          px(2, 33, 2, 30, '#8A5A30'); px(76, 33, 2, 30, '#8A5A30'); break;
+        case 'cottage': { // chimney with a curl of smoke, and the second window
+          px(60, -10, 8, 14, '#6B4F3A'); px(59, -11, 10, 2, '#4C3826');
+          const k = Math.floor(sceneMs / 400) % 3;
+          px(62 + k, -16 - k * 2, 3, 3, 'rgba(232,225,210,0.7)');
+          px(12, 40, 10, 8, glow); px(12, 44, 10, 1, '#4C3826'); px(16, 40, 1, 8, '#4C3826');
+          break;
+        }
+        case 'greenhouse': // a glass lean-to on the west wall
+          px(-14, 34, 14, 30, '#9FD4C8'); px(-14, 34, 14, 1, '#E8F6F0');
+          for (let i = 0; i < 3; i++) px(-13 + i * 5, 35, 1, 29, '#5E8C80');
+          px(-12, 56, 10, 6, '#5A8F3C'); break;
+        case 'workshop': // a plank lean-to on the east wall with a little vice sign
+          px(80, 38, 14, 26, '#7A5230'); px(78, 34, 18, 4, '#4C3826'); px(84, 44, 6, 4, '#C9C2B0'); break;
+        case 'training-yard': // chalk ring and a straw dummy beside the porch
+          px(86, 66, 20, 1, '#F6F1E3'); px(86, 74, 20, 1, '#F6F1E3'); px(94, 56, 4, 12, '#D9B45A'); px(91, 60, 10, 2, '#D9B45A'); break;
+        case 'cellar': // the cellar hatch at the foot of the wall
+          px(56, 60, 16, 6, '#5A3A22'); px(64, 60, 1, 6, '#3B2A1E'); break;
+        case 'porch-loft': // a dormer with the telescope poking out
+          px(30, 6, 18, 14, '#6B4F3A'); px(34, 10, 10, 8, glow); px(46, 8, 8, 2, '#C8A04A'); break;
+        case 'gallery': // a long picture window
+          px(44, 40, 26, 8, glow); px(44, 44, 26, 1, '#4C3826'); px(57, 40, 1, 8, '#4C3826'); break;
+        default: break;
+      }
+    }
   }
 
   function drawPorchLamps(c, R, minute) {

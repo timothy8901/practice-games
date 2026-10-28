@@ -416,10 +416,17 @@ describe('tuning: GDD-00 numbers', () => {
     assert.deepEqual([...TUNING.porchWindow], [19 * 60, 60]);
   });
 
-  test('EXP: 8 × L², KO EXP ÷ 5, and night one takes a Lv5 starter past Lv7', () => {
+  test('EXP: 8 × L² through Lv8 (a cubic above, MID-06), KO EXP ÷ 5, and night one takes a Lv5 starter past Lv7', () => {
     const c = TUNING.GROWTH_CURVES['medium-fast'];
-    const expAt = (L) => (c.num[0] * L ** 3 + c.num[1] * L ** 2 + c.num[2] * L + c.num[3]) / c.den;
+    const expAt = (L) => {
+      let seg = c;
+      for (const st of c.steps ?? []) if (L >= st.from) seg = st;
+      return Math.floor((seg.num[0] * L ** 3 + seg.num[1] * L ** 2 + seg.num[2] * L + seg.num[3]) / seg.den);
+    };
     assert.deepEqual([5, 7, 8].map(expAt), [200, 392, 512]);
+    for (let L = 2; L <= 8; L++) assert.equal(expAt(L), 8 * L * L, `8 × L² at Lv${L}`);
+    assert.equal(expAt(9), Math.floor((3 * 729 - 512) / 2), 'the cubic joins at 512 and takes over from Lv9');
+    for (let L = 9; L <= 100; L++) assert.ok(expAt(L) - expAt(L - 1) >= expAt(L - 1) - expAt(L - 2), `a level never costs less than the one before (Lv${L})`);
     for (const g of Object.values(TUNING.GROWTH_CURVES)) assert.deepEqual(g, c);
     assert.ok(200 + 100 + 40 + 66 > 392, 'Linnet + the Tossup catch + Pip\'s Wirewhisk');
     assert.deepEqual([...TUNING.WINDOW_LEVELS], [8, 20, 34]);

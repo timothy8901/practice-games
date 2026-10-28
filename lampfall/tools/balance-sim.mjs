@@ -11,10 +11,13 @@
  * (`theme.rule`) is passed as `weatherCycle`, trainer party entries carry their `held` item (as
  * `heldItem`) and `onEntry` weather (Cass's and Idris's squall), and the item and weather tables
  * (`data/items.ITEMS`, `data/spires.WEATHER_KINDS`) are injected with the rest of the content.
- * What the engine does not run yet, the harness supplies, and says so:
- *  - posted boss Shifts (`party[i].bossShift`) are applied here, at the end of the turn the data
- *    names, on the trainer's own creature (cards rolled at the Flux base odds, or 100%);
- *  - the Relay Spire is played as three rounds of two player creatures each, no repeats;
+ * Posted boss Shifts (`party[i].bossShift`) run in the engine too (GDD-04 §1.4, the same code the game
+ * runs): the strip posts at `postAt`, the Shift lands at `shiftAt`, cards at the Flux base odds (or 100%)
+ * on `bossShift:<trainerId>:<slot>`.
+ * The Relay Spire follows the rounds the game's battle flow runs (`theme.rule.rounds`; battleFlow `relayRule`,
+ * `relayNextSetup`): three rounds of two player creatures each, no repeats, no heal between, both bags
+ * (the player's and the twins' two Tonics) carried over; the harness plans the split against the posted rounds.
+ * What the engine does not run, the harness supplies, and says so:
  *  - the Summit is played as one run: three fights in a row, no Waystone between, +5 PP per move;
  *    the player's bag is used between fights (Revives on the fainted, Full Salves on the lowest).
  *
@@ -154,7 +157,7 @@ export function trainerParty(tr, scale = null) {
     const level = scale !== null && c.levelOffset !== undefined ? Math.max(2, scale + c.levelOffset) : c.level;
     const m = mon(c.species, level, c.moves ? [...c.moves] : null, { nick: c.nick });
     m._slot = i;
-    m._bossShift = c.bossShift || null;
+    if (c.bossShift) m.bossShift = c.bossShift;
     m.heldItem = c.held ?? null;
     if (c.onEntry) m.onEntry = { ...c.onEntry };
     return m;
@@ -348,18 +351,7 @@ function statusTakes(battle, mv) {
   return !(ab.hooks.statusImmune && ab.hooks.statusImmune(st.kind));
 }
 
-// --- boss Shifts (harness) ------------------------------------------------------------------------
-
-/** Rolls a posted boss Shift's card (Flux base odds, or the card's fixed percentage). */
-function rollBossShift(bs, rng, dial = 'flux') {
-  if (bs.odds !== 'dial') return bs.cards[0].form;
-  const odds = BOSS_SHIFT_ODDS.base[dial];
-  const cards = bs.cards.filter((c) => SP[c.form]);
-  const total = cards.reduce((a, c) => a + odds[c.dir], 0);
-  let r = rng.next() * total;
-  for (const c of cards) { r -= odds[c.dir]; if (r < 0) return c.form; }
-  return cards[cards.length - 1].form;
-}
+// --- boss Shifts -----------------------------------------------------------------------------------
 
 /** Re-forms a battle creature in place: types, ability, base, stats (HP fraction kept), moves kept. */
 export function reform(c, formId) {
@@ -380,45 +372,37 @@ export function reform(c, formId) {
  * Plays one trainer battle to the end and returns {outcome, turns, party (player side state), items}.
  * @param {any[]} playerParty creatures (mutated copies are returned)
  * @param {any[]} foeParty
- * @param {{rng: any, trainer?: any, source?: string, summit?: boolean, items?: any[], crackdust?: number, maxTurns?: number, weatherCycle?: any, log?: string[]}} o
+ * @param {{rng: any, trainer?: any, source?: string, summit?: boolean, items?: any[], foeItems?: any[], crackdust?: number, maxTurns?: number, weatherCycle?: any, log?: string[]}} o   `foeItems`: the foe's heals left (a Relay round)
  */
 export function playBattle(playerParty, foeParty, o) {
   const rng = o.rng;
-  for (const c of foeParty) {
-    if (c._bossShift && c._bossShift.shiftAt === 0) { reform(c, rollBossShift(c._bossShift, rng)); c._bossShift = null; }
-  }
+  const trainerId = o.trainer ? o.trainer.id : 'trainer';
   const battle = createBattle({
     sides: [
       { party: playerParty, bag: { crackdust: o.crackdust || 0 }, trainer: { name: 'Sorrel', items: (o.items || []).map((x) => ({ ...x })) } },
-      { party: foeParty, trainer: { name: o.trainer ? o.trainer.name : 'Trainer', items: o.trainer && o.trainer.items ? o.trainer.items.map((x) => ({ ...x })) : [] } },
+      { party: foeParty, trainer: { name: o.trainer ? o.trainer.name : 'Trainer', items: (o.foeItems || (o.trainer && o.trainer.items) || []).map((x) => ({ ...x })) } },
     ],
     kind: 'trainer', data: BATTLE_DATA, dial: 'flux', rng: rng.fork('battle'), source: o.source || 'route', summit: !!o.summit, tuning: SIM_TUNING,
     weatherCycle: o.weatherCycle || null,
+    // posted boss Shifts: the engine's own (the game's code path), at the Flux base odds
+    bossShiftOdds: BOSS_SHIFT_ODDS.base.flux,
+    bossShiftRng: (i) => rng.fork(`bossShift:${trainerId}:${foeParty[i] && foeParty[i]._slot !== undefined ? foeParty[i]._slot : i}`),
   });
   if (o.log) for (const ev of battle.intro) if (ev.text) o.log.push(`[t0] ${ev.text}`);
   const profile = o.trainer && o.trainer.ai ? o.trainer.ai : undefined;
   const memo = {};
-  const onField = new Map();
   let steps = 0;
   const maxSteps = (o.maxTurns || 300) * 3;
   while (battle.phase !== 'ended' && steps++ < maxSteps) {
     const actions = [];
     const who = battle.phase === 'replace' ? battle.pendingReplace : [0, 1];
     for (const s of who) actions[s] = s === 0 ? playerBrain(battle, memo) : (battle.phase === 'replace' ? chooseReplacement(battle, 1) : chooseAction(battle, 1, profile ? { profile } : {}));
-    const wasChoose = battle.phase === 'choose';
     const evs = battle.step(actions);
     if (o.log) for (const ev of evs) if (ev.text) o.log.push(`[t${battle.turn}] ${ev.text}`);
-    if (wasChoose && battle.phase !== 'ended') {
-      const c = battle.active(1);
-      if (c && c.hp > 0 && c._bossShift) {
-        const n = (onField.get(c) || 0) + 1;
-        onField.set(c, n);
-        if (n >= c._bossShift.shiftAt) { reform(c, rollBossShift(c._bossShift, rng)); c._bossShift = null; }
-      }
-    }
   }
   return {
     outcome: battle.outcome, turns: battle.turn, party: battle.sides[0].party, items: battle.sides[0].items, crackdust: battle.sides[0].bag.crackdust,
+    foeItems: battle.sides[1].items,
     consumedItems: battle.result().consumedItems, events: battle.log,
   };
 }
@@ -517,11 +501,14 @@ export function playRelay(party, tr, sp, rng, items, stats = null, plan = null) 
   plan ||= relayPlan(party, tr, sp);
   let turns = 0;
   let bag = items;
+  // the twins' heals last across the three rounds, as battleFlow carries them (relayNextSetup foeItems)
+  let foeBag = tr.items || [];
   for (let k = 0; k < rounds.length; k++) {
     const round = rounds[k];
-    const r = playBattle(plan[k].map((i) => party[i]), round.slots.map((i) => foes[i]), { rng: rng.fork(`round${round.n}`), trainer: tr, source: 'spire', items: bag });
+    const r = playBattle(plan[k].map((i) => party[i]), round.slots.map((i) => foes[i]), { rng: rng.fork(`round${round.n}`), trainer: tr, source: 'spire', items: bag, foeItems: foeBag });
     turns += r.turns;
     bag = r.items;
+    foeBag = r.foeItems;
     if (stats) {
       const key = `r${round.n}:${plan[k].map((i) => party[i].speciesId).join('+')}`;
       stats[key] ||= [0, 0];
@@ -678,6 +665,234 @@ export function statOutliers() {
   return report;
 }
 
+// --- level progression (GDD-04 §7 posted curve; GDD-00 §8 EXP and Shift windows) ------------------
+
+/** The isles in story order, each with its Spire. */
+export const PROGRESSION_STOPS = Object.freeze([
+  Object.freeze({ isle: 'lowmoor', spire: 'turn' }), Object.freeze({ isle: 'cairnhold', spire: 'ward' }),
+  Object.freeze({ isle: 'emberstep', spire: 'weather' }), Object.freeze({ isle: 'drownwood', spire: 'hollow' }),
+  Object.freeze({ isle: 'thistlewind', spire: 'relay' }), Object.freeze({ isle: 'rimeholt', spire: 'mirror' }),
+]);
+
+/**
+ * Who the party is (GDD-04 §7.1's on-curve party for the Sloshkin line): when each member is caught and
+ * when it leaves. Shifts change forms, never the curve, so members keep their first species here.
+ */
+export const PROGRESSION_PLAN = Object.freeze({
+  starter: 'sloshkin',
+  pellwick: Object.freeze({ join: Object.freeze(['tossup']) }),
+  lowmoor: Object.freeze({ join: Object.freeze(['wirewhisk', 'mudfist']) }),
+  cairnhold: Object.freeze({ join: Object.freeze(['chillnub']) }),
+  emberstep: Object.freeze({ join: Object.freeze(['sootling', 'sedgehare']), drop: Object.freeze(['tossup']) }),
+  drownwood: Object.freeze({ join: Object.freeze(['rushling', 'bilgebob']), drop: Object.freeze(['mudfist', 'sedgehare']) }),
+  thistlewind: Object.freeze({ join: Object.freeze(['duskowl']), drop: Object.freeze(['bilgebob']) }),
+  rimeholt: Object.freeze({ join: Object.freeze(['gillwick']), drop: Object.freeze(['rushling']) }),
+});
+
+/**
+ * Player behaviour per isle (never what the battles pay): wild KOs that are not catches, the share of
+ * the declinable night trainers fought, Porch Duels fought while on that isle. Story battles, the
+ * mandatory route trainers and the Spire are always fought.
+ */
+export const PROGRESSION_PLAYERS = Object.freeze({
+  minimal: Object.freeze({ id: 'minimal', label: 'Minimal (mandatory trainers, 2 wilds an isle, no duels)', wilds: 2, optional: 0, duels: 0 }),
+  typical: Object.freeze({ id: 'typical', label: 'Typical (6 wilds an isle, half the night trainers, 3 duels an isle)', wilds: 6, optional: 0.5, duels: 3 }),
+  thorough: Object.freeze({ id: 'thorough', label: 'Thorough (12 wilds an isle, every trainer, 6 duels an isle)', wilds: 12, optional: 1, duels: 6 }),
+});
+
+/**
+ * Acceptance bands for the party median at each Spire door, relative to the posted curve (GDD-04 §7:
+ * the ace sits at curve + 3), and where the starter's Shift windows (GDD-00 §8: Lv8 / 20 / 34) open.
+ */
+export const PROGRESSION_TARGETS = Object.freeze({
+  // Lowmoor sits highest (+4/+5): its night trainers and Linnet's Caldermaw 11 stand above its posted 7.
+  typical: Object.freeze([-1, 5]),
+  minimal: Object.freeze([-4, 4]),
+  thorough: Object.freeze([0, 8]),
+  /** window level -> the stops (isle ids, 'pellwick', 'the-bar') it may open in for the starter, by player */
+  starterWindows: Object.freeze({
+    8: Object.freeze(['pellwick', 'lowmoor']),
+    20: Object.freeze(['cairnhold', 'emberstep', 'drownwood']),
+    34: Object.freeze(['drownwood', 'thistlewind', 'rimeholt']),
+  }),
+});
+
+const REGION = Object.fromEntries(REGIONS.map((r) => [r.id, r]));
+const SPIRE_BY_ID = Object.fromEntries(SPIRES.map((s) => [s.id, s]));
+
+/**
+ * The average wild foe of an isle: the weighted mean yield and level of its land and water tables
+ * (`data/encounters`), as one foe of the award split.
+ * @param {string} isle
+ * @returns {{expYield: number, level: number}}
+ */
+export function wildFoe(isle) {
+  const rows = [...(ENCOUNTERS[`${isle}-land`] || []), ...(ENCOUNTERS[`${isle}-water`] || [])].filter((r) => SP[r.species]);
+  if (!rows.length) {
+    const band = REGION[isle]?.wild ?? [5, 5];
+    return { expYield: 60, level: Math.round((band[0] + band[1]) / 2) };
+  }
+  const W = rows.reduce((a, r) => a + (r.w ?? 1), 0);
+  const expYield = rows.reduce((a, r) => a + (r.w ?? 1) * SP[r.species].expYield, 0) / W;
+  const level = rows.reduce((a, r) => a + (r.w ?? 1) * ((r.levels[0] + r.levels[1]) / 2), 0) / W;
+  return { expYield: Math.round(expYield), level: Math.round(level) };
+}
+
+/**
+ * A run's battles in order, as progression events (see {@link simulateProgression}).
+ * @param {{wilds: number, optional: number, duels: number}} player
+ * @returns {any[]}
+ */
+export function progressionSchedule(player) {
+  const ev = [];
+  const trainerFight = (id, extra = {}) => {
+    const tr = TRAINER_BY_ID[id];
+    if (!tr) return;
+    ev.push({ type: 'fight', kind: 'trainer', source: tr.expSource ?? (tr.story ? 'story' : 'route'), foes: tr.party.map((e) => ({ species: e.species, level: e.level })), label: id, holdOut: tr.holdOut ?? null, ...extra });
+  };
+  const catchOne = (species, level, stop) => {
+    ev.push({ type: 'fight', kind: 'wild', source: 'route', foes: [{ species, level }], label: `catch ${species}`, stop });
+    ev.push({ type: 'join', species, level, stop });
+  };
+  // night one (GDD-00 §8 check): Pip, Linnet's dock hold-out, the Tossup catch
+  ev.push({ type: 'stop', stop: 'pellwick', curve: REGION.pellwick.curveLevel });
+  trainerFight('pip');
+  ev.push({ type: 'flat', amount: TUNING.holdOutExp, label: 'linnet-dock hold-out' });
+  for (const sp of PROGRESSION_PLAN.pellwick.join) catchOne(sp, 4, 'pellwick');
+  let optAcc = 0;
+  PROGRESSION_STOPS.forEach(({ isle, spire }, i) => {
+    const curve = REGION[isle].curveLevel;
+    ev.push({ type: 'stop', stop: isle, curve });
+    const plan = PROGRESSION_PLAN[isle] || {};
+    for (const sp of plan.drop || []) ev.push({ type: 'drop', species: sp });
+    const wild = wildFoe(isle);
+    for (const sp of plan.join || []) catchOne(sp, wild.level, isle);
+    for (let k = 0; k < player.wilds; k++) ev.push({ type: 'fight', kind: 'wild', source: 'route', foes: [{ ...wild }], label: 'wild' });
+    for (let k = 0; k < player.duels; k++) ev.push({ type: 'duel', badges: i, trainer: PORCH_DUELS.neighbours[k % PORCH_DUELS.neighbours.length].trainer });
+    for (const tr of TRAINERS.filter((t) => t.region === isle && t.class === 'route')) {
+      if (tr.declinable || tr.band === 'night') {
+        optAcc += player.optional;
+        if (optAcc < 1 - 1e-9) continue;
+        optAcc -= 1;
+      }
+      trainerFight(tr.id);
+    }
+    for (const tr of TRAINERS.filter((t) => t.region === isle && (t.story || t.class === 'mentor'))) trainerFight(tr.id);
+    const sp = SPIRE_BY_ID[spire];
+    ev.push({ type: 'door', id: spire, curve, ace: sp.ace.level });
+    trainerFight(sp.trainer);
+  });
+  // the Bar and the Summit
+  ev.push({ type: 'stop', stop: 'the-bar', curve: REGION['the-bar']?.curveLevel ?? 41 });
+  for (const tr of TRAINERS.filter((t) => t.region === 'the-bar')) trainerFight(tr.id);
+  ev.push({ type: 'door', id: 'summit', curve: SUMMIT.curveLevel ?? 47, ace: 50 });
+  for (const id of ['bastien-keeper', 'cass-keeper', 'idris-champion']) trainerFight(id);
+  return ev;
+}
+
+/**
+ * Plays progression events through the real EXP rules: `systems/exp.computeAward` (battlers 100%, bench
+ * 60%, catch-up under the posted curve, Porch Duel damping) and the curve in `tuning` (default: the
+ * shipped `data/tuning.TUNING`). Each foe's KO is credited to the next party member in rotation; every
+ * member used in a battle is a battler for all of its KOs, as in the engine. Events:
+ *  - `{type: 'stop', stop, curve}` the isle the party is on (curve for catch-up; window bookkeeping);
+ *  - `{type: 'fight', kind, source, foes: [{species|expYield, level}], label}`;
+ *  - `{type: 'duel', badges, trainer}` a Porch Duel: the trainer's party at the party median + offsets,
+ *    `PORCH_DUELS.partySizeByBadges` creatures (the last ones), source 'rematch';
+ *  - `{type: 'flat', amount}` the hold-out: battlers all of it, the bench 60%;
+ *  - `{type: 'join', species, level}` / `{type: 'drop', species}`;
+ *  - `{type: 'door', id, curve, ace}` snapshot before a Spire (or the Summit);
+ *  - any event may carry `t` (real minutes), copied onto the windows it opens.
+ * @param {any[]} events
+ * @param {{tuning?: object}} [opts]
+ */
+export function simulateProgression(events, opts = {}) {
+  const tuning = opts.tuning ?? TUNING;
+  const xo = { tuning };
+  const growth = 'medium-fast';
+  /** @type {Array<{uid: string, species: string, familyId: string, level: number, exp: number, windowsUsed: number[]}>} */
+  const party = [];
+  const windows = [];
+  const doors = [];
+  let uidSeq = 0;
+  let rot = 0;
+  let stop = 'pellwick';
+  let curve = 4;
+  let t = null;
+  const add = (species, level) => {
+    const c = { uid: `p${uidSeq++}`, species, familyId: SP[species].familyId, level, exp: expSys.expForLevel(growth, level, xo), windowsUsed: [] };
+    expSys.skipPassedWindows(c, CREATURE_DATA, xo);
+    party.push(c);
+  };
+  const credit = (uid, amount) => {
+    const c = party.find((x) => x.uid === uid);
+    if (!c || !(amount > 0)) return;
+    const from = c.level;
+    c.exp += amount;
+    c.level = expSys.levelFromExp(growth, c.exp, xo);
+    for (const L of expSys.windowLevels(c, CREATURE_DATA, xo)) {
+      if (L > from && L <= c.level && !c.windowsUsed.includes(L)) {
+        c.windowsUsed.push(L);
+        windows.push({ uid: c.uid, species: c.species, starter: c.uid === 'p0', level: L, stop, t });
+      }
+    }
+  };
+  const median = () => {
+    const lv = party.map((c) => c.level).sort((a, b) => a - b);
+    return lv[Math.floor((lv.length - 1) / 2)];
+  };
+  const fight = (foes, kind, source) => {
+    const used = new Set();
+    for (let i = 0; i < foes.length; i++) used.add(party[(rot++) % party.length].uid);
+    const award = expSys.computeAward({
+      kind, source, curveLevel: curve,
+      defeated: foes.map((f) => ({ level: f.level, expYield: f.expYield ?? SP[f.species].expYield })),
+      party: party.map((c) => ({ uid: c.uid, level: c.level, participated: used.has(c.uid) })),
+    }, null, xo);
+    for (const a of award.totals) credit(a.uid, a.amount);
+  };
+  add(PROGRESSION_PLAN.starter, 5);
+  for (const e of events) {
+    if (Number.isFinite(e.t)) t = e.t;
+    if (e.type === 'stop') { stop = e.stop; curve = e.curve; } else if (e.type === 'fight') fight(e.foes, e.kind, e.source);
+    else if (e.type === 'duel') {
+      const tr = TRAINER_BY_ID[e.trainer];
+      const size = PORCH_DUELS.partySizeByBadges[Math.min(e.badges, PORCH_DUELS.partySizeByBadges.length - 1)];
+      const m = median();
+      const scale = tr.scale ?? {};
+      const foes = tr.party.slice(-size).map((p) => ({ species: p.species, level: Math.max(scale.min ?? 1, Math.min(scale.max ?? 100, m)) + (p.levelOffset ?? 0) }));
+      fight(foes, 'trainer', tr.expSource ?? 'rematch');
+    } else if (e.type === 'flat') {
+      const lead = party[0];
+      for (const c of party) credit(c.uid, Math.floor(e.amount * (c === lead ? 1 : tuning.BENCH_SHARE)));
+    } else if (e.type === 'join') { if (party.length < 6) add(e.species, e.level); } else if (e.type === 'drop') {
+      const i = party.findIndex((c) => c.species === e.species && c.uid !== 'p0');
+      if (i >= 0) party.splice(i, 1);
+    } else if (e.type === 'door') {
+      const levels = party.map((c) => c.level);
+      doors.push({ id: e.id, curve: e.curve, ace: e.ace, levels, starter: party[0].level, median: median(), max: Math.max(...levels), t });
+    }
+  }
+  return { doors, windows, party: party.map((c) => ({ species: c.species, level: c.level })), forecasts: windows.length };
+}
+
+/**
+ * The progression of every player in {@link PROGRESSION_PLAYERS}, with each door's offset from the
+ * posted curve and whether it sits in its band.
+ * @param {{tuning?: object}} [opts]
+ */
+export function progressionReport(opts = {}) {
+  const out = {};
+  for (const [id, player] of Object.entries(PROGRESSION_PLAYERS)) {
+    const r = simulateProgression(progressionSchedule(player), opts);
+    const band = PROGRESSION_TARGETS[id];
+    const doors = r.doors.map((d) => ({ ...d, offset: d.median - d.curve, ok: d.median - d.curve >= band[0] && d.median - d.curve <= band[1] }));
+    const starterWindows = r.windows.filter((w) => w.starter).map((w) => ({ level: w.level, stop: w.stop }));
+    out[id] = { ...r, doors, band, starterWindows };
+  }
+  return out;
+}
+
 // --- all of it ------------------------------------------------------------------------------------
 
 /** Every run, one report. */
@@ -690,11 +905,21 @@ export function runAll(n = 200, seed = 'balance') {
 
 const pct = (x) => `${(x * 100).toFixed(1)}%`;
 
+/** Prints a {@link progressionReport}. @param {Record<string, any>} rep */
+export function printProgression(rep) {
+  console.log('Level progression (party median at each Spire door vs the posted curve; ace = curve + 3)');
+  for (const [id, r] of Object.entries(rep)) {
+    console.log(`  ${id.padEnd(9)} band ${r.band[0]}..+${r.band[1]}  forecasts ${r.forecasts}  starter windows ${r.starterWindows.map((w) => `Lv${w.level}@${w.stop}`).join(' ')}`);
+    for (const d of r.doors) console.log(`    ${d.id.padEnd(8)} curve ${String(d.curve).padStart(2)} ace ${String(d.ace).padStart(2)}  median ${String(d.median).padStart(2)} (${d.offset >= 0 ? '+' : ''}${d.offset})${d.ok ? '' : ' OUT'}  party ${d.levels.join(',')}`);
+  }
+}
+
 /** CLI. */
 async function main(argv) {
   const ni = argv.indexOf('--n');
   const n = ni >= 0 ? Number(argv[ni + 1]) : 200;
   const only = argv.indexOf('--only') >= 0 ? argv[argv.indexOf('--only') + 1] : null;
+  if (only === 'progression') { printProgression(progressionReport()); return; }
   if (only === 'route') { for (const r of simulateRoute(n)) console.log(r.id.padEnd(24), pct(r.rate), r.avgTurns.toFixed(1)); return; }
   if (only === 'summit') { const s = simulateSummit(n); console.log(pct(s.rate), JSON.stringify(s.byStarter), s.avgTurns.toFixed(1), JSON.stringify(s.reached)); return; }
   if (only) { const s = simulateSpire(only, n); console.log(s.id, pct(s.rate), JSON.stringify(s.byStarter), s.avgTurns.toFixed(1)); return; }

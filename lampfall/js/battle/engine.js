@@ -32,7 +32,7 @@ import {
   isDamaging, isSureHit, isSelfTargeting, isChipMove, moveTypeFor, wardCheck, wardHeldText, wardIndirect, isWard, MAJOR_STATUS, weatherOf,
 } from './effects.js';
 import { DEFAULTS as ABILITY_DEFAULTS } from './abilityHooks.js';
-import { DEFAULTS as CREATURE_DEFAULTS, gainExp as defaultGainExp, isFainted, hpRatio } from './creatureOps.js';
+import { DEFAULTS as CREATURE_DEFAULTS, gainExp as defaultGainExp, isFainted, hpRatio, recomputeStats } from './creatureOps.js';
 import { DEFAULTS as DATA_DEFAULTS, createBattleData } from './data.js';
 import { readCreature } from './read.js';
 import {
@@ -186,6 +186,12 @@ export const DIALS = Object.freeze(['drift', 'flux', 'freefall']);
  * @typedef {{readCostsTurn: boolean, captureDisplay: 'exact'|'bands', wardBadge: 'start'|'after-block', runAllowed: boolean, holdOutTurns: number|null}} DialRules
  * @type {Readonly<Record<string, Readonly<DialRules>>>}
  */
+/**
+ * Card odds of a 'dial' boss Shift when the flow passes none: the Flux base row (GDD-00 §8 Shift
+ * table). The flow passes the player's own dial row (data/spires.js BOSS_SHIFT_ODDS) as `bossShiftOdds`.
+ */
+export const BOSS_SHIFT_FALLBACK_ODDS = Object.freeze({ up: 40, side: 35, down: 25 });
+
 export const DIAL_RULES = Object.freeze({
   drift: Object.freeze({ readCostsTurn: false, captureDisplay: 'exact', wardBadge: 'start', runAllowed: true, holdOutTurns: null }),
   flux: Object.freeze({ readCostsTurn: false, captureDisplay: 'exact', wardBadge: 'start', runAllowed: true, holdOutTurns: null }),
@@ -277,9 +283,23 @@ export class BattleError extends Error {
  *   something replaces it; `turns` makes it timed)
  * @property {import('./weather.js').WeatherCycle|null} [weatherCycle]     a posted cycle (the Weather Spire's `theme.rule`)
  * @property {ReadonlyArray<any>|null} [weatherKinds]                       weather kind rows (default: `data.weatherKinds`)
+ * @property {{up: number, side: number, down: number}|null} [bossShiftOdds]  card odds (percent) of a posted boss Shift whose `odds` is
+ *   'dial': the flow passes the player's dial row (steadied after the Relighting); default {@link BOSS_SHIFT_FALLBACK_ODDS}
+ * @property {((slot: number) => {next: () => number})|null} [bossShiftRng]  the stream a side-1 creature's boss Shift is rolled on
+ *   (GDD-04 §1.4: `bossShift:<trainerId>:<slot>`); default: the battle rng
+ * @property {ReadonlyArray<{id?: string, name?: string, types: string[], turns?: number, cards?: Array<{dir: string, name: string, types: string[], weather?: string}>,
+ *   odds?: {up: number, side: number, down: number}, rule?: {evasion?: number}}>|null} [readingPhases]   the Reading (`source: 'reading'`): a phase with
+ *   `cards` rolls one of its three aspects as it opens (posted `readingPostAt` turns into the phase before; an aspect's `weather` holds for the phase)
+ * @property {((phase: number, draw: number) => {next: () => number})|null} [readingRng]   the Reading's card stream (`reading:<phase>:<draw>`)
+ * @property {number} [readingPostAt=1]               turns into a phase when the next phase's cards post (THE_READING `postAtTurn`)
+ * @property {((c: Creature) => void)|null} [restat]   recomputes a creature's stats after a boss Shift changed its base (keeps the HP
+ *   ratio; default: creatureOps.recomputeStats)
  *
  * Creatures may also carry `heldItem` (an item id; its row's `held` keys drive the held-item hooks
  * when `data` has an items table) and `onEntry: {weather, turns}` (posts weather as it enters).
+ * A trainer's creature may carry `bossShift: {postAt, shiftAt, odds: 'dial'|number, cards: [{dir, form}]}`
+ * (data/trainers.js, GDD-04 §1.4): its Forecast strip is posted at the end of its `postAt`-th turn on the
+ * field ('shift-posted') and it Shifts at the end of its `shiftAt`-th ('boss-shift'); 0 = as it enters.
  */
 
 /**
@@ -350,16 +370,33 @@ export class Battle {
     this.summit = !!opts.summit;
     this.source = opts.source || 'route';
     this.captureBlockReason = opts.captureBlockReason ?? null;
+    const typeName = (t) => typeof t === 'string' ? t.slice(0, 1).toUpperCase() + t.slice(1).toLowerCase() : t;
     this.readingPhases = this.source === 'reading' ? (opts.readingPhases || [{ id: 'star', name: 'The Passenger', types: ['Star'], turns: 2 }]).map((p) => ({ ...p,
-      types: Array.isArray(p.types) ? p.types.map((t) => typeof t === 'string' ? t.slice(0, 1).toUpperCase() + t.slice(1).toLowerCase() : t) : p.types })) : null;
+      types: Array.isArray(p.types) ? p.types.map(typeName) : p.types,
+      // THE_READING (data/spires.js): the three aspects this phase may take, posted during the phase before
+      cards: Array.isArray(p.cards) ? p.cards.map((k) => ({ ...k, types: Array.isArray(k.types) ? k.types.map(typeName) : k.types })) : null })) : null;
+    /** @type {((phase: number, draw: number) => {next: () => number})|null} the Reading's card stream (`reading:<phase>:<draw>`) */
+    this._readingRng = typeof opts.readingRng === 'function' ? opts.readingRng : null;
+    /** turns into a phase when the next phase's cards are posted (THE_READING `postAtTurn`) */
+    this.readingPostAt = Number.isInteger(opts.readingPostAt) && opts.readingPostAt >= 0 ? opts.readingPostAt : 1;
     if (this.readingPhases) {
-      if (!Array.isArray(this.readingPhases) || !this.readingPhases.length || this.readingPhases.some((p) => !Array.isArray(p.types) || !p.types.length || p.types.some((t) => !this.data.chart.has(t)))) {
+      const badTypes = (list) => !Array.isArray(list) || !list.length || list.some((t) => !this.data.chart.has(t));
+      if (!Array.isArray(this.readingPhases) || !this.readingPhases.length || this.readingPhases.some((p) => badTypes(p.types) || (p.cards && (!p.cards.length || p.cards.some((k) => badTypes(k.types) || !['up', 'side', 'down'].includes(k.dir)))))) {
         throw new TypeError('createBattle: readingPhases needs named, valid type lists');
       }
       this.rules.runAllowed = false;
       this.rules.holdOutTurns ??= this.readingPhases.reduce((n, p) => n + (p.turns || 2), 0);
     }
     this.foeAi = opts.foeAi || null;
+    if (opts.bossShiftOdds != null && !['up', 'side', 'down'].every((k) => Number.isFinite(opts.bossShiftOdds[k]) && opts.bossShiftOdds[k] >= 0)) {
+      throw new TypeError('createBattle: bossShiftOdds needs {up, side, down} percentages');
+    }
+    /** @type {{up: number, side: number, down: number}} */
+    this.bossShiftOdds = opts.bossShiftOdds ? { up: opts.bossShiftOdds.up, side: opts.bossShiftOdds.side, down: opts.bossShiftOdds.down } : { ...BOSS_SHIFT_FALLBACK_ODDS };
+    if (opts.bossShiftRng != null && typeof opts.bossShiftRng !== 'function') throw new TypeError('createBattle: bossShiftRng must be a function (slot) => Rng');
+    this._bossShiftRng = opts.bossShiftRng || null;
+    if (opts.restat != null && typeof opts.restat !== 'function') throw new TypeError('createBattle: restat must be a function (creature) => void');
+    this._restat = opts.restat || null;
     this.yard = opts.yard || [];
     this.prism = !!opts.prism;
     this.fieldLog = opts.fieldLog || { seen: new Set(), read: new Set() };
@@ -400,6 +437,7 @@ export class Battle {
         for (const m of c.moves) data.move(m.id);
         if (c.heldItem != null && typeof c.heldItem !== 'string') throw new TypeError(`createBattle: side ${i} party[${j}]: heldItem must be an item id or null`);
         data.held(c.heldItem);
+        if (c.bossShift != null) checkBossShift(c.bossShift, `createBattle: side ${i} party[${j}].bossShift`);
       });
       const first = s.party.findIndex((c) => !isFainted(c));
       if (first < 0) throw new RangeError(`createBattle: side ${i} has no healthy creature`);
@@ -611,6 +649,7 @@ export class Battle {
         charging: s.vol.charging ? s.party[s.active].moves[s.vol.charging.move].id : null,
         pendingHeal: s.vol.pendingHeal ? Math.max(0, s.vol.pendingHeal.until - this.turn) : null,
         wardSuppressed: s.vol.wardSuppressed,
+        shiftStrip: this.shiftStrip(s.index),
         party: s.party.map((c) => ({
           uid: c.uid, name: c.nickname, speciesId: c.speciesId, level: c.level, hp: c.hp, maxHp: c.stats.hp,
           status: c.status ? c.status.kind : null, mends: c.mends, types: c.types.slice(), fainted: isFainted(c), heldItem: c.heldItem ?? null,
@@ -864,7 +903,35 @@ export class Battle {
     while (index < this.readingPhases.length - 1 && left >= (this.readingPhases[index].turns || 2)) left -= this.readingPhases[index++].turns || 2;
     const p = this.readingPhases[index];
     const next = this.readingPhases[(index + 1) % this.readingPhases.length];
-    return { index, name: p.name || p.id, types: p.types.slice(), turnsLeft: Math.max(0, (p.turns || 2) - left), next: next.name || next.id, nextTypes: next.types.slice() };
+    const posted = index + 1 < this.readingPhases.length && next.cards && this._readingPosted === index + 1 ? next.cards.map((k) => ({ ...k, types: k.types.slice() })) : null;
+    return { index, name: p.aspect || p.name || p.id, phase: p.name || p.id, types: p.types.slice(), turnsLeft: Math.max(0, (p.turns || 2) - left),
+      next: next.cards ? (posted ? 'Forecast posted' : 'Forecast not yet posted') : next.name || next.id, nextTypes: next.cards ? [] : next.types.slice(), nextCards: posted }; // str
+  }
+
+  /** Card odds (percent) of a Reading phase's posted aspects (its `odds`, or the boss-Shift odds). @param {any} p */
+  _readingOdds(p) {
+    const row = p.odds && ['up', 'side', 'down'].every((k) => Number.isFinite(p.odds[k])) ? p.odds : this.bossShiftOdds;
+    const total = p.cards.reduce((a, k) => a + (row[k.dir] || 0), 0) || 1;
+    const out = p.cards.map((k) => Math.round(((row[k.dir] || 0) * 100) / total));
+    const sum = out.reduce((a, n) => a + n, 0);
+    if (out.length && sum !== 100) out[out.indexOf(Math.max(...out))] += 100 - sum;
+    return out;
+  }
+
+  /** Posts the next phase's three aspects once this phase is `readingPostAt` turns old (THE_READING `postAtTurn`). */
+  _readingPost() {
+    const view = this._readingView();
+    const i = view.index;
+    const next = this.readingPhases[i + 1];
+    if (!next || !next.cards || this._readingPosted === i + 1) return;
+    const into = (this.readingPhases[i].turns || 2) - view.turnsLeft;
+    if (into < this.readingPostAt) return;
+    this._readingPosted = i + 1;
+    const odds = this._readingOdds(next);
+    const c = this.active(1);
+    const cards = next.cards.map((k, j) => ({ dir: k.dir, form: c.speciesId, name: k.name, types: k.types.slice(), odds: odds[j] }));
+    this._emit({ type: 'shift-posted', side: 1, who: c.nickname, uid: c.uid, cards, turnsLeft: view.turnsLeft,
+      text: `Forecast posted for ${next.name || next.id}: ${cards.map((k) => `${k.name} (${k.types.join('/')}) ${k.odds}%`).join(' · ')}.` }); // str
   }
 
   _setReadingPhase(index) {
@@ -872,11 +939,151 @@ export class Battle {
     const p = this.readingPhases[index];
     const next = this.readingPhases[(index + 1) % this.readingPhases.length];
     const c = this.active(1);
+    if (p.cards && !p.aspect) {
+      // the posted aspects roll as the phase opens (stream `reading:<phase>:<draw>`; draw 0 = the first reading)
+      const odds = this._readingOdds(p);
+      const rng = this._readingRng ? this._readingRng(index, 0) : this.rng;
+      let r = rng.next() * 100;
+      let k = p.cards.length - 1;
+      for (let j = 0; j < p.cards.length; j++) { r -= odds[j]; if (r < 0) { k = j; break; } }
+      const card = p.cards[k];
+      p.types = card.types.slice();
+      p.aspect = card.name;
+      p.landed = card.dir;
+      if (card.weather && this.weatherKinds.has(card.weather) && !this.weatherCycle) this._setTimedWeather(card.weather, p.turns || 2, 'setup', null);
+    }
+    if (p.rule && Number.isInteger(p.rule.evasion) && p.rule.evasion > 0) this._changeStage(1, 'eva', p.rule.evasion, { bySelf: true });
     c.types = p.types.slice();
-    this._emit({ type: 'type-shift', side: 1, who: c.nickname, current: c.types.join('/'), types: c.types.slice(), next: next.types.slice(),
-      text: `Reading ${index + 1}/${this.readingPhases.length}: ${p.name || p.id} (${c.types.join('/')}) — ${p.turns || 2} turns. Next: ${next.name || next.id} (${next.types.join('/')}).` });
+    const head = `Reading ${index + 1}/${this.readingPhases.length}: ${p.name || p.id}${p.aspect ? `, ${p.aspect}` : ''} (${c.types.join('/')}) — ${p.turns || 2} turns.`; // str
+    this._emit({ type: 'type-shift', side: 1, who: c.nickname, current: c.types.join('/'), types: c.types.slice(), next: next.cards ? [] : next.types.slice(), aspect: p.aspect ?? null,
+      text: index === this.readingPhases.length - 1 && this.readingPhases.some((q) => q.cards) ? `${head} Its last Forecast will be offered to you.` // str
+        : next.cards ? `${head} Its next Forecast posts after ${this.readingPostAt} ${this.readingPostAt === 1 ? 'turn' : 'turns'}.` : `${head} Next: ${next.name || next.id} (${next.types.join('/')}).` }); // str
   }
 
+
+  // ---- posted boss Shifts (GDD-04 §1.4) -------------------------------------------
+
+  /**
+   * The posted Forecast strip of a side's active creature (null: nothing posted, or it has Shifted).
+   * @param {number} side
+   * @returns {{who: string, uid: any, cards: Array<{dir: string, form: string, name: string, odds: number}>, turnsLeft: number}|null}
+   */
+  shiftStrip(side) {
+    const c = this.active(side);
+    if (!c || !c.bossShift) return null;
+    const f = this.bflags(side, c);
+    if (!f.bossShiftPosted || f.bossShiftDone) return null;
+    return { who: c.nickname, uid: c.uid, cards: f.bossShiftCards.map((k) => ({ ...k })), turnsLeft: Math.max(0, c.bossShift.shiftAt - (f.bossTurns || 0)) };
+  }
+
+  /**
+   * A posted boss Shift's cards with their odds: one sure card reads its own percentage on every dial;
+   * 'dial' cards use {@link Battle#bossShiftOdds}. A card whose form is missing or is the current form
+   * drops out and its odds go to the rest pro rata (as on the player's Forecast).
+   * @param {Creature} c @returns {Array<{dir: string, form: string, name: string, odds: number}>}
+   */
+  _bossShiftCards(c) {
+    const bs = c.bossShift;
+    const named = (k) => {
+      try { return { dir: k.dir, form: k.form, name: this.data.species(k.form).name }; } catch { return null; }
+    };
+    if (bs.odds !== 'dial') {
+      const k = named(bs.cards[0]);
+      return k && k.form !== c.speciesId ? [{ ...k, odds: Math.max(0, Math.min(100, Number(bs.odds))) }] : [];
+    }
+    const cards = bs.cards.map(named).filter((k) => k && k.form !== c.speciesId);
+    const total = cards.reduce((a, k) => a + (this.bossShiftOdds[k.dir] || 0), 0);
+    if (total <= 0) return [];
+    const out = cards.map((k) => ({ ...k, odds: Math.round(((this.bossShiftOdds[k.dir] || 0) * 100) / total) }));
+    // whole percents that add to 100 (the largest card takes the rounding)
+    const sum = out.reduce((a, k) => a + k.odds, 0);
+    if (out.length && sum !== 100) out.reduce((a, k) => (k.odds > a.odds ? k : a)).odds += 100 - sum;
+    return out;
+  }
+
+  /** End of turn: counts each active boss-Shift creature's turns on the field and posts / lands its Shift. */
+  _bossShiftsEndOfTurn() {
+    for (const s of this.sides) {
+      const c = this.active(s.index);
+      if (!c.bossShift || isFainted(c)) continue;
+      const f = this.bflags(s.index, c);
+      if (f.bossShiftDone) continue;
+      f.bossTurns = (f.bossTurns || 0) + 1;
+      this._bossShiftTick(s.index, c);
+    }
+  }
+
+  /**
+   * Posts the strip once its `postAt` is reached and lands the Shift at `shiftAt` (counted in the
+   * creature's own turns on the field, which follow it across switches).
+   * @param {number} side @param {Creature} c
+   */
+  _bossShiftTick(side, c) {
+    const bs = c.bossShift;
+    const f = this.bflags(side, c);
+    if (f.bossShiftDone) return;
+    const n = f.bossTurns || 0;
+    if (!f.bossShiftPosted && n >= bs.postAt) {
+      f.bossShiftPosted = true;
+      f.bossShiftCards = this._bossShiftCards(c);
+      if (!f.bossShiftCards.length) { f.bossShiftDone = true; return; }
+      const left = Math.max(0, bs.shiftAt - n);
+      const when = left === 0 ? 'now' : left === 1 ? 'at the end of next turn' : `in ${left} turns`;
+      const list = f.bossShiftCards.map((k) => `${k.dir[0].toUpperCase()}${k.dir.slice(1)} ${k.name} ${k.odds}%`).join(' · ');
+      this._emit({ type: 'shift-posted', side, who: c.nickname, uid: c.uid, cards: f.bossShiftCards.map((k) => ({ ...k })), turnsLeft: left,
+        text: `${c.nickname}'s mark is glowing. Forecast posted: ${list}. It Shifts ${when}.` });
+    }
+    if (n < bs.shiftAt) return;
+    f.bossShiftDone = true;
+    const cards = f.bossShiftCards || this._bossShiftCards(c);
+    if (!cards.length) return;
+    const slot = this.sides[side].party.indexOf(c);
+    const rng = this._bossShiftRng ? this._bossShiftRng(slot) : this.rng;
+    const total = cards.reduce((a, k) => a + k.odds, 0);
+    let card = null;
+    if (cards.length === 1 && total >= 100) card = cards[0];
+    else {
+      let r = rng.next() * Math.max(100, total);
+      for (const k of cards) { r -= k.odds; if (r < 0) { card = k; break; } }
+    }
+    if (!card) {
+      this._emit({ type: 'message', side, text: `${c.nickname}'s mark dims. It holds its shape.` });
+      return;
+    }
+    this._bossReform(side, c, card);
+  }
+
+  /**
+   * Re-forms a creature in place (GDD-04 §1.4): level, HP fraction, moves, nickname, held item, status
+   * and stat stages stay; species, types, ability, base and stats change.
+   * @param {number} side @param {Creature} c @param {{dir: string, form: string, name: string}} card
+   */
+  _bossReform(side, c, card) {
+    const from = c.speciesId;
+    const who = c.nickname;
+    const fromTypes = c.types.slice();
+    const fromMaxHp = c.stats.hp;
+    const fromName = (() => { try { return this.data.species(from).name; } catch { return from; } })();
+    const sp = this.data.species(card.form);
+    // an un-nicknamed creature answers to its form's name (a given nickname stays)
+    if (c.nickname === fromName) c.nickname = sp.name;
+    c.speciesId = sp.id;
+    c.types = sp.types.slice();
+    c.ability = sp.ability;
+    c.base = { ...sp.base };
+    delete c.typeQueue;
+    delete c.typeIndex;
+    if (this._restat) this._restat(c);
+    else recomputeStats(c, this.data);
+    this.fieldLog.seen.add(sp.id);
+    // a fresh body: the player may Read it again for free, and a Ward badge follows the new ability
+    this.sides[1 - side].readUsed.delete(c.uid);
+    this.wardBadgeUids.delete(c.uid);
+    if (this.rules.wardBadge === 'start') this._revealWard(side, c);
+    const dir = `${card.dir[0].toUpperCase()}${card.dir.slice(1)}`;
+    this._emit({ type: 'boss-shift', side, who, name: c.nickname, uid: c.uid, from, to: sp.id, toName: sp.name, dir: card.dir, types: c.types.slice(), hp: c.hp, maxHp: c.stats.hp, fromTypes, fromMaxHp,
+      text: c.nickname === sp.name ? `${fromName} Shifts ${dir}: it is a ${sp.name} now!` : `${c.nickname} Shifts ${dir}: ${fromName} to ${sp.name}!` });
+  }
 
   // ---- weather ---------------------------------------------------------------
 
@@ -1182,11 +1389,13 @@ export class Battle {
       this._inTurn = false;
     }
     if (this.phase !== 'ended') this._endOfTurn();
+    if (this.phase !== 'ended') this._bossShiftsEndOfTurn();
     if (this.phase !== 'ended') this._resolveFaints();
     if (this.phase !== 'ended' && this.rules.holdOutTurns != null && this.turn >= this.rules.holdOutTurns) this._finish(this.readingPhases ? 'reading' : 'holdout', null);
     else if (this.phase !== 'ended' && this.readingPhases) {
       const view = this._readingView();
       if (view.index !== this._readingIndex) this._setReadingPhase(this._readingIndex = view.index);
+      this._readingPost();
     }
     if (this.phase !== 'ended' && this.turn >= this.tuning.maxTurns) this._finish('draw', null);
     return this._flush();
@@ -1309,6 +1518,8 @@ export class Battle {
     s.vol = freshVol();
     const c = s.party[to];
     s.participants.add(c.uid);
+    // a posted boss Shift at 0 lands as it enters (Linnet's dock Sootling), before its ability wakes
+    if (c.bossShift) this._bossShiftTick(side, c);
     const ability = this.data.ability(c.ability);
     if (this.rules.wardBadge === 'start') this._revealWard(side, c);
     if ((!initial || this.turn === 0) && ability.hooks.onSwitchIn) ability.hooks.onSwitchIn({ battle: this, side, self: c, foe: this.foeOf(side) });
@@ -1952,7 +2163,8 @@ export class Battle {
         // a held payout item (Lucky Button) counts when its holder battled
         const mult = Math.max(1, ...player.party.filter((c) => player.participants.has(c.uid)).map((c) => (this.heldOf(c) ? this.heldOf(c).payoutMult : 1)));
         this.payout = Math.floor(base * mult);
-        this._emit({ type: 'payout', amount: this.payout, text: `You won ${this.payout} glint.` });
+        // a trainer who pays nothing (a story set piece, a Relay round before the last) says nothing about it
+        if (this.payout > 0) this._emit({ type: 'payout', amount: this.payout, text: `You won ${this.payout} glint.` });
       }
     } else if (outcome === 'loss') {
       this.blackoutCost = this.summit ? 0 : Math.max(0, Math.min(t.blackoutCap, Math.floor(this.sides[0].glint * t.blackoutRate)));
@@ -2134,6 +2346,22 @@ function checkCreature(c, where) {
   if (!Array.isArray(c.moves)) throw new TypeError(`${where}: moves must be an array`);
   for (const m of c.moves) {
     if (!m || typeof m.id !== 'string' || !Number.isFinite(m.pp) || !Number.isFinite(m.maxPp) || m.pp < 0) throw new TypeError(`${where}: bad move slot ${JSON.stringify(m)}`);
+  }
+}
+
+/**
+ * Checks a `bossShift` block (data/trainers.js): postAt / shiftAt are turns on the field (0 = as it
+ * enters, postAt <= shiftAt), `odds` is 'dial' or a percentage, `cards` name a direction and a form.
+ * @param {any} bs @param {string} where
+ */
+function checkBossShift(bs, where) {
+  if (!bs || typeof bs !== 'object') throw new TypeError(`${where}: must be an object`);
+  if (!Number.isInteger(bs.postAt) || bs.postAt < 0 || !Number.isInteger(bs.shiftAt) || bs.shiftAt < bs.postAt) {
+    throw new TypeError(`${where}: postAt / shiftAt must be integers with 0 <= postAt <= shiftAt`);
+  }
+  if (bs.odds !== 'dial' && !(Number.isFinite(bs.odds) && bs.odds > 0 && bs.odds <= 100)) throw new TypeError(`${where}: odds must be 'dial' or 1..100`);
+  if (!Array.isArray(bs.cards) || !bs.cards.length || bs.cards.some((k) => !k || !['up', 'side', 'down'].includes(k.dir) || typeof k.form !== 'string')) {
+    throw new TypeError(`${where}: cards must be [{dir: 'up'|'side'|'down', form}]`);
   }
 }
 

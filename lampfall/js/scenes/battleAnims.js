@@ -337,6 +337,8 @@ export function createAnimQueue(opts = {}) {
  * @property {(ev: any) => string|null|void} ended   the engine's `end` event reached the screen; may return the line to say (a trainer's parting words)
  * @property {(side: number) => void} runAway
  * @property {(ev: any|null) => void} weather        the posted battle weather (null = clear)
+ * @property {(ev: any|null) => void} [shiftStrip]   the posted boss-Shift strip ('shift-posted'; null = taken down)
+ * @property {(ev: any) => void} [reform]            the foe's new form after a 'boss-shift' (sprite, types, HP bar)
  * @property {boolean} [reducedMotion]
  */
 
@@ -571,6 +573,25 @@ export const BATTLE_ANIMS = Object.freeze({
   'type-shift': (ev, v) => anim('type-shift', function* run() {
     v.sfx(ev);
     v.glint(ev.side);
+    // a Reading phase opening (it names its aspect) takes down the strip its cards were posted on
+    if (ev.aspect !== undefined && typeof v.shiftStrip === 'function') v.shiftStrip(null);
+    yield v.say(lineFor(ev));
+  }),
+  // a posted boss Shift (GDD-04 §1.4): the strip goes up a turn before it lands; it stays until then
+  'shift-posted': (ev, v) => anim('shift-posted', function* run() {
+    v.sfx(ev);
+    v.glint(ev.side);
+    if (typeof v.shiftStrip === 'function') v.shiftStrip(ev);
+    yield v.say(lineFor(ev));
+  }),
+  'boss-shift': (ev, v) => anim('boss-shift', function* run() {
+    v.sfx(ev);
+    v.flash(ev.side, 6);
+    if (!v.reducedMotion) v.shake(1, 4);
+    yield frames(6);
+    if (typeof v.reform === 'function') v.reform(ev);
+    if (typeof v.shiftStrip === 'function') v.shiftStrip(null);
+    v.sparkle(ev.side);
     yield v.say(lineFor(ev));
   }),
   'weather-start': (ev, v) => anim('weather-start', function* run() {

@@ -193,7 +193,8 @@ export function beadTime(beads) {
  * follows the roof and picks the room for the loan just offered. Back means "later": the plan
  * stays on Wren's board, and the Ledger can still pick it.
  * @param {{ceremony: any, cleared: any, paid: number, tier: number, roofChoices?: string[], onRoof?: (c: string) => void, onDone?: () => void,
- *   rooms?: Array<{id: string, name: string, blurb?: string}>, roomTier?: number, roomFirst?: boolean, onRoom?: (id: string) => any}} p
+ *   rooms?: Array<{id: string, name: string, blurb?: string}>, roomTier?: number, roomFirst?: boolean, onRoom?: (id: string) => any,
+ *   roomPrompt?: () => ({tier: number, rooms: Array<{id: string, name: string, blurb?: string}>}|null)}} p
  */
 export function createCeremonyScene(G, p) {
   const c = p.ceremony || { beads: 0, notchesBefore: 0, notchesAfter: 0, notchesPerStick: 20, split: false, notchesCut: 0 };
@@ -209,16 +210,32 @@ export function createCeremonyScene(G, p) {
   const roofs = (p.cleared && Array.isArray(p.roofChoices) ? p.roofChoices : []).slice(0, 8);
   let ms = 0;
   let thwapped = false;
-  const rooms = (Array.isArray(p.rooms) ? p.rooms : []).slice(0, 6);
+  let rooms = (Array.isArray(p.rooms) ? p.rooms : []).slice(0, 6);
+  let roomTier = p.roomTier;
   /** the phases after the count, in order (count -> [room] -> [roof] -> [room] -> done -> out) */
   const queue = p.roomFirst && rooms.length
-    ? ['room', ...(roofs.length ? ['roof'] : [])]
+    ? ['room', ...(roofs.length ? ['roof'] : []), 'room']
     : [...(roofs.length ? ['roof'] : []), ...(rooms.length ? ['room'] : [])];
   let phase = 'count';
   let roofIndex = Math.max(0, roofs.indexOf('slate-blue'));
   let roomIndex = 0;
   let pickedRoom = null;
-  const advance = () => { phase = queue.shift() ?? 'done'; };
+  let roomsShown = 0;
+  const advance = () => {
+    for (;;) {
+      phase = queue.shift() ?? 'done';
+      if (phase !== 'room') return;
+      // a later plan re-reads what Wren is still waiting on (a pick may have opened the next loan's)
+      if (roomsShown > 0) {
+        const next = typeof p.roomPrompt === 'function' ? p.roomPrompt() : null;
+        if (!next || !next.rooms || !next.rooms.length) continue;
+        rooms = next.rooms.slice(0, 6); roomTier = next.tier;
+      }
+      if (!rooms.length) continue;
+      roomsShown += 1; roomIndex = 0;
+      return;
+    }
+  };
   let outMs = -1;
   let skipHold = 0;
   const chips = [];
@@ -296,7 +313,7 @@ export function createCeremonyScene(G, p) {
         if (input.pressed('right')) roofIndex = (roofIndex + 1) % roofs.length;
         if (input.pressed('confirm') || tapped(input)) {
           if (typeof p.onRoof === 'function') p.onRoof(roofs[roofIndex]);
-          phase = 'done';
+          advance();
         }
         return;
       }
@@ -367,7 +384,7 @@ export function createCeremonyScene(G, p) {
         });
         drawText(ctx, ROOF_NAMES[roofs[roofIndex]] || roofs[roofIndex], 240, 256, { align: 'center', color: COLORS.paper.light });
       } else if (phase === 'room') {
-        drawText(ctx, t('ceremony.pickRoom', { n: p.roomTier ?? '' }), 240, 192, { align: 'center', color: PALETTE.porchAmber });
+        drawText(ctx, t('ceremony.pickRoom', { n: roomTier ?? '' }), 240, 192, { align: 'center', color: PALETTE.porchAmber });
         rooms.forEach((r, i) => {
           const R = roomRect(i);
           ctx.fillStyle = i === roomIndex ? '#3E5A4A' : '#2A3B33'; ctx.fillRect(R.x, R.y, R.w, R.h);

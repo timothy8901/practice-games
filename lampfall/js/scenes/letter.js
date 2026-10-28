@@ -15,8 +15,14 @@
  * every pinned find on a card, red strings to their letters, the new string drawing in.
  * A letter already read opens straight to the page (Journal re-reads).
  *
- * Params: `{n?, from?: 'mailbox'|'counter'|'journal'|'wall'|'script', onClose?}`; `n` defaults to
- * this morning's letter, else the first unread. Pops with `{read: n}`.
+ * Params: `{n?, from?: 'mailbox'|'counter'|'journal'|'wall'|'script', onClose?, journal?}`; `n`
+ * defaults to this morning's letter, else the first unread. Pops with `{read: n}`.
+ *
+ * **Journal** (`{journal: true}`, Pause → Journal; GDD-09 §3.23, LG-RN104): tabs Letters / Stamps /
+ * Season Book / Seed Card / Log at 16,8. Letters lists every letter received, grouped by channel;
+ * confirm re-reads one (a letter scene on top). Stamps is the 6×4 grid with the focused stamp's
+ * words; the Season Book is Dimity's tally of the season, whose last page is the Seed Card
+ * (`seedCard.drawRunCard`); Log is the 100-line text log. Empty pages say what to do next (LG-PF5).
  * @module scenes/letter
  */
 import { drawText, drawTextTyped, wrapText, measureText } from '../core/font.js';
@@ -29,7 +35,14 @@ import { t } from '../data/strings.js';
 import { SEALS } from '../data/letters/index.js';
 import * as letters from '../systems/letters.js';
 import { itemOf } from '../systems/econ.js';
-import { textCps, reducedMotion, skipAnims, framesMs } from './scriptHost.js';
+import { textCps, reducedMotion, skipAnims, framesMs, textLog } from './scriptHost.js';
+import { drawRunCard } from './seedCard.js';
+import { STAMPS } from '../data/town.js';
+import { TUNING } from '../data/tuning.js';
+import { evalCond } from '../script/cond.js';
+import { isPorchLit } from '../systems/townCommon.js';
+import * as loansSys from '../systems/loans.js';
+import { litPorchCount } from './flowKit.js';
 
 /** Page geometry (GDD-09 §3.23). */
 export const PAGE = Object.freeze({ x: 72, y: 12, w: 336, h: 246 });
@@ -76,6 +89,90 @@ export function doorName(id) {
   if (!id) return 'the right door'; // str
   const words = String(id).replace(/^porch-/, '').split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1));
   return `${words.join(' ')} porch`; // str
+}
+
+// ---------------------------------------------------------------------------------------------
+// Journal (pure helpers)
+// ---------------------------------------------------------------------------------------------
+
+/** Journal tabs in order (GDD-09 §3.23); labels are `journal.<id>`. */
+export const JOURNAL_TABS = Object.freeze(['letters', 'stamps', 'seasonBook', 'seedCard', 'log']);
+/** Letter channels in Journal order. */
+export const JOURNAL_CHANNELS = Object.freeze(['keeper', 'family', 'town', 'event']);
+
+/**
+ * The Letters tab: a heading per channel that has letters, then its letters in serial order.
+ * @param {any} world
+ * @param {any} data
+ * @returns {Array<{kind: 'head', channel: string, text: string} | {kind: 'letter', n: number, label: string, subject: string, unread: boolean}>}
+ */
+export function journalLetterRows(world, data) {
+  const got = Array.isArray(world?.letters?.got) ? world.letters.got : [];
+  const byChannel = new Map(JOURNAL_CHANNELS.map((c) => [c, []]));
+  for (const n of [...got].sort((a, b) => a - b)) {
+    const row = letters.letterByN(data, n);
+    if (!row) continue;
+    const ch = letters.channelOf(row);
+    const list = byChannel.get(JOURNAL_CHANNELS.includes(ch) ? ch : 'event');
+    list.push({ kind: 'letter', n, label: letters.labelOf(data, row), subject: row.subject ?? row.from ?? '', unread: !letters.isRead(world, n) });
+  }
+  const out = [];
+  for (const [ch, list] of byChannel) {
+    if (!list.length) continue;
+    out.push({ kind: 'head', channel: ch, text: t(`journal.channel.${ch}`) });
+    out.push(...list);
+  }
+  return out;
+}
+
+/**
+ * The Stamps tab: all 24 stamps with whether each is stamped (its `cond` holds now).
+ * @param {any} world
+ * @param {any} data
+ * @returns {Array<{id: string, name: string, text: string, earned: boolean}>}
+ */
+export function stampStates(world, data) {
+  return STAMPS.map((s) => {
+    let earned = false;
+    try { earned = Boolean(evalCond(world, s.cond, { data })); } catch { earned = false; }
+    const name = t(`stamp.${s.id}.name`) !== `stamp.${s.id}.name` ? t(`stamp.${s.id}.name`) : s.name;
+    const text = t(`stamp.${s.id}.text`) !== `stamp.${s.id}.text` ? t(`stamp.${s.id}.text`) : s.text;
+    return { id: s.id, name, text, earned };
+  });
+}
+
+/**
+ * Dimity's Season Book: the season so far, one line each. Pure.
+ * @param {any} world
+ * @param {any} data
+ * @returns {string[]}
+ */
+export function seasonBookLines(world, data) {
+  const lines = [];
+  const day = Math.floor((world?.clock?.total ?? 0) / 1440) + 1;
+  lines.push(t('journal.seasonBook.line.day', { n: day }));
+  try {
+    const ctx = { data };
+    if (loansSys.isPaidOff(world, ctx)) lines.push(t('journal.seasonBook.line.paidOff'));
+    else lines.push(t('journal.seasonBook.line.loan', { n: world?.loans?.tier ?? 1, owed: loansSys.balance(world, ctx).toLocaleString('en-US') }));
+  } catch { /* no loans table */ }
+  lines.push(t('journal.seasonBook.line.seals', { n: world?.badges?.length ?? 0 }));
+  lines.push(t('journal.seasonBook.line.letters', { n: (world?.letters?.read ?? []).length }));
+  lines.push(t('journal.seasonBook.line.party', { n: world?.party?.length ?? 0, box: world?.box?.length ?? 0 }));
+  try { lines.push(t('journal.seasonBook.line.porches', { n: litPorchCount(world, data) })); } catch { /* no porches */ }
+  return lines;
+}
+
+/**
+ * What an empty letter page / Letters tab says to do next (LG-PF5): light the porch first.
+ * @param {any} world
+ * @param {any} data
+ * @returns {string}
+ */
+export function emptyLettersText(world, data) {
+  let lit = true;
+  try { lit = isPorchLit(world, data, TUNING.homePorchId ?? 'porch-keepers-cottage', { tuning: TUNING }); } catch { lit = true; }
+  return t(lit ? 'journal.empty.letters.lit' : 'journal.empty.letters.dark');
 }
 
 /**
@@ -213,17 +310,21 @@ export function createLetterScene(G) {
     if (typeof params.onClose === 'function') { try { params.onClose(result); } catch (e) { console.warn(e); } }
   }
 
+  /** @type {ReturnType<typeof createJournalView>|null} */ let journal = null;
+
   const scene = {
     name: 'letter',
     opaque: true,
     enter(p) {
       params = p ?? {};
+      if (params.journal) { journal = createJournalView(G, () => scene); journal.enter(params); return; }
+      journal = null;
       n = pickLetter(params);
       row = n !== null ? letters.letterByN(G.data, n) : null;
       label = row ? letters.labelOf(G.data, row) : '';
       family = row ? letters.channelOf(row) === 'family' : false;
       wasRead = n !== null && letters.isRead(G.world, n);
-      lines = row ? bodyLines(row.body) : ['The mailbox is empty this morning.']; // str
+      lines = row ? bodyLines(row.body) : [emptyLettersText(G.world, G.data)];
       total = lines.reduce((s, l) => s + Array.from(l).length, 0);
       shown = 0; acc = 0; scroll = 0; carried = false; revealToasts = [];
       const fromWall = params.from === 'wall' && row && letters.channelOf(row) === 'town';
@@ -232,7 +333,9 @@ export function createLetterScene(G) {
       go(fromWall ? 'wall' : 'sealed');
     },
     exit() {},
+    resume() { if (journal) journal.refresh(); },
     update(dt) {
+      if (journal) { journal.update(dt); return; }
       stateT += dt;
       bob = (bob + dt) % TIMING.cursorBobMs;
       if (state === 'breaking' && stateT >= framesMs(G, 5) + framesMs(G, 14)) go('unfold');
@@ -256,6 +359,7 @@ export function createLetterScene(G) {
       if (state === 'closing' && stateT >= framesMs(G, 4)) popNow();
     },
     handleInput(input) {
+      if (journal) { journal.handleInput(input); return; }
       const tap = !!(input.pointer && input.pointer.inside && input.pointer.justDown);
       if (state === 'wall') {
         if (stateT < framesMs(G, 20)) return;
@@ -285,6 +389,7 @@ export function createLetterScene(G) {
       }
     },
     draw(ctx) {
+      if (journal) { journal.draw(ctx); return; }
       ctx.fillStyle = PALETTE.nightInk;
       ctx.fillRect(0, 0, 480, 270);
       // the desk
@@ -305,13 +410,16 @@ export function createLetterScene(G) {
       }
     },
     debugText() {
-      if (!row) return 'letter: none';
+      if (journal) return journal.debugText();
+      if (!row) return `letter: none\n${lines[0] ?? ''}`;
       const head = `${label} from ${row.from}`;
       if (state === 'sealed' || state === 'wall') return `${head} (${state})`;
       return `${head}\n${lines.slice(scroll, scroll + visibleRows()).join('\n')}${state === 'carry' ? `\n${t('letter.carry')}` : ''}`;
     },
-    isBusy: () => (state === 'reading' && shown < total) || state === 'breaking' || state === 'unfold' || state === 'closing',
-    get state() { return state; },
+    isBusy: () => !journal && ((state === 'reading' && shown < total) || state === 'breaking' || state === 'unfold' || state === 'closing'),
+    get state() { return journal ? 'journal' : state; },
+    /** The Journal view when opened with `{journal: true}` (tests). */
+    get journal() { return journal; },
   };
 
   // ------------------------------------------------------------------ drawing
@@ -471,6 +579,192 @@ export function createLetterScene(G) {
   }
 
   return scene;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Journal view
+// ---------------------------------------------------------------------------------------------
+
+const JOURNAL_PANEL = Object.freeze({ x: 16, y: 26, w: 448, h: 226 });
+const STAMP_GRID = Object.freeze({ x: 28, y: 34, cols: 6, rows: 4, w: 64, h: 40, gapX: 8, gapY: 4 });
+const JOURNAL_ROW_H = 12;
+const JOURNAL_ROWS = 17;
+
+/**
+ * The Journal's tabbed view (GDD-09 §3.23). Lives inside the letter scene so Pause → Journal keeps
+ * one scene name; re-reading a letter pushes a plain letter scene on top.
+ * @param {any} G
+ * @param {() => any} self  the owning scene (to tell whether it is on top)
+ */
+function createJournalView(G, self) {
+  let tab = 0;
+  let cursor = 0;      // letters: index into rows; stamps: cell
+  let top = 0;         // letters/log scroll
+  let ms = 0;
+  /** @type {ReturnType<typeof journalLetterRows>} */ let rows = [];
+  /** @type {ReturnType<typeof stampStates>} */ let stamps = [];
+  const tabId = () => JOURNAL_TABS[tab];
+  const letterIdx = () => rows.map((r, i) => (r.kind === 'letter' ? i : -1)).filter((i) => i >= 0);
+  const logLines = () => {
+    const out = [];
+    for (const l of textLog(G).lines()) for (const w of wrapText(l.who ? `${l.who}: ${l.text}` : l.text, JOURNAL_PANEL.w - 32)) out.push(w);
+    return out;
+  };
+
+  function refresh() {
+    rows = journalLetterRows(G.world, G.data);
+    stamps = stampStates(G.world, G.data);
+    const li = letterIdx();
+    if (tabId() === 'letters' && li.length && !li.includes(cursor)) cursor = li[0];
+  }
+  function setTab(i) {
+    tab = (i + JOURNAL_TABS.length) % JOURNAL_TABS.length;
+    cursor = 0; top = 0;
+    refresh();
+    if (tabId() === 'log') top = Math.max(0, logLines().length - JOURNAL_ROWS);
+    try { G.bus?.emit('ui:cursor', {}); } catch { /* audio never breaks the journal */ }
+  }
+  function close() { const me = self(); if (G.scenes.top() === me) G.scenes.pop({ journal: true }); }
+  function open() {
+    const r = rows[cursor];
+    if (!r || r.kind !== 'letter') return;
+    try { G.bus?.emit('ui:confirm', {}); } catch { /* no audio */ }
+    if (typeof G.push === 'function') G.push('letter', { n: r.n, from: 'journal' });
+  }
+  function moveLetters(d) {
+    const li = letterIdx();
+    if (!li.length) return;
+    const at = Math.max(0, li.indexOf(cursor));
+    cursor = li[(at + d + li.length) % li.length];
+    if (cursor < top + 1) top = Math.max(0, cursor - 1);
+    if (cursor >= top + JOURNAL_ROWS) top = cursor - JOURNAL_ROWS + 1;
+  }
+
+  return {
+    refresh,
+    enter(p) {
+      const want = JOURNAL_TABS.indexOf(p && typeof p.tab === 'string' ? p.tab : 'letters');
+      tab = want >= 0 ? want : 0; cursor = 0; top = 0; ms = 0;
+      refresh();
+      if (tabId() === 'log') top = Math.max(0, logLines().length - JOURNAL_ROWS);
+    },
+    update(dt) { ms += dt; },
+    handleInput(input) {
+      if (input.pressed('cancel') || (input.pressed('menu') && !input.pressed('confirm')) || input.pressed('log')) { close(); return; }
+      const p = input.pointer;
+      if (p && p.justDown && p.y >= 8 && p.y < 22 && p.x >= 16 && p.x < 16 + JOURNAL_TABS.length * 90) { setTab(Math.floor((p.x - 16) / 90)); return; }
+      if (input.pressed('l')) { setTab(tab - 1); return; }
+      if (input.pressed('r')) { setTab(tab + 1); return; }
+      const id = tabId();
+      if (id === 'stamps') {
+        const n = STAMP_GRID.cols * STAMP_GRID.rows;
+        if (input.repeat('left')) cursor = (cursor + n - 1) % n;
+        if (input.repeat('right')) cursor = (cursor + 1) % n;
+        if (input.repeat('up')) cursor = (cursor + n - STAMP_GRID.cols) % n;
+        if (input.repeat('down')) cursor = (cursor + STAMP_GRID.cols) % n;
+        return;
+      }
+      if (input.repeat('left')) { setTab(tab - 1); return; }
+      if (input.repeat('right')) { setTab(tab + 1); return; }
+      if (id === 'letters') {
+        if (input.repeat('up')) moveLetters(-1);
+        if (input.repeat('down')) moveLetters(1);
+        if (input.pressed('confirm')) open();
+        return;
+      }
+      if (id === 'log') {
+        const max = Math.max(0, logLines().length - JOURNAL_ROWS);
+        if (input.repeat('up')) top = Math.max(0, top - 1);
+        if (input.repeat('down')) top = Math.min(max, top + 1);
+      }
+    },
+    draw(ctx) {
+      ctx.fillStyle = PALETTE.nightInk;
+      ctx.fillRect(0, 0, 480, 270);
+      // tabs at 16,8
+      JOURNAL_TABS.forEach((id, i) => {
+        const x = 16 + i * 90;
+        ctx.fillStyle = i === tab ? COLORS.wax.fill : PALETTE.deepBlue;
+        ctx.fillRect(x, 8, 86, 14);
+        drawText(ctx, t(`journal.${id}`), x + 43, 11, { align: 'center', color: COLORS.paper.light, font: 'small' });
+      });
+      const P = JOURNAL_PANEL;
+      const id = tabId();
+      if (id === 'seedCard') {
+        drawRunCard(ctx, G, 72, 32);
+      } else {
+        drawPanel(ctx, P, id === 'stamps' ? 'paper' : 'ledger');
+        if (id === 'letters') drawLetters(ctx);
+        else if (id === 'stamps') drawStamps(ctx);
+        else if (id === 'seasonBook') drawSeasonBook(ctx);
+        else drawLog(ctx);
+      }
+      drawText(ctx, t('journal.hints'), 240, 258, { align: 'center', color: COLORS.dark.textSoft, font: 'small' });
+    },
+    debugText() {
+      const id = tabId();
+      const head = `${t('journal.heading')}: ${t(`journal.${id}`)}`;
+      if (id === 'letters') return rows.length ? `${head}\n${rows.map((r, i) => (r.kind === 'head' ? r.text : `${i === cursor ? '>' : ' '} ${r.label} ${r.subject}${r.unread ? ` (${t('journal.unread')})` : ''}`)).join('\n')}` : `${head}\n${emptyLettersText(G.world, G.data)}`;
+      if (id === 'stamps') { const st = stamps[cursor]; return `${head}\n${t('journal.stampCount', { n: stamps.filter((x) => x.earned).length })}\n${st ? `${st.name}: ${st.earned ? st.text : t('journal.stampLocked')}` : ''}`; }
+      if (id === 'seasonBook') return `${head}\n${seasonBookLines(G.world, G.data).join('\n')}\n${t('journal.seasonBook.lastPage')}`;
+      if (id === 'seedCard') return `${head}\n${G.world?.run?.seedCode ?? ''}`;
+      const lines = logLines();
+      return `${head}\n${lines.length ? lines.slice(top, top + JOURNAL_ROWS).join('\n') : t('journal.empty.log')}`;
+    },
+    get tab() { return tabId(); },
+    get cursor() { return cursor; },
+  };
+
+  function drawLetters(ctx) {
+    const P = JOURNAL_PANEL;
+    if (!rows.length) {
+      drawText(ctx, emptyLettersText(G.world, G.data), P.x + P.w / 2, P.y + 96, { align: 'center', color: COLORS.paper.inkSoft, maxWidth: P.w - 60 });
+      return;
+    }
+    for (let i = 0; i < JOURNAL_ROWS && top + i < rows.length; i++) {
+      const r = rows[top + i];
+      const y = P.y + 10 + i * JOURNAL_ROW_H;
+      if (r.kind === 'head') { drawText(ctx, r.text, P.x + 14, y, { color: COLORS.wax.fill }); continue; }
+      const focused = top + i === cursor;
+      if (focused) { ctx.fillStyle = COLORS.paper.shade; ctx.fillRect(P.x + 20, y - 2, P.w - 40, JOURNAL_ROW_H); drawText(ctx, TYPE.cursor, P.x + 22, y, { color: COLORS.wax.fill }); }
+      drawText(ctx, r.label, P.x + 32, y, { color: COLORS.paper.ink });
+      drawText(ctx, r.subject, P.x + 70, y, { color: COLORS.paper.inkSoft, maxWidth: P.w - 150 });
+      if (r.unread) drawText(ctx, t('journal.unread'), P.x + P.w - 24, y, { align: 'right', color: COLORS.wax.fill, font: 'small' });
+    }
+  }
+
+  function drawStamps(ctx) {
+    const P = JOURNAL_PANEL, S = STAMP_GRID;
+    stamps.forEach((st, i) => {
+      const x = S.x + (i % S.cols) * (S.w + S.gapX), y = S.y + Math.floor(i / S.cols) * (S.h + S.gapY);
+      ctx.fillStyle = st.earned ? COLORS.paper.light : COLORS.paper.shade;
+      ctx.fillRect(x, y, S.w, S.h);
+      // perforated edge
+      ctx.fillStyle = st.earned ? COLORS.wax.fill : COLORS.paper.deep;
+      for (let k = 2; k < S.w; k += 4) { ctx.fillRect(x + k, y, 2, 1); ctx.fillRect(x + k, y + S.h - 1, 2, 1); }
+      for (let k = 2; k < S.h; k += 4) { ctx.fillRect(x, y + k, 1, 2); ctx.fillRect(x + S.w - 1, y + k, 1, 2); }
+      drawText(ctx, st.earned ? st.name : '?', x + S.w / 2, y + S.h / 2 - 4, { align: 'center', color: st.earned ? COLORS.paper.ink : COLORS.paper.inkFaint, font: 'small', maxWidth: S.w - 6 });
+      if (i === cursor) { ctx.fillStyle = COLORS.paper.ink; ctx.fillRect(x - 2, y - 2, S.w + 4, 1); ctx.fillRect(x - 2, y + S.h + 1, S.w + 4, 1); ctx.fillRect(x - 2, y - 2, 1, S.h + 4); ctx.fillRect(x + S.w + 1, y - 2, 1, S.h + 4); }
+    });
+    const st = stamps[cursor];
+    const ty = S.y + S.rows * (S.h + S.gapY) + 2;
+    drawText(ctx, t('journal.stampCount', { n: stamps.filter((x) => x.earned).length }), P.x + P.w - 14, ty, { align: 'right', color: COLORS.paper.inkSoft, font: 'small' });
+    if (st) drawText(ctx, `${st.earned ? st.name : '?'}: ${st.earned ? st.text : t('journal.stampLocked')}`, P.x + 12, ty, { color: COLORS.paper.ink, font: 'small', maxWidth: P.w - 110 });
+  }
+
+  function drawSeasonBook(ctx) {
+    const P = JOURNAL_PANEL;
+    drawText(ctx, t('journal.seasonBook.heading'), P.x + 18, P.y + 12, { color: COLORS.wax.fill });
+    seasonBookLines(G.world, G.data).forEach((line, i) => drawText(ctx, line, P.x + 24, P.y + 34 + i * 16, { color: COLORS.paper.ink, maxWidth: P.w - 48 }));
+    drawText(ctx, t('journal.seasonBook.lastPage'), P.x + P.w - 18, P.y + P.h - 18, { align: 'right', color: COLORS.paper.inkSoft, font: 'small' });
+  }
+
+  function drawLog(ctx) {
+    const P = JOURNAL_PANEL;
+    const lines = logLines();
+    if (!lines.length) { drawText(ctx, t('journal.empty.log'), P.x + P.w / 2, P.y + 96, { align: 'center', color: COLORS.paper.inkSoft, maxWidth: P.w - 60 }); return; }
+    lines.slice(top, top + JOURNAL_ROWS).forEach((line, i) => drawText(ctx, line, P.x + 16, P.y + 10 + i * JOURNAL_ROW_H, { color: COLORS.paper.ink }));
+  }
 }
 
 /** The measured width of a seal label (tests). */

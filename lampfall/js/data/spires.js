@@ -179,9 +179,9 @@ export const SPIRES = f([
       rule: f({
         singles: true, playerPerRound: 2, noRepeat: true, whenDry: 'reuse-any', healBetweenRounds: false,
         rounds: f([
-          f({ n: 1, trainer: 'ivo', slots: f([0, 1]) }),
-          f({ n: 2, trainer: 'ada', slots: f([2, 3]) }),
-          f({ n: 3, trainer: 'both', slots: f([4, 5]) }),
+          f({ n: 1, trainer: 'ivo', name: 'Ivo Halloran', slots: f([0, 1]) }),
+          f({ n: 2, trainer: 'ada', name: 'Ada Halloran', slots: f([2, 3]) }),
+          f({ n: 3, trainer: 'both', name: 'Ada & Ivo Halloran', slots: f([4, 5]) }),
         ]),
       }),
     }),
@@ -194,7 +194,7 @@ export const SPIRES = f([
     dossier: f({
       title: 'Relay Spire: Ada & Ivo Halloran',
       tacticTag: 'three rounds, no repeats: one carry will not do',
-      text: 'Round 1 (Ivo): Skirl Lv33, Gillwick Lv34. Round 2 (Ada): Rimeplate Lv34, Sedgehare Lv35. Round 3 (both): Duskowl Lv35, Coilcrest Lv36 (holds a Whetstone). Two Tonics across the three rounds. Bench EXP has been on since your first route; your sitters are readier than you think. "Unless you have run out of nobodies." -I.H.',
+      text: 'Round 1 (Ivo): Skirl Lv33, Gillwick Lv35. Round 2 (Ada): Rimeplate Lv34, Stillox Lv35. Round 3 (both): Duskowl Lv35, Coilcrest Lv36 (holds a Whetstone). Two Tonics across the three rounds. Bench EXP has been on since your first route; your sitters are readier than you think. "Unless you have run out of nobodies." -I.H.',
     }),
     badge: f({ id: 'relay', name: 'Relay Seal', seal: 'two jackdaw feathers crossed in red wax' }),
     prize: f({ buttons: 7200, starsalt: 3 }),

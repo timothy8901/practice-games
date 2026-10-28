@@ -37,7 +37,7 @@ import * as memory from '../systems/memory.js';
 import * as party from '../systems/party.js';
 import { createConfirmScene } from '../ui/confirm.js';
 import { createNameEntry } from './nameEntry.js';
-import { readExt } from './menuKit.js';
+import { readExt, drawSkinPanel, skinOf } from './menuKit.js';
 import {
   DIALOGUE_OPS, TILDE_BEAT_MS, createSession, resolveTalk, recordSaid, canLinger, lingerSession,
   speakerOf, textLog, textCps, reducedMotion, skipAnims, stripBeats,
@@ -553,7 +553,10 @@ export function createDialogueScene(G) {
     const { slip: SLIP, bust: BUST, scale } = L();
     const y = SLIP.y + off;
     const hasBust = !!speaker.name;
-    drawPanel(ctx, { x: SLIP.x, y, w: SLIP.w, h: SLIP.h }, 'ledger', { rulePitch: 10 * scale, ruleStart: scale === 2 ? 25 : 17, margin: 0 });
+    // High contrast (LG-RN102, GDD-09 §6): the slip becomes cream on night ink with 2 px edges
+    const hc = ext().highContrast === true;
+    if (hc) drawSkinPanel(ctx, { x: SLIP.x, y, w: SLIP.w, h: SLIP.h }, skinOf({ contrast: true }), 'ledger');
+    else drawPanel(ctx, { x: SLIP.x, y, w: SLIP.w, h: SLIP.h }, 'ledger', { rulePitch: 10 * scale, ruleStart: scale === 2 ? 25 : 17, margin: 0 });
     // the margin line right of the bust
     if (hasBust) {
       ctx.fillStyle = COLORS.paper.margin;
@@ -585,7 +588,7 @@ export function createDialogueScene(G) {
     // text
     const T = hasBust ? L().text : L().narration;
     const pg = pages[page] ?? { text: '' };
-    drawTextTyped(ctx, pg.text, T.x, T.y + off, shown, { color: COLORS.paper.ink, maxWidth: T.w + 4, scale }); // maxWidth is in scaled px
+    drawTextTyped(ctx, pg.text, T.x, T.y + off, shown, { color: hc ? COLORS.paper.light : COLORS.paper.ink, maxWidth: T.w + 4, scale }); // maxWidth is in scaled px
     // more / end marks
     const ax = SLIP.x + SLIP.w - 12, ay = SLIP.y + SLIP.h - 11 + off;
     const lift = bob < TIMING.cursorBobMs / 2 ? 0 : 1;

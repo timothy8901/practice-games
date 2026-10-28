@@ -550,3 +550,15 @@ test('director: deterministic — the same event script gives the same engine ca
   };
   assert.deepEqual(script(rig({ scenes: true })), script(rig({ scenes: true })));
 });
+
+test('director: the ambience slider reaches the engine\'s ambience bus, only when it changes (LG-RN102)', () => {
+  const world = makeWorld({ volumes: { master: 1, music: 0.8, sfx: 1 }, muted: false });
+  world.settings.ambience = 0.2;
+  const { audio, bus } = rig({ world });
+  assert.deepEqual(audio.of('setAmbience').at(-1), ['setAmbience', 0.2]);
+  bus.emit('settings:changed', { changed: ['textSpeed'] });
+  assert.equal(audio.of('setAmbience').length, 1, 'unchanged ambience is not re-sent');
+  world.settings.ambience = 0;
+  bus.emit('settings:changed', { changed: ['ambience'] });
+  assert.deepEqual(audio.of('setAmbience').at(-1), ['setAmbience', 0]);
+});

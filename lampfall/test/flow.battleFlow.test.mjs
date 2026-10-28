@@ -14,6 +14,7 @@ import * as bag from '../js/systems/bag.js';
 import * as wallet from '../js/systems/wallet.js';
 import * as loans from '../js/systems/loans.js';
 import { TUNING_KEYS as ENGINE_KEYS } from '../js/battle/engine.js';
+import { TUNING } from '../js/data/tuning.js';
 
 const data = realBattleData();
 const tuning = F.tuningFor(data);
@@ -71,7 +72,11 @@ describe('tuning (TUNING RECONCILIATION, GDD-00 wins)', () => {
     assert.equal(t.captureOddsMax, 0.95);
     assert.deepEqual(t.captureBands.map((b) => b[1]), ['Slim', 'Fair', 'Good', 'Sure']);
     assert.deepEqual(t.WINDOW_LEVELS, [8, 20, 34]);
-    for (const curve of Object.values(t.GROWTH_CURVES)) assert.deepEqual(curve.num, [0, 8, 0, 0], '8 × L² on every curve');
+    for (const curve of Object.values(t.GROWTH_CURVES)) {
+      assert.deepEqual(curve.num, [0, 8, 0, 0], '8 × L² through Lv8 on every curve');
+      assert.deepEqual(curve.steps, [{ from: 9, num: [3, 0, 0, -512], den: 2 }], 'then the MID-06 cubic');
+    }
+    assert.deepEqual(JSON.parse(JSON.stringify(t.GROWTH_CURVES)), JSON.parse(JSON.stringify(TUNING.GROWTH_CURVES)), 'the flow fallback equals data/tuning.js');
   });
 
   it('lets data.tuning win where it speaks', () => {
@@ -292,8 +297,11 @@ describe('applyBattleResult', () => {
     const post = F.applyBattleResult(G, s);
     assert.equal(post.outcome, 'loss');
     assert.equal(G.world.wallet.main, 3000);
-    assert.equal(post.blackout.summit, true);
-    assert.equal(post.blackout.lost, 0);
+    // MID-10: no blackout and no trip home; the Bell holds your place at whoever beat you
+    assert.equal(post.blackout, null);
+    assert.equal(post.summitBell.holds, true);
+    assert.equal(post.summitBell.mapId, 'idris-hall');
+    assert.equal(post.summitBell.marker, 'bell-restart-idris');
   });
 
   it('a story hold-out never blacks out and grants the flat hold-out EXP', () => {
@@ -323,7 +331,7 @@ describe('applyBattleResult', () => {
 
   it('a level-up with full slots reports the offer; learnOffered applies the choice', () => {
     const G = makeG();
-    give(G, { speciesId: 'sloshkin', level: 8, moves: ['tap', 'salt-spray', 'undertow', 'shell-rattle'] }, { exp: 640 });
+    give(G, { speciesId: 'sloshkin', level: 8, moves: ['tap', 'salt-spray', 'undertow', 'shell-rattle'] }, { exp: 830 }); // Lv9 at 837
     const s = F.buildBattle(G, { kind: 'wild', wild: { speciesId: 'tossup', level: 6 } }, data);
     playOut(s, (lg) => ({ type: 'move', move: lg.moves.findIndex((m) => m.id === 'undertow') }));
     const post = F.applyBattleResult(G, s);

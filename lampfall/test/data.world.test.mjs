@@ -583,10 +583,13 @@ function activeLayout(def, world) {
   for (const v of def.variants ?? []) if (holds(world, v.cond)) m = expandVariant(def, v);
   return m;
 }
-/** Walkable set from a cell under a world state: tiles + collision, solid entities whose cond holds. */
+/**
+ * Walkable set from a cell under a world state: tiles + collision, solid entities whose cond holds.
+ * A Spire sentinel (`sentinel: <id>`) is a battle gate: it steps aside once beaten, so it never walls.
+ */
 function reachI(m, world, from = m.entry) {
   const rm = loadMap(m, TILES, { legend: DEFAULT_LEGEND });
-  const block = new Set((m.entities ?? []).filter((e) => e.solid !== false && holds(world, e.cond)).map((e) => `${e.x},${e.y}`));
+  const block = new Set((m.entities ?? []).filter((e) => e.solid !== false && !e.sentinel && holds(world, e.cond)).map((e) => `${e.x},${e.y}`));
   const ok = (x, y) => x >= 0 && y >= 0 && x < m.w && y < m.h && rm.passable(x, y, 'high', 'walk') && !block.has(`${x},${y}`);
   const seen = new Set([`${from.x},${from.y}`]);
   const q = [[from.x, from.y]];

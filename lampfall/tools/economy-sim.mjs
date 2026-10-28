@@ -26,6 +26,7 @@
  * Usage:  node tools/economy-sim.mjs            all three profiles, summary + typical day table
  *         node tools/economy-sim.mjs casual     one profile's day table
  *         node tools/economy-sim.mjs --json     machine-readable results
+ * The summary ends with each profile's level pace (`levelPace`: party levels at each Spire door and Shift windows).
  * @module tools/economy-sim
  */
 
@@ -43,6 +44,7 @@ import * as wallet from '../js/systems/wallet.js';
 import { tidesForDay, tideOffsetFor } from '../js/systems/clockSys.js';
 import { rowActive, modsFor, lowTouchesNight } from '../js/systems/gather.js';
 import { phaseOfMinute, tideStateAt } from '../js/core/time.js';
+import { simulateProgression, wildFoe, PROGRESSION_PLAN } from './balance-sim.mjs';
 
 const H = 60;
 const DAY = 1440;
@@ -441,7 +443,7 @@ export function simulate(profileOrId, opts = {}) {
   let starsaltFree = 0;
 
   for (let d = 1; d <= maxDays; d++) {
-    const day = { day: d, gross: {}, sinks: {}, skipped: [], running: 0, paused: 0, tierBefore: world.loans.tier };
+    const day = { day: d, gross: {}, sinks: {}, skipped: [], running: 0, paused: 0, tierBefore: world.loans.tier, fights: [] };
     const arrival = d === 1;
 
     // 05:40: the overnight build lands; the Relighting fires at the dusk the Lamp Room lands
@@ -471,8 +473,9 @@ export function simulate(profileOrId, opts = {}) {
       earn(day, 'honey', honey, totalAt(1, 19 * H + 20), false);
       earn(day, 'fish', FISH.find((f) => f.id === 'perch').price, totalAt(1, 20 * H + 45), false);
       earn(day, 'trainers', PIP.payout, totalAt(1, 21 * H + 30), false);
+      day.fights.push({ trainer: PIP.id }, { holdOut: tuning.holdOutExp }, { join: 'tossup', level: 4 });
       for (let i = 0; i < tuning.errandCount; i++) credit(day, 'errands', loans.errand(world, `errand-${i + 1}`, ctxAt(totalAt(1, 18 * H + 30))));
-      if (P.duelsFrom <= 1) earn(day, 'duels', tuning.porchDuelPerCurve * duelCurve[0], totalAt(1, 22 * H + 45), false);
+      if (P.duelsFrom <= 1) { earn(day, 'duels', tuning.porchDuelPerCurve * duelCurve[0], totalAt(1, 22 * H + 45), false); day.fights.push({ duels: 1, badges: 0 }); }
       if (P.castsNight === 'fill') earn(day, 'fish', fishSession(TOWN_REACHES, 8, totalAt(1, 22 * H + 50), 'pellwick').value, totalAt(1, 23 * H + 20), false);
       day.paused += PAUSED_MINUTES.trainer * 2 + PAUSED_MINUTES.capture + PAUSED_MINUTES.ceremony;
     } else {
@@ -530,7 +533,8 @@ export function simulate(profileOrId, opts = {}) {
         const roster = ROUTE[isle].filter((t) => !t.declinable || take(`opt-${isle}-${t.id}`, at('optional')));
         const mine = roster.filter((_, i) => !twoDays || (firstHalf ? i < Math.ceil(roster.length / 2) : i >= Math.ceil(roster.length / 2)));
         const mult = luckyButton ? ITEM.get('lucky-button').held.payoutMult : 1;
-        for (const t of mine) earn(day, 'trainers', t.payout * mult, totalAt(d, 12 * H));
+        day.fights.push({ isle, legFirst: legDay(P, visit) === d });
+        for (const t of mine) { earn(day, 'trainers', t.payout * mult, totalAt(d, 12 * H)); day.fights.push({ trainer: t.id }); }
         day.paused += PAUSED_MINUTES.trainer * mine.length;
         spend(day, 'medicine', MEDICINE_PER_BATTLE[badges.length] * mine.length, totalAt(d, 9 * H));
         // isle fishing while the tide turns
@@ -538,6 +542,8 @@ export function simulate(profileOrId, opts = {}) {
         seconds += ACTION_SECONDS.cast * 2;
         if (k >= 0) {
           const sp = SPIRE_TRAINER[visit];
+          if (visit === 0 && LINNET_REMATCH) day.fights.push({ trainer: LINNET_REMATCH.id });
+          day.fights.push({ door: SPIRES[visit] }, { trainer: sp.id });
           earn(day, 'spires', sp.payout * mult, totalAt(d, 14 * H));
           if (badges.length >= 2) spend(day, 'medicine', ITEM.get('revive').price * 2, totalAt(d, 9 * H));
           const id = SPIRES[visit];
@@ -551,12 +557,13 @@ export function simulate(profileOrId, opts = {}) {
       // the Long Road and the Summit the days after badge 6, for a player who walks it before the light
       if (P.longRoad && badges.length === 6 && relightDay === null) {
         const after = d - P.badgeDays[5];
-        if (after === 1) { for (const t of LONG_ROAD) earn(day, 'trainers', t.payout, totalAt(d, 12 * H)); day.paused += PAUSED_MINUTES.trainer * LONG_ROAD.length; spend(day, 'medicine', MEDICINE_PER_BATTLE[6] * LONG_ROAD.length, totalAt(d, 9 * H)); }
+        if (after === 1) { for (const t of LONG_ROAD) { earn(day, 'trainers', t.payout, totalAt(d, 12 * H)); day.fights.push({ trainer: t.id }); } day.paused += PAUSED_MINUTES.trainer * LONG_ROAD.length; spend(day, 'medicine', MEDICINE_PER_BATTLE[6] * LONG_ROAD.length, totalAt(d, 9 * H)); }
       }
 
       // captures (wild, wicks burned) and the Gallery frames
       const caps = take('captures', at('captures'));
       if (caps) {
+        day.fights.push({ captures: caps, badges: badges.length });
         heldForms += caps;
         const wickPrice = badges.length < 2 ? ITEM.get('tallow-wick').price : badges.length < 4 ? avg(ITEM.get('tallow-wick').price, ITEM.get('brass-wick').price) : avg(ITEM.get('brass-wick').price, ITEM.get('skyglass-wick').price);
         spend(day, 'wicks', Math.max(0, caps * P.wicksPerCatch - (d <= 3 ? 1.5 : 0)) * wickPrice, totalAt(d, 9 * H));
@@ -571,7 +578,7 @@ export function simulate(profileOrId, opts = {}) {
       // Errants: Squallcoil from the Emberstep leg on, Hailcoil from the Rimeholt leg on; each returns the next day
       const errants = (d >= legDay(P, 2) ? 1 : 0) + (d >= legDay(P, 5) ? 1 : 0);
       for (let e = 0; e < errants; e++) {
-        if (take(`errant-${e}`, at('errant'))) { earn(day, 'errants', tuning.errantButtons, totalAt(d, 15 * H), false); day.paused += PAUSED_MINUTES.errant; }
+        if (take(`errant-${e}`, at('errant'))) { earn(day, 'errants', tuning.errantButtons, totalAt(d, 15 * H), false); day.paused += PAUSED_MINUTES.errant; day.fights.push({ errant: e === 0 ? 'squallcoil' : 'hailcoil', badges: badges.length }); }
       }
 
       // Wanted Today: one stack each of three items at +50% (sold at Pell's)
@@ -583,6 +590,7 @@ export function simulate(profileOrId, opts = {}) {
         const n = Math.min(tuning.porchDuelsPerDay, at('duels'));
         const mult = luckyButton ? ITEM.get('lucky-button').held.payoutMult : 1;
         earn(day, 'duels', n * tuning.porchDuelPerCurve * duelCurve[Math.min(badges.length, duelCurve.length - 1)] * mult, totalAt(d, 21 * H), false);
+        if (n > 0) day.fights.push({ duels: n, badges: badges.length });
         day.paused += PAUSED_MINUTES.duel * n;
       }
       earn(day, 'bugs', at('bugsNight') * bugValue(bugPool(world, totalAt(d, 21 * H), BUG_NIGHT)), totalAt(d, 21 * H));
@@ -704,6 +712,78 @@ export function simulate(profileOrId, opts = {}) {
   };
 }
 
+/** Wild KOs (not catches) a profile fights per leg day: player behaviour for {@link levelPace}. */
+export const WILDS_PER_LEG_DAY = Object.freeze({ casual: 2, typical: 3, ideal: 3, grinder: 6 });
+
+/**
+ * Level and Shift-window pace of a profile's season (GDD-04 §7 posted curve; GDD-00 §8 "≈ 18 Forecasts
+ * per run, at most one per 20 real minutes on average"): replays the battles the economy sim logged
+ * each day (`day.fights`: route trainers, Spires, Linnet's rematch, the Long Road, captures, Errants,
+ * Porch Duels) through `tools/balance-sim.simulateProgression` (the real award split and curve), with
+ * the party GDD-04 §7.1 names joining on each isle's first leg day and `WILDS_PER_LEG_DAY` wild KOs a leg
+ * day. Times are real minutes played, summed from `day.realMinutes`.
+ * @param {ReturnType<typeof simulate>} result
+ * @param {{wildsPerLegDay?: number, tuning?: object}} [opts]
+ */
+export function levelPace(result, opts = {}) {
+  const wilds = opts.wildsPerLegDay ?? WILDS_PER_LEG_DAY[result.profile] ?? 3;
+  const curveByBadges = PORCH_DUELS.curveByBadges;
+  const ev = [{ type: 'stop', stop: 'pellwick', curve: 4 }];
+  let clock = 0;
+  const neighbours = PORCH_DUELS.neighbours;
+  let duelSeq = 0;
+  for (const day of result.days) {
+    const t = Math.round(clock + day.realMinutes);
+    let isle = null;
+    for (const f of day.fights ?? []) {
+      if (f.isle) {
+        isle = f.isle;
+        const wild = wildFoe(isle);
+        ev.push({ type: 'stop', stop: isle, curve: curveByBadges[ISLES.indexOf(isle)], t });
+        if (f.legFirst) {
+          const plan = PROGRESSION_PLAN[isle] || {};
+          for (const sp of plan.drop || []) ev.push({ type: 'drop', species: sp, t });
+          for (const sp of plan.join || []) {
+            ev.push({ type: 'fight', kind: 'wild', source: 'route', foes: [{ species: sp, level: wild.level }], t });
+            ev.push({ type: 'join', species: sp, level: wild.level, t });
+          }
+        }
+        for (let k = 0; k < wilds; k++) ev.push({ type: 'fight', kind: 'wild', source: 'route', foes: [{ ...wild }], t });
+      } else if (f.trainer) {
+        const tr = TRAINERS.find((x) => x.id === f.trainer);
+        if (tr) ev.push({ type: 'fight', kind: 'trainer', source: tr.expSource ?? 'route', foes: tr.party.map((e) => ({ species: e.species, level: e.level })), t });
+      } else if (f.holdOut) ev.push({ type: 'flat', amount: f.holdOut, t });
+      else if (f.join) {
+        ev.push({ type: 'fight', kind: 'wild', source: 'route', foes: [{ species: f.join, level: f.level }], t });
+        ev.push({ type: 'join', species: f.join, level: f.level, t });
+      } else if (f.door) {
+        const i = SPIRES.indexOf(f.door);
+        ev.push({ type: 'door', id: f.door, curve: curveByBadges[i], ace: curveByBadges[i] + 3, t });
+      } else if (f.captures) {
+        const where = isle ?? ISLES[Math.min(f.badges, ISLES.length - 1)];
+        for (let k = 0; k < f.captures; k++) ev.push({ type: 'fight', kind: 'wild', source: 'route', foes: [{ ...wildFoe(where) }], t });
+      } else if (f.errant) {
+        ev.push({ type: 'fight', kind: 'wild', source: 'route', foes: [{ species: f.errant, level: curveByBadges[Math.min(f.badges, curveByBadges.length - 1)] }], t });
+      } else if (f.duels) {
+        for (let k = 0; k < f.duels; k++) ev.push({ type: 'duel', badges: f.badges, trainer: neighbours[(duelSeq++) % neighbours.length].trainer, t });
+      }
+    }
+    if (isle) ev.push({ type: 'stop', stop: 'pellwick', curve: curveByBadges[Math.min(ISLES.indexOf(isle) + 1, curveByBadges.length - 1)], t });
+    clock += day.realMinutes;
+  }
+  const r = simulateProgression(ev, { tuning: opts.tuning });
+  const times = r.windows.map((w) => w.t).filter(Number.isFinite);
+  return {
+    profile: result.profile,
+    doors: r.doors.map((d) => ({ id: d.id, curve: d.curve, median: d.median, offset: d.median - d.curve, starter: d.starter, t: d.t })),
+    windows: r.windows,
+    forecasts: r.forecasts,
+    realMinutes: Math.round(clock),
+    minutesPerForecast: r.forecasts ? Math.round(clock / r.forecasts) : Infinity,
+    firstWindowAt: times.length ? Math.min(...times) : null,
+  };
+}
+
 /**
  * Grind check (GDD-00 §7): on each loan's target day, the shortfall divided by that day's earning rate
  * (buttons a real minute played) must stay under `grindCapRealMinutes`.
@@ -767,5 +847,10 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     const which = args.find((a) => PROFILES[a]);
     if (which) printDays(all[which]);
     else { printDays(all.typical); printSummary(all); console.log('\ntypical grind minutes by tier:', grindMinutes(all.typical)); }
+    console.log('\nlevel pace (party median at each Spire door vs the posted curve; Forecasts = Shift windows opened):');
+    for (const r of Object.values(all)) {
+      const p = levelPace(r);
+      console.log(`${r.profile.padEnd(8)} | ${p.doors.map((d) => `${d.id} ${d.median} (${d.offset >= 0 ? '+' : ''}${d.offset})`).join(', ')} | ${p.forecasts} Forecasts, one per ${p.minutesPerForecast} real min | starter ${p.windows.filter((w) => w.starter).map((w) => `Lv${w.level}@${w.stop}`).join(' ')}`);
+    }
   }
 }
