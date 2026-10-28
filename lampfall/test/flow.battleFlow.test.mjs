@@ -526,3 +526,19 @@ describe('capture storage', () => {
     assert.equal(space.battle.legal(0).lantern.available, true);
   });
 });
+
+describe('story battles cost nothing (GDD-00 §6, §8)', () => {
+  it('the dock hold-out heals the party and pays its 100 EXP even when the starter falls', () => {
+    const G = makeG();
+    give(G, { speciesId: 'reedkit', level: 5 });
+    const before = G.world.party[0].exp;
+    const s = F.buildBattle(G, { kind: 'trainer', trainerId: 'linnet-dock' }, data);
+    playOut(s);
+    const outcome = s.battle.outcome;
+    F.applyBattleResult(G, s);
+    const c = G.world.party[0];
+    assert.equal(c.hp, c.stats.hp, `healed after the hold-out (outcome ${outcome})`);
+    assert.ok(c.exp - before >= tuning.holdOutExp, `gained at least ${tuning.holdOutExp} EXP (got ${c.exp - before}, outcome ${outcome})`);
+    assert.equal(G.world.flags['sys.blackout'] ?? false, false, 'no blackout');
+  });
+});

@@ -14,6 +14,9 @@ function trigger(mapId, marker, script, cond, kind = 'step', id = script) {
 trigger('pellwick', 'arrival-start', 'arrival-causeway', no('sp.arrived'), 'enter');
 trigger('pellwick', 'cottage-porch', 'wick-keeper', all(flag('sp.starter-chosen'), { not: { seen: 'wick-keeper' } }));
 trigger('pellwick', 'porch-keepers-cottage-step', 'corin-reading-glass', all(flag('sp.starter-chosen'), no('sp.reading-glass')));
+// Recovery: a save bookmarked inside the dock battle on an older build resumes past the end of the
+// shortened script; the porch step re-opens the dock until it has been fought.
+trigger('pellwick', 'porch-keepers-cottage-step', 'linnet-dock-before', all(flag('sp.reading-glass'), no('sp.dock-battle')), 'step', 'linnet-dock-retry');
 trigger('pellwick', 'yard-apron', 'yard-apron', all(flag('sp.errands-started'), no('sys.errand.apron')));
 trigger('pellwick', 'commons-pin', 'tully-nickname', all(flag('sp.errands-started'), no('sys.errand.notice')), 'use');
 trigger('pellwick', 'first-orchard', 'first-orchard', all(flag('sp.errands-started'), no('sys.errand.orchard')));

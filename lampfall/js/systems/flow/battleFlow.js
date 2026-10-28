@@ -978,6 +978,9 @@ export function applyBattleResult(G, session, opts = {}) {
     } else if (r.outcome === 'holdout' && trainer) {
       post.script = trainer.scripts?.afterWin ?? null;
     }
+    // GDD-00 §6: story battles cost nothing and never wall progress, so the party leaves them healed
+    // (the dock hold-out, the reeds lesson, story trainers). The Summit and the Reading keep their own rules.
+    if (session.story && !session.summit && session.source !== 'reading') party.heal(w, { tuning, bus });
     const sentinel = session.setup.sentinel;
     if (r.outcome === 'win' && sentinel && typeof sentinel.id === 'string') {
       flags.setFlag(w, `sys.trainer.${sentinel.id}`, true, { bus });

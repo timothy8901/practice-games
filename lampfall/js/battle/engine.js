@@ -2205,7 +2205,9 @@ export class Battle {
     this.winner = winner;
     this.pendingReplace = [];
     this._emit({ type: 'end', outcome, winner, text: outcomeText(outcome, this) });
-    if (outcome === 'holdout' && t.holdOutExp > 0) this._holdOutExp();
+    // GDD-00 §8: the story hold-out pays its flat EXP however it ends (a starter that falls before the
+    // last turn still 'held'); a Reading is not a hold-out.
+    if (t.holdOutExp > 0 && (outcome === 'holdout' || (outcome === 'loss' && this.rules.holdOutTurns != null && !this.readingPhases))) this._holdOutExp({ includeFainted: outcome === 'loss' });
     if (outcome === 'win' || outcome === 'capture') {
       this._distributeExp();
       if (this.kind === 'trainer') {
@@ -2272,13 +2274,13 @@ export class Battle {
   }
 
   /** The flat hold-out EXP ({@link DEFAULTS}.holdOutExp): battlers all of it, the bench `benchShare`. */
-  _holdOutExp() {
+  _holdOutExp({ includeFainted = false } = {}) {
     const t = this.tuning;
     const player = this.sides[0];
     /** @type {Map<any, number>} */
     const gains = new Map();
     for (const c of player.party) {
-      if (isFainted(c)) continue;
+      if (isFainted(c) && !(includeFainted && player.participants.has(c.uid))) continue;
       const battler = player.participants.has(c.uid);
       const amount = Math.floor(t.holdOutExp * (battler ? 1 : this._benchShare(c)));
       if (!(amount > 0)) continue;
