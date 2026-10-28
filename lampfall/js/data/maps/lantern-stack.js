@@ -157,6 +157,5 @@ export default {
     'perch-front': { x: 10, y: 6, facing: 'up' },
   },
   music: null,
-  light: { indoor: false, ambient: 'sea' },
   entry: { x: 10, y: 14, facing: 'up' },
 };
