@@ -23,8 +23,15 @@
  * curve (starter at curve +1, everyone else at the curve), with sensible movesets picked
  * from their learnsets and the discs a player can own by then.
  *
- * Usage: node tools/balance-sim.mjs [--n 200] [--json]
- * Library: import { runAll, simulateSpire, simulateSummit, simulateRoute, statOutliers } from it.
+ * Level progression (`simulateProgression`): the on-curve parties above are fixed; this part plays a whole
+ * run's EXP instead, through the real award split (`systems/exp.computeAward`) and the shipped curve
+ * (`data/tuning.GROWTH_CURVES`), against the real rosters (trainers, the isles' wild tables, Porch Duels
+ * scaled as `battleFlow` scales them), for three players (minimal, typical, thorough), and reports each
+ * party's levels at every Spire door against the posted curve and ace, plus where each Shift window opens.
+ * `tools/economy-sim.mjs` (`levelPace`) feeds it the economy sim's day-by-day battles for real-minute pace.
+ *
+ * Usage: node tools/balance-sim.mjs [--n 200] [--json] [--only progression]
+ * Library: import { runAll, simulateSpire, simulateSummit, simulateRoute, statOutliers, simulateProgression } from it.
  * @module tools/balance-sim
  */
 
@@ -41,6 +48,11 @@ import { MOVES } from '../js/data/moves/index.js';
 import { TRAINERS, TRAINER_BY_ID } from '../js/data/trainers.js';
 import { SPIRES, SUMMIT, BOSS_SHIFT_ODDS, WEATHER_KINDS } from '../js/data/spires.js';
 import { ITEMS } from '../js/data/items.js';
+import { TUNING } from '../js/data/tuning.js';
+import { REGIONS } from '../js/data/regions.js';
+import { ENCOUNTERS } from '../js/data/encounters/index.js';
+import { PORCH_DUELS } from '../js/data/town.js';
+import * as expSys from '../js/systems/exp.js';
 
 // --- data views -----------------------------------------------------------------------------------
 

@@ -521,6 +521,15 @@ async function pay(G, action, host) {
     roofChoices: res.cleared ? loans.roofChoices(res.cleared.tier, ctx) : [],
     onRoof: (colour) => G.store.tx('loan:roof', (ww) => loans.chooseRoof(ww, res.cleared.tier, colour, ctx)),
   };
+  // MID-11: a commission loan (3-6) waiting on its room gets the chalk plan in the ceremony, so
+  // paying at the yard never clears a loan into "no build"
+  const prompt = loans.commissionPrompt(G.world, res, ctx);
+  if (prompt) {
+    Object.assign(params, {
+      rooms: prompt.rooms, roomTier: prompt.tier, roomFirst: prompt.roomFirst,
+      onRoom: (roomId) => G.store.tx('loan:commission', (ww) => loans.chooseCommission(ww, roomId, ctx)),
+    });
+  }
   if (hasScene(G, 'ceremony')) G.push('ceremony', params);
   else if (!pushOverlay(G, host, 'createCeremonyScene', params)) toast(G, host, `Paid ${res.paid.toLocaleString('en-US')}◉. THWAP.`); // str
   return done('pay', { scene: 'ceremony', paid: res.paid, cleared: res.cleared });
