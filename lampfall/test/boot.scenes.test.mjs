@@ -205,3 +205,13 @@ test('rectangular step triggers fire once and use triggers execute their authore
   assert.equal(G.calls.at(-1)[2].scriptId, 'use-story');
   assert.ok(G.world.maps.pellwick.opened.includes('use-story'));
 });
+
+test('a new No Rewind run tells persist to drop to one autosave slot at once (LG-RN103)', () => {
+  for (const [challenges, want] of [[['no-rewind'], true], [[], false]]) {
+    const G = fakeG(); const seen = [];
+    G.persist = { latest: () => null, setNoRewind: (on) => seen.push(on) };
+    newGame(G, { seedCode: 'TEST-FIELD', challenges });
+    assert.deepEqual(seen, [want]);
+    assert.deepEqual([...G.world.run.challenges], challenges);
+  }
+});

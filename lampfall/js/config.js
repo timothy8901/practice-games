@@ -11,7 +11,7 @@
 export const TITLE = 'Lampfall';
 
 /** Semantic build version shown on the title screen and stamped into save summaries. */
-export const VERSION = '0.1.0-dev';
+export const VERSION = '1.0.0';
 
 /** Native buffer width in game pixels. */
 export const NATIVE_W = 480;

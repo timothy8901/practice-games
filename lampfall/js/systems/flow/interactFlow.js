@@ -31,6 +31,7 @@ import * as party from '../party.js';
 import * as flags from '../flags.js';
 import * as weather from '../weather.js';
 import { isPorchLit, porchesOf } from '../townCommon.js';
+import * as schedule from '../schedule.js';
 import * as dayFlow from './dayFlow.js';
 import { minuteOfDay, badgeCount, formatTime } from '../../state/selectors.js';
 import { formatMinute } from '../../core/time.js';
@@ -397,11 +398,23 @@ async function sit(G, action, host) {
   return done('sit', { porch: false });
 }
 
+/**
+ * The empty-mailbox line (LG-PF5): Hesper only stops at a lit porch, so until yours is lit the
+ * box says how to light it rather than promising post at six.
+ * @param {any} G
+ * @returns {string}
+ */
+export function mailboxEmptyText(G) {
+  let lit = true;
+  try { lit = isPorchLit(G.world, G.data, TUNING.homePorchId ?? 'porch-keepers-cottage', { tuning: TUNING }); } catch { lit = true; }
+  return t(lit ? 'mailbox.emptyLit' : 'mailbox.emptyDark');
+}
+
 function mailbox(G, action, host) {
   G.store.tx('letters:mailbox', (w) => letters.collectMail(w, G.data, laneCtx(G)));
   const unread = letters.unread(G.world);
   G.bus.emit('interact', { verb: 'mailbox' });
-  if (!unread.length) { toast(G, host, 'Nothing in the box. Post comes at six.'); return fail('mailbox', 'empty'); } // str
+  if (!unread.length) { toast(G, host, mailboxEmptyText(G)); return fail('mailbox', 'empty'); }
   G.push('letter', { from: 'mailbox' });
   return done('mailbox', { scene: 'letter' });
 }
@@ -572,8 +585,36 @@ function knock(G, action, host) {
     G.push('dialogue', { target: { kind: 'porch', id: npcId, mapId: host.mapId, atPorch: true } });
     return done('knock', { scene: 'dialogue', npcId });
   }
-  toast(G, host, lit ? 'You knock. Nobody answers, but the lamp is on.' : 'The house is dark. Nobody has lived here for years.'); // str
+  toast(G, host, knockText(G, porchId, npcId, lit));
   return fail('knock', lit ? 'no-answer' : 'dark');
+}
+
+/**
+ * What a knock with nobody at the door says (MID-20). A dark house (porch-dark-N, before its
+ * project or Relighting) is empty; a resident's porch names the resident: asleep, or out and
+ * where. A resident row may carry its own `knockAsleep` / `knockAway` text ({name} filled in).
+ * @param {any} G
+ * @param {string|null|undefined} porchId
+ * @param {string|null|undefined} npcId
+ * @param {boolean} lit
+ * @returns {string}
+ */
+export function knockText(G, porchId, npcId, lit) {
+  const darkHouse = typeof porchId === 'string' && /^porch-dark-/.test(porchId);
+  if (!npcId || (darkHouse && !lit)) return t(lit ? 'knock.litNobody' : 'knock.emptyHouse');
+  const npc = G.data && G.data.has && G.data.has('npcs', npcId) ? G.data.get('npcs', npcId) : null;
+  const name = (npc && npc.name) || npcId;
+  let placement = null;
+  try { placement = schedule.whereIs(npcId, G.world, G.data, { tuning: TUNING }); } catch { placement = null; }
+  const activity = placement && typeof placement.activity === 'string' ? placement.activity : '';
+  const asleep = !!placement && (placement.pose === 'sleep' || /\basleep\b|\bsleep/i.test(activity));
+  const fill = (s) => String(s).replace(/\{name\}/g, name);
+  if (asleep) return npc && typeof npc.knockAsleep === 'string' ? fill(npc.knockAsleep) : t('knock.asleep', { name });
+  if (npc && typeof npc.knockAway === 'string') return fill(npc.knockAway);
+  // only a described activity ("a swim off the slipway") is worth saying; pose/source words are not
+  const out = /\s/.test(activity) && !/^festival:/.test(activity) ? activity : '';
+  if (lit) return out ? t('knock.awayLitDoing', { name, activity: out }) : t('knock.awayLit', { name });
+  return out ? t('knock.awayDarkDoing', { name, activity: out }) : t('knock.awayDark', { name });
 }
 
 async function waystone(G, action, host) {

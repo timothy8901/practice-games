@@ -149,12 +149,13 @@ export function createBoxScene(G) {
       const k = gridFocus.index;
       const target = w.box[k] ?? null;
       if (src.where === 'box') {
-        hand = null;
-        sfx(G, target && target.uid !== src.c.uid ? 'blocked' : 'cancel');
-        if (target && target.uid !== src.c.uid) toast(G, 'Storage keeps its own order.'); // str
-        return;
-      }
-      if (!target) result = G.store.tx('box:to-box', (ww) => partySys.toBox(ww, hand.uid, G.data, opts));
+        // Storage reorder (LG-RN108): drop on a filled cell swaps, on an empty one moves it there
+        if (target && target.uid === src.c.uid) { hand = null; sfx(G, 'cancel'); return; }
+        const uid = hand.uid;
+        result = target
+          ? G.store.tx('box:swap', (ww) => partySys.boxSwap(ww, uid, target.uid, { bus: G.bus }))
+          : G.store.tx('box:move', (ww) => partySys.boxMove(ww, uid, k, { bus: G.bus }));
+      } else if (!target) result = G.store.tx('box:to-box', (ww) => partySys.toBox(ww, hand.uid, G.data, opts));
       else result = G.store.tx('box:swap-out', (ww) => swapPartyBox(ww, hand.uid, target.uid, src.index, opts));
     }
     if (result && result.ok === false) {

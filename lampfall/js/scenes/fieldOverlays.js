@@ -187,7 +187,13 @@ export function beadTime(beads) {
 
 /**
  * @param {any} G
- * @param {{ceremony: any, cleared: any, paid: number, tier: number, roofChoices?: string[], onRoof?: (c: string) => void, onDone?: () => void}} p
+ * The room phase (MID-11): when Wren is waiting on a room pick (`p.rooms`, from
+ * `loans.commissionPrompt`), the chalk plan opens after the strike. `roomFirst` puts it before the
+ * roof (the cleared loan's build needs a room before it can take a roof colour); otherwise it
+ * follows the roof and picks the room for the loan just offered. Back means "later": the plan
+ * stays on Wren's board, and the Ledger can still pick it.
+ * @param {{ceremony: any, cleared: any, paid: number, tier: number, roofChoices?: string[], onRoof?: (c: string) => void, onDone?: () => void,
+ *   rooms?: Array<{id: string, name: string, blurb?: string}>, roomTier?: number, roomFirst?: boolean, onRoom?: (id: string) => any}} p
  */
 export function createCeremonyScene(G, p) {
   const c = p.ceremony || { beads: 0, notchesBefore: 0, notchesAfter: 0, notchesPerStick: 20, split: false, notchesCut: 0 };
@@ -203,8 +209,16 @@ export function createCeremonyScene(G, p) {
   const roofs = (p.cleared && Array.isArray(p.roofChoices) ? p.roofChoices : []).slice(0, 8);
   let ms = 0;
   let thwapped = false;
-  let phase = 'count'; // count -> roof? -> done -> out
+  const rooms = (Array.isArray(p.rooms) ? p.rooms : []).slice(0, 6);
+  /** the phases after the count, in order (count -> [room] -> [roof] -> [room] -> done -> out) */
+  const queue = p.roomFirst && rooms.length
+    ? ['room', ...(roofs.length ? ['roof'] : [])]
+    : [...(roofs.length ? ['roof'] : []), ...(rooms.length ? ['room'] : [])];
+  let phase = 'count';
   let roofIndex = Math.max(0, roofs.indexOf('slate-blue'));
+  let roomIndex = 0;
+  let pickedRoom = null;
+  const advance = () => { phase = queue.shift() ?? 'done'; };
   let outMs = -1;
   let skipHold = 0;
   const chips = [];
@@ -234,7 +248,7 @@ export function createCeremonyScene(G, p) {
         const before = beadIndexAt(ms - dt), now = beadIndexAt(ms);
         if (now > before) G.audio.sfx('blip', { pitch: 1 + Math.min(12, now) * 0.06, volume: 0.4 });
       }
-      if (phase === 'count' && ms >= tSettled) phase = roofs.length ? 'roof' : 'done';
+      if (phase === 'count' && ms >= tSettled) advance();
       if (outMs >= 0) {
         outMs += dt;
         if (outMs >= 400) {
@@ -249,7 +263,32 @@ export function createCeremonyScene(G, p) {
         // hold confirm to skip to the strike
         if (input.held('confirm')) skipHold += 16.7; else skipHold = 0;
         if (skipHold > 250 && ms < tStrikeStart) ms = tStrikeStart;
-        if (ms > tSettled - 1 && (input.pressed('confirm') || tapped(input))) phase = roofs.length ? 'roof' : 'done';
+        if (ms > tSettled - 1 && (input.pressed('confirm') || tapped(input))) advance();
+        return;
+      }
+      if (phase === 'room') {
+        const n = rooms.length;
+        if (input.pressed('left') || input.pressed('up')) roomIndex = (roomIndex + n - 1) % n;
+        if (input.pressed('right') || input.pressed('down')) roomIndex = (roomIndex + 1) % n;
+        const pt = input.pointer;
+        if (pt && pt.justDown) {
+          const hit = rooms.findIndex((_, i) => { const r = roomRect(i); return pt.x >= r.x && pt.x < r.x + r.w && pt.y >= r.y && pt.y < r.y + r.h; });
+          if (hit >= 0 && hit !== roomIndex && pt.type === 'touch') { roomIndex = hit; return; }
+          if (hit >= 0) roomIndex = hit; else return;
+        }
+        if (input.pressed('confirm') || (pt && pt.justDown)) {
+          const res = typeof p.onRoom === 'function' ? p.onRoom(rooms[roomIndex].id) : { ok: true };
+          if (res && res.ok === false) { phase = 'done'; return; }
+          pickedRoom = rooms[roomIndex];
+          if (G.audio && typeof G.audio.sfx === 'function') G.audio.sfx('ui:confirm');
+          advance();
+          return;
+        }
+        if (input.pressed('cancel')) {
+          // later: a room-first plan without a room has no build for a roof yet
+          if (p.roomFirst) queue.length = 0;
+          advance();
+        }
         return;
       }
       if (phase === 'roof') {
@@ -327,7 +366,19 @@ export function createCeremonyScene(G, p) {
           if (i === roofIndex) drawText(ctx, '▲', x + 12, y + 26, { align: 'center', color: COLORS.paper.light });
         });
         drawText(ctx, ROOF_NAMES[roofs[roofIndex]] || roofs[roofIndex], 240, 256, { align: 'center', color: COLORS.paper.light });
+      } else if (phase === 'room') {
+        drawText(ctx, t('ceremony.pickRoom', { n: p.roomTier ?? '' }), 240, 192, { align: 'center', color: PALETTE.porchAmber });
+        rooms.forEach((r, i) => {
+          const R = roomRect(i);
+          ctx.fillStyle = i === roomIndex ? '#3E5A4A' : '#2A3B33'; ctx.fillRect(R.x, R.y, R.w, R.h);
+          drawNotchedFrame(ctx, R.x, R.y, R.w, R.h, i === roomIndex ? COLORS.paper.light : COLORS.paper.ink);
+          drawText(ctx, r.name, R.x + R.w / 2, R.y + 3, { align: 'center', color: i === roomIndex ? COLORS.paper.light : COLORS.paper.shade, font: 'small' });
+        });
+        const blurb = rooms[roomIndex] && rooms[roomIndex].blurb ? wrapText(rooms[roomIndex].blurb, 400)[0] ?? '' : '';
+        if (blurb) drawText(ctx, blurb, 240, 240, { align: 'center', font: 'small', color: COLORS.paper.light });
+        drawText(ctx, t('ceremony.roomLater'), 240, 254, { align: 'center', font: 'small', color: PALETTE.porchAmber });
       } else if (phase === 'done') {
+        if (pickedRoom) drawText(ctx, t('ceremony.roomChosen', { room: pickedRoom.name }), 240, 200, { align: 'center', color: PALETTE.porchAmber });
         drawText(ctx, p.cleared ? t('ceremony.buildTonight') : `Paid ${Number(p.paid || 0).toLocaleString('en-US')}◉. ${c.notchesCut || 0} notch${c.notchesCut === 1 ? '' : 'es'} cut.`, 240, 214, { align: 'center', color: COLORS.paper.light }); // str
         drawText(ctx, 'confirm: back to the yard', 240, 252, { align: 'center', font: 'small', color: PALETTE.porchAmber }); // str
       }
@@ -337,9 +388,13 @@ export function createCeremonyScene(G, p) {
       const cover = Math.max(1 - fin, fout);
       if (cover > 0) { ctx.save(); ctx.globalAlpha = cover; ctx.fillStyle = '#141B33'; ctx.fillRect(0, 0, 480, 270); ctx.restore(); }
     },
-    debugText: () => `ceremony ${phase} beads ${beads} thwap ${thwapped}`,
+    debugText: () => `ceremony ${phase} beads ${beads} thwap ${thwapped}${phase === 'room' ? ` room ${rooms[roomIndex]?.id}` : ''}`,
+    get phase() { return phase; },
     isBusy: () => phase === 'count' || outMs >= 0,
   };
+
+  /** Chalk-plan cells: three across, two rows, under the stick. */
+  function roomRect(i) { return { x: 72 + (i % 3) * 114, y: 204 + Math.floor(i / 3) * 16, w: 108, h: 13 }; }
 
   function beadIndexAt(m) {
     if (m < T0) return 0;

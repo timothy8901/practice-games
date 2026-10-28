@@ -653,6 +653,29 @@ export function needsCommission(world, ctx) {
 }
 
 /**
+ * The room prompt the yard owes the player after a payment (MID-11), or null when no room pick
+ * is pending. `roomFirst` is true when this payment just cleared a commission loan with no room
+ * on the plan: the room must be picked before its roof (the build is queued by the pick). Read
+ * only; `chooseCommission` makes the pick.
+ * @param {World} world
+ * @param {{cleared?: Clearance|null}|null|undefined} payRes   the `pay` result (or null before paying)
+ * @param {EconCtx} [ctx]
+ * @returns {{tier: number, roomFirst: boolean, rooms: Array<{id: string, name: string, blurb: string}>}|null}
+ */
+export function commissionPrompt(world, payRes, ctx) {
+  const tier = pendingPickTier(world, ctx);
+  if (tier === null) return null;
+  const db = lookup(ctx?.data);
+  const rooms = commissionOptions(world, ctx).map((id) => {
+    const row = db.row('commissions', id) ?? null;
+    return { id, name: row?.name ?? id, blurb: row?.blurb ?? row?.text ?? '' };
+  });
+  if (!rooms.length) return null;
+  const cleared = payRes && payRes.cleared ? payRes.cleared : null;
+  return { tier, roomFirst: !!(cleared && cleared.needsPick && cleared.tier === tier), rooms };
+}
+
+/**
  * Picks the room for the next commission tier (loans 3-6, in order). Allowed once that loan is
  * offered; if it has already cleared, its build is queued now.
  * @param {World} world

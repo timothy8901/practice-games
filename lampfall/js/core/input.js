@@ -64,8 +64,8 @@ const TAN_22_5 = 0.41421356;
 
 /**
  * Default bindings, as `{ action: token[] }`.
- * Keyboard: arrows/WASD move; Z/Enter/Space confirm; X/Esc/Backspace cancel; Enter/Esc
- * also open the menu; Shift runs; C tool ring; M map; Tab log; P pause (`start`);
+ * Keyboard: arrows/WASD move; Z/Enter/Space confirm; X/Esc/Backspace cancel; Esc
+ * also opens the menu (Enter is Confirm only); Shift runs; C tool ring; M map; Tab log; P pause (`start`);
  * backquote `select`; `[` / `]` are `l` / `r`.
  * Gamepad (standard mapping): A confirm, B cancel, X tool, Y map, LB/RB l/r, LT log,
  * RT run, Back select, Start start + menu, d-pad and left stick move.
@@ -77,7 +77,9 @@ export const DEFAULT_BINDINGS = freezeBindings({
   right: ['ArrowRight', 'KeyD', 'gp:b15', 'gp:axis0+', 'touch:right'],
   confirm: ['KeyZ', 'Enter', 'NumpadEnter', 'Space', 'gp:b0', 'touch:a'],
   cancel: ['KeyX', 'Escape', 'Backspace', 'gp:b1', 'touch:b'],
-  menu: ['Enter', 'NumpadEnter', 'Escape', 'gp:b9', 'touch:menu'],
+  // GDD-00 §13 / MID-21: Pause is P (via `start`) or Esc; Enter is Confirm only, so pressing it
+  // in front of a counter performs the verb and never doubles as "open the pause menu".
+  menu: ['Escape', 'gp:b9', 'touch:menu'],
   run: ['ShiftLeft', 'ShiftRight', 'gp:b7'],
   tool: ['KeyC', 'gp:b2'],
   map: ['KeyM', 'gp:b3'],

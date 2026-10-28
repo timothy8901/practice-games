@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseFlags, flagsToSearch, isLocalhost, DEFAULT_FLAGS, SPEED_MAX, SPEED_MIN } from '../js/debug/flags.js';
+import { parseFlags, flagsToSearch, isLocalhost, debugEnabled, DEFAULT_FLAGS, SPEED_MAX, SPEED_MIN } from '../js/debug/flags.js';
 
 test('parseFlags: defaults for an empty or missing query', () => {
   assert.deepEqual(parseFlags(''), DEFAULT_FLAGS);
@@ -77,4 +77,12 @@ test('isLocalhost', () => {
   assert.equal(isLocalhost('example.com'), false);
   assert.equal(isLocalhost(null), false);
   assert.equal(isLocalhost(undefined), false);
+});
+
+test('debugEnabled: only ?debug=1 installs the debug hook, never just localhost (LG-SCAN3)', () => {
+  assert.equal(debugEnabled(parseFlags(''), '127.0.0.1'), false);
+  assert.equal(debugEnabled(parseFlags(''), 'localhost'), false);
+  assert.equal(debugEnabled(parseFlags('?debug=1'), '127.0.0.1'), true);
+  assert.equal(debugEnabled(parseFlags('?debug=1'), 'example.com'), true);
+  assert.equal(debugEnabled(null), false);
 });

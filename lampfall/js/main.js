@@ -7,7 +7,7 @@
  * @module main
  */
 import * as config from './config.js';
-import { parseFlags, isLocalhost } from './debug/flags.js';
+import { parseFlags, debugEnabled } from './debug/flags.js';
 import { installDebugHook } from './debug/hook.js';
 import { createDisplay } from './core/canvas.js';
 import { createInput } from './core/input.js';
@@ -111,7 +111,7 @@ export function boot(env = {}) {
 
   // 1. flags
   const flags = parseFlags(win.location.search);
-  const debug = flags.debug || isLocalhost(win.location.hostname);
+  const debug = debugEnabled(flags, win.location.hostname); // ?debug=1 only, never just 'on localhost' (LG-SCAN3)
   const entropy = makeRng(`${Date.now()}:${Math.random()}`); // the only unseeded rng; cosmetic use only
   /** @type {G|null} assigned in step 7; display/scene callbacks that fire earlier see null */
   let G = null;

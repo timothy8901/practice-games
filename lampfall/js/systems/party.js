@@ -293,6 +293,47 @@ export function swap(world, i, j, opts = {}) {
 }
 
 /**
+ * Moves a stored creature to box cell `index` (Storage reorder, LG-RN108). The box stays dense:
+ * an index at or past the end moves it to the last filled cell; the cells between shift by one.
+ * @param {World} world
+ * @param {string} uid
+ * @param {number} index
+ * @param {PartyOpts} [opts]
+ * @returns {{ok: true, index: number}|{ok: false, reason: 'not-in-box'|'bad-index'}}
+ */
+export function boxMove(world, uid, index, opts = {}) {
+  const i = world.box.findIndex((c) => c.uid === uid);
+  if (i < 0) return { ok: false, reason: 'not-in-box' };
+  if (!Number.isInteger(index) || index < 0) return { ok: false, reason: 'bad-index' };
+  const to = Math.min(index, world.box.length - 1);
+  if (to === i) return { ok: true, index: i };
+  const [c] = world.box.splice(i, 1);
+  world.box.splice(to, 0, c);
+  emit(opts, 'party:changed', { reason: 'boxMove', uid, from: i, to });
+  return { ok: true, index: to };
+}
+
+/**
+ * Swaps two stored creatures' cells (Storage reorder, LG-RN108). Same uid is a no-op success.
+ * @param {World} world
+ * @param {string} a uid
+ * @param {string} b uid
+ * @param {PartyOpts} [opts]
+ * @returns {{ok: true}|{ok: false, reason: 'not-in-box'}}
+ */
+export function boxSwap(world, a, b, opts = {}) {
+  const i = world.box.findIndex((c) => c.uid === a);
+  const j = world.box.findIndex((c) => c.uid === b);
+  if (i < 0 || j < 0) return { ok: false, reason: 'not-in-box' };
+  if (i === j) return { ok: true };
+  const t = world.box[i];
+  world.box[i] = world.box[j];
+  world.box[j] = t;
+  emit(opts, 'party:changed', { reason: 'boxSwap', from: i, to: j });
+  return { ok: true };
+}
+
+/**
  * Moves a party creature to the box. Refuses the last party member, and refuses when the party
  * would be left with no conscious creature although it has one now. A creature with an open window drops out of
  * `pendingShifts` while stored when HOLD_WINDOWS_IN_BOX (it keeps the window).

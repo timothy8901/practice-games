@@ -20,3 +20,8 @@ test('config: title and save prefix are placeholders tagged for the GDD', () => 
   assert.ok(config.SAVE_PREFIX.endsWith('.'));
   assert.ok(config.SLOW_FRAMES_TO_LOW_POWER > 0 && config.SLOW_FRAME_MS > config.TICK_MS);
 });
+
+test('config: the title shows a release version, not a -dev build tag (LG-SCAN3)', () => {
+  assert.match(config.VERSION, /^\d+\.\d+\.\d+$/);
+  assert.ok(!/dev/i.test(config.VERSION));
+});

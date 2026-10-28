@@ -132,7 +132,21 @@ export function flagsToSearch(flags) {
 }
 
 /**
- * Whether a hostname is a local development host (debug hooks install there without `?debug=1`).
+ * Whether the debug tooling (window.__game hook, data.verify at boot, draw counters) installs.
+ * Only an explicit `?debug=1` turns it on: the shipped launcher serves the game from 127.0.0.1,
+ * so "on localhost" would hand every player the cheat hook (LG-SCAN3). The hostname is accepted
+ * and ignored so callers can keep passing it.
+ * @param {Partial<import('./flags.js').BootFlags>|null|undefined} flags
+ * @param {string|null|undefined} [_hostname]
+ * @returns {boolean}
+ */
+export function debugEnabled(flags, _hostname) {
+  return !!(flags && flags.debug === true);
+}
+
+/**
+ * Whether a hostname is a local development host. Informational only: it no longer turns the
+ * debug hook on by itself (see `debugEnabled`).
  * @param {string|null|undefined} hostname
  * @returns {boolean}
  */

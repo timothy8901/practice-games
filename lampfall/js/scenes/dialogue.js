@@ -528,8 +528,10 @@ export function createDialogueScene(G) {
       const alpha = reducedMotion(G) ? prog : 1;
       ctx.save();
       if (alpha < 1) ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
+      // the entry panel carries its own prompt: the slip (old line / choices) must not sit on top
+      // of the key grid (LG-RN130)
       if (state === 'entry' && entry) entry.draw(ctx);
-      drawSlip(ctx, off);
+      else drawSlip(ctx, off);
       ctx.restore();
       if (logOpen) drawLog(ctx);
     },

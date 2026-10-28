@@ -16,6 +16,7 @@
  * @module scenes/boot
  */
 import { createNewWorld } from '../state/schema.js';
+import { wantsNoRewind } from '../state/persist.js';
 import { FEATURES, TRANSITION_MS } from '../config.js';
 import { drawText } from '../core/font.js';
 import { PALETTE } from '../ui/theme.js';
@@ -122,6 +123,16 @@ export function buildRunWorld(G, opts) {
 }
 
 /**
+ * Rebuilds the persist slots for the run just installed (LG-RN103): a No Rewind run keeps one
+ * autosave slot and no manual slots from its very first save, not only after a reload.
+ * @param {any} G
+ * @param {any} world
+ */
+export function syncNoRewind(G, world) {
+  try { G.persist?.setNoRewind?.(wantsNoRewind(world)); } catch (e) { console.warn(`boot: setNoRewind failed: ${e.message}`); }
+}
+
+/**
  * Starts a new run: builds the world, swaps it into the store and fades to the overworld. When
  * `?scene=<name>` names a non-flow scene it is pushed on top for visual work.
  * @param {object} G
@@ -131,6 +142,7 @@ export function newGame(G, opts) {
   const world = buildRunWorld(G, opts);
   G.scenes.transition(opts.transition ?? 'fade', fadeMs(G), () => {
     G.store.replace(world);
+    syncNoRewind(G, world);
     G.replaceWith('overworld', { fresh: true });
     const s = G.flags.scene;
     if (s && s !== 'overworld' && !DIRECT_SCENES.includes(s) && G.sceneFactories[s]) {
@@ -150,6 +162,7 @@ export function continueGame(G, slot) {
   if (!res.ok) return res;
   G.scenes.transition('fade', fadeMs(G), () => {
     G.store.replace(res.world);
+    syncNoRewind(G, res.world);
     G.replaceWith('overworld', { loaded: slot });
   }, { color: PALETTE.nightInk });
   return { ok: true };

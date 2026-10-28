@@ -162,7 +162,7 @@ describe('constants', () => {
     assert.ok(b.left.includes('ArrowLeft') && b.left.includes('KeyA'));
     for (const t of ['KeyZ', 'Enter', 'Space']) assert.ok(b.confirm.includes(t), `confirm has ${t}`);
     for (const t of ['KeyX', 'Escape', 'Backspace']) assert.ok(b.cancel.includes(t), `cancel has ${t}`);
-    assert.ok(b.menu.includes('Enter') && b.menu.includes('Escape'));
+    assert.ok(!b.menu.includes('Enter') && !b.menu.includes('NumpadEnter') && b.menu.includes('Escape'));
     assert.ok(b.run.includes('ShiftLeft') && b.run.includes('ShiftRight'));
     assert.ok(b.tool.includes('KeyC') && b.map.includes('KeyM') && b.log.includes('Tab') && b.start.includes('KeyP'));
     assert.ok(b.l.includes('BracketLeft') && b.r.includes('BracketRight'));
@@ -438,7 +438,7 @@ describe('keyboard edges', () => {
     assert.equal(input.released('confirm'), true);
   });
 
-  it('shares Escape between cancel and menu, Enter between confirm and menu', () => {
+  it('shares Escape between cancel and menu; Enter is confirm only (MID-21)', () => {
     const { input, press, release, tick } = harness();
     press('Escape');
     tick();
@@ -446,7 +446,7 @@ describe('keyboard edges', () => {
     release('Escape');
     press('Enter');
     tick();
-    assert.deepEqual(activeActions(input, 'pressed'), ['confirm', 'menu', ANY_KEY]);
+    assert.deepEqual(activeActions(input, 'pressed'), ['confirm', ANY_KEY]);
   });
 
   it('reports anyKey for unbound keys without touching bound actions', () => {

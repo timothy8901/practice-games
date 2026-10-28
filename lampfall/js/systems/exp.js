@@ -28,7 +28,12 @@ import { LEVEL_MAX } from '../state/schema.js';
 
 /** @typedef {import('../state/schema.js').World} World */
 /** @typedef {import('../state/schema.js').Creature} Creature */
-/** @typedef {{num: number[], den: number}} GrowthCurve  EXP(n) = floor((num[0]·n³ + num[1]·n² + num[2]·n + num[3]) / den), clamped ≥ 0; level 1 is always 0 */
+/** @typedef {{from: number, num: number[], den: number}} CurveStep  the cubic used from level `from` up */
+/**
+ * @typedef {{num: number[], den: number, steps?: CurveStep[]}} GrowthCurve  EXP(n) = floor((num[0]·n³ + num[1]·n² + num[2]·n + num[3]) / den),
+ * clamped ≥ 0; level 1 is always 0. Optional `steps` (ascending `from`) replace the cubic from their level up, so a
+ * curve can keep one shape for the early levels and steepen later (data/tuning.js keeps GDD-00's 8 × L² through Lv8).
+ */
 /** @typedef {{bus?: {emit: (evt: string, payload: any) => any}|null, tuning?: Partial<ExpTuning>|null, levels?: number[]}} ExpOpts */
 
 /**
@@ -96,13 +101,16 @@ const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
 const nonNeg = (v) => isNum(v) && v >= 0;
 const posInt = (v) => Number.isInteger(v) && v >= 1;
 const intList = (v) => Array.isArray(v) && v.every(posInt);
+const cubicOk = (c) => !!c && Array.isArray(c.num) && c.num.length === 4 && c.num.every(Number.isInteger) && posInt(c.den);
 
 /** @type {Record<keyof ExpTuning, [(v: any) => boolean, string]>} */
 const SPEC = {
   MAX_LEVEL: [(v) => posInt(v) && v <= LEVEL_MAX, `integer 1..${LEVEL_MAX}`],
   GROWTH_CURVES: [(v) => v && typeof v === 'object' && Object.values(v).every(
-    (c) => c && Array.isArray(c.num) && c.num.length === 4 && c.num.every(Number.isInteger) && posInt(c.den),
-  ), '{id: {num: [4 integers], den: positive integer}}'],
+    (c) => cubicOk(c) && (c.steps === undefined || (Array.isArray(c.steps) && c.steps.every(
+      (st, i) => cubicOk(st) && Number.isInteger(st.from) && st.from >= 2 && (i === 0 || st.from > c.steps[i - 1].from),
+    ))),
+  ), '{id: {num: [4 integers], den: positive integer, steps?: [{from: integer ≥ 2 ascending, num, den}]}}'],
   EXP_DIVISOR: [(v) => isNum(v) && v > 0, 'number > 0'],
   TRAINER_EXP_MULT: [nonNeg, 'number ≥ 0'],
   PARTICIPANT_SHARE: [nonNeg, 'number ≥ 0'],
@@ -324,8 +332,10 @@ export function expForLevel(growth, level, opts = {}) {
   if (!curve) throw new RangeError(`exp.expForLevel: unknown growth curve ${JSON.stringify(growth)}`);
   const n = Math.max(1, Math.min(t.MAX_LEVEL, Math.floor(isNum(level) ? level : 1)));
   if (n === 1) return 0;
-  const [a, b, c, d] = curve.num;
-  return Math.max(0, Math.floor((a * n ** 3 + b * n ** 2 + c * n + d) / curve.den));
+  let seg = curve;
+  if (Array.isArray(curve.steps)) for (const st of curve.steps) if (n >= st.from) seg = st;
+  const [a, b, c, d] = seg.num;
+  return Math.max(0, Math.floor((a * n ** 3 + b * n ** 2 + c * n + d) / seg.den));
 }
 
 /**
