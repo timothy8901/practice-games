@@ -401,19 +401,35 @@ export function forgetMove(c, index) {
 }
 
 /**
- * Memory moves the current form can use again (rules §5.3: relearned free at a Shelter).
+ * Whether a Memory move can come back at Barnaby's desk (GDD-00 §7, §18: Memory relearn is a
+ * fairness tool). Any move in Memory qualifies, whatever the current form's learnset, except a
+ * signature move whose signature species is not the creature's current form. Unknown move ids and
+ * moves already known never qualify.
+ * @param {Creature} c
+ * @param {string} moveId
+ * @param {any} data
+ * @returns {boolean}
+ */
+export function canRelearn(c, moveId, data) {
+  if (!c.memory.includes(moveId) || c.moves.some((m) => m.id === moveId)) return false;
+  const mv = dataLookup(data).moveOrNull(moveId);
+  if (!mv) return false;
+  return !mv.signature || mv.signature === c.speciesId;
+}
+
+/**
+ * Memory moves the creature can relearn free at the Archive ({@link canRelearn}), each once.
  * @param {Creature} c
  * @param {any} data
  * @returns {string[]}
  */
 export function relearnable(c, data) {
-  const sp = speciesOf(c, data);
-  return c.memory.filter((id, i) => c.memory.indexOf(id) === i && canLearn(sp, id) && !c.moves.some((m) => m.id === id));
+  return c.memory.filter((id, i) => c.memory.indexOf(id) === i && canRelearn(c, id, data));
 }
 
 /**
- * Relearns a Memory move the current form can learn (into a free slot or over
- * `opts.replaceIndex`) and removes it from Memory.
+ * Relearns a Memory move ({@link canRelearn}; into a free slot or over `opts.replaceIndex`) and
+ * removes it from Memory.
  * @param {Creature} c
  * @param {string} moveId
  * @param {any} data
@@ -422,7 +438,7 @@ export function relearnable(c, data) {
  */
 export function relearnFromMemory(c, moveId, data, opts = {}) {
   const i = c.memory.indexOf(moveId);
-  if (i < 0 || !canLearn(speciesOf(c, data), moveId)) return false;
+  if (i < 0 || !canRelearn(c, moveId, data)) return false;
   if (!learnMove(c, moveId, data, opts)) return false;
   c.memory.splice(i, 1);
   return true;

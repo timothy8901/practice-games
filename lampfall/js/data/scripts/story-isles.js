@@ -24,6 +24,41 @@ const companion = (who) => ({ op: 'if', cond: LINNET_HOME, then: who.linnet, els
   { op: 'if', cond: { flag: 'sp.tamsin-arrived' }, then: who.tamsin, else: who.maud },
 ] });
 
+/** Maud's practice table (FE-14): a Reroll was made this sitting, and which practice hand comes next. */
+const PRACTICE_ROLLED = 'sys.practice-rolled';
+const PRACTICE_HAND = 'sys.practice-hand';
+const PRACTICE_PROMPT = 'Maud: Your move. Confirm when you\'ve chosen.';
+/** The practice deck: each Reroll turns the next hand (four, round and round), so no two in a row match. */
+const PRACTICE_HANDS = [
+  'UP: Brinelance. SIDE: Puddlepip. DOWN: Puddlepip.',
+  'UP: Sloshkin. SIDE: Rushling. DOWN: Puddlepip.',
+  'UP: Brinelance. SIDE: Rillfin. DOWN: Bilgebob.',
+  'UP: Rillfin. SIDE: Rushling. DOWN: Puddlepip.',
+];
+const practiceHand = (text) => `* Maud pinches salt over the cards. They turn over, slide, and turn back. ${text}`;
+/** The table's three answers (a fresh array each use: one per choice op). */
+const practiceOptions = () => [
+  { text: 'Reroll.', then: [
+    sfx('shiftFlip'),
+    { op: 'branch', on: PRACTICE_HAND, cases: {
+      ...Object.fromEntries(PRACTICE_HANDS.slice(1).map((h, i) => [String(i + 2), [practiceHand(h), flag(PRACTICE_HAND, i + 2 === PRACTICE_HANDS.length ? 1 : i + 3)]])),
+      default: [practiceHand(PRACTICE_HANDS[0]), flag(PRACTICE_HAND, 2)],
+    } },
+    flag(PRACTICE_ROLLED),
+    'Maud: Different faces, same odds. Reroll redraws what\'s on the cards, never the chance of each card. It does not promise Up. ~ That\'s what the Scatter forgets. Again?',
+    go('table'),
+  ] },
+  { text: 'Anchor.', then: [
+    '* She sets a small grey stone on the slate. The cards go still.',
+    'Maud: Anchored. That window\'s spent. It\'ll open again at the next one, later, higher. ~ That\'s what the Mooring forgets. It\'s a pause, not a cure.',
+    go('table'),
+  ] },
+  { text: 'Accept.', then: [
+    '* She turns the up card face down, then the others, and slides them off the slate.',
+    'Maud: Accepted. ~ Whatever it lands as, it\'s still yours. Same mark. Same name. Same Bond. That\'s the bit that matters, and it\'s the bit nobody can roll.',
+  ] },
+];
+
 export default {
   // ---------------------------------------------------------------------------------------------
   // day 2: Linnet declines (the Decline lesson); also her daily topic until badge 1
@@ -68,24 +103,12 @@ export default {
       freefall: ['Maud: You picked wild. Thirty up, thirty side, forty down. And the faces are flat on your dial; anything in the pool can come.'],
     }),
     'Maud: Three choices. Accept: let it land. Anchor: one stone, refuse this window, keep what you\'ve got. Reroll: a pinch of Starsalt, the cards go round again. One pinch, then two, then four, then eight. Same window, the price doubles.',
+    flag(PRACTICE_ROLLED, false),
     label('table'),
-    { op: 'choice', prompt: 'Maud: Your move. Confirm when you\'ve chosen.', options: [
-      { text: 'Reroll.', then: [
-        sfx('shiftFlip'),
-        '* Maud pinches salt over the cards. They turn over, slide, and turn back. UP: Brinelance. SIDE: Puddlepip. DOWN: Puddlepip.',
-        'Maud: Different faces, same odds. Reroll redraws what\'s on the cards, never the chance of each card. It does not promise Up. ~ That\'s what the Scatter forgets. Again?',
-        go('table'),
-      ] },
-      { text: 'Anchor.', then: [
-        '* She sets a small grey stone on the slate. The cards go still.',
-        'Maud: Anchored. That window\'s spent. It\'ll open again at the next one, later, higher. ~ That\'s what the Mooring forgets. It\'s a pause, not a cure.',
-        go('table'),
-      ] },
-      { text: 'Accept.', then: [
-        '* She turns the up card face down, then the others, and slides them off the slate.',
-        'Maud: Accepted. ~ Whatever it lands as, it\'s still yours. Same mark. Same name. Same Bond. That\'s the bit that matters, and it\'s the bit nobody can roll.',
-      ] },
-    ] },
+    // FE-14: after a Reroll the cursor rests on Accept (no loop by mashing confirm)
+    { op: 'if', cond: { flag: PRACTICE_ROLLED },
+      then: [{ op: 'choice', prompt: PRACTICE_PROMPT, defaultIndex: 2, options: practiceOptions() }],
+      else: [{ op: 'choice', prompt: PRACTICE_PROMPT, options: practiceOptions() }] },
     flag('sp.reroll-taught'),
     'Maud: The salt\'s yours to spend once you\'ve a seal. Not before; Hollis\'s rule, not mine. Till then, the table is free. Same lesson, no chance of a bill. ~ Spire\'s up the meadow.',
     'Maud: Confirm?',

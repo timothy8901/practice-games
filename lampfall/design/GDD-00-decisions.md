@@ -89,7 +89,7 @@ Folder `lampfall/`, save prefix `lampfall.`, `config.TITLE = 'Lampfall'`.
 
 | # | Isle | Short way (tide) | Long way (any tide) | Wild Lv | Spire · leader · theme · ace | Waystone | Holds |
 |---|---|---|---|---|---|---|---|
-| 1 | **Lowmoor** | stepping stones from the point flats (±2 h) | river footbridge + marsh boardwalk | 3–8 | **Turn** · Maud Tallis (greylag goose) · posted scripted Shifts · Bilgebob Lv10 | Brackenford | tide flats, marsh, the old ferry pavilion, Maud's practice table, Linnet's rematch stones; Sloshkin, Scrapling, Reedkit, Tossup, Puddlepip, Wirewhisk, Mudfist |
+| 1 | **Lowmoor** | stepping stones from the point flats (±2 h) | river footbridge + marsh boardwalk | 3–8 | **Turn** · Maud Tallis (greylag goose) · posted scripted Shifts · Bilgebob Lv9 | Brackenford | tide flats, marsh, the old ferry pavilion, Maud's practice table, Linnet's rematch stones; Sloshkin, Scrapling, Reedkit, Tossup, Puddlepip, Wirewhisk, Mudfist |
 | 2 | **Cairnhold** | causeway from Lowmoor (±2.5 h) | quarry road | 9–14 | **Ward** · Osric Penhallow (tortoise) · Wards · Prismoth Lv16 | Knapp's End | quarry, standing stones, the Mooring clinic (stones, Still Knots, Crackdust), the memorial; Prismoth (first Ward; none before here), Chillnub, Mothling, Cairnward (rare) |
 | 3 | **Emberstep** | stepping stones from Cairnhold (±2 h) | cliff path | 15–20 | **Weather** · Ines Calloway (crested newt) · posted 3-turn weather · Emberjaw Lv22 | Sulphur Cross | volcano, spa terraces; Sootling, Sedgehare, Rayling; **Squallcoil** (first Errant) roams |
 | 4 | **Drownwood** | causeway from Emberstep (±2.5 h) | mangrove boardwalk | 22–27 | **Hollow** · Wendel Teague (grebe boatwright) · immunities · Hulkwight Lv29 | Mossgate | drowned forest, stilt town, the drowning street, Scatter rescue, Anchor Pulse misfire; Creelwight (Tamsin's nameboard), Bilgebob, Rushling, Rustcreel, Duskwisp |
@@ -231,7 +231,7 @@ Folder `lampfall/`, save prefix `lampfall.`, `config.TITLE = 'Lampfall'`.
 | Fossils / relics / shore finds | 300–1,500 / 300–1,500 / 100–400 | ~4 cracks a day; 3 sparkles per low; Barnaby buys duplicates; cleaned +40% |
 | Skyglass relic | 1 Starsalt at the Raft, or 900◉ to Barnaby | max 3 per night low |
 | Route trainer | 50 × highest level | once each |
-| Spire win | 200 × ace (2,000 / 3,200 / 4,400 / 5,800 / 7,200 / 8,600) + 3 Starsalt | once |
+| Spire win | 200 × ace (1,800 / 3,200 / 4,400 / 5,800 / 7,200 / 8,600) + 3 Starsalt | once |
 | **Spire share** | 10% of the loan currently open, notched onto Wren's ledger | once per badge |
 | Porch Duel | 30 × curve level | 3 a day |
 | Errant beaten or caught | 2 Starsalt + 1,500 | each returns the next day |
@@ -677,7 +677,7 @@ The integration, three fix waves and the final fix pass changed these rulings. E
 - **KO EXP** goes to whoever was standing at each KO, even if they faint later or the battle is lost; Relay sitters get the bench share.
 - **Pip's team** is Tossup Lv2 (Tap) then Wirewhisk Lv4 (200◉): the first trainer takes 3–4 turns and a Read pays. Night-one EXP is 436, so the Lv8 window still opens on day 2.
 - **Capture odds in the tutorial.** Corin says "about a third while it is fresh, nearly sure at a sliver; every miss raises the next try", which is what the Lantern shows (33% fresh, 95% at a sliver under the Stance). The reeds Tossup fights with Settle only so the lesson is safe, and the lesson repeats until a Tossup is held or the player says Later.
-- **Linnet's dock.** Her Sootling Shifts on entry (posted Up 100%), for every starter. The strip reads "Stand as long as you can"; the battle records whether you held or fell and Corin's line follows it.
+- **Linnet's dock.** Her Sootling Shifts on entry (posted Up 100%), for every starter. Corin says "You are not meant to win. Stand as long as you can; three turns is a hold." and the strip reads "Stand as long as you can"; the battle records whether you held or fell and Corin's line follows it.
 - **Story battles leave the party healed**, and the hold-out pays its 100 EXP however it ends.
 - **Catches** always join with at least one damaging move.
 - **A Shift teaches one move** when the creature keeps no damaging move of its new form's types: that form's latest damaging same-type learnset move at or below its level (into a free slot, or over the last non-Heartmark move, which goes to Memory). The Forecast result names it; Barnaby's Archive desk teaches Memory moves back.
@@ -685,7 +685,12 @@ The integration, three fix waves and the final fix pass changed these rulings. E
 - **Ward sentinels** are wild-style exhibitions with their own stone art: no capture, nothing lost; a loss heals the party in place.
 - **Relay:** a pick screen before every round (round 1 included) with the satchel available between rounds.
 - **Summit:** losses are never blackouts. Drift/Flux: the Bell restores the party as that fight began and offers "Keep my place" or "Start again from the first Keeper" while a climb is under way. Freefall: party healed, Keepers stand again, back to the Keepers' Hall door. After each Keeper win every move regains 5 PP (no heal), and a slip says so. The climb must go in order: a Keeper or Idris challenged out of turn starts no battle.
-- **Badge gifts** (Scouting Prism, Weatherglass, Plumbline disc) arrive once, at the first win; the seal slip says a gift waits and the leader hands it over.
+- **Badge gifts** (Scouting Prism, Weatherglass, Plumbline disc) arrive once, at the first win; the seal slip says a gift waits and the leader hands it over, with one "Received: <gift>" toast at that moment.
+- **Memory relearn is a fairness tool.** Barnaby's desk teaches back any move in a creature's Memory, free, whatever its current form's learnset holds; the one exception is a signature move whose species is not the creature's current form (it comes back when the creature is that form again). A Shift that parks a move says so on the Forecast result ("Knuckle went to Memory: Barnaby can teach it back."), and the Turn Spire dossier points to the desk. *Why:* a Down-Shifted Scrapling (now a Kiln Sootling) lost Knuckle, the one move that beats the Brine Turn Spire, and could never get it back.
+- **Turn Spire: Maud's Bilgebob is Lv9**, so Lowmoor's posted curve (ace − 3) reads **6**, not 7; her prize is 1,800◉ and the first Porch Duel purse 180◉. Tibby (optional, night) is Lv7/7/7. *Why:* in the real engine (400 runs each), a Down-Shifted Sootling Lv8 that relearned Knuckle plus the reeds Tossup won 0.3–7% against a Lv10 ace and 28% (Tossup Lv6) to 47% (Tossup Lv7) against Lv9; at Sootling Lv10, 37–59%. The on-curve party wins 83% (band 55–85%). Lowmoor parties now reach the door 5–6 over its curve, which the progression check allows at this one door.
+- **The Reading's offer** is the Forecast card view: the three Ring cards (Light, Tide, Dark Water; a Reroll brings new faces) with the dial's steadied odds, Anchor and Reroll free. Accept flips the card that lands, names the ring the Passenger settles into, and the Seed Card records it (`np.keeper.reading-ring`). The battle's last posted strip uses the same Ring names.
+- **Shift windows after a battle:** "Open now?" is offered only after a battle that was not lost, and only for a creature still standing; any other window waits for the next Waystone or home.
+- **The Summit order is checked before the Challenge prompt:** a Keeper or Idris out of turn refuses at once ("The climb goes in order: Bastien Kell first."), and the Keepers' Hall north door stays shut until both Keepers are beaten.
 
 **Clock, story and saves**
 - **Real Clock** keeps a run-relative day (day 1 = the arrival) and a saved `clock.realOffset`, so the Glint and day-gated story behave as on the other day lengths and days between sessions count. The weekday and spring tide follow the run calendar, not the device's weekday, so the first Lantern Market is always day 7. Save v7 rebased older Real Clock saves.

@@ -145,7 +145,7 @@ Grouped by family. *Sprite* = drawn in `proto/creatures/sprites.js` (key by form
 
 | id | Name | Stage | Types | Ability | Sprite | Role / facts |
 |---|---|---|---|---|---|---|
-| `bilgebob` | Bilgebob | 1 | Brine | `sodden` | — | F1 creature; Turn Spire ace Lv10; Augusta's; hooked on any reach; must not read as Wailmer/Cetoddle |
+| `bilgebob` | Bilgebob | 1 | Brine | `sodden` | — | F1 creature; Turn Spire ace Lv9; Augusta's; hooked on any reach; must not read as Wailmer/Cetoddle |
 | `brinelance` | Brinelance | 2 | Brine/Rime | `last-ebb` | yes | accidental Shift hero; signature Gnash |
 
 ### Creelwight line (`creelwight`)
@@ -486,7 +486,7 @@ Retired: `prism-ward` (merged into `glasshide`, GDD-00 §8).
 | Region id | Name | Posted curve level |
 |---|---|---|
 | `pellwick` | Pellwick | 4 |
-| `lowmoor` | Lowmoor | 7 |
+| `lowmoor` | Lowmoor | 6 |
 | `cairnhold` | Cairnhold | 13 |
 | `emberstep` | Emberstep | 19 |
 | `drownwood` | Drownwood | 26 |
@@ -536,7 +536,7 @@ Retired: `prism-ward` (merged into `glasshide`, GDD-00 §8).
 
 | Spire / badge id | Name | Isle | Leader | Theme | Ace | Badge unlock |
 |---|---|---|---|---|---|---|
-| `turn` | Turn Spire | `lowmoor` | `maud` | posted scripted Shifts | bilgebob Lv10 | B1: Reroll + 3 Starsalt; chip disc guaranteed in stock |
+| `turn` | Turn Spire | `lowmoor` | `maud` | posted scripted Shifts | bilgebob Lv9 | B1: Reroll + 3 Starsalt; chip disc guaranteed in stock |
 | `ward` | Ward Spire | `cairnhold` | `osric` | Wards | prismoth Lv16 | B2: Lantern-paths, free ferry, Skyglass Wicks |
 | `weather` | Weather Spire | `emberstep` | `ines` | posted 3-turn weather | emberjaw Lv22 | B3: Scouting Prism, Ethers stocked |
 | `hollow` | Hollow Spire | `drownwood` | `wendel` | immunities | hulkwight Lv29 | B4: Recall; one coverage disc face-up |
@@ -603,7 +603,7 @@ Route payout = 50 × highest level; mandatory route trainers stay inside their i
 | `lowmoor-dunlin` | Dunlin *inv.* | Mudlarker | `lowmoor` | `mudfist` | 7 | 2: Lv6-7 |  |
 | `lowmoor-colm` | Colm *inv.* | Ferry Hand | `lowmoor` | `puddlepip` | 7 | 2: Lv6-7 | optional (declinable) |
 | `lowmoor-perrin` | Perrin *inv.* | Marsh Walker | `lowmoor` | `sloshkin` | 8 | 2: Lv7-8 |  |
-| `lowmoor-tibby` | Tibby *inv.* | Pavilion Regular | `lowmoor` | `wirewhisk` | 9 | 3: Lv7-9 | optional |
+| `lowmoor-tibby` | Tibby *inv.* | Pavilion Regular | `lowmoor` | `wirewhisk` | 7 | 3: Lv7 | optional |
 | `cairnhold-ruddock` | Ruddock *inv.* | Quarryman | `cairnhold` | `knuckleback` | 12 | 2: Lv11-12 |  |
 | `cairnhold-prudence` | Prudence *inv.* | Mooring Clerk | `cairnhold` | `chillnub` | 12 | 2: Lv11-12 | first mandatory Ward (Stillcoat); Crackdust stocked first |
 | `cairnhold-jory` | Jory *inv.* | Stonecutter | `cairnhold` | `siltback` | 13 | 3: Lv11-13 |  |
@@ -630,7 +630,7 @@ Route payout = 50 × highest level; mandatory route trainers stay inside their i
 | `rimeholt-sunniva` | Sunniva *inv.* | Mirror Polisher | `rimeholt` | `lumenveil` | 41 | 4: Lv38-41 | optional; Ward (Mirrorveil) preview |
 | `rimeholt-aldous` | Aldous *inv.* | Frost Hermit | `rimeholt` | `caldermaw` | 42 | 4: Lv39-42 | optional |
 | `pip` | Pip | Dock Hand | `pellwick` | `wirewhisk` | 4 | 1: Lv4 | night one, 21:30; pays 200 |
-| `maud-spire` | Maud Tallis | Spire Leader | `spire-turn` | `bilgebob` | 10 | 2: Lv8-10 | two posted scripted Shifts; 2,000 + 3 Starsalt |
+| `maud-spire` | Maud Tallis | Spire Leader | `spire-turn` | `bilgebob` | 9 | 2: Lv8-9 | two posted scripted Shifts; 1,800 + 3 Starsalt |
 | `osric-spire` | Osric Penhallow | Spire Leader | `spire-ward` | `prismoth` | 16 | 3: Lv14-16 | Ward sentinels; 3,200 |
 | `ines-spire` | Ines Calloway | Spire Leader | `spire-weather` | `emberjaw` | 22 | 3: Lv20-22 | posted 3-turn weather; 4,400 |
 | `wendel-spire` | Wendel Teague | Spire Leader | `spire-hollow` | `hulkwight` | 29 | 3: Lv27-29 | Hollow, immune to Plain and Grit; 5,800 |

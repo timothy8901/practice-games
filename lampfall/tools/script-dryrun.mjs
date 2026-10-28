@@ -146,7 +146,7 @@ export function staticFindings(id, ops, data, env) {
       const m = data.get('maps', op.mapId);
       if (!(op.x >= 0 && op.y >= 0 && op.x < m.w && op.y < m.h)) out.push({ kind: 'unknown-id', msg: `${at}: warp (${op.x},${op.y}) is outside map '${op.mapId}'` });
     }
-    if (op.op === 'forecast' && !(typeof op.who === 'string' && /^player:c\d+$/.test(op.who))) out.push({ kind: 'unknown-id', msg: `${at}: forecast who '${op.who}' is not a party uid (player:cN)` });
+    if (op.op === 'forecast' && !(typeof op.who === 'string' && (/^player:c\d+$/.test(op.who) || op.who === 'reading'))) out.push({ kind: 'unknown-id', msg: `${at}: forecast who '${op.who}' is not a party uid (player:cN) or 'reading'` });
     if (op.op === 'choice') (op.options ?? []).forEach((o, k) => {
       if (o && typeof o.goto === 'string' && Array.isArray(o.then) && o.then.length) out.push({ kind: 'dead-end', msg: `${at}: choice option ${k} has both goto and then; the runner jumps to '${o.goto}' and never runs then` });
     });

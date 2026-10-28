@@ -148,7 +148,7 @@ const PORCH_SCALE = Object.freeze({ by: 'party-median', sizeByBadges: Object.fre
 
 /** @type {ReadonlyArray<Readonly<import('./index.js').Trainer>>} */
 export const TRAINERS = Object.freeze([
-  // ===== Lowmoor (curve 7; day wilds 3-8, night 5-10). No Wards. =====
+  // ===== Lowmoor (curve 6; day wilds 3-8, night 5-10). No Wards. =====
   trainer({
     id: 'lowmoor-osier', name: 'Osier', title: 'Reed Cutter', class: 'route', sprite: 'trainerVest', kind: 'harvest mouse',
     map: 'lowmoor', post: 'lowmoor-reed-beds', postName: 'the reed beds below the stepping stones', region: 'lowmoor', band: 'day',
@@ -196,7 +196,7 @@ export const TRAINERS = Object.freeze([
   trainer({
     id: 'lowmoor-tibby', name: 'Tibby', title: 'Pavilion Regular', class: 'route', sprite: 'trainerVest', kind: 'dormouse',
     map: 'lowmoor', post: 'lowmoor-pavilion-bench', postName: 'the bench inside the old ferry pavilion', region: 'lowmoor', band: 'night', declinable: true,
-    party: [mon('tossup', 7, ['tap', 'sure-pinch', 'settle']), mon('scrapling', 8, ['tap', 'knuckle', 'shadowbox']), mon('wirewhisk', 8, ['arc-ping', 'fizz', 'tap'])],
+    party: [mon('tossup', 7, ['tap', 'sure-pinch', 'settle']), mon('scrapling', 7, ['tap', 'knuckle', 'shadowbox']), mon('wirewhisk', 7, ['arc-ping', 'fizz', 'tap'])],
     tacticTag: 'three-deep; Wirewhisk pings your moves first',
     lines: {
       intro: 'I have sat on this bench every evening for eleven years. Three creatures. No waiting. Unless you would rather not.',
@@ -522,7 +522,7 @@ export const TRAINERS = Object.freeze([
     map: 'spire-turn', post: 'spire-turn-dais', postName: 'the Turn Spire dais', region: 'lowmoor', spire: 'turn',
     party: [
       mon('puddlepip', 8, ['tap', 'salt-spray', 'settle'], { bossShift: sureShift(1, 2, 'up', 'sloshkin') }),
-      mon('bilgebob', 10, ['tap', 'salt-spray', 'gnash'], { bossShift: dialShift(1, 2, 'brinelance', 'rushling', 'puddlepip') }),
+      mon('bilgebob', 9, ['tap', 'salt-spray', 'gnash'], { bossShift: dialShift(1, 2, 'brinelance', 'rushling', 'puddlepip') }),
     ],
     items: heal('salve'),
     ai: 'spire', payoutRule: 'ace', expSource: 'spire',
@@ -739,6 +739,9 @@ export const TRAINERS = Object.freeze([
       lose: 'Patience, Keeper. The Bell will hold your place.',
       // Freefall: the Bell keeps nothing (LF-22)
       loseFreefall: 'Patience, Keeper. The Bell keeps nothing on this dial; the climb starts at my door again.',
+      // a Porch Duel after the Summit (visitor, setup.porchDuel): no Bell, no climb, no gift
+      duelWin: 'You counted, even on a porch. The fleet would have liked you.',
+      duelLose: 'Porch rules: nothing lost. Patience still wins, now and then.',
     },
   }),
   trainer({
@@ -760,6 +763,8 @@ export const TRAINERS = Object.freeze([
       win: 'It stuck. Go on through. He has been waiting a long time; be gentle with him.',
       lose: 'Blown clean off the stack. The Bell rings for you; come back up.',
       loseFreefall: 'Blown clean off the stack. The Bell keeps nothing today: back down, and start at Bastien.',
+      duelWin: 'No squall on a porch, and you still read me. Fair.',
+      duelLose: 'Blown off a porch step. Nothing lost; sit down, have the good chair.',
     },
   }),
   trainer({
@@ -782,6 +787,8 @@ export const TRAINERS = Object.freeze([
       win: 'You read it. All of it. I think... I think it is time I took the ring off.',
       lose: 'Thank you. Truly. The Bell will hold your place. I will be here; I am always here.',
       loseFreefall: 'Thank you. Truly. The Bell keeps nothing on this dial; climb again. I will be here; I am always here.',
+      duelWin: 'Read again, on a porch, under a lamp you lit. I am glad I took the ring off.',
+      duelLose: 'A porch game, nothing on it. It is good to play one for nothing.',
     },
   }),
 

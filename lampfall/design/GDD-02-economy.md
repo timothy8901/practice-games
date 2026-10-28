@@ -55,7 +55,7 @@ All amounts from GDD-00 §7; where the source is a system, the tuning key is nam
 | Fossils / relics / shore finds | 300–1,500 / 300–1,500 / 100–400 | ~4 cracks a day, 3 sparkles per low; cleaned +40% | GDD-05; `cracksPerDay`, `sparklesPerLow`, `findCleanMult` |
 | Skyglass relic | 1 Starsalt at the Raft, or 900◉ to Barnaby | max 3 per night low | `relicStarsaltRate`, `relicBarnabyPrice`, `skyglassPerNightLow` |
 | Route trainer | 50 × highest level | once each | `payoutPerLevel` (engine) |
-| Spire win | 200 × ace + 3 Starsalt (2,000 / 3,200 / 4,400 / 5,800 / 7,200 / 8,600) | once | `spireWinPerAce`, `spireAceLevels`, `spireWinStarsalt` |
+| Spire win | 200 × ace + 3 Starsalt (1,800 / 3,200 / 4,400 / 5,800 / 7,200 / 8,600) | once | `spireWinPerAce`, `spireAceLevels`, `spireWinStarsalt` |
 | **Spire share** | 10% of the open loan, notched on Wren's ledger | once per badge | `spireShareFraction` |
 | Porch Duel | 30 × curve level | 3 a day | `porchDuelPerCurve`, `porchDuelsPerDay` |
 | Errant beaten or caught | 1,500 + 2 Starsalt | each returns the next day | `errantButtons`, `errantStarsalt` |
@@ -75,7 +75,7 @@ GDD-00's targets, which the economy sim reads from `tuning.dailyIncomeTargets`:
 | Days | Gross a day | Typical mix (24-minute day) |
 |---|---|---|
 | 1 | 3,000 + 3,000 errands | 18 fruit (2,160), a purse (300), a nest (350), a perch, Pip (200); Ludo buys the lot |
-| 2–3 | 8,000 | orchard sweep (~3,000), the Glint (~640), two purses, quay fish, Lowmoor trainers (~350 each), badge 1 (2,000) |
+| 2–3 | 8,000 | orchard sweep (~3,000), the Glint (~640), two purses, quay fish, Lowmoor trainers (~350 each), badge 1 (1,800) |
 | 4–6 | 15,000 | orchard + a graft, the Glint, Cairnhold trainers (~550–700 each), a Porch Duel (~300), night fish, Wanted Today |
 | 7–9 | 25,000 | foreign fruit begins, Emberstep trainers (~900), Errant (1,500), Porch Duels (~600), John Dory at the night low (2,400) |
 | 10–12 | 35,000 | three trainers (~1,350 each), foreign orchard, Porch Duels (~800), two John Dory and a wolffish (~9,000) |

@@ -81,7 +81,7 @@ Smaller findings: sentinels used the plain standing-stone art and said "came out
 
 ## The final fix pass
 
-Two fix lanes (core and rest) worked through both lists, each followed by an independent verifier who re-checked the fixes in the browser. Full gate after the pass: `bash tools/check.sh` reports **CHECK OK, 4,765 tests passing in 188 files, 0 failing**.
+Two fix lanes (core and rest) worked through both lists, each followed by an independent verifier who re-checked the fixes in the browser. Full gate after the first pass: `bash tools/check.sh` reported **CHECK OK, 4,765 tests passing in 188 files, 0 failing**. The second pass's gate result is given at the end of this document.
 
 **Fixed and checked in the browser**
 
@@ -99,15 +99,26 @@ Two fix lanes (core and rest) worked through both lists, each followed by an ind
 - Pause-menu Ledger payments include the room choice; the Lamp Room payoff asks no roof colour.
 - Sentinel art and labels; sentinel and Spire intro lines; Tide Table card icons; Seed Card caption; Hollow wreck post; chip words for every verb; 12-hour bed clock with unavailable rests greyed out; stamps batched into one toast with a quiet NEW tag in the Journal; text on the ruled lines; the bedsit void is transparent; Day Page names each Shift's form and notes a lost fight.
 
-**Done in code, not fully wired**
+**Second fix pass (residual items), checked in the browser on port 8871 with no page or console errors**
 
-- **The Reading's last offer:** the Forecast scene has a Reading mode (Ring cards with odds, Accept / Anchor / Reroll, the landed ring named), but the ending script still uses its dialogue choice, so the cards are not shown yet.
-- **Badge gifts:** the early toast is gone and the seal slip says "A gift waits", but the gift is already in the satchel, so the leader's handover scene skips its `give` and shows no "Received" line.
-- **Linnet's hold-out:** the strip and tactic tag now say "Stand as long as you can"; Corin's after-fight line was not reworded. A Reedkit still always falls on turn 1–2.
+- **Memory relearn is a fairness tool** (GDD-00 §18): Barnaby's desk teaches back any Memory move except another form's signature. A Sootling that lost Knuckle in a Down-Shift sees Knuckle at the desk and relearns it free. A Shift that parks a move says so on the Forecast result ("Knuckle went to Memory: Barnaby can teach it back."); a parked signature (Shadowbox on a Tossup) is not promised. The Turn dossier points to the desk.
+- **Turn Spire:** Maud's Bilgebob is now Lv9, so Lowmoor posts curve 6 (prize 1,800◉; Tibby 7/7/7). In the real engine (400 runs each), a Down-Shifted Sootling Lv8 with Knuckle relearned plus the reeds Tossup wins 28% (Tossup Lv6) to 47% (Tossup Lv7), and 37–59% at Sootling Lv10. Against the old Lv10 ace it was 0.3–10%. The on-curve party wins 83%.
+- **The Reading's offer** is the Forecast card view: three Ring cards with the dial's steadied odds, Anchor and Reroll free. A Reroll brings new faces (Ember, Reeds, Gale). Accept flips the card that lands, the script names it ("The Ring of the Reeds lands. The Passenger settles into it…"), and the Seed Card shows it under *The Reading*. Phase 6's posted strip now uses the same Ring names.
+- **Badge gifts:** the leader's handover shows exactly one "Received: Scouting Prism" toast, and only one Prism is in the satchel.
+- **Linnet's dock:** Corin now says "You are not meant to win. Stand as long as you can; three turns is a hold."
+- **Maud's practice table:** after a Reroll the cursor rests on Accept, and each Reroll turns the next of four practice hands, so no two hands in a row match.
+- **Summit order:** Z on Cass before Bastien toasts "The climb goes in order: Bastien Kell first." with no Challenge prompt. The Keepers' Hall north door says "The door to Idris stays shut. The climb goes in order: both Keepers first." until both Keepers are beaten.
+- **Shift windows after a battle:** a lost battle, or a creature that fainted in it, no longer gets "Open now?". The window waits for the next Waystone or home. Covered by unit tests.
+- **HUD and prompts:** the NEXT chip re-reads the objective on flag, loan, commons and counter events and when a menu closes. It drops a "Next seal:" prefix. The Spire challenge body capitalises the tactic tag ("Posted scripted Shifts, one sure, one rolled.").
+- **Text in data:** the battle engine's event lines, refusal reasons and outcome lines, and the battle scene's Forecast strip and weather label, now come from `battle.msg.*` in `js/data/strings.js`. The Summit Keepers and Idris have Porch Duel lines.
 
 **Still open**
 
-- The Turn Spire is hard for a Kiln lead against Maud's Brine team (the double Shift that caused it in Run 1 can no longer happen).
-- Maud's practice table: Reroll is the default, so mashing Confirm loops "Again?", and every reroll shows the same faces.
 - The Dorrows' "house" is a lamp on the cliff stair; its door tile is cliff.
+- Turn Spire with a Down-Shifted starter: 28% when the reeds Tossup is still Lv6, below the ~35% aim. It reaches 47% with a Lv7 Tossup, or 37% with a Lv10 Sootling. Lowmoor parties now reach the door 5–6 levels over its posted 6.
+- The capture naming keyboard and the lease card's keyboard are still two layouts (Caps/no digits vs abc/digits); both now default to Yes.
+- The NEXT chip's instant refresh is checked in code and unit tests, not timed in the browser.
+- Carried polish: same-coloured neighbouring roofs; no blanket rule keeping NPCs off chokepoints; a cleaned fossil's shop price leaves out the +40% (the payout is right); a batched stamp toast can sit over a menu's top row.
 - Not covered by either run: a full natural campaign from Day 3 to the Relighting in one save, physical touch and controller hardware, and browsers other than Chromium. In-game music is about 4 dB quieter after the audio pass and should be checked by ear.
+
+**Gate after the second fix pass:** `bash tools/check.sh` reports **CHECK OK, 4,787 tests passing in 189 files, 0 failing**. All six gate tools are clean: validate-data, validate-content, lint-owners, lint-art (char advisory only), smoke-import and script-dryrun (327 scripts, 1,201 paths).

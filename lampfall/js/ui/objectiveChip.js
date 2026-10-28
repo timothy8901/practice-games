@@ -137,6 +137,18 @@ export function createObjectiveChip(o = {}) {
 }
 
 /**
+ * The chip's line under its own "Next:" label: a line that starts "Next seal:" / "Next:" drops that
+ * prefix so the chip never reads "NEXT: Next seal: Ward Spire…" (LF-22). Pure.
+ * @param {string} line
+ * @returns {string}
+ */
+export function chipBody(line) {
+  const s = typeof line === 'string' ? line : '';
+  const out = s.replace(/^\s*next(\s+seal)?\s*:\s*/i, '');
+  return out ? out.charAt(0).toUpperCase() + out.slice(1) : s;
+}
+
+/**
  * Draws the chip: a slim paper strip at (x, y), "Next:" in amber-ink and the line, clipped to `maxW`.
  * @param {CanvasRenderingContext2D} ctx
  * @param {string} line
@@ -149,9 +161,10 @@ export function drawObjectiveChip(ctx, line, o = {}) {
   const label = t('menu.next');
   const lw = measureText(label, { font: 'small' }).w;
   const maxW = o.maxW ?? 300;
-  let body = line;
+  const full = chipBody(line);
+  let body = full;
   while (body.length > 4 && measureText(body).w + lw + 16 > maxW) body = body.slice(0, -2);
-  if (body !== line) body = `${body.replace(/\s+$/, '')}…`;
+  if (body !== full) body = `${body.replace(/\s+$/, '')}…`;
   const w = 4 + 6 + 3 + lw + 4 + measureText(body).w + 5;
   const h = 13;
   const x = Math.round((o.x ?? 4) - (1 - a) * 12);

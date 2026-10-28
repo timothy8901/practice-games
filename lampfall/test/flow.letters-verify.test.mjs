@@ -81,7 +81,7 @@ describe('a neighbour\'s Porch Duel is won once an evening', () => {
     assert.equal(G.world.wallet.main, before, 'a loss pays nothing');
     assert.equal(G.world.flags[`sys.duel.${npc}`], true, 'a lost friendly duel can be tried again tonight');
     G.bus.emit('battle:end', { outcome: 'win', kind: 'trainer', trainerId: trainer, porchDuel: true });
-    assert.equal(G.world.wallet.main - before, 210, 'the purse, once');
+    assert.equal(G.world.wallet.main - before, 180, 'the purse, once');
     assert.equal(G.world.flags[`sys.duel.${npc}`], undefined, 'the topic flag is cleared');
     assert.ok(duelSlipLines(G).some((l) => l.includes('fought')), 'the slip shows it fought');
     at(G, 6, 0, 20);
@@ -89,7 +89,7 @@ describe('a neighbour\'s Porch Duel is won once an evening', () => {
     G.bus.emit('world:replaced', { world: G.world });
     assert.equal(G.world.flags[`sys.duel.${npc}`], undefined, 'a reload does not re-post a won duel');
     G.bus.emit('battle:end', { outcome: 'win', kind: 'trainer', trainerId: trainer, porchDuel: true });
-    assert.equal(G.world.wallet.main - before, 210, 'no second purse the same evening');
+    assert.equal(G.world.wallet.main - before, 180, 'no second purse the same evening');
     off();
   });
 });

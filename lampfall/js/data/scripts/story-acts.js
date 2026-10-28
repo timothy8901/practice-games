@@ -19,6 +19,7 @@
 
 import { mk, tp, warpTo, camHome, flag, sfx, END } from './_stage.js';
 import { SPIRE_BY_ID } from '../spires.js';
+import { ITEMS } from '../items.js';
 
 /**
  * The six Spires' entry and badge lines. `'warp'` steps outside onto the isle's `spire-step` with
@@ -117,6 +118,16 @@ function spireEnter(id) {
   ];
 }
 
+/**
+ * The handover toast for a badge gift: "Received: Scouting Prism", "Received: Plumbline disc".
+ * @param {string} item
+ * @returns {string}
+ */
+export function receivedText(item) {
+  const name = ITEMS.find((r) => r.id === item)?.name ?? item;
+  return `Received: ${/^Disc: /.test(name) ? `${name.slice(6)} disc` : name}`; // str
+}
+
 /** @param {string} id */
 function spireBadge(id) {
   const s = SPIRE_BY_ID[id];
@@ -125,7 +136,10 @@ function spireBadge(id) {
     if (line === 'warp') ops.push(warpTo(s.isle, 'spire-step', 'down'), tp('corin', s.isle, 'spire-step', 1, 0));
     else if (typeof line === 'string' && line.startsWith('give:')) {
       const item = line.slice(5);
-      ops.push({ op: 'if', cond: { not: { hasItem: item } }, then: [{ op: 'give', item, n: 1 }] });
+      // the one announcement of a badge gift is here, at the handover (LF-15): battleFlow grants it at
+      // the win without a toast (the slip says a gift waits), so a held gift is only announced
+      const toast = { op: 'toast', text: receivedText(item) };
+      ops.push({ op: 'if', cond: { not: { hasItem: item } }, then: [{ op: 'give', item, n: 1 }, toast], else: [toast] });
     } else ops.push(line);
   }
   // GDD-00 §11: Act I ends at badge 1 (or day 4 dawn). The badge:won event plays only this Spire's

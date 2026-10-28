@@ -35,12 +35,16 @@ import { DEFAULTS as ABILITY_DEFAULTS } from './abilityHooks.js';
 import { DEFAULTS as CREATURE_DEFAULTS, gainExp as defaultGainExp, isFainted, hpRatio, recomputeStats } from './creatureOps.js';
 import { DEFAULTS as DATA_DEFAULTS, createBattleData } from './data.js';
 import { readCreature } from './read.js';
+import { t as tString } from '../data/strings.js';
 import {
   DEFAULTS as WEATHER_DEFAULTS, indexWeatherKinds, cycleProblems, cycleKindAt, cycleTurnsLeft, weatherSchedule,
   weatherPowerMult, weatherChip, weatherWord,
 } from './weather.js';
 
 export { stageMult, critChance, damageFormula, captureOdds, captureBand, catchUpMult } from './effects.js';
+
+/** A battle line from data/strings.js (`battle.msg.<key>`): the engine keeps no inline text. */
+const msg = (key, vars) => tString(`battle.msg.${key}`, vars);
 export { readCreature, readCard, dossier } from './read.js';
 
 // ---------------------------------------------------------------------------
@@ -482,8 +486,8 @@ export class Battle {
     /** @type {Array<{side: 0|1, uid: any, item: string}>} held items used up this battle */
     this.consumedItems = [];
     this._initWeather(opts);
-    this._emit({ type: 'message', text: this.kind !== 'wild' ? `${this.sides[1].trainer.name} wants to battle.` // str
-      : this.readingPhases ? `The ${this.active(1).nickname} settles on the Lantern Stack. Its mark is already glowing.` : `A wild ${this.active(1).nickname} appeared.` }); // str
+    this._emit({ type: 'message', text: this.kind !== 'wild' ? msg('trainerIntro', { trainer: this.sides[1].trainer.name })
+      : this.readingPhases ? msg('readingArrive', { name: this.active(1).nickname }) : msg('wildIntro', { name: this.active(1).nickname }) });
     /** onEntry weather of the opening send-ins, applied once both leads are out. */
     this._openingEntries = [];
     for (const side of this.sides) this._sendIn(side.index, side.active, true);
@@ -543,7 +547,7 @@ export class Battle {
     // the Reading's Ward phase (THE_READING phase 2 `rule.ward`): a lattice over the whole body
     const ward = side === 1 ? this._readingRule('ward') : null;
     // Crackdust brings the lattice down like any Ward (the Ward Spire's lesson): its own ability shows through
-    if (ward && typeof ward === 'object' && !(this.sides[side].vol.wardSuppressed > 0)) return { ...ability, id: 'reading-lattice', name: 'The Lattice', ward: { ...ward } }; // str
+    if (ward && typeof ward === 'object' && !(this.sides[side].vol.wardSuppressed > 0)) return { ...ability, id: 'reading-lattice', name: msg('latticeName'), ward: { ...ward } };
     if (isWard(ability) && this.sides[side].vol.wardSuppressed > 0) return null;
     return ability;
   }
@@ -724,7 +728,7 @@ export class Battle {
       // blocks the latter), so the menu and the AI both see "Blocked by Ward".
       const check = isDamaging(mv) || !isSelfTargeting(mv) ? this._wardCheck(foeAbility, mv, foe.types, type) : { lands: true, reason: null, eff: { mult: 1, word: 'Neutral' } };
       const selectable = m.pp > 0;
-      const reason = selectable ? null : 'No PP left.';
+      const reason = selectable ? null : msg('noPp');
       const word = check.reason === 'ward' ? 'Blocked by Ward' : check.reason === 'immune' ? 'No effect' : isDamaging(mv) ? check.eff.word : null;
       const weatherMult = isDamaging(mv) ? this.weatherPowerMult(type) : 1;
       return {
@@ -732,13 +736,13 @@ export class Battle {
         mult: check.eff.mult, weatherMult, weatherWord: weatherWord(weatherMult), hitChance: this.hitChance(side, mv), heartmark: m.id === c.heartmark,
       };
     });
-    out.scrap = { available: allOut, usable: allOut, name: this.data.scrap.name, reason: allOut ? null : 'Scrap is only available when every move is out of PP.', cost: Math.max(1, Math.floor(c.stats.hp * t.scrapCost)) };
+    out.scrap = { available: allOut, usable: allOut, name: this.data.scrap.name, reason: allOut ? null : msg('scrapOnly'), cost: Math.max(1, Math.floor(c.stats.hp * t.scrapCost)) };
     out.switches = this._switchOptions(side, false);
     const isTrainer = this.kind === 'trainer';
     const canRun = !isTrainer && this.rules.runAllowed;
     out.run = side === 0
-      ? { available: canRun, usable: canRun, reason: isTrainer ? 'You cannot run from a trainer battle.' : canRun ? null : 'You cannot run from this battle.' }
-      : { available: false, usable: false, reason: 'Only the player may run.' };
+      ? { available: canRun, usable: canRun, reason: isTrainer ? msg('noRunTrainer') : canRun ? null : msg('noRunHere') }
+      : { available: false, usable: false, reason: msg('noRunFoe') };
     const readDone = s.readUsed.has(foe.uid);
     out.read = { available: !readDone, usable: !readDone, free: !this.rules.readCostsTurn, costsTurn: this.rules.readCostsTurn, reason: readDone ? `${foe.nickname} has already been Read.` : null };
     if (side === 0 && this.kind === 'wild' && !this.readingPhases && !this.captureBlockReason) {
@@ -753,10 +757,10 @@ export class Battle {
         return { grade: g, name: L.name, price: L.price, odds: exact ? odds : null, band: captureBand(odds, t), stock, selectable, usable: selectable, reason: stock === 0 ? `No ${L.name} left.` : null };
       });
       out.lantern = { available: true, fails, grades, exactOdds: exact };
-      out.captureStance = { on: this.stance, available: true, text: 'Party damage cannot drop the wild creature below 1 HP.' };
+      out.captureStance = { on: this.stance, available: true, text: msg('stanceRule') };
     } else {
-      out.lantern = { available: false, reason: this.readingPhases ? 'The Passenger can be caught after the Reading.' : this.captureBlockReason || (side === 0 ? 'You cannot capture a trainer\'s creature.' : 'Only the player captures.') };
-      out.captureStance = { on: false, available: false, reason: 'Capture Stance is only for wild battles.' };
+      out.lantern = { available: false, reason: this.readingPhases ? msg('noCatchReading') : this.captureBlockReason || (side === 0 ? msg('noCatchTrainer') : msg('noCatchFoe')) };
+      out.captureStance = { on: false, available: false, reason: msg('stanceWildOnly') };
     }
     if (s.bag.crackdust > 0) {
       const why = this._crackdustBlocked(side);
@@ -786,8 +790,8 @@ export class Battle {
   /** @param {number} side @returns {string|null} why Crackdust cannot be thrown now (null when it can) */
   _crackdustBlocked(side) {
     const foe = this.foeOf(side);
-    if (!isWard(this.data.ability(foe.ability)) && !(side === 0 && this._readingRule('ward'))) return `${foe.nickname} has no Ward.`;
-    if (this.sides[1 - side].vol.wardSuppressed > 0) return 'Its Ward is already suppressed.';
+    if (!isWard(this.data.ability(foe.ability)) && !(side === 0 && this._readingRule('ward'))) return msg('noWard', { target: foe.nickname });
+    if (this.sides[1 - side].vol.wardSuppressed > 0) return msg('wardAlreadySuppressed');
     return null;
   }
 
@@ -797,11 +801,11 @@ export class Battle {
     const trapped = !forced && s.vol.trap > 0;
     return s.party.map((c, i) => {
       let reason = null;
-      if (this._readingBenched(side, c)) reason = `${c.nickname} ended the last phase. Someone else reads this one.`; // str
-      else if (i === s.active && !forced) reason = `${c.nickname} is already out.`;
-      else if (isFainted(c)) reason = `${c.nickname} has fainted.`;
-      else if (trapped) reason = `${this.active(side).nickname} is trapped and cannot switch.`;
-      else if (i === s.active && forced) reason = `${c.nickname} has fainted.`;
+      if (this._readingBenched(side, c)) reason = msg('readingBenched', { target: c.nickname });
+      else if (i === s.active && !forced) reason = msg('alreadyOut', { target: c.nickname });
+      else if (isFainted(c)) reason = msg('hasFainted', { target: c.nickname });
+      else if (trapped) reason = msg('trappedNoSwitch', { target: this.active(side).nickname });
+      else if (i === s.active && forced) reason = msg('hasFainted', { target: c.nickname });
       const selectable = reason === null;
       return { index: i, i, name: c.nickname, speciesId: c.speciesId, level: c.level, hp: c.hp, maxHp: c.stats.hp, selectable, usable: selectable, reason };
     });
@@ -848,7 +852,7 @@ export class Battle {
     if (this.kind !== 'wild') throw new BattleError('NO_STANCE', 'Capture Stance is only for wild battles.');
     if (this.phase === 'ended') throw new BattleError('ENDED', 'The battle is over.');
     this.stance = !!on;
-    this._emit({ type: 'stance', on: this.stance, text: this.stance ? 'Capture Stance. Party damage stops at 1 HP.' : 'Capture Stance off.' });
+    this._emit({ type: 'stance', on: this.stance, text: this.stance ? msg('stanceOn') : msg('stanceOff') });
     return this._flush();
   }
 
@@ -874,14 +878,14 @@ export class Battle {
     const s = this.sides[side];
     const foe = this.foeOf(side);
     if (s.readUsed.has(foe.uid)) {
-      this._emit({ type: 'message', side, text: `${foe.nickname} has already been Read.` });
+      this._emit({ type: 'message', side, text: msg('alreadyRead', { target: foe.nickname }) });
       return false;
     }
     s.readUsed.add(foe.uid);
     this.fieldLog.read.add(foe.speciesId);
     const info = readCreature(foe, this.dial, this.data, { prism: this.prism, costsTurn: this.rules.readCostsTurn });
     if (this.rules.wardBadge === 'start') this._revealWard(1 - side, foe);
-    this._emit({ type: 'read', side, target: foe.nickname, source, info, text: `${foe.nickname}: ${info.ability.name}. ${info.ability.text}` });
+    this._emit({ type: 'read', side, target: foe.nickname, source, info, text: msg('read', { target: foe.nickname, ability: info.ability.name, text: info.ability.text }) });
     return true;
   }
 
@@ -911,7 +915,7 @@ export class Battle {
       }
     }
     memo.revealed.set(foe.uid, set);
-    if (revealed.length) this._emit({ type: 'reveal', side, target: foe.nickname, source, moves: revealed, text: `${source}: ${foe.nickname} knows ${revealed.map((id) => this.data.move(id).name).join(', ')}.` });
+    if (revealed.length) this._emit({ type: 'reveal', side, target: foe.nickname, source, moves: revealed, text: msg('reveal', { source, target: foe.nickname, moves: revealed.map((id) => this.data.move(id).name).join(', ') }) });
   }
 
   /**
@@ -926,7 +930,7 @@ export class Battle {
     c.typeIndex = ((c.typeIndex || 0) + 1) % q.length;
     c.types = [q[c.typeIndex]];
     const next = [1, 2].map((k) => q[(c.typeIndex + k) % q.length]);
-    this._emit({ type: 'type-shift', side, who: c.nickname, current: c.types[0], next, text: `${c.nickname} turns ${c.types[0]}. Next: ${next.join(', ')}.` });
+    this._emit({ type: 'type-shift', side, who: c.nickname, current: c.types[0], next, text: msg('typeShift', { target: c.nickname, type: c.types[0], types: next.join(', ') }) });
   }
 
   /** Posted two-turn Reading phases. They are a protected reading, on the battle's normal controls. */
@@ -938,7 +942,7 @@ export class Battle {
     const next = this.readingPhases[(index + 1) % this.readingPhases.length];
     const posted = index + 1 < this.readingPhases.length && next.cards && this._readingPosted === index + 1 ? next.cards.map((k) => ({ ...k, types: k.types.slice() })) : null;
     return { index, name: p.aspect || p.name || p.id, phase: p.name || p.id, types: p.types.slice(), turnsLeft: Math.max(0, (p.turns || 2) - left),
-      next: next.cards ? (posted ? 'Forecast posted' : 'Forecast not yet posted') : next.name || next.id, nextTypes: next.cards ? [] : next.types.slice(), nextCards: posted }; // str
+      next: next.cards ? (posted ? msg('forecastPosted') : msg('forecastNotPosted')) : next.name || next.id, nextTypes: next.cards ? [] : next.types.slice(), nextCards: posted };
   }
 
   /** Card odds (percent) of a Reading phase's posted aspects (its `odds`, or the boss-Shift odds). @param {any} p */
@@ -964,7 +968,7 @@ export class Battle {
     const c = this.active(1);
     const cards = next.cards.map((k, j) => ({ dir: k.dir, form: c.speciesId, name: k.name, types: k.types.slice(), odds: odds[j] }));
     this._emit({ type: 'shift-posted', side: 1, who: c.nickname, uid: c.uid, cards, turnsLeft: view.turnsLeft,
-      text: `Forecast posted for ${next.name || next.id}: ${cards.map((k) => `${k.name} (${k.types.join('/')}) ${k.odds}%`).join(' · ')}.` }); // str
+      text: msg('readingPosted', { name: next.name || next.id, cards: cards.map((k) => `${k.name} (${k.types.join('/')}) ${k.odds}%`).join(' · ') }) });
   }
 
   _setReadingPhase(index) {
@@ -991,18 +995,18 @@ export class Battle {
       const v = this.sides[1].vol;
       if (v.stages.eva > 0) {
         v.stages.eva = 0;
-        this._emit({ type: 'stat', side: 1, target: c.nickname, stat: 'eva', stages: 0, result: 'reset', text: `The decoys fade. ${c.nickname}'s evasion is back to normal.` }); // str
+        this._emit({ type: 'stat', side: 1, target: c.nickname, stat: 'eva', stages: 0, result: 'reset', text: msg('decoysFade', { target: c.nickname }) });
       }
     }
     if (p.rule && Number.isInteger(p.rule.evasion) && p.rule.evasion > 0) this._changeStage(1, 'eva', p.rule.evasion, { bySelf: true });
     c.types = p.types.slice();
-    const head = `Reading ${index + 1}/${this.readingPhases.length}: ${p.name || p.id}${p.aspect ? `, ${p.aspect}` : ''} (${c.types.join('/')}) — ${p.turns || 2} turns.`; // str
+    const head = msg('readingHead', { i: index + 1, n: this.readingPhases.length, name: p.name || p.id, aspect: p.aspect ? `, ${p.aspect}` : '', types: c.types.join('/'), turns: p.turns || 2 });
     this._emit({ type: 'type-shift', side: 1, who: c.nickname, current: c.types.join('/'), types: c.types.slice(), next: next.cards ? [] : next.types.slice(), aspect: p.aspect ?? null,
-      text: index === this.readingPhases.length - 1 && this.readingPhases.some((q) => q.cards) ? `${head} Its last Forecast will be offered to you.` // str
-        : next.cards ? `${head} Its next Forecast posts after ${this.readingPostAt} ${this.readingPostAt === 1 ? 'turn' : 'turns'}.` : `${head} Next: ${next.name || next.id} (${next.types.join('/')}).` }); // str
+      text: index === this.readingPhases.length - 1 && this.readingPhases.some((q) => q.cards) ? `${head} ${msg('readingLastOffer')}`
+        : next.cards ? `${head} ${msg('readingNextPosts', { n: this.readingPostAt })}` : `${head} ${msg('readingNext', { name: next.name || next.id, types: next.types.join('/') })}` });
     // phase rules (THE_READING `rule`)
     const ward = p.rule && p.rule.ward;
-    if (ward && ward.kind === 'min-power') this._emit({ type: 'message', side: 1, text: `A lattice shimmers over the whole body. Hits under ${ward.minPower} power do nothing this phase.` }); // str
+    if (ward && ward.kind === 'min-power') this._emit({ type: 'message', side: 1, text: msg('lattice', { n: ward.minPower }) });
     this._readingBench = null;
     if (p.rule && p.rule.noRepeatLead) {
       const s0 = this.sides[0];
@@ -1012,7 +1016,7 @@ export class Battle {
         // the creature that ended the last phase sits this one out: the player sends someone else in
         this.phase = 'replace';
         this.pendingReplace = [0];
-        this._emit({ type: 'message', side: 0, text: `The Relay: ${lead.nickname} ended the last phase and sits this one out. Someone else reads.` }); // str
+        this._emit({ type: 'message', side: 0, text: msg('readingSitsOut', { target: lead.nickname }) });
       } else if (!s0.party.some((o) => o.uid !== lead.uid && !isFainted(o))) this._readingBench = null;
     }
   }
@@ -1085,10 +1089,10 @@ export class Battle {
       f.bossShiftCards = this._bossShiftCards(c);
       if (!f.bossShiftCards.length) { f.bossShiftDone = true; return; }
       const left = Math.max(0, bs.shiftAt - n);
-      const when = left === 0 ? 'now' : left === 1 ? 'at the end of next turn' : `in ${left} turns`;
+      const when = left === 0 ? msg('whenNow') : left === 1 ? msg('whenNext') : msg('whenIn', { n: left });
       const list = f.bossShiftCards.map((k) => `${k.dir[0].toUpperCase()}${k.dir.slice(1)} ${k.name} ${k.odds}%`).join(' · ');
       this._emit({ type: 'shift-posted', side, who: c.nickname, uid: c.uid, cards: f.bossShiftCards.map((k) => ({ ...k })), turnsLeft: left,
-        text: `${c.nickname}'s mark is glowing. Forecast posted: ${list}. It Shifts ${when}.` });
+        text: msg('bossPosted', { target: c.nickname, list, when }) });
     }
     if (n < bs.shiftAt) return;
     f.bossShiftDone = true;
@@ -1104,7 +1108,7 @@ export class Battle {
       for (const k of cards) { r -= k.odds; if (r < 0) { card = k; break; } }
     }
     if (!card) {
-      this._emit({ type: 'message', side, text: `${c.nickname}'s mark dims. It holds its shape.` });
+      this._emit({ type: 'message', side, text: msg('bossHolds', { target: c.nickname }) });
       return;
     }
     this._bossReform(side, c, card);
@@ -1139,7 +1143,7 @@ export class Battle {
     if (this.rules.wardBadge === 'start') this._revealWard(side, c);
     const dir = `${card.dir[0].toUpperCase()}${card.dir.slice(1)}`;
     this._emit({ type: 'boss-shift', side, who, name: c.nickname, uid: c.uid, from, to: sp.id, toName: sp.name, dir: card.dir, types: c.types.slice(), hp: c.hp, maxHp: c.stats.hp, fromTypes, fromMaxHp,
-      text: c.nickname === sp.name ? `${fromName} Shifts ${dir}: it is a ${sp.name} now!` : `${c.nickname} Shifts ${dir}: ${fromName} to ${sp.name}!` });
+      text: c.nickname === sp.name ? msg('bossShiftSame', { from: fromName, dir, to: sp.name }) : msg('bossShift', { target: c.nickname, dir, from: fromName, to: sp.name }) });
   }
 
   // ---- weather ---------------------------------------------------------------
@@ -1240,12 +1244,12 @@ export class Battle {
     if (!row) return;
     const w = this.weather;
     const lower = row.name.toLowerCase();
-    const lead = renewed ? `The ${lower} picks up again. `
-      : source === 'entry' ? `${who} brings ${lower} in with it. `
-        : source === 'move' ? `${who} calls up ${lower}. `
-          : source === 'cycle' && this.turn > 0 ? 'The weather turns. ' : '';
-    const turns = w.turnsLeft != null ? ` (${w.turnsLeft} turn${w.turnsLeft === 1 ? '' : 's'})` : '';
-    this._emit({ type: 'weather-start', kind: row.id, name: row.name, turnsLeft: w.turnsLeft, posted: w.posted.map((p) => ({ ...p })), source, rule: row.text, text: `${lead}${row.text}${turns}` });
+    const lead = renewed ? `${msg('weatherRenewed', { name: lower })} `
+      : source === 'entry' ? `${msg('weatherEntry', { who, name: lower })} `
+        : source === 'move' ? `${msg('weatherMove', { who, name: lower })} `
+          : source === 'cycle' && this.turn > 0 ? `${msg('weatherTurns')} ` : '';
+    const turns = w.turnsLeft != null ? ` (${msg('weatherTurnsLeft', { n: w.turnsLeft })})` : '';
+    this._emit({ type: 'weather-start', kind: row.id, name: row.name, turnsLeft: w.turnsLeft, posted: w.posted.map((p) => ({ ...p })), source, rule: row.text, text: lead + row.text + turns });
     if (row.evasion && !renewed) {
       for (const s of this.sides) {
         const c = this.active(s.index);
@@ -1257,7 +1261,7 @@ export class Battle {
   /** @param {string|null} kind */
   _endWeather(kind) {
     const row = kind ? this.weatherKinds.get(kind) : null;
-    if (row) this._emit({ type: 'weather-end', kind: row.id, name: row.name, text: `The ${row.name.toLowerCase()} passes.` });
+    if (row) this._emit({ type: 'weather-end', kind: row.id, name: row.name, text: msg('weatherEnds', { name: row.name.toLowerCase() }) });
   }
 
   /**
@@ -1326,13 +1330,13 @@ export class Battle {
         if (isFainted(c)) continue;
         const f = weatherChip(row, c.types);
         if (f > 0) {
-          this._emit({ type: 'message', side: s.index, text: `${c.nickname} is worn down by the ${row.name.toLowerCase()}.` });
+          this._emit({ type: 'message', side: s.index, text: msg('weatherChip', { target: c.nickname, name: row.name.toLowerCase() }) });
           this._applyDamage(s.index, Math.max(1, Math.floor(c.stats.hp * f)), 'weather');
         }
         if (!isFainted(c) && c.status && row.status.cures.includes(c.status.kind)) {
           const kind = c.status.kind;
           c.status = null;
-          this._emit({ type: 'status', side: s.index, target: c.nickname, kind, action: 'cure', text: `The ${row.name.toLowerCase()} clears it: ${c.nickname} ${CURE_WORD[kind] || 'is cured'}.` });
+          this._emit({ type: 'status', side: s.index, target: c.nickname, kind, action: 'cure', text: msg('weatherCure', { name: row.name.toLowerCase(), target: c.nickname, cure: CURE_WORD[kind] || msg('isCured') }) });
         }
       }
     }
@@ -1374,13 +1378,13 @@ export class Battle {
       c.heldItem = null;
       this.consumedItems.push({ side: /** @type {0|1} */ (side), uid: c.uid, item: rt.id });
     }
-    this._emit({ type: 'held-item', side, who: c.nickname, uid: c.uid, item: rt.id, itemName: rt.name, effect, consumed, text: consumed ? `${text} The ${rt.name} is used up.` : text });
+    this._emit({ type: 'held-item', side, who: c.nickname, uid: c.uid, item: rt.id, itemName: rt.name, effect, consumed, text: consumed ? `${text} ${msg('heldUsedUp', { item: rt.name })}` : text });
   }
 
   /** A held heal: spends a Mend (the hook only fires with one left), then heals. @param {number} side @param {Creature} c @param {number} fraction @param {string} source */
   _heldHeal(side, c, fraction, source) {
     c.mends--;
-    this._emit({ type: 'mend-spent', side, user: c.nickname, remaining: c.mends, text: `${c.nickname} spends a Mend (${c.mends} left).` });
+    this._emit({ type: 'mend-spent', side, user: c.nickname, remaining: c.mends, text: msg('mendSpent', { user: c.nickname, n: c.mends }) });
     this._heal(side, Math.max(1, Math.floor(c.stats.hp * fraction)), source);
   }
 
@@ -1431,7 +1435,7 @@ export class Battle {
         const a = acts[s.index];
         const chosen = a && a.type === 'move' && me.moves[a.move] ? this.data.move(me.moves[a.move].id) : a && a.type === 'scrap' ? this.data.scrap : null;
         if (chosen && isDamaging(chosen) && s.vol.critRoll < critChance(this._critStage(me, chosen), this.tuning)) {
-          this._emit({ type: 'glint', side: s.index, who: me.nickname, text: `${me.nickname}'s ears glint. Its next hit will crit.` });
+          this._emit({ type: 'glint', side: s.index, who: me.nickname, text: msg('glint', { target: me.nickname }) });
         }
       }
     }
@@ -1571,7 +1575,7 @@ export class Battle {
   _sendIn(side, to, initial) {
     const s = this.sides[side];
     const prev = s.party[s.active];
-    if (!initial) this._emit({ type: 'switch', side, from: prev.nickname, to: s.party[to].nickname, text: `${prev.nickname} comes back. Go, ${s.party[to].nickname}!` });
+    if (!initial) this._emit({ type: 'switch', side, from: prev.nickname, to: s.party[to].nickname, text: msg('switch', { from: prev.nickname, to: s.party[to].nickname }) });
     s.active = to;
     s.vol = freshVol();
     const c = s.party[to];
@@ -1597,14 +1601,14 @@ export class Battle {
   _itemBlocked(side, it) {
     const c = this.active(side);
     if (it.heal) {
-      if (c.hp >= c.stats.hp) return 'HP is full.';
-      if (it.mends && c.mends <= 0) return 'No Mends left this battle.';
-      if (it.mends && this.sides[side].vol.pendingHeal) return 'A Mend is already on its way.';
+      if (c.hp >= c.stats.hp) return msg('itemHpFull');
+      if (it.mends && c.mends <= 0) return msg('itemNoMends');
+      if (it.mends && this.sides[side].vol.pendingHeal) return msg('itemMendPending');
     } else if (it.cures) {
-      if (!c.status || !it.cures.includes(c.status.kind)) return 'No matching condition to cure.';
+      if (!c.status || !it.cures.includes(c.status.kind)) return msg('itemNoCure');
     } else if (it.pp) {
-      if (!c.moves.some((m) => m.pp < m.maxPp)) return 'Every move has full PP.';
-    } else return 'This item cannot be used in battle.';
+      if (!c.moves.some((m) => m.pp < m.maxPp)) return msg('itemPpFull');
+    } else return msg('itemNotHere');
     return null;
   }
 
@@ -1618,27 +1622,27 @@ export class Battle {
       // +1: the counter ticks at the end of the throw turn, so the Ward stays down for `turns` full turns after it.
       this.sides[1 - side].vol.wardSuppressed = turns + 1;
       const foe = this.foeOf(side);
-      this._emit({ type: 'item', side, item: CRACKDUST, text: `Crackdust scatters over ${foe.nickname}.` });
-      this._emit({ type: 'ward-suppressed', side: 1 - side, target: foe.nickname, turns, text: `${foe.nickname}'s Ward is suppressed for ${turns} turns.` });
+      this._emit({ type: 'item', side, item: CRACKDUST, text: msg('crackdust', { target: foe.nickname }) });
+      this._emit({ type: 'ward-suppressed', side: 1 - side, target: foe.nickname, turns, text: msg('wardSuppressed', { target: foe.nickname, n: turns }) });
       return;
     }
     const idx = s.items.findIndex((it) => it.id === itemId);
     const it = s.items[idx];
     s.items.splice(idx, 1);
-    this._emit({ type: 'item', side, item: it.id, text: `${s.trainer ? s.trainer.name : 'The trainer'} uses ${it.name || it.id}.` });
+    this._emit({ type: 'item', side, item: it.id, text: msg('trainerItem', { trainer: s.trainer ? s.trainer.name : msg('theTrainer'), item: it.name || it.id }) });
     if (it.heal) {
       if (it.mends) {
         c.mends--;
-        this._emit({ type: 'mend-spent', side, user: c.nickname, remaining: c.mends, text: `${c.nickname} has ${c.mends} Mends left.` });
+        this._emit({ type: 'mend-spent', side, user: c.nickname, remaining: c.mends, text: msg('mendsLeftOf', { target: c.nickname, n: c.mends }) });
       }
       this._heal(side, Math.floor(c.stats.hp * it.heal), 'item');
     } else if (it.cures && c.status) {
       const kind = c.status.kind;
       c.status = null;
-      this._emit({ type: 'status', side, target: c.nickname, kind, action: 'cure', text: `${c.nickname}'s ${kind} is cured.` });
+      this._emit({ type: 'status', side, target: c.nickname, kind, action: 'cure', text: msg('statusCured', { target: c.nickname, kind }) });
     } else if (it.pp) {
       for (const m of c.moves) m.pp = Math.min(m.maxPp, m.pp + it.pp);
-      this._emit({ type: 'message', text: `${c.nickname}'s techniques regain ${Number.isFinite(it.pp) ? `${it.pp} ` : 'all '}PP.` });
+      this._emit({ type: 'message', text: Number.isFinite(it.pp) ? msg('ppRegain', { target: c.nickname, n: it.pp }) : msg('ppRegainAll', { target: c.nickname }) });
     }
   }
 
@@ -1650,7 +1654,7 @@ export class Battle {
     const theirs = this.effStat(1 - side, 'spe');
     const f = Math.floor((mine * t.runSpeedScale) / Math.max(1, theirs)) + t.runAttemptBonus * this.runAttempts;
     const ok = f >= t.runAutoThreshold || this.rng.int(0, t.runAutoThreshold - 1) < f;
-    this._emit({ type: 'run', side, success: ok, text: ok ? 'Got away safely.' : 'Could not get away.' });
+    this._emit({ type: 'run', side, success: ok, text: ok ? msg('runGot') : msg('runFailed') });
     if (ok) this._finish('run', null);
   }
 
@@ -1668,18 +1672,18 @@ export class Battle {
     const success = lantern.mult === Infinity || roller.chance(odds);
     const segments = success ? 3 : Math.min(2, Math.floor(odds * 3));
     const exact = this.rules.captureDisplay === 'exact';
-    this._emit({ type: 'capture-shake', side, target: target.nickname, grade, odds: exact ? odds : null, band: captureBand(odds, t), segments, success, text: `You raise the ${lantern.name}. The light draws ${target.nickname} in.` });
+    this._emit({ type: 'capture-shake', side, target: target.nickname, grade, odds: exact ? odds : null, band: captureBand(odds, t), segments, success, text: msg('lanternRaise', { lantern: lantern.name, target: target.nickname }) });
     if (success) {
       target.wild = false;
       if (this.nextUid !== undefined) target.uid = this.nextUid;
       this.caught = target;
-      this._emit({ type: 'capture', side, speciesId: target.speciesId, name: target.nickname, text: `${target.nickname} was caught. Its Heartmark lights.` });
+      this._emit({ type: 'capture', side, speciesId: target.speciesId, name: target.nickname, text: msg('caught', { target: target.nickname }) });
       this._finish('capture', 0);
     } else {
       const next = fails + 1;
       this.captureFails.set(target.uid, next);
       const nextOdds = this._captureOddsFor(target, grade, next);
-      this._emit({ type: 'capture-fail', side, target: target.nickname, fails: next, nextOdds: exact ? nextOdds : null, nextBand: captureBand(nextOdds, t), text: `${target.nickname} slipped out of the light.` });
+      this._emit({ type: 'capture-fail', side, target: target.nickname, fails: next, nextOdds: exact ? nextOdds : null, nextBand: captureBand(nextOdds, t), text: msg('captureFail', { target: target.nickname }) });
     }
   }
 
@@ -1690,15 +1694,15 @@ export class Battle {
     const c = this.active(side);
     const v = this.sides[side].vol;
     if (v.flinched) {
-      this._emit({ type: 'status', side, target: c.nickname, kind: 'flinch', action: 'cant-move', text: `${c.nickname} flinched.` });
+      this._emit({ type: 'status', side, target: c.nickname, kind: 'flinch', action: 'cant-move', text: msg('flinched', { target: c.nickname }) });
       return false;
     }
     if (c.status && c.status.kind === 'chill' && this.rng.chance(this.tuning.chillSkipChance)) {
-      this._emit({ type: 'status', side, target: c.nickname, kind: 'chill', action: 'cant-move', text: `${c.nickname} is chilled stiff.` });
+      this._emit({ type: 'status', side, target: c.nickname, kind: 'chill', action: 'cant-move', text: msg('chilledStiff', { target: c.nickname }) });
       return false;
     }
     if (c.status && c.status.kind === 'numb' && this.rng.chance(this.tuning.numbSkipChance)) {
-      this._emit({ type: 'status', side, target: c.nickname, kind: 'numb', action: 'cant-move', text: `${c.nickname} is numb and cannot move.` });
+      this._emit({ type: 'status', side, target: c.nickname, kind: 'numb', action: 'cant-move', text: msg('numbStuck', { target: c.nickname }) });
       return false;
     }
     return true;
@@ -1726,18 +1730,18 @@ export class Battle {
       move = this.data.move(slot.id);
       if (move.effect.charge) {
         v.charging = { move: index };
-        this._emit({ type: 'charge', side, user: user.nickname, move: move.id, moveName: move.name, text: `${user.nickname} braces for ${move.name}.` });
+        this._emit({ type: 'charge', side, user: user.nickname, move: move.id, moveName: move.name, text: msg('braces', { user: user.nickname, move: move.name }) });
         return;
       }
     }
     const moveType = moveTypeFor(move, user);
-    this._emit({ type: 'move', side, user: user.nickname, move: move.id, moveName: move.name, moveType, category: move.category, pp: index === null || !user.moves[index] ? null : user.moves[index].pp, text: `${user.nickname} used ${move.name}.` });
+    this._emit({ type: 'move', side, user: user.nickname, move: move.id, moveName: move.name, moveType, category: move.category, pp: index === null || !user.moves[index] ? null : user.moves[index].pp, text: msg('used', { user: user.nickname, move: move.name }) });
     try {
       this._resolveMove(side, move, moveType);
     } finally {
       if (move.effect.scrap && !isFainted(user)) {
         const cost = Math.max(1, Math.floor(user.stats.hp * this.tuning.scrapCost));
-        this._emit({ type: 'scrap-cost', side, user: user.nickname, amount: cost, text: `${user.nickname} pays for ${move.name}.` });
+        this._emit({ type: 'scrap-cost', side, user: user.nickname, amount: cost, text: msg('scrapCost', { user: user.nickname, move: move.name }) });
         this._applyDamage(side, cost, 'self');
       }
     }
@@ -1755,33 +1759,33 @@ export class Battle {
     // --- self-targeting techniques ---------------------------------------------
     if (e.guard) {
       if (v.guardedLast) {
-        this._emit({ type: 'blocked', side, target: user.nickname, reason: 'consecutive-guard', text: `${move.name} failed. Guards fail on consecutive turns.` });
+        this._emit({ type: 'blocked', side, target: user.nickname, reason: 'consecutive-guard', text: msg('guardFails', { move: move.name }) });
         v.guardedLast = false;
         return;
       }
       v.guarding = true;
-      this._emit({ type: 'guard', side, who: user.nickname, text: `${user.nickname} guards.` });
+      this._emit({ type: 'guard', side, who: user.nickname, text: msg('guards', { user: user.nickname }) });
       return;
     }
     if (e.recovery) {
       if (user.hp >= user.stats.hp) {
-        this._emit({ type: 'blocked', side, target: user.nickname, reason: 'hp-full', text: `${user.nickname}'s HP is already full.` });
+        this._emit({ type: 'blocked', side, target: user.nickname, reason: 'hp-full', text: msg('hpFull', { user: user.nickname }) });
         return;
       }
       if (e.recovery.delay > 0 && v.pendingHeal) {
-        this._emit({ type: 'blocked', side, target: user.nickname, reason: 'heal-pending', text: `${user.nickname}'s heal is already pending. ${move.name} failed.` });
+        this._emit({ type: 'blocked', side, target: user.nickname, reason: 'heal-pending', text: msg('healPending', { user: user.nickname, move: move.name }) });
         return;
       }
       if (user.mends <= 0) {
-        this._emit({ type: 'blocked', side, target: user.nickname, reason: 'no-mends', text: `${user.nickname} has no Mends left. ${move.name} failed.` });
+        this._emit({ type: 'blocked', side, target: user.nickname, reason: 'no-mends', text: msg('noMends', { user: user.nickname, move: move.name }) });
         return;
       }
       user.mends--;
-      this._emit({ type: 'mend-spent', side, user: user.nickname, remaining: user.mends, text: `${user.nickname} spends a Mend (${user.mends} left).` });
+      this._emit({ type: 'mend-spent', side, user: user.nickname, remaining: user.mends, text: msg('mendSpent', { user: user.nickname, n: user.mends }) });
       if (e.recovery.delay > 0) {
         // Heals at the end of the turn `delay` turns after this one.
         v.pendingHeal = { until: this.turn + e.recovery.delay, fraction: e.recovery.fraction, cancelledBy: e.recovery.cancelledBy || null, move: move.id };
-        this._emit({ type: 'mend-pending', side, user: user.nickname, turns: e.recovery.delay, text: `${user.nickname} gathers light for a delayed heal.` });
+        this._emit({ type: 'mend-pending', side, user: user.nickname, turns: e.recovery.delay, text: msg('mendPending', { user: user.nickname }) });
       } else {
         this._heal(side, Math.floor(user.stats.hp * e.recovery.fraction), move.id);
       }
@@ -1801,18 +1805,18 @@ export class Battle {
       const blocked = [0, 1].some((i) => this.data.ability(this.active(i).ability).blocksSelfKo && !isFainted(this.active(i)));
       if (blocked) {
         const holder = [0, 1].map((i) => this.data.ability(this.active(i).ability)).find((a) => a.blocksSelfKo);
-        this._emit({ type: 'blocked', side, target: user.nickname, reason: 'sodden', text: `${holder ? holder.name : 'An ability'} damps the burst. ${move.name} failed.` });
+        this._emit({ type: 'blocked', side, target: user.nickname, reason: 'sodden', text: msg('sodden', { ability: holder ? holder.name : msg('anAbility'), move: move.name }) });
         return;
       }
     }
 
     // --- foe-targeting techniques ------------------------------------------------
     if (isFainted(target)) {
-      this._emit({ type: 'message', side, text: 'There is no target.' });
+      this._emit({ type: 'message', side, text: msg('noTarget') });
       return;
     }
     if (fs.vol.guarding) {
-      this._emit({ type: 'blocked', side, target: target.nickname, reason: 'guard', text: `${target.nickname} guarded.` });
+      this._emit({ type: 'blocked', side, target: target.nickname, reason: 'guard', text: msg('guarded', { target: target.nickname }) });
       return;
     }
     const foeAbility = this.effectiveAbility(foeSide);
@@ -1820,7 +1824,7 @@ export class Battle {
     if (!check.lands) {
       if (check.reason === 'immune') {
         this._emit({ type: 'effectiveness', side, target: target.nickname, word: 'Blocked', mult: 0 });
-        this._emit({ type: 'blocked', side, target: target.nickname, reason: 'immune', text: `It has no effect on ${target.nickname}.` });
+        this._emit({ type: 'blocked', side, target: target.nickname, reason: 'immune', text: msg('noEffect', { target: target.nickname }) });
       } else if (foeAbility) {
         this._revealWard(foeSide, target);
         this._emit({ type: 'effectiveness', side, target: target.nickname, word: 'Blocked', mult: check.eff.mult });
@@ -1845,7 +1849,7 @@ export class Battle {
       if (isDamaging(move)) totalDamage += this._dealHit(side, move, moveType, check.eff, landed === 1);
     }
     if (landed === 0) return;
-    if (hits > 1) this._emit({ type: 'message', side, text: `Hit ${landed} time${landed === 1 ? '' : 's'}.` });
+    if (hits > 1) this._emit({ type: 'message', side, text: msg('hits', { n: landed }) });
     if (isDamaging(move) && e.drain && totalDamage > 0) this._heal(side, Math.max(1, Math.floor(totalDamage * e.drain)), move.id);
     this._applySecondary(side, move, target);
     const w = weatherOf(e);
@@ -1859,7 +1863,7 @@ export class Battle {
     if (isSureHit(move) || move.effect.plumbline) return true;
     const ability = this.data.ability(user.ability);
     if (ability.hooks.sureHitOverride && ability.hooks.sureHitOverride({ attacker: user, move, bflags: this.bflags(side) })) {
-      if (first) this._emit({ type: 'ability', side, who: user.nickname, ability: ability.name, text: `${ability.name}: it cannot miss.` });
+      if (first) this._emit({ type: 'ability', side, who: user.nickname, ability: ability.name, text: msg('cannotMiss', { ability: ability.name }) });
       return true;
     }
     return this.rng.chance(this.hitChance(side, move));
@@ -1873,10 +1877,10 @@ export class Battle {
     if (this.data.ability(target.ability).decoys && fv.stages.eva > 0) {
       const pops = move.effect.spread ? fv.stages.eva : 1;
       fv.stages.eva -= pops;
-      this._emit({ type: 'decoy-pop', side: foeSide, target: target.nickname, popped: pops, remaining: fv.stages.eva, text: `${this.active(side).nickname} hit a decoy. It pops.` });
+      this._emit({ type: 'decoy-pop', side: foeSide, target: target.nickname, popped: pops, remaining: fv.stages.eva, text: msg('hitDecoy', { user: this.active(side).nickname }) });
       return;
     }
-    this._emit({ type: 'miss', side, user: this.active(side).nickname, target: target.nickname, text: `${this.active(side).nickname}'s attack missed.` });
+    this._emit({ type: 'miss', side, user: this.active(side).nickname, target: target.nickname, text: msg('missed', { user: this.active(side).nickname }) });
   }
 
   /**
@@ -1907,28 +1911,28 @@ export class Battle {
       defText = r.text || null;
     }
     const dmg = damageFormula({ level: user.level, power: move.power, attack, defense, typeMult: eff.mult, stab, crit, rand, burned: physical && !!user.status && user.status.kind === 'burn', extra }, t);
-    if (first) this._emit({ type: 'effectiveness', side, target: target.nickname, word: eff.word, mult: eff.mult, text: eff.word === 'Strong' ? 'Strong hit!' : eff.word === 'Weak' ? 'Weak hit.' : null });
-    if (crit) this._emit({ type: 'crit', side, target: target.nickname, text: 'A critical hit!' });
+    if (first) this._emit({ type: 'effectiveness', side, target: target.nickname, word: eff.word, mult: eff.mult, text: eff.word === 'Strong' ? msg('strongHit') : eff.word === 'Weak' ? msg('weakHit') : null });
+    if (crit) this._emit({ type: 'crit', side, target: target.nickname, text: msg('crit') });
     if (defText) this._emit({ type: 'ability', side: foeSide, who: target.nickname, ability: targetAbility.name, text: defText });
     const dealt = this._applyDamage(foeSide, dmg, 'party');
     const fvol = this.sides[foeSide].vol;
     const pending = fvol.pendingHeal;
     if (pending && pending.cancelledBy && moveType !== null && (Array.isArray(pending.cancelledBy) ? pending.cancelledBy.includes(moveType) : pending.cancelledBy === moveType)) {
       fvol.pendingHeal = null;
-      this._emit({ type: 'mend-cancelled', side: foeSide, target: target.nickname, text: `The ${moveType} hit breaks ${target.nickname}'s pending heal.` });
+      this._emit({ type: 'mend-cancelled', side: foeSide, target: target.nickname, text: msg('mendBroken', { type: moveType, target: target.nickname }) });
     }
     if (target.status && this.data.cures(moveType, target.status.kind)) {
       const kind = target.status.kind;
       target.status = null;
-      this._emit({ type: 'status', side: foeSide, target: target.nickname, kind, action: 'cure', text: `${target.nickname} ${CURE_WORD[kind] || 'is cured'}.` });
+      this._emit({ type: 'status', side: foeSide, target: target.nickname, kind, action: 'cure', text: msg('cure', { target: target.nickname, cure: CURE_WORD[kind] || msg('isCured') }) });
     }
     if (move.effect.popsDecoy && targetAbility.decoys && fvol.stages.eva > 0) {
       const pops = Math.min(fvol.stages.eva, move.effect.popsDecoy === true ? 1 : move.effect.popsDecoy);
       fvol.stages.eva -= pops;
-      this._emit({ type: 'decoy-pop', side: foeSide, target: target.nickname, popped: pops, remaining: fvol.stages.eva, text: `${move.name} pops a decoy.` });
+      this._emit({ type: 'decoy-pop', side: foeSide, target: target.nickname, popped: pops, remaining: fvol.stages.eva, text: msg('popsDecoy', { move: move.name }) });
     }
     if (isFainted(target) && userAbility.hooks.healOnKo && !isFainted(user)) {
-      this._emit({ type: 'ability', side, who: user.nickname, ability: userAbility.name, text: `${userAbility.name} feeds ${user.nickname}.` });
+      this._emit({ type: 'ability', side, who: user.nickname, ability: userAbility.name, text: msg('feeds', { ability: userAbility.name, target: user.nickname }) });
       this._heal(side, Math.max(1, Math.floor(user.stats.hp * userAbility.hooks.healOnKo())), userAbility.id);
     }
     return dealt;
@@ -1977,14 +1981,14 @@ export class Battle {
       const st = fvol.stages;
       const cleared = Object.keys(st).filter((k) => st[k] > 0);
       for (const k of cleared) st[k] = 0;
-      this._emit({ type: 'stat', side: foeSide, target: target.nickname, stat: 'all', stages: 0, result: cleared.length ? 'cleared-raised' : 'none', text: cleared.length ? `${target.nickname}'s boosts were snuffed out.` : 'Nothing to snuff.' });
+      this._emit({ type: 'stat', side: foeSide, target: target.nickname, stat: 'all', stages: 0, result: cleared.length ? 'cleared-raised' : 'none', text: cleared.length ? msg('snuffed', { target: target.nickname }) : msg('snuffNone') });
     }
     if (e.plumbline) {
       const st = fvol.stages;
       for (const k of Object.keys(st)) st[k] = 0;
       const n = this.tuning.plumblineBlockTurns;
       fvol.boostBlockUntil = this.turn + n;
-      this._emit({ type: 'stat', side: foeSide, target: target.nickname, stat: 'all', stages: 0, result: 'cleared', text: `${move.name}. ${target.nickname}'s stat stages drop to level and it cannot re-boost for ${n} turns.` });
+      this._emit({ type: 'stat', side: foeSide, target: target.nickname, stat: 'all', stages: 0, result: 'cleared', text: msg('levelled', { move: move.name, target: target.nickname, n }) });
     }
     if (e.revealMoves) this.revealFoeMove(side, target.moves.length, move.name);
   }
@@ -2026,7 +2030,7 @@ export class Battle {
         const up = me.party.filter((p) => !isFainted(p));
         this.koLog.push({ foe: c, battlers: new Set(up.filter((p) => me.participants.has(p.uid)).map((p) => p.uid)), bench: new Set(up.filter((p) => !me.participants.has(p.uid)).map((p) => p.uid)) });
       }
-      this._emit({ type: 'faint', side, target: c.nickname, text: `${c.nickname} fainted.` });
+      this._emit({ type: 'faint', side, target: c.nickname, text: msg('fainted', { target: c.nickname }) });
     } else if (held && c.heldItem === held.id) {
       const r = held.hooks.onDamageTaken({ phase: 'after', self: c, amount: dmg, source, uses: this._heldUses(side, c, held), mends: c.mends });
       if (r && r.heal) {
@@ -2042,7 +2046,7 @@ export class Battle {
     const c = this.active(side);
     const healed = Math.max(0, Math.min(Math.floor(amount), c.stats.hp - c.hp));
     c.hp += healed;
-    this._emit({ type: 'heal', side, target: c.nickname, amount: healed, hp: c.hp, maxHp: c.stats.hp, source, text: `${c.nickname} recovered ${healed} HP.` });
+    this._emit({ type: 'heal', side, target: c.nickname, amount: healed, hp: c.hp, maxHp: c.stats.hp, source, text: msg('healed', { target: c.nickname, amount: healed }) });
     return healed;
   }
 
@@ -2054,34 +2058,34 @@ export class Battle {
       const v = this.sides[side].vol;
       const wr = this.weatherRow();
       if (wr && wr.status.blocks.includes('trap')) {
-        this._emit({ type: 'status', side, target: name, kind, action: 'immune', text: `The ${wr.name.toLowerCase()} keeps ${name} from being trapped.` });
+        this._emit({ type: 'status', side, target: name, kind, action: 'immune', text: msg('weatherNoTrap', { weather: wr.name.toLowerCase(), target: name }) });
         return false;
       }
       if (v.trap > 0) {
-        this._emit({ type: 'status', side, target: name, kind, action: 'already', text: `${name} is already trapped.` });
+        this._emit({ type: 'status', side, target: name, kind, action: 'already', text: msg('alreadyTrapped', { target: name }) });
         return false;
       }
       v.trap = this.tuning.trapTurns;
-      this._emit({ type: 'status', side, target: name, kind, action: 'inflict', turns: v.trap, text: `${name} is trapped.` });
+      this._emit({ type: 'status', side, target: name, kind, action: 'inflict', turns: v.trap, text: msg('trapped', { target: name }) });
       return true;
     }
     if (!MAJOR_STATUS.includes(kind)) throw new RangeError(`unknown status ${String(kind)}`);
     if (c.status) {
-      this._emit({ type: 'status', side, target: name, kind, action: 'already', text: `${name} already has a condition.` });
+      this._emit({ type: 'status', side, target: name, kind, action: 'already', text: msg('alreadyStatus', { target: name }) });
       return false;
     }
     const ability = this.data.ability(c.ability);
     if (this.data.typeBlocksStatus(kind, c.types) || (ability.hooks.statusImmune && ability.hooks.statusImmune(kind))) {
-      this._emit({ type: 'status', side, target: name, kind, action: 'immune', text: `${name} cannot be ${STATUS_WORD[kind]}.` });
+      this._emit({ type: 'status', side, target: name, kind, action: 'immune', text: msg('cannotBe', { target: name, status: STATUS_WORD[kind] }) });
       return false;
     }
     const row = this.weatherRow();
     if (row && row.status.blocks.includes(kind)) {
-      this._emit({ type: 'status', side, target: name, kind, action: 'immune', text: `The ${row.name.toLowerCase()} keeps ${name} from being ${STATUS_WORD[kind]}.` });
+      this._emit({ type: 'status', side, target: name, kind, action: 'immune', text: msg('weatherNoStatus', { weather: row.name.toLowerCase(), target: name, status: STATUS_WORD[kind] }) });
       return false;
     }
     c.status = { kind, turns: kind === 'chill' ? this.rng.int(this.tuning.chillTurnsMin, this.tuning.chillTurnsMax) : 0 };
-    this._emit({ type: 'status', side, target: name, kind, action: 'inflict', text: `${name} is ${STATUS_WORD[kind]}.` });
+    this._emit({ type: 'status', side, target: name, kind, action: 'inflict', text: msg('statusInflict', { target: name, status: STATUS_WORD[kind] }) });
     return true;
   }
 
@@ -2095,13 +2099,13 @@ export class Battle {
     const t = this.tuning;
     const name = c.nickname;
     if (stages > 0 && this.turn <= v.boostBlockUntil) {
-      this._emit({ type: 'stat', side, target: name, stat, stages: 0, result: 'blocked', reason: 'plumbline', text: `${name} is held level. It cannot boost.` });
+      this._emit({ type: 'stat', side, target: name, stat, stages: 0, result: 'blocked', reason: 'plumbline', text: msg('statLevel', { target: name }) });
       return false;
     }
     if (stages < 0 && !bySelf) {
       const ability = this.data.ability(c.ability);
       if (ability.hooks.blocksForeignStatDrops && ability.hooks.blocksForeignStatDrops()) {
-        this._emit({ type: 'stat', side, target: name, stat, stages: 0, result: 'blocked', reason: ability.id, text: `${ability.name} keeps ${name}'s ${STAT_NAMES[stat]} steady.` });
+        this._emit({ type: 'stat', side, target: name, stat, stages: 0, result: 'blocked', reason: ability.id, text: msg('statSteady', { ability: ability.name, target: name, stat: STAT_NAMES[stat] }) });
         return false;
       }
     }
@@ -2109,15 +2113,15 @@ export class Battle {
     const cur = v.stages[stat];
     const next = Math.max(-t.stageCap, Math.min(cap, cur + stages));
     if (next === cur) {
-      this._emit({ type: 'stat', side, target: name, stat, stages: 0, result: 'capped', text: stat === 'eva' ? `${name}'s evasion cannot go higher (cap +${t.evasionCap}).` : `${name}'s ${STAT_NAMES[stat]} will not go ${stages > 0 ? 'higher' : 'lower'}.` });
+      this._emit({ type: 'stat', side, target: name, stat, stages: 0, result: 'capped', text: stat === 'eva' ? msg('evaCap', { target: name, n: t.evasionCap }) : msg(stages > 0 ? 'statMax' : 'statMin', { target: name, stat: STAT_NAMES[stat] }) });
       return false;
     }
     v.stages[stat] = next;
     const delta = next - cur;
-    const word = Math.abs(delta) >= 2 ? 'sharply ' : '';
-    this._emit({ type: 'stat', side, target: name, stat, stages: delta, stage: next, result: delta > 0 ? 'raised' : 'lowered', text: `${name}'s ${STAT_NAMES[stat]} ${word}${delta > 0 ? 'rose' : 'fell'}.` });
+    const sharp = Math.abs(delta) >= 2;
+    this._emit({ type: 'stat', side, target: name, stat, stages: delta, stage: next, result: delta > 0 ? 'raised' : 'lowered', text: msg(delta > 0 ? (sharp ? 'statRoseSharp' : 'statRose') : (sharp ? 'statFellSharp' : 'statFell'), { target: name, stat: STAT_NAMES[stat] }) });
     if (stat === 'eva' && delta > 0 && this.data.ability(c.ability).decoys) {
-      this._emit({ type: 'decoy', side, who: name, count: next, text: `A decoy ${name} shimmers into place (${next}).` });
+      this._emit({ type: 'decoy', side, who: name, count: next, text: msg('decoyAppears', { target: name, n: next }) });
     }
     return true;
   }
@@ -2134,21 +2138,21 @@ export class Battle {
       if (c.status) {
         const k = c.status.kind;
         if (k === 'burn' || k === 'poison') {
-          this._emit({ type: 'status', side: s.index, target: c.nickname, kind: k, action: 'tick', text: `${c.nickname} is hurt by ${k === 'burn' ? 'its burn' : 'poison'}.` });
+          this._emit({ type: 'status', side: s.index, target: c.nickname, kind: k, action: 'tick', text: msg(k === 'burn' ? 'hurtBurn' : 'hurtPoison', { target: c.nickname }) });
           this._applyDamage(s.index, Math.max(1, Math.floor(c.stats.hp * t.chip[k] * this._chipMult(c, k))), 'status');
         } else if (k === 'chill') {
           c.status.turns--;
           if (c.status.turns <= 0) {
             c.status = null;
-            this._emit({ type: 'status', side: s.index, target: c.nickname, kind: 'chill', action: 'cure', text: `${c.nickname} shook off the chill.` });
+            this._emit({ type: 'status', side: s.index, target: c.nickname, kind: 'chill', action: 'cure', text: msg('shookChill', { target: c.nickname }) });
           }
         }
       }
       if (!isFainted(c) && v.trap > 0) {
-        this._emit({ type: 'status', side: s.index, target: c.nickname, kind: 'trap', action: 'tick', text: `${c.nickname} is hurt by the trap.` });
+        this._emit({ type: 'status', side: s.index, target: c.nickname, kind: 'trap', action: 'tick', text: msg('hurtTrap', { target: c.nickname }) });
         this._applyDamage(s.index, Math.max(1, Math.floor(c.stats.hp * t.chip.trap * this._chipMult(c, 'trap'))), 'status');
         v.trap--;
-        if (v.trap === 0 && !isFainted(c)) this._emit({ type: 'status', side: s.index, target: c.nickname, kind: 'trap', action: 'cure', text: `${c.nickname} is free of the trap.` });
+        if (v.trap === 0 && !isFainted(c)) this._emit({ type: 'status', side: s.index, target: c.nickname, kind: 'trap', action: 'cure', text: msg('trapFree', { target: c.nickname }) });
       }
       if (!isFainted(c) && v.pendingHeal && this.turn >= v.pendingHeal.until) {
         const p = v.pendingHeal;
@@ -2157,7 +2161,7 @@ export class Battle {
       }
       if (v.wardSuppressed > 0) {
         v.wardSuppressed--;
-        if (v.wardSuppressed === 0) this._emit({ type: 'message', side: s.index, text: `${c.nickname}'s Ward returns.` });
+        if (v.wardSuppressed === 0) this._emit({ type: 'message', side: s.index, text: msg('wardReturns', { target: c.nickname }) });
       }
       v.guardedLast = v.guarding;
       v.guarding = false;
@@ -2176,7 +2180,7 @@ export class Battle {
         const kind = c.status.kind;
         c.status = null;
         this._heldFired(s.index, c, held, 'cure', r.text);
-        this._emit({ type: 'status', side: s.index, target: c.nickname, kind, action: 'cure', text: `${c.nickname} ${CURE_WORD[kind] || 'is cured'}.` });
+        this._emit({ type: 'status', side: s.index, target: c.nickname, kind, action: 'cure', text: msg('cure', { target: c.nickname, cure: CURE_WORD[kind] || msg('isCured') }) });
       } else if (r.heal) {
         this._heldFired(s.index, c, held, 'heal', r.text);
         this._heldHeal(s.index, c, r.heal, held.id);
@@ -2203,7 +2207,7 @@ export class Battle {
     if (need.length) {
       this.phase = 'replace';
       this.pendingReplace = need;
-      for (const side of need) this._emit({ type: 'replace-needed', side, text: side === 0 ? 'Choose your next creature.' : `${this.sides[1].trainer ? this.sides[1].trainer.name : 'The foe'} is about to send in another creature.` });
+      for (const side of need) this._emit({ type: 'replace-needed', side, text: side === 0 ? msg('chooseNext') : msg('foeSendsNext', { trainer: this.sides[1].trainer ? this.sides[1].trainer.name : msg('theFoe') }) });
     }
     return undefined;
   }
@@ -2230,7 +2234,7 @@ export class Battle {
         const mult = Math.max(1, ...player.party.filter((c) => player.participants.has(c.uid)).map((c) => (this.heldOf(c) ? this.heldOf(c).payoutMult : 1)));
         this.payout = Math.floor(base * mult);
         // a trainer who pays nothing (a story set piece, a Relay round before the last) says nothing about it
-        if (this.payout > 0) this._emit({ type: 'payout', amount: this.payout, text: `You won ${this.payout} glint.` });
+        if (this.payout > 0) this._emit({ type: 'payout', amount: this.payout, text: msg('payoutGlint', { amount: this.payout }) });
       }
     } else if ((outcome === 'loss' || outcome === 'draw') && this.koLog.length && !this.readingPhases) {
       // the KOs scored before a loss still pay (LF-12)
@@ -2238,7 +2242,7 @@ export class Battle {
     }
     if (outcome === 'loss') {
       this.blackoutCost = this.summit ? 0 : Math.max(0, Math.min(t.blackoutCap, Math.floor(this.sides[0].glint * t.blackoutRate)));
-      this._emit({ type: 'blackout', cost: this.blackoutCost, summit: this.summit, text: this.summit ? 'The Summit takes nothing.' : `You black out and lose ${this.blackoutCost} glint.` });
+      this._emit({ type: 'blackout', cost: this.blackoutCost, summit: this.summit, text: this.summit ? msg('summitTakesNothing') : msg('blackout', { amount: this.blackoutCost }) });
     }
   }
 
@@ -2254,7 +2258,7 @@ export class Battle {
     const add = (c, amount, share) => {
       if (!(amount > 0)) return;
       gains.set(c.uid, (gains.get(c.uid) || 0) + amount);
-      this._emit({ type: 'exp', creature: c.nickname, uid: c.uid, amount, share, text: `${c.nickname} gained ${amount} EXP${share === 'bench' ? ' (bench)' : share === 'sibling' ? ' (shared)' : share === 'yard' ? ' (Training Yard)' : ''}.` });
+      this._emit({ type: 'exp', creature: c.nickname, uid: c.uid, amount, share, text: msg(share === 'bench' ? 'expBench' : share === 'sibling' ? 'expShared' : share === 'yard' ? 'expYard' : 'exp', { target: c.nickname, amount }) });
     };
     const sitters = this.bench.filter((c) => !isFainted(c));
     for (const d of defeated) {
@@ -2307,7 +2311,7 @@ export class Battle {
       const amount = Math.floor(t.holdOutExp * (battler ? 1 : this._benchShare(c)));
       if (!(amount > 0)) continue;
       gains.set(c.uid, amount);
-      this._emit({ type: 'exp', creature: c.nickname, uid: c.uid, amount, share: battler ? 'battler' : 'bench', text: `${c.nickname} gained ${amount} EXP${battler ? '' : ' (bench)'}.` });
+      this._emit({ type: 'exp', creature: c.nickname, uid: c.uid, amount, share: battler ? 'battler' : 'bench', text: msg(battler ? 'exp' : 'expBench', { target: c.nickname, amount }) });
     }
     this._applyGains(gains, player.party);
   }
@@ -2323,9 +2327,9 @@ export class Battle {
       const r = this._gainExp(c, amount);
       this.expReport.push({ uid: c.uid, name: c.nickname, amount, from: r.from, to: r.to, levelsGained: r.to - r.from, learned: r.learned, offers: r.offers });
       if (r.to > r.from) {
-        this._emit({ type: 'levelup', creature: c.nickname, uid: c.uid, from: r.from, to: r.to, stats: r.statsAfter, text: `${c.nickname} grew to Lv${r.to}.` });
-        for (const mv of r.learned) this._emit({ type: 'learn', creature: c.nickname, uid: c.uid, move: mv, moveName: this.data.move(mv).name, text: `${c.nickname} learned ${this.data.move(mv).name}.` });
-        for (const mv of r.offers) this._emit({ type: 'learn-offer', creature: c.nickname, uid: c.uid, move: mv, moveName: this.data.move(mv).name, text: `${c.nickname} wants to learn ${this.data.move(mv).name}, but its slots are full.` });
+        this._emit({ type: 'levelup', creature: c.nickname, uid: c.uid, from: r.from, to: r.to, stats: r.statsAfter, text: msg('levelUp', { target: c.nickname, level: r.to }) });
+        for (const mv of r.learned) this._emit({ type: 'learn', creature: c.nickname, uid: c.uid, move: mv, moveName: this.data.move(mv).name, text: msg('learned', { target: c.nickname, move: this.data.move(mv).name }) });
+        for (const mv of r.offers) this._emit({ type: 'learn-offer', creature: c.nickname, uid: c.uid, move: mv, moveName: this.data.move(mv).name, text: msg('learnOffer', { target: c.nickname, move: this.data.move(mv).name }) });
       }
     }
   }
@@ -2372,15 +2376,15 @@ export class Battle {
     const posted = new Set([this.weather.kind, ...this.weather.posted.map((p) => p.kind)].filter(Boolean));
     for (const k of posted) {
       const row = this.weatherKinds.get(k);
-      if (row && weatherChip(row, target.types) > 0) indirect.push(`weather chip (${row.name}${k === this.weather.kind ? '' : ', posted'})`);
+      if (row && weatherChip(row, target.types) > 0) indirect.push(msg(k === this.weather.kind ? 'wardWeatherChip' : 'wardWeatherChipPosted', { name: row.name }));
     }
     const lines = [wardHeldText(ability)];
-    lines.push(canLand.length ? `Can land: ${canLand.map((e) => `${e.creature}'s ${e.moveName}`).join(', ')}.` : 'Nothing in your party lands right now.');
-    if (outOfPp.length) lines.push(`Out of PP: ${outOfPp.map((e) => `${e.creature}'s ${e.moveName}`).join(', ')}.`);
-    lines.push(types.length ? `Types that get through: ${types.join(', ')}.` : 'No type gets through directly.');
-    lines.push(`Indirect damage that works: ${indirect.join(', ')}.`);
-    if (chip.length) lines.push(`Your chip techniques: ${chip.map((e) => `${e.creature}'s ${e.moveName} (${e.kind})`).join(', ')}.`);
-    if (s.bag.crackdust > 0) lines.push(`You carry Crackdust (${s.bag.crackdust}).`);
+    lines.push(canLand.length ? msg('wardCanLand', { list: canLand.map((e) => `${e.creature}'s ${e.moveName}`).join(', ') }) : msg('wardNothingLands'));
+    if (outOfPp.length) lines.push(msg('wardOutOfPp', { list: outOfPp.map((e) => `${e.creature}'s ${e.moveName}`).join(', ') }));
+    lines.push(types.length ? msg('wardTypes', { list: types.join(', ') }) : msg('wardNoTypes'));
+    lines.push(msg('wardIndirect', { list: indirect.join(', ') }));
+    if (chip.length) lines.push(msg('wardChip', { list: chip.map((e) => `${e.creature}'s ${e.moveName} (${e.kind})`).join(', ') }));
+    if (s.bag.crackdust > 0) lines.push(msg('wardCrackdust', { n: s.bag.crackdust }));
     return {
       type: 'ward-readout', side, target: target.nickname, targetTypes: target.types.slice(), ward: ability.name, wardId: ability.id,
       wardKind: /** @type {any} */ (ability.ward).kind, canLand, outOfPp, types, indirect, chip, crackdust: s.bag.crackdust > 0, text: lines.join(' '),
@@ -2450,13 +2454,13 @@ function itemIdOf(a) {
 /** @param {string} outcome @param {Battle} b @returns {string} */
 function outcomeText(outcome, b) {
   switch (outcome) {
-    case 'win': return b.kind === 'trainer' ? `You beat ${b.sides[1].trainer.name}.` : `The wild ${b.sides[1].party[0].nickname} fainted.`;
-    case 'loss': return 'You have no creatures left.';
-    case 'capture': return `${b.caught ? b.caught.nickname : 'It'} joins you.`;
-    case 'run': return 'You got away.';
-    case 'holdout': return `You held out for ${b.turn} turns.`;
-    case 'reading': return 'The Passenger settles. Every shape carries the same mark. The Reading is complete.';
-    default: return 'The battle ends in a draw.';
+    case 'win': return b.kind === 'trainer' ? msg('endWin', { trainer: b.sides[1].trainer.name }) : msg('endWild', { name: b.sides[1].party[0].nickname });
+    case 'loss': return msg('endLoss');
+    case 'capture': return msg('endCapture', { name: b.caught ? b.caught.nickname : msg('it') });
+    case 'run': return msg('endRun');
+    case 'holdout': return msg('endHoldout', { n: b.turn });
+    case 'reading': return msg('endReading');
+    default: return msg('endDraw');
   }
 }
 

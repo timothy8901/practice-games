@@ -331,7 +331,9 @@ export function proveWorld() {
     claim(`day ${day} high water, lit.bar: Shardcrown and the seventh Waystone reachable`, lit.maps['hollis-gate'] && lit.waystones['hollis-gate'], '');
     claim(`day ${day} high water, lit.bar: the Lantern Stack stays behind its spur window`, !lit.maps['lantern-stack'], '');
     const summit = census(snapshot(hw, { 'lit.bar': true, 'sp.summit-open': true }));
-    claim(`day ${day} high water, lit.bar + sp.summit-open: the Keepers' Hall and Idris's Hall reachable`, summit.maps['keepers-hall'] && summit.maps['idris-hall'], '');
+    claim(`day ${day} high water, lit.bar + sp.summit-open: the Keepers' Hall reachable, Idris's Hall shut until both Keepers fall (LF-01)`, summit.maps['keepers-hall'] && !summit.maps['idris-hall'], '');
+    const keepers = census(snapshot(hw, { 'lit.bar': true, 'sp.summit-open': true, 'sys.trainer.bastien-keeper': true, 'sys.trainer.cass-keeper': true }));
+    claim(`day ${day} high water, both Keepers beaten: Idris's Hall reachable`, keepers.maps['idris-hall'], '');
     const { lower, other } = lowsOf(day);
     if (lower !== null) {
       const atLower = census(snapshot(lower, {}));

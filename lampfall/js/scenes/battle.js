@@ -179,6 +179,30 @@ export function sealRewardLines(p) {
  * @param {any} G
  * @returns {import('../core/scene.js').Scene & Record<string, any>}
  */
+/**
+ * Which Shift windows a battle's end offers "Open now?" for, and which wait for the next Waystone or
+ * home (they stay in `pendingShifts`). A lost battle offers none; a creature that fainted in the
+ * battle, or sits at 0 HP, waits. Pure.
+ * @param {{outcome?: string, windowsOpened?: string[]}} post
+ * @param {any} world
+ * @param {any} [battle]  the engine battle (its side-0 combatants say who fainted)
+ * @returns {{offer: string[], waits: string[]}}
+ */
+export function windowsToOffer(post, world, battle = null) {
+  const ids = Array.isArray(post?.windowsOpened) ? post.windowsOpened : [];
+  if (post?.outcome === 'loss') return { offer: [], waits: ids.slice() };
+  const mine = battle?.sides?.[0]?.party ?? [];
+  const offer = [];
+  const waits = [];
+  for (const uid of ids) {
+    const c = (world?.party ?? []).find((x) => x.uid === uid) || (world?.box ?? []).find((x) => x.uid === uid);
+    const inBattle = mine.find((x) => x && x.uid === uid);
+    const fainted = (c && !(c.hp > 0)) || (inBattle && (inBattle.fainted === true || inBattle.hp <= 0));
+    (fainted ? waits : offer).push(uid);
+  }
+  return { offer, waits };
+}
+
 export function createBattleScene(G) {
   installBattleDebug(G);
 
@@ -947,7 +971,13 @@ export function createBattleScene(G) {
       await waitConfirm();
       overlay = null;
     }
-    for (const uid of p.windowsOpened || []) await offerWindow(uid);
+    const { offer, waits } = windowsToOffer(p, world(), session?.battle);
+    for (const uid of offer) await offerWindow(uid);
+    for (const uid of waits) {
+      // a fainted creature or a lost battle never gets "Open now?": the window waits (pendingShifts)
+      const c = world().party.find((x) => x.uid === uid) || world().box.find((x) => x.uid === uid);
+      try { if (c) G.toasts?.show?.(t('forecast.deferred', { nick: c.nickname })); } catch { /* no toasts */ }
+    }
     flushDeferred();
     if (p.relay && p.outcome === 'win') {
       // the Relay (MID-05): pick the next round's two, then the next round starts in this same scene
@@ -1088,7 +1118,7 @@ export function createBattleScene(G) {
           trainerFx.show = false;
           view.sendOut(1);
           emitBus('battle:event', { event: { type: 'switch', side: 1, from: '', to: foe.name, text: '' } });
-          const m2 = view.say(`${session.relay ? session.relay.name : trainer.name} sends out ${foe.name}.`); // str
+          const m2 = view.say(t('battle.msg.sendsOut', { trainer: session.relay ? session.relay.name : trainer.name, name: foe.name }));
           yield frames(20);
           view.glint(1);
           yield Math.max(frames(10), m2 - frames(20));
@@ -1224,7 +1254,7 @@ export function createBattleScene(G) {
     if (b.phase === 'ended') { finish(); return; }
     if (b.phase === 'replace') {
       if (b.pendingReplace.includes(0)) {
-        log = { text: 'Choose your next creature.', ms: 1e9, cps: Infinity }; // str
+        log = { text: t('battle.msg.chooseNext'), ms: 1e9, cps: Infinity };
         openList('party', { forced: true });
         return;
       }
@@ -1971,7 +2001,7 @@ export function createBattleScene(G) {
   /** The posted weather: name, turns left and the strip of what comes next (Weather Spire). */
   function drawWeather(ctx) {
     const w = weatherState;
-    const label = w.turnsLeft != null ? `${w.name}, ${w.turnsLeft} ${w.turnsLeft === 1 ? 'turn' : 'turns'}` : w.name; // str
+    const label = w.turnsLeft != null ? t('battle.msg.weatherLabel', { name: w.name, n: w.turnsLeft }) : w.name;
     const tw = measureText(label).w;
     const x = 200;
     const y = 8;
@@ -2001,8 +2031,8 @@ export function createBattleScene(G) {
     const sh = /** @type {NonNullable<ReturnType<typeof visibleStrip>>} */ (visibleStrip());
     const x = L.foeBox.x;
     const y = L.foeBox.y + L.foeBox.h + 4;
-    const when = sh.turnsLeft <= 0 ? 'Shifts now' : sh.turnsLeft === 1 ? 'Shifts at the end of next turn' : `Shifts in ${sh.turnsLeft} turns`; // str
-    const title = `Forecast: ${when}`; // str
+    const when = sh.turnsLeft <= 0 ? t('battle.msg.stripNow') : sh.turnsLeft === 1 ? t('battle.msg.stripNext') : t('battle.msg.stripIn', { n: sh.turnsLeft });
+    const title = t('battle.msg.stripTitle', { when });
     drawPanel(ctx, { x, y, w: Math.max(120, measureText(title, { font: 'small' }).w + 12), h: 12 }, 'dark');
     drawText(ctx, title, x + 6, y + 3, { color: COLORS.dark.text, font: 'small' });
     let px = x;

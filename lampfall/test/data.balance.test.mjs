@@ -195,7 +195,7 @@ test("Linnet's opener and arc teams follow GDD-00 §11 and GDD-ids", () => {
 });
 
 test('Spire aces, levels, curves and prizes follow GDD-00 §4 / §7; the Summit aces follow §8', () => {
-  const want = { turn: ['bilgebob', 10], ward: ['prismoth', 16], weather: ['emberjaw', 22], hollow: ['hulkwight', 29], relay: ['coilcrest', 36], mirror: ['lumenveil', 43] };
+  const want = { turn: ['bilgebob', 9], ward: ['prismoth', 16], weather: ['emberjaw', 22], hollow: ['hulkwight', 29], relay: ['coilcrest', 36], mirror: ['lumenveil', 43] };
   for (const sp of SPIRES) {
     const tr = TRAINER_BY_ID[sp.trainer];
     const ace = tr.party.at(-1);

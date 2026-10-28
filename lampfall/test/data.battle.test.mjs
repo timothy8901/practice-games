@@ -22,7 +22,7 @@ import { SPIRES, LONG_ROAD, SUMMIT, SUMMIT_BELL, THE_READING, WEATHER_KINDS, BOS
 const TYPE_NAMES = ['Plain', 'Grit', 'Brine', 'Kiln', 'Moss', 'Bolt', 'Rime', 'Gust', 'Stone', 'Rust', 'Glass', 'Hollow', 'Star'];
 const WEATHER_IDS = WEATHER_KINDS.map((w) => w.id);
 const ALL_ITEM_IDS = new Set(M.MANIFEST.items.ids);
-const REGION_CURVE = { pellwick: 4, lowmoor: 7, cairnhold: 13, emberstep: 19, drownwood: 26, thistlewind: 33, rimeholt: 40, 'the-bar': 41, shardcrown: 47 };
+const REGION_CURVE = { pellwick: 4, lowmoor: 6, cairnhold: 13, emberstep: 19, drownwood: 26, thistlewind: 33, rimeholt: 40, 'the-bar': 41, shardcrown: 47 };
 // Isle wild bands (GDD-00 §4): mandatory route trainers sit in the day band, optional ones in the night band (+2).
 const WILD = { lowmoor: [3, 8], cairnhold: [9, 14], emberstep: [15, 20], drownwood: [22, 27], thistlewind: [29, 34], rimeholt: [36, 41] };
 
@@ -31,7 +31,7 @@ const WILD = { lowmoor: [3, 8], cairnhold: [9, 14], emberstep: [15, 20], drownwo
 // parties) and Seraphine fields six (Lv42-43; four at Lv40-43 lost to on-curve parties 9 times in 10).
 const EXPECTED = {
   'lowmoor-osier': ['reedkit', 6, 2, [5, 6]], 'lowmoor-dunlin': ['mudfist', 7, 2, [6, 7]], 'lowmoor-colm': ['puddlepip', 7, 2, [6, 7]],
-  'lowmoor-perrin': ['sloshkin', 8, 2, [7, 8]], 'lowmoor-tibby': ['wirewhisk', 8, 3, [7, 8]],
+  'lowmoor-perrin': ['sloshkin', 8, 2, [7, 8]], 'lowmoor-tibby': ['wirewhisk', 7, 3, [7, 7]],
   'cairnhold-ruddock': ['knuckleback', 12, 2, [11, 12]], 'cairnhold-prudence': ['chillnub', 12, 2, [11, 12]], 'cairnhold-jory': ['siltback', 13, 3, [11, 13]],
   'cairnhold-ellery': ['mothling', 13, 2, [12, 13]], 'cairnhold-bette': ['prismoth', 15, 3, [13, 15]],
   'emberstep-asha': ['rayling', 18, 2, [17, 18]], 'emberstep-kip': ['sootling', 18, 3, [16, 18]], 'emberstep-roswitha': ['sedgehare', 19, 2, [18, 19]],
@@ -43,7 +43,7 @@ const EXPECTED = {
   'rimeholt-hild': ['rimeplate', 38, 3, [37, 38]], 'rimeholt-oskar': ['floeback', 39, 3, [37, 39]], 'rimeholt-greer': ['strandrunner', 40, 4, [38, 40]],
   'rimeholt-sunniva': ['lumenveil', 41, 4, [38, 41]], 'rimeholt-aldous': ['caldermaw', 42, 4, [39, 42]],
   pip: ['wirewhisk', 4, 2, [2, 4]], // FH-15: a Tossup opens so the first trainer asks for a decision
-  'maud-spire': ['bilgebob', 10, 2, [8, 10]], 'osric-spire': ['prismoth', 16, 3, [14, 16]], 'ines-spire': ['emberjaw', 22, 3, [20, 22]],
+  'maud-spire': ['bilgebob', 9, 2, [8, 9]], 'osric-spire': ['prismoth', 16, 3, [14, 16]], 'ines-spire': ['emberjaw', 22, 3, [20, 22]],
   'wendel-spire': ['hulkwight', 29, 3, [27, 29]], 'hallorans-spire': ['coilcrest', 36, 6, [33, 36]], 'seraphine-spire': ['lumenveil', 43, 6, [40, 43]],
   'bar-corwen': ['hulkwight', 41, 4, [40, 41]], 'bar-tilda': ['strandrunner', 41, 4, [40, 41]], 'bar-ezra': ['cairnward', 42, 4, [41, 42]],
   'bar-ottilie': ['lumenveil', 43, 5, [41, 43]], 'bar-hamish': ['brinelance', 43, 5, [42, 43]], 'bar-delphine': ['cragmitt', 44, 5, [42, 44]],
@@ -248,7 +248,7 @@ test('trainers: payouts are 50 x highest level, 200 x ace, or rule-driven', () =
   }
   assert.equal(TRAINER_BY_ID.pip.payout, 200);
   assert.equal(TRAINER_BY_ID['drownwood-hettie'].payout, 1350, 'Day 10 check');
-  assert.deepEqual(['maud-spire', 'osric-spire', 'ines-spire', 'wendel-spire', 'hallorans-spire', 'seraphine-spire'].map((id) => TRAINER_BY_ID[id].payout), [2000, 3200, 4400, 5800, 7200, 8600]);
+  assert.deepEqual(['maud-spire', 'osric-spire', 'ines-spire', 'wendel-spire', 'hallorans-spire', 'seraphine-spire'].map((id) => TRAINER_BY_ID[id].payout), [1800, 3200, 4400, 5800, 7200, 8600]);
   assert.equal(TRAINER_BY_ID['idris-champion'].payout, 10000);
 });
 
@@ -330,7 +330,7 @@ test('trainers: Porch Duels scale to the party median and gate correctly', () =>
 // --- Spires, Long Road, Summit, the Reading -----------------------------------------------------
 
 test('spires: six rows in badge order with prizes, shares, dossiers and unlocks', () => {
-  const curve = [7, 13, 19, 26, 33, 40];
+  const curve = [6, 13, 19, 26, 33, 40];
   SPIRES.forEach((s, i) => {
     assert.equal(s.n, i + 1);
     const tr = TRAINER_BY_ID[s.trainer];

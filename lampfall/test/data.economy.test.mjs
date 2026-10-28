@@ -167,7 +167,7 @@ describe('continuity: GDD-00 §6-§7 income, shares and the blackout', () => {
     assert.equal(wallet.glintValue(2, TUNING), 620);
     assert.equal(wallet.glintValue(10, TUNING), 1100);
     assert.deepEqual(TUNING.purseRange, [200, 600]);
-    assert.deepEqual(TUNING.spireAceLevels.map((a) => a * TUNING.spireWinPerAce), [2000, 3200, 4400, 5800, 7200, 8600]);
+    assert.deepEqual(TUNING.spireAceLevels.map((a) => a * TUNING.spireWinPerAce), [1800, 3200, 4400, 5800, 7200, 8600]);
     assert.equal(TUNING.spireWinStarsalt, 3);
     assert.equal(TUNING.payoutPerLevel, 50);
     assert.equal(TUNING.porchDuelPerCurve, 30);

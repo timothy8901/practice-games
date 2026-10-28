@@ -62,7 +62,7 @@ Why the curve steps (fix wave 1, MID-06): under 8·L² a level costs 16·L while
 - **Who earns a KO** (final fix pass): the engine records who was standing at each foe's KO and pays them at the end, so a creature that scores a KO and faints later still earns it, and a loss or a draw still pays the KOs scored before it. Fainted creatures stay at 0 HP while gaining EXP. Relay sitters are passed as bench and get the bench share.
 
 - Battlers 100%, the rest of the party 60%; Training Yard 25% to 3 stored creatures; Big Sibling +30% to the lowest party member; **catch-up** +50% per 5 levels under the posted curve, cap ×3; Porch Duel EXP ×0.5 past curve + 10 (engine source `rematch`), never damped elsewhere.
-- **Payouts:** route trainers, rivals and the Long Road **50 × highest level** (Pip 200; Hettie 1,350); Spire leaders **200 × ace + 3 Starsalt** (2,000 / 3,200 / 4,400 / 5,800 / 7,200 / 8,600) plus the **Spire share** (10% of the open loan, notched on Wren's ledger); Keepers 200 × ace (9,200 / 9,600); Champion 10,000 + the Summit seal; Porch Duels 30 × curve (flow sets it); story set pieces, friends and Corin's exhibitions pay nothing and cost nothing. Lucky Button +50% applies on top.
+- **Payouts:** route trainers, rivals and the Long Road **50 × highest level** (Pip 200; Hettie 1,350); Spire leaders **200 × ace + 3 Starsalt** (1,800 / 3,200 / 4,400 / 5,800 / 7,200 / 8,600) plus the **Spire share** (10% of the open loan, notched on Wren's ledger); Keepers 200 × ace (9,200 / 9,600); Champion 10,000 + the Summit seal; Porch Duels 30 × curve (flow sets it); story set pieces, friends and Corin's exhibitions pay nothing and cost nothing. Lucky Button +50% applies on top.
 - **Blackout** (route, Spire and Long Road losses only): 10% of buttons on hand, capped 1,500, nothing under 500; half goes to the Keeper's Purse. Story battles, the Summit, Porch Duels and exhibitions never cost anything.
 - Check: Linnet's dock (100) + the Tossup catch (40) + Pip's Tossup (30) and Wirewhisk (66) carry a Lv5 starter (200) to 436, past Lv7 (392) and under Lv8 (512), on night one. Pip fields **Tossup Lv2 (Tap) then Wirewhisk Lv4** (fix wave 2), so the first trainer takes 3–4 turns and a Read pays; the Lv8 window still opens on day 2.
 - **Story battles leave the party healed** afterwards (the dock hold-out, Linnet's fights, the Engine, the Reading), so a hold-out loss never sends the player into the reeds or to Pip on low HP.
@@ -121,7 +121,7 @@ The 54 prototype rows keep their ids, numbers, effects and text, with two text e
 | `lowmoor-dunlin` | Mudlarker Dunlin | lowmoor-mud-bank | Puddlepip 6, Mudfist 7 | trainer | 350 | Brine lead, Grit ace |
 | `lowmoor-colm` | Ferry Hand Colm | lowmoor-pavilion-steps | Bilgebob 6, Puddlepip 7 | trainer | 350 | two Brine, slow and sturdy (declinable) |
 | `lowmoor-perrin` | Marsh Walker Perrin | lowmoor-boardwalk-bend | Reedkit 7, Sloshkin 8 | trainer | 400 | Moss lead, Undertow slows you |
-| `lowmoor-tibby` | Pavilion Regular Tibby | lowmoor-pavilion-bench | Tossup 7, Scrapling 8, Wirewhisk 8 | trainer | 400 | three-deep; Wirewhisk pings your moves first (declinable) |
+| `lowmoor-tibby` | Pavilion Regular Tibby | lowmoor-pavilion-bench | Tossup 7, Scrapling 7, Wirewhisk 7 | trainer | 400 | three-deep; Wirewhisk pings your moves first (declinable) |
 | `cairnhold-ruddock` | Quarryman Ruddock | cairnhold-quarry-road | Mudfist 11, Knuckleback 12 | trainer | 600 | two Grit punchers; lowers your Attack |
 | `cairnhold-prudence` | Mooring Clerk Prudence | cairnhold-clinic-gate | Mothling 11, Chillnub 12 | trainer | 600 | Ward: Stillcoat (hits under 50 power do nothing) (Salve) |
 | `cairnhold-jory` | Stonecutter Jory | cairnhold-standing-stones | Scrapling 11, Rushling 12, Siltback 13 | trainer | 650 | Siltback ace: Brine/Stone, Settles in |
@@ -148,7 +148,7 @@ The 54 prototype rows keep their ids, numbers, effects and text, with two text e
 | `rimeholt-sunniva` | Mirror Polisher Sunniva | rimeholt-polished-wall | Mothling 38, Rushling 39, Skeinwing 40, Lumenveil 41 | trainer | 2,050 | Ward: Mirrorveil (status fails); evasion preview (declinable; Tonic) |
 | `rimeholt-aldous` | Frost Hermit Aldous | rimeholt-hermit-hut | Sootling 39, Stillox 40, Floeback 41, Caldermaw 42 | trainer | 2,100 | fire on the ice; Caldermaw ace (declinable; Tonic) |
 | `pip` | Dock Hand Pip | pellwick-quay-bollards | Tossup 2, Wirewhisk 4 | trainer | 200 | a little Tossup to open, then the Wirewhisk ace; Arc Ping goes first |
-| `maud-spire` | Spire Leader Maud Tallis | spire-turn-dais | Puddlepip 8*, Bilgebob 10* | spire | 2,000 | posted scripted Shifts, one sure, one rolled (Salve) |
+| `maud-spire` | Spire Leader Maud Tallis | spire-turn-dais | Puddlepip 8*, Bilgebob 9* | spire | 1,800 | posted scripted Shifts, one sure, one rolled (Salve) |
 | `osric-spire` | Spire Leader Osric Penhallow | spire-ward-dais | Siltback 14, Rimeplate 15, Prismoth 16 | spire | 3,200 | stone pair, then a Glasshide Prismoth (Kiln, Rime, chip) (Salve+Salve) |
 | `ines-spire` | Spire Leader Ines Calloway | spire-weather-dais | Rayling 20, Coilcrest 21, Emberjaw 22 | spire | 4,400 | posted 3-turn weather: steam, ash, squall, clear (Tonic) |
 | `wendel-spire` | Spire Leader Wendel Teague | spire-hollow-dais | Duskwisp 27, Creelwight 28, Hulkwight 29 (oilskin) | spire | 5,800 | all Hollow: immune to Plain and Grit; Oilskin halves chip (Tonic+Tonic) |
@@ -191,7 +191,7 @@ Each Spire certifies one reading skill and ends in a battle that uses it. The do
 
 | # | Spire | Leader | Theme rule (data) | Inside | Ace | Prize | Badge unlocks (GDD-00 §7) |
 |---|---|---|---|---|---|---|---|
-| 1 | **Turn** (Lowmoor, Brackenford) | Maud Tallis | `scripted-shifts`: every creature Shifts once; strip posted a turn ahead | door → Maud's practice table (Reroll lesson, optional, any time before) → Maud | Bilgebob 10 | 2,000 + 3 Starsalt | Reroll; Spore Drift disc guaranteed at Pell's |
+| 1 | **Turn** (Lowmoor, Brackenford) | Maud Tallis | `scripted-shifts`: every creature Shifts once; strip posted a turn ahead | door → Maud's practice table (Reroll lesson, optional, any time before) → Maud | Bilgebob 9 | 1,800 + 3 Starsalt | Reroll; Spore Drift disc guaranteed at Pell's |
 | 2 | **Ward** (Cairnhold, Knapp's End) | Osric Penhallow | `wards`: badge, readout, Crackdust 300 for 3 turns | door → East Sentinel (Chillnub 13) → West Sentinel (Cairnward 14) → Osric | Prismoth 16 | 3,200 + 3 | Lantern-paths, free ferry, Skyglass Wicks |
 | 3 | **Weather** (Emberstep, Sulphur Cross) | Ines Calloway | `weather`: steam → ash → squall → clear, 3 turns each, next 3 turns posted | door → Ines | Emberjaw 22 | 4,400 + 3 | Scouting Prism (Corin), Ethers |
 | 4 | **Hollow** (Drownwood, Mossgate) | Wendel Teague | `immunities`: all Hollow; menu marks *No effect* | door → Wendel | Hulkwight 29 | 5,800 + 3 | Recall (6 Starsalt), one coverage disc face-up |
@@ -206,7 +206,7 @@ Every win also notches the **Spire share** (10% of the open loan) on Wren's ledg
 - **Ward sentinels** stand on their markers with their own art (`sentinel-stone`, a glowing rune) and a "Granite Sentinel" label. Each is a wild-style battle: no capture, nothing lost, posted moves. A win sets `sys.trainer.<id>`, posts the lesson and the sentinel steps aside; a loss heals the party in place with no blackout and no cost. Intro: "The {sentinel} wakes: a {name} stirs in the stone."
 - **Relay rounds** (fix wave 1, MID-05) play in one battle scene. A pick screen opens before every round (round 1 included; skipped under One Heart) with an "Open the satchel" option; creatures that already fought are greyed out until you run out of fresh ones. There is no healing between rounds, the twins' two Tonics carry across all three, and the payout, badge and parting words come only after round 3. Rounds 1–2 say nothing about money.
 
-**Turn.** Maud teaches the strip by contrast: her Puddlepip posts a single card, *Up: Sloshkin 100%*, so the first lesson is that a posted 100% means it lands; then her Bilgebob posts three cards at your dial's odds (Up Brinelance, Side Rushling, Down Puddlepip). A Lv10 Brinelance with Gnash is a real threat at badge 1, so the right play is a move that is good against all three: the strip turns into a plan, not a hope. The practice table is where Reroll is taught; the badge is what lets you use it on your own Forecasts.
+**Turn.** Maud teaches the strip by contrast: her Puddlepip posts a single card, *Up: Sloshkin 100%*, so the first lesson is that a posted 100% means it lands; then her Bilgebob posts three cards at your dial's odds (Up Brinelance, Side Rushling, Down Puddlepip). A Lv9 Brinelance with Gnash is a real threat at badge 1, so the right play is a move that is good against all three: the strip turns into a plan, not a hope. The practice table is where Reroll is taught; the badge is what lets you use it on your own Forecasts.
 
 **Ward.** The sentinels are wild-style exhibitions (no capture, nothing lost) that teach Stillcoat twice before the real lesson: Osric fields exactly one Ward, the Glasshide Prismoth, whose only Strong types are Kiln and Rime. The answers on offer by then: the Spore Drift disc (guaranteed since badge 1), any Kiln or Rime move, Crackdust, or Cairn Crash from a lucky Pell's rotation. GDD-00's one-Ward-per-trainer rule is what forced the sentinels: the theme is Wards, the rule caps them per trainer, so the Spire becomes a walk past several.
 
@@ -250,7 +250,7 @@ Phases 1–6 replay the six Spires' lessons in badge order, each voiced by someo
 | 3 | The Weather | the landed aspect's weather, for this phase | Wick | Drowned Bell / Wreck-light / Empty Weave (all carry Hollow) |
 | 4 | The Hollow | Plain and Grit go straight through | Idris | Windle / Mill-race / Sheepfold |
 | 5 | The Relay | the creature that ended phase 4 may not lead | Linnet | Lumen / Vesper / Rime-mirror |
-| 6 | The Mirror | evasion +2 with two decoys, true odds; Plumbline cuts through | Varga | Lamplit / Harbor / Dark Water |
+| 6 | The Mirror | evasion +2 with two decoys, true odds; Plumbline cuts through | Varga | Ring of the Light / Ring of the Tide / Ring of the Dark Water (the same names the seventh offer shows) |
 | 7 | The Reading | **its Forecast is offered to you** | Corin: "I cannot read one that size. You can." | Ring of the Light / Ring of the Tide / Ring of the Dark Water |
 
 On the seventh, **Anchor** (Merrow's way) and **Reroll** (Varga's way; redraws three rings from a pool of six) are free and each keeps the night going one more phase; **Accept** is the only ending (`sp.reading-done`, stamp *The Reading*). Whichever ring lands is the palette the post-game Passenger perches in.
@@ -261,18 +261,18 @@ On the seventh, **Anchor** (Merrow's way) and **Reroll** (Varga's way; redraws t
 - **Ward phase:** a min-power-50 lattice ("Blocked by Ward"); Crackdust can drop it, and while it is down the Vagary's own ability shows. **Relay phase:** the creature that ended the last phase is benched for that phase (left out of the switch list). **Mirror phase:** +2 evasion with decoys, reset when phase 7 opens.
 - The opening line is "The Vagary settles on the Lantern Stack…". The 96-cell Vagary is drawn at 1× with its foot on the platform and tinted by its current type.
 - Each Anchor or Reroll adds a 2-turn night with new cards (`sys.reading-draws`, up to `READING_EXTRA_DRAWS` = 6 different draws).
-- **Open:** the seventh offer is still a dialogue choice. The Forecast scene has a Reading mode (`who: 'reading'`: Ring cards with odds, Accept / Anchor / Reroll marked free, the landed ring named, `np.keeper.reading-ring` / `reading-choice` / `reading-rerolls`), but the ending script does not call it yet, so no cards are drawn and the landed ring is not named.
+- **The seventh offer** is the Forecast card view in its Reading mode: the ending script runs `{op: 'forecast', who: 'reading'}` and branches on `np.keeper.reading-choice`. The three Ring cards show the dial's steadied odds (a Reroll brings new faces from the pool of six); Accept flips the card that lands, names it ("The Ring of the Tide lands. The Passenger settles into it."), and stores it in `np.keeper.reading-ring`, which the Seed Card shows under *The Reading*. Phase 6's posted strip uses the same Ring names, so the cards the battle posts and the cards offered match.
 
 ---
 
 ## 7. Difficulty curve
 
-The curve rises in even steps of 6–7 levels per isle, and every boss sits exactly 3 over the posted curve; the Summit adds 2 per fight.
+The curve rises in even steps of 6–7 levels per isle, and every boss sits exactly 3 over the posted curve; the Summit adds 2 per fight. Lowmoor posts 6, not 7: Maud's Bilgebob is Lv9 so a party whose starter Shifted down (a Sootling that relearned Knuckle at the Archive, plus the reeds Tossup) has a real chance (GDD-00 §18). Tibby, the optional night trainer, came down to Lv7 with it.
 
 | Stop | Posted curve | Route trainers (mandatory / optional) | Boss | Boss − curve |
 |---|---|---|---|---|
 | Night one (Pellwick) | 4 | Pip 4; Linnet's dock hold-out 5 | — | — |
-| Lowmoor | 7 | 5–8 / 6–8 | Maud: Bilgebob 10 | +3 |
+| Lowmoor | 6 | 5–8 / 6–7 | Maud: Bilgebob 9 | +3 |
 | Cairnhold | 13 | 11–13 / 12–15 | Osric: Prismoth 16 | +3 |
 | Emberstep | 19 | 16–20 / 18–21 | Ines: Emberjaw 22 | +3 |
 | Drownwood | 26 | 24–27 / 26–28 | Wendel: Hulkwight 29 | +3 |
@@ -292,7 +292,7 @@ Side fights sit on the same rails: Linnet's rematch (one-carry Caldermaw 11, the
 
 | Fight | Curve | Party after the starter | Discs | Bag |
 |---|---|---|---|---|
-| Turn | 7 | Tossup, Wirewhisk, Mudfist | — | 2 Salves |
+| Turn | 6 | Tossup, Wirewhisk, Mudfist | — | 2 Salves |
 | Ward | 13 | Tossup, Wirewhisk, Mudfist, Chillnub | Spore Drift | 2 Salves, 2 Crackdust |
 | Weather | 19 | Wirewhisk, Mudfist, Chillnub, Sootling, Sedgehare | Spore Drift | Tonic, Salve |
 | Hollow | 26 | Coilcrest, Rimeplate, Sootling, Rushling, Bilgebob | + Flashover | 2 Tonics |
@@ -304,7 +304,7 @@ Side fights sit on the same rails: Linnet's rematch (one-carry Caldermaw 11, the
 
 | Fight | Target | Win | By line | Turns |
 |---|---|---|---|---|
-| Turn (Maud) | 55–85% | **78%** | 93 / 100 / 42 | 7.8 |
+| Turn (Maud) | 55–85% | **83%** | 98 / 100 / 51 | 8.2 |
 | Ward (Osric) | 55–85% | **62%** | 100 / 32 / 54 | 14.1 |
 | Weather (Ines) | 55–85% | **69%** | 71 / 77 / 59 | 10.9 |
 | Hollow (Wendel) | 55–85% | **70%** | 24 / 88 / 100 | 12.0 |
@@ -319,7 +319,7 @@ Re-run on 2026-10-28 (`node tools/balance-sim.mjs`) with the engine's own boss S
 
 | Door | Curve | Minimal | Typical | Thorough |
 |---|---|---|---|---|
-| Turn | 7 | 11 (+4) | 12 (+5) | 14 (+7) |
+| Turn | 6 | 11 (+5) | 12 (+6) | 14 (+8) |
 | Ward | 13 | 14 (+1) | 17 (+4) | 19 (+6) |
 | Weather | 19 | 19 (+0) | 22 (+3) | 25 (+6) |
 | Hollow | 26 | 26 (+0) | 28 (+2) | 31 (+5) |
@@ -328,7 +328,7 @@ Re-run on 2026-10-28 (`node tools/balance-sim.mjs`) with the engine's own boss S
 | Summit | 47 | 46 (−1) | 49 (+2) | 53 (+6) |
 | Forecasts per run | | 15 | 16 | 17 |
 
-The starter's windows open at Lv8 on Lowmoor (day 2), Lv20 around Emberstep and Lv34 around Thistlewind for the typical player (Drownwood and Rimeholt for the minimal one). Lowmoor runs high because its night trainers and Linnet's Caldermaw 11 sit above its posted curve of 7. `tools/economy-sim.mjs` puts the Relighting on day 14 for a typical player (casual 20, ideal 13, grinder 8).
+The starter's windows open at Lv8 on Lowmoor (day 2), Lv20 around Emberstep and Lv34 around Thistlewind for the typical player (Drownwood and Rimeholt for the minimal one). Lowmoor runs high because its night trainers and Linnet's Caldermaw 11 sit above its posted curve of 6 (Maud's ace is Lv9, GDD-00 §18). `tools/economy-sim.mjs` puts the Relighting on day 14 for a typical player (casual 20, ideal 13, grinder 8).
 
 No fight averages more than 26 turns. Every starter line wins every Spire at least one time in five; the low cells are type matchups the dossier names and the party can answer: Reedkit's Moss is weak into Maud's Brine (Wirewhisk is the answer), Scrapling's Grit takes Strong Shardlight from Osric's Prismoth (Chillnub's Frost Nip or Crackdust), Bogmonarch's Stone takes Strong Hollow hits (Coilcrest's Gust, the Flashover disc), and the Hallorans' Gust and Moss lean against a Grit carry (Duskowl and Coilcrest from Thistlewind). The Ward readout names an answer to every Ward a trainer fields, for every on-curve party.
 
@@ -336,7 +336,7 @@ No fight averages more than 26 turns. Every starter line wins every Spire at lea
 
 | Where | Was | Now | Why |
 |---|---|---|---|
-| Tibby (optional, Lowmoor) | Wirewhisk 9 with Jolt | Wirewhisk 8 with Fizz | At 9 it swept a Lv7 party (18% win); now 93%. GDD-ids lists Lv7–9; the range is 7–8. |
+| Tibby (optional, Lowmoor) | Wirewhisk 9 with Jolt | Wirewhisk 7 with Fizz (Tossup, Scrapling, Wirewhisk all Lv7) | At 9 it swept a Lv7 party (18% win). With Lowmoor's curve at 6 (GDD-00 §18) the whole team came down to Lv7. |
 | Hallorans (Relay) | Skirl 33, Gillwick 34, Rimeplate (Stand Firm), Sedgehare 35 | Skirl 33 (Murk), Gillwick 35, Rimeplate (Shard Fling), **Stillox 35** | Six Gust or Moss bodies walled any Grit carry (1%); Stillox, Thistlewind's rare, gives round 2 a Stone face instead. |
 | Seraphine (Mirror) | four: Rushling 40 … Lumenveil 43; Full Salve + Tonic | **six** at 42 (Gillwick, Rimeplate, Floeback, Strandrunner, Skeinwing) + Lumenveil 43; two Full Salves | Four creatures at 40–43 lost to every on-curve party 9 times in 10 (89–93%); the sixth Spire now fields a full six. GDD-ids lists 4: Lv40–43. |
 | Seraphine (Mirror), with held items live | the five at 42 | **Gillwick 40, Rimeplate 42, Floeback 41, Strandrunner 40, Skeinwing 42** (Lumenveil 43 unchanged) | Once the engine ran held items, Lumenveil's Ballast Stone (+1 Def, +1 SpD on entry) took the Mirror from 73% to 52%, under the band. Two of the five supports drop two levels and one drops one; Skeinwing stays at 42 because it learns Hoarfrost there. 60% on the shipped seed and 59–62% on two others; every level is still inside GDD-ids' Lv40–43. Weather (69%) and the Summit (50%) stayed in band with weather and held items live, so their teams and weathers are unchanged. |
@@ -385,7 +385,7 @@ Stat totals by stage after tuning: stage 1 300–335 (mean 322), stage 2 420–4
 1. **Wiring:** `DATA.moves = MOVES` (moves/index.js), `DATA.trainers = TRAINERS`, `DATA.scripts = {...story scripts, ...TRAINER_SCRIPTS}`; add a `spires` table (`SPIRES`) and move `spires` from `UNMAPPED` to `MANIFEST` when it lands.
 2. **Engine follow-ups (not this chapter's files):**
    - Plumbline through Wards: done in the engine (`DEFAULTS.plumblineIgnoresWards: true`).
-   - Posted boss Shifts, the Relay round structure and the Reading's HP floors and phase loop are implemented (fix waves 1–2; see §1.4, §4, §6). **Still not implemented:** Merrow's Anchor Pulse (`rules.anchorPulse` on her trainer row is data only), and the Reading's seventh offer through the Forecast scene (§6).
+   - Posted boss Shifts, the Relay round structure and the Reading's HP floors and phase loop are implemented (fix waves 1–2; see §1.4, §4, §6). **Still not implemented:** Merrow's Anchor Pulse (`rules.anchorPulse` on her trainer row is data only). The Reading's seventh offer now runs through the Forecast scene (§6).
    - Arena weather and held items: done in the engine (§7.2), and the flow now passes them (held items, `onEntry`, `weatherKinds`, the Weather Spire's `weatherCycle`). Consumed held items are not dropped by `party.applyOutcome`, which no shipped item needs. Original note: `systems/flow/battleFlow.buildBattle` should copy a trainer entry's `held` to the creature's `heldItem` and its `onEntry` onto the creature, pass `weatherKinds: WEATHER_KINDS` (or put them in the data) and, for the Weather Spire, `weatherCycle: SPIRE_BY_ID.weather.theme.rule`; `readCard` / `dossier` take the same `weatherCycle`. `party.applyOutcome` should drop the held item of every side-0 entry in `result().consumedItems` (no shipped item is consumable yet). The battle scene draws the weather from the `weather-start` / `weather-tick` / `weather-end` events (`scenes/battleAnims.js`, `drawWeather` in `scenes/battle.js`).
    - (Done: `js/data/tuning.js` passes all of these, with the stepped curve of §1.3.) Engine `DEFAULTS` that differ from GDD-00 and need `tuning` overrides: `payoutPerLevel` 40 → 50; `expYieldDivisor` 7 → 5; growth curves → the single 8·L² curve; `captureOddsMax` 0.99 → 0.95; `blackoutCap` 3,000 → 1,500 with a 500 floor; `captureBands` Low/Fair/Good → Slim/Fair/Good/Sure; Lantern grades → wick grades (Tallow ×1 100, Brass ×1.5 300, Skyglass ×2 600). `js/systems/exp.js` uses `EXP_DIVISOR: 7` too.
    - (Resolved: GDD-03's abilities landed and `validate-data` passes with `wardCount: 3`.)

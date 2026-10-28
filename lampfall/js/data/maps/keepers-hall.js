@@ -71,7 +71,10 @@ export default {
   ],
   warps: [
     { x: 10, y: 13, kind: 'door', to: { mapId: 'hollis-gate', x: 10, y: 1, facing: 'down' }, sfx: 'doorOpen' },
-    { x: 10, y: 0, kind: 'door', to: { mapId: 'idris-hall', x: 10, y: 12, facing: 'up' }, via: 'summit', sfx: 'doorOpen' },
+    // LF-01: the climb goes in order; Idris's door opens once both Keepers are beaten
+    { x: 10, y: 0, kind: 'door', to: { mapId: 'idris-hall', x: 10, y: 12, facing: 'up' }, via: 'summit', sfx: 'doorOpen',
+      cond: { all: [{ flag: 'sys.trainer.bastien-keeper' }, { flag: 'sys.trainer.cass-keeper' }] },
+      refusal: 'The door to Idris stays shut. The climb goes in order: both Keepers first.' },
   ],
   spawns: [],
   regions: {

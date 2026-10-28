@@ -150,7 +150,7 @@ export function createArchiveScene(G) {
       if (cr) {
         drawCreature(c, G, cr, 376, 49, { scale: 2 });
         drawText(c, fitText(cr.nickname, 155), 218, 54, { color: skin.text });
-        drawText(c, stage === 'forget' ? 'Choose a move to forget' : service === 'memory' ? 'Moves this form can remember' : locked() ? 'Opens with the fourth seal' : 'Forms from its own Shiftlog', 218, 72, { color: skin.soft, maxWidth: 155 });
+        drawText(c, stage === 'forget' ? 'Choose a move to forget' : service === 'memory' ? 'Moves waiting in its Memory' : locked() ? 'Opens with the fourth seal' : 'Forms from its own Shiftlog', 218, 72, { color: skin.soft, maxWidth: 155 });
         if (stage !== 'party') {
           options.draw(c);
           if (!options.items.length) drawText(c, emptyServiceText(service), 220, 148, { color: skin.faint, maxWidth: 230 });

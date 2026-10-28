@@ -150,13 +150,33 @@ export default {
     'Corin: Seven phases. Two turns each. The next shape is posted before it comes. Neither side can fall tonight. This is a reading, Keeper. Take your time.',
     'Merrow: You may anchor it.', 'Varga: You may redraw it.',
     { op: 'if', cond: LINNET_HOME, then: ['Linnet: You may let it answer.'] },
-    READING, label('choose'),
+    READING,
     '* The seventh window opens. The Passenger turns its great mark toward the lamp, and then toward you, and the Glass in your paw goes warm.',
     '* Three cards hang in the air between you: the Ring of the Light, the Ring of the Tide, the Ring of the Dark Water. Odds on every one. The Heartshard waits without moving. For the first time, the choice is not its. It is yours.',
-    { op: 'choice', defaultIndex: 0, options: [
-      { text: 'Accept. Let it become.', then: [
+    // the offer is the Forecast card view in its Reading mode (scenes/forecast.js `who: 'reading'`,
+    // LF-02): the three rings with the dial's steadied odds; Accept flips the card that lands and stores
+    // it in np.keeper.reading-ring (the Seed Card shows it); the choice lands in np.keeper.reading-choice
+    label('choose'),
+    flag('np.keeper.reading-choice', 'pending'),
+    { op: 'forecast', who: 'reading' },
+    { op: 'branch', on: 'np.keeper.reading-choice', cases: {
+      anchor: [
+        'Merrow: Hold it. Hold it still. ~ …It is still. Is that what I wanted? A hand. One choice. You read it first.',
+        ...readingNight(),
+        '* The window opens again. The cards are the same three, and so are the odds. The choice is still yours.',
+        go('choose'),
+      ],
+      reroll: [
+        'Varga: Again! Again. ~ …Every one of them is beautiful. That is the trouble. Another reading. No promise. You know.',
+        sfx('shiftFlip'), ...readingNight(),
+        '* The cards come round again, new faces, the same odds. The choice is still yours.',
+        go('choose'),
+      ],
+      default: [
         flag('sp.reading-done'), sfx('shiftReveal'),
-        '* The cards turn. One lands. The Passenger settles into it like a ship into a berth, and the hum that has been in the sea for thirty years goes quiet, and then comes back slower, steadier, like a tide.',
+        { op: 'if', cond: { flag: 'np.keeper.reading-ring' },
+          then: ['* The {flag:np.keeper.reading-ring} lands. The Passenger settles into it like a ship into a berth, and the hum that has been in the sea for thirty years goes quiet, and then comes back slower, steadier, like a tide.'],
+          else: ['* The cards turn. One lands. The Passenger settles into it like a ship into a berth, and the hum that has been in the sea for thirty years goes quiet, and then comes back slower, steadier, like a tide.'] },
         '* The Heartshard is steady. Along the shore, every creature\'s mark, wild and bonded, glows once and settles to a soft even light.',
         'Corin: I can\'t read one that size. ~ You can.',
         'Merrow: It held. ~ Not because anybody held it. Because somebody read it, and let it.',
@@ -164,22 +184,8 @@ export default {
         'Merrow: Badly, Teo. You feel badly about it. So do I. We will feel badly about it together at the clinic, where the Shift Tide line is going on the wall.',
         { op: 'if', cond: { flag: 'sp.idris-beaten' }, then: ['Idris: Silence is an answer. ~ So, it turns out, is yes.'] },
         'Corin: Light calls the change. ~ Light lets you read it.', go('done'),
-      ] },
-      { text: 'Anchor — hold this night a little longer. Free.', then: [
-        flag('np.keeper.reading-choice', 'anchor'),
-        'Merrow: Hold it. Hold it still. ~ …It is still. Is that what I wanted? A hand. One choice. You read it first.',
-        ...readingNight(),
-        '* The window opens again. The cards are the same three, and so are the odds. The choice is still yours.',
-        go('choose'),
-      ] },
-      { text: 'Reroll — ask for another shape. Free.', then: [
-        flag('np.keeper.reading-choice', 'reroll'),
-        'Varga: Again! Again. ~ …Every one of them is beautiful. That is the trouble. Another reading. No promise. You know.',
-        sfx('shiftFlip'), ...readingNight(),
-        '* The cards come round again, new faces, the same odds. The choice is still yours.',
-        go('choose'),
-      ] },
-    ] }, label('done'), toast('The Reading'), { op: 'save', reason: 'reading' }, END,
+      ],
+    } }, label('done'), toast('The Reading'), { op: 'save', reason: 'reading' }, END,
   ],
 
   // ---------------------------------------------------------------------------------------------

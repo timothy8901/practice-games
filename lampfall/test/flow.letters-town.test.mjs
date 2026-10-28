@@ -410,13 +410,13 @@ describe('Porch Duel payout', () => {
     const G = makeGame('DUEL-PAY');
     const w0 = G.world.wallet.main;
     G.bus.emit('battle:end', { outcome: 'win', kind: 'trainer', trainerId: 'porch-tully', porchDuel: true });
-    assert.equal(G.world.wallet.main - w0, 210);
+    assert.equal(G.world.wallet.main - w0, 180);
     G.store.tx('b', (w) => { w.badges.push('turn', 'ward', 'weather'); });
     G.bus.emit('battle:end', { outcome: 'win', kind: 'trainer', trainerId: 'porch-wren', porchDuel: true });
-    assert.equal(G.world.wallet.main - w0, 210 + 780, 'Day 10\'s Osric duel pays 780 at three badges');
+    assert.equal(G.world.wallet.main - w0, 180 + 780, 'Day 10\'s Osric duel pays 780 at three badges');
     G.bus.emit('battle:end', { outcome: 'lose', kind: 'trainer', trainerId: 'porch-wren', porchDuel: true });
     G.bus.emit('battle:end', { outcome: 'win', kind: 'trainer', trainerId: 'lowmoor-osier', porchDuel: false });
-    assert.equal(G.world.wallet.main - w0, 990);
+    assert.equal(G.world.wallet.main - w0, 960);
   });
 });
 

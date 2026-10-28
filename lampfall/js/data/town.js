@@ -331,7 +331,7 @@ export const PORCH_DUELS = deepFreeze({
   stream: 'shop:<day>/duels',
   scaling: 'party-median',
   /** Posted curve by badges held (next Spire's ace − 3; after six badges, the Summit's 47). */
-  curveByBadges: [7, 13, 19, 26, 33, 40, 47],
+  curveByBadges: [6, 13, 19, 26, 33, 40, 47],
   /** Opponent party size by badges held: 1 before badge 2, 2 until badge 4, then 3. */
   partySizeByBadges: [1, 1, 2, 2, 3, 3, 3],
   composition: 'Two neighbours and one visitor when any visitor is eligible, else three neighbours. No opponent twice a day; no neighbour three days running.',

@@ -99,7 +99,8 @@ function defaultSystems(bus) {
 }
 
 /**
- * Fills `{player}`, `{nick:uid}`, `{npcNick}`, `{npc}`, `{wallet}`, `{var:name}` in text. `|` page
+ * Fills `{player}`, `{nick:uid}`, `{npcNick}`, `{npc}`, `{wallet}`, `{var:name}`, `{flag:id}` (a
+ * flag's stored value, e.g. the Reading's ring, LF-02) in text. `|` page
  * breaks and `~` beats are left for the textbox. Unknown tokens stay as written.
  * @param {string} text
  * @param {ScriptCtx} ctx
@@ -109,7 +110,7 @@ export function interpolate(text, ctx) {
   if (typeof text !== 'string') return text;
   const world = ctx?.world ?? {};
   const data = ctx?.data ?? null;
-  return text.replace(/\{(player|npcNick|npc|wallet|nick:[^}]+|var:[^}]+)\}/g, (m, token) => {
+  return text.replace(/\{(player|npcNick|npc|wallet|nick:[^}]+|var:[^}]+|flag:[^}]+)\}/g, (m, token) => {
     if (token === 'player') return world.player?.name ?? m;
     if (token === 'wallet') return String(world.wallet?.main ?? 0);
     if (token === 'npcNick') {
@@ -129,6 +130,10 @@ export function interpolate(text, ctx) {
       const uid = token.slice(5);
       const c = [...(world.party ?? []), ...(world.box ?? [])].find((x) => x.uid === uid);
       return c ? c.nickname : m;
+    }
+    if (token.startsWith('flag:')) {
+      const v = world.flags?.[token.slice(5)];
+      return v === undefined || v === null || typeof v === 'object' ? m : String(v);
     }
     if (token.startsWith('var:')) {
       const v = ctx.vars?.[token.slice(4)];

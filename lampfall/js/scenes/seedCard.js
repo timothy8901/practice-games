@@ -105,6 +105,17 @@ export function runTallies(world) {
 }
 
 /**
+ * The ring the Passenger settled into at the Reading (np.keeper.reading-ring, set by the Forecast
+ * scene's Reading offer, LF-02), or null before the Reading. Pure.
+ * @param {any} world
+ * @returns {string|null}
+ */
+export function readingRing(world) {
+  const v = world?.flags?.['np.keeper.reading-ring'];
+  return typeof v === 'string' && v ? v : null;
+}
+
+/**
  * The Seed Card as text (GDD-09 §8), for the clipboard.
  * @param {any} world
  * @param {any} [data] registry (form names)
@@ -130,6 +141,8 @@ export function seedCardText(world, data) {
     lines.push(t('seedCard.text.shiftlog', { nick: c.nickname || formName(c.speciesId), forms }));
   }
   lines.push(`${t('seedCard.summitSeal')}: ${world?.flags?.['sp.idris-beaten'] ? 'stamped' : 'open'}`); // str
+  const ring = readingRing(world);
+  if (ring) lines.push(t('seedCard.text.line', { label: t('seedCard.reading'), value: ring }));
   return lines.join('\n');
 }
 
@@ -300,6 +313,12 @@ export function drawRunCard(ctx, G, ox, oy, o = {}) {
     drawText(ctx, r[0], ox + 12, oy + 58 + i * 11, { color: ink });
     drawText(ctx, r[1], ox + 90, oy + 58 + i * 11, { color: ink });
   });
+  // the ring the Passenger settled into (LF-02), under the seals
+  const ring = readingRing(world);
+  if (ring) {
+    drawText(ctx, t('seedCard.reading'), ox + 170, oy + 69, { color: soft, font: 'small' });
+    drawText(ctx, ring, ox + 170, oy + 80, { color: ink, maxWidth: CARD.w - 182 });
+  }
   ctx.fillStyle = COLORS.paper.rule; ctx.fillRect(ox + 12, oy + 98, CARD.w - 24, 1);
   // Shiftlogs: one strip per party member, each form's icon with the mark in the same spot
   const party = world?.party ?? [];

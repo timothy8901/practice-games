@@ -481,7 +481,7 @@ export const TUNING = freeze({
 
   // ===== Reference: payouts (GDD-00 §7 Income) ==================================================
   spireWinPerAce: 200,                 // Spire win = 200 × ace level, once [fixed]
-  spireAceLevels: [10, 16, 22, 29, 36, 43], // Turn, Ward, Weather, Hollow, Relay, Mirror aces [fixed]
+  spireAceLevels: [9, 16, 22, 29, 36, 43], // Turn, Ward, Weather, Hollow, Relay, Mirror aces [fixed]
   spireWinStarsalt: 3,                 // + 3 Starsalt per Spire win [fixed]
   porchDuelPerCurve: 30,               // Porch Duel = 30 × curve level; the first lever if loans 5-6 stall [25-45]
   porchDuelsPerDay: 3,                 // three offers a day on the slate [fixed]

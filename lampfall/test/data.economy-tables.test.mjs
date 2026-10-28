@@ -447,7 +447,7 @@ describe('tuning: GDD-00 numbers', () => {
     assert.equal(TUNING.spireShareFraction, 0.1);
     assert.equal(TUNING.residentShareFraction, 0.05);
     assert.equal(TUNING.glintBase + TUNING.glintPerDay * 2, 620, 'the night-one Glint (day 2 at 03:40) is 620');
-    assert.deepEqual(TUNING.spireAceLevels.map((a) => a * TUNING.spireWinPerAce), [2000, 3200, 4400, 5800, 7200, 8600]);
+    assert.deepEqual(TUNING.spireAceLevels.map((a) => a * TUNING.spireWinPerAce), [1800, 3200, 4400, 5800, 7200, 8600]);
     assert.equal(TUNING.wardCount, 3);
   });
 });

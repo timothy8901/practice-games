@@ -31,6 +31,7 @@ import { t, confirmSpec } from '../data/strings.js';
 import { drawCreature, creatureArt, creatureSprite } from '../art/creatures/index.js';
 import { markAnchor } from '../art/heartmark.js';
 import * as forecastSys from '../systems/forecast.js';
+import * as creatureSys from '../systems/creature.js';
 import * as exp from '../systems/exp.js';
 import * as wallet from '../systems/wallet.js';
 import * as flags from '../systems/flags.js';
@@ -127,6 +128,24 @@ export function readingPick(cards, u) {
  * @param {any} G
  * @returns {import('../core/scene.js').Scene & Record<string, any>}
  */
+/**
+ * The result-line note for moves a Shift parked in Memory (FE-06): "Knuckle went to Memory: Barnaby
+ * can teach it back." Only moves the creature can relearn now are named ({@link creatureSys.canRelearn});
+ * another form's signature waits for that form. Pure; '' when nothing qualifies.
+ * @param {string[]|undefined} toMemory
+ * @param {any} c   the creature after the Shift
+ * @param {any} data
+ * @returns {string}
+ */
+export function memoryNote(toMemory, c, data) {
+  if (!c || !Array.isArray(toMemory) || !toMemory.length) return '';
+  const ids = toMemory.filter((id) => creatureSys.canRelearn(c, id, data));
+  if (!ids.length) return '';
+  const names = ids.map((id) => (data?.tryGet ? data.tryGet('moves', id)?.name : null) ?? data?.moves?.[id]?.name ?? id);
+  const list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`;
+  return t(names.length === 1 ? 'shift.toMemory' : 'shift.toMemoryMany', { moves: list });
+}
+
 export function createForecastScene(G) {
   /** @type {any} */ let params = null;
   /** @type {any} */ let data = null;
@@ -438,6 +457,8 @@ export function createForecastScene(G) {
       const mv = data.tryGet ? data.tryGet('moves', id) : null;
       message += ` ${t('battle.msg.learned', { target: name, move: mv ? mv.name : id })}`;
     }
+    const memLine = memoryNote(outcome.result?.toMemory, findCreature(), data);
+    if (memLine) message += ` ${memLine}`;
   }
 
   function doReroll() {
@@ -816,10 +837,12 @@ export function createForecastScene(G) {
   }
 
   function drawMessage(ctx) {
-    const w = measureText(message, { maxWidth: 300 }).w + 20;
+    const m = measureText(message, { maxWidth: 300 });
+    const w = m.w + 28; // room for the more-arrow after the widest line
     const x = Math.round((W - w) / 2);
-    const y = 211;
-    drawPanel(ctx, { x, y, w, h: 18 + (measureText(message, { maxWidth: 300 }).h > 10 ? 10 : 0) }, 'notice', { torn: 'none' });
+    const lines = Math.max(1, m.lines ?? (m.h > 10 ? 2 : 1));
+    const y = 211 - Math.max(0, lines - 2) * 10;
+    drawPanel(ctx, { x, y, w, h: 18 + (lines - 1) * 10 }, 'notice', { torn: 'none' });
     drawText(ctx, message, x + 10, y + 5, { color: COLORS.paper.ink, maxWidth: 300 });
     if ((mode === 'result' || mode === 'readingDone') && Math.floor(elapsed / 500) % 2 === 0) drawText(ctx, TYPE.more, x + w - 10, y + 6, { color: PALETTE.waxRed });
   }

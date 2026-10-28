@@ -245,19 +245,32 @@ describe('moves and Memory', () => {
     assert.equal(C.forgetMove(c, 0), false, 'last move');
   });
 
-  it('relearnFromMemory only relearns moves the current form can learn', () => {
+  it('relearnFromMemory relearns any Memory move except another form\'s signature (FE-06: a fairness tool)', () => {
     const c = mk('c1', 'sloshkin', 30);
-    c.memory = ['gale-cut', 'settle', 'settle'];
+    c.memory = ['gale-cut', 'settle', 'settle', 'shadowbox', 'nothing'];
     c.moves = c.moves.filter((m) => m.id !== 'settle');
-    assert.deepEqual(C.relearnable(c, DATA), ['settle']);
-    assert.equal(C.relearnFromMemory(c, 'gale-cut', DATA), false);
+    assert.deepEqual(C.relearnable(c, DATA), ['gale-cut', 'settle'], 'off-learnset moves come back; Scrapling\'s signature and unknown ids do not');
+    assert.equal(C.canRelearn(c, 'shadowbox', DATA), false);
+    assert.equal(C.relearnFromMemory(c, 'shadowbox', DATA, { replaceIndex: 0 }), false);
     assert.equal(C.relearnFromMemory(c, 'nothing', DATA), false);
     assert.equal(c.moves.length, 4);
     assert.equal(C.relearnFromMemory(c, 'settle', DATA), false, 'slots full, no replacement index');
     const free = c.moves.findIndex((m) => m.id !== c.heartmark);
     assert.equal(C.relearnFromMemory(c, 'settle', DATA, { replaceIndex: free }), true);
     assert.ok(c.moves.some((m) => m.id === 'settle'));
-    assert.deepEqual(c.memory, ['gale-cut', 'settle']);
+    assert.deepEqual(c.memory, ['gale-cut', 'settle', 'shadowbox', 'nothing']);
+    const free2 = c.moves.findIndex((m) => m.id !== c.heartmark && m.id !== 'settle');
+    assert.equal(C.relearnFromMemory(c, 'gale-cut', DATA, { replaceIndex: free2 }), true, 'a move the form cannot learn by level still comes back');
+    assert.ok(c.moves.some((m) => m.id === 'gale-cut'));
+  });
+
+  it('a signature move in Memory comes back once the creature is its signature form again', () => {
+    const c = mk('c2', 'scrapling', 12);
+    c.moves = c.moves.filter((m) => m.id !== 'shadowbox').slice(0, 3);
+    c.memory = ['shadowbox'];
+    assert.deepEqual(C.relearnable(c, DATA), ['shadowbox']);
+    assert.equal(C.relearnFromMemory(c, 'shadowbox', DATA), true);
+    assert.deepEqual(c.memory, []);
   });
 
   it('pinHeartmarkTechnique pins a known move once (force overrides) and records STAB', () => {

@@ -21,8 +21,8 @@ import { TRAINER_SCRIPTS } from '../js/data/trainers.js';
 const scripts = { ...THREAD_SCRIPTS, ...TRAINER_SCRIPTS, ...NPC_SCRIPTS, ...STORY_SCRIPTS };
 const data = createRegistry({ ...DATA_CONTENT, npcs: NPCS, schedules: SCHEDULES, scripts, eventScripts: EVENT_SCRIPTS });
 const fresh = () => createNewWorld({ seedCode: encodeSeedCode({ seed: 88, dial: 'FLUX', toggles: [] }) });
-function drive(id, world = fresh(), picks = []) {
-  const writes = [], requests = [], answers = picks.slice();
+function drive(id, world = fresh(), picks = [], forecasts = []) {
+  const writes = [], requests = [], answers = picks.slice(), offers = forecasts.slice();
   const systems = {
     setFlag(w, key, value = true) { w.flags[key] = value; writes.push(['flag', key, value]); },
     give(w, item, n = 1) { writes.push(['give', item, n]); return { ok: true }; },
@@ -34,6 +34,8 @@ function drive(id, world = fresh(), picks = []) {
   while (!r.done) {
     requests.push(r);
     if (requests.length > 500) throw new Error(`Unbounded story script: ${id}`);
+    // the Reading's offer (`forecast`, who 'reading'): the Forecast scene writes the choice flag (LF-02)
+    if (r.op === 'forecast' && r.who === 'reading') world.flags['np.keeper.reading-choice'] = offers.shift() ?? 'accept';
     r = runner.step(r.op === 'choice' ? (answers.shift() ?? 0) : undefined);
   }
   return { world, requests, writes };
@@ -95,7 +97,8 @@ test('clearing the final loan hands over Isolde\'s lantern and lights all six ru
 test('the Reading runs THE_READING (seven two-turn phases) and supports both free extensions before Accept (MID-18)', () => {
   assert.equal(THE_READING.phases.length, 7);
   assert.equal(THE_READING.phaseTurns, 2);
-  const r = drive('the-reading', fresh(), [1, 2, 0]);
+  const r = drive('the-reading', fresh(), [], ['anchor', 'reroll', 'accept']);
+  assert.equal(r.requests.filter((op) => op.op === 'forecast' && op.who === 'reading').length, 3, 'the offer is the Forecast card view, once a night');
   const battles = r.requests.filter((op) => op.op === 'startBattle');
   assert.deepEqual(battles.map((op) => op.holdOut), [14, 2, 2]);
   assert.ok(battles.every((op) => op.source === 'reading' && op.wild.speciesId === 'vagary' && op.wild.reading === THE_READING));

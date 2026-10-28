@@ -235,6 +235,13 @@ export function createOverworldScene(G) {
   // the HUD's "Next:" chip (FH-09): shows for a few seconds after the objective changes or a menu closes
   const nextChip = createObjectiveChip();
   let nextPollMs = 0;
+  // FE-23: a flag, loan or errand event re-reads the objective at once (not on the next map or poll)
+  let nextDirty = false;
+  function readObjective() {
+    let line = '';
+    try { line = objectiveFor(G.world, G.data)?.text ?? ''; } catch { line = ''; }
+    nextChip.observe(line, sceneMs);
+  }
   const CHIP_MENUS = new Set(['menu', 'mapScreen', 'party', 'bag', 'box', 'fieldLog', 'ledger', 'settings', 'saveLoad', 'letter', 'dayPage']);
   let lastGateToast = { key: '', at: -1e9 };
   let litWorld = null;
@@ -632,7 +639,9 @@ export function createOverworldScene(G) {
   }
 
   function refuseWarp(res, warp) {
-    const msg = res.reason === 'tide' ? tideMessage(warp.way) : (hasString(`warp.${res.reason}`) ? t(`warp.${res.reason}`) : res.message);
+    // a warp may carry its own refusal line (`refusal`, e.g. the Keepers' Hall north door, LF-01)
+    const own = res.reason !== 'tide' && typeof warp.refusal === 'string' && warp.refusal ? warp.refusal : null;
+    const msg = own ?? (res.reason === 'tide' ? tideMessage(warp.way) : (hasString(`warp.${res.reason}`) ? t(`warp.${res.reason}`) : res.message));
     gateToast(`warp:${warp.x},${warp.y}`, msg);
     G.bus.emit('player:bump', { reason: res.reason });
     return res;
@@ -1047,10 +1056,11 @@ export function createOverworldScene(G) {
   function listen() {
     if (offs.length) return;
     const on = (evt, fn) => offs.push(G.bus.on(evt, fn));
-    on('flag:set', () => { flagsVersion++; entitiesDirty = true; });
-    on('loan:built', () => { flagsVersion++; entitiesDirty = true; });
-    on('loan:paid', () => { flagsVersion++; });
-    on('day:start', () => { entitiesDirty = true; flagsVersion++; });
+    on('flag:set', () => { flagsVersion++; entitiesDirty = true; nextDirty = true; });
+    on('loan:built', () => { flagsVersion++; entitiesDirty = true; nextDirty = true; });
+    on('loan:paid', () => { flagsVersion++; nextDirty = true; });
+    for (const evt of ['loan:tier', 'loan:commission', 'loan:roof', 'commons:built', 'counter:inc']) on(evt, () => { nextDirty = true; });
+    on('day:start', () => { entitiesDirty = true; flagsVersion++; nextDirty = true; });
     on('world:replaced', () => { loadedWorld = null; });
     on('gather:shake', () => { entitiesDirty = true; });
     on('bag:changed', () => { toolsDirty = true; });
@@ -1136,6 +1146,7 @@ export function createOverworldScene(G) {
       if (toolRing) toolRing.setTools(ringTools());
       camera.follow(camTarget);
       void result;
+      if (!G.world.cutscene) { readObjective(); nextDirty = false; } // the chip comes back with the current line (FE-23)
       if (nextChip.resumed(sceneMs)) nextPollMs = CHIP_POLL_MS; // re-read now; the chip shows again
       // FE-18: a stamp is stamped when its moment ends (back in the field after the scene that earned
       // it), not days later all at once in the Journal
@@ -1205,11 +1216,13 @@ export function createOverworldScene(G) {
       if (toolRing) toolRing.update(dt);
       // the objective, re-read about once a second while the field is in charge
       nextPollMs += dt;
-      if (nextPollMs >= CHIP_POLL_MS && G.scenes.top() === scene && busy === 0 && !changing && !G.world.cutscene) {
+      if (nextDirty && !changing && !G.world.cutscene) {
+        nextDirty = false;
         nextPollMs = 0;
-        let line = '';
-        try { line = objectiveFor(G.world, G.data)?.text ?? ''; } catch { line = ''; }
-        nextChip.observe(line, sceneMs);
+        readObjective();
+      } else if (nextPollMs >= CHIP_POLL_MS && G.scenes.top() === scene && busy === 0 && !changing && !G.world.cutscene) {
+        nextPollMs = 0;
+        readObjective();
       }
       floats = floats.filter((f) => sceneMs - f.t0 < 1200);
       if (G.flags && G.flags.debug && G.debugOverlay == null) { /* nothing */ }

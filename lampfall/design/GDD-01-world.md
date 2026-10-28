@@ -194,7 +194,7 @@ Chapter 1 of the full GDD (GDD-00 §17). It turns GDD-00 §2–§5 and §16 into
 | id | Name | Curve level | Day wild band | Music |
 |---|---|---|---|---|
 | `pellwick` | Pellwick | 4 | 2–5 (the reed edges) | hourly |
-| `lowmoor` | Lowmoor | 7 | 3–8 | hourly |
+| `lowmoor` | Lowmoor | 6 | 3–8 | hourly |
 | `cairnhold` | Cairnhold | 13 | 9–14 | hourly |
 | `emberstep` | Emberstep | 19 | 15–20 | hourly |
 | `drownwood` | Drownwood | 26 | 22–27 | hourly |

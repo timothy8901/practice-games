@@ -511,7 +511,7 @@ describe('town.js', () => {
     const P = T.PORCH_DUELS;
     assert.equal(P.offersPerDay, 3);
     assert.equal(P.payoutPerCurveLevel, 30);
-    const aces = [10, 16, 22, 29, 36, 43, 50];
+    const aces = [9, 16, 22, 29, 36, 43, 50];
     assert.deepEqual(P.curveByBadges, aces.map((a) => a - 3));
     assert.equal(P.payoutPerCurveLevel * P.curveByBadges[3], 780, 'Day 10: a Porch Duel with Osric pays 780');
     assert.deepEqual(P.hours, [19 * 60, 60], 'porch talk 19:00–01:00');

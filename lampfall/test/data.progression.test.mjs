@@ -163,7 +163,7 @@ describe('a scripted early game (battleFlow + the real engine)', () => {
     for (let i = 0; i < 4; i++) fight(G, { kind: 'wild', wild: { speciesId: 'bilgebob', level: 6 } });
     const lv = G.world.party.map((c) => c.level).sort((a, b) => a - b);
     const median = lv[Math.floor((lv.length - 1) / 2)];
-    assert.ok(median >= 7 && median <= 12, `Turn Spire door (curve 7, ace 10): party ${lv.join(',')}`);
+    assert.ok(median >= 7 && median <= 12, `Turn Spire door (curve 6, ace 9): party ${lv.join(',')}`);
     assert.ok(s().level <= 13, `starter Lv${s().level}`);
   });
 });

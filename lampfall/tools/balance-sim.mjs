@@ -423,7 +423,7 @@ export const STARTER_LINES = Object.freeze({
  * `crackdust` how many Crackdust, `alt` the forms that fill a slot when the starter's line already holds a member.
  */
 export const PARTIES = Object.freeze({
-  turn: { curve: 7, starterStage: 0, members: ['tossup', 'wirewhisk', 'mudfist'], discs: [], items: [['salve', 25], ['salve', 25]], crackdust: 0, alt: ['puddlepip'] },
+  turn: { curve: 6, starterStage: 0, members: ['tossup', 'wirewhisk', 'mudfist'], discs: [], items: [['salve', 25], ['salve', 25]], crackdust: 0, alt: ['puddlepip'] },
   ward: { curve: 13, starterStage: 1, members: ['tossup', 'wirewhisk', 'mudfist', 'chillnub'], discs: ['spore-drift'], items: [['salve', 25], ['salve', 25]], crackdust: 2, alt: ['mothling'] },
   weather: { curve: 19, starterStage: 1, members: ['wirewhisk', 'mudfist', 'chillnub', 'sootling', 'sedgehare'], discs: ['spore-drift'], items: [['tonic', 70], ['salve', 25]], crackdust: 0, alt: ['rayling'] },
   hollow: { curve: 26, starterStage: 2, members: ['coilcrest', 'rimeplate', 'sootling', 'rushling', 'bilgebob'], discs: ['spore-drift', 'flashover'], items: [['tonic', 70], ['tonic', 70]], crackdust: 0, alt: ['creelwight'] },
@@ -705,10 +705,13 @@ export const PROGRESSION_PLAYERS = Object.freeze({
  * the ace sits at curve + 3), and where the starter's Shift windows (GDD-00 §8: Lv8 / 20 / 34) open.
  */
 export const PROGRESSION_TARGETS = Object.freeze({
-  // Lowmoor sits highest (+4/+5): its night trainers and Linnet's Caldermaw 11 stand above its posted 7.
+  // Lowmoor sits highest (+5/+6): its night trainers and Linnet's Caldermaw 11 stand above its posted 6
+  // (Maud's ace dropped to Lv9 for the Down-Shifted party, FE-06; night one's EXP did not move).
   typical: Object.freeze([-1, 5]),
   minimal: Object.freeze([-4, 4]),
   thorough: Object.freeze([0, 8]),
+  /** extra headroom above the band at one door: the Turn door's curve fell to 6 (ace 9, FE-06) */
+  doorSlack: Object.freeze({ turn: 1 }),
   /** window level -> the stops (isle ids, 'pellwick', 'the-bar') it may open in for the starter, by player */
   starterWindows: Object.freeze({
     8: Object.freeze(['pellwick', 'lowmoor']),
@@ -886,7 +889,7 @@ export function progressionReport(opts = {}) {
   for (const [id, player] of Object.entries(PROGRESSION_PLAYERS)) {
     const r = simulateProgression(progressionSchedule(player), opts);
     const band = PROGRESSION_TARGETS[id];
-    const doors = r.doors.map((d) => ({ ...d, offset: d.median - d.curve, ok: d.median - d.curve >= band[0] && d.median - d.curve <= band[1] }));
+    const doors = r.doors.map((d) => ({ ...d, offset: d.median - d.curve, ok: d.median - d.curve >= band[0] && d.median - d.curve <= band[1] + (PROGRESSION_TARGETS.doorSlack[d.id] ?? 0) }));
     const starterWindows = r.windows.filter((w) => w.starter).map((w) => ({ level: w.level, stop: w.stop }));
     out[id] = { ...r, doors, band, starterWindows };
   }

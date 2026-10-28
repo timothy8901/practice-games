@@ -42,6 +42,7 @@ import { PORCH_DUELS } from '../../data/town.js';
 import { duelSlate, postedDuels } from '../townCommon.js';
 import { shiftTideRows } from './shiftTide.js';
 import * as rooms from './rooms.js';
+import { summitBlocker } from './battleFlow.js';
 
 /** @typedef {import('../../world/interact.js').ContextAction} ContextAction */
 
@@ -267,6 +268,19 @@ async function sentinel(G, action, host) {
   return done('challenge', { scene: 'battle', sentinelId: row.id });
 }
 
+/**
+ * The Challenge confirm's body: "Spire Leader. 2 creatures, up to Lv9. Posted scripted Shifts, …."
+ * The tactic tag starts a sentence, so its first letter is capitalised (LF-22). Pure.
+ * @param {{title: string, party: any[], tacticTag?: string}} trainer
+ * @param {number[]} [levels]
+ * @returns {string}
+ */
+export function challengeBody(trainer, levels = trainer.party.map((c) => c.level)) {
+  const tag = String(trainer.tacticTag ?? '').trim();
+  const tagLine = tag ? ` ${tag.charAt(0).toUpperCase()}${tag.slice(1)}${/[.!?]$/.test(tag) ? '' : '.'}` : '';
+  return `${trainer.title}. ${trainer.party.length} creatures, up to Lv${Math.max(...levels)}.${tagLine}`;
+}
+
 async function challenge(G, action, host) {
   if (def(action).sentinel) return sentinel(G, action, host);
   let id = action.payload?.trainerId ?? def(action).trainerId;
@@ -279,12 +293,19 @@ async function challenge(G, action, host) {
     say(G, trainer.lines.win, trainer.npc ?? trainer.name);
     return done('challenge', { scene: 'dialogue', defeated: true });
   }
+  // the Summit climbs in order (LF-01): refuse a Keeper or Idris out of turn before any Challenge confirm
+  const blocker = summitBlocker(G.world, id);
+  if (blocker) {
+    const who = G.data.tryGet('trainers', blocker)?.name ?? blocker;
+    toast(G, host, t('summit.order', { who }));
+    return fail('challenge', 'out-of-order');
+  }
   if (!hasAliveParty(G.world)) {
     toast(G, host, t('common.restedCompanion'));
     return fail('challenge', 'no-party');
   }
   const levels = trainer.party.map((c) => c.level);
-  const pick = await ask(G, host, { title: trainer.name, body: `${trainer.title}. ${trainer.party.length} creatures, up to Lv${Math.max(...levels)}. ${trainer.tacticTag}.`,
+  const pick = await ask(G, host, { title: trainer.name, body: challengeBody(trainer, levels),
     options: ['Come back later', 'Challenge'], defaultIndex: 0 });
   if (pick !== 1) return fail('challenge', 'declined');
   const setup = { kind: 'trainer', trainerId: id, source: trainer.expSource ?? (trainer.spire ? 'spire' : 'route') };

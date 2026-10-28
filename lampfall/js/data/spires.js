@@ -58,8 +58,8 @@ const SHARE = f({ fraction: 0.1, of: 'open-loan', ledger: 'wren', once: true });
 
 export const SPIRES = f([
   f({
-    id: 'turn', n: 1, name: 'Turn Spire', isle: 'lowmoor', map: 'spire-turn', waystone: 'brackenford', curveLevel: 7,
-    leader: 'maud', trainer: 'maud-spire', ace: f({ species: 'bilgebob', level: 10 }),
+    id: 'turn', n: 1, name: 'Turn Spire', isle: 'lowmoor', map: 'spire-turn', waystone: 'brackenford', curveLevel: 6,
+    leader: 'maud', trainer: 'maud-spire', ace: f({ species: 'bilgebob', level: 9 }),
     theme: f({
       kind: 'scripted-shifts', name: 'Posted scripted Shifts',
       text: 'Each of Maud\'s creatures Shifts once, mid-battle, and the Forecast strip is posted a turn before it lands. Her Puddlepip\'s card is a sure thing; her Bilgebob\'s three cards roll at your dial\'s odds.',
@@ -73,10 +73,10 @@ export const SPIRES = f([
     dossier: f({
       title: 'Turn Spire: Maud Tallis',
       tacticTag: 'posted scripted Shifts, one sure, one rolled',
-      text: 'Puddlepip Lv8 (Brine). Strip: Up to Sloshkin, 100%. Bilgebob Lv10 (Brine, Sodden). Strip: Up Brinelance / Side Rushling / Down Puddlepip at your dial\'s odds. One Salve. Plan a move for every card, not just the one you like. Memory moves the new form can use: Barnaby\'s desk at the Archive teaches them back, free. "Read them. Then decide. Confirm?" -M.T.',
+      text: 'Puddlepip Lv8 (Brine). Strip: Up to Sloshkin, 100%. Bilgebob Lv9 (Brine, Sodden). Strip: Up Brinelance / Side Rushling / Down Puddlepip at your dial\'s odds. One Salve. Plan a move for every card, not just the one you like. A move a Shift parked in Memory? Barnaby\'s desk at the Archive teaches it back, free. "Read them. Then decide. Confirm?" -M.T.',
     }),
     badge: f({ id: 'turn', name: 'Turn Seal', seal: 'a goose feather pressed into grey wax' }),
-    prize: f({ buttons: 2000, starsalt: 3 }),
+    prize: f({ buttons: 1800, starsalt: 3 }),
     share: SHARE,
     unlocks: f([
       f({ kind: 'reader-tool', id: 'reroll', name: 'Reroll', text: 'Spend Starsalt to redraw a Forecast: 1, 2, 4, 8 Starsalt within one window.' }),
@@ -387,9 +387,9 @@ export const THE_READING = f({
       rule: f({ evasion: 2, decoys: 2, showTrueOdds: true }),
       voice: f({ npc: 'varga', line: 'Look at it. Every shape at once. And you want to pick ONE?' }),
       next: cards(
-        { aspect: aspect('Lamplit', 'comet', ['Star', 'Glass', 'Kiln', 'Brine']) },
-        { aspect: aspect('Harbor', 'tide', ['Star', 'Brine', 'Stone', 'Moss']) },
-        { aspect: aspect('Dark Water', 'dusk', ['Star', 'Hollow', 'Brine', 'Rime']) },
+        { aspect: aspect('Ring of the Light', 'comet', ['Star', 'Glass', 'Kiln', 'Brine']) },
+        { aspect: aspect('Ring of the Tide', 'tide', ['Star', 'Brine', 'Stone', 'Moss']) },
+        { aspect: aspect('Ring of the Dark Water', 'dusk', ['Star', 'Hollow', 'Brine', 'Rime']) },
       ),
     }),
     f({

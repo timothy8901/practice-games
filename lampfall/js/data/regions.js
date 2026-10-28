@@ -10,7 +10,7 @@
 /** @type {ReadonlyArray<Readonly<{id: string, name: string, curveLevel: number, wild: readonly [number, number] | null, music: string | null}>>} */
 export const REGIONS = Object.freeze([
   Object.freeze({ id: 'pellwick', name: 'Pellwick', curveLevel: 4, wild: Object.freeze([2, 5]), music: null }),
-  Object.freeze({ id: 'lowmoor', name: 'Lowmoor', curveLevel: 7, wild: Object.freeze([3, 8]), music: null }),
+  Object.freeze({ id: 'lowmoor', name: 'Lowmoor', curveLevel: 6, wild: Object.freeze([3, 8]), music: null }),
   Object.freeze({ id: 'cairnhold', name: 'Cairnhold', curveLevel: 13, wild: Object.freeze([9, 14]), music: null }),
   Object.freeze({ id: 'emberstep', name: 'Emberstep', curveLevel: 19, wild: Object.freeze([15, 20]), music: null }),
   Object.freeze({ id: 'drownwood', name: 'Drownwood', curveLevel: 26, wild: Object.freeze([22, 27]), music: null }),

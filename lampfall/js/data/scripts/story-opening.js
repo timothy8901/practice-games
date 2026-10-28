@@ -234,7 +234,7 @@ export default {
     tp('corin', P, 'corin-dock', 0, -1),
     '* The dock runs out over the flats into the dusk. Corin settles on a piling behind you and tilts his head at Cinder.',
     'Corin: Its window is open. Keeper, the Glass: over Cinder stands a strip, and one card is lit. UP — CALDERMAW — 100%. A posted Shift. It lands the moment she sends it out, on every dial.',
-    'Corin: Then that Sootling is a great deal larger than you, and much harder to hurt. You are not meant to win. Hold three turns. ~ Read, then choose.',
+    'Corin: Then that Sootling is a great deal larger than you, and much harder to hurt. You are not meant to win. Stand as long as you can; three turns is a hold. ~ Read, then choose.',
     'Linnet: Stop TEACHING, it\'s my turn!',
     { op: 'startBattle', trainer: 'linnet-dock', source: 'story', holdOut: 3 },
     END,
