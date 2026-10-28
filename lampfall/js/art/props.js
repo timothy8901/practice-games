@@ -257,6 +257,33 @@ P('shop-sign', { k: 'iron', d: 'wd0', p: 'wd2', l: 'wd3', b: 'brass', w: 'pl3', 
   '................',
   '................',
 ]);
+// Hanging shop signs (16×16 overlays from a wall bracket beside the door; FH-09 wayfinding): an
+// iron arm, two chains and a painted board whose glyph names the place at a glance (the board's
+// `look` text and the field's near-sign label carry the words).
+const HANGING_ICONS = Object.freeze({
+  pells: ['wwpww', 'wpppw', 'ppapp', 'ppppp', 'wpppw'], // a sundries sack with a coin
+  archive: ['bbibb', 'bcicb', 'bcicb', 'bbibb', 'wwiww'], // an open book
+  post: ['iiiii', 'iicii', 'icrci', 'icccc', 'iiiii'], // a sealed letter
+  yard: ['wkkkw', 'wkkkw', 'wwpww', 'wwpww', 'wwpww'], // a mallet
+  cottage: ['wwkww', 'wkkkw', 'wkykw', 'wkykw', 'wkkkw'], // the porch lantern
+});
+const hangingRows = (icon) => [
+  '................',
+  'kkkkkkkkkkkkk...',
+  '..k.......k.....',
+  '..k.......k.....',
+  '.kdddddddddk....',
+  '.kdwwwwwwwdk....',
+  ...icon.map((r) => `.kdw${r}wdk....`),
+  '.kdwwwwwwwdk....',
+  '.kdddddddddk....',
+  '..kkkkkkkkk.....',
+  '................',
+  '................',
+];
+for (const [id, icon] of Object.entries(HANGING_ICONS)) {
+  P(`hanging-sign-${id}`, { k: 'iron', d: 'wd0', p: 'wd2', w: 'pl3', c: 'pl1', i: 'uiink', a: 'brass', b: 'blue2', r: 'red2', y: '!amber' }, [hangingRows(icon)]);
+}
 // Tide chalkboard (16×16): an A-frame slate by each Waystone with the next lows chalked as wave lines.
 P('tide-chalkboard', { k: 'base', d: 'wd0', p: 'wd2', g: 'dark1', c: 'pl2', s: 'shadow' }, [
   '................',

@@ -321,6 +321,10 @@ export function optionsFrom(world, data) {
     seed: tideSeedFor(t.TIDE_DAY1_LOW),
     minutesPerDay: Number.isFinite(mpd) && mpd > 0 ? mpd : t.CLOCK_DEFAULT_MINUTES_PER_DAY,
     realClock: world?.settings?.realClock === true,
+    // Real Clock keeps the run's own day count (LG-RN70): the device gives the hour and the passing
+    // of days, never the epoch day, so day-gated story, the Glint's day bonus and every daily cap
+    // read the run day under every clock setting.
+    realRelative: true,
   };
 }
 
@@ -356,12 +360,35 @@ export function restoreFrom(world, clock, data) {
     // A load never resumes a porch Sit or a pause: the scene stack is not saved, so a ×6 speed or a
     // paused flag captured by an autosave mid-Sit (`day:start` fires while you sit through midnight)
     // would leave the clock racing or stopped with no bench to stand up from.
+    // A pre-LG-RN70 Real Clock save (see isLegacyRealTotal) keeps its total: every day stamp in it
+    // (letters.keeperDay, loans builds' readyDay, threads' lastAdvancedDay, shop and gather days) was
+    // written on that epoch-day count, so rebasing only the clock would put them all in the future
+    // (no letter, no build landing, no thread beat ever again). Rebasing belongs to a save migration
+    // that moves every stamp with it.
     clock.restore({ ...state, seed: tideSeedFor(tuningOf(data).TIDE_DAY1_LOW), speed: 1, paused: false });
     return { ok: true };
   } catch (e) {
     world.clock = clock.serialize();
     return { ok: false, error: String(e && e.message ? e.message : e) };
   }
+}
+
+/**
+ * Smallest total a Real Clock save written before LG-RN70 carried (core/time's epoch-day index:
+ * 2000-01-01 onward). No run reaches that day count (it is ~10,960 days).
+ */
+export const LEGACY_REAL_TOTAL_MIN = 10_960 * MINUTES_PER_DAY;
+
+/**
+ * Whether a clock state is a Real Clock save written before LG-RN70 (its total holds the epoch day).
+ * {@link restoreFrom} keeps such a total as it is (its day stamps agree with it); a save migration
+ * that rebases the clock must shift every day stamp by the same whole days.
+ * @param {any} state  a `world.clock`
+ * @returns {boolean}
+ */
+export function isLegacyRealTotal(state) {
+  const total = state?.total;
+  return state?.realClock === true && typeof total === 'number' && Number.isFinite(total) && total >= LEGACY_REAL_TOTAL_MIN;
 }
 
 /** @returns {ClockEvents} */
@@ -455,8 +482,8 @@ function report(before, clock, t, bus, mode) {
     for (const c of list) {
       if (c.kind === 'day') {
         bus.emit('day:end', { day: c.day - 1, gameDay: c.day });
-        const wd = weekdayOfDay(c.day + 1, t, mode.realClock ? c.day : null);
-        bus.emit('day:start', { day: c.day, gameDay: c.day + 1, dayOfWeek: wd, dayName: DAY_NAMES[wd], spring: springOn(c.day + 1, t, mode.realClock ? c.day : null) });
+        const wd = weekdayOfDay(c.day + 1, t, null);
+        bus.emit('day:start', { day: c.day, gameDay: c.day + 1, dayOfWeek: wd, dayName: DAY_NAMES[wd], spring: springOn(c.day + 1, t, null) });
       } else {
         bus.emit('clock:anchor', { id: c.id, minute: c.minute, day: c.day, gameDay: c.day + 1 });
       }
@@ -585,8 +612,9 @@ function totalOf(world) {
 }
 
 /**
- * Game day number, 1-based as the GDD counts (day 1 = core day 0). Under Real Clock the clock counts
- * absolute days, so the number is large but still advances once per real midnight.
+ * Game day number, 1-based as the GDD counts (day 1 = core day 0). Run-relative under every clock
+ * setting: Real Clock keeps the run's day count too (core/time `realRelative`, LG-RN70) and still
+ * advances once per real midnight.
  * @param {World} world
  * @returns {number}
  */
@@ -697,17 +725,20 @@ function springOn(day, t, realDay) {
 }
 
 /**
- * The real-clock day number when the world clock follows real time, else null.
- * @param {World} world
- * @returns {number|null}
+ * The calendar day the weekday and spring-tide rules read: always null now (the run's own GDD
+ * calendar). `world.clock.total` is run-relative under Real Clock too (LG-RN70), so the device's
+ * weekday is not known here, and one calendar keeps clockSys, state/selectors `dayOfWeek` and the
+ * cond DSL's `day.dow` agreeing (the first Lantern Market is day 7 under every setting).
+ * @param {World} _world
+ * @returns {null}
  */
-function realDayOf(world) {
-  return world?.clock?.realClock === true ? Math.floor(totalOf(world) / MINUTES_PER_DAY) : null;
+function realDayOf(_world) {
+  return null;
 }
 
 /**
- * The world's weekday: day 1 is a Sunday, so days 7, 14, 21 are Saturdays (Lantern Market). Under
- * Real Clock it is the device's weekday.
+ * The world's weekday: day 1 is a Sunday, so days 7, 14, 21 are Saturdays (Lantern Market), under
+ * every clock setting (Real Clock keeps the run's calendar; see {@link realDayOf}).
  * @param {World} world
  * @param {any} [data]
  * @returns {{index: number, name: string, isSaturday: boolean}} `index` 0 = Monday … 6 = Sunday

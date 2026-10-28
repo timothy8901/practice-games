@@ -6,6 +6,7 @@ import { openConfirm } from '../ui/confirm.js';
 import { createCeremonyScene } from './fieldOverlays.js';
 import { sysCtx, toast, sfx, prefsOf, skinOf, drawBackdrop, drawHeading, drawHints } from './menuKit.js';
 import * as loans from '../systems/loans.js';
+import { TUNING } from '../data/tuning.js';
 
 const PAGES = ['Loan ledger', 'Room commissions', 'Commons Jar'];
 const money = n => Math.max(0, Math.floor(n || 0)).toLocaleString('en-US');
@@ -23,6 +24,38 @@ export function ledgerRows(world, data, page = 0) {
   if (world.wallet.main > 0) rows.push({ id: 'deposit', label: `Add ${money(Math.min(1000, world.wallet.main))} buttons to the Jar`, amount: Math.min(1000, world.wallet.main) });
   for (const row of loans.commonsStatus(world, ctx)) rows.push({ id: row.id, label: `${row.built ? 'Done: ' : ''}${data.tryGet('commons', row.id)?.name ?? row.id}`, detail: row.built ? 'The neighbors made this together.' : `Your share: ${money(row.share)}. ${row.unlocked ? '' : 'A little further into the season.'}`, disabled: row.built || !row.unlocked });
   return rows;
+}
+
+/**
+ * The Ledger's resident-share line (GDD-00 §7): how many neighbours' life threads have paid their
+ * notch (or, after payoff, their 4,000 to the Jar). Pure.
+ * @param {any} world
+ * @param {any} data
+ * @returns {string}
+ */
+export function residentShareLine(world, data) {
+  const lead = (data?.list?.('threads') ?? []).filter((t) => (t.kind ?? 'lead') === 'lead').length || 6;
+  const paid = (world?.loans?.residentShares ?? []).length;
+  return `Neighbours' shares: ${paid} of ${lead} threads tied off`; // str
+}
+
+/**
+ * The First Night Errands credit line (FH-11): what the clipboard has taken off loan 1 and how many
+ * errands are left, or null once they are done or loan 1 is behind you. Pure.
+ * @param {any} world
+ * @param {any} [data]
+ * @returns {string|null}
+ */
+export function errandLine(world, data) {
+  const tu = { ...TUNING, ...(data?.tuning && typeof data.tuning === 'object' ? data.tuning : {}) };
+  const each = Number.isInteger(tu.errandCredit) ? tu.errandCredit : 500;
+  const count = Number.isInteger(tu.errandCount) ? tu.errandCount : 6;
+  const tier = Number.isInteger(tu.errandTier) ? tu.errandTier : 1;
+  const L = world?.loans;
+  if (!L || L.tier !== tier || !world?.flags?.['sp.errands-started']) return null;
+  const done = Math.min(count, Array.isArray(L.errands) ? L.errands.length : 0);
+  if (done >= count) return null;
+  return `Errand credit: ${money(done * each)} of ${money(count * each)}. Errands left: ${count - done}.`; // str
 }
 
 export function createLedgerScene(G) {
@@ -101,9 +134,12 @@ export function createLedgerScene(G) {
         drawText(canvas, `${house.built ? '*' : house.state === 'paid' ? '+' : '-'} ${house.tier}. ${title}`, 23, 125 + i * 13, { color: house.built ? COLORS.paper.ink : COLORS.paper.inkSoft, font: 'small', maxWidth: 202 });
       });
       drawText(canvas, `Scaffold: ${st.scaffold} / ${st.scaffoldMax}`, 23, 224, { color: COLORS.paper.inkSoft, font: 'small' });
+      drawText(canvas, residentShareLine(G.world, G.data), 23, 235, { color: COLORS.paper.inkSoft, font: 'small', maxWidth: 206 });
       if (page === 2) drawText(canvas, `Jar: ${money(st.jar)}`, 258, 51, { color: COLORS.paper.inkSoft, font: 'small' });
       if (page === 1) drawText(canvas, st.needsCommission ? `Choose for loan ${st.pendingPickTier}` : st.paidOff ? 'Two rooms can still be yours.' : 'Plans for your next room', 258, 51, { color: COLORS.paper.inkSoft, font: 'small' });
-      if (!rows.length) drawText(canvas, st.paidOff ? 'Paid in full. The light is yours.' : 'Your buttons can wait.', 258, 82, { color: COLORS.paper.inkSoft, maxWidth: 194 });
+      if (!rows.length) drawText(canvas, st.paidOff ? 'Paid in full. The light is yours.' : 'Your buttons can wait. Errands, and finds sold at Pell\'s or to Ludo, fill the apron.', 258, 82, { color: COLORS.paper.inkSoft, maxWidth: 194 }); // str
+      const errands = page === 0 ? errandLine(G.world, G.data) : null;
+      if (errands) drawText(canvas, errands, 258, 166, { color: COLORS.paper.ink, font: 'small', maxWidth: 196 });
       rows.slice(top, top + 8).forEach((row, i) => {
         const y = 63 + i * 16;
         if (top + i === index) { canvas.fillStyle = COLORS.focus.bandOnPaper; canvas.fillRect(253, y - 2, 208, 15); }

@@ -63,7 +63,7 @@ export const scripts = {
         'Tully: Thanks, {player}! ~ She will, you know. She remembers everything.',
       ] },
     ] },
-    'Bryony: I\'m getting new posts. Ambrose cuts posts. Ambrose wants timber. You\'ve got arms, and the storm branches are all over the orchard. Three good pieces.',
+    'Bryony: I\'m getting new posts. Ambrose cuts posts. Ambrose wants timber. You\'ve got arms, and the storm branches are all over the orchard. Three good pieces. ~ Or Juniper sells the yard\'s offcuts, if your arms are busy.',
     { op: 'beat', thread: T, to: 2 },
     { op: 'end' },
   ],

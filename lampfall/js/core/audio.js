@@ -1283,6 +1283,92 @@ function swell(ctx, dest, t0, { gain, attack, release, freq, peakFreq, q = 0.8, 
   return end;
 }
 
+// ───────────────────────────────────────────────────────────────────────────────────────────────
+// Creature cries (GDD-09 §10.5): audio.cry({base, slide, wave, tail})
+// ───────────────────────────────────────────────────────────────────────────────────────────────
+
+/** Cry waveforms (`saw` is the WebAudio sawtooth; `sawNoise` adds a noise rasp for Rust). */
+export const CRY_WAVES = Object.freeze(['sine', 'triangle', 'square', 'saw', 'sawNoise']);
+
+/** Seconds per 60 fps frame (cry timings are written in frames in the GDD). */
+const CRY_FRAME = 1 / 60;
+
+/**
+ * Normalizes cry parameters into a timed plan (pure; the tests read it). The cry is ≈ 21 f: the main
+ * voice slides from `base` by `slide` semitones (a `snap` cry slides up and snaps back to `base`
+ * for its last third); a `tail` adds the bonded two-note tail A5 then D6, 4 f each, sine, 50 % gain;
+ * `shimmer` (Star-touched) adds a 12 f octave shimmer; `motif` notes (MIDI list) replace the voice
+ * with a short falling figure (the Vagary on glass).
+ * @param {unknown} params  {base: MIDI, slide: semitones, wave, tail?: boolean, snap?: boolean, shimmer?: boolean, motif?: number[], frames?: number}
+ * @returns {{base: number, slide: number, wave: string, snap: boolean, dur: number, notes: Array<{midi: number, to: number, t: number, dur: number, wave: string, gain: number}>, end: number}}
+ */
+export function cryPlan(params) {
+  const o = opts(params);
+  const base = clamp(Math.round(num(o.base, 64)), 24, 108);
+  const slide = clamp(num(o.slide, 0), -24, 24);
+  const wave = CRY_WAVES.includes(o.wave) ? o.wave : 'triangle';
+  const snap = Boolean(o.snap);
+  const dur = clamp(num(o.frames, 21), 6, 60) * CRY_FRAME;
+  const notes = [];
+  if (Array.isArray(o.motif) && o.motif.length) {
+    const each = dur / Math.min(6, o.motif.length);
+    o.motif.slice(0, 6).forEach((m, i) => {
+      const midi = clamp(Math.round(num(m, base)), 24, 108);
+      notes.push({ midi, to: midi, t: i * each, dur: each * 1.6, wave: 'glass', gain: 0.7 });
+    });
+  } else if (snap) {
+    notes.push({ midi: base, to: base + slide, t: 0, dur: dur * 0.66, wave, gain: 1 });
+    notes.push({ midi: base, to: base, t: dur * 0.66, dur: dur * 0.34, wave, gain: 0.8 });
+  } else {
+    notes.push({ midi: base, to: base + slide, t: 0, dur, wave, gain: 1 });
+  }
+  let end = notes.reduce((m, n) => Math.max(m, n.t + n.dur), 0);
+  if (o.shimmer) notes.push({ midi: base + 12, to: base + 12 + slide, t: dur * 0.25, dur: 12 * CRY_FRAME, wave: 'sine', gain: 0.3 });
+  if (o.tail) {
+    notes.push({ midi: 81, to: 81, t: end, dur: 4 * CRY_FRAME, wave: 'sine', gain: 0.5 });
+    notes.push({ midi: 86, to: 86, t: end + 4 * CRY_FRAME, dur: 4 * CRY_FRAME, wave: 'sine', gain: 0.5 });
+  }
+  end = notes.reduce((m, n) => Math.max(m, n.t + n.dur), 0);
+  return { base, slide, wave, snap, dur, notes, end };
+}
+
+/**
+ * Plays a cry plan into `dest` from `t0`.
+ * @param {BaseAudioContext} ctx @param {AudioNode} dest @param {number} t0
+ * @param {ReturnType<typeof cryPlan>} plan @param {{gain: number, pitch: number, rand?: () => number}} p
+ */
+function playCry(ctx, dest, t0, plan, p) {
+  const out = mkFilter(ctx, dest, 'lowpass', 5200, 0.6);
+  for (const n of plan.notes) {
+    const a = t0 + n.t;
+    const f0 = midiToFreq(n.midi) * p.pitch;
+    const f1 = midiToFreq(n.to) * p.pitch;
+    if (n.wave === 'glass') {
+      const g = mkGain(ctx, out, 0);
+      perc(g.gain, a, 0.22 * n.gain * p.gain, n.dur);
+      mkOsc(ctx, g, 'sine', f0, a, a + n.dur);
+      mkOsc(ctx, g, 'sine', f0 * 2.76, a, a + n.dur * 0.6);
+      continue;
+    }
+    const type = n.wave === 'saw' || n.wave === 'sawNoise' ? 'sawtooth' : n.wave;
+    const level = (type === 'sine' ? 0.3 : type === 'triangle' ? 0.32 : 0.16) * n.gain * p.gain;
+    const g = mkGain(ctx, out, 0);
+    adsr(g.gain, a, { a: 0.012, d: n.dur * 0.35, s: 0.55, r: n.dur * 0.35, peak: level, hold: n.dur * 0.6 });
+    const osc = mkOsc(ctx, g, type, f0, a, a + n.dur + 0.05);
+    if (f1 !== f0) sweep(osc.frequency, a, f0, a + n.dur * 0.9, f1);
+    // a little vibrato so a cry reads as a voice, not a beep
+    const lfo = ctx.createOscillator();
+    const lg = ctx.createGain();
+    lfo.frequency.value = 9;
+    lg.gain.value = f0 * 0.012;
+    lfo.connect(lg);
+    lg.connect(osc.frequency);
+    lfo.start(a);
+    lfo.stop(a + n.dur + 0.06);
+    if (n.wave === 'sawNoise') burst(ctx, out, a, { gain: 0.12 * p.gain, dur: n.dur * 0.8, freq: f0 * 2, q: 1.2, rand: p.rand });
+  }
+}
+
 /** @type {Record<string, {dur: number, play: (ctx: BaseAudioContext, dest: AudioNode, t0: number, p: SfxParams) => void}>} */
 const SFX = {
   blip: {
@@ -2383,6 +2469,35 @@ export function createAudio() {
         return null;
       }
       return { name: key, time: t0, duration: def.dur };
+    },
+
+    /**
+     * A creature cry (GDD-09 §10.5). `params` from `audio/cries.js` cryParams(species): `{base, slide,
+     * wave, tail, snap?, shimmer?, motif?}`; `options` as sfx (`volume`, `pan`, `delay`, `pitch`).
+     * Returns `{name: 'cry', time, duration, plan}` or null while locked / rate-limited.
+     */
+    cry(params, options) {
+      const o = opts(options);
+      if (!graph || !ctx) return null;
+      if (ctx.state !== 'running') {
+        resume();
+        if (Date.now() - unlockCalledAt > UNLOCK_GRACE_MS) return null;
+      }
+      const now = ctx.currentTime;
+      if (!limiter.allow('cry', now)) return null;
+      const gain = clamp(num(o.volume, 1), 0, 2);
+      if (!(gain > 0)) return null;
+      const plan = cryPlan(params);
+      const pan = clamp(num(o.pan, 0), -1, 1);
+      const t0 = now + SFX_LATENCY + clamp(num(o.delay, 0), 0, MAX_SFX_DELAY);
+      try {
+        const dest = pan ? mkPan(ctx, graph.sfxBus, pan) : graph.sfxBus;
+        playCry(ctx, dest, t0, plan, { pitch: pitchMult(o), gain, rand: Math.random });
+      } catch (err) {
+        warnOnce(`audio.cry: ${err && err.message}`);
+        return null;
+      }
+      return { name: 'cry', time: t0, duration: plan.end, plan };
     },
 
     defineTrack(id, def) {

@@ -144,5 +144,5 @@ test('a `* ` pool line resolves to narration without the asterisk (Corin at the 
   assert.ok(say && !say.text.startsWith('*'), JSON.stringify(r));
   assert.equal(r.lineId, sit.id);
   assert.equal(say.text, sit.text.slice(2));
-  assert.equal(say.who, undefined);
+  assert.equal(say.who, null, 'narration says so, so the runner never gives it the NPC tab (MID-16)');
 });

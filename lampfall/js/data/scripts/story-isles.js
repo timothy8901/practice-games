@@ -297,6 +297,18 @@ export default {
     END,
   ],
 
+  // every later market night: the string lights and stalls go up at 20:00 Saturday and come down
+  // after 02:00 (triggers.js market-lights rows; LG-CH61). The first market lights them itself.
+  'market-lights-on': [
+    flag('sys.lantern-market'),
+    toast('Market Night'),
+    END,
+  ],
+  'market-lights-off': [
+    { op: 'setFlag', id: 'sys.lantern-market', value: false },
+    END,
+  ],
+
   // ---------------------------------------------------------------------------------------------
   // Dov's sealed crate: the first market's crate, then a weekly lot (Dov's market topic)
   // ---------------------------------------------------------------------------------------------

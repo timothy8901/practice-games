@@ -82,7 +82,9 @@ const folk = [
     'Sit at the table. No clock. Draw the cards again until you know why you drew them. Then we\'ll talk about the Spire.',
     'The punt\'s older than your grandmother and steers better than most people. Mind the third plank.',
   ], { group: 'leader', schedule: [at(hm(1), P, 'maud-berth', { pose: 'sleep' }), at(hm(5), 'lowmoor', 'maud-practice-table'), at(hm(18), P, 'maud-berth')],
-    topics: [topic('practice', 'maud-practice-table', 10, { once: true, cond: { not: { flag: 'sp.reroll-taught' } } })], voice: {
+    topics: [topic('practice', 'maud-practice-table', 10, { once: true, cond: { not: { flag: 'sp.reroll-taught' } } }),
+      // The Ember Grub beat 3 is Maud's (the beat's npcId), reached through a topic: the resolver reads only an npc's own threadId (MID-03)
+      topic('ember-grub-crossing', 'th-ember-grub-3', 20, { cond: { all: [{ thread: { id: 'ember-grub', beat: { eq: 2 } } }, { flag: 'sp.linnet-fell' }] } })], voice: {
       morning: ['First crossing\'s at five. You\'re late for it. Second\'s at eight. Confirm?'],
       evening: ['Punt\'s tied. Rope\'s coiled. That\'s a day. ~ Sit if you\'re sitting. I don\'t do porch talk. I do berth talk. It\'s shorter.'],
       night: ['Late for a crossing. The tide doesn\'t care, but I do. Go home. Confirm? ~ Confirmed.'],

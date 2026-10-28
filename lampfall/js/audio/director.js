@@ -105,6 +105,11 @@ export const DEFAULTS = Object.freeze({
   STOP_FADE_MS: 600,
   /** battle outcomes that play the victory sting */
   VICTORY_OUTCOMES: Object.freeze(['win', 'capture']),
+  /** indoors (a map of kind 'interior' with no music of its own): the day-part theme heard through the
+   * walls, low-passed to this music intensity (top10 #8 / FH-13) … */
+  INDOOR_INTENSITY: 0.45,
+  /** … with these stems dropped (the low-stem mix: no brushes, no tide, no rain on the roof) */
+  INDOOR_STEMS_OFF: Object.freeze(['perc', 'tide', 'rain']),
   /** how often a locked engine is polled for unlock */
   UNLOCK_POLL_MS: 250,
   /** decisions kept in the history ring (debug overlay, tests) */
@@ -207,6 +212,7 @@ export function tuningOf(tuning) {
  * @property {string|null} season
  * @property {string|null} place           the map's region (music place)
  * @property {string|null} mapMusic        the map's `music` override track id
+ * @property {boolean} [indoor]            the player is inside (map kind 'interior'): the world theme is filtered
  * @property {string[]} scenes             scene names, bottom first
  * @property {boolean} scenesKnown         true once a scene feed exists (empty stack = silence)
  * @property {{kind: string, hpRatio: number}|null} battle
@@ -235,7 +241,7 @@ export function tuningOf(tuning) {
  */
 export function initialState(over = {}) {
   return {
-    hour: 12, weekday: 0, weather: null, weatherStems: null, tide: null, tideState: null, season: null, place: null, mapMusic: null,
+    hour: 12, weekday: 0, weather: null, weatherStems: null, tide: null, tideState: null, season: null, place: null, mapMusic: null, indoor: false,
     scenes: [], scenesKnown: false, battle: null, sting: null, override: null, stemOverrides: {}, oneShotDone: null,
     ...over,
   };
@@ -380,6 +386,7 @@ export function stemsFor(trackId, s, source, t = DEFAULTS, extra = {}) {
   if (source === 'world' || source === 'map') {
     Object.assign(out, worldStems(s, trackId, t));
     applyCue(trackId);
+    if (source === 'world' && s.indoor && Array.isArray(t.INDOOR_STEMS_OFF)) for (const k of t.INDOOR_STEMS_OFF) if (has(k)) out[k] = false;
   } else if (source === 'battle') {
     if (has('tense')) out.tense = (s.battle ? s.battle.hpRatio : 1) <= t.TENSE_HP_RATIO;
   } else if (source === 'scene' && extra.cue) {
@@ -408,7 +415,8 @@ export function decide(s, t = DEFAULTS, sceneMusic = SCENE_MUSIC) {
   const make = (source, track, fade, extra = {}) => ({
     source, track, fade: fadeOf(fade, t.SCENE_FADE_MS), oneShot: Boolean(trackOf(track) && trackOf(track).loop === false),
     stems: track ? stemsFor(track, s, source, t, extra) : {},
-    intensity: source === 'world' || source === 'map' ? seasonIntensity(s, t) : 1,
+    intensity: source === 'world' && s.indoor && Number.isFinite(t.INDOOR_INTENSITY) ? Math.min(seasonIntensity(s, t), t.INDOOR_INTENSITY)
+      : source === 'world' || source === 'map' ? seasonIntensity(s, t) : 1,
     scene: extra.scene ?? null,
   });
   if (s.sting && trackOf(s.sting.track)) return make('sting', s.sting.track, t.STING_FADE_MS);
@@ -654,7 +662,12 @@ export function createMusicDirector(G, opts = {}) {
     }
     const place = payload.place ?? payload.region ?? def?.region ?? null;
     const music = payload.music ?? def?.music ?? null;
-    return { place: typeof place === 'string' ? place : null, music: typeof music === 'string' ? music : null };
+    // map:enter's own `kind` is the arrival ('warp' / 'load'); the map's kind comes from its definition
+    const kind = payload.mapKind ?? def?.kind ?? null;
+    // the map's `light.indoor` wins when it says so: the Lantern Stack is an 'interior' map open to the sky
+    const lightIndoor = def && def.light && typeof def.light.indoor === 'boolean' ? def.light.indoor : null;
+    const indoor = lightIndoor ?? kind === 'interior';
+    return { place: typeof place === 'string' ? place : null, music: typeof music === 'string' ? music : null, indoor };
   }
   function syncFromWorld() {
     state.hour = hourOf(readHour());
@@ -664,7 +677,7 @@ export function createMusicDirector(G, opts = {}) {
     setWeather(readWeather());
     const w = world();
     const mapId = w && w.player ? w.player.mapId : null;
-    if (typeof mapId === 'string') { const m = mapInfo(mapId); state.place = m.place; state.mapMusic = m.music; }
+    if (typeof mapId === 'string') { const m = mapInfo(mapId); state.place = m.place; state.mapMusic = m.music; state.indoor = m.indoor; }
   }
 
   // ----- settings -----------------------------------------------------------------------------
@@ -876,6 +889,7 @@ export function createMusicDirector(G, opts = {}) {
       const m = mapInfo(p && p.mapId, p && typeof p === 'object' ? p : {});
       state.place = m.place;
       state.mapMusic = m.music;
+      state.indoor = m.indoor;
       reconcile('map');
     },
     'battle:start': (p) => {

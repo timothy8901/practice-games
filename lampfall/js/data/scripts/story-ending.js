@@ -6,8 +6,10 @@
  * reached through the legacy `relighting` alias in ./index.js) ends by setting `lit.calls`, which
  * starts the ending scene; it plays the lens and beam set-pieces and then pushes `the-crossing`,
  * `the-reading` and `credits-dawn` itself, and the credits queue `coda-morning`. So these scripts never
- * `call` one another. The Reading is one protected 14-turn hold-out over the seven posted
- * {@link READING_PHASES} (battleFlow `source: 'reading'`), then an offer only Accept ends.
+ * `call` one another. The Reading is one protected 14-turn hold-out over the seven phases of
+ * data/spires.js `THE_READING` (battleFlow `source: 'reading'` builds the phases, the posted three-card
+ * Forecasts at the dial's steadied odds and the scaled level from it, MID-18), then an offer only
+ * Accept ends; each Anchor / Reroll plays one more two-turn night on a fresh card draw.
  *
  * `ansel-confession`, `ansel-weir-wheel`, `bell-dig` and `tamsin-sails` are set-pieces their thread
  * beats `call`; they never set thread flags or advance beats. The Summit beats work before or after
@@ -15,24 +17,34 @@
  * @module data/scripts/story-ending
  */
 import { warpTo, tp, cam, camHome, face, emote, flag, porch, deliver, sfx, music, toast, label, go, END, byDial } from './_stage.js';
+import { THE_READING } from '../spires.js';
 
 const P = 'pellwick';
 const LS = 'lantern-stack';
 /** Linnet is about: she never fell, or she has come home. */
 const LINNET_HOME = { any: [{ not: { flag: 'sp.linnet-fell' } }, { flag: 'sp.linnet-returned' }] };
 
-/** Posted two-turn phases passed directly to the Reading battle (no data import cycle). */
-export const READING_PHASES = Object.freeze([
-  { id: 'shore', name: 'The Shore', types: ['Brine'], next: 'Moss', turns: 2 },
-  { id: 'root', name: 'The Root', types: ['Moss'], next: 'Kiln', turns: 2 },
-  { id: 'ember', name: 'The Ember', types: ['Kiln'], next: 'Bolt', turns: 2 },
-  { id: 'storm', name: 'The Storm', types: ['Bolt', 'Gust'], next: 'Hollow', turns: 2 },
-  { id: 'hollow', name: 'The Empty Room', types: ['Hollow'], next: 'Glass', turns: 2 },
-  { id: 'mirror', name: 'The Mirror', types: ['Glass', 'Rime'], next: 'Star', turns: 2 },
-  { id: 'heart', name: 'The Heart', types: ['Star'], next: 'Your choice', turns: 2 },
-].map(Object.freeze));
-const readingBattle = (turns = 14) => ({ op: 'startBattle', source: 'reading', holdOut: turns,
-  wild: { speciesId: 'vagary', level: 50, readingPhases: turns === 14 ? READING_PHASES : [READING_PHASES[6]] } });
+/** The Reading: all seven phases of THE_READING; no level (battleFlow scales it: party max + 2, 30-60). */
+const READING = { op: 'startBattle', source: 'reading', holdOut: THE_READING.phases.length * THE_READING.phaseTurns,
+  wild: { speciesId: 'vagary', reading: THE_READING } };
+/** Card draws an Anchor / Reroll night can take before the last one repeats (each night draws anew). */
+export const READING_EXTRA_DRAWS = 6;
+/**
+ * One more night after Anchor / Reroll: the seventh phase's offer (its three rings) for two turns,
+ * on the next card draw (stream `reading:8:<draw>`), counted by `sys.reading-draws`.
+ */
+const readingNight = () => [
+  { op: 'inc', id: 'sys.reading-draws' },
+  { op: 'branch', on: 'sys.reading-draws', cases: Object.fromEntries([
+    ...Array.from({ length: READING_EXTRA_DRAWS - 1 }, (_, i) => [String(i + 1), [night(i + 1)]]),
+    ['default', [night(READING_EXTRA_DRAWS)]],
+  ]) },
+];
+/** @param {number} draw */
+function night(draw) {
+  return { op: 'startBattle', source: 'reading', holdOut: THE_READING.phaseTurns,
+    wild: { speciesId: 'vagary', reading: THE_READING, readingOffer: true, readingFrom: THE_READING.phases.length + 1, readingDraw: draw } };
+}
 
 /** The seven families who come home after the Relighting, one a night (dark houses 2-8). */
 const HOMECOMINGS = [
@@ -138,7 +150,7 @@ export default {
     'Corin: Seven phases. Two turns each. The next shape is posted before it comes. Neither side can fall tonight. This is a reading, Keeper. Take your time.',
     'Merrow: You may anchor it.', 'Varga: You may redraw it.',
     { op: 'if', cond: LINNET_HOME, then: ['Linnet: You may let it answer.'] },
-    readingBattle(), label('choose'),
+    READING, label('choose'),
     '* The seventh window opens. The Passenger turns its great mark toward the lamp, and then toward you, and the Glass in your paw goes warm.',
     '* Three cards hang in the air between you: the Ring of the Light, the Ring of the Tide, the Ring of the Dark Water. Odds on every one. The Heartshard waits without moving. For the first time, the choice is not its. It is yours.',
     { op: 'choice', defaultIndex: 0, options: [
@@ -156,14 +168,14 @@ export default {
       { text: 'Anchor — hold this night a little longer. Free.', then: [
         flag('np.keeper.reading-choice', 'anchor'),
         'Merrow: Hold it. Hold it still. ~ …It is still. Is that what I wanted? A hand. One choice. You read it first.',
-        readingBattle(2),
+        ...readingNight(),
         '* The window opens again. The cards are the same three, and so are the odds. The choice is still yours.',
         go('choose'),
       ] },
       { text: 'Reroll — ask for another shape. Free.', then: [
         flag('np.keeper.reading-choice', 'reroll'),
         'Varga: Again! Again. ~ …Every one of them is beautiful. That is the trouble. Another reading. No promise. You know.',
-        sfx('shiftFlip'), readingBattle(2),
+        sfx('shiftFlip'), ...readingNight(),
         '* The cards come round again, new faces, the same odds. The choice is still yours.',
         go('choose'),
       ] },
@@ -397,6 +409,19 @@ export default {
       flux: ['* The Bell keeps your place. Rest, change the team, and come back up: you start at whoever held you, with your party as it stood. Nothing lost. Nobody asks you to climb the same stair twice.'],
       freefall: ['* You chose wild odds, so the Bell rings for the whole climb: come back, and it starts with Bastien again. It costs nothing. Nothing up here ever costs anything but the climb.'],
     }),
+    // Drift / Flux: the Bell's hold can always be declined (spires.js SUMMIT_BELL `declinable`), while
+    // a climb is under way: a Keeper beaten, the Champion not yet. The Bell rung by hand after the
+    // Summit is cleared never resets it (that would re-pay every Summit purse and replay Idris's win).
+    { op: 'if', cond: { all: [{ dial: ['drift', 'flux'] }, { not: { flag: 'sys.trainer.idris-champion' } },
+      { any: [{ flag: 'sys.trainer.bastien-keeper' }, { flag: 'sys.trainer.cass-keeper' }] }] }, then: [
+      { op: 'choice', defaultIndex: 0, prompt: 'The Bell is still humming.', options: [
+        { text: 'Keep my place.', then: ['* The note hangs over the halls and settles. Whoever held you will be waiting where you left them.'] },
+        { text: 'Start again from the first Keeper.', then: [
+          { op: 'restartSummit' },
+          '* You lay a paw on the rope and pull once more. The Bell answers twice, and somewhere below, doors open again: Bastien will stand at the first one, as if the climb had never begun.',
+        ] },
+      ] },
+    ] },
     '* The rosters on the board at Hollis\'s gate never change. Read them again.',
     END,
   ],
@@ -430,7 +455,8 @@ export default {
       { text: '(Raise your cup to Hesper.)', then: ['* You raise your cup. The whole green raises theirs. Hesper goes very pink for a snail and hides inside her shell for a whole minute.'] },
     ] },
     music(null, 1200),
-    flag('sp.late-delivery'), toast('Late Delivery'), END,
+    // `sp.late-delivery` already holds the GDD day the 56th letter came (systems/letters); it stays
+    toast('Late Delivery'), END,
   ],
 
   // ---------------------------------------------------------------------------------------------

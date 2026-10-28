@@ -36,6 +36,8 @@ import * as flags from '../systems/flags.js';
  * @property {(world: World, spec: {species: string, level: number, nick: string|null}, ctx: {data: Registry|null, rng: any}) => any} [addCreature]
  * @property {(world: World, npc: string, key: string, value: any) => any} [remember]
  * @property {(world: World, threadId: string, beat: number|null) => any} [setBeat]   `null` = advance one beat
+ * @property {(world: World, ctx: {data: Registry|null}) => any} [restartSummit]   the Summit Bell's decline
+ *   (bind systems/flow/battleFlow `restartSummit`; the default clears the same `sys.trainer.<id>` flags)
  */
 
 /**
@@ -79,6 +81,20 @@ function defaultSystems(bus) {
   return {
     setFlag: (world, id, value) => flags.setFlag(world, id, value, sctx),
     inc: (world, id, by) => flags.inc(world, id, by, sctx),
+    // battleFlow.restartSummit's rule: every beaten Keeper and the Champion (trainer class `keeper` /
+    // `champion`) stands again, so the next climb starts at the first Keeper
+    restartSummit: (world, { data }) => {
+      const out = [];
+      let list = [];
+      try { list = data && typeof data.list === 'function' ? data.list('trainers') : []; } catch { list = []; }
+      for (const t of list) {
+        if (!t || (t.class !== 'keeper' && t.class !== 'champion')) continue;
+        if (!flags.hasFlag(world, `sys.trainer.${t.id}`)) continue;
+        flags.clearFlag(world, `sys.trainer.${t.id}`, sctx);
+        out.push(t.id);
+      }
+      return out;
+    },
   };
 }
 
@@ -283,6 +299,7 @@ export function createRunner(ops, ctx, state = null) {
       case 'remember': sys('remember', op.op)(w, op.npc ?? ictx.npc, op.key, op.value); return false;
       case 'thread': sys('setBeat', op.op)(w, op.id, op.beat ?? null); return false;
       case 'beat': sys('setBeat', op.op)(w, op.thread, op.to); return false;
+      case 'restartSummit': vars._restarted = sys('restartSummit', op.op)(w, { data }) ?? null; return false;
       default: throw new Error(`script: unknown pure op '${op.op}'`);
     }
   }
@@ -299,9 +316,12 @@ export function createRunner(ops, ctx, state = null) {
     const req = { id: ++seq, ...op };
     for (const f of schema.text ?? []) if (typeof req[f] === 'string') req[f] = interpolate(req[f], ictx);
     if (op.op === 'say') {
-      const who = op.who ?? ictx.npc ?? null;
+      // `who: null` is narration (a `* ...` line, ops.parseShorthand): never the NPC being talked to
+      // (MID-16). Only a line with no `who` at all defaults to that NPC.
+      const who = op.who === null ? null : op.who ?? ictx.npc ?? null;
       req.who = who;
-      req.name = who && data && data.has('npcs', who) ? (ictx.world.npcs?.[who]?.nickname || data.get('npcs', who).name) : who;
+      // the npc row's own name (LG-RN117): `world.npcs[id].nickname` is what they call the PLAYER
+      req.name = who && data && data.has('npcs', who) ? data.get('npcs', who).name : who;
     }
     if (op.op === 'choice') {
       const opts = [];

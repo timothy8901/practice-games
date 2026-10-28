@@ -517,6 +517,12 @@ export function validateData(DATA, opts = {}) {
     const r = validateOps(ops, { scriptId: id, has, isNpcId, validateCond: (c) => validateCond(c, condOpts) });
     errors.push(...r.errors);
     warnings.push(...r.warnings);
+    // LG-RN33: bag.take refuses a one-of-a-kind item without the player's confirm, so a scripted
+    // hand-over must ask (`ask: true`); a bare take silently leaves the keepsake in the satchel.
+    walkOps(ops, (op, path) => {
+      if (!op || op.op !== 'take' || op.ask === true || typeof op.item !== 'string' || !has('items', op.item)) return;
+      if (reg.get('items', op.item)?.oneOfAKind === true) err('scripts', `${id}[${path.join('.')}]`, `take of one-of-a-kind '${op.item}' must pass ask: true`);
+    });
   }
   for (const es of list('eventScripts')) {
     if (typeof es.event !== 'string' || !es.event) err('eventScripts', es.id, 'event must be a bus event name');

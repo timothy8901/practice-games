@@ -17,6 +17,12 @@ import {
 const ID = 'tamsin';
 /** Oyster Boat waiting at beat 2: Tamsin is on Drownwood (GDD-08 handoff). */
 const BEAT2 = { thread: { id: 'oyster-boat', beat: { eq: 2 } } };
+/**
+ * Oyster Boat waiting at beat 1: beat 2 ("standing in the dry bed of the north creek", 08:00-18:00)
+ * is next, so through its hours Tamsin keeps to the boat (the beat plays where she is; its thread
+ * `where` is only a hint).
+ */
+const BEAT1 = { thread: { id: 'oyster-boat', beat: { eq: 1 } } };
 
 export const scripts = {
   'talk-tamsin-first': [
@@ -101,15 +107,17 @@ export default {
     'late-delivery-party': spot(P, 'shift-fair', { pose: 'stand' }),
   },
   schedule: [
-    at({ tide: 'low', offset: -75 }, P, 'tamsin-flats', { pose: 'wander', wanderR: 3, for: 150, cond: { all: [{ hour: [7, 19] }, { not: BEAT2 }] }, activity: 'racing to the sparkles' }),
+    at({ tide: 'low', offset: -75 }, P, 'tamsin-flats', { pose: 'wander', wanderR: 3, for: 150, cond: { all: [{ hour: [7, 19] }, { not: BEAT2 }, { not: { all: [BEAT1, { hour: [8, 18] }] } }] }, activity: 'racing to the sparkles' }),
     at({ tide: 'low', offset: -75 }, 'drownwood', 'drowning-street', { pose: 'stand', for: 150, cond: { all: [{ hour: [9, 17] }, BEAT2] }, activity: 'waiting at the drowning street with Kettle' }),
     at(hm(7), P, 'tamsin-porch', { pose: 'sit', activity: 'breakfast on the step' }),
     at(hm(8), P, 'tamsin-boat', { pose: 'stand', activity: 'the boat in the north creek' }),
     at(hm(8, 1), P, 'night-fishing', { pose: 'stand', cond: { flag: 'sp.tamsin-sailed' }, activity: 'the Tidy Sum at the slipway' }),
     at(hm(9), 'drownwood', 'tamsin-drownwood', { pose: 'stand', cond: BEAT2, activity: 'Wendel\'s boatyard on Drownwood' }),
-    at(hm(13), P, 'tamsin-porch', { pose: 'sit', cond: { not: BEAT2 }, activity: 'lunch' }),
+    at(hm(13), P, 'tamsin-porch', { pose: 'sit', cond: { all: [{ not: BEAT2 }, { not: BEAT1 }] }, activity: 'lunch' }),
     at(hm(14), P, 'tamsin-boat', { pose: 'stand', cond: { not: BEAT2 } }),
-    at(hm(17), P, 'tamsin-porch', { pose: 'stand' }),
+    at(hm(17), P, 'tamsin-porch', { pose: 'stand', cond: { not: BEAT1 } }),
+    at(hm(17, 1), P, 'tamsin-boat', { pose: 'stand', cond: BEAT1, activity: 'the boat in the north creek' }),
+    at(hm(18), P, 'tamsin-porch', { pose: 'stand', cond: BEAT1 }),
     at(hm(23), P, 'door-dark-1', { pose: 'sleep' }),
   ],
   topics: [

@@ -68,6 +68,17 @@ export function litSteadied(w) {
   return flags.hasFlag(w, 'lit.steadied');
 }
 
+/**
+ * Whether the card flip has been seen once (it is then skippable). Written with flags.setFlag, so it
+ * is read as a FLAG; flags.get read the counter of the same id and was always 0, so the flip could
+ * never be skipped.
+ * @param {any} w
+ * @returns {boolean}
+ */
+export function flipSeen(w) {
+  return flags.hasFlag(w, FLIP_SEEN_FLAG);
+}
+
 /** @param {string} ty @returns {string} */
 const chipId = (ty) => String(ty || '').toLowerCase();
 
@@ -257,7 +268,7 @@ export function createForecastScene(G) {
       return;
     }
     outcome = { kind: 'accepted', index: r.index, card: r.card, result: r.result, fromForm, toForm: r.result.to, header };
-    flipSkippable = !!flags.get(world(), FLIP_SEEN_FLAG);
+    flipSkippable = flipSeen(world());
     G.store.tx('forecast.flipSeen', (w) => flags.setFlag(w, FLIP_SEEN_FLAG, true, { bus: G.bus }));
     flipF = 0;
     mode = instant() ? 'result' : 'flip';

@@ -477,7 +477,8 @@ export class Battle {
     /** @type {Array<{side: 0|1, uid: any, item: string}>} held items used up this battle */
     this.consumedItems = [];
     this._initWeather(opts);
-    this._emit({ type: 'message', text: this.kind === 'wild' ? `A wild ${this.active(1).nickname} appeared.` : `${this.sides[1].trainer.name} wants to battle.` });
+    this._emit({ type: 'message', text: this.kind !== 'wild' ? `${this.sides[1].trainer.name} wants to battle.` // str
+      : this.readingPhases ? `The ${this.active(1).nickname} settles on the Lantern Stack. Its mark is already glowing.` : `A wild ${this.active(1).nickname} appeared.` }); // str
     /** onEntry weather of the opening send-ins, applied once both leads are out. */
     this._openingEntries = [];
     for (const side of this.sides) this._sendIn(side.index, side.active, true);
@@ -534,8 +535,34 @@ export class Battle {
    */
   effectiveAbility(side) {
     const ability = this.data.ability(this.active(side).ability);
+    // the Reading's Ward phase (THE_READING phase 2 `rule.ward`): a lattice over the whole body
+    const ward = side === 1 ? this._readingRule('ward') : null;
+    // Crackdust brings the lattice down like any Ward (the Ward Spire's lesson): its own ability shows through
+    if (ward && typeof ward === 'object' && !(this.sides[side].vol.wardSuppressed > 0)) return { ...ability, id: 'reading-lattice', name: 'The Lattice', ward: { ...ward } }; // str
     if (isWard(ability) && this.sides[side].vol.wardSuppressed > 0) return null;
     return ability;
+  }
+
+  /**
+   * A rule of the Reading phase now running (THE_READING `rule`: `ward`, `noRepeatLead`, `evasion`),
+   * or null outside the Reading.
+   * @param {string} key @returns {any}
+   */
+  _readingRule(key) {
+    if (!this.readingPhases || !Number.isInteger(this._readingIndex)) return null;
+    const p = this.readingPhases[this._readingIndex];
+    return p && p.rule && p.rule[key] != null ? p.rule[key] : null;
+  }
+
+  /**
+   * The Relay phase (`rule.noRepeatLead`): whether `c` is the creature that ended the last phase and
+   * must sit this one out (only while someone else can read).
+   * @param {number} side @param {Creature} c @returns {boolean}
+   */
+  _readingBenched(side, c) {
+    if (side !== 0 || !c || this._readingBench == null || !this._readingRule('noRepeatLead')) return false;
+    if (c.uid !== this._readingBench) return false;
+    return this.sides[0].party.some((o) => o.uid !== c.uid && !isFainted(o));
   }
 
   /**
@@ -754,7 +781,7 @@ export class Battle {
   /** @param {number} side @returns {string|null} why Crackdust cannot be thrown now (null when it can) */
   _crackdustBlocked(side) {
     const foe = this.foeOf(side);
-    if (!isWard(this.data.ability(foe.ability))) return `${foe.nickname} has no Ward.`;
+    if (!isWard(this.data.ability(foe.ability)) && !(side === 0 && this._readingRule('ward'))) return `${foe.nickname} has no Ward.`;
     if (this.sides[1 - side].vol.wardSuppressed > 0) return 'Its Ward is already suppressed.';
     return null;
   }
@@ -765,7 +792,8 @@ export class Battle {
     const trapped = !forced && s.vol.trap > 0;
     return s.party.map((c, i) => {
       let reason = null;
-      if (i === s.active && !forced) reason = `${c.nickname} is already out.`;
+      if (this._readingBenched(side, c)) reason = `${c.nickname} ended the last phase. Someone else reads this one.`; // str
+      else if (i === s.active && !forced) reason = `${c.nickname} is already out.`;
       else if (isFainted(c)) reason = `${c.nickname} has fainted.`;
       else if (trapped) reason = `${this.active(side).nickname} is trapped and cannot switch.`;
       else if (i === s.active && forced) reason = `${c.nickname} has fainted.`;
@@ -952,12 +980,36 @@ export class Battle {
       p.landed = card.dir;
       if (card.weather && this.weatherKinds.has(card.weather) && !this.weatherCycle) this._setTimedWeather(card.weather, p.turns || 2, 'setup', null);
     }
+    // the Mirror phase's decoys (+2 evasion) belong to that phase: they fade when the next one opens
+    const prev = index > 0 ? this.readingPhases[index - 1] : null;
+    if (prev && prev.rule && Number.isInteger(prev.rule.evasion) && prev.rule.evasion > 0 && !(p.rule && p.rule.evasion > 0)) {
+      const v = this.sides[1].vol;
+      if (v.stages.eva > 0) {
+        v.stages.eva = 0;
+        this._emit({ type: 'stat', side: 1, target: c.nickname, stat: 'eva', stages: 0, result: 'reset', text: `The decoys fade. ${c.nickname}'s evasion is back to normal.` }); // str
+      }
+    }
     if (p.rule && Number.isInteger(p.rule.evasion) && p.rule.evasion > 0) this._changeStage(1, 'eva', p.rule.evasion, { bySelf: true });
     c.types = p.types.slice();
     const head = `Reading ${index + 1}/${this.readingPhases.length}: ${p.name || p.id}${p.aspect ? `, ${p.aspect}` : ''} (${c.types.join('/')}) — ${p.turns || 2} turns.`; // str
     this._emit({ type: 'type-shift', side: 1, who: c.nickname, current: c.types.join('/'), types: c.types.slice(), next: next.cards ? [] : next.types.slice(), aspect: p.aspect ?? null,
       text: index === this.readingPhases.length - 1 && this.readingPhases.some((q) => q.cards) ? `${head} Its last Forecast will be offered to you.` // str
         : next.cards ? `${head} Its next Forecast posts after ${this.readingPostAt} ${this.readingPostAt === 1 ? 'turn' : 'turns'}.` : `${head} Next: ${next.name || next.id} (${next.types.join('/')}).` }); // str
+    // phase rules (THE_READING `rule`)
+    const ward = p.rule && p.rule.ward;
+    if (ward && ward.kind === 'min-power') this._emit({ type: 'message', side: 1, text: `A lattice shimmers over the whole body. Hits under ${ward.minPower} power do nothing this phase.` }); // str
+    this._readingBench = null;
+    if (p.rule && p.rule.noRepeatLead) {
+      const s0 = this.sides[0];
+      const lead = this.active(0);
+      this._readingBench = lead.uid;
+      if (this._readingBenched(0, lead) && this.phase === 'choose') {
+        // the creature that ended the last phase sits this one out: the player sends someone else in
+        this.phase = 'replace';
+        this.pendingReplace = [0];
+        this._emit({ type: 'message', side: 0, text: `The Relay: ${lead.nickname} ended the last phase and sits this one out. Someone else reads.` }); // str
+      } else if (!s0.party.some((o) => o.uid !== lead.uid && !isFainted(o))) this._readingBench = null;
+    }
   }
 
 
@@ -1476,6 +1528,7 @@ export class Battle {
     const target = Number.isInteger(to) ? s.party[to] : undefined;
     if (!target) throw new BattleError('BAD_SWITCH', `No party slot ${String(to)}.`);
     if (isFainted(target)) throw new BattleError('BAD_SWITCH', `${target.nickname} has fainted.`);
+    if (this._readingBenched(side, target)) throw new BattleError('RELAY_BENCH', `${target.nickname} ended the last phase. Someone else reads this one.`);
     if (!forced && to === s.active) throw new BattleError('BAD_SWITCH', `${target.nickname} is already out.`);
     if (!forced && s.vol.trap > 0) throw new BattleError('TRAPPED', `${this.active(side).nickname} is trapped.`);
   }

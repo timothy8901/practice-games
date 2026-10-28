@@ -903,7 +903,8 @@ export function dig(world, map, x, y, rng, ctx) {
       if (hit.findId) recordFind(world, hit.findId, ctx);
       give(hit.findId);
       Object.assign(res, { ok: true, kind: 'skyglass', findId: hit.findId });
-      res.events.push({ type: 'dig', mapId: map.id, x, y }, { type: 'skyglass', mapId: map.id, x, y, id: hit.findId });
+      // `gather:skyglass {n}` (emitAll) counts toward the Glowing Flats stamp (data/town.js STAMPS)
+      res.events.push({ type: 'dig', mapId: map.id, x, y }, { type: 'skyglass', mapId: map.id, x, y, id: hit.findId, n: 1 });
       emitAll(ctx, res.events);
       return res;
     }

@@ -146,7 +146,7 @@ export default {
     { id: 1, cond: { hour: [6, 10] }, script: 'th-mudlark-mile-1', where: { mapId: 'pellwick', x: 32, y: 22 },
       when: 'Dawn laps, 06:00-10:00, on the green.', topic: 'Time my laps?',
       choices: [{ key: `th.${T}.timer`, options: ['honest', 'kind'] }] },
-    { id: 2, cond: { hour: [6, 12] }, script: 'th-mudlark-mile-2', advance: { days: 1 }, where: { mapId: 'pellwick', x: 32, y: 22 },
+    { id: 2, cond: { hour: [6, 12] }, script: 'th-mudlark-mile-2', advance: { days: 2 }, where: { mapId: 'pellwick', x: 32, y: 22 },
       when: 'A morning after beat 1, by the Commons board.', topic: 'Grey mullet, for luck.',
       choices: [{ key: `th.${T}.mullet`, options: ['yes', 'no'] }] },
     { id: 3, cond: { all: [{ flag: 'sp.tamsin-arrived' }, { lowTide: true }] }, script: 'th-mudlark-mile-3', advance: { days: 1 },

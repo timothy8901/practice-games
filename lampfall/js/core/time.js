@@ -521,6 +521,13 @@ export function realCalendar(day) {
  * @property {number} [minutesPerDay=24] real minutes one in-game day lasts (> 0, and large enough that
  *   one real millisecond is a finite, non-zero number of in-game minutes)
  * @property {boolean} [realClock=false] follow the local wall clock instead of `update(realDt)`
+ * @property {boolean} [realRelative=false] in real-clock mode, keep `total` counting from the run's own
+ *   day 0: the wall clock supplies the minute of day and the passing of days, never the absolute date.
+ *   The calendar offset lives in memory only and is re-anchored by `createClock`, `setRealClock(true)`
+ *   and `restore()` so the clock never runs backwards (today's wall minute, or tomorrow's when it has
+ *   already passed on the run's current day; the next `update()` advances there firing every
+ *   boundary). The calendar getters (`dayOfWeek`, `season`, `year`, `dateLabel`) still show the real
+ *   date. `serialize()` writes the run-relative total, so a game save never stores the epoch day.
  * @property {number} [startDay=0] day number at creation (integer in `[0, MAX_DAY]`; ignored in real-clock mode)
  * @property {number} [startMinute=1120] minute of day at creation, in `[0, 1440)` (ignored in real-clock mode)
  * @property {string|number|null} [seed] world seed; shifts the tide and moon schedules (see {@link scheduleForSeed})
@@ -592,7 +599,8 @@ export function realCalendar(day) {
  * @property {number} minute minute of day, `[0, 1440)`, fractional
  * @property {number} hour `[0, 23]`
  * @property {number} minuteOfHour `[0, 59]`
- * @property {number} day day number; 0-based from `startDay` (real-clock mode: an absolute day index)
+ * @property {number} day day number; 0-based from `startDay` (real-clock mode: an absolute day index,
+ *   unless `realRelative`, where it stays the run's day)
  * @property {number} dayOfWeek 0 = Monday .. 6 = Sunday
  * @property {string} dayName
  * @property {Season} season
@@ -624,6 +632,7 @@ export function realCalendar(day) {
  * @property {() => void} pause
  * @property {() => void} resume
  * @property {(on: boolean) => void} setRealClock switch modes; switching on jumps silently to the wall clock
+ *   (with `realRelative`: keeps the run day and lets the next `update()` walk to the wall minute)
  * @property {(minute: number, options?: {silent?: boolean}) => void} skipTo debug: advance to the next
  *   occurrence of a minute of day (tomorrow's if it already passed; no-op if it is now), firing boundary
  *   events unless `silent`; throws in real-clock mode
@@ -679,9 +688,18 @@ export function createClock(options = {}) {
   let frozenTide = null;
 
   let realClock = checkBoolean('createClock: realClock', o.realClock ?? false);
+  const realRelative = checkBoolean('createClock: realRelative', o.realRelative ?? false);
+  /** Real Clock with `realRelative`: wall-clock minutes minus this (a whole number of days) is `total`. Never serialized. */
+  let realOffset = 0;
   let seed = o.seed ?? null;
   let { tideOffset, moonOffset } = scheduleForSeed(seed);
-  let total = realClock ? realTimeToTotal(now()) : startDay * MINUTES_PER_DAY + startMinute;
+  let total = startDay * MINUTES_PER_DAY + startMinute;
+  if (realClock) {
+    if (realRelative) {
+      realOffset = realAnchorFor(startDay * MINUTES_PER_DAY);
+      total = realTimeToTotal(now()) - realOffset;
+    } else total = realTimeToTotal(now());
+  }
   let speed = 1;
   let paused = false;
   let advancing = false;
@@ -702,7 +720,23 @@ export function createClock(options = {}) {
   /** @returns {number} */
   const currentMinute = () => splitTotal(total).minute;
   /** @returns {CalendarInfo} */
-  const calendar = () => (realClock ? realCalendar(currentDay()) : gameCalendar(currentDay(), daysPerSeason));
+  const calendar = () => (realClock ? realCalendar(currentDay() + realOffset / MINUTES_PER_DAY) : gameCalendar(currentDay(), daysPerSeason));
+
+  /**
+   * The `realRelative` calendar offset that puts the wall clock's next reading on the run day of
+   * `from` (or the day after, when that day's wall minute is already behind `from`), so the clock
+   * never runs backwards across an anchor. Reads `now()` (may throw).
+   * @param {number} from run-relative total minutes
+   * @returns {number} offset in minutes, a whole number of days
+   */
+  function realAnchorFor(from) {
+    const wall = realTimeToTotal(now());
+    const wallDay = Math.floor(wall / MINUTES_PER_DAY);
+    const wallMinute = wall - wallDay * MINUTES_PER_DAY;
+    let day = Math.floor(from / MINUTES_PER_DAY);
+    if (day * MINUTES_PER_DAY + wallMinute < from) day += 1;
+    return (wallDay - day) * MINUTES_PER_DAY;
+  }
 
   /**
    * Tide facts at the current time, computed once per call.
@@ -872,7 +906,7 @@ export function createClock(options = {}) {
     assertIdle('update');
     if (realClock) {
       if (paused) return;
-      const target = realTimeToTotal(now());
+      const target = realTimeToTotal(now()) - realOffset;
       if (target > total) advanceTo(target, false);
       else if (target < total) jumpSilently(target); // the wall clock went backwards (DST, NTP, manual change)
       return;
@@ -905,7 +939,10 @@ export function createClock(options = {}) {
     assertIdle('setRealClock');
     checkBoolean('clock.setRealClock: on', on);
     if (on === realClock) return;
-    if (on) jumpSilently(realTimeToTotal(now())); // may throw: then the mode is left unchanged
+    // may throw: then the mode is left unchanged. Run-relative: the day is kept and the next update()
+    // walks forward to the wall clock's minute, firing every boundary (it never runs backwards).
+    if (on && realRelative) realOffset = realAnchorFor(total);
+    else if (on) jumpSilently(realTimeToTotal(now()));
     realClock = on;
   }
 
@@ -941,13 +978,15 @@ export function createClock(options = {}) {
     const nextRealClock = checkBoolean('clock.restore: state.realClock', state.realClock);
     // A real-clock total must map to a day `Date` can represent (which allows pre-1970 negatives);
     // a game total is any safe non-negative minute count.
-    const totalRange = nextRealClock
+    const totalRange = nextRealClock && !realRelative
       ? { min: MIN_REAL_DAY * MINUTES_PER_DAY, max: (MAX_REAL_DAY + 1) * MINUTES_PER_DAY, exclusiveMax: true }
       : { min: 0, max: MAX_TOTAL_MINUTES };
     const nextTotal = checkNumber('clock.restore: state.total', state.total, totalRange);
     const nextSpeed = checkNumber('clock.restore: state.speed', state.speed, { min: 0 });
     const nextPaused = checkBoolean('clock.restore: state.paused', state.paused);
     seedKey('clock.restore: state.seed', state.seed);
+    const nextOffset = nextRealClock && realRelative ? realAnchorFor(nextTotal) : 0; // may throw: nothing changed yet
+    realOffset = nextOffset;
     seed = state.seed ?? null;
     ({ tideOffset, moonOffset } = scheduleForSeed(seed));
     speed = nextSpeed;

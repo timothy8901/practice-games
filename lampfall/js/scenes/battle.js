@@ -39,13 +39,15 @@ import { portraitSprite } from '../art/portraits.js';
 import { hour as worldHour } from '../state/selectors.js';
 import {
   createAnimQueue, animFor, frames, FRAME_MS, SPEEDS, DEFAULT_SPEED, effTier, effWord, EFF_GLYPH, typedChars, lineMs,
-  LANTERN_FRAMES, unfoldShape, meterFrames, GATE,
+  LANTERN_FRAMES, unfoldShape, meterFrames, GATE, spriteFit,
 } from './battleAnims.js';
 import {
   buildBattle, applyBattleResult, createDeferredBus, prepareAction, captureMenu, bagMenu, noteEvents, expDisplay,
   applyExpEvent, learnOffered, nameCaught, installBattleDebug, relayRule, relayChoices, relayDefaultPicks, relayNextSetup,
 } from '../systems/flow/battleFlow.js';
 import { resolveBattleData } from './battleData.js';
+import { backdropFor, drawBackdrop, rustleColour } from '../art/backdrops.js';
+import { cryParams } from '../audio/cries.js';
 
 // ---------------------------------------------------------------------------------------------
 // Layout (GDD-09 §3.16) and colours
@@ -112,103 +114,42 @@ function makeCanvas(w, h) {
   return null;
 }
 
-/** Day-part palette for the arena. @param {number} h @returns {'day'|'dusk'|'night'} */
-function partOf(h) {
-  if (h >= 21 || h < 5) return 'night';
-  if (h >= 17 || h < 7) return 'dusk';
-  return 'day';
-}
-
-const ARENA_PAL = Object.freeze({
-  day: { sky: ['#EAF2F8', '#C9DDEB', '#94B0C2'], sea: ['#41A6F6', '#3B5DC9'], glint: '#F4F4F4', land: ['#A7F070', '#38B764', '#257179'], pad: ['#38B764', '#257179', '#29366F'] },
-  dusk: { sky: ['#F6D8AE', '#F3C178', '#EF7D57'], sea: ['#3B5DC9', '#29366F'], glint: '#F9C46B', land: ['#38B764', '#257179', '#29366F'], pad: ['#257179', '#29366F', '#1A1C2C'] },
-  night: { sky: ['#2B3A67', '#1E2A4D', '#141B33'], sea: ['#29366F', '#1A1C2C'], glint: '#3FF2E0', land: ['#257179', '#29366F', '#141B33'], pad: ['#29366F', '#1E2A4D', '#141B33'] },
-});
-
 /** @type {Map<string, any>} */
 const backdropCache = new Map();
 
 /**
- * Dithered band fill between two colours.
- * @param {CanvasRenderingContext2D} c @param {number} x @param {number} y @param {number} w @param {number} h
- * @param {string} a @param {string} b @param {number} k 0..1 share of b
- */
-function dither(c, x, y, w, h, a, b, k) {
-  c.fillStyle = a;
-  c.fillRect(x, y, w, h);
-  if (k <= 0) return;
-  c.fillStyle = b;
-  const pattern = k >= 0.75 ? [[0, 0], [1, 0], [0, 1]] : k >= 0.5 ? [[0, 0], [1, 1]] : [[0, 0]];
-  for (let yy = y; yy < y + h; yy += 2) {
-    for (let xx = x; xx < x + w; xx += 2) {
-      for (const [dx, dy] of pattern) if (xx + dx < x + w && yy + dy < y + h) c.fillRect(xx + dx, yy + dy, 1, 1);
-    }
-  }
-}
-
-/**
- * Filled pixel ellipse.
- * @param {CanvasRenderingContext2D} c @param {number} cx @param {number} cy @param {number} rx @param {number} ry @param {string} color
- */
-function ellipse(c, cx, cy, rx, ry, color) {
-  c.fillStyle = color;
-  for (let y = -ry; y <= ry; y++) {
-    const half = Math.round(rx * Math.sqrt(Math.max(0, 1 - (y * y) / (ry * ry))));
-    c.fillRect(cx - half, cy + y, half * 2, 1);
-  }
-}
-
-/**
- * The arena backdrop for a day-part (cached): sky bands, the sea line, the far shore and the two
- * stands the creatures stand on.
- * @param {'day'|'dusk'|'night'} part
+ * The arena backdrop for a place and day-part (cached per theme, part and accent): drawn by
+ * `art/backdrops.js` (shore, flats, marsh, drowned wood, stone, ember, moor, ice, summit, Spire
+ * interiors, the Reading at night, rooms), stands included.
+ * @param {{theme: string, part: 'day'|'dusk'|'night', accent: string|null, key: string}} pick
  * @returns {any}
  */
-function backdrop(part) {
-  if (backdropCache.has(part)) return backdropCache.get(part);
+function backdrop(pick) {
+  if (backdropCache.has(pick.key)) return backdropCache.get(pick.key);
   const cv = makeCanvas(W, L.arenaH);
   if (!cv) return null;
   const c = /** @type {CanvasRenderingContext2D} */ (cv.getContext('2d'));
-  const p = ARENA_PAL[part];
-  // sky: three bands with dithered seams
-  dither(c, 0, 0, W, 34, p.sky[0], p.sky[0], 0);
-  dither(c, 0, 34, W, 8, p.sky[0], p.sky[1], 0.5);
-  dither(c, 0, 42, W, 26, p.sky[1], p.sky[1], 0);
-  dither(c, 0, 68, W, 8, p.sky[1], p.sky[2], 0.5);
-  dither(c, 0, 76, W, 18, p.sky[2], p.sky[2], 0);
-  if (part === 'night') {
-    c.fillStyle = '#F4F4F4';
-    for (const [x, y] of [[40, 12], [96, 30], [150, 8], [212, 22], [270, 6], [300, 40], [404, 14], [452, 34], [24, 52], [180, 48], [330, 24]]) c.fillRect(x, y, 1, 1);
-    c.fillStyle = '#FF5BD6'; // the comet, a faint smudge
-    c.fillRect(250, 16, 2, 1); c.fillRect(252, 15, 1, 1);
-  }
-  // sea
-  c.fillStyle = p.sea[0];
-  c.fillRect(0, 94, W, 18);
-  dither(c, 0, 106, W, 6, p.sea[0], p.sea[1], 0.5);
-  c.fillStyle = p.glint;
-  for (let x = 6; x < W; x += 23) c.fillRect(x, 98 + ((x * 7) % 9), 5 + (x % 3), 1);
-  // far shore and the near ground
-  dither(c, 0, 112, W, 6, p.land[1], p.land[0], 0.5);
-  c.fillStyle = p.land[1];
-  c.fillRect(0, 118, W, L.arenaH - 118);
-  dither(c, 0, 150, W, 48, p.land[1], p.land[2], 0.25);
-  // tufts so the ground reads as ground
-  c.fillStyle = p.land[0];
-  for (let i = 0; i < 40; i++) {
-    const x = (i * 53) % W;
-    const y = 124 + ((i * 29) % 70);
-    c.fillRect(x, y, 1, 2); c.fillRect(x + 2, y + 1, 1, 1);
-  }
-  // stands
-  ellipse(c, L.foeBase.x, L.foeBase.y + 1, 58, 11, p.pad[2]);
-  ellipse(c, L.foeBase.x, L.foeBase.y, 56, 10, p.pad[1]);
-  ellipse(c, L.foeBase.x, L.foeBase.y - 1, 52, 8, p.pad[0]);
-  ellipse(c, L.playerBase.x, L.playerBase.y + 1, 68, 13, p.pad[2]);
-  ellipse(c, L.playerBase.x, L.playerBase.y, 66, 12, p.pad[1]);
-  ellipse(c, L.playerBase.x, L.playerBase.y - 1, 62, 10, p.pad[0]);
-  backdropCache.set(part, cv);
+  drawBackdrop(c, pick, { foe: L.foeBase, player: L.playerBase });
+  backdropCache.set(pick.key, cv);
   return cv;
+}
+
+/**
+ * The `battle:end` bus payload (stamps read `porchDuel` from it; wave-1 follow-up).
+ * @param {any} session @param {{outcome: string}} ev
+ * @returns {{outcome: string, kind: string, trainerId: string|null, summit: any, porchDuel: boolean}}
+ */
+export function battleEndPayload(session, ev) {
+  return { outcome: ev.outcome, kind: session.kind, trainerId: session.trainer ? session.trainer.id : null, summit: session.summit, porchDuel: !!session.porchDuel };
+}
+
+/**
+ * The badge gifts listed on the seal slip (each reward's own line; they also toast).
+ * @param {any} p PostBattle
+ * @returns {string[]}
+ */
+export function sealRewardLines(p) {
+  return (Array.isArray(p?.rewards) ? p.rewards : []).map((r) => (r && typeof r.line === 'string' ? r.line : '')).filter(Boolean);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -303,6 +244,23 @@ export function createBattleScene(G) {
   const st = () => session.battle.state();
   const legal = () => session.battle.legal(0);
   const emitBus = (evt, payload) => { try { G.bus?.emit(evt, payload); } catch (err) { console.error(err); } };
+  /**
+   * The creature on a side cries (GDD-09 §10.5): on send-out, a wild entrance, a faint and a catch.
+   * The voice comes from its species row (stage, primary type, size); a bonded one ends on the tail.
+   * @param {number} side @param {'sendOut'|'appear'|'faint'|'capture'} why
+   */
+  const cry = (side, why) => {
+    const m = sides[side];
+    if (!m || !m.speciesId) return;
+    try {
+      let row = null;
+      try { row = data && data.tryGet ? data.tryGet('species', m.speciesId) : null; } catch { row = null; }
+      const params = cryParams(row, { bonded: why !== 'capture' && !!m.lit, star: !!m.starTouched, speciesId: m.speciesId, types: m.types });
+      // a faint droops: the same voice a few semitones down and softer
+      const o = why === 'faint' ? { semitones: -4, volume: 0.8 } : why === 'capture' ? { volume: 0.7 } : { volume: 0.9 };
+      G.audio?.cry?.(params, { ...o, pan: side === 1 ? 0.35 : -0.35 });
+    } catch { /* audio locked */ }
+  };
 
   function setSpeed(n) {
     if (!SPEEDS.includes(n)) return;
@@ -447,12 +405,13 @@ export function createBattleScene(G) {
     arrows(side, dir, stat) {
       fx.push({ kind: 'arrows', side, dir, stat, ms: 0, life: frames(30) });
     },
-    faint(side) { const m = sides[side]; m.fainting = true; m.faintT = 0; },
+    faint(side) { const m = sides[side]; m.fainting = true; m.faintT = 0; cry(side, 'faint'); },
     recall(side) { const m = sides[side]; m.recalling = true; m.recallT = 0; },
     sendOut(side) {
       syncSide(side);
       const m = sides[side];
       m.hidden = false; m.fainting = false; m.faintT = 0; m.recallT = 0; m.recalling = false; m.entering = true; m.enterT = 0; m.foldT = 0;
+      cry(side, 'sendOut');
     },
     glint(side) { sides[side].glintMs = frames(30); },
     lattice(side) { sides[side].latticeMs = frames(6) + frames(42); },
@@ -499,10 +458,10 @@ export function createBattleScene(G) {
       return () => done;
     },
     payout(ev) { fx.push({ kind: 'coin', side: 0, text: `+${formatNumber(ev.amount)}`, ms: 0, life: frames(60) }); },
-    release(ev) { releaseFor(ev); },
+    release(ev) { releaseFor(ev); if (ev && ev.type === 'capture') cry(1, 'capture'); },
     stance() { /* the badge redraws from state */ },
     ended(ev) {
-      emitBus('battle:end', { outcome: ev.outcome, kind: session.kind, trainerId: session.trainer ? session.trainer.id : null, summit: session.summit });
+      emitBus('battle:end', battleEndPayload(session, ev));
       const tr = session.trainer;
       // a Relay round won with more to come: the twins keep their parting words for the last one
       if (session.relay && !session.relay.final && ev.outcome === 'win') return session.relay.round < session.relay.of ? `Round ${session.relay.round} of ${session.relay.of} won. No healing between rounds.` : null; // str
@@ -957,6 +916,7 @@ export function createBattleScene(G) {
       overlay = { kind: 'slip', title: `${p.badge[0].toUpperCase()}${p.badge.slice(1)} seal`, lines: [ // str
         `+${p.starsalt} Starsalt`, // str
         p.spireShare > 0 ? `Spire share: ${formatNumber(p.spireShare)}◉ notched on Wren's ledger` : '', // str
+        ...sealRewardLines(p),
       ].filter(Boolean) };
       sfx('achievement');
       await waitConfirm();
@@ -1116,7 +1076,10 @@ export function createBattleScene(G) {
           sides[1].rise = 1;
           intro.rustle = frames(36);
           yield frames(24);
-          const ms = view.say(t('battle.wild', { name: foe.name, place: intro.place === 'water' ? 'water' : 'grass' }));
+          cry(1, 'appear');
+          // the Reading lands on the Lantern Stack: never "came out of the grass" (MID-18)
+          const ms = view.say(session.battle.readingPhases ? `The ${foe.name} settles on the Lantern Stack. Its mark is already glowing.` // str
+            : t('battle.wild', { name: foe.name, place: intro.place === 'water' ? 'water' : 'grass' }));
           yield frames(18);
           yield Math.max(frames(10), ms - frames(18));
         },
@@ -1425,9 +1388,34 @@ export function createBattleScene(G) {
     drawText(ctx, 'Back: X / tap', 106, 160, { color: SOFT }); // str
   }
 
+  /** @type {Map<string, {scale: number, dx: number, dy: number}>} */
+  const fitCache = new Map();
+  /** Draw scale and offset of the foe's front sprite (battleAnims.spriteFit over its art). */
+  function foeFit(speciesId, types) {
+    const k = `${speciesId}|${types?.[0] ?? ''}`;
+    let f = fitCache.get(k);
+    if (!f) {
+      let art = null;
+      try { art = creatureArt(speciesId, { types }); } catch { art = null; }
+      f = spriteFit(art?.rows, 2, art?.w ?? 32);
+      fitCache.set(k, f);
+    }
+    return f;
+  }
+
+  /** Where this battle happens: the setup's backdrop, the Reading, or the map the player stands on. */
+  function arenaPick() {
+    const hr = worldHour(world());
+    return backdropFor({
+      theme: session?.setup?.backdrop ?? null,
+      source: session?.setup?.source ?? session?.source ?? null,
+      mapId: world()?.player?.mapId ?? null,
+      hour: Number.isFinite(hr) ? hr : 12,
+    });
+  }
+
   function drawArena(ctx) {
-    const part = partOf(Number.isFinite(worldHour(world())) ? worldHour(world()) : 12);
-    const bd = backdrop(part);
+    const bd = backdrop(arenaPick());
     if (bd) ctx.drawImage(bd, 0, 0);
     else { ctx.fillStyle = COLORS.night.blue; ctx.fillRect(0, 0, W, L.arenaH); }
   }
@@ -1441,8 +1429,12 @@ export function createBattleScene(G) {
     if (!m.present || m.hidden || !m.speciesId) return;
     const base = side === 1 ? L.foeSprite : L.playerSprite;
     const ground = side === 1 ? L.foeBase.y + 1 : L.playerBase.y + 1;
-    let x = base.x;
-    let y = base.y;
+    // a small front form draws one step larger, on the same centre and foot line (FH-14)
+    const fit = side === 1 ? foeFit(m.speciesId, m.types) : { scale: 2, dx: 0, dy: 0 };
+    const sc = fit.scale;
+    const box = 32 * sc;
+    let x = base.x + fit.dx;
+    let y = base.y + fit.dy;
     // nudge (2 px away from the attacker) and lunge (toward the foe)
     if (m.nudgeMs > 0) x += Math.round(m.nudgePx * (m.nudgeMs / m.nudgeDur));
     if (m.lungeMs > 0) {
@@ -1455,7 +1447,7 @@ export function createBattleScene(G) {
     const view0 = side === 0 ? 'back' : 'front';
     // shadow
     ctx.fillStyle = 'rgba(20, 27, 51, 0.35)';
-    ellipseFill(ctx, x + 32, ground - 1, 22, 4);
+    ellipseFill(ctx, x + box / 2, ground - 1, Math.round(22 * sc / 2), 4);
     ctx.save();
     // clip the faint drop and the rise at the stand's lip
     ctx.beginPath();
@@ -1469,20 +1461,20 @@ export function createBattleScene(G) {
     if (m.foldT > 0) {
       // fold into light: squash vertically into a bright strip
       const k = m.foldT;
-      const sprite = creatureSprite(m.speciesId, { view: view0, scale: 2, types: m.types, silhouette: k > 0.3 ? '#FFF3D6' : null });
-      const hgt = Math.max(1, Math.round(64 * (1 - k)));
+      const sprite = creatureSprite(m.speciesId, { view: view0, scale: sc, types: m.types, silhouette: k > 0.3 ? '#FFF3D6' : null });
+      const hgt = Math.max(1, Math.round(box * (1 - k)));
       ctx.globalAlpha = 1 - k * 0.3;
-      ctx.drawImage(sprite.canvas, 0, 0, sprite.w, sprite.h, x, y + (64 - hgt), 64, hgt);
+      ctx.drawImage(sprite.canvas, 0, 0, sprite.w, sprite.h, x, y + (box - hgt), box, hgt);
       ctx.globalAlpha = 1;
     } else if (flashing) {
-      const sprite = creatureSprite(m.speciesId, { view: view0, scale: 2, types: m.types, silhouette: '#F4F4F4' });
+      const sprite = creatureSprite(m.speciesId, { view: view0, scale: sc, types: m.types, silhouette: '#F4F4F4' });
       drawSprite(ctx, sprite, x, y, alpha < 1 ? { alpha } : undefined);
     } else {
       const glint = m.glintMs > 0 ? 1 - m.glintMs / frames(30) + 0.01 : 0;
-      drawCreature(ctx, m.speciesId, x, y, { view: view0, frame: side === 1 ? frame : 0, scale: 2, types: m.types, mark: m.mark, star: m.starTouched, lit: m.lit, glint, alpha: alpha < 1 ? alpha : undefined });
+      drawCreature(ctx, m.speciesId, x, y, { view: view0, frame: side === 1 ? frame : 0, scale: sc, types: m.types, mark: m.mark, star: m.starTouched, lit: m.lit, glint, alpha: alpha < 1 ? alpha : undefined });
       // Ward lattice: a 48 f sweep every 4 s, a 6 f flare on a blocked hit; stilled under reduced motion
-      if (side === 1 && st().sides[1].wardBadge) drawLattice(ctx, m, x, y, view0);
-      else if (m.latticeMs > 0) drawLattice(ctx, m, x, y, view0);
+      if (side === 1 && st().sides[1].wardBadge) drawLattice(ctx, m, x, y, view0, sc);
+      else if (m.latticeMs > 0) drawLattice(ctx, m, x, y, view0, sc);
     }
     ctx.restore();
   }
@@ -1495,7 +1487,7 @@ export function createBattleScene(G) {
   }
 
   /** Ward lattice over the opaque pixels of the sprite. */
-  function drawLattice(ctx, m, x, y, view0) {
+  function drawLattice(ctx, m, x, y, view0, sc = 2) {
     const art = creatureArt(m.speciesId, { types: m.types });
     const rows = view0 === 'back' && art.back ? art.back : art.rows;
     const flare = m.latticeMs > frames(42);
@@ -1516,14 +1508,13 @@ export function createBattleScene(G) {
           const pos = (px + py) / 62;
           if (Math.abs(pos - band) > 0.12) continue;
         } else if (band === 'static' && (px + py) % 12 !== 0) continue;
-        ctx.fillRect(x + px * 2, y + py * 2, 2, 1);
+        ctx.fillRect(x + px * sc, y + py * sc, sc, 1);
       }
     }
   }
 
   /** Grass rustle or water rings in front of a wild creature rising into view. */
   function drawEntrance(ctx) {
-    const part = partOf(Number.isFinite(worldHour(world())) ? worldHour(world()) : 12);
     // wild entrance: grass rustle or water rings
     if (intro.rustle > 0) {
       const k = Math.floor((intro.rustle / FRAME_MS) / 4) % 3;
@@ -1533,7 +1524,7 @@ export function createBattleScene(G) {
         const r = 10 + (24 - intro.rustle / FRAME_MS) * 1.4;
         for (let a = 0; a < 24; a++) { const ang = (a / 24) * Math.PI * 2; ctx.fillRect(Math.round(x + Math.cos(ang) * r), Math.round(y - 2 + Math.sin(ang) * r * 0.25), 1, 1); }
       } else {
-        ctx.fillStyle = ARENA_PAL[part].land[0];
+        ctx.fillStyle = rustleColour(arenaPick());
         for (let i = -4; i <= 4; i++) {
           const h = 6 + ((i + k) % 3 === 0 ? 3 : 0);
           ctx.fillRect(x + i * 9 + (k - 1), y - h, 2, h);

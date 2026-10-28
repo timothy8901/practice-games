@@ -75,7 +75,7 @@ export const scripts = {
         '* He climbs in under the rim. The helmet clanks off onto the sand.',
       ] },
     ] },
-    { op: 'take', item: 'fleet-bell', n: 1 },
+    { op: 'take', item: 'fleet-bell', n: 1, ask: true },
     'Barnaby: The helmet goes on a plinth. Exhibit 1: My Old House. (Provenance: me.)',
     { op: 'setFlag', id: 'sp.bell-dug' },
     { op: 'beat', thread: T, to: 3 },

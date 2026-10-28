@@ -122,7 +122,7 @@ describe('tide seed', () => {
     assert.equal(o.minutesPerDay, world.settings.minutesPerDay);
     assert.equal(o.realClock, false);
     assert.equal(clockSys.optionsFrom({ settings: { minutesPerDay: -3 } }).minutesPerDay, DEFAULT_MINUTES_PER_DAY);
-    assert.deepEqual(clockSys.optionsFrom({}), { seed: clockSys.tideSeedFor(), minutesPerDay: DEFAULT_MINUTES_PER_DAY, realClock: false });
+    assert.deepEqual(clockSys.optionsFrom({}), { seed: clockSys.tideSeedFor(), minutesPerDay: DEFAULT_MINUTES_PER_DAY, realClock: false, realRelative: true });
     assert.equal(clockSys.optionsFrom({}, { CLOCK_DEFAULT_MINUTES_PER_DAY: 48 }).minutesPerDay, 48);
     assert.equal(clockSys.optionsFrom({ settings: { realClock: true, minutesPerDay: 12 } }).realClock, true);
   });
@@ -392,16 +392,67 @@ describe('calendar and day-parts', () => {
     assert.throws(() => clockSys.isSpringTideDay(1.5), TypeError);
   });
 
-  test('under Real Clock the weekday and spring tide follow the device calendar', () => {
-    // 2026-10-24 is a Saturday
-    const total = (Math.floor(Date.UTC(2026, 9, 24) / 86_400_000) + 3) * MINUTES_PER_DAY + 600;
-    const world = { clock: { total, realClock: true } };
+  test('under Real Clock the weekday and spring tide keep the run calendar (LG-RN70: the total is run-relative)', () => {
+    // GDD day 7 (core day 6) is the first Saturday and spring low, under every clock setting
+    const world = { clock: { total: 6 * MINUTES_PER_DAY + 600, realClock: true } };
+    assert.equal(clockSys.gameDay(world), 7);
     assert.equal(clockSys.weekday(world).name, 'Sat');
     assert.equal(clockSys.isSpringTide(world), true);
     world.clock.total += MINUTES_PER_DAY;
     assert.equal(clockSys.weekday(world).name, 'Sun');
     assert.equal(clockSys.isSpringTide(world), false);
-    assert.equal(clockSys.isSpringTide(world, { TIDE_SPRING_EVERY_DAYS: 5 }), Math.floor(world.clock.total / MINUTES_PER_DAY) % 5 === 0);
+    assert.equal(clockSys.weekday(world).index, selectors.dayOfWeek(world));
+  });
+
+  test('LG-RN70: Real Clock keeps the run day (enabling it on day 1 stays day 1; a legacy epoch save is rebased)', () => {
+    const { world, clock } = bound();
+    const t0 = world.clock.total;
+    assert.equal(clockSys.gameDay(world), 1);
+    // the device says 2026-10-28 10:00; the run is on day 1, 17:40ish
+    const ms = new Date(2026, 9, 28, 10, 0).getTime();
+    const real = createClock({ ...clockSys.optionsFrom(world), now: () => ms });
+    clockSys.restoreFrom(world, real);
+    clockSys.applySettingsEffects(world, real, [{ kind: 'clock.realClock', realClock: true }]);
+    assert.equal(world.clock.realClock, true);
+    assert.equal(world.clock.total, t0, 'switching on never jumps to the epoch day');
+    assert.equal(clockSys.gameDay(world), 1);
+    const events = [];
+    const bus = { emit: (e, p) => events.push([e, p]) };
+    clockSys.tick(world, real, 16, { bus });
+    // 10:00 is behind the run's 17:40, so the run walks forward to day 2, 10:00 (a real night passed)
+    assert.equal(clockSys.gameDay(world), 2);
+    assert.equal(Math.floor(clockSys.minuteOfDay(world)), 600);
+    assert.ok(events.some(([e, p]) => e === 'day:start' && p.gameDay === 2), 'the midnight is reported, not skipped');
+    assert.ok(events.some(([e, p]) => e === 'clock:anchor' && p.id === 'morning'), 'the 06:00 morning still lands');
+    assert.ok(world.clock.total < 10 * MINUTES_PER_DAY, 'the save holds the run-relative total');
+    // a Real Clock save from before the fix stored the epoch day: it loads as it is (its day stamps
+    // were written on that count; a clock-only rebase would put them all in the future)
+    const legacyDay = Math.floor(Date.UTC(2026, 9, 28) / 86_400_000) + 3;
+    const legacy = { ...world.clock, total: legacyDay * MINUTES_PER_DAY + 615 };
+    assert.equal(clockSys.isLegacyRealTotal(legacy), true);
+    assert.equal(clockSys.isLegacyRealTotal(world.clock), false);
+    const w2 = { clock: legacy };
+    const c2 = createClock({ ...clockSys.optionsFrom(w2), now: () => ms });
+    assert.equal(clockSys.restoreFrom(w2, c2).ok, true);
+    assert.equal(c2.day, legacyDay, 'the legacy day count is kept, never rebased to day 0');
+  });
+
+  test('LG-RN70 verify: a legacy Real Clock save keeps working (letters, builds and threads still advance)', () => {
+    // the save was written with stamps on the epoch-day count: a clock rebased to day 0 would leave
+    // letters.keeperDay ahead of today ('already' for ~20,000 days) and builds never landing
+    const legacyDay = 20_757;
+    const world = createNewWorld({ seedCode: SEED, settings: { realClock: true } });
+    world.clock.realClock = true;
+    world.clock.total = legacyDay * MINUTES_PER_DAY + 12 * 60;
+    world.letters.keeperDay = legacyDay;
+    const ms = new Date(2026, 9, 28, 13, 0).getTime();
+    const clock = createClock({ ...clockSys.optionsFrom(world), now: () => ms });
+    assert.equal(clockSys.restoreFrom(world, clock).ok, true);
+    const events = [];
+    clockSys.tick(world, clock, 16, { bus: { emit: (e, p) => events.push([e, p]) } });
+    assert.equal(Math.floor(world.clock.total / MINUTES_PER_DAY), legacyDay, 'same day: 12:00 -> 13:00');
+    assert.ok(world.letters.keeperDay <= Math.floor(world.clock.total / MINUTES_PER_DAY), 'no stamp is left in the future');
+    assert.equal(Math.floor(clockSys.minuteOfDay(world)), 13 * 60);
   });
 
   test('snapshot gathers the HUD facts', () => {

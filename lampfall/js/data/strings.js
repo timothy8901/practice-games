@@ -416,6 +416,12 @@ export const STRINGS = Object.freeze({
   'archive.relearnFree': 'Relearn a technique. Free, always.',
   'archive.recallCost': 'Return to any form in the Shiftlog: 6 Starsalt.',
   'archive.recallLocked': 'Recall opens with the fourth seal.',
+  'archive.memory.empty': 'No forgotten moves yet. Moves a creature outgrows or forgets as it levels wait here; check back after it learns a new one.',
+  'archive.recall.empty': 'No other forms yet. Every shape it Shifts into is kept here, ready for Recall.',
+  // the starter choice (FH-06): one line of temperament beside each creature on the last dry stones
+  'starter.temper.sloshkin': 'Round and damp. Takes a knock and blows bubbles at it.',
+  'starter.temper.scrapling': 'All knuckles and grit. Hits hard and plainly.',
+  'starter.temper.reedkit': 'Ears up, very still. Quick, and patient about it.',
   'archive.pinned': 'Pinned. A town letter is on its way.',
 
   // ---- shops --------------------------------------------------------------------------------

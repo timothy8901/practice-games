@@ -605,6 +605,61 @@ export function residentShare(world, threadId, ctx) {
   return { ok: true, to: 'loan', credited: r.applied, share, balance: balance(world, ctx), cleared: r.steps.map((s) => s.cleared).filter(Boolean) };
 }
 
+/** Counter (world.counters, systems/flags) holding how many Gallery frames have been paid. */
+export const GALLERY_FRAMED_COUNTER = 'sys.gallery-framed';
+
+/**
+ * Whether a room commission's build has landed (`world.loans.builds` entry with that id, done).
+ * @param {World} world
+ * @param {string} roomId
+ * @returns {boolean}
+ */
+export function roomBuilt(world, roomId) {
+  return (world?.loans?.builds ?? []).some((b) => b && b.id === roomId && b.done === true);
+}
+
+/**
+ * Gallery frame income (GDD-00 §7 / §9, GDD-02 §2): once the Gallery commission has landed, every
+ * `galleryFrameForms` (6) Held forms frame one plate for `galleryFrameButtons` (1,000), paid once per
+ * frame. The frames already paid are counted in {@link GALLERY_FRAMED_COUNTER}. Call when a form is
+ * first Held, when a build lands, and overnight; repeat calls pay nothing new.
+ * @param {World} world
+ * @param {EconCtx & {held?: number}} [ctx]   `held` overrides the Held count (tests)
+ * @returns {{ok: true, frames: number, paid: number, newFrames: number} | {ok: false, reason: 'no-gallery'}}
+ */
+export function galleryFrames(world, ctx) {
+  if (!roomBuilt(world, 'gallery')) return { ok: false, reason: 'no-gallery' };
+  const t = galleryTuning(ctx);
+  const held = Number.isInteger(ctx?.held) ? ctx.held
+    : Object.values(world?.fieldLog?.forms ?? {}).filter((e) => e && e.held).length;
+  const frames = Math.floor(held / t.forms);
+  const framed = flags.get(world, GALLERY_FRAMED_COUNTER);
+  const newFrames = Math.max(0, frames - framed);
+  if (newFrames > 0) {
+    flags.set(world, GALLERY_FRAMED_COUNTER, frames, ctx);
+    wallet.earn(world, newFrames * t.buttons, { ...ctx, source: 'gallery' });
+  }
+  return { ok: true, frames, paid: newFrames * t.buttons, newFrames };
+}
+
+/**
+ * The Gallery's frame numbers: tuning `galleryFrameButtons` / `galleryFrameForms`, else the gallery
+ * commission row's `effects.frameButtons` / `framePerForms`, else 1,000 per 6.
+ * @param {EconCtx|undefined} ctx
+ * @returns {{buttons: number, forms: number}}
+ */
+function galleryTuning(ctx) {
+  const tun = ctx?.tuning ?? null;
+  let room = null;
+  try { room = lookup(ctx?.data).row('commissions', 'gallery'); } catch { room = null; }
+  const fx = room && room.effects ? room.effects : {};
+  const pickInt = (...v) => v.find((x) => Number.isInteger(x) && x > 0);
+  return {
+    buttons: pickInt(tun?.galleryFrameButtons, fx.frameButtons) ?? 1000,
+    forms: pickInt(tun?.galleryFrameForms, fx.framePerForms) ?? 6,
+  };
+}
+
 // ---------------------------------------------------------------------------------------------
 // Commissions and roofs
 // ---------------------------------------------------------------------------------------------

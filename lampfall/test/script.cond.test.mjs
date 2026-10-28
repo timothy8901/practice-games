@@ -78,8 +78,11 @@ test('hour ranges are half-open and wrap midnight; phase; day / dow', () => {
   const w = worldAt(10 * 60, 9);
   assert.equal(ev(w, { phase: [sel.phase(w)] }), true);
   assert.equal(ev(w, { phase: ['nowhere'] }), false);
-  assert.equal(ev(w, { day: { gte: 9 } }), true);
-  assert.equal(ev(w, { day: { gte: 10 } }), false);
+  // core day 9 is GDD day 10: `day` is the GDD day of the run (MID-07)
+  assert.equal(ev(w, { day: { gte: 10 } }), true);
+  assert.equal(ev(w, { day: { gte: 11 } }), false);
+  assert.equal(ev(w, { day: { lte: 10 } }), true);
+  assert.equal(ev(w, { day: { lte: 9 } }), false);
   assert.equal(ev(w, { day: { dow: [sel.dayOfWeek(w)] } }), true);
   assert.equal(ev(w, { day: { dow: [(sel.dayOfWeek(w) + 1) % 7] } }), false);
 });

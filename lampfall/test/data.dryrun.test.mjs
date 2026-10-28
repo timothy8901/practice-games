@@ -8,7 +8,8 @@ import { createRegistry } from '../js/data/registry.js';
 
 test('the merged registry dry-runs clean on every branch: no throws, unknown ops or ids, or dead ends', () => {
   const report = dryRunAll();
-  assert.ok(report.scripts >= 400, `only ${report.scripts} scripts in the registry`);
+  // (trainers no longer generate win / loss scripts that repeated the battle's parting line, FH-10)
+  assert.ok(report.scripts >= 320, `only ${report.scripts} scripts in the registry`);
   assert.ok(report.paths > report.scripts * 2, 'both passes explored');
   assert.deepEqual(report.findings.map((f) => `${f.kind} ${f.msg}`), []);
   assert.deepEqual(report.truncated, []);

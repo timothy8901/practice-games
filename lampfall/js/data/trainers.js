@@ -32,8 +32,10 @@
  * before Cairnhold, and at most one per trainer, counting boss-Shift cards. Heal items: route
  * trainers at most 1, everyone else at most 2 (the Keeper cap), shown as pips with the Scouting Prism.
  *
- * `TRAINER_SCRIPTS` holds the before / win / loss scripts this chapter owns (`<id>-before`,
- * `<id>-win`, `<id>-loss`); story trainers point at GDD-07's script ids from the manifest instead.
+ * `TRAINER_SCRIPTS` holds the before scripts this chapter owns (`<id>-before`); story trainers point
+ * at GDD-07's script ids from the manifest instead. A trainer without a story after-battle script has
+ * no `scripts.afterWin` / `scripts.afterLoss`: the battle scene shows `lines.win` / `lines.lose`
+ * itself, and a generated script saying them again printed every parting line twice (FH-10).
  * @module data/trainers
  */
 
@@ -93,14 +95,17 @@ function trainer(d) {
     afterLoss: d.scripts?.afterLoss ?? OWN,
   };
   const who = d.npc ?? d.name;
-  const own = { before: [`${d.id}-before`, d.lines.intro], afterWin: [`${d.id}-win`, d.lines.win], afterLoss: [`${d.id}-loss`, d.lines.lose] };
+  const own = { before: [`${d.id}-before`, d.lines.intro] };
   const out = {};
   for (const k of ['before', 'afterWin', 'afterLoss']) {
-    if (ids[k] === OWN) {
+    if (ids[k] !== OWN) out[k] = ids[k];
+    else if (own[k]) {
       const [sid, text] = own[k];
       scripts[sid] = Object.freeze([Object.freeze({ op: 'say', who, text }), Object.freeze({ op: 'end' })]);
       out[k] = sid;
-    } else out[k] = ids[k];
+    }
+    // no generated after-battle script: the battle scene already shows `lines.win` / `lines.lose` as
+    // the trainer steps back in, and a script repeating it printed the parting line twice (FH-10)
   }
   const row = {
     id: d.id,
@@ -499,12 +504,14 @@ export const TRAINERS = Object.freeze([
   trainer({
     id: 'pip', name: 'Pip', title: 'Dock Hand', class: 'dock', npc: 'pip',
     map: 'pellwick', post: 'pellwick-quay-bollards', postName: 'the bollards on the quay', region: 'pellwick', band: 'day',
-    party: [mon('wirewhisk', 4, ['arc-ping', 'tap'])],
-    tacticTag: 'one Wirewhisk; Arc Ping goes first',
+    // FH-15: two creatures, so the first trainer takes 3-4 turns and a Read pays (a Plain opener, then
+    // the Bolt ace); night-one EXP stays under Lv8 (340 + 30 + 66 = 436 < 512), so the window opens on day 2
+    party: [mon('tossup', 2, ['tap']), mon('wirewhisk', 4, ['arc-ping', 'tap'])],
+    tacticTag: 'a little Tossup to open, then the Wirewhisk ace; Arc Ping goes first',
     scripts: { before: 'pip-before' },
     lines: {
-      intro: 'You are the new Keeper? I tie boats. Well, I would if we had boats. Battle?',
-      win: 'Hah! Fair. Two hundred buttons, and do not tell Maud I bet.',
+      intro: 'Tossup, flip for it! Whisk\'s on the bollard, waiting.',
+      win: 'Hah! Untied, fair and square. Here\'s your two hundred.',
       lose: 'Tied up! Like a boat! If we had boats!',
     },
   }),
@@ -765,14 +772,17 @@ export const TRAINERS = Object.freeze([
   trainer({
     id: 'linnet-dock', name: 'Linnet Rask', title: 'Rival', class: 'rival', npc: 'linnet',
     map: 'pellwick', post: 'pellwick-keepers-dock', postName: 'the dock below the Keeper\'s Cottage', region: 'pellwick',
+    // FH-07: the strip posts and the Shift lands as Cinder enters (0 / 0): the intro shows the Sootling under
+    // its Up 100% card, then the flip, for every starter. A turn-2 Shift (0 / 1) was tried and dropped: a
+    // Lv5 Sloshkin's Undertow or a Scrapling's Knuckle KOs the Sootling on turn 1, so good play never saw it
     party: [mon('sootling', 5, ['ember-lick', 'tap'], { nick: 'Cinder', bossShift: sureShift(0, 0, 'up', 'caldermaw') })],
     story: true, holdOut: 3, payoutRule: 'none', expSource: 'story',
     tacticTag: 'hold out three turns; the strip says Up 100%',
     scripts: { before: 'linnet-dock-before', afterWin: 'linnet-dock-after', afterLoss: 'linnet-dock-after' },
     lines: {
-      intro: 'You are the walker? Cinder, look. A new one. Let us see what... what is it doing? Why is it glowing?',
-      win: 'That was... that was not my Sootling any more. That was a mountain. And it is still mine. Ha!',
-      lose: 'Did you see that? Did you SEE that? It is enormous! Same mark, look, same mark!',
+      intro: 'Cinder, up! Show the walker what all that glowing\'s for!',
+      win: 'You knocked over a HILL. Cinder, we\'re practising. All of tomorrow.',
+      lose: 'Sorry! Sorry. Cinder doesn\'t know how big it is yet. Neither do I.',
     },
   }),
   trainer({

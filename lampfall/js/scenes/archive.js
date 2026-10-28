@@ -9,6 +9,7 @@ import * as exp from '../systems/exp.js';
 import * as wallet from '../systems/wallet.js';
 import * as fieldLog from '../systems/fieldLog.js';
 import { TUNING } from '../data/tuning.js';
+import { t } from '../data/strings.js';
 import { drawBackdrop, drawHeading, drawHints, drawSkinPanel, drawCreature, prefsOf, skinOf, fitText, sfx, toast } from './menuKit.js';
 
 /** A Recall is deliberate: only a known form, after four seals, and no held Still Knot. */
@@ -30,6 +31,15 @@ export function recallAtArchive(world, uid, formId, data, opts = {}) {
   fieldLog.markHeld(world, formId, { data, bus: opts.bus });
   opts.bus?.emit('party:changed', { reason: 'recall', uid });
   return { ok: true, cost, result };
+}
+
+/**
+ * What an empty Memory / Recall list says to do next (FH-11, LG-PF5). Pure.
+ * @param {'memory'|'recall'} service
+ * @returns {string}
+ */
+export function emptyServiceText(service) {
+  return t(service === 'memory' ? 'archive.memory.empty' : 'archive.recall.empty');
 }
 
 export function createArchiveScene(G) {
@@ -143,7 +153,7 @@ export function createArchiveScene(G) {
         drawText(c, stage === 'forget' ? 'Choose a move to forget' : service === 'memory' ? 'Moves this form can remember' : locked() ? 'Opens with the fourth seal' : 'Forms from its own Shiftlog', 218, 72, { color: skin.soft, maxWidth: 155 });
         if (stage !== 'party') {
           options.draw(c);
-          if (!options.items.length) drawText(c, service === 'memory' ? 'No eligible Memory moves yet.' : 'No other forms recorded yet.', 220, 148, { color: skin.faint, maxWidth: 230 });
+          if (!options.items.length) drawText(c, emptyServiceText(service), 220, 148, { color: skin.faint, maxWidth: 230 });
         } else drawText(c, 'Choose a creature on the left.', 220, 143, { color: skin.soft, maxWidth: 230 });
       } else drawText(c, 'Your companions will find their way here.', 220, 91, { color: skin.soft, maxWidth: 230 });
       drawHints(c, G.input, [['l', 'Service'], ['confirm', 'Choose'], ['cancel', 'Back']]);

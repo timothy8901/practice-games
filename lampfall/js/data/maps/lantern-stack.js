@@ -1,8 +1,10 @@
 /**
  * THE LANTERN STACK (lantern-stack) — the Engine, the Reading, the Passenger's perch (GDD-00 §2, §4,
- * §11; GDD-01 §13.4). [DATA-MAPS] 20x16, `kind: 'interior'` (a self-contained room) but open to the
- * sky. Door (10,15), arrival (10,14) at the head of the cut stair; the stair foot returns to the Bar's
- * `lantern-stack-step` on the spur.
+ * §11; GDD-01 §13.4). [DATA-MAPS] 20x16, a self-contained stack top open to the sky: `kind: 'exterior'`
+ * with `light.indoor: false`, so it takes the day/night grade, the Skyband and the world mix (MID-17:
+ * the finale at 23:00 is night up here, not the fixed lamp-lit interior grade). Door (10,15), arrival
+ * (10,14) at the head of the cut stair; the stair foot returns to the Bar's `lantern-stack-step` on
+ * the spur.
  *
  * A sea stack under the comet's road, seen from the Lamp Room all game: a turf-and-heather top inside a
  * rim of cliff, sea on every side, shingle where the spray lands, a basalt spur at the north edge that
@@ -24,8 +26,10 @@ const perched = { all: [{ flag: 'sp.reading-done' }, { not: { flag: 'sp.passenge
 export default {
   id: 'lantern-stack',
   name: 'The Lantern Stack',
-  kind: 'interior',
+  kind: 'exterior',
   region: 'the-bar',
+  // open to the sky: day/night grading and the full world mix (audio/director reads light.indoor)
+  light: { indoor: false, ambient: 'sea' },
   w: 20,
   h: 16,
   legend: { X: 'sea-stack' },

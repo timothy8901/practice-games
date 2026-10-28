@@ -632,7 +632,10 @@ test('interiors: authored (no stubs), interior kind, door centred in the bottom 
     const m = MAPS_BY_ID[id];
     assert.ok(m, id);
     assert.equal(m.stub, undefined, `${id} is still a stub`);
-    assert.equal(m.kind, 'interior', id);
+    // the Lantern Stack is built like an interior (one door, arrival above it) but is open to the sky:
+    // exterior kind with light.indoor false, so the finale at 23:00 is night up there (MID-17)
+    if (id === 'lantern-stack') assert.ok(m.kind === 'exterior' && m.light?.indoor === false, id);
+    else assert.equal(m.kind, 'interior', id);
     const door = { x: Math.floor(m.w / 2), y: m.h - 1 };
     for (const L of layoutsOf(m)) {
       const w = L.warps.find((x) => x.x === door.x && x.y === door.y);

@@ -350,6 +350,12 @@ export const PORCH_DUELS = deepFreeze({
       cond: { all: [{ flag: 'sp.linnet-rematch' }, { any: [{ not: { flag: 'sp.linnet-fell' } }, { flag: 'sp.linnet-returned' }] }] },
       leadAfter: { cond: { flag: 'sp.linnet-returned' }, lead: 'sootling' } },
   ],
+  /**
+   * Visitors (beaten leaders, route trainers) join the slate once the battle flow can fight them as a
+   * Porch Duel (`setup.porchDuel`: scaled to the party median, no blackout, the duel purse instead of
+   * the trainer's payout). Until then the slate is neighbours only.
+   */
+  visitorsLive: false,
   /** Beaten leaders ferry in and borrow the Archive porch (Barnaby keeps the cards). */
   visitorVenue: 'porch-archive',
   leaders: [

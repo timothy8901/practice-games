@@ -9,7 +9,8 @@ import {
 
 // The §6.1 vocabulary, split exactly as the draft splits it.
 const DRAFT_PURE = ['label', 'goto', 'call', 'end', 'if', 'branch', 'setFlag', 'inc', 'give', 'take', 'earn', 'spend',
-  'addCreature', 'remember', 'thread', 'beat'];
+  'addCreature', 'remember', 'thread', 'beat',
+  'restartSummit']; // the Summit Bell's decline (wave 2): the beaten Keepers stand again
 const DRAFT_HOST = ['say', 'choice', 'nickname', 'move', 'face', 'emote', 'teleport', 'spawn', 'despawn', 'wait', 'camera',
   'playSfx', 'music', 'stem', 'openShop', 'startBattle', 'forecast', 'letter', 'toast', 'warp', 'setTime', 'tide', 'sleep', 'save'];
 
@@ -28,7 +29,7 @@ test('parseShorthand: speaker resolved by npc id, else kept as display name; nar
   assert.deepEqual(parseShorthand('Wren: Morning, Keeper.', isNpc), { op: 'say', who: 'wren', text: 'Morning, Keeper.' });
   assert.deepEqual(parseShorthand('Old Tam: Mind the tide.', isNpc), { op: 'say', who: 'Old Tam', text: 'Mind the tide.' });
   assert.deepEqual(parseShorthand('The tide is out.'), { op: 'say', text: 'The tide is out.' });
-  assert.deepEqual(parseShorthand('* Note: 3 boats'), { op: 'say', text: 'Note: 3 boats' });
+  assert.deepEqual(parseShorthand('* Note: 3 boats'), { op: 'say', who: null, text: 'Note: 3 boats' });   // narration says so (MID-16)
   assert.deepEqual(parseShorthand('Time:12:00'), { op: 'say', text: 'Time:12:00' });  // no space after colon
   assert.deepEqual(parseShorthand('Wren: a|b~c', isNpc).text, 'a|b~c');               // page breaks / beats kept
   assert.throws(() => parseShorthand(3), TypeError);

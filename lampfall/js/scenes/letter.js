@@ -39,7 +39,8 @@ import { textCps, reducedMotion, skipAnims, framesMs, textLog } from './scriptHo
 import { drawRunCard } from './seedCard.js';
 import { STAMPS } from '../data/town.js';
 import { TUNING } from '../data/tuning.js';
-import { evalCond } from '../script/cond.js';
+import * as stampSys from '../systems/stamps.js';
+import * as flagSys from '../systems/flags.js';
 import { isPorchLit } from '../systems/townCommon.js';
 import * as loansSys from '../systems/loans.js';
 import { litPorchCount } from './flowKit.js';
@@ -132,13 +133,46 @@ export function journalLetterRows(world, data) {
  * @returns {Array<{id: string, name: string, text: string, earned: boolean}>}
  */
 export function stampStates(world, data) {
+  const got = new Set(stampSys.earnedStamps(world, STAMPS, { data }));
   return STAMPS.map((s) => {
-    let earned = false;
-    try { earned = Boolean(evalCond(world, s.cond, { data })); } catch { earned = false; }
+    const earned = got.has(s.id);
     const name = t(`stamp.${s.id}.name`) !== `stamp.${s.id}.name` ? t(`stamp.${s.id}.name`) : s.name;
     const text = t(`stamp.${s.id}.text`) !== `stamp.${s.id}.text` ? t(`stamp.${s.id}.text`) : s.text;
     return { id: s.id, name, text, earned };
   });
+}
+
+/** Flag prefix marking a stamp the Journal has already announced (`stamp.got.<id>`). */
+export const STAMP_GOT_PREFIX = 'stamp.got.';
+
+/**
+ * Stamps earned now (systems/stamps.earnedStamps over data/town STAMPS) that have not been announced
+ * yet, in table order. Pure.
+ * @param {any} world
+ * @param {any} data
+ * @returns {string[]}
+ */
+export function newStamps(world, data) {
+  return stampSys.earnedStamps(world, STAMPS, { data }).filter((id) => !world?.flags?.[`${STAMP_GOT_PREFIX}${id}`]);
+}
+
+/**
+ * Announces every newly earned stamp once: marks it (`stamp.got.<id>`, systems/flags) and toasts
+ * `stamp.earned` with its name. Returns the ids announced.
+ * @param {any} G
+ * @returns {string[]}
+ */
+export function announceStamps(G) {
+  const fresh = newStamps(G.world, G.data);
+  if (!fresh.length) return fresh;
+  G.store.tx('journal:stamps', (w) => { for (const id of fresh) flagSys.setFlag(w, `${STAMP_GOT_PREFIX}${id}`, true, { bus: G.bus }); });
+  for (const id of fresh) {
+    const row = STAMPS.find((s) => s.id === id);
+    const key = `stamp.${id}.name`;
+    const name = t(key) !== key ? t(key) : row?.name ?? id;
+    try { G.bus?.emit('toast', { text: t('stamp.earned', { name }), icon: 'star' }); } catch { /* toasts never break the journal */ }
+  }
+  return fresh;
 }
 
 /**
@@ -612,6 +646,7 @@ function createJournalView(G, self) {
   };
 
   function refresh() {
+    try { if (G.store) announceStamps(G); } catch (e) { console.warn('journal: stamps', e); }
     rows = journalLetterRows(G.world, G.data);
     stamps = stampStates(G.world, G.data);
     const li = letterIdx();

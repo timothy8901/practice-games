@@ -15,7 +15,10 @@
  *   {inRegion} | {dial: string[]} | {challenge} | {seen} | {tool}
  *
  * `loan.tier` accepts a number (current tier >= n) or `{gte, lte, eq}`. `hour: [a, b]` is a
- * half-open range of hours that wraps midnight when `a > b`.
+ * half-open range of hours that wraps midnight when `a > b`. `day.gte` / `day.lte` are GDD day
+ * numbers of this run (state/selectors `gameDay`: day 1 is the arrival, a Sunday), never absolute
+ * calendar days; `day.dow` is the GDD weekday (0 = Monday). `hasItem` on a currency item (Starsalt,
+ * Anchor Stones) reads the wallet.
  * @module script/cond
  */
 
@@ -93,7 +96,7 @@ export function evalCond(world, cond, ctx = {}) {
       const n = world.counters?.[v] ?? 0;
       return inRange(n, { gte: cond.gte, lte: cond.lte });
     }
-    case 'hasItem': return sel.itemCount(world, v) >= (cond.n ?? 1);
+    case 'hasItem': return sel.itemCount(world, v, data) >= (cond.n ?? 1);
     case 'wallet': return inRange(world.wallet?.main ?? 0, v);
     case 'hour': {
       const h = sel.hour(world);
@@ -104,7 +107,8 @@ export function evalCond(world, cond, ctx = {}) {
     case 'tide': return v.includes(sel.tideState(world));
     case 'lowTide': return sel.isLowTide(world) === v;
     case 'day': {
-      const d = sel.day(world);
+      // the GDD's day number (1-based, run-relative: the arrival is day 1, the first market day 7)
+      const d = sel.gameDay(world);
       if (v.gte !== undefined && d < v.gte) return false;
       if (v.lte !== undefined && d > v.lte) return false;
       if (v.dow !== undefined && !v.dow.includes(sel.dayOfWeek(world))) return false;

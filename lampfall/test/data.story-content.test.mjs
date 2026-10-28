@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { NPCS, NPCS_BY_ID, NPC_SCRIPTS } from '../js/data/npcs/index.js';
-import { STORY_SCRIPTS, STORY_TRIGGERS, EVENT_SCRIPTS, READING_PHASES } from '../js/data/scripts/index.js';
+import { STORY_SCRIPTS, STORY_TRIGGERS, EVENT_SCRIPTS, READING_EXTRA_DRAWS } from '../js/data/scripts/index.js';
+import { THE_READING } from '../js/data/spires.js';
 import { SCHEDULES } from '../js/data/schedules.js';
 import { NPC_IDS, SCRIPT_IDS } from '../js/data/ids.manifest.js';
 import { DATA_CONTENT } from '../js/data/content.js';
@@ -91,13 +92,18 @@ test('clearing the final loan hands over Isolde\'s lantern and lights all six ru
   assert.equal(again.writes.filter(([kind]) => kind === 'give').length, 0);
 });
 
-test('the Reading posts seven two-turn phases and supports both free extensions before Accept', () => {
-  assert.equal(READING_PHASES.length, 7);
-  assert.equal(READING_PHASES.reduce((sum, p) => sum + p.turns, 0), 14);
+test('the Reading runs THE_READING (seven two-turn phases) and supports both free extensions before Accept (MID-18)', () => {
+  assert.equal(THE_READING.phases.length, 7);
+  assert.equal(THE_READING.phaseTurns, 2);
   const r = drive('the-reading', fresh(), [1, 2, 0]);
   const battles = r.requests.filter((op) => op.op === 'startBattle');
   assert.deepEqual(battles.map((op) => op.holdOut), [14, 2, 2]);
-  assert.ok(battles.every((op) => op.source === 'reading' && op.wild.speciesId === 'vagary'));
+  assert.ok(battles.every((op) => op.source === 'reading' && op.wild.speciesId === 'vagary' && op.wild.reading === THE_READING));
+  assert.ok(battles.every((op) => op.wild.level === undefined && op.wild.readingPhases === undefined), 'battleFlow scales the level and builds the phases');
+  assert.equal(battles[0].wild.readingOffer, undefined);
+  assert.ok(battles.slice(1).every((op) => op.wild.readingOffer === true && op.wild.readingFrom === 8));
+  assert.deepEqual(battles.slice(1).map((op) => op.wild.readingDraw), [1, 2], 'each extra night draws new cards');
+  assert.ok(READING_EXTRA_DRAWS >= 2);
   assert.equal(r.world.flags['sp.reading-done'], true);
   assert.equal(r.writes.some(([kind]) => kind === 'give' || kind === 'spend'), false);
 });

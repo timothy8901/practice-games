@@ -128,7 +128,7 @@ describe('name entry', () => {
     const key = (k) => target.fns.forEach((f) => f({ key: k, preventDefault() {} }));
     const input = { lastDevice: 'keyboard', pressed: () => false, repeat: () => false, pointer: null };
     let done = null, cancelled = 0;
-    const e = createNameEntry({ input, keyTarget: target, onDone: (n) => { done = n; }, onCancel: () => { cancelled++; } });
+    const e = createNameEntry({ input, keyTarget: target, guardMs: 0, onDone: (n) => { done = n; }, onCancel: () => { cancelled++; } });
     e.attach();
     for (const k of ['M', 'u', 'd', 'z', 'x']) key(k); // z and x are letters here
     e.handle(input);

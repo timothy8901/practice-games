@@ -488,6 +488,7 @@ export const TUNING = freeze({
   errantButtons: 1500,                 // Errant beaten or caught: 1,500 [fixed]
   errantStarsalt: 2,                   // ... + 2 Starsalt [fixed]
   championPrize: 10000,                // beating Idris: 10,000 [fixed]
+  summitPpTopUp: 5,                    // between Summit fights every move regains 5 PP, no heal (spires.js SUMMIT.between) [fixed]
   holdOutExp: 100,                     // the dock hold-out grants a flat 100 EXP [fixed]
   galleryFrameButtons: 1000,           // Gallery: 1,000 per 6 Held forms framed [fixed]
   galleryFrameForms: 6,                // [fixed]

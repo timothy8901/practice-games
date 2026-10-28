@@ -19,7 +19,7 @@
  * Pure: imports only the string glossary; no DOM, no canvas. The view is the scene's business.
  * @module scenes/battleAnims
  */
-import { t } from '../data/strings.js';
+import { t, has, fill } from '../data/strings.js';
 
 /** Milliseconds per frame at 60 fps. */
 export const FRAME_MS = 1000 / 60;
@@ -81,6 +81,57 @@ export function hitStopFrames(mult, crit = false) {
   if (mult >= 2) return 6;
   if (mult <= 0.25) return 2;
   return 4;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Sprite fit (FH-14: a small front form must not read as a speck beside a big back sprite)
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * Bounds of the opaque cells of string art ('.' is clear).
+ * @param {ReadonlyArray<string>} rows
+ * @returns {{x0: number, y0: number, x1: number, y1: number, w: number, h: number}|null}
+ */
+export function opaqueBounds(rows) {
+  if (!Array.isArray(rows)) return null;
+  let x0 = Infinity; let y0 = Infinity; let x1 = -1; let y1 = -1;
+  for (let y = 0; y < rows.length; y++) {
+    const r = String(rows[y] ?? '');
+    for (let x = 0; x < r.length; x++) {
+      if (r[x] === '.' || r[x] === ' ') continue;
+      if (x < x0) x0 = x;
+      if (x > x1) x1 = x;
+      if (y < y0) y0 = y;
+      if (y > y1) y1 = y;
+    }
+  }
+  if (x1 < 0) return null;
+  return { x0, y0, x1, y1, w: x1 - x0 + 1, h: y1 - y0 + 1 };
+}
+
+/** Opaque size (cells) at or under which a 32-cell front form is drawn one step larger. */
+export const SMALL_FORM_CELLS = 21;
+
+/**
+ * Draw scale and offset for a foe's front sprite. Forms whose opaque art is at most
+ * {@link SMALL_FORM_CELLS} cells on its long side draw at `base + 1` (the Sootling's 20×11 becomes
+ * 60×33 instead of 40×22), keeping the same centre line and standing its foot 4 px above the bottom
+ * of the base-scale box, on the stand. Every other form is untouched (scale = base, offset 0).
+ * @param {ReadonlyArray<string>|null|undefined} rows  the front-view rows
+ * @param {number} [base=2]
+ * @param {number} [size=32]  the art's cell size (forms larger than 32 never grow)
+ * @returns {{scale: number, dx: number, dy: number}}
+ */
+export function spriteFit(rows, base = 2, size = 32) {
+  const b = opaqueBounds(rows || []);
+  if (!b || size > 32 || Math.max(b.w, b.h) > SMALL_FORM_CELLS) return { scale: base, dx: 0, dy: 0 };
+  const scale = base + 1;
+  const cx = (b.x0 + b.x1 + 1) / 2;
+  const foot = b.y1 + 1;
+  // keep the art's centre line; stand its foot just inside the bottom of the base-scale box (on the
+  // stand) instead of hovering where a small form's empty lower rows left it
+  const footAt = Math.max(foot * base, size * base - 4);
+  return { scale, dx: Math.round(cx * base - cx * scale), dy: Math.round(footAt - foot * scale) };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -180,6 +231,36 @@ export function lineFor(ev) {
     default:
       return typeof ev.text === 'string' && ev.text ? ev.text : null;
   }
+}
+
+/**
+ * A glossary line with a built-in fallback (the key wins once the glossary carries it).
+ * @param {string} key @param {string} fallback @param {Record<string, any>} vars
+ * @returns {string}
+ */
+function say2(key, fallback, vars) {
+  return has(key) ? t(key, vars) : fill(fallback, vars);
+}
+
+/**
+ * The log line for a landed hit (FH-14): the effectiveness and the damage in one readable line,
+ * e.g. "It's strong! Wirewhisk took 13." Null for a hit that did nothing or a non-party source.
+ * @param {any} ev        the `damage` event
+ * @param {number|null} mult  the effectiveness multiplier of the hit (null = neutral)
+ * @param {boolean} [crit]
+ * @returns {string|null}
+ */
+export function damageLine(ev, mult, crit = false) {
+  if (!ev || ev.type !== 'damage' || ev.source !== 'party') return null;
+  const n = Math.max(0, Math.round(Number(ev.amount) || 0));
+  const vars = { target: ev.target || 'It', n };
+  const took = n > 0 ? say2('battle.msg.took', '{target} took {n}.', vars) : say2('battle.msg.tookNone', '{target} barely felt it.', vars); // str
+  const tier = effTier(mult ?? 1);
+  const lead = [];
+  if (crit) lead.push(say2('battle.msg.critShort', 'A critical hit!', vars)); // str
+  if (tier === 'strong') lead.push(say2('battle.msg.itsStrong', "It's strong!", vars)); // str
+  else if (tier === 'weak') lead.push(say2('battle.msg.itsWeak', "It's weak…", vars)); // str
+  return [...lead, took].join(' ');
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -406,10 +487,12 @@ export const BATTLE_ANIMS = Object.freeze({
     if (fromParty && v.hit.effEv) { v.sfx(v.hit.effEv); v.hit.effEv = null; }
     if (fromParty && v.hit.critEv) { v.sfx(v.hit.critEv); v.hit.critEv = null; }
     v.sfx(ev);
+    let sayMs = 0;
     if (fromParty) {
       const mult = v.hit.mult ?? 1;
       const crit = v.hit.crit;
       const stop = hitStopFrames(mult, crit);
+      const line = damageLine(ev, mult, crit);
       v.flash(ev.side, crit ? 4 : 2);
       if (typeof v.impact === 'function') v.impact(ev.side, v.hit.moveType ?? null, mult);
       if (stop > 0) {
@@ -420,7 +503,8 @@ export const BATTLE_ANIMS = Object.freeze({
         if (tier !== 'neutral') v.effWord(ev.side, tier);
         yield frames(stop);
       }
-      if (crit) v.say(t('battle.msg.crit'));
+      // one line carries the crit, the effectiveness and the damage ("It's strong! Wirewhisk took 13.")
+      sayMs = v.say(line) || 0;
       v.hit.mult = null;
       v.hit.crit = false;
     } else {
@@ -428,7 +512,8 @@ export const BATTLE_ANIMS = Object.freeze({
     }
     const ms = v.hpTo(ev.side, ev.hp, ev.maxHp);
     v.emitHp(ev.side);
-    yield Math.max(frames(10), ms);
+    // hold long enough to read the hit line, not only to drain the bar
+    yield Math.max(frames(10), ms, sayMs * 0.7);
   }),
   faint: (ev, v) => anim('faint', function* run() {
     v.sfx(ev);

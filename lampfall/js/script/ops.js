@@ -55,6 +55,7 @@ export const OPS = Object.freeze({
   remember: { kind: 'pure', fields: { npc: req('string', { ref: 'npcs' }), key: req('string'), value: req('any') } },
   thread: { kind: 'pure', fields: { id: req('string', { ref: 'threads' }), beat: opt('number') } },
   beat: { kind: 'pure', fields: { thread: req('string', { ref: 'threads' }), to: req('number') } },
+  restartSummit: { kind: 'pure', fields: {} },   // the Summit Bell's decline: the beaten Keepers stand again
   // ---- host: yielded as a Request; the scene performs them ---------------------------------------
   say: { kind: 'host', fields: { who: opt('string'), text: req('string'), emote: opt('string'), portrait: opt('string') }, text: ['text'] },
   choice: { kind: 'host', fields: { prompt: opt('string'), options: req('options'), defaultIndex: opt('number') }, text: ['prompt'] },
@@ -108,9 +109,11 @@ export function isHostOp(name) {
 /**
  * Parses the string shorthand: `"Wren: Morning, Keeper."` -> `{op:'say', who:'wren', text:'Morning, Keeper.'}`.
  * The speaker is resolved by id when `isNpcId(kebab(name))` says so, otherwise kept as the display
- * name written. A string without a `Name: ` prefix is narration (`who` omitted). A leading `*` or
- * the absence of a space after the colon keeps the colon in the text (`"Note: 3 boats"` is narration
- * only if `isNpcId` rejects `note`... so authors write `"* Note: 3 boats"` to force narration).
+ * name written. A line written `* ...` is narration and says so with `who: null` (MID-16): the runner
+ * never gives it the speaker of an NPC talk, so a thread beat's stage directions show no name tab or
+ * bust. A plain string without a `Name: ` prefix has no `who` (in an NPC talk it is that NPC's line).
+ * A leading `*` or the absence of a space after the colon keeps the colon in the text (`"Note: 3
+ * boats"` is narration only if `isNpcId` rejects `note`... so authors write `"* Note: 3 boats"`).
  * @param {string} line
  * @param {(id: string) => boolean} [isNpcId]   defaults to accepting any speaker as a display name
  * @returns {Op}
@@ -118,7 +121,7 @@ export function isHostOp(name) {
  */
 export function parseShorthand(line, isNpcId) {
   if (typeof line !== 'string') throw new TypeError(`parseShorthand: expected a string, got ${typeof line}`);
-  if (line.startsWith('* ')) return { op: 'say', text: line.slice(2) };
+  if (line.startsWith('* ')) return { op: 'say', who: null, text: line.slice(2) };
   const m = /^([^:|~{}]{1,40}?):\s(.*)$/s.exec(line);
   if (!m) return { op: 'say', text: line };
   const name = m[1].trim();

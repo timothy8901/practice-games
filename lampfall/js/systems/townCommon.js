@@ -456,3 +456,136 @@ export function leadCreature(world) {
 export function clone(v) {
   return v === undefined ? v : JSON.parse(JSON.stringify(v));
 }
+
+// ---------------------------------------------------------------------------------------------
+// The Porch Duel slate (GDD-05 §8; data/town.js PORCH_DUELS)
+// ---------------------------------------------------------------------------------------------
+
+/** Flag prefix the slate posts (`sys.duel.<npc>`; `sys.duel.visitor` holds the visitor's trainer id). */
+export const PORCH_DUEL_FLAG_PREFIX = 'sys.duel.';
+/**
+ * The slate history is replayed from core day 0 (at most this many days back), so every evening's
+ * slate is the same whichever later evening asked for it: the "no neighbour three days running"
+ * rule then holds across the whole run.
+ */
+const SLATE_HISTORY = 400;
+
+/**
+ * What a Porch Duel pays (GDD-05 §8): `payoutPerCurveLevel` (30) × the posted curve of your next Spire
+ * by badges held (`curveByBadges`: 210 / 390 / 570 / 780 / 990 / 1,200 / 1,410). Pure.
+ * @param {World} world
+ * @param {any} table   PORCH_DUELS
+ * @param {number} [perLevel]   tuning `porchDuelPerCurve` (the first economy lever); default the table's
+ * @returns {number}
+ */
+export function duelPayout(world, table, perLevel) {
+  const T = table && typeof table === 'object' ? table : {};
+  const badges = Math.max(0, Math.min(6, Array.isArray(world?.badges) ? world.badges.length : 0));
+  const curve = Array.isArray(T.curveByBadges) ? (T.curveByBadges[badges] ?? T.curveByBadges[T.curveByBadges.length - 1] ?? 0) : 0;
+  return (isNum(perLevel) ? perLevel : (isNum(T.payoutPerCurveLevel) ? T.payoutPerCurveLevel : 30)) * curve;
+}
+
+/**
+ * @typedef {Object} DuelOffer
+ * @property {'neighbour'|'leader'|'route'} kind
+ * @property {string|null} npc        the neighbour or leader npc (null for a route trainer)
+ * @property {string} trainer         porch-* / leader / route trainer id
+ * @property {string} porch           where it is fought (the visitor venue for visitors)
+ * @property {number} creatures       party size by badges held
+ * @property {number} payout          30 × the posted curve of your next Spire
+ */
+
+/**
+ * The Porch Duel slate for an evening (GDD-05 §8): `offersPerDay` friendly offers, two neighbours and
+ * one visitor when any visitor (a beaten leader, or a route trainer of an isle whose badge you hold)
+ * is eligible, else neighbours only. No opponent twice a day; no neighbour three days running (the
+ * slates before are replayed from day 0). Each evening's draw is the labelled fork `shop:<gameDay>/duels`.
+ * The evening runs to the 06:00 post, so before 06:00 the slate is the previous day's.
+ * Neighbours need their row `cond` and to have been met; visitors are drawn only while the table's
+ * `visitorsLive` is not false. Pure.
+ * @param {World} world
+ * @param {any} table   PORCH_DUELS
+ * @param {{day?: number, minute?: number, data?: any, perDay?: number, payoutPerCurveLevel?: number}} [opts]
+ * @returns {{day: number, gameDay: number, offers: DuelOffer[], payout: number, creatures: number}}
+ */
+export function duelSlate(world, table, opts = {}) {
+  const T = table && typeof table === 'object' ? table : {};
+  const minute = minuteNow(world, opts);
+  const day = isInt(opts.day) ? opts.day : coreDay(world) - (minute < 360 ? 1 : 0);
+  const badges = Math.max(0, Math.min(6, Array.isArray(world?.badges) ? world.badges.length : 0));
+  const payout = duelPayout(world, T, opts.payoutPerCurveLevel);
+  const creatures = Array.isArray(T.partySizeByBadges) ? (T.partySizeByBadges[badges] ?? 3) : 1;
+  const perDay = isInt(opts.perDay) ? opts.perDay : (isInt(T.offersPerDay) ? T.offersPerDay : 3);
+  const ok = (cond) => holds(world, cond, opts.data ?? null);
+  const neighbours = (Array.isArray(T.neighbours) ? T.neighbours : [])
+    .filter((n) => n && typeof n.npc === 'string' && world?.npcs?.[n.npc]?.met && ok(n.cond));
+  /** @type {Array<{kind: 'leader'|'route', npc: string|null, trainer: string}>} */
+  const visitors = [];
+  const visitorsOn = T.visitorsLive !== false;
+  if (visitorsOn) for (const l of Array.isArray(T.leaders) ? T.leaders : []) if (l && ok(l.cond)) visitors.push({ kind: 'leader', npc: l.npc ?? null, trainer: l.trainer });
+  if (visitorsOn) for (const p of Array.isArray(T.routePools) ? T.routePools : []) if (p && ok(p.cond)) for (const tr of p.trainers ?? []) visitors.push({ kind: 'route', npc: null, trainer: tr });
+  const seed = world?.run?.seed ?? 0;
+  const draw = (d, banned) => {
+    const rng = forkFor(seed, `shop:${d + 1}/duels`);
+    const pool = neighbours.filter((n) => !banned.has(n.npc));
+    const visitor = visitors.length ? visitors[rng.int(0, visitors.length - 1)] : null;
+    const want = Math.max(0, perDay - (visitor ? 1 : 0));
+    const picked = [];
+    const left = pool.slice();
+    while (picked.length < want && left.length) picked.push(left.splice(rng.int(0, left.length - 1), 1)[0]);
+    return { picked, visitor };
+  };
+  // replay the slates before this one so the three-days-running rule has its history
+  let prev2 = new Set(), prev1 = new Set();
+  let out = null;
+  for (let d = Math.max(0, day - SLATE_HISTORY); d <= day; d++) {
+    const banned = new Set([...prev1].filter((n) => prev2.has(n)));
+    const r = draw(d, banned);
+    prev2 = prev1;
+    prev1 = new Set(r.picked.map((n) => n.npc));
+    if (d === day) out = r;
+  }
+  const o = /** @type {{picked: any[], visitor: any}} */ (out);
+  /** @type {DuelOffer[]} */
+  const offers = o.picked.map((n) => ({ kind: 'neighbour', npc: n.npc, trainer: n.trainer, porch: n.porch, creatures, payout }));
+  if (o.visitor) offers.push({ kind: o.visitor.kind, npc: o.visitor.npc, trainer: o.visitor.trainer, porch: typeof T.visitorVenue === 'string' ? T.visitorVenue : 'porch-archive', creatures, payout });
+  return { day, gameDay: day + 1, offers, payout, creatures };
+}
+
+/** Flag holding the game day whose evening slate is posted (`sys.duel.day`): the slate is frozen for that evening. */
+export const PORCH_DUEL_DAY_FLAG = 'sys.duel.day';
+/** Flag prefix marking a neighbour's duel won this evening (`sys.duel.done.<npc>` = the evening's game day). */
+export const PORCH_DUEL_DONE_PREFIX = 'sys.duel.done.';
+
+/**
+ * The game day of the Porch Duel evening `world`'s clock is in (the evening runs to the 06:00 post,
+ * so before 06:00 it is the previous day's). Pure.
+ * @param {World} world
+ * @param {{minute?: number}} [opts]
+ * @returns {number}
+ */
+export function duelEvening(world, opts = {}) {
+  return coreDay(world) - (minuteNow(world, opts) < 360 ? 1 : 0) + 1;
+}
+
+/**
+ * The slate as posted for this evening (the `sys.duel.*` flags), or null when this evening's slate was
+ * never posted. Neighbours keep table order; `taken` marks a duel already won tonight. Pure.
+ * @param {World} world
+ * @param {any} table   PORCH_DUELS
+ * @returns {{gameDay: number, neighbours: Array<{npc: string, trainer: string, porch: string, taken: boolean}>, visitor: string|null}|null}
+ */
+export function postedDuels(world, table) {
+  const T = table && typeof table === 'object' ? table : {};
+  const f = world?.flags ?? {};
+  const gameDay = duelEvening(world);
+  if (f[PORCH_DUEL_DAY_FLAG] !== gameDay) return null;
+  const neighbours = [];
+  for (const n of Array.isArray(T.neighbours) ? T.neighbours : []) {
+    if (!n || typeof n.npc !== 'string') continue;
+    const taken = f[`${PORCH_DUEL_DONE_PREFIX}${n.npc}`] === gameDay;
+    if (taken || f[`${PORCH_DUEL_FLAG_PREFIX}${n.npc}`]) neighbours.push({ npc: n.npc, trainer: n.trainer, porch: n.porch, taken });
+  }
+  const v = f[`${PORCH_DUEL_FLAG_PREFIX}visitor`];
+  return { gameDay, neighbours, visitor: typeof v === 'string' && v ? v : null };
+}

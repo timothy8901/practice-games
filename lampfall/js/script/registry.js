@@ -22,6 +22,7 @@ import * as sel from '../state/selectors.js';
 import { noRepeatDays, porchWindow } from '../data/tuning.js';
 import { t } from '../data/strings.js';
 import * as memory from '../systems/memory.js';
+import { beatBlock } from '../systems/threads.js';
 
 /** Line pools read through memory.pickLine (tags + cond), after porch talk, before phase lines. */
 // `act`, `market`, `creek`, `nickname`, `declined` and `letters` are story / situation pools whose
@@ -86,7 +87,8 @@ export const SOURCE_ORDER = Object.freeze(['thread', 'favour', 'topic', 'schedul
 function line(npcId, who, lineId, text, source) {
   // a pool line written `* ...` is narration, as in script shorthand (ops.parseShorthand): the
   // marker is stripped so it never reaches the dialogue box as a literal asterisk
-  const say = typeof text === 'string' && text.startsWith('* ') ? { op: 'say', text: text.slice(2) } : { op: 'say', who, text };
+  // (`who: null`: the runner keeps it narration even inside this NPC's talk, MID-16)
+  const say = typeof text === 'string' && text.startsWith('* ') ? { op: 'say', who: null, text: text.slice(2) } : { op: 'say', who, text };
   return { scriptId: `${npcId}#${lineId}`, source, lineId, ops: [say, { op: 'end' }] };
 }
 
@@ -128,13 +130,18 @@ function resolveNpc(world, data, target) {
   const holds = (cond) => cond === undefined || evalCond(world, cond, cctx);
   const script = (id, extra) => ({ scriptId: id, ops: data.get('scripts', id), ...extra });
 
-  // (1) life thread: the next beat whose cond holds
+  // (1) life thread: the next beat, under the thread rules (systems/threads `beatBlock`: its cond,
+  // involvement, one beat a day, `advance.days` spacing and weekday), and a porch beat only at the
+  // porch. Before, any talk anywhere ran the beat on its cond alone, so a beat could follow the last
+  // one the same day (oyster-boat 2 straight after 1).
   if (npc.threadId && data.has('threads', npc.threadId)) {
     const thread = data.get('threads', npc.threadId);
     const state = world.threads?.[thread.id] ?? { beat: 0, done: false };
     if (!state.done) {
       const next = thread.beats.find((b) => b.id === state.beat + 1);
-      if (next && holds(next.cond) && data.has('scripts', next.script)) return script(next.script, { source: 'thread', beat: next.id });
+      const atPorch = Boolean(target.atPorch) || target.pose === 'porch';
+      if (next && (next.porch !== true || atPorch) && holds(next.cond) && data.has('scripts', next.script)
+        && beatBlock(world, data, thread) === null) return script(next.script, { source: 'thread', beat: next.id });
     }
   }
 

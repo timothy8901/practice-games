@@ -85,6 +85,7 @@ export const SHOPS = freeze([
       { item: 'warm-shawl' },
       { item: 'crackdust' },
       { item: 'anchor-stone', cond: STONES_SOLD },
+      { item: 'timber' },                                  // the yard's offcuts: Ambrose's posts (The Fence) and carved furniture (MID-03)
       { item: 'disc-spore-drift', cond: { badge: 1 } },          // the chip-damage disc, guaranteed by badge 1
       // two discs a day
       { item: 'disc-spore-drift', rotate: 'discs', cond: { not: { badge: 1 } } },

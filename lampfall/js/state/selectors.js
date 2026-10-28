@@ -33,12 +33,25 @@ export function totalMinutes(world) {
 }
 
 /**
- * Day number (0-based).
+ * Day number of this run (0-based core day; day 0 is the arrival). `world.clock.total` counts from
+ * the start of the run under every clock setting, Real Clock included (core/time keeps the wall
+ * clock's calendar offset out of the serialized total, LG-RN70), so this is always run-relative.
  * @param {World} world
  * @returns {number}
  */
 export function day(world) {
   return Math.floor(totalMinutes(world) / MINUTES_PER_DAY);
+}
+
+/**
+ * The GDD's day number of this run (1-based: the arrival is day 1, a Sunday; the first Lantern
+ * Market is day 7). The cond DSL's `{day}` reads this (MID-07), as do the town systems' `fromDay`
+ * fields and systems/clockSys `gameDay`.
+ * @param {World} world
+ * @returns {number}
+ */
+export function gameDay(world) {
+  return day(world) + 1;
 }
 
 /**
@@ -264,17 +277,50 @@ export function hasChallenge(world, id) {
 }
 
 /**
- * Total stacks of an item across every pocket.
+ * Item ids that are wallet currencies (data/items.js rows with `wallet`), for callers without a
+ * registry. With one, the row's own `wallet` field decides.
+ */
+export const WALLET_ITEMS = Object.freeze({ starsalt: 'starsalt', 'anchor-stone': 'anchors' });
+
+/**
+ * How many of an item the player holds: stacks across every pocket, or for a currency item
+ * (Starsalt, Anchor Stones: counted in the wallet, never a stack) the wallet balance (LG-RN34).
  * @param {World} world
  * @param {string} itemId
+ * @param {{has?: (t: string, id: string) => boolean, get?: (t: string, id: string) => any}|null} [data]
  * @returns {number}
  */
-export function itemCount(world, itemId) {
+export function itemCount(world, itemId, data = null) {
+  const row = data && typeof data.has === 'function' && data.has('items', itemId) ? data.get('items', itemId) : null;
+  const currency = row ? (typeof row.wallet === 'string' ? row.wallet : null) : WALLET_ITEMS[itemId] ?? null;
+  if (currency) {
+    const v = world?.wallet?.[currency];
+    return Number.isFinite(v) && v > 0 ? v : 0;
+  }
   let n = 0;
   for (const stacks of Object.values(world?.bag?.pockets ?? {})) {
     for (const s of stacks) if (s.id === itemId) n += s.n;
   }
   return n;
+}
+
+/**
+ * The Shift Tide line (GDD-00 §2, the Relighting's `lit.shiftTide` rule; GDD-09 §3 Tide Table): after
+ * the Relighting every pending Shift window is chalked a tide ahead on the Tide Table and the Day
+ * Page. One row per pending window (`world.pendingShifts` order; party, then box), carrying what the
+ * `board.shiftTideLine` string fills ({nick}); [] before the Relighting.
+ * @param {World} world
+ * @returns {Array<{uid: string, nick: string, speciesId: string, level: number}>}
+ */
+export function shiftTideLines(world) {
+  if (!world?.flags?.['lit.shiftTide']) return [];
+  const all = [...(world.party ?? []), ...(world.box ?? [])];
+  const out = [];
+  for (const uid of world.pendingShifts ?? []) {
+    const c = all.find((x) => x && x.uid === uid);
+    if (c) out.push({ uid, nick: c.nickname ?? c.speciesId, speciesId: c.speciesId, level: c.level });
+  }
+  return out;
 }
 
 /**

@@ -33,8 +33,15 @@ import * as shops from '../shops.js';
 import * as weather from '../weather.js';
 import * as party from '../party.js';
 import * as eventScripts from './eventScripts.js';
+import * as letters from '../letters.js';
+import * as bag from '../bag.js';
+import * as flags from '../flags.js';
+import { duelSlate, PORCH_DUEL_FLAG_PREFIX, PORCH_DUEL_DAY_FLAG, PORCH_DUEL_DONE_PREFIX } from '../townCommon.js';
+import { forkFor } from '../../state/rngs.js';
 import { MINUTES_PER_DAY } from '../../core/time.js';
 import { t } from '../../data/strings.js';
+import { TUNING } from '../../data/tuning.js';
+import { PORCH_DUELS } from '../../data/town.js';
 
 /** @typedef {import('../../state/schema.js').World} World */
 
@@ -118,6 +125,7 @@ export function restNight(world, clock, kind, ctx) {
       bus,
       tomorrow: ctx.tomorrow,
       isPorchLit: /** @type {any} */ (ctx.isPorchLit),
+      ...letterHands(data, bus),
       hooks: {
         builds: (w, d, s) => { order.push('builds'); return loans.landDue(w, { data: d, bus: s.bus, now: s.now }); },
         crate: (w, d, s) => { order.push('crate'); return shops.settleCrate(w, { data: d, bus: s.bus, now: s.now }); },
@@ -131,6 +139,7 @@ export function restNight(world, clock, kind, ctx) {
     const day = clockSys.gameDay(world);
     report.weather = weather.rollDay(world, data, ctx.rng ?? null, { day, bus });
     order.push('weather');
+    postDuelSlate(world, data, { bus });
   } else {
     // Real Clock sleep, nap, lie down: the page (if shown) is today so far
     report.summary = dayPage.summarize(world, data, { tomorrow: ctx.tomorrow });
@@ -400,19 +409,91 @@ export function install(G) {
       G.store.tx('morning', (w) => {
         const night = dayPage.overnight(w, G.data, rngOf(G), {
           bus: G.bus,
+          ...letterHands(G.data, G.bus),
           hooks: {
             builds: (ww, d, s) => loans.landDue(ww, { data: d, bus: s.bus, now: s.now }),
             crate: (ww, d, s) => shops.settleCrate(ww, { data: d, bus: s.bus, now: s.now }),
           },
         });
+        postDuelSlate(w, G.data, { bus: G.bus });
         weather.update(w, G.data, rngOf(G), { bus: G.bus });
         return night;
       });
     }
   });
   on('clock:dayPart', (p) => { if (p?.dayPart === 'dusk') checkRelighting(G); });
-  on('clock:hour', (p) => { if (p?.hour === 18) checkRelighting(G); });
+  on('clock:hour', (p) => {
+    if (p?.hour === 18) checkRelighting(G);
+    eveningLetter(G);
+  });
+  // a load (or a new run) lands mid-evening: the counter and tonight's slate catch up at once
+  on('world:replaced', () => { eveningLetter(G); G.store.tx('duels:post', (w) => postDuelSlate(w, G.data, { bus: G.bus })); });
   return () => { for (const off of offs) { try { off(); } catch { /* gone */ } } };
+}
+
+// ---------------------------------------------------------------------------------------------
+// Family letters (GDD-08 §1, §3) and the Porch Duel slate (GDD-05 §8)
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * The heirloom collaborators `letters.deliverToDoor` / `releaseHeirlooms` (and the overnight) take:
+ * the keepsake goes to the satchel (systems/bag) and a returned creature joins the party or the box
+ * (systems/party, on the shipped EXP curve). The creature's rng is the labelled fork
+ * `heirloom:<species>` of the run seed, so a reload hands back the same creature.
+ * @param {any} data
+ * @param {any} [bus]
+ * @returns {{giveItem: (world: World, itemId: string, n: number) => any, addCreature: (world: World, spec: {species: string, level: number, nick?: string}) => any}}
+ */
+export function letterHands(data, bus = null) {
+  return {
+    giveItem: (world, itemId, n) => bag.give(world, itemId, n, { data, bus, source: 'heirloom' }),
+    addCreature: (world, spec) => party.giveCreature(world, { species: spec.species, level: spec.level, nick: spec.nick ?? undefined }, data,
+      forkFor(world.run?.seed ?? 0, `heirloom:${spec.species}`), { bus, tuning: TUNING }),
+  };
+}
+
+/**
+ * The 18:00 family letter: puts tonight's letter on Hesper's counter (repeat calls do nothing; a
+ * call after midnight while the counter is open catches up the evening before) and says so.
+ * @param {any} G
+ * @returns {{family: number|null, reason: string|null}}
+ */
+export function eveningLetter(G) {
+  if (!G?.world?.letters || !G.store) return { family: null, reason: 'no-world' };
+  const res = G.store.tx('letters:evening', (w) => letters.deliverEvening(w, G.data, { bus: G.bus, tuning: TUNING }));
+  if (res && res.family !== null) G.bus?.emit?.('toast', { text: 'Hesper has a letter on the counter for you.', icon: 'read' }); // str
+  return res;
+}
+
+/**
+ * Posts the day's Porch Duel slate (GDD-05 §8): `sys.duel.<npc>` is set for each neighbour offering
+ * tonight (their porch topic reads it) and cleared for everyone else; `sys.duel.visitor` names the
+ * visitor's trainer when one is on the slate. Call inside a tx. The slate is frozen once posted for
+ * an evening (`sys.duel.day`): a later post the same evening (a load, a second dawn hook) changes
+ * nothing, so the Commons slip and the porch topics never disagree, and a neighbour met at noon joins
+ * tomorrow's slate. A neighbour whose duel was won tonight (`sys.duel.done.<npc>`) is not re-posted.
+ * @param {World} world
+ * @param {any} data
+ * @param {{bus?: any, day?: number}} [opts]
+ * @returns {ReturnType<typeof duelSlate> & {kept?: boolean}}
+ */
+export function postDuelSlate(world, data, opts = {}) {
+  const slate = duelSlate(world, PORCH_DUELS, { day: opts.day, data, perDay: TUNING.porchDuelsPerDay, payoutPerCurveLevel: TUNING.porchDuelPerCurve });
+  const ctx = { bus: opts.bus ?? null };
+  if (flags.getFlag(world, PORCH_DUEL_DAY_FLAG) === slate.gameDay) return { ...slate, kept: true };
+  flags.setFlag(world, PORCH_DUEL_DAY_FLAG, slate.gameDay, ctx);
+  const won = (npc) => flags.getFlag(world, `${PORCH_DUEL_DONE_PREFIX}${npc}`) === slate.gameDay;
+  const on = new Set(slate.offers.filter((o) => o.kind === 'neighbour' && !won(o.npc)).map((o) => o.npc));
+  for (const n of PORCH_DUELS.neighbours) {
+    const id = `${PORCH_DUEL_FLAG_PREFIX}${n.npc}`;
+    if (on.has(n.npc)) flags.setFlag(world, id, true, ctx);
+    else if (flags.getFlag(world, id) !== null) flags.clearFlag(world, id, ctx);
+  }
+  const visitor = slate.offers.find((o) => o.kind !== 'neighbour') ?? null;
+  const vid = `${PORCH_DUEL_FLAG_PREFIX}visitor`;
+  if (visitor) flags.setFlag(world, vid, visitor.trainer, ctx);
+  else if (flags.getFlag(world, vid) !== null) flags.clearFlag(world, vid, ctx);
+  return slate;
 }
 
 /**

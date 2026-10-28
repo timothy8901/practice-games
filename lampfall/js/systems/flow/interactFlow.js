@@ -28,6 +28,7 @@ import * as loans from '../loans.js';
 import * as shops from '../shops.js';
 import * as letters from '../letters.js';
 import * as party from '../party.js';
+import * as creatureSys from '../creature.js';
 import * as flags from '../flags.js';
 import * as weather from '../weather.js';
 import { isPorchLit, porchesOf } from '../townCommon.js';
@@ -37,6 +38,8 @@ import { minuteOfDay, badgeCount, formatTime } from '../../state/selectors.js';
 import { formatMinute } from '../../core/time.js';
 import { hasAliveParty } from '../../state/selectors.js';
 import { markTrigger } from '../../world/warps.js';
+import { PORCH_DUELS } from '../../data/town.js';
+import { duelSlate, postedDuels } from '../townCommon.js';
 
 /** @typedef {import('../../world/interact.js').ContextAction} ContextAction */
 
@@ -209,6 +212,7 @@ function talk(G, action, host) {
     return challenge(G, { ...action, verb: 'challenge', payload: { ...(action.payload || {}), trainerId: spireTr.id } }, host);
   }
   if (host && host.faceToward) host.faceToward(e && e.id ? e.id : npcId);
+  deliverCarriedTo(G, porchOfNpc(G, npcId), host);
   const pose = host && host.npcPose ? host.npcPose(npcId) : null;
   G.push('dialogue', { target: { kind: 'npc', id: npcId, pose: pose || undefined, mapId: host && host.mapId ? host.mapId : G.world.player.mapId } });
   return done('talk', { scene: 'dialogue', npcId });
@@ -467,6 +471,7 @@ export function mailboxEmptyText(G) {
 }
 
 function mailbox(G, action, host) {
+  deliverCarriedTo(G, TUNING.homePorchId ?? 'porch-keepers-cottage', host);
   G.store.tx('letters:mailbox', (w) => letters.collectMail(w, G.data, laneCtx(G)));
   const unread = letters.unread(G.world);
   G.bus.emit('interact', { verb: 'mailbox' });
@@ -478,8 +483,12 @@ function mailbox(G, action, host) {
 function hesperCounter(G, action, host) {
   const m = minuteOfDay(G.world);
   if (!(m >= 18 * 60 || m < 2 * 60)) { toast(G, host, 'Hesper\'s counter opens at six in the evening.'); return fail('hesperCounter', 'closed'); } // str
+  const handed = deliverCarriedTo(G, 'porch-post-office', host);
   const got = G.store.tx('letters:carry', (w) => letters.carry(w, G.data, laneCtx(G)));
-  if (!got.ok) { toast(G, host, 'Nothing for you tonight.'); return fail('hesperCounter', got.reason); } // str
+  if (!got.ok) {
+    if (!handed.length) toast(G, host, carryingText(G) || 'Nothing for you tonight.'); // str
+    return fail('hesperCounter', got.reason);
+  }
   G.push('letter', { n: got.n, from: 'counter' });
   return done('hesperCounter', { scene: 'letter' });
 }
@@ -521,6 +530,7 @@ export function boardContent(G, kind) {
     `Augusta's odds: ${odds}${fc && fc.minute != null ? ` (${weather.forecastTime(fc)})` : ''}`, // str
     `Commons Jar: ${(st.jar ?? 0).toLocaleString('en-US')}◉`, // str
     w.weather && w.weather.outlook ? `Tomorrow: ${weather.forecastText(w.weather.outlook, G.data)}` : null, // str
+    ...duelSlipLines(G),
   ].filter(Boolean);
   if (kind === 'tide') return { title: t('board.tideTable'), lines: tide };
   if (kind === 'commons') return { title: t('board.commons'), lines: commons };
@@ -604,6 +614,7 @@ function shop(G, action, host) {
       return fail('shop', 'closed');
     }
   }
+  if (G.data.has('shops', id)) deliverCarriedTo(G, porchOfNpc(G, G.data.get('shops', id).keeper), host);
   G.push('shop', { shop: id });
   return done('shop', { scene: 'shop', shop: id });
 }
@@ -646,13 +657,182 @@ function knock(G, action, host) {
   const npcId = row && row.npcId;
   const here = npcId && host && host.ents ? host.ents.find(npcId) : null;
   G.bus.emit('interact', { verb: 'use' });
+  // a family letter for this door goes in first (GDD-08 §3), whoever answers
+  const handed = porchId ? deliverCarriedTo(G, porchId, host) : [];
+  if (porchId && porchId === PORCH_DUELS.visitorVenue) {
+    const v = visitorDuelOffer(G);
+    if (v) return visitorDuel(G, v, host);
+  }
   if (here) {
     if (host.faceToward) host.faceToward(npcId);
     G.push('dialogue', { target: { kind: 'porch', id: npcId, mapId: host.mapId, atPorch: true } });
     return done('knock', { scene: 'dialogue', npcId });
   }
+  if (handed.length) return done('knock', { delivered: handed.map((r) => r.n) });
   toast(G, host, knockText(G, porchId, npcId, lit));
   return fail('knock', lit ? 'no-answer' : 'dark');
+}
+
+// ---- family letters at the door (MID-02; GDD-08 §3) -------------------------------------------
+
+/** The porch a resident's door is (porch rows / npc `porch`), or null. */
+export function porchOfNpc(G, npcId) {
+  if (!npcId) return null;
+  const row = porchesOf(G.data).find((p) => p.npcId === npcId);
+  return row ? row.id : null;
+}
+
+/** Display name of an item (keepsake / heirloom), without a leading "The" (the lines supply it). */
+function itemName(G, id) {
+  const name = (id && G.data.has('items', id) ? G.data.get('items', id).name : null) || id;
+  return String(name).replace(/^the\s+/i, '');
+}
+
+/** "You're carrying F3 for the Pells' porch." when a family letter is in the satchel, else ''. */
+export function carryingText(G) {
+  const n = (G.world?.letters?.carrying ?? [])[0];
+  if (!Number.isInteger(n)) return '';
+  const row = letters.letterByN(G.data, n);
+  if (!row) return '';
+  return `You're carrying ${letters.labelOf(G.data, row)} for ${porchLabel(G, row.door)}.`; // str
+}
+
+/**
+ * The words for a door hand-in: the letter going in, then the heirloom coming home (or waiting on a
+ * dark porch), the porch lighting, and a creature following it up the step. Pure.
+ * @param {any} G
+ * @param {any} res   letters.deliverToDoor result
+ * @param {any} row   the letter row
+ * @returns {string[]}
+ */
+export function doorLines(G, res, row) {
+  const label = letters.labelOf(G.data, row);
+  const out = [`${label} delivered. ${row.to ? `To ${row.to}.` : ''}`.trim()]; // str
+  const r = res.reward;
+  if (r) {
+    if (r.item) out.push(`Juniper brings the ${itemName(G, r.item)} home from her back room.`); // str
+    if (r.lightsPorch) out.push('The porch lamp comes on.'); // str
+    if (r.creature) {
+      let name = r.creature.species;
+      try { name = G.data.tryGet('species', r.creature.species)?.name ?? name; } catch { /* id */ }
+      out.push(`A ${name} follows it up the step and stays with you.`); // str
+    }
+  } else if (res.returned === false && row.heirloom) {
+    out.push(`The house is dark. The ${itemName(G, row.heirloom)} will wait until its porch is lit.`); // str
+  }
+  return out;
+}
+
+/**
+ * Hands in every carried family letter whose door is `porchId` (letters.deliverToDoor, with the
+ * heirloom collaborators: the keepsake to the satchel, a creature to the party or box) and toasts
+ * what happened. Returns the deliveries made.
+ * @param {any} G
+ * @param {string|null} porchId
+ * @param {any} [host]
+ * @returns {Array<{n: number, returned: boolean, reward: any}>}
+ */
+export function deliverCarriedTo(G, porchId, host) {
+  if (!porchId || !G.world?.letters) return [];
+  const due = (G.world.letters.carrying ?? []).filter((n) => letters.letterByN(G.data, n)?.door === porchId);
+  const out = [];
+  for (const n of due) {
+    const row = letters.letterByN(G.data, n);
+    const res = G.store.tx('letters:door', (w) => letters.deliverToDoor(w, G.data, n, porchId, laneCtx(G, dayFlow.letterHands(G.data, G.bus))));
+    if (!res || !res.ok) continue;
+    out.push({ n, returned: res.returned, reward: res.reward });
+    for (const line of doorLines(G, res, row)) toast(G, host, line, { icon: 'read' });
+  }
+  if (out.length && host && host.refresh) host.refresh();
+  return out;
+}
+
+// ---- the Gallery commission (LG-RN36; GDD-00 §9: a Shiftlog strip gives +1 Bond once) -------
+
+/** Flag set once the Shiftlog strip has been hung in the Gallery (its +1 Bond is given once). */
+export const GALLERY_STRIP_FLAG = 'sys.gallery-strip';
+
+function gallery(G, action, host) {
+  if (!loans.roomBuilt(G.world, 'gallery')) return done('gallery', { scene: say(G, VERB_LINES.gallery) });
+  const framed = flags.get(G.world, loans.GALLERY_FRAMED_COUNTER);
+  const lead = (G.world.party ?? []).find((c) => c && c.hp > 0) ?? (G.world.party ?? [])[0] ?? null;
+  if (!flags.hasFlag(G.world, GALLERY_STRIP_FLAG) && lead) {
+    const r = G.store.tx('gallery:strip', (w) => {
+      const c = w.party.find((x) => x && x.uid === lead.uid);
+      const b = creatureSys.addBond(c, 1, { tuning: TUNING });
+      flags.setFlag(w, GALLERY_STRIP_FLAG, true, { bus: G.bus });
+      return b;
+    });
+    const name = lead.nickname || (G.data.has('species', lead.speciesId) ? G.data.get('species', lead.speciesId).name : 'your lead');
+    G.bus.emit('creature:bond', { uid: lead.uid, from: r.from, to: r.to, source: 'gallery' });
+    return done('gallery', { bond: r.to, scene: say(G, `You hang ${name}'s Shiftlog strip under Odile's canvases. ${name} looks at it for a long time. (+1 Bond)`) }); // str
+  }
+  return done('gallery', { scene: say(G, `The Gallery: Odile's canvases, the tally wall, ${framed} plate frame${framed === 1 ? '' : 's'} of Held forms. Every six Held forms frames another.`) }); // str
+}
+
+// ---- Porch Duel visitors (GDD-05 §8: beaten leaders and route trainers on the Archive porch) ----
+
+/** Tonight's visitor offer when it can be fought now (porch hours, not fought tonight), else null. */
+export function visitorDuelOffer(G, table = PORCH_DUELS) {
+  const w = G.world;
+  const m = minuteOfDay(w);
+  const [a, b] = table.hours || [19 * 60, 60];
+  if (!(m >= a || m < b)) return null;
+  const slate = duelSlate(w, table, { data: G.data, perDay: TUNING.porchDuelsPerDay, payoutPerCurveLevel: TUNING.porchDuelPerCurve });
+  const v = slate.offers.find((o) => o.kind !== 'neighbour');
+  if (!v || !G.data.has('trainers', v.trainer)) return null;
+  if (flags.getFlag(w, 'sys.duel.visitor-fought') === slate.gameDay) return null;
+  return { ...v, gameDay: slate.gameDay };
+}
+
+async function visitorDuel(G, offer, host) {
+  const tr = G.data.get('trainers', offer.trainer);
+  if (!hasAliveParty(G.world)) { toast(G, host, 'Bring a rested companion. The Waystones heal your party.'); return fail('knock', 'no-party'); } // str
+  const pick = await ask(G, host, { title: 'Porch Duel', // str
+    body: `${tr.name} is on tonight's Porch Duel slate and waiting under the lamp. Friendly, ${offer.creatures === 1 ? 'one creature' : `${offer.creatures} creatures`}, ${offer.payout.toLocaleString('en-US')}◉. Nothing lost.`, // str
+    options: ['Not tonight', 'Duel'], defaultIndex: 0 }); // str
+  if (pick !== 1) return fail('knock', 'declined');
+  G.store.tx('duel:visitor', (w) => flags.setFlag(w, 'sys.duel.visitor-fought', offer.gameDay, { bus: G.bus }));
+  const setup = { kind: 'trainer', trainerId: offer.trainer, source: 'duel', porchDuel: true };
+  if (host && host.startBattle) G.push('dialogue', { who: tr.npc ?? tr.name, text: tr.lines?.intro ?? '', onDone: () => host.startBattle(setup) });
+  else G.push('battle', { setup });
+  return done('knock', { scene: 'battle', trainerId: offer.trainer, duel: true });
+}
+
+/**
+ * The Commons slip's Porch Duel lines (GDD-05 §8, PORCH_DUELS.slip). Pure.
+ * @param {any} G
+ * @returns {string[]}
+ */
+export function duelSlipLines(G) {
+  const slate = duelSlate(G.world, PORCH_DUELS, { data: G.data, perDay: TUNING.porchDuelsPerDay, payoutPerCurveLevel: TUNING.porchDuelPerCurve });
+  // the slate as posted this evening (the flags the porch topics read); the live draw only before a post
+  const posted = postedDuels(G.world, PORCH_DUELS);
+  const offers = posted
+    ? [...posted.neighbours.map((n) => ({ kind: 'neighbour', npc: n.npc, trainer: n.trainer, porch: n.porch, taken: n.taken })),
+      ...slate.offers.filter((o) => o.kind !== 'neighbour' && o.trainer === posted.visitor)]
+    : slate.offers;
+  const slip = PORCH_DUELS.slip || {};
+  if (!offers.length) return [slip.none || 'No duels posted tonight.']; // str
+  const nameOf = (o) => {
+    const npc = o.npc && G.data.has('npcs', o.npc) ? G.data.get('npcs', o.npc) : null;
+    if (npc && npc.name) return npc.name;
+    return G.data.has('trainers', o.trainer) ? G.data.get('trainers', o.trainer).name : o.trainer;
+  };
+  const n = slate.creatures;
+  const pay = slate.payout.toLocaleString('en-US');
+  return [slip.header || 'Porch Duels tonight', ...offers.map((o) => (o.taken
+    ? `${nameOf(o)}: fought. ${pay}◉ in your pocket.` // str
+    : `${nameOf(o)}: ${porchesOf(G.data).find((p) => p.id === o.porch)?.npcId === o.npc && o.npc ? 'home porch' : porchLabel(G, o.porch)}, after seven. ${n === 1 ? 'One creature' : `${n} creatures`}, friendly. ${pay}◉.`))]; // str
+}
+
+/** "Juniper Pell's porch" for a porch row with a resident, else the porch id in words. */
+export function porchLabel(G, porchId) {
+  const row = porchesOf(G.data).find((p) => p.id === porchId);
+  const npc = row && row.npcId && G.data.has('npcs', row.npcId) ? G.data.get('npcs', row.npcId) : null;
+  if (npc && npc.name) return `${npc.name}'s porch`; // str
+  if (porchId === (TUNING.homePorchId ?? 'porch-keepers-cottage')) return 'your own porch'; // str
+  return `the ${String(porchId).replace(/^porch-/, '').split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')} porch`; // str
 }
 
 /**
@@ -802,7 +982,15 @@ export const VERB_HANDLERS = Object.freeze({
   hesperCounter,
   gateBoards: (G, a, h) => board_(G, a, h, 'gate'),
   tideTable: (G, a, h) => board_(G, a, h, 'tide'),
-  commons: (G, a, h) => board_(G, a, h, 'commons'),
+  commons: async (G, a, h) => {
+    // a visitor's Porch Duel is fought under the Commons lamp when the Archive porch has no door to knock (GDD-05 §8)
+    const v = visitorDuelOffer(G);
+    if (v) {
+      const r = await visitorDuel(G, v, h);
+      if (r.ok) return r;
+    }
+    return board_(G, a, h, 'commons');
+  },
   ledgerBoard: (G, a, h) => board_(G, a, h, 'ledger'),
   commonsJar,
   pay,
@@ -810,6 +998,7 @@ export const VERB_HANDLERS = Object.freeze({
   crate,
   ferry,
   knock,
+  gallery,
   waystone,
   bed,
   ledger: sceneVerb,

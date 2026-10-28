@@ -26,11 +26,12 @@ import { ease } from '../core/tween.js';
 import { createFocus, drawDottedRect } from '../ui/focus.js';
 import { drawPanel } from '../ui/panel.js';
 import { drawSeal, getPortraitPlaceholder } from '../ui/icons.js';
-import { drawSealButton } from '../ui/widgets.js';
+import { drawSealButton, drawTypeChip } from '../ui/widgets.js';
+import { creatureSprite } from '../art/creatures/index.js';
 import { beatFor, paginate } from '../ui/textbox.js';
 import { COLORS, PALETTE, TIMING, TYPE } from '../ui/theme.js';
 import { portraitSprite } from '../art/portraits.js';
-import { t } from '../data/strings.js';
+import { t, has as hasString } from '../data/strings.js';
 import { parseShorthand } from '../script/ops.js';
 import { itemOf } from '../systems/econ.js';
 import * as memory from '../systems/memory.js';
@@ -88,6 +89,32 @@ export function pagesFor(text, narration, large = false) {
   return paginate(raw, { maxWidth: w, maxLines: L.text.lines }).map(stripBeats);
 }
 
+/** Starter-card choice rows (FH-06): sprite, name, type chips and a line of temperament. */
+export const STARTER_ROW_H = 34;
+export const STARTER_PANEL_W = 312;
+
+/**
+ * Starter cards for a choice whose every option names a starter on the last dry stones ("The
+ * Sloshkin."): one `{speciesId, name, types, temper}` per option, or null for any other choice. Only
+ * species with a `starter.temper.<id>` line count, so ordinary choices never grow cards. Pure.
+ * @param {string[]} labels
+ * @param {any} data   Registry (`list('species')`) or tables (`species` array)
+ * @returns {Array<{speciesId: string, name: string, types: string[], temper: string}>|null}
+ */
+export function starterCardsFor(labels, data) {
+  if (!Array.isArray(labels) || !labels.length) return null;
+  let rows = [];
+  try { rows = typeof data?.list === 'function' ? data.list('species') : Array.isArray(data?.species) ? data.species : Object.values(data?.species ?? {}); } catch { rows = []; }
+  const out = [];
+  for (const label of labels) {
+    const m = /^the\s+(.+?)\.?$/i.exec(String(label ?? '').trim());
+    const sp = m && rows.find((r) => r && typeof r.name === 'string' && r.name.toLowerCase() === m[1].toLowerCase());
+    if (!sp || !hasString(`starter.temper.${sp.id}`)) return null;
+    out.push({ speciesId: sp.id, name: sp.name, types: Array.isArray(sp.types) ? sp.types.slice() : [], temper: t(`starter.temper.${sp.id}`) });
+  }
+  return out;
+}
+
 /**
  * Is `who` a creature (a party/box uid, or `player:<uid>`)? Returns the uid or null.
  * @param {any} world
@@ -122,6 +149,7 @@ export function createDialogueScene(G) {
   /** @type {any} */ let choiceFocus = null;
   let choiceRect = { x: 0, y: 0, w: 0, h: 0 };
   let choiceLock = 0, choiceT = 0;
+  /** @type {ReturnType<typeof starterCardsFor>} */ let choiceCards = null;
   /** @type {(i: number) => void} */ let onChoice = () => {};
   // name entry / confirm
   /** @type {any} */ let entry = null;
@@ -214,10 +242,11 @@ export function createDialogueScene(G) {
         } else {
           completePage();
         }
+        const labels = r.options.map((o) => o.text);
         openChoices(r.options.map((o) => ({ label: o.text, value: o.index })), r.defaultIndex ?? 0, (i) => {
           textLog(G).push('>', r.options[i].text);
           pull(i);
-        });
+        }, starterCardsFor(labels, G.data));
         state = 'choice';
         return;
       }
@@ -297,16 +326,19 @@ export function createDialogueScene(G) {
   }
 
   // ------------------------------------------------------------------ choices
-  function openChoices(list, defaultIndex, cb) {
+  function openChoices(list, defaultIndex, cb, cards = null) {
     choices = list;
     onChoice = cb;
+    // starter cards dock on the left, so the creatures on the stones at the right edge stay in view (FH-06)
+    choiceCards = cards && cards.length === list.length ? cards : null;
+    const rowH = choiceCards ? STARTER_ROW_H : CHOICE_ROW_H;
     const labelW = list.reduce((m, c) => Math.max(m, measureText(c.label).w), 0);
-    const w = Math.min(300, Math.max(152, labelW + 30));
-    const h = list.length * CHOICE_ROW_H + 8;
-    choiceRect = { x: L().slip.x + L().slip.w - w, y: L().slip.y - 10 - h, w, h };
+    const w = choiceCards ? STARTER_PANEL_W : Math.min(300, Math.max(152, labelW + 30));
+    const h = list.length * rowH + 8;
+    choiceRect = { x: choiceCards ? L().slip.x + 4 : L().slip.x + L().slip.w - w, y: L().slip.y - 10 - h, w, h };
     const items = list.map((c, i) => ({
       id: String(i), enabled: c.enabled !== false, reason: c.reason,
-      rect: { x: choiceRect.x + 14, y: choiceRect.y + 4 + i * CHOICE_ROW_H, w: w - 20, h: CHOICE_ROW_H },
+      rect: { x: choiceRect.x + 14, y: choiceRect.y + 4 + i * rowH, w: w - 20, h: rowH },
     }));
     choiceFocus = createFocus({ items, cols: 1, wrap: true, index: Math.max(0, Math.min(list.length - 1, defaultIndex | 0)) });
     choiceFocus.on('change', () => sfx('ui:cursor'));
@@ -633,20 +665,31 @@ export function createDialogueScene(G) {
       const cx = reducedMotion(G) ? 0 : Math.round((1 - k) * SLIDE_PX);
       const R = { ...choiceRect, x: choiceRect.x + cx };
       drawPanel(ctx, R, 'paper', { grain: false });
+      const rowH = choiceCards ? STARTER_ROW_H : CHOICE_ROW_H;
       choices.forEach((c, i) => {
         const it = choiceFocus.items[i];
         const ry = it.rect.y;
         if (i === choiceFocus.index && choiceLock <= 0) {
           ctx.fillStyle = choiceFocus.pointerActive ? COLORS.focus.hoverOnPaper : COLORS.focus.bandOnPaper;
-          ctx.fillRect(R.x + 10, ry, R.w - 14, CHOICE_ROW_H);
+          ctx.fillRect(R.x + 10, ry, R.w - 14, rowH);
         }
-        drawText(ctx, c.label, R.x + 15, ry + 4, { color: c.enabled === false ? COLORS.role.disabled : COLORS.paper.ink, maxWidth: R.w - 20 });
+        const card = choiceCards ? choiceCards[i] : null;
+        if (!card) {
+          drawText(ctx, c.label, R.x + 15, ry + 4, { color: c.enabled === false ? COLORS.role.disabled : COLORS.paper.ink, maxWidth: R.w - 20 });
+          return;
+        }
+        try { drawSprite(ctx, creatureSprite(card.speciesId, { view: 'front', types: card.types }), R.x + 15, ry + 1); } catch { /* no art: the words still choose */ }
+        drawText(ctx, c.label, R.x + 52, ry + 4, { color: COLORS.paper.ink, maxWidth: R.w - 60 });
+        let cx = R.x + 52;
+        for (const ty of card.types) cx += drawTypeChip(ctx, String(ty).toLowerCase(), cx, ry + 17) + 2;
+        drawText(ctx, card.temper, cx + 3, ry + 19, { font: 'small', color: COLORS.paper.inkSoft, maxWidth: R.x + R.w - cx - 10 });
       });
       const cur = choiceFocus.items[choiceFocus.index];
       if (cur) {
         const locked = choiceLock > 0;
-        drawText(ctx, TYPE.cursor, R.x + 5 + (locked ? 0 : lift), cur.rect.y + 4, { color: locked ? COLORS.paper.inkFaint : COLORS.wax.fill });
-        if (!locked) drawDottedRect(ctx, R.x + 10, cur.rect.y, R.w - 14, CHOICE_ROW_H, COLORS.focus.ringOnPaper);
+        const cy = choiceCards ? cur.rect.y + Math.floor((rowH - 8) / 2) : cur.rect.y + 4;
+        drawText(ctx, TYPE.cursor, R.x + 5 + (locked ? 0 : lift), cy, { color: locked ? COLORS.paper.inkFaint : COLORS.wax.fill });
+        if (!locked) drawDottedRect(ctx, R.x + 10, cur.rect.y, R.w - 14, rowH, COLORS.focus.ringOnPaper);
       }
     }
   }

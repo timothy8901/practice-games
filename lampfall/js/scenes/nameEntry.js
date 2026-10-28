@@ -12,6 +12,12 @@
  * layer's keyboard presses are ignored (Z, X, WASD are letters here), so gamepad and touch keep
  * working side by side.
  *
+ * FH-03: an empty field opens with the suggestion filled in and *selected* (Enter, Start, Done, or
+ * a lowercase z / Space accept it; typing or a grid key replaces it; Backspace / B clears it). Once
+ * the arrows have walked the grid, z / Space press the focused key instead of typing. For the first
+ * {@link OPEN_GUARD_MS} after it opens every key and button is ignored, so a confirm mashed through
+ * the dialogue before it does not carry over.
+ *
  * Empty -> `entry.empty`; longer than `maxLen` (10) -> `entry.tooLong`. No DOM at import time.
  * @module scenes/nameEntry
  */
@@ -29,6 +35,8 @@ export const KEY_W = 24;
 export const KEY_H = 18;
 /** Default maximum length (GDD-09 §3.27 / memory.nicknameMaxLength). */
 export const MAX_LEN = 10;
+/** Keys and buttons are ignored this long after the entry opens (FH-03: no carried-over mashing). */
+export const OPEN_GUARD_MS = 250;
 
 const UPPER = ['ABCDEFGHIJ', 'KLMNOPQRST', "UVWXYZ'-. ", '0123456789'];
 
@@ -88,6 +96,9 @@ export function finishName(name, maxLen = MAX_LEN) {
  * @property {(evt: string, payload?: any) => void} [sfx]   ui sound hook (`ui:cursor`, `ui:confirm`, ...)
  * @property {EventTarget|null} [keyTarget]   where physical keys are read (default: globalThis when it has addEventListener)
  * @property {{x: number, y: number}} [origin]   top-left of the card (default 104,26)
+ * @property {boolean} [prefill]       fill an empty field with `suggest`, selected (default true)
+ * @property {number} [guardMs]        input ignored this long after attach (default {@link OPEN_GUARD_MS})
+ * @property {() => number} [now]      clock in ms for the guard (default performance.now / Date.now)
  */
 
 /**
@@ -102,11 +113,24 @@ export function createNameEntry(o) {
   const gx = X + 16, gy = Y + 50;
   let caps = true;
   let name = String(o.initial ?? '').slice(0, 64);
+  // FH-03: an empty field starts with the suggestion, selected (accept it, or type over it)
+  let selected = false;
+  if (!name && o.prefill !== false && typeof o.suggest === 'string' && o.suggest) {
+    name = editName('', { type: 'set', text: o.suggest }, maxLen).name;
+    selected = !!name;
+  }
+  const clock = typeof o.now === 'function' ? o.now
+    : () => (typeof performance !== 'undefined' && typeof performance.now === 'function' ? performance.now() : Date.now());
+  const guardMs = Number.isFinite(o.guardMs) ? Math.max(0, /** @type {number} */ (o.guardMs)) : OPEN_GUARD_MS;
+  let openedAt = clock();
+  const guarded = () => clock() - openedAt < guardMs;
   let error = null;
   let errorMs = 0;
   let caretMs = 0;
   let typing = false; // a physical keyboard is typing
   let gridNav = false; // the keyboard last moved the grid cursor (Enter presses the focused key)
+  let walked = false; // the cursor has moved on the grid at least once (keyboard or pad)
+  let doneFired = false;
   let pressFlash = -1;
   let pressMs = 0;
   /** @type {string[]} */
@@ -134,6 +158,8 @@ export function createNameEntry(o) {
   function flash(err) { error = err; errorMs = 1800; if (err) sfx('ui:blocked'); }
 
   function apply(edit) {
+    // a selected suggestion is replaced by the first letter and cleared by the first delete
+    if (selected) { selected = false; if (edit.type === 'delete') { name = ''; error = null; return; } if (edit.type === 'char') name = ''; }
     const r = editName(name, edit, maxLen);
     name = r.name;
     if (r.error) flash(r.error); else error = null;
@@ -143,11 +169,12 @@ export function createNameEntry(o) {
     const r = finishName(name, maxLen);
     if (!r.ok) { flash(r.error); return; }
     sfx('ui:confirm');
+    doneFired = true;
     o.onDone(r.name);
   }
 
   function back() {
-    if (Array.from(name).length > 0) { apply({ type: 'delete' }); sfx('ui:cancel'); return; }
+    if (Array.from(name).length > 0) { apply({ type: 'delete' }); sfx('ui:cancel'); return; } // a selected suggestion clears whole
     sfx('ui:cancel');
     o.onCancel();
   }
@@ -156,7 +183,7 @@ export function createNameEntry(o) {
     if (id === 'caps') { caps = !caps; sfx('ui:cursor'); return; }
     if (id === 'del') { apply({ type: 'delete' }); sfx('ui:cancel'); return; }
     if (id === 'suggest') {
-      if (typeof o.suggest === 'string' && o.suggest) { apply({ type: 'set', text: o.suggest }); sfx('ui:confirm'); } else flash(null);
+      if (typeof o.suggest === 'string' && o.suggest) { selected = false; apply({ type: 'set', text: o.suggest }); selected = true; sfx('ui:confirm'); } else flash(null);
       return;
     }
     done();
@@ -174,6 +201,7 @@ export function createNameEntry(o) {
   /** @param {KeyboardEvent} ev */
   function onKey(ev) {
     if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
+    if (guarded()) { ev.preventDefault?.(); return; } // a confirm mashed through the dialogue
     const k = ev.key;
     const arrows = { ArrowUp: 'U', ArrowDown: 'D', ArrowLeft: 'L', ArrowRight: 'R' };
     if (arrows[k]) { keyQueue.push(`\x00${arrows[k]}`); ev.preventDefault?.(); return; }
@@ -181,13 +209,15 @@ export function createNameEntry(o) {
     if (k === 'Enter') { keyQueue.push('\r'); ev.preventDefault?.(); return; }
     if (k === 'Backspace') { keyQueue.push('\b'); ev.preventDefault?.(); return; }
     if (k === 'Escape') { keyQueue.push('\x1b'); ev.preventDefault?.(); return; }
-    if (typeof k === 'string' && Array.from(k).length === 1) { keyQueue.push(k); typing = true; ev.preventDefault?.(); }
+    if (typeof k === 'string' && Array.from(k).length === 1) { keyQueue.push(k); ev.preventDefault?.(); }
   }
 
   const target = o.keyTarget !== undefined ? o.keyTarget : (typeof globalThis.addEventListener === 'function' ? globalThis : null);
   let attached = false;
 
   function attach() {
+    openedAt = clock();
+    keyQueue.length = 0;
     if (attached || !target) return;
     target.addEventListener('keydown', onKey, true);
     attached = true;
@@ -210,7 +240,12 @@ export function createNameEntry(o) {
       if (k === '\b') { apply({ type: 'delete' }); sfx('ui:cancel'); continue; }
       // Escape backs out one level (Backspace is the keyboard's delete); never commits
       if (k === '\x1b') { typing = false; sfx('ui:cancel'); o.onCancel(); return true; }
+      // after the arrows walked the grid, the action keys press the focused key (FH-03)
+      if (gridNav && (k === 'z' || k === 'Z' || k === ' ')) { if (row5 >= 0) pressSpecial(SPECIAL[row5].id); else pressKey(focus.index); continue; }
+      // the untouched suggestion: z / Space keep it (Shift+Z still types a capital Z)
+      if (selected && !walked && (k === 'z' || k === ' ')) { done(); return true; }
       gridNav = false;
+      typing = true;
       apply({ type: 'char', ch: k });
       sfx('ui:textTick');
     }
@@ -219,6 +254,7 @@ export function createNameEntry(o) {
 
   /** One grid step: 'U' | 'D' | 'L' | 'R'. */
   function moveDir(d) {
+    walked = true;
     const dx = d === 'L' ? -1 : d === 'R' ? 1 : 0, dy = d === 'U' ? -1 : d === 'D' ? 1 : 0;
     if (row5 >= 0) { moveRow5(dx, dy); sfx('ui:cursor'); return; }
     const idx = focus.index;
@@ -251,6 +287,7 @@ export function createNameEntry(o) {
    * @param {any} input
    */
   function handle(input = o.input) {
+    if (guarded()) { keyQueue.length = 0; return false; }
     if (drainKeys()) return true;
     // a physical keyboard is read through the key listener above (letters type, arrows move, Enter
     // presses / finishes); the action layer serves the gamepad and the touch overlay
@@ -274,7 +311,13 @@ export function createNameEntry(o) {
     for (const [dir, d] of [['left', 'L'], ['right', 'R'], ['up', 'U'], ['down', 'D']]) {
       if (rep(dir)) { typing = false; moveDir(d); break; }
     }
-    if (usable('confirm')) { typing = false; if (row5 >= 0) pressSpecial(SPECIAL[row5].id); else pressKey(focus.index); return false; }
+    if (usable('confirm')) {
+      typing = false;
+      // the untouched suggestion with the cursor not yet moved: A keeps it (FH-03)
+      if (selected && !walked && row5 < 0) { done(); return !!doneFired; }
+      if (row5 >= 0) pressSpecial(SPECIAL[row5].id); else pressKey(focus.index);
+      return false;
+    }
     if (usable('cancel')) { back(); return false; }
     if (usable('start')) { done(); return false; }
     return false;
@@ -311,8 +354,9 @@ export function createNameEntry(o) {
     const shown = name;
     const m = measureText(shown);
     const tx = field.x + Math.floor((field.w - m.w) / 2);
+    if (selected && shown) { ctx.fillStyle = COLORS.focus.bandOnPaper; ctx.fillRect(tx - 2, field.y + 2, m.w + 4, 12); }
     drawText(ctx, shown, tx, field.y + 5, { color: COLORS.paper.ink });
-    if (caretMs < 520) {
+    if (caretMs < 520 && !selected) {
       ctx.fillStyle = COLORS.wax.fill;
       ctx.fillRect(tx + m.w + 1, field.y + 3, 1, 10);
     }
@@ -333,8 +377,11 @@ export function createNameEntry(o) {
     const r = row5 >= 0 ? specialRects[row5] : items[focus.index].rect;
     if (!typing) drawText(ctx, TYPE.cursor, r.x - 7, r.y + Math.floor((r.h - TYPE.capH) / 2), { color: COLORS.focus.cursorOnPaper });
     // status line
-    const kbHint = gridNav ? 'Arrows + Enter: press key   Esc: back' : 'Type a name. Enter: done   Bksp: delete   Esc: back'; // str
-    const status = error ?? (o.input?.lastDevice === 'keyboard' ? kbHint : 'A: press   B: delete   Start: done'); // str
+    const kbHint = gridNav ? 'Arrows + Z/Enter: press key   Esc: back' // str
+      : selected ? `Z/Enter: keep ${name}   Type to rename   Esc: back` // str
+        : 'Type a name. Enter: done   Bksp: delete   Esc: back'; // str
+    const padHint = selected ? `Start: keep ${name}   A: press   B: clear` : 'A: press   B: delete   Start: done'; // str
+    const status = error ?? (o.input?.lastDevice === 'keyboard' ? kbHint : padHint);
     drawText(ctx, status, card.x + card.w / 2, card.y + card.h - 11, { align: 'center', font: 'small', color: error ? PALETTE.r : COLORS.paper.inkFaint });
   }
 
@@ -342,10 +389,13 @@ export function createNameEntry(o) {
     handle, update, draw, attach, detach,
     get name() { return current(); },
     get typing() { return typing; },
+    /** the suggestion is filled in and untouched (Enter keeps it, typing replaces it) */
+    get selected() { return selected; },
+    get gridNav() { return gridNav; },
     get caps() { return caps; },
     get error() { return error; },
     /** test helper: type a string as if from the keyboard */
-    type(s) { for (const ch of Array.from(String(s))) keyQueue.push(ch); typing = true; gridNav = false; },
+    type(s) { for (const ch of Array.from(String(s))) keyQueue.push(ch); gridNav = false; },
     debugText: () => `entry: ${name}`,
   };
 }

@@ -472,7 +472,8 @@ function returnHeirloom(world, data, letter, opts) {
 /**
  * Hands a carried family letter in at a door. The letter's `door` (when it names one) must match.
  * At a lit porch, or for a `lightsPorch` letter, the heirloom comes home now; otherwise it waits in
- * `awaiting`. Emits `letter:door`.
+ * `awaiting`. A letter with nothing to bring home (no heirloom, creature or porch) never waits.
+ * Emits `letter:door`.
  * @param {World} world
  * @param {any} data
  * @param {number} n
@@ -489,8 +490,11 @@ export function deliverToDoor(world, data, n, doorId, opts = {}) {
   L.carrying.splice(L.carrying.indexOf(n), 1);
   if (!L.doors.includes(n)) L.doors.push(n);
   const porch = porchOfLetter(letter) ?? doorId;
-  const lit = Boolean(letter.lightsPorch) || isPorchLit(world, data, porch, opts);
+  // a letter with nothing to bring home (no heirloom, creature or porch to light) never waits
+  const nothing = !letter.heirloom && !(letter.creature && typeof letter.creature === 'object') && !letter.lightsPorch;
+  const lit = nothing || Boolean(letter.lightsPorch) || isPorchLit(world, data, porch, opts);
   emit(opts.bus, 'letter:door', { n, id: letter.id, door: doorId, awaiting: !lit });
+  if (nothing) return { ok: true, returned: false, reward: null };
   if (!lit) {
     if (!L.awaiting.includes(n)) L.awaiting.push(n);
     return { ok: true, returned: false, reward: null };

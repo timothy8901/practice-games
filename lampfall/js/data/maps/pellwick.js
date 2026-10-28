@@ -307,7 +307,12 @@ export default {
     { kind: 'prop', id: 'timber-stack-1', x: 50, y: 28, art: 'timber-stack' },
     { kind: 'prop', id: 'timber-stack-2', x: 50, y: 30, art: 'timber-stack' },
     { kind: 'prop', id: 'tide-board-quay', x: 36, y: 39, art: 'tide-chalkboard', verb: 'tideTable' },
-    { kind: 'prop', id: 'shop-sign-pells', x: 26, y: 19, art: 'shop-sign', verb: 'look' },
+    // hanging signs by the doors (FH-09): a glyph you can read from the lane, the name on Look
+    { kind: 'prop', id: 'shop-sign-pells', x: 26, y: 19, art: 'hanging-sign-pells', verb: 'look', name: 'Pell\'s Sundries', text: 'PELL\'S SUNDRIES. Wicks, salves and odds and ends. Open days.' },
+    { kind: 'prop', id: 'shop-sign-archive', x: 31, y: 19, art: 'hanging-sign-archive', verb: 'look', name: 'The Archive', text: 'THE ARCHIVE. Barnaby\'s field logs, old moves and the Memory desk. Knock at the porthole.' },
+    { kind: 'prop', id: 'shop-sign-post', x: 47, y: 19, art: 'hanging-sign-post', verb: 'look', name: 'Post Office', text: 'POST OFFICE. Hesper sorts the mail at six. Letters, parcels, the odd sack.' },
+    { kind: 'prop', id: 'shop-sign-yard', x: 55, y: 25, art: 'hanging-sign-yard', verb: 'look', name: 'Co-op Yard', text: 'CO-OP YARD. Wren\'s counter: loans paid, rooms built, errands handed out.' },
+    { kind: 'prop', id: 'shop-sign-cottage', x: 8, y: 22, art: 'hanging-sign-cottage', verb: 'look', name: 'Keeper\'s Cottage', text: 'KEEPER\'S COTTAGE. Yours, on the lease. The lamp is yours to light.' },
     { kind: 'prop', id: 'tally-post', x: 56, y: 27, art: 'signpost', verb: 'look', note: 'the yard\'s split-stick post (the tally wall proper is in the shed)' },
     { kind: 'boat', id: 'ansel-launch', x: 51, y: 9, art: 'launch-beached', note: 'beached; Ansel\'s post 17-23' },
     { kind: 'boat', id: 'oyster-boat', x: 44, y: 4, art: 'boat', note: 'the Bracks\' oyster boat, nameboard missing (thread The Oyster Boat)' },

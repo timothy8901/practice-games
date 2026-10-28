@@ -35,6 +35,8 @@ import { t } from '../data/strings.js';
 import * as shops from '../systems/shops.js';
 import * as bag from '../systems/bag.js';
 import * as fieldLog from '../systems/fieldLog.js';
+import * as letters from '../systems/letters.js';
+import * as wallet from '../systems/wallet.js';
 import { itemOf } from '../systems/econ.js';
 import { POCKET_IDS } from '../state/schema.js';
 import { reducedMotion, skipAnims, framesMs } from './scriptHost.js';
@@ -82,6 +84,90 @@ export function satchelStacks(world) {
     }
   }
   return [...out.values()];
+}
+
+// ---------------------------------------------------------------------------------------------
+// Barnaby's desk and the Raft (LG-RN36, MID-02): pure-ish helpers the scene and tests share
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * Barnaby's Sell rows: finds already donated (so every copy is a duplicate; the first of each find is
+ * pinned and never sold), priced at the row's `archivePrice` (skyglass 900), else its `price`. Pure.
+ * @param {any} world
+ * @param {any} data
+ * @returns {Array<{id: string, label: string, enabled: boolean, data: any}>}
+ */
+export function archiveSellRows(world, data) {
+  return satchelStacks(world).flatMap((s) => {
+    const it = itemOf(data, s.id);
+    if (it?.kind !== 'relic' || !fieldLog.isDonated(world, s.id)) return [];
+    const price = typeof it.archivePrice === 'number' ? it.archivePrice : (typeof it.price === 'number' ? it.price : 0);
+    if (price <= 0) return [];
+    return [{ id: s.id, label: it.name ?? s.id, enabled: true, data: { item: s.id, row: it, mode: 'archive', have: s.n, price, pocket: s.pocket } }];
+  });
+}
+
+/**
+ * Donates one specimen to the Archive; a find (with a town letter) is pinned on the string wall at
+ * once (fieldLog.pinFind -> letters.pinFind), which delivers its town letter (GDD-00 §9).
+ * @param {any} G
+ * @param {string} itemId
+ * @returns {{ok: boolean, reason?: string, pinned: boolean, letter: number|null}}
+ */
+export function archiveDonate(G, itemId) {
+  const ctx = { data: G.data, bus: G.bus };
+  return G.store.tx('archive:donate', (w) => {
+    const res = fieldLog.donate(w, itemId, { ...ctx, take: (id, n) => bag.take(w, id, n, { ...ctx, source: 'archive' }).ok });
+    if (!res.ok) return { ok: false, reason: res.reason, pinned: false, letter: null };
+    const it = itemOf(G.data, itemId);
+    if (it?.kind !== 'relic' || !w.collections.relics[itemId]) return { ok: true, pinned: false, letter: null };
+    const pin = fieldLog.pinFind(w, itemId, { ...ctx, pinFind: (fid) => letters.pinFind(w, G.data, fid, ctx) });
+    return { ok: true, pinned: pin.ok, letter: pin.ok && Number.isInteger(pin.letter) ? pin.letter : null };
+  });
+}
+
+/**
+ * Pins every find that was donated but never pinned (saves from before the string wall was wired):
+ * each pin delivers its town letter to the mailbox. Called when Barnaby's desk opens.
+ * @param {any} G
+ * @returns {string[]} the finds pinned now
+ */
+export function pinDonatedFinds(G) {
+  const w = G.world;
+  const due = (w?.collections?.donated ?? []).filter((id) => w.collections.relics?.[id] && !fieldLog.isPinned(w, id));
+  if (!due.length) return [];
+  const ctx = { data: G.data, bus: G.bus };
+  return G.store.tx('archive:pin-catch-up', (ww) => due.filter((id) => fieldLog.pinFind(ww, id, { ...ctx, pinFind: (fid) => letters.pinFind(ww, G.data, fid, ctx) }).ok));
+}
+
+/**
+ * Sells duplicates of a donated find to Barnaby (fieldLog.sellDuplicates at `archivePrice`).
+ * @param {any} G
+ * @param {string} itemId
+ * @param {number} n
+ * @returns {{ok: boolean, amount?: number, reason?: string}}
+ */
+export function archiveSell(G, itemId, n) {
+  const ctx = { data: G.data, bus: G.bus };
+  return G.store.tx('archive:sell', (w) => fieldLog.sellDuplicates(w, itemId, n, {}, {
+    ...ctx,
+    take: (id, k) => bag.take(w, id, k, { ...ctx, source: 'archive' }).ok,
+    earn: (amount, source) => wallet.earn(w, amount, { ...ctx, source }),
+  }));
+}
+
+/**
+ * The Raft's Refine rows: each skyglass relic held, refined 1:1 into Starsalt. Pure.
+ * @param {any} world
+ * @param {any} shop   shop row
+ * @param {any} data
+ * @returns {Array<{id: string, label: string, enabled: boolean, data: any}>}
+ */
+export function refineRowsFor(world, shop, data) {
+  return shops.refineRows(world, shop.id, { data }).map((r) => ({
+    id: r.item, label: r.name, enabled: true,
+    data: { item: r.item, row: itemOf(data, r.item), mode: 'refine', have: r.have, price: 0, gives: r.rate, to: r.to, pocket: 'finds' },
+  }));
 }
 
 /**
@@ -183,7 +269,10 @@ export function createShopScene(G) {
 
   function refresh() {
     const tab = tabs.active;
-    const rows = crate ? (tab === 'in' ? crateContents() : crateRows()) : tab === 'donate' ? donationRows() : tab === 'sell' ? sellRows() : buyRows();
+    const rows = crate ? (tab === 'in' ? crateContents() : crateRows())
+      : tab === 'donate' ? donationRows()
+        : tab === 'refine' ? refineRowsFor(G.world, shop, G.data)
+          : tab === 'sell' ? (shop.id === 'archive-desk' ? archiveSellRows(G.world, G.data) : sellRows()) : buyRows();
     for (const r of rows) if (r.data.mode === 'buy') r.data.wanted = false;
     list.setItems(rows);
     wanted = !crate && shop ? shops.wantedToday(G.world, shop, undefined, ctx()) : [];
@@ -215,6 +304,14 @@ export function createShopScene(G) {
       openQty(d, 'deposit', d.have, d.price);
       return;
     }
+    if (d.mode === 'archive') {
+      openQty(d, 'archive', d.have, d.price);
+      return;
+    }
+    if (d.mode === 'refine') {
+      openQty(d, 'refine', d.have, 0);
+      return;
+    }
     if (d.mode === 'withdraw') {
       if (d.have > 1) { openQty(d, 'withdraw', d.have, d.price); return; }
       doWithdraw(d.item, 1);
@@ -236,6 +333,8 @@ export function createShopScene(G) {
     if (q.mode === 'buy') doBuy(q.item.item, q.n, false);
     else if (q.mode === 'sell') doSell(q.item.item, q.n, false);
     else if (q.mode === 'deposit') doDeposit(q.item.item, q.n, false);
+    else if (q.mode === 'archive') doArchiveSell(q.item.item, q.n);
+    else if (q.mode === 'refine') doRefine(q.item.item, q.n);
     else doWithdraw(q.item.item, q.n);
   }
 
@@ -312,11 +411,27 @@ export function createShopScene(G) {
   }
 
   function doDonate(itemId) {
-    const res = G.store.tx('archive:donate', (w) => fieldLog.donate(w, itemId, {
-      ...ctx(), take: (id, n) => bag.take(w, id, n, { ...ctx(), source: 'archive' }).ok,
-    }));
-    if (res.ok) { emit('ui:confirm'); say('A place in the Archive. Thank you.'); refresh(); }
-    else { emit('ui:blocked'); say('No specimen to donate.', 'warn'); }
+    const res = archiveDonate(G, itemId);
+    if (!res.ok) { emit('ui:blocked'); say('No specimen to donate.', 'warn'); return; }
+    emit('ui:confirm');
+    say(res.pinned ? 'Pinned on the string wall. Oh, look where the string goes.' : 'A place in the Archive. Thank you.'); // str
+    refresh();
+    // the find's town letter arrives on the spot: the cork board, the new string, then the letter
+    if (res.letter !== null && typeof G.push === 'function') G.push('letter', { n: res.letter, from: 'wall' });
+  }
+
+  function doArchiveSell(itemId, n) {
+    const res = archiveSell(G, itemId, n);
+    if (res.ok) { sold += n; emit('sfx', { name: 'coin' }); say(`${formatNumber(res.amount ?? 0)}◉. A duplicate, for the drawers.`); refresh(); return; } // str
+    emit('ui:blocked');
+    say(res.reason === 'not-donated' ? 'Donate the first one. I only buy duplicates.' : String(res.reason), 'warn'); // str
+  }
+
+  function doRefine(itemId, n) {
+    const res = G.store.tx('shop:refine', (w) => shops.refine(w, shop.id, itemId, n, ctx()));
+    if (res.ok) { emit('sfx', { name: 'coin' }); say(`${res.got} Starsalt. One for one, as promised.`); refresh(); return; } // str
+    emit('ui:blocked');
+    say(res.reason === 'closed' ? closedText() : String(res.reason), 'warn');
   }
 
   function closedText() {
@@ -351,12 +466,16 @@ export function createShopScene(G) {
         shop = { id: String(params.shop ?? 'shop'), name: 'Shop', keeper: null, hours: [0, 0], stock: [], buys: [] }; // str
       }
       open = crate || shops.isOpen(G.world, shop, ctx());
+      if (shop.id === 'archive-desk') {
+        try { if (pinDonatedFinds(G).length) emit('toast', { text: 'Barnaby has been busy: new strings on the wall, and letters in your mailbox.', icon: 'read' }); } catch (e) { console.warn('archive: pins', e); } // str
+      }
       bought = 0; sold = 0; qty = null; pendingConfirm = null; message = ''; messageMs = 0;
       state = 'browse'; stateT = 0;
       shownWallet = G.world.wallet.main;
       const tabDefs = crate
         ? [{ id: 'deposit', label: 'Deposit' }, { id: 'in', label: 'In the crate' }] // str
-        : [{ id: shop.id === 'archive-desk' ? 'donate' : 'buy', label: shop.id === 'archive-desk' ? 'Donate' : t('shop.buy') }, { id: 'sell', label: t('shop.sell') }];
+        : [{ id: shop.id === 'archive-desk' ? 'donate' : 'buy', label: shop.id === 'archive-desk' ? 'Donate' : t('shop.buy') },
+          shops.refineRule(shop) ? { id: 'refine', label: 'Refine' } : { id: 'sell', label: t('shop.sell') }]; // str
       tabs = createTabs({ tabs: tabDefs, rect: { x: 16, y: 62, w: 448 }, input: G.input, dpad: true, active: params.mode === 'sell' ? 'sell' : undefined, onChange: () => { refresh(); list.select(0); emit('ui:cursor'); } });
       list = createList({
         rect: { x: LIST_RECT.x + 4, y: LIST_RECT.y + 3, w: LIST_RECT.w - 10, h: 7 * ROW_H },
@@ -467,6 +586,7 @@ export function createShopScene(G) {
       return { total: q.total, after: w + q.total };
     }
     if (d.mode === 'deposit') return { total: shops.crateValue(d.row, n, ctx()), after: w };
+    if (d.mode === 'archive') return { total: d.price * n, after: w + d.price * n };
     return { total: 0, after: w };
   }
 
@@ -491,7 +611,7 @@ export function createShopScene(G) {
       drawText(c, d.reason === t('shop.dailyCap') ? 'Cap reached' : t('shop.soldOut'), right, y + 6, { align: 'right', font: 'small', color: COLORS.role.disabled }); // str
     } else {
       const price = d.mode === 'sell' && d.wanted ? d.wantedPrice : d.price;
-      const label = d.mode === 'deposit' || d.mode === 'withdraw' ? `${formatNumber(price)}◉ ea at dawn` : `${formatNumber(price)}◉`; // str
+      const label = d.mode === 'refine' ? `${d.gives} Starsalt each` : d.mode === 'deposit' || d.mode === 'withdraw' ? `${formatNumber(price)}◉ ea at dawn` : `${formatNumber(price)}◉`; // str
       drawText(c, d.mode === 'donate' ? 'One specimen' : label, right, y + 5, { align: 'right', color: d.mode === 'buy' && !d.canAfford ? PALETTE.r : ink });
       if (d.mode === 'buy' && d.left !== null && d.left !== undefined && d.left < 20) drawText(c, `${d.left} left`, right - measureText(label).w - 8, y + 6, { align: 'right', font: 'small', color: COLORS.paper.inkFaint }); // str
     }
@@ -564,7 +684,7 @@ export function createShopScene(G) {
       drawText(c, `At dawn: ${formatNumber(shops.crateEstimate(G.world, ctx()))}◉`, FOOT.x + FOOT.w - 8, T0 + 12, { align: 'right', font: 'small', color: COLORS.paper.inkSoft }); // str
     }
     if (!d) {
-      drawText(c, crate && tabs.active === 'in' ? 'The crate is empty.' : tabs.active === 'donate' ? 'Bring an undonated fish, bug or find in your satchel.' : tabs.active === 'sell' ? 'Nothing here this counter buys.' : 'Nothing on the shelf.', L, T0 + 4, { color: COLORS.paper.inkFaint }); // str
+      drawText(c, crate && tabs.active === 'in' ? 'The crate is empty.' : tabs.active === 'donate' ? 'Bring an undonated fish, bug or find in your satchel.' : tabs.active === 'refine' ? 'Bring skyglass relics from the glowing flats at a night low.' : tabs.active === 'sell' ? (shop?.id === 'archive-desk' ? 'Barnaby buys duplicates of finds you have donated.' : 'Nothing here this counter buys.') : 'Nothing on the shelf.', L, T0 + 4, { color: COLORS.paper.inkFaint }); // str
       return;
     }
     const it = d.row ?? {};
@@ -648,10 +768,10 @@ export function createShopScene(G) {
     }
     drawText(c, t('shop.qty', { n: q.n }), R.x + R.w / 2, R.y + 27, { align: 'center', color: COLORS.paper.ink });
     const pv = previewOf(q.item, q.n);
-    const totalTxt = q.mode === 'withdraw' ? `of ${q.max}` : t('shop.total', { total: formatNumber(pv.total) }); // str
+    const totalTxt = q.mode === 'withdraw' ? `of ${q.max}` : q.mode === 'refine' ? `${q.n * (q.item.gives ?? 1)} Starsalt` : t('shop.total', { total: formatNumber(pv.total) }); // str
     drawText(c, totalTxt, R.x + R.w / 2, R.y + 39, { align: 'center', font: 'small', color: COLORS.paper.inkSoft });
-    if (q.mode === 'buy' || q.mode === 'sell') drawText(c, t('shop.after', { n: `${formatNumber(pv.after)}◉` }), R.x + R.w / 2, R.y + 47, { align: 'center', font: 'small', color: pv.after < 0 ? PALETTE.r : COLORS.paper.inkSoft });
-    const label = q.mode === 'buy' ? t('shop.buy') : q.mode === 'sell' ? t('shop.sell') : q.mode === 'deposit' ? 'Crate it' : 'Take back'; // str
+    if (q.mode === 'buy' || q.mode === 'sell' || q.mode === 'archive') drawText(c, t('shop.after', { n: `${formatNumber(pv.after)}◉` }), R.x + R.w / 2, R.y + 47, { align: 'center', font: 'small', color: pv.after < 0 ? PALETTE.r : COLORS.paper.inkSoft });
+    const label = q.mode === 'buy' ? t('shop.buy') : q.mode === 'sell' || q.mode === 'archive' ? t('shop.sell') : q.mode === 'refine' ? 'Refine' : q.mode === 'deposit' ? 'Crate it' : 'Take back'; // str
     const ok = { ...B.ok, y: R.y + R.h - 20 };
     const locked = qtyLock > 0;
     c.fillStyle = locked ? COLORS.wax.dark : COLORS.wax.fill;

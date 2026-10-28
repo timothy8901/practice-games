@@ -105,7 +105,7 @@ export const scripts = {
         '* You hold the board against the pale square on the bow. Tamsin taps the nails in with a pebble, one at a time, and doesn\'t look at you once, which is how you know.',
       ] },
     ] },
-    { op: 'take', item: 'oyster-boat-nameboard', n: 1 },
+    { op: 'take', item: 'oyster-boat-nameboard', n: 1, ask: true },
     'Tamsin: Tidy Sum. ~ Gran said it was a stupid name for a boat that got sold to pay debts. She also said it was ours.',
     { op: 'beat', thread: T, to: 4 },
     { op: 'end' },

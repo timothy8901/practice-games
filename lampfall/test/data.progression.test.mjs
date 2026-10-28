@@ -145,9 +145,10 @@ describe('a scripted early game (battleFlow + the real engine)', () => {
     give(G, 'sloshkin', 5);
     const starter = G.world.party[0].uid;
     assert.equal(G.world.party[0].exp, 200);
-    fight(G, { kind: 'trainer', trainerId: 'pip' });
+    // night one in the game's order: the dock hold-out, the reeds Tossup, then Pip on the quay
     G.store.tx('holdout', (w) => party.giveExp(w, starter, TUNING.holdOutExp, data, { tuning }));
     fight(G, { kind: 'wild', wild: { speciesId: 'tossup', level: 4 } });
+    fight(G, { kind: 'trainer', trainerId: 'pip' });
     const s = () => G.world.party.find((c) => c.uid === starter);
     assert.equal(s().level, 7, 'night one: Linnet + the Tossup + Pip\'s Wirewhisk take the starter to Lv7');
     assert.ok(E.windowSoon(s(), data, { tuning }), 'the pip shows on night one');

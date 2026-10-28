@@ -625,6 +625,74 @@ export function listing(world, shopId, ctx) {
 }
 
 // ---------------------------------------------------------------------------------------------
+// Refining (the Carnival Raft: skyglass relics into Starsalt, 1:1; GDD-00 §7, GDD-02 §1)
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * A shop's refining rule (`refine: {from: itemId[], to, rate}`), normalized, or null.
+ * @param {ShopRow & {refine?: any}|null} row
+ * @returns {{from: string[], to: string, rate: number}|null}
+ */
+export function refineRule(row) {
+  const r = row && row.refine;
+  if (!r || !Array.isArray(r.from) || typeof r.to !== 'string') return null;
+  const rate = Number.isInteger(r.rate) && r.rate > 0 ? r.rate : 1;
+  return { from: r.from.filter((id) => typeof id === 'string'), to: r.to, rate };
+}
+
+/**
+ * The satchel lines a refiner takes: each refinable item held, with what it turns into. Pure.
+ * @param {World} world
+ * @param {string} shopId
+ * @param {EconCtx} [ctx]
+ * @returns {Array<{item: string, name: string, have: number, to: string, rate: number}>}
+ */
+export function refineRows(world, shopId, ctx) {
+  const rule = refineRule(shopRow(shopId, ctx));
+  if (!rule) return [];
+  return rule.from.flatMap((id) => {
+    const have = bag.count(world, id, undefined, ctx);
+    if (have < 1) return [];
+    const it = item(id, ctx);
+    return [{ item: id, name: typeof it?.name === 'string' ? it.name : id, have, to: rule.to, rate: rule.rate }];
+  });
+}
+
+/**
+ * Refines `n` of a relic at an open refiner: the relics leave the satchel and `n × rate` of the
+ * product arrive (Starsalt straight into the wallet; refining is not buying, so the 3-a-day
+ * purchase cap does not apply). Emits `shop:refined {shopId, itemId, n, to, got}`.
+ * @param {World} world
+ * @param {string} shopId
+ * @param {string} itemId
+ * @param {number} [n=1]
+ * @param {EconCtx & {anyHour?: boolean}} [ctx]
+ * @returns {{ok: true, got: number, to: string} | {ok: false, reason: 'unknown-shop'|'no-refining'|'not-refinable'|'closed'|'not-enough', have?: number}}
+ */
+export function refine(world, shopId, itemId, n = 1, ctx) {
+  assertId(shopId, 'shops.refine');
+  assertId(itemId, 'shops.refine');
+  assertCount(n, 'shops.refine');
+  const row = shopRow(shopId, ctx);
+  if (!row) return { ok: false, reason: 'unknown-shop' };
+  const rule = refineRule(row);
+  if (!rule) return { ok: false, reason: 'no-refining' };
+  if (!rule.from.includes(itemId)) return { ok: false, reason: 'not-refinable' };
+  if (!ctx?.anyHour && !isOpen(world, row, ctx)) return { ok: false, reason: 'closed' };
+  const have = bag.count(world, itemId, undefined, ctx);
+  if (have < n) return { ok: false, reason: 'not-enough', have };
+  const took = bag.take(world, itemId, n, { ...ctx, source: `refine:${row.id}`, confirm: true });
+  if (!took.ok) return { ok: false, reason: 'not-enough', have };
+  const got = n * rule.rate;
+  const to = item(rule.to, ctx);
+  const currency = to ? bag.walletCurrencyOf(to) : null;
+  if (currency) wallet.earn(world, got, { ...ctx, currency, source: `refine:${row.id}` });
+  else bag.give(world, rule.to, got, { ...ctx, source: `refine:${row.id}` });
+  emit(ctx, 'shop:refined', { shopId: row.id, itemId, n, to: rule.to, got });
+  return { ok: true, got, to: rule.to };
+}
+
+// ---------------------------------------------------------------------------------------------
 // Consignment Crate
 // ---------------------------------------------------------------------------------------------
 

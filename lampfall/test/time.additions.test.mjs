@@ -135,3 +135,41 @@ test('freezeTide validates its argument and refuses re-entry from a listener', (
   clock.update(msPerMinute(24));
   assert.match(String(err), /inside one of its own listeners/);
 });
+
+// LG-RN70: Real Clock with `realRelative` keeps the run's own day count (the game's clock, clockSys).
+test('realRelative Real Clock: the total stays run-relative, the calendar shows the real date', () => {
+  let ms = new Date(2026, 9, 23, 18, 40, 30).getTime(); // a Friday
+  const clock = createClock({ realClock: true, realRelative: true, startDay: 3, now: () => ms });
+  assert.equal(clock.day, 3, 'starts on the run day, not the epoch day');
+  assert.ok(Math.abs(clock.minute - 1120.5) < 1e-9, 'the wall minute');
+  assert.equal(clock.dayName, 'Fri', 'the calendar still reads the device date');
+  assert.equal(clock.year, 2026);
+  const days = [];
+  clock.onDayStart((e) => days.push(e.day));
+  ms += 6 * 3_600_000; // past midnight
+  clock.update();
+  assert.deepEqual(days, [4], 'a real midnight advances the run day by one');
+  assert.equal(clock.serialize().total < 10 * MINUTES_PER_DAY, true, 'serialize writes the run-relative total');
+});
+
+test('realRelative: switching on keeps the day and never runs backwards; restore re-anchors', () => {
+  const ms = new Date(2026, 9, 23, 10, 0).getTime();
+  const clock = createClock({ realRelative: true, startDay: 0, startMinute: 1060, maxDt: Infinity, now: () => ms });
+  clock.setRealClock(true);
+  assert.equal(clock.total, 1060, 'no silent jump on switching');
+  const hours = [];
+  clock.onHour((e) => hours.push(e.hour));
+  clock.update();
+  assert.equal(clock.day, 1, '10:00 is behind 17:40 on day 0, so the clock walks on to day 1, 10:00');
+  assert.ok(Math.abs(clock.minute - 600) < 1e-9);
+  assert.ok(hours.includes(0) && hours.includes(6), 'every boundary on the way fires');
+  const state = clock.serialize();
+  const again = createClock({ realRelative: true, now: () => ms + 60_000 });
+  again.restore(state);
+  assert.equal(again.total, state.total, 'restore keeps the saved total');
+  again.update();
+  assert.ok(Math.abs(again.total - (state.total + 1)) < 1e-9, 'and follows the wall clock from there');
+  // a plain Real Clock (no realRelative) still counts epoch days
+  const abs = createClock({ realClock: true, now: () => ms });
+  assert.ok(abs.day > 20_000);
+});

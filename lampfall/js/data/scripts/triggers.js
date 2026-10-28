@@ -37,7 +37,8 @@ trigger('cairnhold', 'memorial-player', 'cairnhold-memorial', no('sp.memorial-se
 trigger('cairnhold', 'clinic-door', 'anchorage-turns-away', no('sp.anchorage-seen'));
 trigger('emberstep', 'errant-sighting-player', 'first-errant-sighting', no('sp.errant-seen'));
 trigger('drownwood', 'drowning-street-player', 'drowning-street', all({ lowTide: true }, no('sp.drowning-street')));
-trigger('thistlewind', 'surge-player', 'the-surge', all({ badge: 4 }, { hour: [18, 6] }, no('sp.surge')));
+// the Surge is a mid-game beat: never after the Relighting (MID-07), whichever way it would fire
+trigger('thistlewind', 'surge-player', 'the-surge', all({ badge: 4 }, { hour: [18, 6] }, no('sp.surge'), no('sp.relighting')));
 trigger('rimeholt', 'gallery-player', 'idris-gallery', no('sp.idris-gallery'));
 trigger('rimeholt', 'linnet-returns-player', 'linnet-returns', all(flag('sp.linnet-fell'), no('sp.linnet-returned')));
 trigger('spire-mirror', 'gallery-look', 'idris-gallery', no('sp.idris-gallery'));
@@ -53,8 +54,8 @@ export const STORY_TRIGGERS = deepFreeze(Object.fromEntries([...new Set(rows.map
 
 const events = [];
 function event(id, event, script, cond, once = true) { events.push({ id, event, script, ...(cond ? { cond } : {}), once }); }
-// One script per event (systems/flow/eventScripts takes the first matching row), so each Spire's
-// badge beat sits ahead of the generic badge row; Act II still opens on the next clock/map row.
+// One script per event (systems/flow/eventScripts takes the first matching row), so the Spire's own
+// badge beat plays; the first badge's beat opens Act II itself (story-acts `spireBadge`).
 for (const s of SPIRES) event(`badge-${s.id}`, `badge:won:${s.id}`, `story-spire-${s.id}-badge`);
 event('opening-corin', 'flag:set:seen.wick-keeper', 'corin-reading-glass', no('sp.reading-glass'));
 event('loan-one-cleared', 'loan:tier:2', 'first-payment');
@@ -63,24 +64,43 @@ event('lamp-room-finished', 'loan:built:lamp-room', 'lamp-room-built');
 event('relighting-dusk', 'relighting:due', 'relighting', no('sp.relighting'));
 event('first-roof', 'loan:built:bedsit', 'thatch-first-roof');
 event('first-keeper-letter', 'letter:delivered:1', 'hesper-k1');
-event('fifty-six-letters', 'letters:late-delivery', 'late-delivery-party');
+// After the credits, one dark house reopens a night (houses 2-8 in pellwick.js `reopensNight` order;
+// the counter stops it at seven). It sits ahead of every other clock row so 20:00 always belongs to
+// it (one script per event); the market lights and the party catch up on the next hour or map.
+event('dark-house-night', 'clock:hour:20', 'dark-house-reopens', all(flag('lit.fleetHome'), flag('sp.credits-seen'), { counter: 'sys.dark-houses-reopened', lte: 6 }), false);
 // Clock fallbacks let a town-first player see the acts without badges or a date deadline.
+// `day` is the GDD day of the run (cond DSL, MID-07): the Raft docks on day 3, Act II opens by day 4,
+// the first Lantern Market is day 7 (a Saturday, 20:00-02:00), the Surge falls back to day 10. A
+// mid-game beat waits for the act it belongs to, and none of them plays after the Relighting (the
+// finale has already answered the comet, the Engine and the charges).
+/** The Lantern Market window: Saturday 20:00 to Sunday 02:00 (GDD weekdays, 0 = Monday). */
+const MARKET_WINDOW = { any: [all({ day: { dow: [5] } }, { hour: [20, 24] }), all({ day: { dow: [6] } }, { hour: [0, 2] })] };
+const NOT_LIT = no('sp.relighting');
 for (const evt of ['day:start', 'clock:hour', 'map:enter']) {
   const key = evt.replace(':', '-');
   event(`raft-${key}`, evt, 'raft-docks', all({ day: { gte: 3 } }, no('sp.raft-docked')));
   event(`new-neighbor-${key}`, evt, 'tamsin-arrives', all({ day: { gte: 3 } }, flag('sys.commons.dark-house-1'), no('sp.tamsin-arrived')));
-  event(`act-two-${key}`, evt, 'act-2-open', all({ any: [{ badge: 1 }, { day: { gte: 4 } }] }, no('sp.act-2')));
-  event(`act-three-${key}`, evt, 'comet-brightens', all({ any: [{ badge: 3 }, { loan: { tier: { gte: 4 } } }] }, no('sp.act-3')));
-  event(`surge-${key}`, evt, 'the-surge', all({ day: { gte: 10 } }, no('sp.surge')));
-  event(`market-${key}`, evt, 'first-lantern-market', all({ day: { gte: 7, dow: [5] } }, { hour: [20, 2] }, no('sp.first-market')));
-  event(`linnet-fall-${key}`, evt, 'linnet-fall', all(flag('sp.first-market'), { badge: 2 }, { hour: [20, 2] }, no('sp.linnet-fell')));
-  event(`plans-${key}`, evt, 'two-plans-one-night', all({ any: [{ badge: 5 }, { loan: { tier: { gte: 6 } } }] }, { hour: [18, 6] }, { lowTide: true }, no('sp.two-plans')));
+  event(`act-two-${key}`, evt, 'act-2-open', all({ any: [{ badge: 1 }, { day: { gte: 4 } }] }, no('sp.act-2'), NOT_LIT));
+  event(`act-three-${key}`, evt, 'comet-brightens', all(flag('sp.act-2'), { any: [{ badge: 3 }, { loan: { tier: { gte: 4 } } }] }, no('sp.act-3'), NOT_LIT));
+  event(`surge-${key}`, evt, 'the-surge', all(flag('sp.act-3'), { day: { gte: 10 } }, no('sp.surge'), NOT_LIT));
+  event(`market-${key}`, evt, 'first-lantern-market', all(flag('sp.act-2'), { day: { gte: 7 } }, MARKET_WINDOW, no('sp.first-market'), NOT_LIT));
+  event(`linnet-fall-${key}`, evt, 'linnet-fall', all(flag('sp.first-market'), { badge: 2 }, MARKET_WINDOW, no('sp.linnet-fell'), NOT_LIT));
+  event(`plans-${key}`, evt, 'two-plans-one-night', all(flag('sp.act-3'), { any: [{ badge: 5 }, { loan: { tier: { gte: 6 } } }] }, { hour: [18, 6] }, { lowTide: true }, no('sp.two-plans'), NOT_LIT));
 }
-event('first-badge-act', 'badge:won', 'act-2-open', all({ badge: 1 }, no('sp.act-2')));
+// The market's string lights and stalls (pellwick.js `sys.lantern-market`) are up only on a market
+// night once the first market has been held: lit as the window opens, struck after it (LG-CH61).
+for (const evt of ['clock:hour', 'map:enter', 'day:start']) {
+  const key = evt.replace(':', '-');
+  event(`market-lights-on-${key}`, evt, 'market-lights-on', all(flag('sp.first-market'), MARKET_WINDOW, no('sys.lantern-market')), false);
+  event(`market-lights-off-${key}`, evt, 'market-lights-off', all(flag('sys.lantern-market'), { not: MARKET_WINDOW }), false);
+}
+// The 56th letter arrives with the 06:00 post; the party itself is on the green that evening
+// (data/town.js festival `late-delivery-party`, 18:00-02:00).
+for (const evt of ['clock:hour', 'map:enter']) {
+  event(`fifty-six-letters-${evt.replace(':', '-')}`, evt, 'late-delivery-party', all(flag('sp.late-delivery'), { hour: [18, 2] }));
+}
 event('after-linnet-return', 'flag:set:sp.linnet-returned', 'comet-brightens', no('sp.act-3'));
 event('first-forecast-anywhere', 'shift:resolved', 'story-first-forecast-noted', no('sp.first-forecast'));
-// After the credits, one dark house reopens a night (houses 2-8; the counter stops it at seven).
-event('dark-house-night', 'clock:hour:20', 'dark-house-reopens', all(flag('lit.fleetHome'), flag('sp.credits-seen'), { counter: 'sys.dark-houses-reopened', lte: 6 }), false);
 export const EVENT_SCRIPTS = deepFreeze(events);
 
 /** Prefix hooks the host installs on flag:set. Each value names its existing system function. */

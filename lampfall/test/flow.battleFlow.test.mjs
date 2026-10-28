@@ -239,7 +239,7 @@ describe('applyBattleResult', () => {
     assert.equal(post.payout, 50 * 4);
     assert.equal(G.world.wallet.main, 200);
     assert.equal(G.world.flags['sys.trainer.pip'], true);
-    assert.equal(post.script, 'pip-win');
+    assert.equal(post.script, null, 'no after script: the battle scene speaks the win line once (FH-10)');
     assert.equal(G.world.battleBookmark, null);
   });
 
@@ -251,7 +251,8 @@ describe('applyBattleResult', () => {
     playOut(s);
     F.applyBattleResult(G, s);
     const yieldW = data.get('species', 'wirewhisk').expYield;
-    assert.equal(G.world.party[0].exp - before, Math.floor((yieldW * 4) / 5) * 1.5);
+    const yieldT = data.get('species', 'tossup').expYield;
+    assert.equal(G.world.party[0].exp - before, Math.floor((yieldT * 2) / 5) * 1.5 + Math.floor((yieldW * 4) / 5) * 1.5, 'the Tossup opener, then the Wirewhisk ace');
   });
 
   it('a Spire win adds the seal, 3 Starsalt and the Spire share', () => {
@@ -284,7 +285,7 @@ describe('applyBattleResult', () => {
     assert.equal(G.world.wallet.purse, 150);
     assert.equal(G.world.party[0].hp, G.world.party[0].stats.hp, 'you wake healed');
     assert.equal(G.world.stats.blackouts, 1);
-    assert.equal(post.script, 'osric-spire-loss');
+    assert.equal(post.script, null, 'no generated loss script: the parting line shows once, in battle');
   });
 
   it('a Summit loss costs nothing', () => {

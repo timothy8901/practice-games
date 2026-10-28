@@ -136,7 +136,9 @@ export default {
     at(hm(23), P, 'door-tully', { pose: 'sleep' }),
   ],
   topics: [
-    topic('nickname', 'tully-nickname', 11, { once: true, cond: { all: [{ flag: 'sp.errands-started' }, { not: { seen: 'tully-nickname' } }] } }),
+    // the scene pins your notice on the Commons board, so it plays only by the board (the square);
+    // elsewhere Tully's ordinary first-meeting talk runs and the errand waits for the pin
+    topic('nickname', 'tully-nickname', 11, { once: true, cond: { all: [{ flag: 'sp.errands-started' }, { not: { seen: 'tully-nickname' } }, { map: 'pellwick' }, { inRegion: 'commons-square' }] } }),
     topic('first', 'talk-tully-first', 10, { cond: { npc: { id: ID, met: false } }, once: true }),
     topic('nickname-again', 'talk-tully-nickname-again', 7, { cond: { all: [{ seen: 'tully-nickname' }, { npc: { id: ID, nickname: false } }, { npc: { id: ID, talks: { gte: 3 } } }] }, once: true }),
     topic('nickname-check', 'talk-tully-nickname-check', 3, { cond: { all: [{ npc: { id: ID, nickname: true } }, { npc: { id: ID, talks: { gte: 9 } } }] }, once: true }),

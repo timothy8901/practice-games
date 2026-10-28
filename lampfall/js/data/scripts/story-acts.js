@@ -7,7 +7,8 @@
  *    own battle lines stay on the trainer row (GDD-04), so the leader is never re-staged here.
  *  - `story-spire-<id>-badge`: the seal and the reader tool it unlocks (GDD-00 §8 badge table:
  *    B3 the Scouting Prism from Corin, B5 the Weatherglass, B6 the Plumbline disc), queued by
- *    `badge:won:<id>`. Every gift is guarded by `hasItem`, so a replay never duplicates it.
+ *    `badge:won:<id>`. Every gift is guarded by `hasItem`, so a replay never duplicates it. The first
+ *    badge's beat ends by opening Act II (`act-2-open`) when the day-4 fallback has not already.
  *  - `story-first-forecast-noted`: the first Forecast anywhere sets `sp.first-forecast`, so Corin on
  *    the Lowmoor stones knows you have already read one (`shift:resolved`).
  *  - `story-ration-ledger`: Hollis's parcel at the Bar head, the first time you walk the Bar.
@@ -127,6 +128,9 @@ function spireBadge(id) {
       ops.push({ op: 'if', cond: { not: { hasItem: item } }, then: [{ op: 'give', item, n: 1 }] });
     } else ops.push(line);
   }
+  // GDD-00 §11: Act I ends at badge 1 (or day 4 dawn). The badge:won event plays only this Spire's
+  // beat (one script per event), so the first badge opens Act II from here.
+  ops.push({ op: 'if', cond: { all: [{ not: { flag: 'sp.act-2' } }, { not: { flag: 'sp.relighting' } }] }, then: [{ op: 'call', script: 'act-2-open' }] });
   ops.push(END);
   return ops;
 }

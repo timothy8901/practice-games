@@ -42,7 +42,7 @@ const EXPECTED = {
   'thistlewind-maisie': ['duskowl', 34, 4, [31, 34]], 'thistlewind-gideon': ['bogmonarch', 35, 4, [32, 35]],
   'rimeholt-hild': ['rimeplate', 38, 3, [37, 38]], 'rimeholt-oskar': ['floeback', 39, 3, [37, 39]], 'rimeholt-greer': ['strandrunner', 40, 4, [38, 40]],
   'rimeholt-sunniva': ['lumenveil', 41, 4, [38, 41]], 'rimeholt-aldous': ['caldermaw', 42, 4, [39, 42]],
-  pip: ['wirewhisk', 4, 1, [4, 4]],
+  pip: ['wirewhisk', 4, 2, [2, 4]], // FH-15: a Tossup opens so the first trainer asks for a decision
   'maud-spire': ['bilgebob', 10, 2, [8, 10]], 'osric-spire': ['prismoth', 16, 3, [14, 16]], 'ines-spire': ['emberjaw', 22, 3, [20, 22]],
   'wendel-spire': ['hulkwight', 29, 3, [27, 29]], 'hallorans-spire': ['coilcrest', 36, 6, [33, 36]], 'seraphine-spire': ['lumenveil', 43, 6, [40, 43]],
   'bar-corwen': ['hulkwight', 41, 4, [40, 41]], 'bar-tilda': ['strandrunner', 41, 4, [40, 41]], 'bar-ezra': ['cairnward', 42, 4, [41, 42]],
@@ -294,16 +294,19 @@ test('trainers: scripts resolve (ours generated, story ones from the manifest)',
   const story = new Set(M.SCRIPT_IDS);
   for (const id of OWN_SCRIPT_IDS) {
     assert.ok(!story.has(id), `${id} collides with a GDD-07 script id`);
-    assert.match(id, /^[a-z0-9-]+-(before|win|loss)$/);
+    assert.match(id, /^[a-z0-9-]+-before$/, 'no generated win / loss scripts (they repeated the parting line, FH-10)');
     const [say, end] = TRAINER_SCRIPTS[id];
     assert.equal(say.op, 'say');
     assert.ok(say.text.length > 10 && !/TODO|PLACEHOLDER/i.test(say.text));
     assert.equal(end.op, 'end');
   }
   for (const t of TRAINERS) {
-    for (const k of ['before', 'afterWin', 'afterLoss']) {
-      const sid = t.scripts[k];
-      assert.ok(OWN_SCRIPT_IDS.has(sid) || story.has(sid), `${t.id} scripts.${k} '${sid}'`);
+    const sid = t.scripts.before;
+    assert.ok(OWN_SCRIPT_IDS.has(sid) || story.has(sid), `${t.id} scripts.before '${sid}'`);
+    for (const k of ['afterWin', 'afterLoss']) {
+      // after-battle scripts are story-owned or absent: the battle scene speaks lines.win / lines.lose itself
+      const after = t.scripts[k];
+      if (after !== undefined) assert.ok(story.has(after), `${t.id} scripts.${k} '${after}'`);
     }
     for (const k of ['intro', 'win', 'lose']) assert.ok(t.lines[k] && t.lines[k].length > 10, `${t.id} lines.${k}`);
   }

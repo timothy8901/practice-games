@@ -91,13 +91,23 @@ test('say shorthand: speaker resolved through npc data, text interpolated', () =
   ]);
 });
 
-test('say defaults its speaker to ctx.npc and prefers the npc nickname', () => {
+test('say defaults its speaker to ctx.npc; the name tab is the npc row name, never the nickname they gave the player (LG-RN117)', () => {
   const w = newWorld();
   w.npcs['ph-keeper'] = { met: true, talks: 1, nickname: 'Kip', lastTalkDay: 0, lastPorchDay: null, affinity: 0, favours: [], saidLines: {}, remembered: {} };
   const [q] = drive(createRunner([{ op: 'say', text: 'Hi {npcNick}' }], ctxFor(w, { npc: 'ph-keeper' })));
   assert.equal(q.who, 'ph-keeper');
-  assert.equal(q.name, 'Kip');
+  assert.equal(q.name, data.get('npcs', 'ph-keeper').name);
+  assert.notEqual(q.name, 'Kip');
   assert.equal(q.text, 'Hi Kip');
+});
+
+test('MID-16: a `* ...` line inside an NPC talk stays narration (no speaker, no name tab)', () => {
+  const w = newWorld();
+  const reqs = drive(createRunner(['* The keeper is mending a net.', 'Plain line.', 'PH Keeper: Named.'], ctxFor(w, { npc: 'ph-keeper' })));
+  assert.equal(reqs[0].who, null);
+  assert.equal(reqs[0].name, null);
+  assert.equal(reqs[0].text, 'The keeper is mending a net.');
+  assert.equal(reqs[1].who, 'ph-keeper', 'an unprefixed plain line is the NPC speaking');
 });
 
 test('choice with goto: each answer takes its branch (placeholder ph-intro)', () => {

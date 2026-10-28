@@ -44,6 +44,7 @@ import { gradeFor, lampsLit } from '../world/lighting.js';
 import { createMapRenderer, MAP_RECT, FULL_RECT } from '../render/mapRenderer.js';
 import { getSprite, artDef, resolveArtId } from '../art/atlas.js';
 import { drawHud } from '../ui/hud.js';
+import { createObjectiveChip, drawObjectiveChip, objectiveFor, CHIP_POLL_MS } from '../ui/objectiveChip.js';
 import { createToolRing } from '../ui/toolRing.js';
 import { COLORS, PALETTE } from '../ui/theme.js';
 import { TILES, DEFAULT_LEGEND } from '../data/tilesets.js';
@@ -63,7 +64,7 @@ import { isPorchLit, porchFlag } from '../systems/townCommon.js';
 import * as eventScripts from '../systems/flow/eventScripts.js';
 import * as dayFlow from '../systems/flow/dayFlow.js';
 import { startBattle } from '../systems/flow/battleFlow.js';
-import { doInteraction, snapshotAction, laneCtx, ringHas } from '../systems/flow/interactFlow.js';
+import { doInteraction, snapshotAction, laneCtx, ringHas, signText } from '../systems/flow/interactFlow.js';
 import { createBoardScene, createCeremonyScene, createFerryScene, ROOF_ART } from './fieldOverlays.js';
 import { hasAliveParty, minuteOfDay, tideState as selTideState } from '../state/selectors.js';
 import { arrivalScriptOf } from './boot.js';
@@ -229,6 +230,10 @@ export function createOverworldScene(G) {
   let captionText = '';
   let captionUntil = 0;
   let wallet = { shown: 0, target: 0, until: 0, slide: 0 };
+  // the HUD's "Next:" chip (FH-09): shows for a few seconds after the objective changes or a menu closes
+  const nextChip = createObjectiveChip();
+  let nextPollMs = 0;
+  const CHIP_MENUS = new Set(['menu', 'mapScreen', 'party', 'bag', 'box', 'fieldLog', 'ledger', 'settings', 'saveLoad', 'letter', 'dayPage']);
   let lastGateToast = { key: '', at: -1e9 };
   let litWorld = null;
   let litKey = '';
@@ -1109,7 +1114,10 @@ export function createOverworldScene(G) {
       for (const off of offs.splice(0)) { try { off(); } catch { /* gone */ } }
       standUp();
     },
-    pause() { if (player) player.intend(null, false); },
+    pause() {
+      if (player) player.intend(null, false);
+      try { if (CHIP_MENUS.has(G.scenes.top()?.name)) nextChip.arm(); } catch { /* no stack */ }
+    },
     resume(result) {
       if (G.input && typeof G.input.flush === 'function') G.input.flush();
       ensureMap();
@@ -1124,6 +1132,7 @@ export function createOverworldScene(G) {
       if (toolRing) toolRing.setTools(ringTools());
       camera.follow(camTarget);
       void result;
+      if (nextChip.resumed(sceneMs)) nextPollMs = CHIP_POLL_MS; // re-read now; the chip shows again
       runPendingSoon();
     },
     update(dt) {
@@ -1187,6 +1196,14 @@ export function createOverworldScene(G) {
       const showing = sceneMs < wallet.until;
       wallet.slide += ((showing ? 1 : 0) - wallet.slide) * (showing ? 0.3 : 0.2);
       if (toolRing) toolRing.update(dt);
+      // the objective, re-read about once a second while the field is in charge
+      nextPollMs += dt;
+      if (nextPollMs >= CHIP_POLL_MS && G.scenes.top() === scene && busy === 0 && !changing && !G.world.cutscene) {
+        nextPollMs = 0;
+        let line = '';
+        try { line = objectiveFor(G.world, G.data)?.text ?? ''; } catch { line = ''; }
+        nextChip.observe(line, sceneMs);
+      }
       floats = floats.filter((f) => sceneMs - f.t0 < 1200);
       if (G.flags && G.flags.debug && G.debugOverlay == null) { /* nothing */ }
       // lighthouse relit moment
@@ -1248,6 +1265,7 @@ export function createOverworldScene(G) {
       c.beginPath(); c.rect(R.x, R.y, R.w, R.h); c.clip();
       drawCottageGrowth(c, R);
       drawPorchLamps(c, R, minute);
+      drawSignLabels(c, R);
       drawGlintAndSparkles(c, R);
       drawBugs(c, R);
       if (readView) drawReadView(c, R);
@@ -1270,6 +1288,8 @@ export function createOverworldScene(G) {
     stage,
     /** Test / debug view of the field. */
     field: () => ({ mapId, map, mapDef, ents, player, npcs, bugs, glint, sparkles, gates: { ...gates }, baseTide, action, sitting, readView, busy, host, gateAt, passable, camera }),
+    /** Test / debug view of the HUD's Next chip (FH-09). */
+    nextChip: () => ({ text: nextChip.text, alpha: nextChip.alpha(sceneMs) }),
   };
 
   // ---- V latch (no input action exists for the Read view yet; GDD-09 §4.2 request) ---------------------
@@ -1373,6 +1393,28 @@ export function createOverworldScene(G) {
           px(44, 40, 26, 8, glow); px(44, 44, 26, 1, '#4C3826'); px(57, 40, 1, 8, '#4C3826'); break;
         default: break;
       }
+    }
+  }
+
+  /**
+   * Hanging shop signs (art `hanging-sign-*`, FH-09) say their name on a small paper strip over
+   * the board while the player is within three tiles, so a door can be found without knocking.
+   */
+  function drawSignLabels(c, R) {
+    if (!player || busy > 0) return;
+    const px = player.ent.x, py = player.ent.y;
+    for (const e of ents.list) {
+      const d = e.def;
+      if (!d || typeof d.art !== 'string' || !d.art.startsWith('hanging-sign-') || typeof d.name !== 'string' || !d.name) continue;
+      if (Math.max(Math.abs(e.x - px), Math.abs(e.y - py)) > 3) continue;
+      const label = signText(G, d.name);
+      const tw = measureText(label, { font: 'small' }).w;
+      const sx = Math.round(R.x + e.px + 6 - camera.x - tw / 2);
+      const sy = Math.round(R.y + e.py - 8 - camera.y); // above the board: the player stands below it
+      c.fillStyle = 'rgba(20, 27, 51, 0.35)'; c.fillRect(sx - 2, sy - 1, tw + 5, 9);
+      c.fillStyle = '#F6F1E3'; c.fillRect(sx - 3, sy - 2, tw + 5, 9);
+      c.fillStyle = '#2A2433'; c.fillRect(sx - 3, sy + 6, tw + 5, 1);
+      drawText(c, label, sx, sy, { font: 'small', color: '#2A2433' });
     }
   }
 
@@ -1484,6 +1526,10 @@ export function createOverworldScene(G) {
       c.translate(Math.round((1 - wallet.slide) * 90), 0);
       drawHud(c, { wallet: wallet.shown });
       c.restore();
+    }
+    if (G.scenes.top() === scene && busy === 0 && !G.world.cutscene) {
+      const a = nextChip.alpha(sceneMs);
+      if (a > 0) drawObjectiveChip(c, nextChip.text, { x: 4, y: 21, maxW: 300, alpha: a });
     }
     if (sitting && sitting.kind === 'porch') drawText(c, t('rest.sitting'), 240, 236, { align: 'center', font: 'small', color: '#F6F1E3', shadow: true });
     if (captionText && sceneMs < captionUntil) {
