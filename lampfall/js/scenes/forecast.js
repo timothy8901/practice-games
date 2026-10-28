@@ -58,6 +58,16 @@ const DIR_GLYPH = Object.freeze({ up: '▲', side: '▶', down: '▼' });
 const FLIP_SEEN_FLAG = 'sys.forecastFlipSeen';
 const KEEPERS_ANCHOR_FLAG = 'sys.keepersAnchorNight';
 
+/**
+ * Whether the Relighting has steadied the Shift odds. `lit.*` are world FLAGS (flags.get reads
+ * counters, which made this always false before).
+ * @param {any} w
+ * @returns {boolean}
+ */
+export function litSteadied(w) {
+  return flags.hasFlag(w, 'lit.steadied');
+}
+
 /** @param {string} ty @returns {string} */
 const chipId = (ty) => String(ty || '').toLowerCase();
 
@@ -115,7 +125,7 @@ export function createForecastScene(G) {
   function keepersAnchorFree() {
     const w = world();
     if (!params || !params.atHome) return false;
-    if (!flags.get(w, 'lit.keepersAnchor')) return false;
+    if (!flags.hasFlag(w, 'lit.keepersAnchor')) return false;
     let night = false;
     try { night = clockSys.isNight(w); } catch { night = false; }
     if (!night) return false;
@@ -135,7 +145,7 @@ export function createForecastScene(G) {
     return {
       tuning: tuningFor(data),
       dial: w.run.dial,
-      steadied: !!flags.get(w, 'lit.steadied'),
+      steadied: litSteadied(w),
       freeAnchor: keepersAnchorFree(),
       rules: dialRules(),
       bus: G.bus,
