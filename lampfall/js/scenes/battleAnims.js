@@ -116,14 +116,22 @@ export const SMALL_FORM_CELLS = 21;
  * Draw scale and offset for a foe's front sprite. Forms whose opaque art is at most
  * {@link SMALL_FORM_CELLS} cells on its long side draw at `base + 1` (the Sootling's 20×11 becomes
  * 60×33 instead of 40×22), keeping the same centre line and standing its foot 4 px above the bottom
- * of the base-scale box, on the stand. Every other form is untouched (scale = base, offset 0).
+ * of the base-scale box, on the stand. A form larger than 32 cells draws at 1x, centred on the base
+ * box with its foot on the stand (`cells` reports its size). Every other form is untouched (scale = base, offset 0).
  * @param {ReadonlyArray<string>|null|undefined} rows  the front-view rows
  * @param {number} [base=2]
  * @param {number} [size=32]  the art's cell size (forms larger than 32 never grow)
- * @returns {{scale: number, dx: number, dy: number}}
+ * @returns {{scale: number, dx: number, dy: number, cells?: number}}
  */
 export function spriteFit(rows, base = 2, size = 32) {
   const b = opaqueBounds(rows || []);
+  if (b && size > 32) {
+    // a large form (the 96-cell Vagary) draws at 1x, centred on the base box, its foot on the stand
+    // (at base scale its 192 px ran below the stand's lip and was clipped into the platform, LF-19)
+    const box = 32 * base;
+    const cx = (b.x0 + b.x1 + 1) / 2;
+    return { scale: 1, dx: Math.round(box / 2 - cx), dy: Math.round(box - 2 - (b.y1 + 1)), cells: size };
+  }
   if (!b || size > 32 || Math.max(b.w, b.h) > SMALL_FORM_CELLS) return { scale: base, dx: 0, dy: 0 };
   const scale = base + 1;
   const cx = (b.x0 + b.x1 + 1) / 2;
@@ -218,6 +226,10 @@ export function lineFor(ev) {
       if (ev.share === 'yard') return t('battle.msg.expYard', { target: ev.creature, amount: ev.amount });
       return t('battle.msg.exp', { target: ev.creature, amount: ev.amount });
     case 'levelup': return t('battle.msg.levelUp', { target: ev.creature, level: ev.to });
+    // the engine's own English stays as the fallback text; the glossary speaks these (carried item)
+    case 'learn': return ev.moveName ? t('battle.msg.learned', { target: ev.creature, move: ev.moveName }) : ev.text || null;
+    case 'learn-offer': return ev.moveName ? t('battle.msg.learnOffer', { target: ev.creature, move: ev.moveName }) : ev.text || null;
+    case 'blackout': return ev.summit ? t('battle.msg.summitTakesNothing') : t('battle.msg.blackout', { amount: Number(ev.cost || 0).toLocaleString('en-US') });
     case 'payout': return t('battle.msg.payout', { amount: ev.amount.toLocaleString('en-US') });
     case 'run': return ev.success ? t('battle.msg.runOk') : t('battle.msg.runFail');
     case 'stance': return ev.on ? t('battle.stance.on') : t('battle.stance.off');

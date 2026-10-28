@@ -199,7 +199,10 @@ export function createEntityRenderer() {
     if (!id && key.includes(':')) id = resolveArtId(`char-${key.split(':')[1]}`) || resolveArtId(key.split(':')[1]);
     s.art = id;
     s.isChar = !!id && artDef(id).kind === 'char';
-    if (!id && !warned.has(key)) { warned.add(key); if (typeof console !== 'undefined') console.warn(`entityRenderer: no art for entity '${e.id}' (${key})`); }
+    // a `blocker: true` prop with no art is the invisible footprint of a bigger prop (dossier-board-r,
+    // summit-bell-r, sinking-engine-1..3): nothing to draw and nothing to warn about (FE-15 / LF-20)
+    const footprint = !!e.def && e.def.blocker === true && !e.def.art;
+    if (!id && !footprint && !warned.has(key)) { warned.add(key); if (typeof console !== 'undefined') console.warn(`entityRenderer: no art for entity '${e.id}' (${key})`); }
     return id;
   }
 

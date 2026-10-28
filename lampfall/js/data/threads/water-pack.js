@@ -105,7 +105,8 @@ export default {
   summary: 'A puffling with a fish in a bucket. The fish Shifts into a gill-breather; the puffling builds a pack, carries the flame and becomes the next reader.',
   involve: { loan: { tier: 2 } },
   beats: [
-    { id: 1, cond: { all: [{ loan: { tier: 2 } }, { hour: [18, 22] }] }, script: 'th-water-pack-1', where: { mapId: 'pellwick', x: 8, y: 25 },
+    // LF-13: "Wick is sitting on your porch step": only at your own porch and gate, not at his door
+    { id: 1, cond: { all: [{ loan: { tier: 2 } }, { hour: [18, 22] }, { map: 'pellwick' }, { any: [{ inRegion: 'keepers-cottage' }, { inRegion: 'keepers-orchard' }] }] }, script: 'th-water-pack-1', where: { mapId: 'pellwick', x: 8, y: 25 },
       when: 'Dusk on your porch, from the night loan 1 is paid.', topic: 'Keeper. This is Rillfin.',
       choices: [{ key: `th.${T}.first`, options: ['read', 'carry'] }] },
     { id: 2, cond: { all: [{ badge: 2 }, { hour: [18, 22] }] }, script: 'th-water-pack-2', advance: { days: 1 }, where: { mapId: 'pellwick', x: 8, y: 25 },

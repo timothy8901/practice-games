@@ -531,6 +531,9 @@ export const TRAINERS = Object.freeze([
       intro: 'Every creature I send out will Shift, and I will post the odds a turn ahead. Read them. Then decide. Confirm?',
       win: 'You planned for all three cards. That is a reader. Take the Turn Seal, and the Reroll with it.',
       lose: 'You planned for the card you wanted. Plan for the one you get. The ferry runs at five.',
+      // a Porch Duel visit (battle.js trainerEndLine): no seal on a porch
+      duelWin: 'Fair read, on a porch and all. I will tell the geese.',
+      duelLose: 'Porch rules: nobody loses anything. Except me, usually. Not tonight.',
     },
   }),
   trainer({
@@ -548,6 +551,8 @@ export const TRAINERS = Object.freeze([
       intro: 'I cut every stone in this Spire by hand. Slowly. Read slowly, too. My Prismoth wears a Ward, and it shows.',
       win: 'You read the shimmer and you did not waste a swing. That is the whole of it. The Ward Seal is yours.',
       lose: 'Only Strong hits land on Glasshide. Poison does not ask permission. Think on it, and come back.',
+      duelWin: 'Slowly, and well. A good evening\'s cutting.',
+      duelLose: 'A porch is no place for haste. Nor for losing. Again some evening.',
     },
   }),
   trainer({
@@ -565,6 +570,8 @@ export const TRAINERS = Object.freeze([
       intro: 'The weather in here changes every three turns, and I post it. You will know before I do. Well. At the same time.',
       win: 'You dressed for the weather. My mother would approve. The Weather Seal, and Corin will be glad of the Prism.',
       lose: 'Steam favours the Kiln. You knew. You swung anyway. Have a soak and reconsider.',
+      duelWin: 'No steam out here, and you still read the weather. Well done.',
+      duelLose: 'Clear skies, and I still caught you. Have some tea.',
     },
   }),
   trainer({
@@ -582,6 +589,8 @@ export const TRAINERS = Object.freeze([
       intro: 'A hull is mostly what is not there. So is my team. Plain and Grit go straight through. Check your menu for "No effect".',
       win: 'You brought what floats. The Hollow Seal, and Corin will show you Recall.',
       lose: 'Tap, tap, nothing. Hollow does not hold a grudge. Come back with something that lands.',
+      duelWin: 'You found the solid part. On a porch, even. Good.',
+      duelLose: 'Tap, tap, nothing. Porch planks are louder than my hull. Again?',
     },
   }),
   trainer({
@@ -602,6 +611,8 @@ export const TRAINERS = Object.freeze([
       intro: 'ADA: Three rounds. IVO: Two of yours each round. ADA: Nobody fights twice. IVO: Unless you have run out of nobodies.',
       win: 'IVO: Six different faces. ADA: Every one of them pulled its weight. BOTH: The Relay Seal.',
       lose: 'ADA: One carry. IVO: Everyone else on the bench. ADA: We have met your rival, you know.',
+      duelWin: 'ADA: Porch rules. IVO: We still lost. BOTH: Good evening, Keeper.',
+      duelLose: 'IVO: Porch rules. ADA: Nobody loses anything. IVO: You did, a little.',
     },
   }),
   trainer({
@@ -622,6 +633,8 @@ export const TRAINERS = Object.freeze([
       intro: 'In here the menu shows true odds. Two decoys at most; three Mends each; nothing hidden. I built this Spire to answer one person. You will meet him.',
       win: 'You counted the Mends and you swung at the real one. Take the Plumbline. It goes through everything, even me.',
       lose: 'You swung at reflections. Count first. Then swing. The gallery is watching, and so is he.',
+      duelWin: 'You counted, even out here. I like this porch.',
+      duelLose: 'No mirrors here, and you still swung at the wrong one. Count first.',
     },
   }),
 
@@ -724,6 +737,8 @@ export const TRAINERS = Object.freeze([
       intro: 'I dived the fleet for twenty years. I learned to wait. My team learned to wait. I have two Full Salves; the Prism will have told you. Count them.',
       win: 'You counted. Here, before you go on: my own Shiftlog. Seven forms, one mark. Nobody asks to see it.',
       lose: 'Patience, Keeper. The Bell will hold your place.',
+      // Freefall: the Bell keeps nothing (LF-22)
+      loseFreefall: 'Patience, Keeper. The Bell keeps nothing on this dial; the climb starts at my door again.',
     },
   }),
   trainer({
@@ -744,6 +759,7 @@ export const TRAINERS = Object.freeze([
       intro: 'Squall coming in. My Skeinwing loves a squall. Two decoys, never three; the Mirror Spire taught you that. Did it stick?',
       win: 'It stuck. Go on through. He has been waiting a long time; be gentle with him.',
       lose: 'Blown clean off the stack. The Bell rings for you; come back up.',
+      loseFreefall: 'Blown clean off the stack. The Bell keeps nothing today: back down, and start at Bastien.',
     },
   }),
   trainer({
@@ -765,6 +781,7 @@ export const TRAINERS = Object.freeze([
       intro: 'Every creature here has been anchored since the day it hatched. Vesperay wears my ring on its tail. I set the Spire tests so the isles could learn to read. I never sat one. Shall we?',
       win: 'You read it. All of it. I think... I think it is time I took the ring off.',
       lose: 'Thank you. Truly. The Bell will hold your place. I will be here; I am always here.',
+      loseFreefall: 'Thank you. Truly. The Bell keeps nothing on this dial; climb again. I will be here; I am always here.',
     },
   }),
 
@@ -777,7 +794,7 @@ export const TRAINERS = Object.freeze([
     // Lv5 Sloshkin's Undertow or a Scrapling's Knuckle KOs the Sootling on turn 1, so good play never saw it
     party: [mon('sootling', 5, ['ember-lick', 'tap'], { nick: 'Cinder', bossShift: sureShift(0, 0, 'up', 'caldermaw') })],
     story: true, holdOut: 3, payoutRule: 'none', expSource: 'story',
-    tacticTag: 'hold out three turns; the strip says Up 100%',
+    tacticTag: 'stand as long as you can; the strip says Up 100%',
     scripts: { before: 'linnet-dock-before', afterWin: 'linnet-dock-after', afterLoss: 'linnet-dock-after' },
     lines: {
       intro: 'Cinder, up! Show the walker what all that glowing\'s for!',

@@ -27,7 +27,7 @@
  */
 
 const legend = Object.freeze({
-  '#': 'cottage-wall-top', W: 'cottage-wall', F: 'cottage-floor',
+  '#': 'cottage-wall-top', W: 'cottage-wall', F: 'cottage-floor', x: 'interior-void',
   h: 'hearth', b: 'bed', T: 'table', r: 'rug', s: 'shelf', v: 'stairs-down',
 });
 
@@ -54,7 +54,7 @@ const ROOMS_ENTITIES = [
   { kind: 'prop', id: 'graft-bench', x: 3, y: 2, art: 'table', verb: 'graft', cond: built('greenhouse'), note: 'grafting bench: foreign fruit; a creature left overnight with its favourite fruit gains +1 Bond' },
   { kind: 'prop', id: 'greenhouse-bed-1', x: 1, y: 2, art: 'bean-rows', verb: 'look', cond: built('greenhouse') },
   { kind: 'prop', id: 'greenhouse-bed-2', x: 1, y: 3, art: 'bean-rows', verb: 'look', cond: built('greenhouse') },
-  { kind: 'prop', id: 'greenhouse-pot', x: 1, y: 4, art: 'bush', verb: 'shake', cond: built('greenhouse'), note: 'the indoor fruit tree, potted' },
+  { kind: 'prop', id: 'greenhouse-pot', x: 1, y: 4, art: 'bush', verb: 'graft', cond: built('greenhouse'), note: 'the indoor fruit trees, potted: grafts and picking go through the bench (systems/flow/rooms)' },
   // gallery (B)
   { kind: 'prop', id: 'gallery-bench', x: 9, y: 3, art: 'bench', verb: 'sit', cond: built('gallery') },
   // training yard (C)
@@ -158,19 +158,21 @@ export default {
   legend,
   artTier: 0,
   // ---- tier 0: the bedsit -------------------------------------------------------------------------
+  // FE-22: the unbuilt house is void ('x' interior-void, the night round other interiors), with one
+  // wall-top ring round the bedsit, not a slab of striped wall
   ground: [
-    '################', //  0
-    '################', //  1
-    '################', //  2
-    '################', //  3
-    '################', //  4
-    '################', //  5
-    '######W%WWW#####', //  6  window (7,6); hearth on (9,6)
-    '######FFFFF#####', //  7
-    '######FFFFF#####', //  8
-    '######FFFFF#####', //  9
-    '######FFFFF#####', // 10
-    '########+#######', // 11
+    'xxxxxxxxxxxxxxxx', //  0
+    'xxxxxxxxxxxxxxxx', //  1
+    'xxxxxxxxxxxxxxxx', //  2
+    'xxxxxxxxxxxxxxxx', //  3
+    'xxxxxxxxxxxxxxxx', //  4
+    'xxxxx#######xxxx', //  5
+    'xxxxx#W%WWW#xxxx', //  6  window (7,6); hearth on (9,6)
+    'xxxxx#FFFFF#xxxx', //  7
+    'xxxxx#FFFFF#xxxx', //  8
+    'xxxxx#FFFFF#xxxx', //  9
+    'xxxxx#FFFFF#xxxx', // 10
+    'xxxxx###+###xxxx', // 11
   ],
   detail: [
     '................', //  0

@@ -68,6 +68,12 @@ export function installStoryHooks(G) {
     G.store.tx('duel:payout', world => wallet.earn(world, amount, { data: G.data, bus: G.bus, source: 'duel' }));
     G.bus.emit('toast', { text: t('toast.duelPurse', { amount: amount.toLocaleString('en-US') }), icon: 'coin' });
   }));
+  // FE-05: any sale at Ludo's eave (through his talk, the eave cell or the first-sale scene) counts
+  // as the first night sale, so the NEXT chip moves on
+  offs.push(G.bus.on('shop:sold', (p) => {
+    if (!p || p.shopId !== 'ludo-eave' || flags.getFlag(G.world, 'seen.ludo-first-sale')) return;
+    G.store.tx('story:ludo-first-sale', (world) => flags.markSeen(world, 'ludo-first-sale', { bus: G.bus }));
+  }));
   offs.push(G.bus.on('fieldLog:held', (p) => { if (!p || p.first !== false) frames(); }));
   offs.push(G.bus.on('loan:built', (p) => { if (p && p.id === 'gallery') frames(); }));
   const uninstall = () => { for (const off of offs) { try { off(); } catch { /* gone */ } } INSTALLED.delete(G); };

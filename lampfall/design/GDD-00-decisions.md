@@ -1,6 +1,6 @@
 # GDD-00 — DECISIONS (authoritative)
 
-This file is the single source of truth. Where a chapter, prototype or concept disagrees with it, this file wins until it is edited. Every number here is a starting value that lives in a data module (`js/data/tuning.js`, `loans.js`, `dials.js`, `shops.js`, `items.js`); chapters may refine a value only inside the ranges stated here and must not rename anything. "Judges" means the three panel reports; a ruling marked *(split)* records the one-line reason a disagreement was settled.
+This file is the single source of truth. Where a chapter, prototype or concept disagrees with it, this file wins until it is edited. **§18 records the decisions changed while the game was built and fixed (to 2026-10-28); where §18 and an earlier section disagree, §18 wins.** Every number here is a starting value that lives in a data module (`js/data/tuning.js`, `loans.js`, `dials.js`, `shops.js`, `items.js`); chapters may refine a value only inside the ranges stated here and must not rename anything. "Judges" means the three panel reports; a ruling marked *(split)* records the one-line reason a disagreement was settled.
 
 ---
 
@@ -68,7 +68,7 @@ Folder `lampfall/`, save prefix `lampfall.`, `config.TITLE = 'Lampfall'`.
 |---|---|---|
 | **Read** | **Corin Vale** (tawny owl, failing eyes, Isolde's old apprentice) | minute 6, your step: the **Reading Glass** (Isolde's old loupe: names finds, Reads creatures, opens Forecasts) and, on Flux, 2 anchor stones. "Look before you swing. Then say what you see." |
 | Watching a Forecast | Corin | minute 7, reading Linnet's strip aloud |
-| **Capture Stance** | Corin | minute 14, the reeds: "62%, and it only goes up if you miss." |
+| **Capture Stance** | Corin | minute 14, the reeds: about a third while it is fresh, nearly sure at a sliver; every miss raises the next try (§18). |
 | Fishing tells | **Ansel Stalk** | night one, from the beached launch: "Forked tail, by the piling. Don't rush it." |
 | **Reroll** | **Maud Tallis** | her practice table at Brackenford, before the Turn Spire |
 | Decline | Linnet | day 2, refusing you until badge 1 |
@@ -135,7 +135,7 @@ Folder `lampfall/`, save prefix `lampfall.`, `config.TITLE = 'Lampfall'`.
 
 ## 5. Clocks and the session
 
-**Day length.** Default one in-game day = **24 real minutes** (1 real minute = 1 game hour; 1 real second = 1 game minute). Settings: 12 / 24 / 48 minutes, and **Real Clock** (device time; Rest saves but never skips; builds take a real night; the setting says so). The clock **pauses** in battle, Forecast, capture, menus, dialogue, shops, ceremonies and the Day Page. Real time per day is therefore 24 minutes plus paused time.
+**Day length.** Default one in-game day = **24 real minutes** (1 real minute = 1 game hour; 1 real second = 1 game minute). Settings: 12 / 24 / 48 minutes, and **Real Clock** (device time; Rest saves but never skips; builds take a real night; the setting says so). Under Real Clock the day number stays **run-relative** (day 1 is the arrival): the device gives the hour and the passing of days, never the calendar day, and the save keeps `clock.realOffset` so days that pass between sessions count (§18). The clock **pauses** in battle, Forecast, capture, menus, dialogue, shops, ceremonies and the Day Page. Real time per day is therefore 24 minutes plus paused time.
 
 **Day-parts** (one table, consumed by music; the LUT keyframes in `proto/tiles/render.js` follow the same hours). Night (game rules) is **18:00–06:00**, exactly half.
 
@@ -336,13 +336,13 @@ Windows at **Lv8 / Lv20 / Lv34** (per-family offsets ±2 in data; the pip shows 
 
 **Capture.** Raise the Lantern from the battle panel; the panel shows wick grade, odds as number and bar, the *Stance* tag; one smooth meter sweep; fold into light; warm chord; no throw, no wobble, no click. Odds shown = odds rolled (stream `capture:<battleId>:<attempt>`); +3% per failed attempt on the same creature, capped +15%; displayed odds clamp to 1–95% except scripted captures and Isolde's Lantern (100%). Freefall shows bands (Slim / Fair / Good / Sure).
 
-**EXP.** Cumulative EXP to reach level *L* = 8 × *L*². KO EXP = yield × foe level ÷ 5; trainer battles ×1.5; a capture grants the KO EXP; the dock hold-out grants a flat 100. Bench 60% (battlers 100%); Training Yard 25% to 3 stored creatures; Big Sibling +30% to the lowest party member; catch-up +50% per 5 levels under the posted curve, cap ×3; Porch Duel EXP ×0.5 past curve + 10. Check: Linnet (100) + the Tossup catch (40) + Pip's Wirewhisk (66) takes a Lv5 starter (200) past Lv7 (392) on night one, so the pip shows; two Lowmoor wilds on day 2 reach Lv8 (512).
+**EXP.** Cumulative EXP to reach level *L* = 8 × *L*² through Lv8, then (3 × *L*³ − 512) ÷ 2 from Lv9 (it joins at 512; §18). KO EXP = yield × foe level ÷ 5; trainer battles ×1.5; a capture grants the KO EXP; the dock hold-out grants a flat 100. Bench 60% (battlers 100%); Training Yard 25% to 3 stored creatures; Big Sibling +30% to the lowest party member; catch-up +50% per 5 levels under the posted curve, cap ×3; Porch Duel EXP ×0.5 past curve + 10. Check: Linnet (100) + the Tossup catch (40) + Pip's Tossup (30) and Wirewhisk (66) take a Lv5 starter (200) to 436, past Lv7 (392) on night one, so the pip shows; two Lowmoor wilds on day 2 reach Lv8 (512).
 
 **Errants.** Squallcoil (Emberstep onward; Skyroam: moves one route per game hour, shown on the map once seen) and Hailcoil (Rimeholt). Start odds ~22% with a Tallow wick. Each pays 2 Starsalt + 1,500◉ beaten or caught and returns the next day. After the Relighting they also visit the lit point.
 
 **The Summit.** Six badges open Hollis's Gate (Hollis Brandt, ex-Mooring quartermaster, keeper of the Readers' fund). Before the Relighting the Bar is dry at the day's lower low; after it, at any tide. The **Long Road**: six trainers on the Bar (Lv40–44), Wick halfway; **Keeper Bastien Kell** (mink, salvage diver of the lost fleet; Hollow/Brine; ace Lv46); **Keeper Cass Rune** (lynx; weather and evasion; ace Lv48); **Champion Idris Fenwake** (great northern diver; Vesperay anchored since it hatched; Lv50). The **Summit Bell** restarts you at whoever beat you (Drift, Flux); losses cost nothing. Beating Idris: the anchor-release scene (silence is an answer), the Summit seal on the Seed Card, 10,000◉.
 
-**Porch Duels** (the Rematch board). Three offers a day on the Commons board's slate from the 8 neighbors who keep a creature (Wren, Tully, Juniper, Odile, Tamsin, Wick, Augusta, Linnet) plus beaten leaders and route trainers; friendly, one to three creatures, scaled to your party's median level, fought on the offering porch during porch talk, 30 × curve, nothing lost. No calls, ever.
+**Porch Duels** (the Rematch board). Three offers a day on the Commons board's slate from the 8 neighbors who keep a creature (Wren, Tully, Juniper, Odile, Tamsin, Wick, Augusta, Linnet) plus beaten leaders and route trainers; friendly, one to three creatures, scaled to your party's median level, 30 × curve, nothing lost. As built: neighbours offer their duel in porch talk from 19:00; a visitor (beaten leader or route trainer) is offered "under the Commons lamp" when you close the Commons board (§18). No calls, ever.
 
 ---
 
@@ -478,7 +478,7 @@ Sixteen scheduled residents (14 neighbors + Corin + Linnet) with schedules, memo
 
 **Cast arcs** (scripted beats on the same system): **Linnet, *The Ember Grub*** · **Wick, *The Water Pack*** (Rillfin Shifts to a gill-breather; he builds a pack; carries the flame) · **Ansel, *The Empty Creek*** (the tells; the confession at K9 + beat 4: "I named her. I'd name her again with what I had. I didn't have the drawing."; the weir wheel in the coda). **Thessaly** runs a 3-beat template thread.
 
-**The rival arc** (four battles and a fall). (1) The dock, night one: the posted strip shows Up 100% on every dial; Lv5 **Caldermaw**; hold three turns; *Identity Crisis*. (2) The Brackenford rematch after badge 1 (before it she Declines); *First Steps*. (3) **The fall** at the Lantern Market Shift fair: Caldermaw Shifts Down to **Sootling** before the town; she refuses Merrow's stone and Varga's Starsalt, leaves on Maud's ferry, and her porch goes dark. (4) Rimeholt: she returns in ermine with a balanced six, Sootling on her shoulder; afterwards her porch relights and on her step she asks: "Read it for me. I'm not asking Merrow." (5) The Shardcrown gate after badge 6; the **Gnash** disc win or lose. Coda: Maud's wheel.
+**The rival arc** (four battles and a fall). (1) The dock, night one: Linnet's Lv5 Sootling posts Up 100% on every dial and Shifts into **Caldermaw** as it enters; you stand as long as you can (three turns to hold; in the final fix pass's simulation Sloshkin holds, Scrapling can win and Reedkit falls in a turn or two; the story continues either way); *Identity Crisis*. (2) The Brackenford rematch after badge 1 (before it she Declines); *First Steps*. (3) **The fall** at the Lantern Market Shift fair: Caldermaw Shifts Down to **Sootling** before the town; she refuses Merrow's stone and Varga's Starsalt, leaves on Maud's ferry, and her porch goes dark. (4) Rimeholt: she returns in ermine with a balanced six, Sootling on her shoulder; afterwards her porch relights and on her step she asks: "Read it for me. I'm not asking Merrow." (5) The Shardcrown gate after badge 6; the **Gnash** disc win or lose. Coda: Maud's wheel.
 
 **The ending scene.** At 17:30 the day after loan 7, Juniper brings Isolde's Lantern and the Lantern letter up the point. You light it from your own porch lamp; Wick, cap pushed back for once, climbs the stair with you. The lens catches in three dither steps; the beam sweeps every roof every 8 s; every lit porch pulses once; a horn answers with Your Signal. The Skyband fills: the comet low, and something coming down to the lit Lantern Stack. The sea draws back (a forced low); you cross with Corin, Wick, Linnet, Merrow and Varga on the shore (and Idris, ring already off, if you have beaten him). **The Reading**: seven phases of two turns; one 96×96 body whose palette and Unfixed type queue change per phase; each phase posts the next Forecast; your creatures cannot fall below 1 HP and its bar cannot empty; on the seventh its Forecast is offered to *you*: Anchor (Merrow's way) or Reroll (Varga's way), free here, each keeps the night going one more phase; **Accept** ends it. The Heartshard steadies; its hum settles into a tide. Corin: "I can't read one that size. You can." **Dawn: credits** over Odile's canvases, your tally wall, the lit porches and the **Seed Card**.
 
@@ -499,15 +499,15 @@ Sixteen scheduled residents (14 neighbors + Corin + Linnet) with schedules, memo
 | 4:00 | 17:50 | Three creatures on the last dry stones; kneel; raise the Lantern (100%); name; the mark lights. *Someone Picked You*. |
 | 5:30 | 18:05 | Wick on the cliff stair: "Keeper!" The bedsit. |
 | 6:00 | 18:10 | Corin on your step: the Reading Glass, 2 stones; Read your own creature. |
-| 7:00 | 18:15 | Linnet vaults the fence; Corin reads her strip aloud; Lv5 Caldermaw; hold three turns; *Identity Crisis* (+100 EXP). Maud from her punt: "Come back stronger. Brackenford stones, low's at five." |
+| 7:00 | 18:15 | Linnet vaults the fence; Corin reads her strip aloud; her Lv5 Sootling Shifts into Caldermaw as it enters; stand as long as you can (three turns to hold; §18); *Identity Crisis* (+100 EXP). Maud from her punt: "Come back stronger. Brackenford stones, low's at five." |
 | 10:00 | 18:25 | Wick brings the errands clipboard (six × 500◉ off loan 1, any order). |
 | 10:30 | 18:35 | Apron at the yard; pin your notice on the Commons board; Tully's nickname (accept / decline / counter); Odile, Bryony, Thessaly. |
 | 12:00 | 19:20 | Six trees, eighteen fruit, a purse (300), the bee hum, a netted nest (350). |
 | 13:30 | 20:00 | Carry the mail sack in; Hesper's lamp lights: "Something's been waiting for you. Morning." |
-| 14:00 | 20:10 | The reeds: a wild Tossup Lv4; Corin teaches Capture Stance; "62%"; **first catch** by 15:30. |
+| 14:00 | 20:10 | The reeds: a wild Tossup Lv4; Corin teaches Capture Stance ("about a third fresh, nearly sure at a sliver"); **first catch** by 15:30. |
 | 15:30 | 20:30 | Barnaby's porthole fogs over a shell: the Field Log. |
 | 16:30 | 20:45 | Ansel from the launch: "Forked tail, by the piling." Feint, feint, plip: a perch. |
-| 18:00 | 21:30 | Pip the dock hand (Wirewhisk Lv4): a win, 200◉. |
+| 18:00 | 21:30 | Pip the dock hand (Tossup Lv2, then Wirewhisk Lv4): a win, 200◉. |
 | 19:00 | 22:10 | Sell to Ludo on the eave: wallet past 3,000. |
 | 19:30 | 22:20 | The yard by lamplight: six beads; Ambrose: "Alder. Notch it wide."; **THWAP**; slate-blue roof; loan 2 offered. |
 | 20:30 | 22:35 | The porchlight comes on; Dimity lands in it; Wick: "Keeper." A Prismoth at the lamp: Read it, *Ward ?*. |
@@ -614,7 +614,7 @@ Every menu works with a d-pad and two buttons; targets ≥ 44 px; no hover; inpu
 
 **Settings** (Save is always the last item of the pause menu): day length (12 / 24 / 48 / Real Clock), text speed, battle speed (1× / 2× default / 4×), fishing (Standard / Gentle / Patient), reduced motion, large text, high contrast, Clear Visuals, Path view hold/toggle, remap, music / sfx / ambience volume, mute, touch layout (two-handed / one-handed), blackout wake point.
 
-**Saves.** One versioned schema with a checksum (FNV-1a over canonical JSON) and migrations; verified write (temp → read back → checksum → swap); three rotating autosaves (doors, Waystones, before Spire doors, after catches and Forecasts, every 5 real minutes) plus three manual slots; a failed write shows the red *Not saved* banner; one-of-a-kind items always ask before they are spent, cursor on No.
+**Saves.** One versioned schema with a checksum (FNV-1a over canonical JSON) and migrations; verified write (temp → read back → checksum → swap); three rotating autosaves (doors, Waystones, before Spire doors, after catches and Forecasts, every 5 real minutes; as built the triggers, timer and spacing differ, see §18) plus three manual slots; a failed write shows the red *Not saved* banner; one-of-a-kind items always ask before they are spent, cursor on No.
 
 ---
 
@@ -665,3 +665,44 @@ Every chapter writes in the §14 formats of `ARCHITECTURE-DRAFT.md` (kebab-case 
 | 7 | `GDD-07-story.md` | acts and triggers in the cond DSL; every story script in §14.6 format (first 30 minutes, dock, rival, factions, Surge, Engine, Relighting, Reading, credits, coda, post-game); flag list; 24 stamps | §11 triggers with alternatives; ending gate = zero balance; §12 timings |
 | 8 | `GDD-08-letters-threads.md` | 56 + 2 letters as §14.8 rows with full text, seal, date, channel and reveals; 6 threads, 3 arcs and the template as §14.7 modules | §11 streams, reveal order, K1 day 2 … K20 day 21, four letter creatures, canon texts |
 | 9 | `GDD-09-presentation.md` | screen specs, controls, UI kit, art bible (palette module, sprite and tile rules, linter, juice), audio (track ↔ CUES, stems, motifs, sfx, cries), accessibility, settings, dial, seeds, Seed Card, challenges, `strings.js` glossary | §13–§15, prototypes and palette |
+
+---
+
+## 18. Decisions changed while building (to 2026-10-28)
+
+The integration, three fix waves and the final fix pass changed these rulings. Each is in the code and covered by tests. Some earlier rows were also edited in place to match (the teachers table, §5 Real Clock, §8 EXP and Porch Duels, the rival arc and §12's first-30-minutes table); any other earlier text that disagrees with this section is superseded by it.
+
+**Progression and battle**
+- **EXP curve.** 8 × L² through Lv8, then (3 × L³ − 512) ÷ 2 from Lv9. *Why:* under 8 × L² a level costs 16 × L while a KO pays yield × L ÷ 5, so every KO was worth the same share of a level at every level; simulated parties reached Lv89 by the Mirror Spire (curve 40). The cubic keeps night one exact (Lv5 200, Lv7 392, Lv8 512) and settles parties near the posted curve (GDD-04 §7.1). Save v6 rebased existing creatures onto it, keeping each one's level and progress.
+- **KO EXP** goes to whoever was standing at each KO, even if they faint later or the battle is lost; Relay sitters get the bench share.
+- **Pip's team** is Tossup Lv2 (Tap) then Wirewhisk Lv4 (200◉): the first trainer takes 3–4 turns and a Read pays. Night-one EXP is 436, so the Lv8 window still opens on day 2.
+- **Capture odds in the tutorial.** Corin says "about a third while it is fresh, nearly sure at a sliver; every miss raises the next try", which is what the Lantern shows (33% fresh, 95% at a sliver under the Stance). The reeds Tossup fights with Settle only so the lesson is safe, and the lesson repeats until a Tossup is held or the player says Later.
+- **Linnet's dock.** Her Sootling Shifts on entry (posted Up 100%), for every starter. The strip reads "Stand as long as you can"; the battle records whether you held or fell and Corin's line follows it.
+- **Story battles leave the party healed**, and the hold-out pays its 100 EXP however it ends.
+- **Catches** always join with at least one damaging move.
+- **A Shift teaches one move** when the creature keeps no damaging move of its new form's types: that form's latest damaging same-type learnset move at or below its level (into a free slot, or over the last non-Heartmark move, which goes to Memory). The Forecast result names it; Barnaby's Archive desk teaches Memory moves back.
+- **Freefall:** the Ward badge appears only after the first blocked hit (`after-block`), and Read cards show no roster pips.
+- **Ward sentinels** are wild-style exhibitions with their own stone art: no capture, nothing lost; a loss heals the party in place.
+- **Relay:** a pick screen before every round (round 1 included) with the satchel available between rounds.
+- **Summit:** losses are never blackouts. Drift/Flux: the Bell restores the party as that fight began and offers "Keep my place" or "Start again from the first Keeper" while a climb is under way. Freefall: party healed, Keepers stand again, back to the Keepers' Hall door. After each Keeper win every move regains 5 PP (no heal), and a slip says so. The climb must go in order: a Keeper or Idris challenged out of turn starts no battle.
+- **Badge gifts** (Scouting Prism, Weatherglass, Plumbline disc) arrive once, at the first win; the seal slip says a gift waits and the leader hands it over.
+
+**Clock, story and saves**
+- **Real Clock** keeps a run-relative day (day 1 = the arrival) and a saved `clock.realOffset`, so the Glint and day-gated story behave as on the other day lengths and days between sessions count. The weekday and spring tide follow the run calendar, not the device's weekday, so the first Lantern Market is always day 7. Save v7 rebased older Real Clock saves.
+- **Story days.** The `day` condition is the run's GDD day. The Raft docks on day 3, the first Lantern Market is day 7 (Saturday 20:00–02:00, lights down after 02:00 and up again each Saturday), the Surge fallback is day 10 dawn. **Act II opens at badge 1 or on day 4, whichever comes first** (§11; the first badge's beat opens it itself, and the day-4 clock fallback covers a town-first player); the comet waits for Act II, the Surge and Two Plans for Act III, and none of these fire after the Relighting.
+- **Autosaves** are written on map changes, Waystones, the start of a story battle, catches, Forecasts, loan payments, letters read and each morning. They wait while a battle or cutscene runs (so a story battle's save lands after it, and Continue can never replay a Forecast), skip a map loaded by Continue or a new game, and overwrite the newest auto slot when less than 2 game hours apart (`day:start` always rotates). The route timer saves every 90 real seconds while there are unsaved changes on the overworld (§15's "every 5 real minutes" is superseded).
+- **Thread pacing** is enforced in talk: one beat a day, the beat's spacing (Mudlark Mile beat 2 waits two days), weekday and porch-only beats.
+- NPCs who speak in a story scene count as **met**, so first-meeting intros do not replay and the Porch Duel slate fills.
+
+**Town and economy**
+- **Porch Duels:** the slate is posted at 06:00 and re-posted every hour and when the Commons board is read, if it was posted empty. Neighbours offer duels in porch talk; visitors (beaten leaders, route trainers) are live and are offered under the Commons lamp when you close the board. A won duel pays 30 × curve once an evening; nothing is lost.
+- **Paying loans:** the Ledger pays from anywhere (pause menu), and a payment that leaves a room to choose opens Wren's chalk plan in the ceremony, as at the yard. Paying off the Lamp Room asks for no roof colour.
+- **Resident share:** finishing a resident's thread pays one notch on the open loan (or 4,000 to the Commons Jar after payoff), once per thread.
+- **Barnaby** buys only duplicates of finds you have donated, at their Archive price; the **Raft** refines skyglass relics into Starsalt 1:1 (Refine tab, outside the 3-a-day cap); a fossil cleaned in the Workshop sells for +40% once at any shop or the Crate.
+- **Rooms:** Training Yard creatures are assigned from Storage; the Workshop cleans one fossil overnight and polishes a skyglass relic into a type tilt; the Greenhouse grafts a foreign fruit or seedling (two nights, one with a Moss lead), holds up to 2 indoor trees picked once a day, and gives the once-per-creature Bond night; the Loft telescope lists the Errants and marks them on the isles map. The Gallery pays 1,000◉ per 6 Held forms.
+- **Ludo** opens his night shop when talked to between 22:00 and 08:00.
+
+**Controls and release**
+- Pause is Esc, P, the gamepad Start or the touch MENU pill; **Enter is Confirm only**.
+- The debug hook (`window.__game`) installs only with `?debug=1`. The title shows v1.0.0.
+

@@ -591,8 +591,25 @@ export function resolveCell(A, layer, i, bc) {
       if (info.roofPlayer && bc.roof) base = `roof-${bc.roof}`;
       const top = !same(0, -1), bottom = !same(0, 1), left = !same(-1, 0), right = !same(1, 0);
       const part = bottom ? 'eave' : top ? 'ridge' : 'body';
-      const end = part === 'body' ? '' : left && !right ? '-l' : right && !left ? '-r' : '';
-      const cand = `${base}-${part}${end}`;
+      // body cells take the end pieces too, so a tall roof's bargeboard / hip line runs unbroken
+      // from ridge to eave (carried: they used plain body at the ends)
+      const end = left && !right ? '-l' : right && !left ? '-r' : '';
+      let cand = `${base}-${part}${end}`;
+      // houses differ (polish backlog): a tall roof may carry one dormer on a body row, chosen by a
+      // hash of the house's own run (its left edge) so the same house always has it in the same place
+      if (part === 'body' && !end) {
+        let lx = 0, rx = 0;
+        while (lx > -32 && same(lx - 1, 0)) lx--;
+        while (rx < 32 && same(rx + 1, 0)) rx++;
+        const len = rx - lx + 1;
+        let ty = 0;
+        while (ty > -16 && same(0, ty - 1)) ty--;
+        const hsh = (((x + lx) * 73856093) ^ ((y + ty) * 19349663)) >>> 0;
+        if (len >= 4 && same(0, -1) && !same(0, -2) && hsh % 3 !== 0 && -lx === 1 + ((hsh >>> 4) % (len - 2))) {
+          const dormer = `${base}-dormer${isLit(info, bc.grade, bc.flags) ? '-lit' : ''}`;
+          if (hasArt(dormer)) cand = dormer;
+        }
+      }
       art = hasArt(cand) ? cand : hasArt(`${base}-${part}`) ? `${base}-${part}` : art;
       break;
     }

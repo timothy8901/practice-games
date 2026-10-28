@@ -64,9 +64,9 @@ export default {
     { kind: 'sign', id: 'crackdust-notice', x: 12, y: 12, art: 'signpost', text: 'Crackdust at the clinic, 300. Read the shimmer first. -O.P.' },
     // The two teaching sentinels (spires.js order: east, then west) stand in the lattice gaps until
     // they are beaten (battleFlow sets sys.trainer.<id>) or the Ward Seal is held (LG-NEW1 / MID-14).
-    { kind: 'prop', id: 'sentinel-east', x: 14, y: 8, art: 'standing-stone', verb: 'challenge', spire: 'ward', sentinel: 'ward-sentinel-east',
+    { kind: 'prop', id: 'sentinel-east', x: 14, y: 8, art: 'sentinel-stone', name: 'Granite Sentinel', verb: 'challenge', spire: 'ward', sentinel: 'ward-sentinel-east',
       cond: { all: [{ not: { flag: 'sys.trainer.ward-sentinel-east' } }, { not: { badge: 'ward' } }] } },
-    { kind: 'prop', id: 'sentinel-west', x: 5, y: 5, art: 'standing-stone', verb: 'challenge', spire: 'ward', sentinel: 'ward-sentinel-west',
+    { kind: 'prop', id: 'sentinel-west', x: 5, y: 5, art: 'sentinel-stone', name: 'Granite Sentinel', verb: 'challenge', spire: 'ward', sentinel: 'ward-sentinel-west',
       cond: { all: [{ not: { flag: 'sys.trainer.ward-sentinel-west' } }, { not: { badge: 'ward' } }] } },
   ],
   triggers: [

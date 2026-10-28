@@ -510,7 +510,7 @@ export default {
     'ambrose-bench': { x: 56, y: 29, facing: 'up' },
     'ambrose-timber': { x: 51, y: 29, facing: 'left' },
     'hesper-post-step': { x: 48, y: 20, facing: 'down' },
-    'hesper-cottage-gate': { x: 9, y: 25, facing: 'up' },
+    'hesper-cottage-gate': { x: 11, y: 25, facing: 'left' }, // beside the gate, never on it (FE-04): (9,25) is the porch's one way out
     'juniper-pells-step': { x: 24, y: 20, facing: 'down' },
     'ludo-eave': { x: 51, y: 20, facing: 'up', hangs: { x: 51, y: 19 } },
     'barnaby-archive-step': { x: 32, y: 20, facing: 'down' },
@@ -599,7 +599,7 @@ export default {
     'linnet-ferry-leaves': { x: 34, y: 42, facing: 'down' },
     'point-skywatch': { x: 5, y: 20, facing: 'up' },
     'lighthouse-door': { x: 4, y: 19, facing: 'up' },
-    'relighting-juniper': { x: 9, y: 25, facing: 'left' },
+    'relighting-juniper': { x: 12, y: 25, facing: 'left' }, // off the gate (FE-04): (9,25) is the porch's one way out
     'relighting-crowd-1': { x: 6, y: 19, facing: 'up' },
     'relighting-crowd-2': { x: 7, y: 18, facing: 'left' },
     'crossing-start': { x: 7, y: 14, facing: 'up' },

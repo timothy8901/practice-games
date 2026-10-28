@@ -470,6 +470,9 @@ const WAINSCOT = ['kkkkkkkkkkkkkkkk', 'llllllllllllllll', 'lppppdlppppppdll', 'l
 const W3P = { g: 'wpg1', h: 'wpg2', k: 'wd0', l: 'wd3', p: 'wd2', d: 'wd1', w: 'wd2', t: 'wd0' };
 def('cottage-wall-3', W3P, [...PAPER3.slice(0, 9), ...WAINSCOT]);
 def('cottage-wall-3-top', W3P, top(PAPER3));
+// The unbuilt part of a growing interior (FE-22): a transparent tile, so the night the map renderer
+// paints behind every map shows through, as round the other interiors.
+def('interior-void', { k: 'ink' }, Array.from({ length: 16 }, () => '................'));
 // Rug (tier 2+): a woven mat with a border and fringe; detail over any floor.
 def('rug', { r: 'rug1', d: 'rug0', l: 'rug2', y: 'rug3', f: 'pl2' }, [
   '................',

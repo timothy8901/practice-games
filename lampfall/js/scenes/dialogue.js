@@ -265,7 +265,7 @@ export function createDialogueScene(G) {
       }
       case 'openShop': {
         state = 'child';
-        G.push('shop', { shop: r.shop, from: 'script' });
+        G.push('shop', { shop: r.shop, from: 'script', mode: r.mode ?? undefined });
         return;
       }
       case 'toast': sfx('toast', { text: r.text }); pull(); return;

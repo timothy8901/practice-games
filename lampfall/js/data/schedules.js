@@ -25,7 +25,9 @@ export const SCHEDULES = deepFreeze([
     'The Warden\'s evening porch count, counting every lit lamp.'),
   path('corin-night-round', 'pellwick', ['corin-archive-step', 'commons-pin', 'market-green', 'tully-lap-1', 'corin-archive-step'],
     'Corin\'s late round of the green: an owl\'s walk, slow, head turning at every lit porch.'),
-  path('wick-errand-run', 'pellwick', ['wick-cliff-stair', 'wick-errands', 'corin-step', 'wick-errands', 'wick-cliff-stair'],
+  // FE-04: the loop stays outside the porch fence (it used to run in to corin-step through the gate,
+  // the porch's only way out, and park there whenever Dimity or the player held the porch)
+  path('wick-errand-run', 'pellwick', ['wick-cliff-stair', 'wick-errands'],
     'Wick up and down the cliff stair to the cottage gate and back, carrying Rillfin\'s bucket, very fast.'),
   path('odile-golden-walk', 'pellwick', ['meet-odile', 'point-dawn', 'odile-easel', 'point-dawn', 'meet-odile'],
     'Odile walking out to the easel on the point and back, stopping wherever the light changes.'),

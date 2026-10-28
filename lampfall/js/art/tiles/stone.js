@@ -298,6 +298,53 @@ def('standing-stone', { k: 'base', d: 'st1', m: 'st2', l: 'st3', h: 'st4', g: 'm
   '................',
   '................',
 ], { w: 16, h: 32, kind: 'object' });
+// Ward Spire sentinel (LF-06): the standing stone with its mark glowing (LUT-exempt rune light) and
+// a lattice shimmer that flickers round it on the second frame, so the stone that talks stands out
+// from the lattice fence of plain stones.
+{
+  const base = [
+    '................',
+    '................',
+    '......kkk.......',
+    '.....khlmk......',
+    '....khlmmdk.....',
+    '....klmmmdk.....',
+    '....khmmmdk.....',
+    '....klmgmdk.....',
+    '...kllmggmdk....',
+    '...klmmrmmdk....',
+    '...klmrwrmdk....',
+    '...khmmrmddk....',
+    '...klmrmrmdk....',
+    '...klrmmmrdk....',
+    '...klmmmmmdk....',
+    '...khmmmmddk....',
+    '...klmmmmmdk....',
+    '...klmmmmddk....',
+    '...klmgmmmdk....',
+    '..kllmggmmddk...',
+    '..klmmmmmmddk...',
+    '..khmmmmmmddk...',
+    '..klmmmmmmddk...',
+    '..klmmmmmdddk...',
+    '..klmmmmmmddk...',
+    '..klmmmmmdddks..',
+    '..kkkkkkkkkkkss.',
+    '..xxxxxxxxxxxsss',
+    '.....sssssssss..',
+    '................',
+    '................',
+    '................',
+  ];
+  const SHIMMER = [[1, 6], [13, 9], [0, 14], [14, 17], [1, 21], [13, 24]];
+  const lit = (rows, on) => rows.map((r, y) => {
+    let row = on ? r : r.replace(/w/g, 'r');
+    for (const [sx, sy] of SHIMMER) if (on && sy === y && row[sx] === '.') row = row.slice(0, sx) + 'w' + row.slice(sx + 1);
+    return row;
+  });
+  def('sentinel-stone', { k: 'base', d: 'st1', m: 'st2', l: 'st3', h: 'st4', g: 'moss2', s: 'shadow', x: 'base', r: '!rune', w: '!runew' },
+    [lit(base, false), lit(base, true)], { w: 16, h: 32, kind: 'object', fps: 3 });
+}
 // Sea stack (the Lantern Stack, the Bar; 32×48): a stratified column standing in the sea, a pale crown
 // of birds' whitewash, kelp at the waterline and a foam ring at its foot.
 const STACK = [];

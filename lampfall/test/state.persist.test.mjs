@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   createPersist, summarize, wantsNoRewind, sceneTransitioning, sceneOnStack, AUTOSAVE_TRIGGERS, DEFAULT_ROUTE_AUTOSAVE_MS, RETRY_MS, PERSIST_ERRORS, CLEAN_EXIT_KEY,
+  AUTOSAVE_MIN_SPACING_MIN, summaryMinutes,
 } from '../js/state/persist.js';
 import { createStore } from '../js/state/store.js';
 import { createRngs } from '../js/state/rngs.js';
@@ -81,7 +82,8 @@ describe('autosave / saveManual / load', () => {
   it('rotates through three autosave slots and supports manual slots, list, latest, remove', () => {
     const G = makeG();
     const p = make();
-    const slots = [1, 2, 3, 4].map(() => { G.store.tx('x', (w) => { w.stats.steps++; }); return p.autosave(G, 'route').slot; });
+    // three game hours apart: past AUTOSAVE_MIN_SPACING_MIN, so every write rotates
+    const slots = [1, 2, 3, 4].map(() => { G.store.tx('x', (w) => { w.stats.steps++; w.clock.total += 180; }); return p.autosave(G, 'route').slot; });
     assert.deepEqual(slots, ['auto:1', 'auto:2', 'auto:3', 'auto:1']);
     const m = p.saveManual(G, 2);
     assert.equal(m.ok, true);
@@ -483,4 +485,82 @@ it('defers a story autosave throughout a battle without a false failure, then wr
   assert.equal(p.status().failed, false);
   assert.equal(p.status().retryPending, false);
   assert.equal(p.latest().state, 'ok');
+});
+
+describe('autosave history (FE-01, FE-16)', () => {
+  it('autosaves closer than the minimum spacing overwrite the newest slot; day:start always rotates', () => {
+    const G = makeG();
+    const p = make();
+    const save = (mins, reason = 'route') => { G.store.tx('x', (w) => { w.clock.total += mins; }); return p.autosave(G, reason).slot; };
+    assert.equal(save(0), 'auto:1');
+    assert.equal(save(10), 'auto:2');
+    assert.equal(save(10), 'auto:2', 'twenty minutes later: the newest slot is reused');
+    assert.equal(save(10), 'auto:2');
+    assert.equal(save(AUTOSAVE_MIN_SPACING_MIN), 'auto:3', 'two game hours later: rotate');
+    assert.equal(save(1, 'day:start'), 'auto:1', 'day:start keeps its own slot');
+    assert.equal(summaryMinutes({ day: 2, time: '14:01' }), 2 * 1440 + 14 * 60 + 1);
+    // spacing runs from the rotation, not the last overwrite: a save every 30 game minutes still
+    // rotates every two game hours
+    const slots = [];
+    for (let i = 0; i < 9; i++) slots.push(save(30));
+    assert.deepEqual(slots, ['auto:1', 'auto:1', 'auto:1', 'auto:2', 'auto:2', 'auto:2', 'auto:2', 'auto:3', 'auto:3']);
+    assert.equal(summaryMinutes(null), null);
+  });
+
+  it('bus-triggered autosaves wait while a cutscene runs and land when it ends', () => {
+    const G = makeG();
+    const p = make();
+    const off = p.attach(G);
+    const onStack = new Set(['cutscene']);
+    G.scenes.has = (name) => onStack.has(name);
+    G.store.tx('cut', (w) => { w.cutscene = { scriptId: 'corin-first-forecast', state: { pc: 3 } }; });
+    G.bus.emit('shift:resolved', { uid: 'c1' });
+    G.bus.emit('capture:ok', {});
+    assert.equal(p.list({ kind: 'auto' }).length, 0, 'nothing written mid-script');
+    assert.equal(p.status().retryPending, true);
+    p.tick(G, 16);
+    assert.equal(p.list({ kind: 'auto' }).length, 0, 'still running');
+    G.store.tx('end', (w) => { w.cutscene = null; });
+    onStack.clear();
+    p.tick(G, 16);
+    const autos = p.list({ kind: 'auto' });
+    assert.equal(autos.length, 1);
+    assert.equal(p.load(autos[0].slot).world.cutscene, null, 'the save has no bookmark to replay');
+    // an explicit save (a script's save op) still writes mid-cutscene
+    onStack.add('cutscene');
+    G.store.tx('cut', (w) => { w.cutscene = { scriptId: 'corin-first-forecast', state: { pc: 9 } }; });
+    assert.equal(p.autosave(G, 'script').ok, true);
+    off();
+  });
+
+  it('a day:start held by a cutscene still rotates when it lands, whatever triggers came after it', () => {
+    const G = makeG();
+    const p = make();
+    const off = p.attach(G);
+    const save = (mins) => { G.store.tx('x', (w) => { w.clock.total += mins; }); return p.autosave(G, 'route').slot; };
+    save(0); save(10);
+    assert.equal(save(10), 'auto:2', 'within the spacing: overwrite');
+    const onStack = new Set(['cutscene']);
+    G.scenes.has = (name) => onStack.has(name);
+    G.store.tx('x', (w) => { w.clock.total += 10; });
+    G.bus.emit('day:start', {});
+    G.bus.emit('map:enter', { mapId: 'harbor', kind: 'warp' });
+    onStack.clear();
+    p.tick(G, 16);
+    const newest = p.list({ kind: 'auto' }).reduce((a, b) => (b.seq > a.seq ? b : a));
+    assert.equal(newest.slot, 'auto:3', 'the held day:start rotated');
+    off();
+  });
+
+  it('a map:enter from loading the map (Continue) does not autosave; a walk in does', () => {
+    const G = makeG();
+    const p = make();
+    const off = p.attach(G);
+    G.bus.emit('map:enter', { mapId: 'harbor', kind: 'enter' });
+    G.bus.emit('map:enter', { mapId: 'harbor', kind: 'load' });
+    assert.equal(p.list({ kind: 'auto' }).length, 0);
+    G.bus.emit('map:enter', { mapId: 'harbor', kind: 'warp' });
+    assert.equal(p.list({ kind: 'auto' }).length, 1);
+    off();
+  });
 });

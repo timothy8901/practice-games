@@ -374,8 +374,13 @@ describe('top10 #9 sprite fit', () => {
       const art = creatureArt(id);
       assert.deepEqual(A.spriteFit(art.rows, 2, art.w), { scale: 2, dx: 0, dy: 0 }, id);
     }
+    // the 96-cell Vagary draws at 1x (96 px), centred on the 64 px box with its foot on the stand (LF-19)
     const v = creatureArt('vagary');
-    assert.equal(A.spriteFit(v.rows, 2, v.w).scale, 2, 'the 96-cell Vagary never grows');
+    const vf = A.spriteFit(v.rows, 2, v.w);
+    assert.equal(vf.scale, 1, 'the 96-cell Vagary never grows past 1x');
+    const vb = A.opaqueBounds(v.rows);
+    assert.equal(vf.dy + vb.y1 + 1, 62, 'its foot rests on the stand, not below it');
+    assert.ok(Math.abs(vf.dx + (vb.x0 + vb.x1 + 1) / 2 - 32) <= 1, 'centred on the box');
   });
 });
 

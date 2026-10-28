@@ -41,6 +41,9 @@ function fakeG() {
 async function loseAtSummit(post, at = { mapId: 'keepers-hall', x: 10, y: 4 }) {
   const G = fakeG();
   G.store.tx('test:place', (w) => { w.player.mapId = at.mapId; w.player.x = at.x; w.player.y = at.y; w.player.facing = 'up'; });
+  // the Summit climbs in order (battleFlow.summitBlocker, LF-01): the Keepers before the fought one are beaten
+  const order = ['bastien-keeper', 'cass-keeper', 'idris-champion'];
+  G.store.tx('test:climb', (w) => { for (const id of order.slice(0, order.indexOf(post.summitBell.trainerId))) w.flags[`sys.trainer.${id}`] = true; });
   const scene = createOverworldScene(G);
   G.stack.push(scene);
   scene.enter({});

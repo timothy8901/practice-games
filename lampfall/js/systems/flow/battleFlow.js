@@ -42,6 +42,7 @@ import * as stats from '../stats.js';
 import * as clockSys from '../clockSys.js';
 import { curveLevel as selectCurveLevel, minuteOfDay } from '../../state/selectors.js';
 import { PORCH_DUELS } from '../../data/town.js';
+import { SUMMIT } from '../../data/spires.js';
 
 // ---------------------------------------------------------------------------------------------
 // Tuning
@@ -435,6 +436,8 @@ export function buildBattle(G, setup, data) {
     source,
     foeAi: makeFoeAi(profile, { tuning: tuning.profiles ? { profiles: tuning.profiles } : undefined }),
     yard,
+    // a Relay round's sitters take the bench share of KO EXP, as the dossier promises (LF-16)
+    bench: relay && !oneHeart ? world.party.filter((c) => !roster.includes(c) && c.hp > 0).map((c) => creature.serialize(c)) : [],
     fieldLog: { seen: seenSet, read: readSet },
     prism: held(world, 'scouting-prism', data) > 0,
     tuning: engineTuningFor(data),
@@ -480,6 +483,13 @@ export function buildBattle(G, setup, data) {
  * @returns {Promise<PostBattle|null>}
  */
 export function startBattle(G, setup) {
+  // the Summit climbs in order (spires.js SUMMIT.order): whatever door or post led here, a Keeper or
+  // the Champion out of turn is refused, and the refusal says who comes first (LF-01)
+  const blocker = setup && setup.kind === 'trainer' && !setup.porchDuel ? summitBlocker(G.world, setup.trainerId) : null;
+  if (blocker) {
+    const who = row(G.data, 'trainers', blocker)?.name ?? blocker;
+    return Promise.reject(new Error(`The climb goes in order: ${who} first.`)); // str
+  }
   return new Promise((resolve) => {
     G.push('battle', { setup, onDone: resolve });
   });
@@ -597,6 +607,19 @@ export function readingLevel(reading, world) {
 // ---------------------------------------------------------------------------------------------
 
 /**
+ * The Summit trainer that must be beaten before `trainerId` (spires.js SUMMIT.order: Bastien, then
+ * Cass, then Idris), or null when `trainerId` is not on the Summit or its turn has come.
+ * @param {any} world @param {string} trainerId @param {{order: ReadonlyArray<{trainer: string}>}} [summit]
+ * @returns {string|null}
+ */
+export function summitBlocker(world, trainerId, summit = SUMMIT) {
+  const order = Array.isArray(summit?.order) ? summit.order : [];
+  const at = order.findIndex((o) => o && o.trainer === trainerId);
+  for (let i = 0; i < at; i++) if (!flags.hasFlag(world, `sys.trainer.${order[i].trainer}`)) return order[i].trainer;
+  return null;
+}
+
+/**
  * Whether the Summit Bell holds your place on this dial (data/dials.js `shift.summitBellHolds`;
  * GDD-00: Drift and Flux yes, Freefall no).
  * @param {string} dial @param {any} data @returns {boolean}
@@ -681,12 +704,12 @@ function roundShown(raw, tuning) {
  * @param {BattleSession} session @param {string|number} grade
  * @returns {import('../capture.js').CaptureOdds}
  */
-function captureOddsFor(session, grade) {
+function captureOddsFor(session, grade, failsOverride = null) {
   const b = session.battle;
   const foe = b.foeOf(0);
   const st = b.state();
   return capture.captureOdds(foe, {
-    grade, fails: b.captureFails.get(foe.uid) || 0, data: session.data, stance: st.captureStance, trapped: st.sides[1].trapped,
+    grade, fails: failsOverride ?? (b.captureFails.get(foe.uid) || 0), data: session.data, stance: st.captureStance, trapped: st.sides[1].trapped,
   }, { dial: session.dial, tuning: session.tuning, rules: { captureDisplay: b.rules.captureDisplay === 'bands' ? 'band' : 'percent' } });
 }
 
@@ -722,11 +745,14 @@ export function captureMenu(session) {
     const sure = grade === 'sure';
     if (sure && stock <= 0) continue;
     const o = captureOddsFor(session, g);
+    // what the missed raises actually add to the shown odds (0 once the odds sit at the cap, FE-09)
+    const fresh = sure || !(o.fails > 0) ? o : captureOddsFor(session, g, 0);
     const item = row(session.data, 'items', itemId);
     const name = item ? item.name : (lantern[g] && lantern[g].name) || itemId;
     rows.push({
       grade: g, itemId, name, stock, mult: sure ? Infinity : (lantern[g] ? lantern[g].mult : 1),
       pct: o.pct, band: o.band, display: o.display, shown: o.shown, nextShown: o.next ? o.next.shown : null, sure,
+      missBonusPct: Math.max(0, o.pct - fresh.pct), atCap: !sure && o.pct >= Math.round((session.tuning.captureOddsMax ?? 0.95) * 100),
       selectable: stock > 0, reason: stock > 0 ? null : 'none-left',
     });
   }
@@ -915,6 +941,8 @@ export function applyBattleResult(G, session, opts = {}) {
   G.store.tx('battle.result', (w) => {
     const ctx = { data, bus, tuning };
     const caughtCopy = r.caught ? { ...creature.serialize(r.caught), uid: party.nextUid(w), wild: false } : null;
+    // a scripted wild's move list (Settle only) stays in the fight; the catch joins able to hit (FE-02)
+    if (caughtCopy) creature.ensureDamagingMove(caughtCopy, data, { tuning });
     const markFieldLog = (world, state, formId) => {
       if (state === 'seen') fieldLog.markSeen(world, formId, ctx);
       else if (state === 'read') fieldLog.markRead(world, formId, null, ctx);
@@ -965,7 +993,9 @@ export function applyBattleResult(G, session, opts = {}) {
         } catch { /* no loan state: nothing to credit */ }
         try { wallet.onBadge(w, trainer.spire, ctx); } catch { /* anchor grant rules missing */ }
         post.rewards = grantBadgeRewards(w, row(data, 'spires', trainer.spire), ctx);
-        for (const rw of post.rewards) bus?.emit('toast', { text: rw.line, icon: 'star' });
+        // the leader's badge script hands each gift over in person (story-acts `give:`): no toast here,
+        // or it would land before the handover (LF-15); the seal slip says a gift waits
+        for (const rw of post.rewards) if (!rw.handover) bus?.emit('toast', { text: rw.line, icon: 'star' });
         bus?.emit('badge:won', { spireId: trainer.spire, trainerId: trainer.id });
       }
       if (trainer.class === 'champion') bus?.emit('summit:cleared', { trainerId: trainer.id });
@@ -1051,8 +1081,11 @@ export function grantBadgeRewards(world, spire, ctx) {
     try { res = bag.give(world, u.item, 1, { data: ctx.data, bus: ctx.bus, source: 'badge' }); } catch { res = null; }
     if (!res || !res.ok) continue;
     const name = row(ctx.data, 'items', u.item)?.name ?? u.item;
+    // 'Disc: Plumbline' reads as 'the Plumbline disc' in a sentence (LF-22)
+    const said = /^Disc: /.test(name) ? `the ${name.slice(6)} disc` : `the ${name}`;
+    // every Spire gift is handed over in the badge script (story-acts `give:`), so `handover`: the slip says it waits
     // a full satchel spills a slotted gift (the disc) into the basket at your feet: say so
-    out.push({ kind: u.kind, item: u.item, name, line: res.overflow > 0 ? `Received: ${name} (satchel full: it waits in a basket at your feet)` : `Received: ${name}` }); // str
+    out.push({ kind: u.kind, item: u.item, name, handover: true, line: res.overflow > 0 ? `A gift waits: ${said} (satchel full: it waits in a basket at your feet)` : `A gift waits: ${said}` }); // str
   }
   return out;
 }

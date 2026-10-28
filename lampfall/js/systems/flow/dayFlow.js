@@ -389,7 +389,7 @@ function hasScript(data, id) {
 }
 
 /** Events the Day Page tally hears (dayPage.noteEvent). */
-export const TALLY_EVENTS = Object.freeze(['wallet:changed', 'loan:paid', ...Object.keys(dayPage.NOTE_EVENTS)]);
+export const TALLY_EVENTS = Object.freeze(['wallet:changed', 'loan:paid', ...Object.keys(dayPage.NOTE_EVENTS).filter((e) => e !== 'stat:inc')]);
 
 /**
  * Wires the awake half of the day on the bus: the tally, the 05:40 builds, the 06:00 overnight
@@ -401,6 +401,8 @@ export function install(G) {
   const offs = [];
   const on = (evt, fn) => offs.push(G.bus.on(evt, (p) => { try { fn(p); } catch (e) { console.warn(`dayFlow: ${evt}`, e); } }));
   for (const evt of TALLY_EVENTS) on(evt, (p) => G.store.tx('dayPage:note', (w) => dayPage.noteEvent(w, evt, p)));
+  // stat:inc fires on every step; only a blackout makes a note (the Day Page's "home to the porch")
+  on('stat:inc', (p) => { if (p?.key === 'blackouts') G.store.tx('dayPage:note', (w) => dayPage.noteEvent(w, 'stat:inc', p)); });
   on('clock:anchor', (p) => {
     if (p?.id === 'builds') {
       const res = G.store.tx('builds:land', (w) => loans.landDue(w, { data: G.data, bus: G.bus }));
@@ -428,6 +430,8 @@ export function install(G) {
   on('clock:hour', (p) => {
     if (p?.hour === 18) checkRelighting(G);
     eveningLetter(G);
+    // FE-03: an evening posted empty at 06:00 fills in once a neighbour has been met
+    if (G.world && G.store) G.store.tx('duels:post', (w) => postDuelSlate(w, G.data, { bus: G.bus }));
   });
   // a load (or a new run) lands mid-evening: the counter and tonight's slate catch up at once
   on('world:replaced', () => { eveningLetter(G); G.store.tx('duels:post', (w) => postDuelSlate(w, G.data, { bus: G.bus })); });
@@ -483,7 +487,14 @@ export function eveningLetter(G) {
 export function postDuelSlate(world, data, opts = {}) {
   const slate = duelSlate(world, PORCH_DUELS, { day: opts.day, data, perDay: TUNING.porchDuelsPerDay, payoutPerCurveLevel: TUNING.porchDuelPerCurve });
   const ctx = { bus: opts.bus ?? null };
-  if (flags.getFlag(world, PORCH_DUEL_DAY_FLAG) === slate.gameDay) return { ...slate, kept: true };
+  if (flags.getFlag(world, PORCH_DUEL_DAY_FLAG) === slate.gameDay) {
+    // FE-03: an evening posted empty (at the 06:00 post nobody had been met yet) is not frozen: once
+    // the live slate has neighbours, it is posted for real. A slate with anyone on it stays frozen.
+    const postedAny = PORCH_DUELS.neighbours.some((n) => flags.getFlag(world, `${PORCH_DUEL_FLAG_PREFIX}${n.npc}`)
+      || flags.getFlag(world, `${PORCH_DUEL_DONE_PREFIX}${n.npc}`) === slate.gameDay);
+    const liveAny = slate.offers.some((o) => o.kind === 'neighbour');
+    if (postedAny || !liveAny) return { ...slate, kept: true };
+  }
   flags.setFlag(world, PORCH_DUEL_DAY_FLAG, slate.gameDay, ctx);
   const won = (npc) => flags.getFlag(world, `${PORCH_DUEL_DONE_PREFIX}${npc}`) === slate.gameDay;
   const on = new Set(slate.offers.filter((o) => o.kind === 'neighbour' && !won(o.npc)).map((o) => o.npc));

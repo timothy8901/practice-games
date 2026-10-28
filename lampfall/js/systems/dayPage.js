@@ -65,7 +65,7 @@ export const STEP_STREAMS = Object.freeze({ glint: 'glint', weather: 'weather', 
 export const STEP_DAY_BASIS = Object.freeze({ weather: 'game' });
 
 /** Order of *Tomorrow:* items by kind; unknown kinds go last in insertion order. */
-export const TOMORROW_ORDER = Object.freeze(['build', 'graft', 'bench', 'forecast', 'letter', 'beat', 'low', 'carry', 'heirloom', 'errant', 'spire']);
+export const TOMORROW_ORDER = Object.freeze(['build', 'graft', 'bench', 'forecast', 'letter', 'meet', 'beat', 'low', 'carry', 'heirloom', 'errant', 'spire']);
 
 /**
  * Designer numbers (GDD-00 §5, §9). [GDD values]
@@ -125,7 +125,12 @@ export const NOTE_EVENTS = Object.freeze({
   'letter:heirloom': (p) => (p && p.id ? `heirloom:${p.id}` : null),
   'thread:beat': (p) => (p && p.threadId ? `beat:${p.threadId}:${p.beat}` : null),
   'thread:done': (p) => (p && p.threadId ? `thread:${p.threadId}` : null),
-  'shift:resolved': (p) => (p && p.uid ? `shift:${p.uid}` : 'shift'),
+  // the form it became is kept on the note (FE-10): a second Shift the same day must not rename the first
+  'shift:resolved': (p) => (p && p.uid ? `shift:${p.uid}${p.anchored !== true && typeof p.to === 'string' && p.to ? `>${p.to}` : ''}` : 'shift'),
+  // a lost fight (FE-10: the Day 2 Spire loss and blackout went unmentioned); friendly duels lose nothing
+  'battle:end': (p) => (p && p.outcome === 'loss' && !p.porchDuel ? `lost:${typeof p.trainerId === 'string' && p.trainerId ? p.trainerId : 'wild'}` : null),
+  // the blackout itself (battleFlow counts it only when the loss cost buttons and sent you home)
+  'stat:inc': (p) => (p && p.key === 'blackouts' ? 'blackout' : null),
   'capture:ok': (p) => (p && (p.speciesId || p.formId) ? `caught:${p.speciesId ?? p.formId}` : null),
 });
 
@@ -284,6 +289,20 @@ export function tomorrowList(world, data, opts = {}) {
   }
   const letter = letters.nextLetterPreview(world, data, { ...opts, day: next });
   if (letter.n !== null) items.push({ kind: 'letter', id: letter.label, params: { n: letter.n, channel: letter.channel, minute: letters.tuningOf(data, opts).letterHour * 60 } });
+  // Greenhouse grafts that take overnight (`sys.graft.<slot>` = `<fruit>|<core day>`, systems/flow/rooms)
+  for (const [id, v] of Object.entries(world?.flags ?? {})) {
+    if (!id.startsWith('sys.graft.') || typeof v !== 'string' || !v.includes('|')) continue;
+    const [fruit, d] = v.split('|');
+    if (Number(d) <= next) {
+      let name = fruit;
+      try { name = data && data.has && data.has('collections', fruit) ? data.get('collections', fruit).name ?? fruit : fruit; } catch { name = fruit; }
+      items.push({ kind: 'graft', id: fruit, params: { fruit: String(name).toLowerCase() } });
+    }
+  }
+  // a story appointment (FE-10): Corin's slip ("I'll be on the stones at the low"), which Dimity
+  // says she has put under Tomorrow, stands until the first Forecast on the stones
+  const f = world?.flags ?? {};
+  if (f['seen.corin-slip'] === true && !f['sp.first-forecast']) items.push({ kind: 'meet', id: 'corin-stones', params: { who: 'Corin', place: 'the Lowmoor stones' } });
   for (const th of threads.openThreads(world, data, { ...opts, day: today })) {
     if (th.readyTomorrow) items.push({ kind: 'beat', id: th.threadId, params: { npcId: th.npcId, beat: th.nextBeat, title: th.title } });
   }

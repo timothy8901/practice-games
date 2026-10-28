@@ -322,6 +322,35 @@ export function defaultMoves(speciesId, level, heartmark, data, opts = {}) {
 }
 
 /**
+ * Whether a move row deals damage (not a status move, power above 0).
+ * @param {any} mv
+ * @returns {boolean}
+ */
+export function isDamagingMove(mv) {
+  return !!mv && mv.category !== 'status' && (mv.power ?? 0) > 0;
+}
+
+/**
+ * A creature that joins the player must be able to hit. A story wild built with a scripted move
+ * list (the Capture Stance Tossup knows only Settle, so it never hurts the player) keeps that list
+ * in the fight; once caught, a creature with no damaging move gets its form's default moves for its
+ * level (the Heartmark technique pinned) at full PP (FE-02).
+ * @param {Creature} c
+ * @param {any} data
+ * @param {TuningOpts} [opts]
+ * @returns {boolean} whether the moves were rebuilt
+ */
+export function ensureDamagingMove(c, data, opts = {}) {
+  const look = dataLookup(data);
+  if ((c.moves || []).some((m) => isDamagingMove(look.moveOrNull ? look.moveOrNull(m.id) : null))) return false;
+  const ids = defaultMoves(c.speciesId, c.level, c.heartmark || null, data, opts);
+  if (!ids.some((id) => isDamagingMove(look.moveOrNull ? look.moveOrNull(id) : null))) return false;
+  c.moves = ids.map((id) => slot(look, id));
+  c.memory = (c.memory || []).filter((id) => !ids.includes(id));
+  return true;
+}
+
+/**
  * @param {import('./exp.js').DataLookup} look
  * @param {string} id
  * @returns {{id: string, pp: number, maxPp: number}}
@@ -665,6 +694,7 @@ function blocksShifts(look, itemId) {
  * @property {string[]} toMemory    move ids parked in Memory
  * @property {number} statDelta     base stat total after − before (floor applied)
  * @property {string[]} floored     stat keys the floor raised
+ * @property {string[]} learned     a same-type hit the new form brought (none of its type was kept)
  */
 
 /**
@@ -726,6 +756,32 @@ export function shiftTo(c, formId, data, dial, opts = {}) {
       toMemory.push(m.id);
     }
   }
+  // Every form has a same-type hit by its level (GDD-03 §186): a Shift that leaves the creature
+  // without a damaging move of its new types gives the form's latest such learnset move at or
+  // below its level (a free slot, else over the last non-Heartmark move, which goes to Memory).
+  /** @type {string[]} */
+  const learned = [];
+  const sameTypeHit = (id) => {
+    const mv = look.moveOrNull ? look.moveOrNull(id) : null;
+    return !!mv && mv.category !== 'status' && (mv.power ?? 0) > 0 && to.types.includes(mv.type);
+  };
+  if (!moves.some((m) => sameTypeHit(m.id))) {
+    const pick = learnableAt(to, c.level).filter((id) => sameTypeHit(id) && !moves.some((m) => m.id === id)).pop();
+    if (pick) {
+      if (moves.length < t.MOVE_SLOTS) moves.push(slot(look, pick));
+      else {
+        let i = moves.length - 1;
+        while (i >= 0 && moves[i].id === c.heartmark) i--;
+        if (i >= 0) {
+          const out = moves[i].id;
+          kept.splice(kept.indexOf(out), 1);
+          toMemory.push(out);
+          moves[i] = slot(look, pick);
+        }
+      }
+      if (moves.some((m) => m.id === pick)) learned.push(pick);
+    }
+  }
   if (moves.length === 0) {
     const fb = fallbackMove(to, c.level, t);
     if (fb) moves.push(slot(look, fb));
@@ -748,7 +804,7 @@ export function shiftTo(c, formId, data, dial, opts = {}) {
   c.shiftlog.push(to.id);
   recomputeStats(c, data, opts);
   const after = STAT_KEYS.reduce((a, k) => a + c.base[k], 0);
-  return { from: from.id, to: to.id, kept, toMemory, statDelta: after - before, floored };
+  return { from: from.id, to: to.id, kept, toMemory, statDelta: after - before, floored, learned };
 }
 
 // ---------------------------------------------------------------------------------------------

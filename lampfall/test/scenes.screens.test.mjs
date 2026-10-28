@@ -337,6 +337,25 @@ test('LG-RN104: Letters groups by channel and re-reads; Stamps count what holds;
   assert.match(j.debugText(), /1 letter read/);
 });
 
+test('Journal Stamps: Left/Right walk the grid and turn the tab past its edge (the hint says Left/Right: Tab)', () => {
+  const G = makeG();
+  G.push('letter', { journal: true });
+  const j = top(G);
+  press(G, 'right');
+  assert.equal(j.journal.tab, 'stamps');
+  press(G, 'right');
+  assert.equal(j.journal.tab, 'stamps', 'inside the row the cursor moves');
+  press(G, 'left');
+  assert.equal(j.journal.tab, 'stamps');
+  press(G, 'left');
+  assert.equal(j.journal.tab, 'letters', 'Left from the first column goes back a tab');
+  press(G, 'right');
+  for (let i = 0; i < 5; i++) press(G, 'right');
+  assert.equal(j.journal.tab, 'stamps', 'last column reached');
+  press(G, 'right');
+  assert.equal(j.journal.tab, 'seasonBook', 'Right from the last column goes on a tab');
+});
+
 test('LG-RN104: the empty letter page is not time-of-day specific', () => {
   const G = makeG();
   G.push('letter', { from: 'mailbox' });

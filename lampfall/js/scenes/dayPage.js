@@ -32,6 +32,7 @@ import * as dayPageSys from '../systems/dayPage.js';
 import { lowsOn } from '../systems/schedule.js';
 import { reducedMotion, skipAnims, framesMs } from './scriptHost.js';
 import { shiftTideRows } from '../systems/flow/shiftTide.js';
+import { announceStamps } from './letter.js';
 
 /** Page geometry (GDD-09 §3.22). */
 export const PAGE = Object.freeze({ x: 64, y: 16, w: 352, h: 238 });
@@ -162,14 +163,23 @@ export function pageLines(s, ctx = {}) {
   // Forecasts and Shifts
   if (s?.forecasts > 0) lines.push({ kind: 'shifts', text: `Forecasts read: ${s.forecasts}.` }); // str
   for (const n of notes.filter((x) => x.startsWith('shift:'))) {
-    const uid = n.slice(6);
+    // `shift:<uid>>formId` (FE-10: the form that Shift became); older notes are `shift:<uid>`
+    const [uid, to] = n.slice(6).split('>');
     const c = [...(world?.party ?? []), ...(world?.box ?? [])].find((x) => x.uid === uid);
-    if (c) lines.push({ kind: 'shifts', text: fill(S.shifts, { nick: c.nickname, form: nameOf(data, 'species', c.speciesId) }) });
+    if (c) lines.push({ kind: 'shifts', text: fill(S.shifts, { nick: c.nickname, form: nameOf(data, 'species', to || c.speciesId) }) });
   }
   // letters, badges, heirlooms
+  const lostSaid = new Set();
   for (const n of notes) {
+    if (n.startsWith('lost:')) { if (lostSaid.has(n)) continue; lostSaid.add(n); }
     if (n.startsWith('read:')) lines.push({ kind: 'note', text: fill(S.letter, { label: n.slice(5) }) });
     else if (n.startsWith('badge:')) lines.push({ kind: 'note', text: fill(S.badge, { spire: words(n.slice(6)) }) });
+    else if (n.startsWith('lost:') && S.lost) {
+      const id = n.slice(5);
+      // "Home to the porch, a bit lighter in the pocket" only when a blackout really sent you home
+      const home = notes.includes('blackout') || !S.lostPlain;
+      lines.push({ kind: 'note', text: id === 'wild' ? (home ? S.lostWild : S.lostWildPlain) : fill(home ? S.lost : S.lostPlain, { name: nameOf(data, 'trainers', id) }) });
+    }
     else if (n.startsWith('built:')) lines.push({ kind: 'note', text: `The ${words(n.slice(6))} is finished.` }); // str
   }
   // people
@@ -261,6 +271,8 @@ export function createDayPageScene(G) {
     state = 'done';
     // pop first: a callback that opens the next screen must not bury this one under it
     if (G.scenes.top() === scene) G.scenes.pop(result);
+    // FE-18: stamps earned today are stamped when the day is written, not days later in the Journal
+    try { if (G.store && G.world) announceStamps(G); } catch (e) { console.warn('dayPage: stamps', e); }
     if (typeof params.onClose === 'function') { try { params.onClose(result); } catch (e) { console.warn(e); } }
   }
 
@@ -388,7 +400,8 @@ export function createDayPageScene(G) {
       y += Math.max(10, Math.ceil((h + 1) / 10) * 10);
       if (y > P.y + 130) break;
     }
-    y += 4;
+    // FE-19: stay on the 10px rule grid (text tops at P.y + 24 + 10k sit on the rules at P.y + 33 + 10k)
+    y += 10;
     drawText(ctx, t('day.tomorrow'), L, y, { color: COLORS.wax.fill });
     y += 10;
     if (!pg.tomorrow.length) { drawText(ctx, DAY_PAGE.tomorrowEmpty.replace(/^Tomorrow: /, ''), L + 8, y, { color: COLORS.paper.ink }); y += 10; }

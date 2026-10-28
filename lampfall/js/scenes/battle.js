@@ -44,6 +44,7 @@ import {
 import {
   buildBattle, applyBattleResult, createDeferredBus, prepareAction, captureMenu, bagMenu, noteEvents, expDisplay,
   applyExpEvent, learnOffered, nameCaught, installBattleDebug, relayRule, relayChoices, relayDefaultPicks, relayNextSetup,
+  summitBellHolds,
 } from '../systems/flow/battleFlow.js';
 import { resolveBattleData } from './battleData.js';
 import { backdropFor, drawBackdrop, rustleColour } from '../art/backdrops.js';
@@ -141,6 +142,24 @@ function backdrop(pick) {
  */
 export function battleEndPayload(session, ev) {
   return { outcome: ev.outcome, kind: session.kind, trainerId: session.trainer ? session.trainer.id : null, summit: session.summit, porchDuel: !!session.porchDuel };
+}
+
+/**
+ * A trainer's parting words when a battle ends: a Porch Duel's own lines (`lines.duelWin` /
+ * `duelLose`) when the trainer has them, a Summit loss on a dial where the Bell keeps nothing
+ * (`lines.loseFreefall`), else `lines.win` / `lines.lose` (LF-22).
+ * @param {any} session @param {string} outcome 'win' | 'loss' @param {any} data
+ * @returns {string|null}
+ */
+export function trainerEndLine(session, outcome, data) {
+  const tr = session?.trainer;
+  if (!tr || !tr.lines) return null;
+  const l = tr.lines;
+  const bellKeepsNothing = !!session.summit && !summitBellHolds(session.dial, data);
+  const said = outcome === 'win'
+    ? (session.porchDuel && l.duelWin) || l.win
+    : (session.porchDuel && l.duelLose) || (bellKeepsNothing && l.loseFreefall) || l.lose;
+  return said ? t('battle.trainerIntro', { trainer: tr.name, text: said }) : null;
 }
 
 /**
@@ -470,8 +489,7 @@ export function createBattleScene(G) {
         trainerFx.show = true; trainerFx.out = false; trainerFx.slide = 0;
         trainerFx.portrait = trainerFx.portrait || portraitSprite(tr.npc || tr.portrait) || null;
         trainerFx.name = tr.name;
-        const said = ev.outcome === 'win' ? tr.lines.win : tr.lines.lose;
-        return said ? `${tr.name}: “${said}”` : null; // str
+        return trainerEndLine(session, ev.outcome, data);
       }
       return null;
     },
@@ -577,7 +595,7 @@ export function createBattleScene(G) {
     }
     const hold = session.battle.rules.holdOutTurns;
     const reading = st().reading;
-    promptLine = reading ? `${reading.name}: ${reading.turnsLeft} turns. Next: ${reading.next}.` : hold ? t('battle.msg.holdout', { n: Math.max(0, hold - session.battle.turn) }) : t('battle.chooseMove', { nick: c.name });
+    promptLine = reading ? t('battle.msg.readingPrompt', { name: reading.name, n: reading.turnsLeft, next: reading.next }) : hold ? t('battle.msg.holdout', { n: Math.max(0, hold - session.battle.turn) }) : t('battle.chooseMove', { nick: c.name });
     log = { text: promptLine, ms: 1e9, cps: Infinity };
   }
 
@@ -821,7 +839,8 @@ export function createBattleScene(G) {
       mode = 'modal';
       const finish = (name) => {
         state.busy = true;
-        openConfirm(G, { body: `Call it ${name}?`, options: ['Not yet', 'Yes'], defaultIndex: 0 }).then((i) => { // str
+        // confirm is the default, as on the lease card's name ("That's me"), FE-23
+        openConfirm(G, { body: t('battle.nameAsk', { name }), options: [t('battle.nameNotYet'), t('battle.nameYes')], defaultIndex: 1 }).then((i) => {
           state.busy = false;
           if (i !== 1) return;
           if (name !== caught.nickname) nameCaught(G, caught.uid, name);
@@ -919,6 +938,12 @@ export function createBattleScene(G) {
         ...sealRewardLines(p),
       ].filter(Boolean) };
       sfx('achievement');
+      await waitConfirm();
+      overlay = null;
+    }
+    if (p.ppTopUp > 0) {
+      // a Keeper beaten: the Summit's between-fights top-up, said aloud (LF-04)
+      overlay = { kind: 'slip', title: t('battle.end.betweenTitle'), lines: [t('battle.end.ppTopUp', { n: p.ppTopUp }), t('battle.end.noHeal')] };
       await waitConfirm();
       overlay = null;
     }
@@ -1055,7 +1080,8 @@ export function createBattleScene(G) {
           yield frames(18);
           // a Relay round after the first names the round instead of repeating the twins' opening
           const ms = session.relay && session.relay.round > 1 ? view.say(session.relay.label)
-            : view.say(`${name}: “${trainer.lines?.intro || t('battle.trainer', { trainer: name })}”`); // str
+            // the opening is the twins' duet: it is spoken under the trainer's name ('Ada & Ivo Halloran'), not round 1's (LF-16)
+            : view.say(t('battle.trainerIntro', { trainer: trainer.name, text: trainer.lines?.intro || t('battle.trainer', { trainer: trainer.name }) }));
           yield Math.max(ms, 900);
           trainerFx.out = true;
           yield frames(12);
@@ -1078,8 +1104,14 @@ export function createBattleScene(G) {
           yield frames(24);
           cry(1, 'appear');
           // the Reading lands on the Lantern Stack: never "came out of the grass" (MID-18)
-          const ms = view.say(session.battle.readingPhases ? `The ${foe.name} settles on the Lantern Stack. Its mark is already glowing.` // str
-            : t('battle.wild', { name: foe.name, place: intro.place === 'water' ? 'water' : 'grass' }));
+          // a Spire sentinel wakes in the stone; a wild indoors steps out of it (LF-07)
+          const sentinel = session.setup?.sentinel;
+          const theme = arenaPick().theme;
+          const ms = view.say(session.battle.readingPhases ? t('battle.msg.readingArrive', { name: foe.name })
+            : sentinel ? t('battle.wildSentinel', { trainer: sentinel.name || t('battle.sentinel'), name: foe.name })
+              : theme === 'spire' ? t('battle.wildStone', { name: foe.name })
+                : theme === 'room' ? t('battle.wildRoom', { name: foe.name })
+                  : t('battle.wild', { name: foe.name, place: intro.place === 'water' ? 'water' : 'grass' }));
           yield frames(18);
           yield Math.max(frames(10), ms - frames(18));
         },
@@ -1329,7 +1361,9 @@ export function createBattleScene(G) {
       return;
     }
     if (mode === 'intro' || mode === 'busy') {
-      if (input.pressed('confirm') || (ptr && ptr.justDown)) {
+      // cancel dismisses a Read card the queue is holding open, like confirm (FE-13)
+      const dismissCard = overlay && overlay.kind === 'readcard' && input.pressed('cancel');
+      if (input.pressed('confirm') || dismissCard || (ptr && ptr.justDown)) {
         if (!queue.confirm()) queue.skip();
       }
       return;
@@ -1406,12 +1440,20 @@ export function createBattleScene(G) {
   /** Where this battle happens: the setup's backdrop, the Reading, or the map the player stands on. */
   function arenaPick() {
     const hr = worldHour(world());
-    return backdropFor({
+    const where = {
       theme: session?.setup?.backdrop ?? null,
       source: session?.setup?.source ?? session?.source ?? null,
       mapId: world()?.player?.mapId ?? null,
       hour: Number.isFinite(hr) ? hr : 12,
-    });
+    };
+    const pick = backdropFor(where);
+    // a wild out of the shore's reeds (route grass, the Capture Stance lesson) stands in the reeds,
+    // not on the dock's sand (FE-21); a fished wild and the dock trainers keep the shore
+    const wild = session?.setup?.wild;
+    if (!where.theme && pick.theme === 'shore' && wild && wild.habitat !== 'water' && !session?.setup?.sentinel) {
+      return backdropFor({ ...where, theme: 'marsh' });
+    }
+    return pick;
   }
 
   function drawArena(ctx) {
@@ -1432,7 +1474,8 @@ export function createBattleScene(G) {
     // a small front form draws one step larger, on the same centre and foot line (FH-14)
     const fit = side === 1 ? foeFit(m.speciesId, m.types) : { scale: 2, dx: 0, dy: 0 };
     const sc = fit.scale;
-    const box = 32 * sc;
+    const big = (fit.cells ?? 32) > 32;
+    const box = big ? fit.cells * sc : 32 * sc;
     let x = base.x + fit.dx;
     let y = base.y + fit.dy;
     // nudge (2 px away from the attacker) and lunge (toward the foe)
@@ -1447,7 +1490,9 @@ export function createBattleScene(G) {
     const view0 = side === 0 ? 'back' : 'front';
     // shadow
     ctx.fillStyle = 'rgba(20, 27, 51, 0.35)';
-    ellipseFill(ctx, x + box / 2, ground - 1, Math.round(22 * sc / 2), 4);
+    // a large form's shadow sits under the base box's centre and spans its body
+    if (big) ellipseFill(ctx, x - fit.dx + 32, ground - 1, Math.round(fit.cells * 0.3), 5);
+    else ellipseFill(ctx, x + box / 2, ground - 1, Math.round(22 * sc / 2), 4);
     ctx.save();
     // clip the faint drop and the rise at the stand's lip
     ctx.beginPath();
@@ -1472,11 +1517,23 @@ export function createBattleScene(G) {
     } else {
       const glint = m.glintMs > 0 ? 1 - m.glintMs / frames(30) + 0.01 : 0;
       drawCreature(ctx, m.speciesId, x, y, { view: view0, frame: side === 1 ? frame : 0, scale: sc, types: m.types, mark: m.mark, star: m.starTouched, lit: m.lit, glint, alpha: alpha < 1 ? alpha : undefined });
+      // the Reading: the Vagary takes the colour of each phase's aspect (its first type past Star), LF-19
+      if (side === 1 && session.battle.readingPhases) {
+        const tint = readingTint(m.types);
+        if (tint) drawSprite(ctx, creatureSprite(m.speciesId, { view: view0, frame, scale: sc, types: m.types, silhouette: tint }), x, y, { alpha: 0.38 * alpha });
+      }
       // Ward lattice: a 48 f sweep every 4 s, a 6 f flare on a blocked hit; stilled under reduced motion
       if (side === 1 && st().sides[1].wardBadge) drawLattice(ctx, m, x, y, view0, sc);
       else if (m.latticeMs > 0) drawLattice(ctx, m, x, y, view0, sc);
     }
     ctx.restore();
+  }
+
+  /** The tint for a Reading aspect: its first type that is not Star, as its type chip's colour. */
+  function readingTint(types) {
+    const ty = (types || []).find((x) => String(x).toLowerCase() !== 'star');
+    const chip = ty ? TYPE_CHIPS[String(ty).toLowerCase()] : null;
+    return chip ? chip.color : null;
   }
 
   function ellipseFill(ctx, cx, cy, rx, ry) {
@@ -1720,7 +1777,8 @@ export function createBattleScene(G) {
     const prismKnown = !!(readInfo && readInfo.mends !== undefined && readInfo.name === m.name);
     const mends = s.party[s.active].mends;
     if (prismKnown) drawPips(ctx, { x: b.x + 142, y: ty + 1, n: mends, max: 3, label: t('battle.tag.mends'), size: 3, gap: 1 });
-    else drawText(ctx, t('battle.tag.mendsUnknown'), b.x + b.w - 6, ty + 1, { color: FAINT, font: 'small', align: 'right' });
+    // 'Mends ?' only once a Read can answer it (the Scouting Prism); before that it was an unexplained label (FE-21)
+    else if (session.battle.prism) drawText(ctx, t('battle.tag.mendsUnknown'), b.x + b.w - 6, ty + 1, { color: FAINT, font: 'small', align: 'right' });
   }
 
   function drawPlayerBox(ctx) {
@@ -1900,7 +1958,11 @@ export function createBattleScene(G) {
       const nextTxt = cur.sure ? t('capture.sure') : cur.nextShown != null
         ? (cur.display === 'band' ? `Next raise: ${t(`capture.band.${String(cur.nextShown).toLowerCase()}`)}` : t('capture.nextOdds', { n: cur.nextShown })) : ''; // str
       drawText(ctx, nextTxt, 232, 235, { color: SOFT });
-      if (menu.fails > 0 && !cur.sure) drawText(ctx, `+${Math.min(15, menu.fails * 3)}% from missed raises`, 232, 247, { color: SOFT, font: 'small' }); // str
+      // the missed-raise line only when it moved the odds shown; pinned at the cap it says so (FE-09)
+      if (menu.fails > 0 && !cur.sure && cur.display !== 'band') {
+        const missTxt = cur.missBonusPct > 0 ? t('battle.capture.missBonus', { n: cur.missBonusPct }) : cur.atCap ? t('battle.capture.atCap') : '';
+        if (missTxt) drawText(ctx, missTxt, 232, 247, { color: SOFT, font: 'small' });
+      }
     }
     drawStanceSeal(ctx);
     drawText(ctx, 'Z: raise   X: back', W - 8, 258, { color: FAINT, font: 'small', align: 'right' }); // str

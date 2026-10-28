@@ -19,7 +19,7 @@
  * @module systems/flow/interactFlow
  */
 import { TUNING } from '../../data/tuning.js';
-import { t, CONFIRMS } from '../../data/strings.js';
+import { t, CONFIRMS, numberWord } from '../../data/strings.js';
 import * as clockSys from '../clockSys.js';
 import * as gather from '../gather.js';
 import * as bag from '../bag.js';
@@ -529,12 +529,17 @@ export function boardContent(G, kind) {
     `${st.notches} of ${st.notchesPerStick} notches cut`, // str
     pace.text,
   ];
-  const fc = w.weather && w.weather.forecast;
+  const today = w.weather && w.weather.forecast;
+  const outlook = w.weather && w.weather.outlook;
+  // FE-17: once the tide today's odds name has passed, the line names tomorrow's tide instead
+  const passed = !!today && today.minute != null && minuteOfDay(w) > today.minute && w.weather.day === clockSys.gameDay(w);
+  const fc = passed && outlook ? outlook : today;
   const odds = fc ? weather.forecastText(fc, G.data) : 'Augusta hasn\'t chalked the odds yet. Six in the morning.'; // str
+  const oddsText = fc === outlook && passed ? odds.replace(/ the (\w+) tide$/, ' tomorrow\'s $1 tide') : odds; // str
   const commons = [
-    `Augusta's odds: ${odds}${fc && fc.minute != null ? ` (${weather.forecastTime(fc)})` : ''}`, // str
+    `Augusta's odds: ${oddsText}${fc && fc.minute != null ? ` (${weather.forecastTime(fc)})` : ''}`, // str
     `Commons Jar: ${(st.jar ?? 0).toLocaleString('en-US')}◉`, // str
-    w.weather && w.weather.outlook ? `Tomorrow: ${weather.forecastText(w.weather.outlook, G.data)}` : null, // str
+    outlook && !(passed && fc === outlook) ? `Tomorrow: ${weather.forecastText(outlook, G.data)}` : null, // str
     ...duelSlipLines(G),
   ].filter(Boolean);
   // `shiftTide`: the same rows with their cards, for the board scene's three card icons (GDD-09 §3)
@@ -590,7 +595,7 @@ async function pay(G, action, host) {
   if (!res.ok) { toast(G, host, 'Wren shakes her head.'); return fail('pay', res.reason); } // str
   const params = {
     ceremony: res.ceremony, cleared: res.cleared, paid: res.paid, tier: res.tier,
-    roofChoices: res.cleared ? loans.roofChoices(res.cleared.tier, ctx) : [],
+    roofChoices: res.cleared && loans.hasRoofPhase(res.cleared.tier, ctx) ? loans.roofChoices(res.cleared.tier, ctx) : [],
     onRoof: (colour) => G.store.tx('loan:roof', (ww) => loans.chooseRoof(ww, res.cleared.tier, colour, ctx)),
   };
   // MID-11: a commission loan (3-6) waiting on its room gets the chalk plan in the ceremony, so
@@ -810,10 +815,40 @@ async function polisher(G, action, host) {
   return done('polish', { tilt: r.tilt, scene: say(G, t('room.polish.left', { item: relic.name, type: tilts[pick - 1].type })) });
 }
 
-/** The Greenhouse bench: a party creature and its favourite fruit overnight, +1 Bond once. */
+/**
+ * The Greenhouse bench: graft a foreign fruit into an indoor tree (it takes in two nights, one with a
+ * Moss lead), pick the indoor trees' fruit (one each a day), or leave a party creature and its
+ * favourite fruit overnight (+1 Bond once).
+ */
 async function greenhouseBench(G, action, host) {
   const w = G.world;
   if (!loans.roomBuilt(w, 'greenhouse')) return done('graft', { scene: say(G, VERB_LINES.graft) });
+  const slots = rooms.greenhouseSlots(w, G.data);
+  const canPick = slots.some((x) => x.state === 'tree' && !x.picked);
+  const grafts = slots.some((x) => x.state === 'empty') ? rooms.graftChoices(w, G.data) : [];
+  const menu = [];
+  if (canPick) menu.push('pick');
+  if (grafts.length) menu.push('graft');
+  menu.push('bond');
+  let what = 'bond';
+  if (menu.length > 1) {
+    const labels = { pick: t('room.greenhouse.optPick'), graft: t('room.greenhouse.optGraft'), bond: t('room.greenhouse.optBond') };
+    const k = await ask(G, host, { title: t('room.greenhouse.title'), body: t('room.greenhouse.what'), options: [t('room.notNow'), ...menu.map((m) => labels[m])], defaultIndex: 0 });
+    if (!Number.isInteger(k) || k < 1 || k > menu.length) return fail('graft', 'declined');
+    what = menu[k - 1];
+  }
+  if (what === 'pick') {
+    const got = G.store.tx('room:pick', (ww) => rooms.pickIndoor(ww, G.data, { bus: G.bus }));
+    return done('graft', { picked: got, scene: say(G, t('room.greenhouse.picked', { list: got.map((id) => rowName(G, id)).join(', ') })) });
+  }
+  if (what === 'graft') {
+    const g = await ask(G, host, { title: t('room.greenhouse.title'), body: t('room.greenhouse.graftAsk'), options: [t('room.notNow'), ...grafts.slice(0, 4).map((x) => x.name)], defaultIndex: 0 });
+    if (!Number.isInteger(g) || g < 1 || g > Math.min(4, grafts.length)) return fail('graft', 'declined');
+    const r = G.store.tx('room:graft', (ww) => rooms.benchGraft(ww, G.data, grafts[g - 1].source, { bus: G.bus }));
+    if (!r.ok) { toast(G, host, r.reason === 'full' ? t('room.greenhouse.full') : t('room.cannot')); return fail('graft', r.reason); }
+    const nights = Math.max(1, r.readyDay - Math.floor((G.world.clock?.total ?? 0) / 1440));
+    return done('graft', { grafted: r.fruit, scene: say(G, t('room.greenhouse.grafted', { fruit: rowName(G, r.fruit), n: nights })) });
+  }
   const on = flags.getFlag(w, rooms.BENCH_BOND_FLAG);
   if (on) return done('graft', { scene: say(G, t('room.greenhouse.busy')) });
   const ready = (w.party ?? []).filter((c) => c && !flags.hasFlag(w, `${rooms.BOND_NIGHT_PREFIX}${c.uid}`))
@@ -862,7 +897,7 @@ async function visitorDuel(G, offer, host) {
   const tr = G.data.get('trainers', offer.trainer);
   if (!hasAliveParty(G.world)) { toast(G, host, t('common.restedCompanion')); return fail('knock', 'no-party'); }
   const pick = await ask(G, host, { title: t('duel.title'),
-    body: t('duel.visitorAsk', { trainer: tr.name, n: offer.creatures, amount: offer.payout.toLocaleString('en-US') }),
+    body: t('duel.visitorAsk', { trainer: tr.name, n: offer.creatures, nw: numberWord(offer.creatures), amount: offer.payout.toLocaleString('en-US') }),
     options: [t('duel.notTonight'), t('duel.go')], defaultIndex: 0 });
   if (pick !== 1) return fail('knock', 'declined');
   G.store.tx('duel:visitor', (w) => flags.setFlag(w, 'sys.duel.visitor-fought', offer.gameDay, { bus: G.bus }));
@@ -895,9 +930,14 @@ export function duelSlipLines(G) {
   };
   const n = slate.creatures;
   const pay = slate.payout.toLocaleString('en-US');
+  // a visitor is fought under the Commons lamp, where the board offers it (LF-08), not at the venue porch
+  const placeOf = (o) => {
+    if (o.kind !== 'neighbour') return t('duel.commonsLamp');
+    return porchesOf(G.data).find((p) => p.id === o.porch)?.npcId === o.npc && o.npc ? t('duel.homePorch') : porchLabel(G, o.porch);
+  };
   return [slip.header || 'Porch Duels tonight', ...offers.map((o) => (o.taken
     ? t('duel.fought', { name: nameOf(o), amount: pay })
-    : t('duel.offer', { name: nameOf(o), place: porchesOf(G.data).find((p) => p.id === o.porch)?.npcId === o.npc && o.npc ? t('duel.homePorch') : porchLabel(G, o.porch), n, amount: pay })))];
+    : t('duel.offer', { name: nameOf(o), place: placeOf(o), n, nwCap: numberWord(n, true), amount: pay })))];
 }
 
 /** "Juniper Pell's porch" for a porch row with a resident, else the porch id in words. */
@@ -997,11 +1037,24 @@ async function waystone(G, action, host) {
   return done('waystone', { healed: !healed, forecasts: n });
 }
 
+/** 12-hour clock text, as the HUD shows it (`hud.time.am/pm`). */
+function twelveHour(minute) {
+  const m = ((Math.floor(minute) % 1440) + 1440) % 1440;
+  const h = Math.floor(m / 60), mm = m % 60;
+  return t(h < 12 ? 'hud.time.am' : 'hud.time.pm', { time: `${((h + 11) % 12) + 1}:${String(mm).padStart(2, '0')}` });
+}
+
 async function bed(G, action, host) {
   const r = clockSys.restOptions(G.world, G.data);
   const byKind = Object.fromEntries(r.options.map((o) => [o.kind, o]));
   const labels = [t('rest.lieDown'), t('rest.napTillDusk'), t('rest.sleepTillDawn'), t('confirm.option.later')];
-  const pick = await ask(G, host, { title: t('rest.heading'), body: r.realClock ? t('rest.realClock') : `It's ${formatTime(G.world)}. The bed is soft enough.`, options: labels, defaultIndex: 3 }); // str
+  // LF-14: a rest that is not open yet is shown greyed out (focus skips it) with its reason in the
+  // body, and the time reads like the HUD's 12-hour clock
+  const disabled = ['lie', 'nap', 'sleep'].map((k) => !!byKind[k] && !byKind[k].available).concat(false);
+  const why = [disabled[1] ? t('rest.napWhen') : null, disabled[2] ? t('rest.sleepWhen') : null].filter(Boolean).join(' ');
+  const now = twelveHour(minuteOfDay(G.world));
+  const body = r.realClock ? t('rest.realClock') : `It's ${now}. The bed is soft enough.${why ? ` ${why}` : ''}`; // str
+  const pick = await ask(G, host, { title: t('rest.heading'), body, options: labels, defaultIndex: 3, disabled });
   const kind = ['lie', 'nap', 'sleep'][pick];
   if (!kind) return fail('bed', 'declined');
   const opt = byKind[kind];
@@ -1056,14 +1109,20 @@ export const VERB_HANDLERS = Object.freeze({
   hesperCounter,
   gateBoards: (G, a, h) => board_(G, a, h, 'gate'),
   tideTable: (G, a, h) => board_(G, a, h, 'tide'),
-  commons: async (G, a, h) => {
-    // a visitor's Porch Duel is fought under the Commons lamp when the Archive porch has no door to knock (GDD-05 §8)
+  commons: (G, a, h) => {
+    // tonight's slate catches up first (FE-03): a neighbour met since the 06:00 post joins an empty one
+    if (G.store) G.store.tx('duels:post', (w) => dayFlow.postDuelSlate(w, G.data, { bus: G.bus }));
+    // a visitor's Porch Duel is fought under the Commons lamp (GDD-05 §8). The board shows first,
+    // with the visitor on the slip; closing it offers the duel (LF-08: before, the confirm replaced it).
     const v = visitorDuelOffer(G);
-    if (v) {
-      const r = await visitorDuel(G, v, h);
-      if (r.ok) return r;
-    }
-    return board_(G, a, h, 'commons');
+    if (!v) return board_(G, a, h, 'commons');
+    return new Promise((resolve) => {
+      const content = boardContent(G, 'commons');
+      const offer = () => visitorDuel(G, v, h).then((r) => resolve(r.ok ? r : done(a.verb, { scene: 'board', content })), () => resolve(done(a.verb, { scene: 'board', content })));
+      content.onClose = offer;
+      G.bus.emit('interact', { verb: 'read' });
+      if (!pushOverlay(G, h, 'createBoardScene', content)) offer();
+    });
   },
   ledgerBoard: (G, a, h) => board_(G, a, h, 'ledger'),
   commonsJar,

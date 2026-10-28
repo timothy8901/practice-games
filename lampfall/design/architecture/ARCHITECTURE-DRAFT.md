@@ -1,5 +1,7 @@
 # ARCHITECTURE (authoritative draft) — the merged WILDSHIFT × PORCHLIGHT browser game
 
+> **As built (2026-10-28).** The game shipped from this draft. §16 records where the code now differs (save format v7, autosave rules, stamps, condition semantics, signatures). Where §1–§15 and §16 disagree, §16 and the module JSDoc win.
+
 Principal engineer's synthesis of proposal A ("fewest moving parts") and proposal B ("data-driven
 extensibility"). Every "either/or" is resolved here. Where this document and a proposal disagree, this
 document wins. Where this document and the shipped code in `_merge-wip/js/core/` disagree, the code's
@@ -472,6 +474,8 @@ this is the runtime half of rule 1 (the static half is `tools/lint-owners.mjs`).
 
 ### 3.3 Versioning and migration
 
+*As built: the save format is at version 7, with steps 0→1 through 6→7; see §16.2.*
+
 `world.v` is stamped by `createNewWorld`. `MIGRATIONS = {1: (d) => d}` keyed by the version being upgraded
 **from**; `migrateWorld(data)` runs them in order then merges `createNewWorld` defaults under the result
 (`fillDefaults`) so new keys appear. `core/save.createSaveSystem({version, migrations})` applies the same
@@ -898,6 +902,8 @@ export function evalCond(world, cond, ctx)
 
 No randomness in conditions. A "sometimes" is a script op that draws from a named fork and sets a flag.
 
+*As built: `day` reads the run's own day number and `hasItem` on a currency reads the wallet; see §16.5 for these and the other semantics that the fix waves pinned down.*
+
 ---
 
 ## 7. UI toolkit
@@ -1081,6 +1087,8 @@ Saves never happen inside a transition or while a battle scene is on the stack; 
 `world.cutscene = {scriptId, state}` only at a `save` op. Triggers are bus events, not calls in scenes.
 Loading never writes. On `ok:false` the HUD shows "Save failed: <code>", `persist` retries once after 2 s,
 then keeps the banner until the next success. Export/import strings come from `core/save` (base64 + crc).
+
+*As built: autosaves also wait while a cutscene runs, skip a map loaded by Continue or a new game, and overwrite instead of rotating when they are close together; see §16.3.*
 
 Not saved: NPC entity positions (recomputed from schedules), chunk/sprite/path caches, the animation queue,
 toasts, live battle state, tween/fx state, the scene stack.
@@ -1456,3 +1464,62 @@ export const ENCOUNTERS = Object.freeze({
 11. **Challenge mode list** beyond No Rewind and One Heart (`data/dials.CHALLENGES`).
 12. **Cast merge**: which NPC ids exist, their schedules, threads and shops; the formats in §14 are fixed.
 13. **Weather kinds and seasonal festivals** (`weather.js` kinds list, `schedules.js` festival days).
+
+---
+
+## 16. As built (2026-10-28)
+
+This section records how the shipped code differs from the draft above, after the integration, three fix waves and the final fix pass. The module JSDoc is the reference for exact signatures.
+
+### 16.1 Where the code wins on signatures
+
+These were left as built and the draft text above was not rewritten (reconcile-notes lists each one):
+
+- `world/tilemap.loadMap(def, tiles, {legend})` takes the tileset, not the Registry; `js/world` never imports `js/data`.
+- `world/interact` `INTERACTION_PRIORITY` is per entity kind (npc > roamer > item > sign > use-trigger > tree > rock > boat > prop > water > crack/mud > door > tile).
+- `world/warps.resolveWarp(world, warp, data, tideState, opts)` adds the reasons `'unknown-map'` and `'blocked'`.
+- The path cache is a standalone LRU (`createPathCache`) owned by the overworld scene, not `store.derived`.
+- `systems/forecast.rollForecast(world, creature|uid, data, opts)`; rules modules take data injected and tunables as `DEFAULTS` plus a `tuning` argument.
+- The cutscene's `startBattle` pushes the `battle` scene with the setup; `G.flow` is not set and is not needed.
+- `js/scenes/scriptHost.js` and `js/scenes/nameEntry.js` are shared modules, not registered scenes.
+
+### 16.2 Save format v7
+
+`js/state/schema.js` `SCHEMA_VERSION = 7`. `js/state/migrate.js` `MIGRATIONS` holds one step per version, keyed by the version upgraded from, and `fillDefaults` adds new keys afterwards. Fixtures `test/fixtures/v0.json`–`v2.json` and `v4.json`–`v7.json` (there is no `v3.json`) back the step tests: `test/state.migrate.test.mjs` (0→1, 1→2), `test/systems.econ.test.mjs` (2→3) and `test/state.migrate-v5/-v6/-v7.test.mjs` (4→5, 5→6, 6→7); the 3→4 step is tested in `test/sys-town.adversarial.test.mjs` from a built world.
+
+| Step | What it does |
+|---|---|
+| 0 → 1 | Stamps the version on pre-versioned data. |
+| 1 → 2 | Weather grows to the full WeatherState; the first tick after loading rolls the day. |
+| 2 → 3 | Satchel pockets become the GDD-00 pockets (`wicks medicine discs finds held keepsakes tools`); old pockets fold in. |
+| 3 → 4 | Letters record which letters arrived (`got`) on three channels; new NPC memory keys; the Day Page tally opens on the save's day. |
+| 4 → 5 | Fishing reaches recover from `reachAt` (stamped at load time); the Patient record board, the Kiln clean day and the `encounter` key join. |
+| 5 → 6 | **The EXP curve changed** (8·L² everywhere → 8·L² through Lv8, then (3·L³ − 512)/2). Every party and box creature keeps its level and its progress through that level: EXP is rebased from the old band onto the new one. Saves holding the Weather, Relay or Mirror badge receive the gift v5 never gave (Scouting Prism, Weatherglass, Plumbline disc) unless they already hold it. |
+| 6 → 7 | **Real Clock across sessions.** `clock.realOffset` (optional leaf, `null` until core/time writes it) holds the run-relative calendar offset, so days that pass between sessions count. A legacy Real Clock save, whose `clock.total` held the epoch day, is rebased onto the run's own day count: D whole days (the earliest day stamp) come off `clock.total`, off every day stamp (`day` / `*Day` keys, `saidLines`, `picked`, `trees`), off total-minute stamps (`reachAt`) and off the day-valued flags (`sys.duel.*`, `sys.relighting-due`, `sp.late-delivery`); `realOffset` becomes D days so the wall clock keeps the same run day. |
+
+Under Real Clock the run calendar decides the weekday and the spring tide, so the first Lantern Market is always day 7. A Real Clock re-anchor never runs the clock backwards; if the device hour is earlier than the game hour, the clock walks forward to the next day and still fires `day:start` and the morning anchor.
+
+### 16.3 Autosave rules (`js/state/persist.js`)
+
+- **Triggers** (`AUTOSAVE_TRIGGERS`): `map:enter`, `waystone:use`, `battle:start` with a story payload (emitted by the battle scene once it is on the stack, so this save is held and lands after the battle and its cutscene), `capture:ok`, `shift:resolved`, `loan:paid`, `letter:read`, `day:start`; plus the route timer (`tuning.routeAutosaveMs`, 90 s while dirty on the overworld). Explicit calls (a script's `save` op, Sleep, the Ledger) write at once.
+- **Waiting.** An autosave asked for during a transition or while a battle is on the stack is held, not failed. Trigger and route autosaves are also held while a **cutscene** is on the stack and land when it ends (FE-01: a save taken mid-script let Continue replay a Forecast and Shift the same creature twice). A held `day:start` keeps its place; a later trigger does not replace it.
+- **Loads are not walks.** A `map:enter` of kind `enter` or `load` (Continue, new game) does not autosave.
+- **Spacing.** An autosave less than `AUTOSAVE_MIN_SPACING_MIN` (120 game minutes) after the newest auto slot of the same seed overwrites that slot instead of rotating. Each rotated slot stores `summary.autoAnchor`, the game minute it was rotated in, and an overwrite keeps it, so a save every 30 game minutes still rotates every 2 hours. `day:start` always rotates.
+- **Slots:** 3 auto + 3 manual; No Rewind keeps 1 auto and no manual slots (`persist.setNoRewind` runs as soon as a run starts). Mid-cutscene state is stored only at a `save` op (`world.cutscene`).
+- Every write still goes snapshot → `validateWorld` (refuse on any problem) → verified write; loading never writes.
+
+### 16.4 Journal stamps (`js/systems/stamps.js`)
+
+- The table is `STAMPS` in `js/data/town.js` (24 rows). Each row has a `cond`; nine also carry `counter: {id, on, match?}`.
+- `stamps.install(G, {rows: STAMPS})` (from `main.js`) subscribes to each counter's bus event; every matching payload adds 1 to a `stamp.*` counter through `systems/flags`, in one `store.tx`. `match` is `{field: value}`: an array matches any entry, `false` also matches an absent field. `derivePayload` fills fields an emitter leaves out (`battle:end {trainerId}` gets `porchDuel` from the trainer's class). Emitters carry `scripted` on `capture:ok` and `porchDuel` on `battle:end`.
+- A stamp is earned when its `cond` holds (`earnedStamps`). `scenes/letter.announceStamps` marks each newly earned stamp once (flag `stamp.got.<id>`) and shows **one** toast for all of them (`stamp.earnedMany`). It runs when the player is back in the field after the scene that earned them (not during a cutscene) and when the Day Page closes. The Journal's Stamps tab marks new stamps with a quiet NEW tag instead of toasting.
+
+### 16.5 Story and day condition semantics (`js/script/cond.js`, `js/script/registry.js`)
+
+- **`day`** reads `selectors.gameDay(world)`: the run's own day number, 1-based, where day 1 is the arrival (a Sunday). Never an absolute calendar day, also under Real Clock. `day.dow` is the GDD weekday with 0 = Monday, so day 1 is `dow` 6 and Saturdays (market and spring tide) are days 7, 14, 21.
+- **`hour: [a, b]`** is half-open and wraps midnight when `a > b`. **`loan.tier`** takes a number (current tier ≥ n) or `{gte, lte, eq}`. **`hasItem`** on a currency (Starsalt, Anchor Stones) reads the wallet.
+- **`npc.met`** is set by talking to an NPC and also when the NPC speaks a line in a story script or cutscene (`memory.meet` from the script session). Story lines do not add to the talk count.
+- **Act gating** (`js/data/scripts/triggers.js`): Act II opens at badge 1 or on day 4, whichever comes first. The `act-two-*` rows fire `act-2-open` on `{any: [{badge: 1}, {day: {gte: 4}}]}`, and every Spire badge beat (`story-acts.js` `spireBadge`) also ends with "if not `sp.act-2`, call `act-2-open`", because the Spire's own `badge:won` row wins that event. The comet needs `sp.act-2`; the Surge and Two Plans need `sp.act-3`; the first Lantern Market needs `sp.act-2`; Linnet's fall needs the first market. None of the act, Surge, market, fall or Two Plans beats fires after `sp.relighting`. The `dark-house-night` row comes before every other `clock:hour` row, so no other row can take its night.
+- **Thread pacing in talk.** `registry.resolveNpc` offers a thread beat through `threads.beatTopics`: one beat a day, `advance.days` spacing (Mudlark Mile beat 2 waits two days), weekday beats, porch-only beats, and a beat carried by another NPC. NPC topics whose script is a thread-beat script are skipped, so a topic can no longer bypass the pacing. A beat's own `cond` can add place (for example `map` + `inRegion`, as on oyster-boat beat 2).
+- **Day-valued flags.** `sys.relighting-due` holds a clock day and `sp.late-delivery` a GDD day; both are rebased by the v7 migration with the other day stamps.
+- **New script op** `restartSummit` (clears the Keepers' and the Champion's `sys.trainer.*` flags), used by the Summit Bell's decline choice on Drift and Flux. The cutscene's `forecast` op accepts `who: 'reading'` for the Reading's offer card, though the ending script does not call it yet.

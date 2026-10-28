@@ -34,7 +34,7 @@ import { loadMap, LAYER } from '../world/tilemap.js';
 import { createEntities, createEntity, DIR_INDEX, DX, DY, OPPOSITE, dirTo } from '../world/entities.js';
 import { createPlayer, dirFromAxes } from '../world/player.js';
 import { createCamera } from '../world/camera.js';
-import { resolveFacing } from '../world/interact.js';
+import { resolveFacing, verbLabel } from '../world/interact.js';
 import { resolveWarp, firesOnStep, markTrigger } from '../world/warps.js';
 import { nearestDry, TIDE_MASK } from '../world/tide.js';
 import { createNpcDriver, arrivalPoint } from '../world/npc.js';
@@ -60,6 +60,7 @@ import * as schedule from '../systems/schedule.js';
 import * as bag from '../systems/bag.js';
 import * as party from '../systems/party.js';
 import * as letters from '../systems/letters.js';
+import { announceStamps } from './letter.js';
 import { isPorchLit, porchFlag } from '../systems/townCommon.js';
 import * as eventScripts from '../systems/flow/eventScripts.js';
 import * as dayFlow from '../systems/flow/dayFlow.js';
@@ -110,7 +111,8 @@ function fadeMs(G, ms = TRANSITION_MS) {
  */
 export function cottageRoofArt(world) {
   const builds = world && world.loans && Array.isArray(world.loans.builds) ? world.loans.builds : [];
-  const done = builds.filter((x) => x && x.done && (typeof x.choice === 'string' || typeof x.roof === 'string'));
+  // the Lamp Room is built on the lighthouse: its colour never repaints the cottage (LF-11)
+  const done = builds.filter((x) => x && x.done && x.id !== 'lamp-room' && (typeof x.choice === 'string' || typeof x.roof === 'string'));
   const last = done.length ? done[done.length - 1] : null;
   const c = last ? (last.choice ?? last.roof) : null;
   return c ? (ROOF_ART[c] || c) : 'slate';
@@ -839,12 +841,14 @@ export function createOverworldScene(G) {
     if (a) {
       const snap = snapshotAction(a);
       if (snap.target?.def?.trainerId) {
-        snap.verb = 'challenge'; snap.label = 'Challenge'; snap.icon = 'strike';
+        // LF-21: a trainer you have beaten only repeats their win line: the chip says Talk
+        const beaten = !!G.world.flags?.[`sys.trainer.${snap.target.def.trainerId}`];
+        snap.verb = 'challenge'; snap.label = beaten ? t('verb.talk') : 'Challenge'; snap.icon = beaten ? 'talk' : 'strike'; // str
         snap.payload.trainerId = snap.target.def.trainerId;
       }
       if (snap.verb === 'board' && snap.target && snap.target.def && snap.target.def.verb) {
         const v = snap.target.def.verb;
-        snap.verb = v; snap.label = hasString(`verb.${v}`) ? t(`verb.${v}`) : v[0].toUpperCase() + v.slice(1);
+        snap.verb = v; snap.label = hasString(`verb.${v}`) ? t(`verb.${v}`) : verbLabel(v);
       }
       if (snap.verb === 'enter') snap.icon = 'door';
       return snap;
@@ -1133,6 +1137,9 @@ export function createOverworldScene(G) {
       camera.follow(camTarget);
       void result;
       if (nextChip.resumed(sceneMs)) nextPollMs = CHIP_POLL_MS; // re-read now; the chip shows again
+      // FE-18: a stamp is stamped when its moment ends (back in the field after the scene that earned
+      // it), not days later all at once in the Journal
+      if (!G.world.cutscene) { try { announceStamps(G); } catch { /* stamps never break the field */ } }
       runPendingSoon();
     },
     update(dt) {
@@ -1383,10 +1390,11 @@ export function createOverworldScene(G) {
           px(-12, 56, 10, 6, '#5A8F3C'); break;
         case 'workshop': // a plank lean-to on the east wall with a little vice sign
           px(80, 38, 14, 26, '#7A5230'); px(78, 34, 18, 4, '#4C3826'); px(84, 44, 6, 4, '#C9C2B0'); break;
-        case 'training-yard': // chalk ring and a straw dummy beside the porch
-          px(86, 66, 20, 1, '#F6F1E3'); px(86, 74, 20, 1, '#F6F1E3'); px(94, 56, 4, 12, '#D9B45A'); px(91, 60, 10, 2, '#D9B45A'); break;
-        case 'cellar': // the cellar hatch at the foot of the wall
-          px(56, 60, 16, 6, '#5A3A22'); px(64, 60, 1, 6, '#3B2A1E'); break;
+        case 'training-yard': // chalk ring and a straw dummy on the cottage's own east strip (x 12), not the neighbour's porch (LF-11)
+          px(81, 70, 14, 1, '#F6F1E3'); px(81, 78, 14, 1, '#F6F1E3'); px(81, 70, 1, 9, '#F6F1E3'); px(94, 70, 1, 9, '#F6F1E3');
+          px(87, 64, 3, 12, '#D9B45A'); px(84, 67, 9, 2, '#D9B45A'); px(86, 62, 5, 3, '#C89A3E'); break;
+        case 'cellar': // the cellar hatch in the yard beside the porch steps (LF-11: it sat over them)
+          px(66, 68, 12, 7, '#5A3A22'); px(66, 68, 12, 1, '#7A5230'); px(72, 68, 1, 7, '#3B2A1E'); break;
         case 'porch-loft': // a dormer with the telescope poking out
           px(30, 6, 18, 14, '#6B4F3A'); px(34, 10, 10, 8, glow); px(46, 8, 8, 2, '#C8A04A'); break;
         case 'gallery': // a long picture window
@@ -1405,12 +1413,19 @@ export function createOverworldScene(G) {
     const px = player.ent.x, py = player.ent.y;
     for (const e of ents.list) {
       const d = e.def;
-      if (!d || typeof d.art !== 'string' || !d.art.startsWith('hanging-sign-') || typeof d.name !== 'string' || !d.name) continue;
+      // shop signs, and the Ward Spire's sentinels (LF-06: the stone that talks is named when near)
+      if (!d || typeof d.art !== 'string' || !(d.art.startsWith('hanging-sign-') || typeof d.sentinel === 'string') || typeof d.name !== 'string' || !d.name) continue;
       if (Math.max(Math.abs(e.x - px), Math.abs(e.y - py)) > 3) continue;
       const label = signText(G, d.name);
       const tw = measureText(label, { font: 'small' }).w;
       const sx = Math.round(R.x + e.px + 6 - camera.x - tw / 2);
-      const sy = Math.round(R.y + e.py - 8 - camera.y); // above the board: the player stands below it
+      let sy = Math.round(R.y + e.py - (typeof d.sentinel === 'string' ? 24 : 8) - camera.y); // above the board (a sentinel: above its 32px stone)
+      // LF-11: once the cottage has grown, its sign's label goes above the roof line, clear of the
+      // greenhouse glass and the gallery window drawn on the walls
+      if (d.id === 'shop-sign-cottage' && mapId === 'pellwick' && cottageGrowth(G.world).length) {
+        const reg = mapDef && mapDef.regions && mapDef.regions['keepers-cottage'];
+        sy = Math.round(R.y + (reg ? reg.y : 19) * TILE - camera.y - 11);
+      }
       c.fillStyle = 'rgba(20, 27, 51, 0.35)'; c.fillRect(sx - 2, sy - 1, tw + 5, 9);
       c.fillStyle = '#F6F1E3'; c.fillRect(sx - 3, sy - 2, tw + 5, 9);
       c.fillStyle = '#2A2433'; c.fillRect(sx - 3, sy + 6, tw + 5, 1);

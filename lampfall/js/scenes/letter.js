@@ -162,16 +162,21 @@ export function newStamps(world, data) {
  * @param {any} G
  * @returns {string[]}
  */
-export function announceStamps(G) {
+export function announceStamps(G, opts = {}) {
   const fresh = newStamps(G.world, G.data);
   if (!fresh.length) return fresh;
   G.store.tx('journal:stamps', (w) => { for (const id of fresh) flagSys.setFlag(w, `${STAMP_GOT_PREFIX}${id}`, true, { bus: G.bus }); });
-  for (const id of fresh) {
+  const nameOf = (id) => {
     const row = STAMPS.find((s) => s.id === id);
     const key = `stamp.${id}.name`;
-    const name = t(key) !== key ? t(key) : row?.name ?? id;
-    try { G.bus?.emit('toast', { text: t('stamp.earned', { name }), icon: 'star' }); } catch { /* toasts never break the journal */ }
-  }
+    return t(key) !== key ? t(key) : row?.name ?? id;
+  };
+  // FE-18: several at once are one slip, not a column of toasts over the Journal's rows
+  const text = fresh.length === 1 ? t('stamp.earned', { name: nameOf(fresh[0]) })
+    : t('stamp.earnedMany', { n: fresh.length, names: fresh.map(nameOf).join(', ') });
+  // the Journal stamps them quietly and tags them NEW on its Stamps page (FE-18: a slip there sat
+  // over the grid's rows)
+  if (!opts.quiet) { try { G.bus?.emit('toast', { text, icon: 'star' }); } catch { /* toasts never break the journal */ } }
   return fresh;
 }
 
@@ -637,6 +642,8 @@ function createJournalView(G, self) {
   let ms = 0;
   /** @type {ReturnType<typeof journalLetterRows>} */ let rows = [];
   /** @type {ReturnType<typeof stampStates>} */ let stamps = [];
+  /** stamps first stamped while this Journal is open: tagged NEW */
+  const freshStamps = new Set();
   const tabId = () => JOURNAL_TABS[tab];
   const letterIdx = () => rows.map((r, i) => (r.kind === 'letter' ? i : -1)).filter((i) => i >= 0);
   const logLines = () => {
@@ -646,7 +653,7 @@ function createJournalView(G, self) {
   };
 
   function refresh() {
-    try { if (G.store) announceStamps(G); } catch (e) { console.warn('journal: stamps', e); }
+    try { if (G.store) for (const id of announceStamps(G, { quiet: true })) freshStamps.add(id); } catch (e) { console.warn('journal: stamps', e); }
     rows = journalLetterRows(G.world, G.data);
     stamps = stampStates(G.world, G.data);
     const li = letterIdx();
@@ -693,8 +700,13 @@ function createJournalView(G, self) {
       const id = tabId();
       if (id === 'stamps') {
         const n = STAMP_GRID.cols * STAMP_GRID.rows;
-        if (input.repeat('left')) cursor = (cursor + n - 1) % n;
-        if (input.repeat('right')) cursor = (cursor + 1) % n;
+        // Left / Right walk the grid; past the row's edge they turn the tab, as the hint says
+        // (Left/Right or [ ]: Tab), so the Stamps page is never a dead end for the arrows
+        const col = cursor % STAMP_GRID.cols;
+        if (input.pressed('left') && col === 0) { setTab(tab - 1); return; }
+        if (input.pressed('right') && col === STAMP_GRID.cols - 1) { setTab(tab + 1); return; }
+        if (input.repeat('left') && col > 0) cursor -= 1;
+        if (input.repeat('right') && col < STAMP_GRID.cols - 1) cursor += 1;
         if (input.repeat('up')) cursor = (cursor + n - STAMP_GRID.cols) % n;
         if (input.repeat('down')) cursor = (cursor + STAMP_GRID.cols) % n;
         return;
@@ -779,6 +791,10 @@ function createJournalView(G, self) {
       for (let k = 2; k < S.w; k += 4) { ctx.fillRect(x + k, y, 2, 1); ctx.fillRect(x + k, y + S.h - 1, 2, 1); }
       for (let k = 2; k < S.h; k += 4) { ctx.fillRect(x, y + k, 1, 2); ctx.fillRect(x + S.w - 1, y + k, 1, 2); }
       drawText(ctx, st.earned ? st.name : '?', x + S.w / 2, y + S.h / 2 - 4, { align: 'center', color: st.earned ? COLORS.paper.ink : COLORS.paper.inkFaint, font: 'small', maxWidth: S.w - 6 });
+      if (st.earned && freshStamps.has(st.id)) {
+        ctx.fillStyle = COLORS.wax.fill; ctx.fillRect(x + S.w - 20, y + 2, 18, 8);
+        drawText(ctx, t('journal.stampNew'), x + S.w - 11, y + 3, { align: 'center', color: COLORS.paper.light, font: 'small' });
+      }
       if (i === cursor) { ctx.fillStyle = COLORS.paper.ink; ctx.fillRect(x - 2, y - 2, S.w + 4, 1); ctx.fillRect(x - 2, y + S.h + 1, S.w + 4, 1); ctx.fillRect(x - 2, y - 2, 1, S.h + 4); ctx.fillRect(x + S.w + 1, y - 2, 1, S.h + 4); }
     });
     const st = stamps[cursor];

@@ -45,7 +45,10 @@ export default {
       { text: 'Fair enough.', then: ['Linnet: It IS fair. That\'s why I said it. ~ The goose is in her Spire. Go and get feathered.'] },
     ] },
     flag('sp.linnet-declined'),
-    'Linnet: I\'ll be right here. On my stones. Being patient. ~ I\'m very good at being patient. I\'ve been practising since yesterday.',
+    // FE-11: "right here, on my stones" only fits at the Brackenford stones
+    { op: 'if', cond: { map: 'lowmoor' },
+      then: ['Linnet: I\'ll be right here. On my stones. Being patient. ~ I\'m very good at being patient. I\'ve been practising since yesterday.'],
+      else: ['Linnet: I\'ll be on my stones at Brackenford. Being patient. ~ I\'m very good at being patient. I\'ve been practising since yesterday.'] },
     label('out'),
     END,
   ],

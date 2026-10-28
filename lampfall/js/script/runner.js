@@ -112,11 +112,17 @@ export function interpolate(text, ctx) {
   return text.replace(/\{(player|npcNick|npc|wallet|nick:[^}]+|var:[^}]+)\}/g, (m, token) => {
     if (token === 'player') return world.player?.name ?? m;
     if (token === 'wallet') return String(world.wallet?.main ?? 0);
-    if (token === 'npc' || token === 'npcNick') {
+    if (token === 'npcNick') {
+      // what the NPC calls the PLAYER: their nickname for you, else your name (LF-05: never the
+      // NPC's own name, "Tully: Tully! Perfect.")
+      const id = ctx.npc;
+      const nick = id ? world.npcs?.[id]?.nickname : null;
+      if (nick) return nick;
+      return world.player?.name ?? m;
+    }
+    if (token === 'npc') {
       const id = ctx.npc;
       if (!id) return m;
-      const nick = world.npcs?.[id]?.nickname;
-      if (token === 'npcNick' && nick) return nick;
       return data && data.has('npcs', id) ? data.get('npcs', id).name : id;
     }
     if (token.startsWith('nick:')) {

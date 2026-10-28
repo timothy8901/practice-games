@@ -54,8 +54,26 @@ export const VERB_TOOLS = Object.freeze({ fish: 'fish', dig: 'dig', catch: 'catc
 /** HUD words per verb (the UI may map these through strings.js). */
 export const VERB_LABELS = Object.freeze({
   talk: 'Talk', read: 'Read', pickUp: 'Pick up', shake: 'Shake', inspect: 'Inspect', fish: 'Fish', dig: 'Dig',
-  catch: 'Catch', enter: 'Enter', board: 'Board', look: 'Look', sit: 'Sit', mailbox: 'Mailbox', use: 'Use',
+  catch: 'Catch', enter: 'Enter', board: 'Board', look: 'Look', sit: 'Sit', mailbox: 'Check mail', use: 'Use',
+  // LF-21: every verb a map can name has a word (the chip showed raw ids: 'challenge', 'bed', 'commons')
+  challenge: 'Challenge', bed: 'Sleep', commons: 'Read board', gateBoards: 'Read board', tideTable: 'Read board',
+  ledgerBoard: 'Read board', commonsJar: 'Commons Jar', pay: 'Pay', shop: 'Shop', crate: 'Crate', ferry: 'Ferry',
+  knock: 'Knock', gallery: 'Gallery', workshop: 'Workbench', polish: 'Polish', graft: 'Graft', loft: 'Telescope',
+  waystone: 'Waystone', ledger: 'Ledger', fieldLog: 'Field Log', storage: 'Storage', cellar: 'Cellar',
+  tallyWall: 'Tally wall', dossier: 'Read', memory: 'Recall', relearn: 'Relearn', recall: 'Recall', net: 'Catch',
+  hesperCounter: 'Counter', open: 'Open', climb: 'Climb', mirror: 'Mirror', seasonBook: 'Read', light: 'Light',
 });
+
+/**
+ * The chip word for a verb: its label, else the id in words ('someVerb' -> 'Some verb').
+ * @param {string} verb
+ * @returns {string}
+ */
+export function verbLabel(verb) {
+  if (VERB_LABELS[verb]) return VERB_LABELS[verb];
+  const words = String(verb || '').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[-_]/g, ' ').toLowerCase();
+  return words ? words.charAt(0).toUpperCase() + words.slice(1) : '';
+}
 
 /** Reason strings for `disabled`. */
 export const DISABLED = Object.freeze({
@@ -122,7 +140,7 @@ function fill(kind, verb, targetId, target, prompt, disabled) {
   action.kind = kind;
   action.targetKind = kind;
   action.verb = verb;
-  action.label = VERB_LABELS[verb] || verb;
+  action.label = verbLabel(verb);
   action.prompt = prompt;
   action.icon = verb;
   action.targetId = targetId;

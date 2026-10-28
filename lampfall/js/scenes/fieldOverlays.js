@@ -22,6 +22,7 @@ import { COLORS, PALETTE } from '../ui/theme.js';
 import { getTile, resolveArtId } from '../art/atlas.js';
 import { portraitSprite } from '../art/portraits.js';
 import { drawSprite } from '../core/pixelart.js';
+import { getCreatureIcon } from '../art/creatures/index.js';
 import { t } from '../data/strings.js';
 
 /** Loans roof colour id -> roof art colour (art/palette ROOF_COLOURS). */
@@ -48,7 +49,10 @@ const tapped = (input) => Boolean(input && input.pointer && input.pointer.justDo
 export function createBoardScene(G, content) {
   let ms = 0;
   let closing = -1;
-  const sections = content.sections || [{ title: content.title, lines: content.lines || [] }];
+  // a single-section board shows its title once, on the plank (LF-09: it was repeated in red)
+  const shiftRows = Array.isArray(content.shiftTide) ? content.shiftTide.filter((r) => r && Array.isArray(r.cards) && r.cards.length) : [];
+  const chalked = new Set(shiftRows.map((r) => r.text));
+  const sections = content.sections || [{ title: null, lines: (content.lines || []).filter((l) => !chalked.has(l)), shiftTide: shiftRows }];
   const PLANK = { x: 8, y: 44, w: 464, h: 218 };
   return {
     name: 'board',
@@ -56,7 +60,7 @@ export function createBoardScene(G, content) {
     enter() { ms = 0; closing = -1; },
     update(dt) {
       ms += dt;
-      if (closing >= 0) { closing += dt; if (closing >= 67) G.scenes.pop({ closed: true }); }
+      if (closing >= 0) { closing += dt; if (closing >= 67) { closing = -1e9; G.scenes.pop({ closed: true }); if (typeof content.onClose === 'function') content.onClose(); } }
     },
     handleInput(input) {
       if (closing >= 0 || ms < 120) return;
@@ -86,8 +90,7 @@ export function createBoardScene(G, content) {
         const rect = { x: x + tear, y: PLANK.y + 20 + dy, w: colW, h: PLANK.h - 32 };
         const inner = drawPanel(ctx, rect, 'notice');
         let y = inner.y + 2;
-        drawText(ctx, s.title, inner.x + 2, y, { color: COLORS.paper.margin });
-        y += 13;
+        if (s.title) { drawText(ctx, s.title, inner.x + 2, y, { color: COLORS.paper.margin }); y += 13; }
         for (const line of s.lines) {
           for (const row of wrapText(line, inner.w - 6)) {
             if (y > rect.y + rect.h - 14) break;
@@ -96,13 +99,52 @@ export function createBoardScene(G, content) {
           }
           y += 3;
         }
+        // the Shift Tide (lit.shiftTide): each pending window chalked with its three cards drawn as
+        // small icons: the form (a silhouette while unseen), its lean and its odds
+        for (const r of s.shiftTide || []) {
+          if (y > rect.y + rect.h - 34) break;
+          drawText(ctx, t('board.shiftTideLine', { nick: r.nick }), inner.x + 2, y, { color: COLORS.paper.ink });
+          y += 11;
+          r.cards.forEach((card, k) => drawShiftCard(ctx, card, inner.x + 2 + k * 92, y));
+          y += 24;
+        }
       });
       drawText(ctx, 'confirm / cancel: close', PLANK.x + PLANK.w - 8, PLANK.y + PLANK.h - 10 + dy, { align: 'right', font: 'small', color: PALETTE.porchAmber }); // str
       ctx.restore();
     },
-    debugText: () => [content.title, ...sections.flatMap((s) => [s.title, ...s.lines])].join('\n'),
+    debugText: () => [content.title, ...sections.flatMap((s) => [s.title, ...s.lines, ...(s.shiftTide || []).map((r) => r.text)]).filter(Boolean)].join('\n'),
     isBusy: () => ms < 300 || closing >= 0,
   };
+}
+
+/** Lean arrows for the Shift Tide cards (6×6 pixel patterns). */
+const SHIFT_ARROWS = Object.freeze({
+  up: ['..x...', '.xxx..', 'xxxxx.', '..x...', '..x...', '..x...'],
+  down: ['..x...', '..x...', '..x...', 'xxxxx.', '.xxx..', '..x...'],
+  side: ['...x..', '...xx.', 'xxxxxx', '...xx.', '...x..', '......'],
+});
+
+/**
+ * One Shift Tide card on the Tide Table (LF-09): a 88×21 chalk card with the form's 16px icon
+ * (a silhouette while unseen; blank for an empty card), its lean arrow and its odds.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {{dir: string, formId: string|null, name: string, odds: number, silhouette: boolean}} card
+ * @param {number} x
+ * @param {number} y
+ */
+function drawShiftCard(ctx, card, x, y) {
+  ctx.fillStyle = '#E9DFC7'; ctx.fillRect(x, y, 88, 21);
+  drawNotchedFrame(ctx, x, y, 88, 21, COLORS.paper.ink);
+  let icon = null;
+  if (card.formId) { try { icon = getCreatureIcon(card.formId, { silhouette: card.silhouette ? '#29366F' : null }); } catch { icon = null; } }
+  if (icon) drawSprite(ctx, icon, x + 3, y + 3);
+  // the lean: a small chalk arrow (up, a sideways right, down)
+  const arrow = SHIFT_ARROWS[card.dir] || SHIFT_ARROWS.side;
+  ctx.fillStyle = PALETTE.waxRed;
+  arrow.forEach((row, dy) => { for (let dx = 0; dx < row.length; dx++) if (row[dx] === 'x') ctx.fillRect(x + 22 + dx, y + 7 + dy, 1, 1); });
+  const name = card.formId ? (card.silhouette ? '?' : card.name) : '';
+  drawText(ctx, name, x + 31, y + 3, { color: COLORS.paper.ink, font: 'small', maxWidth: 55 });
+  drawText(ctx, card.formId ? `${card.odds}%` : '', x + 31, y + 12, { color: COLORS.paper.inkSoft, font: 'small' });
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -297,7 +339,8 @@ export function createCeremonyScene(G, p) {
           const res = typeof p.onRoom === 'function' ? p.onRoom(rooms[roomIndex].id) : { ok: true };
           if (res && res.ok === false) { phase = 'done'; return; }
           pickedRoom = rooms[roomIndex];
-          if (G.audio && typeof G.audio.sfx === 'function') G.audio.sfx('ui:confirm');
+          // LF-10: the sfxMap 'ui:*' names go through the bus (core audio only knows SFX keys)
+          if (G.bus && typeof G.bus.emit === 'function') G.bus.emit('ui:confirm', {});
           advance();
           return;
         }
@@ -391,9 +434,11 @@ export function createCeremonyScene(G, p) {
           drawNotchedFrame(ctx, R.x, R.y, R.w, R.h, i === roomIndex ? COLORS.paper.light : COLORS.paper.ink);
           drawText(ctx, r.name, R.x + R.w / 2, R.y + 3, { align: 'center', color: i === roomIndex ? COLORS.paper.light : COLORS.paper.shade, font: 'small' });
         });
-        const blurb = rooms[roomIndex] && rooms[roomIndex].blurb ? wrapText(rooms[roomIndex].blurb, 400)[0] ?? '' : '';
-        if (blurb) drawText(ctx, blurb, 240, 240, { align: 'center', font: 'small', color: COLORS.paper.light });
-        drawText(ctx, t('ceremony.roomLater'), 240, 254, { align: 'center', font: 'small', color: PALETTE.porchAmber });
+        // LF-10: the whole description, on up to two lines (it used to stop mid-sentence after one)
+        const blurb = rooms[roomIndex] && rooms[roomIndex].blurb ? wrapText(rooms[roomIndex].blurb, 440, { font: 'small' }).slice(0, 2) : [];
+        const by = rooms.length > 3 ? 237 : 223;
+        blurb.forEach((line, i) => drawText(ctx, line, 240, by + i * 8, { align: 'center', font: 'small', color: COLORS.paper.light }));
+        drawText(ctx, t('ceremony.roomLater'), 240, 256, { align: 'center', font: 'small', color: PALETTE.porchAmber });
       } else if (phase === 'done') {
         if (pickedRoom) drawText(ctx, t('ceremony.roomChosen', { room: pickedRoom.name }), 240, 200, { align: 'center', color: PALETTE.porchAmber });
         drawText(ctx, p.cleared ? t('ceremony.buildTonight') : `Paid ${Number(p.paid || 0).toLocaleString('en-US')}◉. ${c.notchesCut || 0} notch${c.notchesCut === 1 ? '' : 'es'} cut.`, 240, 214, { align: 'center', color: COLORS.paper.light }); // str

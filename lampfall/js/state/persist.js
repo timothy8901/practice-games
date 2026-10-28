@@ -84,6 +84,7 @@ export function sceneOnStack(scenes, name) {
  * @property {string|null} lead
  * @property {string} seedCode
  * @property {string} dial
+ * @property {number} [autoAnchor]   auto slots: the game minute (day * 1440 + time) the slot was rotated in (FE-16 spacing)
  */
 
 /**
@@ -127,6 +128,36 @@ export function sceneOnStack(scenes, name) {
 export const AUTOSAVE_TRIGGERS = Object.freeze([
   'map:enter', 'waystone:use', 'battle:start:story', 'capture:ok', 'shift:resolved', 'loan:paid', 'letter:read', 'day:start',
 ]);
+
+/**
+ * Autosaves that come from a bus trigger (or the route timer) wait while a cutscene runs and land
+ * when it ends. A save taken mid-script stores the cutscene bookmark at the request that was just
+ * answered, so Continue would replay it (a Forecast could Shift the same creature twice, FE-01).
+ * Explicit `autosave(G, reason)` calls (a script's `save` op, sleep, the ledger) still write at once.
+ */
+export const CUTSCENE_DEFERRED_REASONS = Object.freeze(new Set([...AUTOSAVE_TRIGGERS, 'route']));
+
+/**
+ * Minimum game-time spacing between rotated autosaves, in game minutes. An autosave closer than this
+ * to the newest auto slot (same run) overwrites that slot instead of rotating, so the other two keep
+ * an older moment to roll back to (FE-16). `day:start` always rotates.
+ */
+export const AUTOSAVE_MIN_SPACING_MIN = 120;
+
+/** `map:enter` kinds that are a map being loaded (Continue, a new game), not a walk into it. */
+export const LOAD_MAP_ENTER_KINDS = Object.freeze(['load', 'enter']);
+
+/**
+ * Absolute game minutes of a save summary (`day * 1440 + HH:MM`), or null.
+ * @param {any} summary
+ * @returns {number|null}
+ */
+export function summaryMinutes(summary) {
+  if (!summary || !Number.isFinite(summary.day)) return null;
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(summary.time ?? ''));
+  if (!m) return null;
+  return summary.day * 1440 + Number(m[1]) * 60 + Number(m[2]);
+}
 
 /** Route autosave interval while dirty on the overworld. // [GDD: tuning.routeAutosaveMs] */
 export const DEFAULT_ROUTE_AUTOSAVE_MS = 90_000;
@@ -278,10 +309,12 @@ export function createPersist(opts) {
         return fail(G, { ...base, error: err(PERSIST_ERRORS.NO_STORE, 'no store to save') }, kind, slot, isRetry);
       }
       const scenes = G.scenes;
-      if (kind === 'auto' && (sceneTransitioning(scenes) || sceneOnStack(scenes, 'battle'))) {
+      if (kind === 'auto' && (sceneTransitioning(scenes) || sceneOnStack(scenes, 'battle')
+        || (CUTSCENE_DEFERRED_REASONS.has(reason) && cutsceneRunning(G)))) {
         // A story checkpoint can arrive after its battle/transition was pushed. Keep it pending;
         // this is a scheduling constraint, not a failed storage write.
-        pendingAuto = reason;
+        // a held day:start keeps its place (it always rotates); a later trigger does not clobber it
+        if (pendingAuto !== 'day:start') pendingAuto = reason;
         return { ...base, error: err(PERSIST_ERRORS.BUSY, 'autosave queued until the scene is ready'), deferred: true };
       }
       if (sceneTransitioning(scenes)) {
@@ -299,7 +332,14 @@ export function createPersist(opts) {
         return fail(G, { ...base, error: err(PERSIST_ERRORS.INVALID_WORLD, `refusing to save an invalid world: ${problems[0]}`, { problems }) }, kind, slot, isRetry);
       }
       const summary = summarize(world);
-      const res = kind === 'auto' ? sys.autosave(world, { summary }) : sys.save(/** @type {any} */ (slot), world, { summary });
+      const near = kind === 'auto' ? nearAutoSlot(summary, reason) : null;
+      // the game minute this auto slot was rotated in: an overwrite keeps it, so the spacing is
+      // measured from the rotation, not from the last overwrite (a save every 30 game minutes would
+      // otherwise never rotate)
+      if (kind === 'auto') summary.autoAnchor = near ? near.anchor : summaryMinutes(summary);
+      const res = kind === 'auto'
+        ? (near ? sys.save(near.slot, world, { summary }) : sys.autosave(world, { summary }))
+        : sys.save(/** @type {any} */ (slot), world, { summary });
       if (!res.ok) return fail(G, { ...base, slot: res.error.slot ?? base.slot, error: res.error }, kind, slot, isRetry);
       G.store.clean?.();
       routeAcc = 0;
@@ -312,6 +352,42 @@ export function createPersist(opts) {
       return ok;
     } catch (cause) {
       return fail(G, { ...base, error: err(PERSIST_ERRORS.EXCEPTION, `save threw: ${cause?.message ?? String(cause)}`, { cause }) }, kind, slot, isRetry);
+    }
+  }
+
+  /**
+   * Whether a cutscene is running: the scene is on the stack. (The world's bookmark alone is not
+   * enough: it is also set between a load and the resume, and a stale one must never stop saving.)
+   * @param {PersistG} G
+   * @returns {boolean}
+   */
+  function cutsceneRunning(G) {
+    return sceneOnStack(G?.scenes, 'cutscene');
+  }
+
+  /**
+   * The auto slot to overwrite instead of rotating: the newest readable auto slot of the same run
+   * when it was rotated in less than {@link AUTOSAVE_MIN_SPACING_MIN} game minutes ago (its
+   * summary's `autoAnchor`, else its own time). Null = rotate.
+   * @param {SaveSummary} summary
+   * @param {string} reason
+   * @returns {{slot: string, anchor: number}|null}
+   */
+  function nearAutoSlot(summary, reason) {
+    if (reason === 'day:start') return null;
+    try {
+      const autos = sys.list({ kind: 'auto' });
+      if (autos.length < 2) return null;
+      const newest = autos.reduce((a, b) => ((b.seq ?? 0) > (a.seq ?? 0) ? b : a));
+      if (!newest?.summary || newest.summary.seedCode !== summary.seedCode) return null;
+      const then = summaryMinutes(newest.summary);
+      const nowMin = summaryMinutes(summary);
+      if (then === null || nowMin === null || nowMin < then) return null;
+      const a = typeof newest.summary.autoAnchor === 'number' ? newest.summary.autoAnchor : NaN;
+      const anchor = Number.isFinite(a) && a <= then ? a : then;
+      return nowMin - anchor < AUTOSAVE_MIN_SPACING_MIN ? { slot: newest.slot, anchor } : null;
+    } catch {
+      return null;
     }
   }
 
@@ -394,7 +470,8 @@ export function createPersist(opts) {
   function tick(G, ms) {
     try {
       if (!(ms > 0) || !G?.store) return;
-      if (pendingAuto !== null && !sceneTransitioning(G.scenes) && !sceneOnStack(G.scenes, 'battle')) {
+      if (pendingAuto !== null && !sceneTransitioning(G.scenes) && !sceneOnStack(G.scenes, 'battle')
+        && !(CUTSCENE_DEFERRED_REASONS.has(pendingAuto) && cutsceneRunning(G))) {
         const reason = pendingAuto;
         pendingAuto = null;
         write(G, 'auto', null, reason, false);
@@ -436,6 +513,13 @@ export function createPersist(opts) {
       if (trigger === 'battle:start:story') {
         offs.push(bus.on('battle:start', (payload) => {
           if (payload && (payload.kind === 'story' || payload.story === true)) write(G, 'auto', null, trigger, false);
+        }));
+      } else if (trigger === 'map:enter') {
+        // a map loaded on Continue / new game is not a walk into it: the slot just loaded already
+        // holds this moment, and saving it again collapsed the three autosaves into copies (FE-16)
+        offs.push(bus.on(trigger, (payload) => {
+          if (payload && LOAD_MAP_ENTER_KINDS.includes(payload.kind)) return;
+          write(G, 'auto', null, trigger, false);
         }));
       } else {
         offs.push(bus.on(trigger, () => { write(G, 'auto', null, trigger, false); }));

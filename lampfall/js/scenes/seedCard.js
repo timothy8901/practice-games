@@ -286,7 +286,9 @@ export function drawRunCard(ctx, G, ox, oy, o = {}) {
   ctx.save(); ctx.translate(sx + 4 * 31 + 2, oy + 24); ctx.scale(0.75, 0.75);
   if (summit && stampK > 0) { ctx.globalAlpha = stampK; drawChallengeSeal(ctx, 0, Math.round((1 - stampK) * -12), 'summit', true); ctx.globalAlpha = 1; } else drawChallengeSeal(ctx, 0, 0, 'summit', false);
   ctx.restore();
-  drawText(ctx, summit ? t('seedCard.summitStamped') : t('seedCard.summitSeal'), sx, oy + 52, { color: soft, font: 'small', maxWidth: 154 });
+  // LF-17: the caption sits centred under the Summit slot (the fifth seal), not under the first challenge seal
+  // (right-aligned to the card's inner edge, which the fifth seal ends on, so a long line stays on the card)
+  drawText(ctx, summit ? t('seedCard.summitStamped') : t('seedCard.summitSeal'), ox + CARD.w - 12, oy + 52, { color: soft, font: 'small', align: 'right', maxWidth: 72 });
   // tallies
   const tl = runTallies(world);
   const rows = [

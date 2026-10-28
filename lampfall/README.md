@@ -1,224 +1,93 @@
-# Lampfall — A Keeper’s Season on the Brindle Isles
+# Lampfall — A Keeper's Season on the Brindle Isles
 
-Read the odds. Pay what’s owed. Keep the light.
+*Read the odds. Pay what's owed. Keep the light.*
 
-A browser creature RPG and harbor life game combining the Wildshift and Porchlight pitches. Explore the Brindle Isles, catch and Shift creatures, challenge six Spires, fish the quay, repay seven interest-free loans, and uncover the old Keeper’s letters. The lighthouse finale leads through the Reading and credits to a continuing season in Pellwick.
+Lampfall is a browser creature RPG and harbor life game. It merges two pitches, **Wildshift** (creatures that Shift into new bodies on odds you can see first) and **Porchlight** (a cozy harbor town that lights up as you pay off your home).
+
+You arrive in Pellwick at dusk with an interest-free loan and the key to the Keeper's Cottage under a lighthouse that has been dark for thirty years. A creature picks you on the causeway. From then on you live one life on one clock, with two tides a day:
+
+- **By day:** shake trees, fish the quay, dig the flats, run errands, and walk tide-gated causeways to six isles. Each isle ends in a Spire that tests one way of reading creatures.
+- **By night:** porches light up, neighbours talk on their steps, someone is always buying, and the mud on the flats glows.
+- **Shifts:** about three times in a life a creature's window opens, and a Forecast shows three cards (Up, Side, Down) with their odds. You Accept, Anchor or Reroll. Nothing is hidden and nothing asks for timing.
+- **Seven loans** grow the cottage and climb the lighthouse scaffold. The last one relights the lamp, and the comet comes down for **the Reading**.
+- A snail delivers one thirty-year-old letter every morning, explaining why the light went out.
+
+After the Reading and the credits, the season continues: the Summit, dark houses reopening one per night, the remaining letters and threads.
+
+Everything runs in the browser from plain files: vanilla JavaScript modules, a 480×270 canvas, pixel art written as strings, and procedural music and sound. No build step, no runtime dependencies, no downloads.
 
 ## Play locally
 
-On macOS, double-click **Play Lampfall.command**. Keep its terminal window open while playing. The launcher starts a private local server and opens the game in your browser. Requires Python 3.
+The game needs a local web server because it uses JavaScript modules; opening `index.html` from the file system will not work.
 
-Or run `python3 serve.py 8000` from this folder, then open <http://127.0.0.1:8000/>. The game needs a web server because it uses browser modules. It has no build step, external asset downloads, or runtime JavaScript dependencies.
+- **macOS:** double-click **Play Lampfall.command**. It starts a private server on 127.0.0.1 (port 8877, or a free port) and opens the game in your browser. Keep its terminal window open while playing; Control-C stops it. Requires Python 3.
+- **Any system:** from this folder run `python3 serve.py 8000` (or `npm start`), then open <http://127.0.0.1:8000/>.
+
+Saves live in the browser's storage for that exact address and port, so use the same address each time to keep your saves.
 
 ## Controls
 
-| Action | Keyboard |
-| --- | --- |
-| Move | Arrows or WASD |
-| Confirm / interact | Z, Enter, or Space |
-| Back | X or Escape |
-| Pause menu | Escape or P |
-| Run | Shift |
-| Tools | C; hold for the tool ring |
-| Map | M |
-| Field view / Read | V |
-| Full screen | F; Escape exits |
+| Action | Keyboard | Gamepad (standard layout) | Touch |
+| --- | --- | --- | --- |
+| Move | Arrows or WASD | D-pad or left stick | On-screen d-pad |
+| Confirm / interact | Z, Enter or Space | A | A button; tap the context chip or a menu row |
+| Back | X, Esc or Backspace | B | B button |
+| Pause menu | Esc or P | Start | MENU pill |
+| Run | Hold Shift | Hold RT | — |
+| Tools | Tap C to swap; hold C for the tool ring | X | — |
+| Map and Tide Table | M | Y | Pause menu → Map |
+| Read view (field) | V or `` ` `` (backquote) | Back / Select | — |
+| Dialogue log | Tab (during dialogue) | LT | — |
+| Switch tabs | [ and ] | LB and RB | Tap the tab |
+| Battle speed 1× / 2× / 4× | 1 / 2 / 3 | — | Settings |
+| Full screen | F toggles it (Esc also leaves) | — | — |
 
-Controller and touch controls are supported. Settings includes key remapping, play speed, fishing assistance, reduced motion, larger text, contrast, sound and captions. Saves stay in this browser; the save screen exports and imports a save string. Keep the same local address/port to reuse browser saves.
+Enter only confirms; it never opens the pause menu. Touch controls appear automatically on a touch screen, and Settings has a one-handed layout that moves the buttons into a right-thumb arc. Settings → Controls remaps every action in the table to other keys or gamepad buttons, except three fixed keys: V (Read view; backquote and Select can be remapped), F (full screen) and 1 / 2 / 3 (battle speed).
+
+## Settings
+
+Settings are under the pause menu (and on the title screen):
+
+- **Time and text:** day length (12, 24 or 48 real minutes, or Real Clock), text speed, auto-advance.
+- **Play:** battle speed, fishing help (Standard, Gentle or Patient), blackout wake point (porch or last Waystone), skip animations.
+- **Sight:** reduced motion, large text, high contrast, Clear Visuals, screen scale, 30 fps.
+- **Sound:** music, sound effects, ambience, mute, captions.
+- **Controls:** path view (hold or toggle; stored, but the field does not read it yet), touch layout, key and button remapping.
+
+The Seed Card at the start of a new game sets the **Chaos dial** (Drift, Flux or Freefall: how wild the Shift odds are), the seed code, and optional challenge seals such as **No Rewind** (one autosave, no manual saves) and **One Heart** (only the starter battles).
+
+## Saves
+
+- **Three autosave slots and three manual slots** per browser address. Autosaves happen on map changes, at Waystones, when a story battle starts, after catches and Forecasts, on loan payments, after reading a letter and each morning, plus every 90 seconds while you have unsaved changes on the field. An autosave asked for during a battle or cutscene waits until it has finished (so a story battle's autosave lands after the battle). An autosave less than two game hours after the newest one overwrites it instead of using the next slot, and loading a save with Continue does not autosave.
+- **Manual saves:** the last item of the pause menu. Overwriting a used slot asks first.
+- **Verified writes:** every save is checked before it replaces the old one. Sitting on the porch bench or sleeping shows the Day Page with "Saved, verified".
+- **Export and import:** the save screen exports a save as a text string and imports one back, for moving a save between browsers.
+- If the last session did not close cleanly, the title offers to resume from the latest autosave.
+- Older saves are upgraded automatically when loaded (the save format is at version 7).
 
 ## Development and verification
 
-Use Node 22 or later for the test tools. Run `bash tools/check.sh` for data validation, ownership and art checks, module imports, and the complete unit suite. `node tools/validate-content.mjs` checks the assembled game content; `node tools/map-reachability.mjs` proves the tide-dependent routes. Browser QA uses Playwright; set `PLAYWRIGHT_EXECUTABLE_PATH` if using an existing installed Chromium.
+Use Node 22 or later for the tools. Nothing needs installing for the game itself.
 
-The game is not deployed. The repository’s Pages workflow publishes only when changes land on `main`.
+| Command | What it does |
+| --- | --- |
+| `bash tools/check.sh` (or `npm run check`) | The full gate: data validation, ownership and purity lint, art lint, a smoke import of every module, then every unit test file in its own process (180 s timeout each). Prints `CHECK OK` when everything passes (4,765 tests in 188 files on 2026-10-28). `bash tools/check.sh <pattern>` runs the same gate with only the test files whose path matches. |
+| `node tools/validate-data.mjs` | The data rules (ids, references, move and item effects, Heartmark anchors, encounter weights, one-of-a-kind hand-overs), run on the registry in `js/data/index.js`, which still holds the placeholder tables. This is the gate's first step. |
+| `node tools/validate-content.mjs` | The same rules on the real game content the game loads (`js/data/content.js`); it should report 0 errors and no pending tables. The unit tests also validate it. |
+| `node tools/map-reachability.mjs` | Proves every Waystone and Spire is reachable at any tide, and the tide-only routes. |
+| `node tools/script-dryrun.mjs` | Runs every story script path with a fake host and reports dead ends or unknown ops. |
+| `node tools/balance-sim.mjs` | Plays each Spire, the Summit and the route trainers through the real battle engine; `--only progression` reports party levels at each Spire door. |
+| `node tools/economy-sim.mjs` | Simulates income and loan payments for several kinds of player. |
 
-The authoritative design is `design/GDD-00-decisions.md`; extracted pitch documents and all chapter notes remain in `design/`. `progress.md` records this continuation and the verification boundary.
+**URL options** (for example `index.html?debug=1&skipTitle=1&seed=FLUX-XXXX-XXXX`): `debug=1` installs the `window.__game` test hook and the debug overlay, and nothing installs them without it. The other options work with or without `debug=1`: `skipTitle=1` boots straight into the field; `seed=` picks the seed code; `strict=1` throws on any world write outside a transaction; `mute=1`; `noanim=1` runs every transition at 0 ms; `speed=` multiplies the simulation (0.25–64); `touch=1` or `touch=0` forces the touch overlay on or off; `slot=auto:1` (or `manual:2`) loads a save slot at boot; `scale=integer|fit|auto`.
 
-## Authoring guide (ARCHITECTURE-DRAFT §14, copied verbatim)
+**Browser checks** use Playwright with Chromium. Playwright is not a dependency of this folder, so make the `playwright` package resolvable first (install it, or link a `node_modules` that has it). `node tools/pw-harness.mjs <url> <outdir> [script.json]` loads the page, plays a JSON list of steps (`keys`, `click`, `waitMs`, `eval`, `shot`), saves screenshots and `log.json` in `<outdir>`, and prints the page errors; set `PLAYWRIGHT_EXECUTABLE_PATH` to use an installed Chromium. `check.sh` does not run a browser.
 
-## 14. How chapter writers must format content
+**Where things are:**
 
-Rules for every example: kebab-case ids, frozen exports, one entry per file where the manifest says so, one
-index line to register it, then `node tools/validate-data.mjs`. Never edit `js/systems`. Names and
-numbers below are placeholders, not decisions.
-
-### 14.1 Species (one form) — `js/data/species/<family>.js`
-
-```js
-import { sp } from './_helpers.js';   // sp(id, name, types, familyId, stage, [hp,atk,def,spa,spd,spe], ability, learnset, heartmark, catchRate, expYield, growth, flags)
-export const forms = [
-  sp('sloshkin', 'Sloshkin', ['Brine'], 'sloshkin', 1, [60, 62, 55, 50, 55, 38], 'shoresense',
-    [[1, 'tap'], [1, 'salt-spray'], [5, 'undertow'], [9, 'settle'], [17, 'shellguard']],
-    'undertow', 45, 64, 'medium-slow', { roleTag: 'starter_base' }),
-];
-```
-
-Fields: `id, name, types[1..2], familyId, stage 0..4, base, ability, learnset [[level, moveId]], heartmark
-(moveId | null), catchRate 3..255, expYield, growth 'fast'|'medium-fast'|'medium-slow'|'slow', flags`.
-
-### 14.2 Family (Shift table) — same file
-
-```js
-export const family = {
-  id: 'sloshkin', name: 'Sloshkin line', windows: [9, 20, 34],        // curve levels where a window opens
-  shiftTable: {                                                       // per current form: pools by direction, weights relative
-    sloshkin:  { up: [{ form: 'skeinwing', w: 3 }, { form: 'brinelance', w: 1 }], side: [{ form: 'puddlepip', w: 1 }], down: [] },
-    skeinwing: { up: [], side: [{ form: 'vesperay', w: 1 }], down: [{ form: 'sloshkin', w: 1 }] },
-  },
-  star: 'vesperay',                                                   // optional star-touched form
-};
-```
-
-### 14.3 Move — `js/data/moves/<type>.js`
-
-```js
-import { m } from './_helpers.js';   // m(id, name, type|null, category, power, accuracy|null, pp|null, priority, effect, text, signature?)
-export default [
-  m('undertow', 'Undertow', 'Brine', 'physical', 65, 100, 15, 0,
-    { stat: [{ target: 'foe', stat: 'spe', stages: -1 }], contact: true }, "Lowers the target's Speed one stage.", 'sloshkin'),
-];
-```
-
-Effect keys must be in `EFFECT_KEYS` (§5.1). `accuracy: null` = never misses; `pp: null` only for Scrap.
-
-### 14.4 Map — `js/data/maps/<map>.js`
-
-```js
-export default {
-  id: 'town-quay', name: 'The Quay', kind: 'exterior', region: 'town', w: 24, h: 12,
-  legend: { '=': 'quay-cobble' },                      // extends DEFAULT_LEGEND (D deep, S shallows, A sand, W wet-sand, E causeway, G grass, T tall-grass, P path, O cobbles, K pier ...)
-  ground: [
-    'DDDDDDDDDDDDSSSSSSAAAAAA',
-    'DDDDDDDDDSSSSSSAAAAAGGGG',
-    // ... 12 rows of 24 chars
-  ],
-  overlay: null,                                       // optional layers may be omitted
-  props: [{ art: 'lighthouse', x: 20, y: 0 }],
-  entities: [
-    { kind: 'npc', id: 'wren', x: 10, y: 6 },          // placement comes from her schedule; this is the fallback
-    { kind: 'tree', id: 'pear-1', x: 15, y: 4, fruit: 'pear' },
-    { kind: 'sign', id: 'quay-sign', x: 12, y: 7, text: 'Quay. Mind the tide.' },
-  ],
-  triggers: [{ x: 11, y: 8, kind: 'use', id: 'mailbox', verb: 'mailbox' }],
-  warps: [{ x: 9, y: 5, to: { mapId: 'int-cottage', x: 4, y: 7, facing: 'up' }, kind: 'door', sfx: 'doorOpen' }],
-  spawns: [{ area: 'grass', table: 'town-grass', rate: 0.08 }],
-  regions: { porch: { x: 8, y: 5, w: 4, h: 2 } },
-  entry: { x: 10, y: 9, facing: 'up' },
-};
-```
-
-### 14.5 NPC with schedule, topics and lines — `js/data/npcs/<npc>.js`
-
-```js
-export default {
-  id: 'wren', name: 'Wren Hearthwright', species: 'beaver', portrait: 'wren', sprite: 'beaver-f', home: 'int-yard',
-  threadId: 'wren-tally',
-  schedule: [
-    { at: 6 * 60,  mapId: 'int-yard',  x: 5, y: 4, pose: 'stand' },
-    { at: 9 * 60,  mapId: 'town-quay', x: 10, y: 6, pose: 'sweep', path: 'quay-sweep' },
-    { at: { tide: 'low' }, mapId: 'town-flats', x: 3, y: 9, pose: 'wander', wanderR: 3, cond: { weather: ['clear', 'mist'] } },
-    { at: 20 * 60, mapId: 'town-quay', x: 9, y: 7, pose: 'sit', days: [0, 1, 2, 3, 4] },
-    { at: 23 * 60, mapId: 'int-yard',  x: 2, y: 2, pose: 'sleep' },
-  ],
-  topics: [
-    { id: 'first-loan', cond: { not: { flag: 'sp.loan-explained' } }, script: 'wren-loan-intro', priority: 10, once: true },
-    { id: 'pay-reminder', cond: { loan: { paid: false } }, script: 'wren-pay', priority: 2, repeatDays: 1 },
-  ],
-  lines: {
-    generic: [{ id: 'g1', text: 'Tally sticks never lie, Keeper.' }, { id: 'g2', text: 'Dad says the light used to hum. I was three.' }],
-    sweep: ['Cobbles grow sand overnight. Nobody knows how.'],
-    night: ['Someone is always buying, even now.'],
-    porch: ['{player}. Sit a minute?'],
-  },
-};
-```
-
-### 14.6 Script — `js/data/scripts/<chapter>.js`
-
-```js
-export default {
-  'wren-loan-intro': [
-    "Wren: You'll want a roof before the Ebb wind. Interest-free; seven tiers.",
-    { op: 'choice', options: [
-      { text: 'Show me the ledger.', goto: 'ledger' },
-      { text: 'Later.', goto: 'later' },
-    ], defaultIndex: 1 },
-    { op: 'label', id: 'ledger' },
-    { op: 'move', who: 'wren', path: 'LLU', wait: true },
-    { op: 'give', item: 'tally-stick', n: 1 },
-    { op: 'setFlag', id: 'sp.loan-explained' },
-    { op: 'thread', id: 'wren-tally', beat: 1 },
-    { op: 'goto', id: 'done' },
-    { op: 'label', id: 'later' },
-    "Wren: The sticks will wait. The tide won't.",
-    { op: 'label', id: 'done' }, { op: 'end' },
-  ],
-};
-```
-
-### 14.7 Life thread — `js/data/threads/<thread>.js`
-
-```js
-export default {
-  id: 'wren-tally', npcId: 'wren', title: 'Seven Notches',
-  beats: [
-    { id: 1, cond: { loan: { tier: 2 } }, script: 'wren-tally-1', advance: { dayOfWeek: [0] } },
-    { id: 2, cond: { all: [{ thread: { id: 'wren-tally', beat: 1 } }, { letter: { read: 12 } }] }, script: 'wren-tally-2', where: { mapId: 'town-point', x: 6, y: 3 }, reward: { share: true } },
-  ],
-};
-```
-
-### 14.8 Letter — `js/data/letters/<chapter>.js`
-
-```js
-export default [
-  { n: 1, from: 'Mabry Coil', to: 'The Keeper, Point Cottage', date: 'Ebb 3, thirty years gone', seal: 'wax-blue',
-    body: 'The light held through the first gale. I counted eleven boats home. The twelfth was yours.|Write when the causeway dries.',
-    relicId: null, unlock: null,                       // default unlock: previous letter read
-    reveal: [{ op: 'setFlag', id: 'sp.letter-1-read' }] },
-];
-```
-
-### 14.9 Shop — `js/data/shops.js`
-
-```js
-export const SHOPS = Object.freeze([
-  { id: 'chandlery', keeper: 'tam', hours: [7 * 60, 21 * 60],
-    stock: [{ item: 'lantern-1' }, { item: 'lantern-2', cond: { badge: 2 } }, { item: 'starsalt', rotate: 'daily', qty: 3 }],
-    buys: ['fish', 'fruit', 'relics'], priceMult: 1.0, nightKeeper: 'hesper' },
-]);
-```
-
-### 14.10 Trainer — `js/data/trainers.js`
-
-```js
-export const TRAINERS = Object.freeze([
-  { id: 'linnet-1', name: 'Linnet Rask', title: 'Rival', class: 'rival', portrait: 'linnet',
-    party: [{ species: 'scrapling', level: 6 }, { species: 'wirewhisk', level: 5, moves: ['arc-ping', 'jolt'] }],
-    items: [{ id: 'salve', heal: 20 }], ai: 'trainer', payout: 300, tacticTag: 'rush',
-    scripts: { before: 'linnet-1-before', afterWin: 'linnet-1-win', afterLoss: 'linnet-1-loss' } },
-]);
-```
-
-### 14.11 Encounter table — `js/data/encounters.js`
-
-```js
-export const ENCOUNTERS = Object.freeze({
-  'town-grass': [
-    { species: 'puddlepip', levels: [2, 4], w: 40 },
-    { species: 'wirewhisk', levels: [3, 5], w: 25 },
-    { species: 'chillnub', levels: [3, 5], w: 20, cond: { phase: ['night', 'evening'] } },
-    { species: 'squallcoil', levels: [30, 30], w: 0.1, errant: true, cond: { weather: ['storm'] } },
-  ],
-});
-```
-
-### 14.12 Item and collection rows — `js/data/items.js`, `js/data/collections.js`
-
-```js
-{ id: 'lantern-1', name: 'Lantern', pocket: 'catch', price: 250, sell: 125, stack: 20, use: 'capture:1', oneOfAKind: false, text: 'Shows the odds before you commit.' }
-{ id: 'pearlfin', name: 'Pearlfin', kind: 'fish', where: ['shallows', 'river'], when: { phase: ['dawn', 'dusk'] }, tide: 'any', shadow: 'small', size: [12, 30], tell: 'two short feints then a long pull', price: 90 }
-```
-
----
-
+- `js/` holds the game. Pure rules (`data`, `state`, `battle`, `world`, `systems`, `script`) run under Node; `scenes`, `ui`, `render`, `audio`, `art` and `main.js` draw and play.
+- `test/` holds the unit tests and fixtures; `test/pages/` holds browser check pages.
+- `tools/` holds the gate, validators and simulators.
+- `design/` holds the design. `design/GDD-00-decisions.md` is authoritative, and its §18 lists what changed during the build. `design/architecture/ARCHITECTURE-DRAFT.md` describes the architecture; §14 is the content authoring guide and §16 records how the shipped code differs from the draft.
+- `qa/` holds the playtest reports: `HUMAN-PLAYTEST.md` and `FINAL-PLAYTEST.md`.
+- `progress.md` is the build log.

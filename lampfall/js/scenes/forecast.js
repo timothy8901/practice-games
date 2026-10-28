@@ -21,7 +21,7 @@
  * @module scenes/forecast
  */
 import { drawText, measureText } from '../core/font.js';
-import { COLORS, PALETTE, TYPE, TIMING } from '../ui/theme.js';
+import { COLORS, PALETTE, TYPE, TIMING, TYPE_CHIPS } from '../ui/theme.js';
 import { drawPanel, drawDim } from '../ui/panel.js';
 import { drawBar, drawPips, drawBadge, drawTypeChip } from '../ui/widgets.js';
 import { createFocus } from '../ui/focus.js';
@@ -37,6 +37,7 @@ import * as flags from '../systems/flags.js';
 import * as clockSys from '../systems/clockSys.js';
 import { tuningFor } from '../systems/flow/battleFlow.js';
 import { resolveBattleData } from './battleData.js';
+import { THE_READING } from '../data/spires.js';
 import { frames, FRAME_MS, FLIP_FRAMES, flipPhase, flipTotal, scrambleRings, scrambleShowsNew } from './battleAnims.js';
 
 const W = 480;
@@ -82,6 +83,46 @@ export function flipSeen(w) {
 /** @param {string} ty @returns {string} */
 const chipId = (ty) => String(ty || '').toLowerCase();
 
+/** Flags the Reading's offer writes for the ending script to branch on (LF-02). */
+export const READING_CHOICE_FLAG = 'np.keeper.reading-choice';
+export const READING_RING_FLAG = 'np.keeper.reading-ring';
+export const READING_REROLLS = 'np.keeper.reading-rerolls';
+
+/**
+ * The seventh window's three cards (spires.js THE_READING, phase 7 `next`), with the dial's steadied
+ * odds; after `rerolls` Rerolls the cards come round with new faces from `rerollPool` (LF-02).
+ * @param {string} dial @param {any} data @param {number} [rerolls]
+ * @returns {Array<{dir: 'up'|'side'|'down', name: string, palette: string, types: string[], odds: number}>}
+ */
+export function readingOfferCards(dial, data, rerolls = 0) {
+  const last = THE_READING.phases[THE_READING.phases.length - 1];
+  const base = (last.next?.cards ?? []).map((k) => ({ dir: k.dir, aspect: k.aspect }));
+  const pool = Array.isArray(last.rerollPool) ? last.rerollPool : [];
+  const dirs = ['up', 'side', 'down'];
+  const faces = rerolls > 0 && pool.length >= 3
+    ? dirs.map((dir, i) => ({ dir, aspect: pool[(rerolls * 3 + i) % pool.length] }))
+    : base;
+  let row = null;
+  try { row = data && data.tryGet ? data.tryGet('dials', dial) : null; } catch { row = null; }
+  const odds = row?.shift?.steadied ?? { up: 40, side: 40, down: 20 };
+  return faces.map((f) => ({ dir: f.dir, name: f.aspect.name, palette: f.aspect.palette, types: (f.aspect.typeQueue ?? []).filter((ty) => ty !== 'Star').slice(0, 2), odds: odds[f.dir] ?? 0 }));
+}
+
+/**
+ * The card an Accept lands on: weighted by the odds, from one uniform draw.
+ * @param {Array<{odds: number}>} cards @param {number} u in [0, 1)
+ * @returns {number} index
+ */
+export function readingPick(cards, u) {
+  const total = cards.reduce((a, c) => a + Math.max(0, c.odds), 0) || 1;
+  let acc = 0;
+  for (let i = 0; i < cards.length; i++) {
+    acc += Math.max(0, cards[i].odds) / total;
+    if (u < acc) return i;
+  }
+  return cards.length - 1;
+}
+
 /**
  * @param {any} G
  * @returns {import('../core/scene.js').Scene & Record<string, any>}
@@ -92,7 +133,7 @@ export function createForecastScene(G) {
   /** @type {any} */ let opts = null;
   /** @type {any} */ let fc = null;          // the Forecast on screen
   /** @type {any} */ let creatureRec = null;
-  /** 'cards' | 'busy' | 'flip' | 'reshuffle' | 'result' | 'error' | 'done' */
+  /** 'cards' | 'busy' | 'flip' | 'reshuffle' | 'result' | 'error' | 'done' | 'reading' | 'readingFlip' | 'readingDone' */
   let mode = 'cards';
   let elapsed = 0;
   let lockMs = 0;
@@ -104,6 +145,9 @@ export function createForecastScene(G) {
   let error = '';
   const detail = [false, false, false];
   let popped = false;
+  let noWindow = false;   // a script's Forecast with no open window: pops on the first update
+  /** @type {null | {cards: any[], picked: number|null, f: number, rerolls: number}} the Reading's offer (`who: 'reading'`) */
+  let reading = null;
 
   const focus = createFocus({ cols: 3, wrap: true, items: [] });
   focus.on('activate', (ev) => onActivate(ev.item));
@@ -211,8 +255,14 @@ export function createForecastScene(G) {
     message = '';
     error = '';
     popped = false;
+    noWindow = false;
+    reading = null;
+    if (params.who === 'reading') { enterReading(); return; }
     try {
       data = resolveBattleData(G);
+      // A script's Forecast (cutscene `forecast` op) only rolls into an open window: a replayed
+      // script (a save that landed mid-cutscene) must never Shift the creature twice (FE-01).
+      if (params.from === 'script' && !params.force && scriptWindowClosed()) { noWindow = true; mode = 'done'; return; }
       roll();
       focus.set(3);
     } catch (err) {
@@ -221,6 +271,104 @@ export function createForecastScene(G) {
       mode = 'error';
     }
     try { G.input?.flush?.(); } catch { /* no input */ }
+  }
+
+  // ---- the Reading's offer (the ending script's `{op: 'forecast', who: 'reading'}`, LF-02) ----
+
+  function enterReading() {
+    try { data = resolveBattleData(G); } catch { data = G.data; }
+    const rerolls = Number(flags.get(world(), READING_REROLLS)) || 0;
+    reading = { cards: readingOfferCards(world().run.dial, data, rerolls), picked: null, f: 0, rerolls };
+    mode = 'reading';
+    focus.setItems(['accept', 'anchor', 'reroll'].map((id, i) => ({ id, rect: L.action(i), enabled: true })));
+    focus.set(0);
+    try { G.input?.flush?.(); } catch { /* no input */ }
+  }
+
+  function readingActivate(item) {
+    if (mode !== 'reading' || !item || !reading) return;
+    if (item.id === 'accept') {
+      let u = 0.5;
+      try { u = G.rngs.fresh(`reading:offer:${reading.rerolls}`).next(); } catch { u = 0.5; }
+      reading.picked = readingPick(reading.cards, u);
+      const card = reading.cards[reading.picked];
+      G.store.tx('reading.accept', (w) => {
+        flags.setFlag(w, READING_CHOICE_FLAG, 'accept', { bus: G.bus });
+        flags.setFlag(w, READING_RING_FLAG, card.name, { bus: G.bus });
+      });
+      sfx('shiftFlip');
+      reading.f = 0;
+      message = t('battle.msg.readingLands', { name: card.name });
+      mode = 'readingFlip';
+      return;
+    }
+    sfx('confirm');
+    G.store.tx(`reading.${item.id}`, (w) => {
+      flags.setFlag(w, READING_CHOICE_FLAG, item.id, { bus: G.bus });
+      if (item.id === 'reroll') flags.inc(w, READING_REROLLS, 1, { bus: G.bus });
+    });
+    close(item.id === 'anchor' ? 'anchored' : 'rerolled', { choice: item.id });
+  }
+
+  /** The Vagary (96 cells) shrunk into the card's 64 px window, tinted by the card's first type. */
+  function drawReadingFace(ctx, card, x, y, dim) {
+    let sprite = null;
+    try { sprite = creatureSprite(THE_READING.species, { scale: 1 }); } catch { sprite = null; }
+    if (!sprite || !sprite.canvas) return;
+    const chip = card.types[0] ? TYPE_CHIPS[chipId(card.types[0])] : null;
+    let tint = null;
+    try { tint = chip ? creatureSprite(THE_READING.species, { scale: 1, silhouette: chip.color }) : null; } catch { tint = null; }
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    ctx.globalAlpha = dim ? 0.4 : 1;
+    ctx.drawImage(sprite.canvas, 0, 0, sprite.w, sprite.h, x, y, 64, 64);
+    if (tint && tint.canvas) { ctx.globalAlpha = (dim ? 0.4 : 1) * 0.4; ctx.drawImage(tint.canvas, 0, 0, tint.w, tint.h, x, y, 64, 64); }
+    ctx.restore();
+  }
+
+  function drawReading(ctx) {
+    const r = L.header;
+    ctx.fillStyle = NIGHT;
+    ctx.fillRect(r.x, r.y, r.w, r.h);
+    frame(ctx, r, '#5D275D');
+    drawText(ctx, t('battle.msg.readingOffer'), r.x + r.w / 2, r.y + 8, { color: INK_D, align: 'center' });
+    drawText(ctx, t('battle.msg.readingOfferSub'), r.x + r.w / 2, r.y + 22, { color: SOFT_D, font: 'small', align: 'center' });
+    const flipping = mode === 'readingFlip' || mode === 'readingDone';
+    for (let i = 0; i < 3; i++) {
+      const card = reading.cards[i];
+      const cr = L.card(i);
+      const dim = flipping && i !== reading.picked && reading.f > 30;
+      ctx.fillStyle = dim ? '#333C57' : CREAM;
+      ctx.fillRect(cr.x, cr.y, cr.w, cr.h);
+      frame(ctx, cr, flipping && i === reading.picked ? MAGENTA : COLORS.paper.edge);
+      const ink = dim ? SOFT_D : COLORS.paper.ink;
+      drawText(ctx, `${DIR_GLYPH[card.dir]} ${t(`forecast.${card.dir}`)}`, cr.x + 6, cr.y + 5, { color: ink });
+      drawText(ctx, t('forecast.odds', { n: card.odds }), cr.x + 6, cr.y + 16, { color: ink, scale: 2 });
+      drawBar(ctx, { x: cr.x + 6, y: cr.y + 33, w: cr.w - 12, h: 5, value: card.odds, max: 100, kind: 'glow' });
+      drawReadingFace(ctx, card, cr.x + cr.w / 2 - 32, cr.y + 40, dim);
+      drawText(ctx, card.name, cr.x + 6, cr.y + 107, { color: ink, maxWidth: cr.w - 12 });
+      let cx = cr.x + 6;
+      for (const ty of card.types) cx += drawTypeChip(ctx, chipId(ty), cx, cr.y + 131) + 2;
+    }
+    const labels = [t('forecast.accept'), t('forecast.anchor'), t('forecast.reroll')];
+    for (let i = 0; i < 3; i++) {
+      const ar = L.action(i);
+      const focused = mode === 'reading' && focus.index === i;
+      ctx.fillStyle = focused ? CREAM : '#E6DCC3';
+      ctx.fillRect(ar.x, ar.y - (focused ? 1 : 0), ar.w, ar.h);
+      frame(ctx, { x: ar.x, y: ar.y - (focused ? 1 : 0), w: ar.w, h: ar.h }, focused ? MAGENTA : '#5D275D');
+      drawSeal(ctx, ar.x + 4, ar.y + 5 - (focused ? 1 : 0), { emblem: i === 0 ? 'check' : 'plus' });
+      drawText(ctx, labels[i], ar.x + 20, ar.y + 7 - (focused ? 1 : 0), { color: COLORS.paper.ink });
+      if (i > 0) drawText(ctx, t('battle.msg.readingFree'), ar.x + ar.w - 6, ar.y + 8 - (focused ? 1 : 0), { color: COLORS.paper.inkSoft, align: 'right', font: 'small' });
+    }
+    if (mode === 'readingDone' || (mode === 'readingFlip' && reading.f > 30)) drawMessage(ctx);
+  }
+
+  /** The script's creature has no open Shift window (all its window levels are resolved). */
+  function scriptWindowClosed() {
+    const c = findCreature();
+    if (!c) return false;
+    try { return exp.openWindows(c, data, { tuning: tuningFor(data) }).length === 0; } catch { return false; }
   }
 
   function close(kind, result) {
@@ -243,6 +391,7 @@ export function createForecastScene(G) {
   }
 
   function onActivate(item) {
+    if (mode === 'reading') { readingActivate(item); return; }
     if (mode !== 'cards' || !item) return;
     if (item.id.startsWith('card')) {
       const i = Number(item.id.slice(4));
@@ -258,6 +407,7 @@ export function createForecastScene(G) {
   function doAccept() {
     sfx('confirm');
     const fromForm = creatureRec.speciesId;
+    const movesBefore = (creatureRec.moves || []).map((m) => m.id);
     const header = headerSnapshot();
     let r;
     try {
@@ -267,7 +417,10 @@ export function createForecastScene(G) {
       mode = 'result';
       return;
     }
-    outcome = { kind: 'accepted', index: r.index, card: r.card, result: r.result, fromForm, toForm: r.result.to, header };
+    // a same-type hit the new form brought (creature.shiftTo, FE-06) is named on the result line
+    const after = findCreature();
+    const learned = after ? after.moves.map((m) => m.id).filter((id) => !movesBefore.includes(id)) : [];
+    outcome = { kind: 'accepted', index: r.index, card: r.card, result: r.result, fromForm, toForm: r.result.to, header, learned };
     flipSkippable = flipSeen(world());
     G.store.tx('forecast.flipSeen', (w) => flags.setFlag(w, FLIP_SEEN_FLAG, true, { bus: G.bus }));
     flipF = 0;
@@ -281,6 +434,10 @@ export function createForecastScene(G) {
     const name = creatureRec.nickname;
     const sp = data.tryGet ? data.tryGet('species', outcome.toForm) : null;
     message = t('shift.accepted', { nick: name, form: sp ? sp.name : outcome.toForm });
+    for (const id of outcome.learned || []) {
+      const mv = data.tryGet ? data.tryGet('moves', id) : null;
+      message += ` ${t('battle.msg.learned', { target: name, move: mv ? mv.name : id })}`;
+    }
   }
 
   function doReroll() {
@@ -325,7 +482,12 @@ export function createForecastScene(G) {
 
   /** @param {number} dt */
   function update(dt) {
+    if (noWindow && !popped) { close('closed'); return; }
     elapsed += dt;
+    if (reading && mode === 'readingFlip') {
+      reading.f += dt / FRAME_MS;
+      if (reading.f >= 60) mode = 'readingDone';
+    }
     if (lockMs > 0) lockMs = Math.max(0, lockMs - dt);
     if (reshuffleF > 0) reshuffleF = Math.max(0, reshuffleF - dt / FRAME_MS);
     if (mode === 'flip') {
@@ -341,6 +503,15 @@ export function createForecastScene(G) {
   function handleInput(input) {
     if (lockMs > 0) return; // the 0.5 s lock ignores held and new buttons alike
     const tap = input.pointer && input.pointer.justDown;
+    if (mode === 'reading') { focus.handle(input); return; }
+    if (mode === 'readingFlip') { if (input.pressed('confirm') || tap) mode = 'readingDone'; return; }
+    if (mode === 'readingDone') {
+      if (input.pressed('confirm') || input.pressed('cancel') || tap) {
+        const card = reading.cards[reading.picked];
+        close('accepted', { formId: card.name, ring: card.name, choice: 'accept' });
+      }
+      return;
+    }
     if (mode === 'error') {
       if (input.pressed('confirm') || input.pressed('cancel') || tap) close('closed');
       return;
@@ -377,6 +548,8 @@ export function createForecastScene(G) {
     ctx.fillRect(4, 4, W - 8, H - 8);
     frame(ctx, { x: 4, y: 4, w: W - 8, h: H - 8 }, MAGENTA);
     frame(ctx, { x: 6, y: 6, w: W - 12, h: H - 12 }, '#5D275D');
+    if (noWindow) return;
+    if (reading) { drawReading(ctx); return; }
     if (mode === 'error' || !fc) { drawError(ctx); return; }
     drawHeader(ctx);
     if (mode === 'flip' || (mode === 'result' && outcome && outcome.kind === 'accepted')) drawFlip(ctx);
@@ -648,11 +821,12 @@ export function createForecastScene(G) {
     const y = 211;
     drawPanel(ctx, { x, y, w, h: 18 + (measureText(message, { maxWidth: 300 }).h > 10 ? 10 : 0) }, 'notice', { torn: 'none' });
     drawText(ctx, message, x + 10, y + 5, { color: COLORS.paper.ink, maxWidth: 300 });
-    if (mode === 'result' && Math.floor(elapsed / 500) % 2 === 0) drawText(ctx, TYPE.more, x + w - 10, y + 6, { color: PALETTE.waxRed });
+    if ((mode === 'result' || mode === 'readingDone') && Math.floor(elapsed / 500) % 2 === 0) drawText(ctx, TYPE.more, x + w - 10, y + 6, { color: PALETTE.waxRed });
   }
 
   function debugText() {
     if (mode === 'error') return `forecast error: ${error}`;
+    if (reading) return `forecast ${mode} | reading ${reading.cards.map((c) => `${c.dir}:${c.name}@${c.odds}`).join(' ')} | picked ${reading.picked} | focus ${focus.current()?.id}`;
     if (!fc) return 'forecast';
     const cards = fc.cards.map((c) => `${c.dir}:${c.formId}@${c.odds}`).join(' ');
     return `forecast ${mode} | ${creatureRec.nickname} ${creatureRec.speciesId} | ${cards} | reroll ${fc.canReroll ? fc.rerollCost : fc.rerollReason} | anchor ${fc.canAnchor ? fc.anchorCost : fc.anchorReason} | focus ${focus.current()?.id} | ${message}`;

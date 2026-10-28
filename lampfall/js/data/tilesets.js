@@ -254,6 +254,7 @@ export const TILESETS = Object.freeze([
   t('cottage-wall-top', null, 'cottage-wall-1-top', solid({ artByTier: ['cottage-wall-0-top', 'cottage-wall-1-top', 'cottage-wall-2-top', 'cottage-wall-3-top'] })),
   t('int-wall', null, 'cottage-wall-1', solid()),
   t('int-wall-top', null, 'cottage-wall-1-top', solid()),
+  t('interior-void', null, 'interior-void', solid({ note: 'the unbuilt dark of a growing interior' })),
   t('rug', null, 'rug', { layer: 'detail' }),
   t('hearth', null, 'hearth', solid({ verb: 'look', anim: { frames: 3, fps: 6 }, glow: GLOW.fire })),
   t('counter', null, 'counter', solid({ verb: 'shop', note: 'ART REQUEST' })),

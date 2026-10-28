@@ -405,7 +405,7 @@ export function drawKeyGlyph(ctx, device, label, x, y, o) {
  * @param {CanvasRenderingContext2D} ctx
  * @param {string} text
  * @param {number} x @param {number} y
- * @param {{focused?: boolean, role?: 'safe'|'danger'|'neutral', dark?: boolean, w?: number}} [o]
+ * @param {{focused?: boolean, role?: 'safe'|'danger'|'neutral', dark?: boolean, w?: number, disabled?: boolean}} [o]
  * @returns {{x: number, y: number, w: number, h: number}}
  */
 export function drawSealButton(ctx, text, x, y, o) {
@@ -415,7 +415,7 @@ export function drawSealButton(ctx, text, x, y, o) {
   const w = opt.w || tw + 20;
   const h = 13;
   const role = opt.role || 'neutral';
-  const ink = role === 'danger' ? PALETTE.r : COLORS.paper.ink;
+  const ink = opt.disabled ? COLORS.paper.inkFaint : role === 'danger' ? PALETTE.r : COLORS.paper.ink;
   // Focused: raised a pixel on a deeper shadow, light paper, ink frame. Resting: flat, shaded paper,
   // a soft rule edge. (The focus model adds the cursor; the difference never rests on colour alone.)
   const lift = opt.focused ? 1 : 0;

@@ -410,11 +410,14 @@ export function buildSnail() {
   const up = [upBase, dn[1].map((r, i) => (i >= 20 ? r : upBase[i])), upBase, dn[3].map((r, i) => (i >= 20 ? r : upBase[i]))];
   const L = SNAIL.left24;
   const left = [L, L.map((r, i) => (i >= 20 && i <= 22 ? '.' + r.slice(0, 23) : r)), L, L.map((r, i) => (i === 21 ? r.slice(1) + '.' : r))];
-  // sit: she is always sitting; fish: rod propped in the satchel strap. The long profile already fills
-  // the 24-wide fishing cell, so it is stamped at 0 (same place on the tile as her walk frames).
+  // sit: she is always sitting; fish: rod propped in the satchel strap. Her long profile fills a
+  // 24-wide cell, so her fish frames are 40 wide (8 px each side; the renderer centres a wider frame,
+  // so her body stays where her walk frames put it) and the rod reaches out over the empty left
+  // margin: the rod, line and bobber stay visible instead of vanishing behind her shell.
   const sit = dn[0];
-  const fish = [0, 1, 2, 3].map((phase) => { const g = blank(FISH_W, 24); stamp(g, L, 0, 0); drawRod(g, 12, 14, phase, { rod: true, water: 21 }); return rows(g); });
-  return { w: 24, h: 24, ox: -4, oy: 0, down, up, left, right: left.map(flipH), sit, fish: fish[0], fishFrames: fish, fishW: FISH_W, fishOx: FISH_OX };
+  const SNAIL_FISH_W = 40, PAD = 8;
+  const fish = [0, 1, 2, 3].map((phase) => { const g = blank(SNAIL_FISH_W, 24); stamp(g, L, PAD, 0); drawRod(g, PAD + 8, 11, phase, { rod: true, water: 21 }); return rows(g); });
+  return { w: 24, h: 24, ox: -4, oy: 0, down, up, left, right: left.map(flipH), sit, fish: fish[0], fishFrames: fish, fishW: SNAIL_FISH_W, fishOx: -4 - PAD };
 }
 
 // ---------------------------------------------------------------------------

@@ -24,6 +24,7 @@
  */
 
 import { lead as selectLead, day as selectDay } from '../state/selectors.js';
+import { setFlag } from './flags.js';
 
 /** @typedef {import('../state/schema.js').World} World */
 /** @typedef {import('../state/schema.js').Creature} Creature */
@@ -692,7 +693,30 @@ export function spendCleaned(world, findId) {
   const rec = world?.collections?.relics?.[findId];
   if (!rec || rec.cleaned !== true) return false;
   rec.cleaned = false;
+  // the Field Log keeps saying "Cleaned once" after the cleaned specimen is sold
+  setFlag(world, `${CLEANED_SOLD_PREFIX}${findId}`, true);
   return true;
+}
+
+/** Flag prefix marking a find whose cleaned specimen has been sold (`sys.cleaned-sold.<findId>`). */
+export const CLEANED_SOLD_PREFIX = 'sys.cleaned-sold.';
+
+/**
+ * Whether a find was ever cleaned and sold (the Field Log's "Cleaned once").
+ * @param {World} world @param {string} findId
+ * @returns {boolean}
+ */
+export function cleanedOnce(world, findId) {
+  return world?.flags?.[`${CLEANED_SOLD_PREFIX}${findId}`] === true;
+}
+
+/**
+ * The value multiplier a cleaned find sells at (`findCleanMult`, +40%).
+ * @param {any} [ctx]
+ * @returns {number}
+ */
+export function cleanMult(ctx) {
+  return tuningOf(tuningSource(ctx)).findCleanMult;
 }
 
 // ---------------------------------------------------------------------------------------------

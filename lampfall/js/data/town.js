@@ -491,6 +491,11 @@ export const DAY_PAGE = deepFreeze({
     letter: 'Read {label}.',
     heirloom: '{item} went home to {porch}.',
     badge: 'The {spire} seal on the tally wall.',
+    lost: 'Lost to {name}. Home to the porch, a bit lighter in the pocket.',
+    lostWild: 'Lost a fight in the wild. Home to the porch, a bit lighter in the pocket.',
+    // a loss that sent nobody home (a story fight, a Keeper, a mentor or friend): no porch, no buttons
+    lostPlain: 'Lost to {name}.',
+    lostWildPlain: 'Lost a fight in the wild.',
     stamp: 'A stamp in the book: {stamp}.',
   },
   quietDay: [
@@ -517,6 +522,7 @@ export const TOMORROW = deepFreeze({
   bench: '{find} comes off the bench cleaned',
   forecast: '{nick} has a Shift pip lit (a Waystone, or home at the {time} low)',
   letter: '{label} at six',
+  meet: '{who} on {place} at the low',
   beat: '{who}\'s porch tonight: {title}',
   low: 'lows at {times}',
   carry: '{label} to carry to its door',

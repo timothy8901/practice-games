@@ -172,6 +172,32 @@ export function talk(world, npcId, data, opts = {}) {
 }
 
 /**
+ * Records that an NPC spoke to the player inside a story script or cutscene (FE-03 / FE-07): `met`
+ * and, for the first such line of the day, `lastTalkDay` and the daily affinity, so the generic
+ * first-meeting topic is skipped, Porch Duel slates and `threadStartNeedsMet` count them, and the
+ * Day Page lists them under "Talked with". Unlike {@link talk} it leaves `talks` alone (topic
+ * conds such as `talks >= 4` count real conversations) and emits nothing (no talk blip).
+ * @param {World} world
+ * @param {string} npcId
+ * @param {any} [data]
+ * @param {TalkOpts} [opts]
+ * @returns {{first: boolean, firstToday: boolean}}
+ */
+export function meet(world, npcId, data, opts = {}) {
+  const t = tuningOf(data, opts);
+  const day = coreDay(world, opts);
+  const m = ensure(world, npcId);
+  const first = !m.met;
+  const firstToday = m.lastTalkDay !== day;
+  m.met = true;
+  if (firstToday) {
+    m.lastTalkDay = day;
+    m.affinity += t.affinityPerTalkDay;
+  }
+  return { first, firstToday };
+}
+
+/**
  * Day the player last talked to an NPC (-1 never).
  * @param {World} world
  * @param {string} npcId

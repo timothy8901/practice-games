@@ -95,10 +95,12 @@ describe('MID-08: badge gifts from spires.js unlocks', () => {
       assert.ok(post.badge, tr);
       assert.equal(bag.count(G.world, item, undefined, { data }), 1, `${item} after ${tr}`);
       assert.deepEqual(post.rewards.map((r) => r.item), [item]);
-      assert.match(post.rewards[0].line, /^Received: /);
+      // the leader's badge script hands it over in person (LF-15): the slip says it waits, no early toast
+      assert.match(post.rewards[0].line, /^A gift waits: the /);
+      assert.ok(!/Disc:/.test(post.rewards[0].line), 'no "Disc:" prefix in a sentence (LF-22)');
       got[item] = post;
     }
-    assert.ok(G.events.some(([e, p]) => e === 'toast' && /Scouting Prism/.test(p.text)), 'a toast names the gift');
+    assert.ok(!G.events.some(([e, p]) => e === 'toast' && /Scouting Prism/.test(p.text)), 'no toast before the handover (LF-15)');
     // a second win over a beaten leader is not a new badge: nothing more is given
     const again = winSpire(G, 'ines-spire');
     assert.equal(again.badge, null);

@@ -534,7 +534,7 @@ export default {
       { text: 'Sorry.', then: ['Ludo: Don\'t be sorry. Be selling.'] },
       { text: 'Is the blood rushing to your head?', then: ['Ludo: Always. It\'s how I think so fast. ~ Selling?'] },
     ] },
-    { op: 'openShop', shop: 'ludo-eave' },
+    { op: 'openShop', shop: 'ludo-eave', mode: 'sell' },
     { op: 'if', cond: { wallet: { gte: 3000 } },
       then: ['Ludo: Three thousand in your apron. ~ The yard\'s still lit. Wren pays attention to people who pay attention.'],
       else: ['Ludo: Come back with more. Ten till eight, every night. Someone\'s always buying. Usually me.'] },
@@ -675,8 +675,16 @@ export default {
       { op: 'goto', id: 'out' },
     ] },
     { op: 'if', cond: { not: { flag: 'np.corin.stones-met' } }, then: [
-      '* Corin is on the last stone of the crossing with his feathers fluffed against the morning, facing exactly the wrong way until you speak.',
-      'Corin: Keeper. You came at the low. ~ Most people come at noon and then wonder where the stones went.',
+      // FE-11: the lines follow the tide you actually came on (the long road works at any tide)
+      { op: 'if', cond: { lowTide: true },
+        then: [
+          '* Corin is on the last stone of the crossing with his feathers fluffed against the wind, facing exactly the wrong way until you speak.',
+          'Corin: Keeper. You came at the low. ~ Most people come at noon and then wonder where the stones went.',
+        ],
+        else: [
+          '* Corin is on the last stone still above the water, feathers fluffed against the wind, facing exactly the wrong way until you speak.',
+          'Corin: Keeper. Not the low, but you came. ~ Most people come at noon and then wonder where the stones went. You only wondered a little.',
+        ] },
       flag('np.corin.stones-met'),
     ] },
     { op: 'if', cond: { not: { party: { level: { gte: 8 } } } }, then: [

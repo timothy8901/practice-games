@@ -133,7 +133,7 @@ export function createFieldLogScene(G) {
       const patient = world()?.collections?.patientBest?.[r.id];
       if (patient > 0) notes.push(`Patient mode best: ${patient} cm`);
     } else if (tabIndex === 2) notes.push(`Movement: ${r.move ?? 'Watch, walk, then swing the net.'}`, `Habitat: ${Array.isArray(r.habitat) ? r.habitat.map(pretty).join(', ') : r.habitat ?? 'The harbor lanes'}`, item.held ? `Caught: ${record.n}` : 'Walk up slowly; running can startle it.');
-    else notes.push(item.held ? `Found: ${record.n} / ${record.cleaned ? 'Cleaned' : 'Uncleaned'}` : 'Dig cracks or search shore sparkles to collect it.', r.skyglass ? 'Skyglass: the Carnival Raft can refine this into Starsalt.' : '', r.letter ? `String-wall connection: ${String(r.letter).toUpperCase()}` : '');
+    else notes.push(item.held ? `Found: ${record.n} / ${record.cleaned ? 'Cleaned' : logSys.cleanedOnce(world(), r.id) ? 'Cleaned once' : 'Uncleaned'}` : 'Dig cracks or search shore sparkles to collect it.', r.skyglass ? 'Skyglass: the Carnival Raft can refine this into Starsalt.' : '', r.letter ? `String-wall connection: ${String(r.letter).toUpperCase()}` : '');
     notes.push('', item.donated ? 'Donated to Barnaby’s Archive.' : 'Bring a specimen to Barnaby’s Archive to donate it.');
     if (item.held && r.archive) notes.push('', `Barnaby: ${r.archive}`);
     return notes;

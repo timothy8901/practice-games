@@ -147,6 +147,9 @@ export default {
     at(hm(23, 59), P, 'door-coop-yard', { pose: 'sleep' }),
   ],
   topics: [
+    // FE-08: the apron errand runs when you talk to her at the yard, not only on its hidden step cell
+    // (only in the yard: the scene stages her there and describes the yard)
+    topic('apron', 'yard-apron', 11, { cond: { all: [{ flag: 'sp.errands-started' }, { not: { flag: 'sys.errand.apron' } }, { map: 'pellwick' }, { inRegion: 'coop-yard' }] } }),
     topic('first', 'talk-wren-first', 10, { cond: { npc: { id: ID, met: false } }, once: true }),
     topic('own-design', 'talk-wren-own-design', 7, { cond: { loan: { tier: { gte: 3 } } }, once: true }),
     topic('favourite-remembered', 'talk-wren-favourite-remembered', 6, { cond: { all: [{ flag: 'np.wren.favourite', is: true }, { loan: { tier: { gte: 5 } } }] }, once: true }),

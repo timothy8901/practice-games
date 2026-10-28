@@ -255,7 +255,15 @@ export function createSession(G, o) {
     next(answer) {
       // the live world may have been replaced (load); the runner keeps the one it started with,
       // which is the right one for a running script
-      return G.store.tx(`script:${scriptId ?? 'inline'}`, () => runner.step(answer));
+      return G.store.tx(`script:${scriptId ?? 'inline'}`, () => {
+        const r = runner.step(answer);
+        // an NPC who speaks in a story script or cutscene has met the player (FE-03 / FE-07)
+        if (r && r.op === 'say' && typeof r.who === 'string' && data && typeof data.has === 'function' && data.has('npcs', r.who)) {
+          const w = ctx.world;
+          if (w && w.npcs && typeof w.npcs === 'object') memory.meet(w, r.who, data);
+        }
+        return r;
+      });
     },
     save: () => runner.save(),
     isDone: () => runner.isDone(),

@@ -40,6 +40,7 @@ import { forkFor } from '../state/rngs.js';
 import { makeTuning, lookup, itemOf, allItems, money, isPriced, nowOf, minuteOfDay, dayOf, gameDay, emit, assertCount, assertId, deepFreeze, is } from './econ.js';
 import * as wallet from './wallet.js';
 import * as bag from './bag.js';
+import * as fieldLog from './fieldLog.js';
 
 /** @typedef {import('../state/schema.js').World} World */
 /** @typedef {import('../state/schema.js').ItemStack} ItemStack */
@@ -542,9 +543,12 @@ export function sell(world, shopId, itemId, n = 1, ctx) {
   const day = dayOf(world, ctx, t);
   rollover(world, day);
   if (quote.wantedUnits > 0) world.shops.wantedSold[itemId] = (world.shops.wantedSold[itemId] ?? 0) + quote.wantedUnits;
-  if (quote.total > 0) wallet.earn(world, quote.total, { ...ctx, source: ctx?.source ?? `sell:${row.id}` });
-  emit(ctx, 'shop:sold', { shopId: row.id, itemId, n, earned: quote.total, wanted: quote.wantedUnits });
-  return { ok: true, earned: quote.total, wantedUnits: quote.wantedUnits, after: world.wallet.main, left: took.left };
+  // a cleaned specimen (Workshop bench / Kiln lead) goes first, at the +40% price, here as at Barnaby's
+  const bonus = cleanedBonus(world, itemId, quote.unit, ctx);
+  const earned = quote.total + bonus;
+  if (earned > 0) wallet.earn(world, earned, { ...ctx, source: ctx?.source ?? `sell:${row.id}` });
+  emit(ctx, 'shop:sold', { shopId: row.id, itemId, n, earned, wanted: quote.wantedUnits, cleaned: bonus > 0 });
+  return { ok: true, earned, wantedUnits: quote.wantedUnits, after: world.wallet.main, left: took.left, cleaned: bonus > 0 };
 }
 
 /**
@@ -703,9 +707,27 @@ export function refine(world, shopId, itemId, n = 1, ctx) {
  * @param {EconCtx} [ctx]
  * @returns {number}
  */
-export function crateValue(itemRow, n, ctx) {
+export function crateValue(itemRow, n, ctx, opts = {}) {
   if (!itemRow) return 0;
-  return Math.floor(sellValue(itemRow, ctx) * n * tuningOf(ctx).crateRate);
+  const unit = sellValue(itemRow, ctx);
+  // `opts.cleaned`: one of the `n` is a cleaned specimen, worth `findCleanMult` (+40%)
+  const extra = opts.cleaned && n >= 1 ? Math.round(unit * (fieldLog.cleanMult(ctx) - 1)) : 0;
+  return Math.floor((unit * n + extra) * tuningOf(ctx).crateRate);
+}
+
+/**
+ * The extra a cleaned specimen fetches over the plain unit price (`findCleanMult` − 1), spending the
+ * find's cleaned mark (fieldLog.spendCleaned). 0 when none is waiting. Call inside a tx.
+ * @param {World} world
+ * @param {string} itemId
+ * @param {number} unit   the plain unit price
+ * @param {EconCtx} [ctx]
+ * @returns {number}
+ */
+function cleanedBonus(world, itemId, unit, ctx) {
+  if (!(unit > 0) || !fieldLog.hasCleaned(world, itemId)) return 0;
+  fieldLog.spendCleaned(world, itemId);
+  return Math.round(unit * (fieldLog.cleanMult(ctx) - 1));
 }
 
 /**
@@ -781,7 +803,9 @@ export function settleCrate(world, ctx) {
       kept.push(line);
       continue;
     }
-    lines.push({ id: line.id, n: line.n, earned: crateValue(it, line.n, ctx) });
+    const cleaned = fieldLog.hasCleaned(world, line.id) && sellValue(it, ctx) > 0;
+    if (cleaned) fieldLog.spendCleaned(world, line.id);
+    lines.push({ id: line.id, n: line.n, earned: crateValue(it, line.n, ctx, { cleaned }) });
   }
   const earned = lines.reduce((s, l) => s + l.earned, 0);
   world.shops.crate = kept;

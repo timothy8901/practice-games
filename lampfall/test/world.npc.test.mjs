@@ -142,6 +142,33 @@ describe('createNpcDriver: walking to a placement', () => {
     assert.deepEqual([npc.x, npc.y, npc.facing], [4, 5, 'right']);
   });
 
+  it('FE-04: once the player leaves its goal, a settled NPC walks back onto it (no parking in the way)', () => {
+    const ents = createEntities(map);
+    const npc = ents.add(createEntity({ id: 'n', kind: 'npc', x: 3, y: 5 }));
+    const player = ents.add(createEntity({ id: 'player', kind: 'player', x: 5, y: 5 }));
+    const drv = createNpcDriver(npc);
+    drv.setPlacement({ mapId: 'lane', x: 5, y: 5, facing: 'down' });
+    const ctx = { map, ents, tideState: 'low' };
+    run(drv, ents, ctx, 400);
+    assert.deepEqual([npc.x, npc.y], [4, 5]);
+    ents.teleport(player, 8, 1);
+    run(drv, ents, ctx, 400, () => npc.x === 5 && npc.y === 5 && !npc.moving);
+    assert.deepEqual([npc.x, npc.y, npc.facing], [5, 5, 'down']);
+  });
+
+  it('FE-04: a walking loop whose next point is occupied goes on to the following point', () => {
+    const ents = createEntities(map);
+    const npc = ents.add(createEntity({ id: 'n', kind: 'npc', x: 1, y: 5 }));
+    ents.add(createEntity({ id: 'player', kind: 'player', x: 5, y: 5 }));
+    const drv = createNpcDriver(npc);
+    drv.setPlacement({ mapId: 'lane', x: 1, y: 5, pose: 'path', pathId: 'loop' });
+    const route = [{ x: 5, y: 5 }, { x: 8, y: 5 }, { x: 1, y: 5 }];
+    const ctx = { map, ents, tideState: 'low', route };
+    const tiles = [];
+    for (let i = 0; i < 800; i++) { ents.tickAll(16); drv.tick(16, ctx); tiles.push(`${npc.x},${npc.y}`); }
+    assert.ok(tiles.includes('8,5'), 'reached the point after the occupied one');
+  });
+
   it("reports 'offmap' for a placement elsewhere and 'idle' with none", () => {
     const ents = createEntities(map);
     const npc = ents.add(createEntity({ id: 'n', kind: 'npc', x: 3, y: 5 }));

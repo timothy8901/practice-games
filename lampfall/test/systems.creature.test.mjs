@@ -383,8 +383,39 @@ describe('shiftTo', () => {
       assert.deepEqual(a.kept, b.kept, to);
       assert.deepEqual(a.toMemory, b.toMemory, to);
       assert.deepEqual(ours.base, theirs.base, to);
-      assert.deepEqual(ours.moves, theirs.moves, to);
+      // the one intended difference (FE-06): a form left with no same-type hit gets one in a free slot
+      assert.deepEqual(ours.moves.filter((m) => !a.learned.includes(m.id)), theirs.moves, to);
     }
+  });
+
+  it('a Shift that leaves no hit of the new types gives the form\'s latest same-type move at or below the level (FE-06)', () => {
+    // the FE-06 run: Fern the Scrapling L8 rolls Down to Sootling (Kiln) and kept only tap + shadowbox
+    const c = C.makeCreature({ uid: 'c1', speciesId: 'scrapling', level: 8 }, DATA);
+    const r = C.shiftTo(c, 'sootling', DATA, 'drift');
+    const kiln = c.moves.map((m) => DATA.moves[m.id] ?? null).filter((mv) => mv && mv.type === 'Kiln' && mv.category !== 'status' && mv.power > 0);
+    assert.ok(kiln.length >= 1, `a Kiln hit after the Shift: ${c.moves.map((m) => m.id)}`);
+    assert.deepEqual(r.learned, ['ember-lick'], 'the latest Kiln hit learnable by Lv8 (Scorch is a status move)');
+    assert.ok(c.moves.length <= 4);
+    assert.ok(!c.memory.includes('ember-lick'));
+    // a form that already keeps a same-type hit learns nothing
+    const hit = (id, types) => { const mv = DATA.moves[id]; return !!mv && mv.category !== 'status' && mv.power > 0 && types.includes(mv.type); };
+    for (const to of ['siltback', 'mudfist', 'puddlepip', 'skeinwing', 'chillnub', 'lumenveil']) {
+      const d = mk('c2', 'sloshkin', 40);
+      const types = SPECIES[to].types;
+      const hadHit = d.moves.some((m) => hit(m.id, types) && SPECIES[to].learnset.some((l) => l.move === m.id));
+      const rd = C.shiftTo(d, to, DATA, 'drift');
+      if (hadHit) assert.deepEqual(rd.learned, [], `${to}: a kept same-type hit means nothing new`);
+      else assert.ok(rd.learned.length <= 1, to);
+    }
+    // a full set: the new hit replaces the last non-Heartmark move, which goes to Memory
+    const e = C.makeCreature({ uid: 'c3', speciesId: 'scrapling', level: 30, moves: ['tap', 'knuckle', 'settle', 'shadowbox'] }, DATA);
+    const before = e.moves.map((m) => m.id);
+    const re = C.shiftTo(e, 'sootling', DATA, 'drift');
+    assert.equal(re.learned.length, 1);
+    assert.equal(e.moves.length, 4);
+    assert.ok(e.moves.some((m) => m.id === e.heartmark || !e.heartmark));
+    assert.ok(re.toMemory.every((id) => before.includes(id)));
+    assert.ok(e.memory.every((id) => !e.moves.some((m) => m.id === id)));
   });
 
   it('STAT_FLOOR is tunable per dial', () => {

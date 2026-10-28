@@ -27,6 +27,7 @@ import { drawSealButton } from './widgets.js';
  * @property {number} [defaultIndex]  The safe option; defaults to the last.
  * @property {number} [lockMs=500]
  * @property {boolean} [danger]       Mark the non-default options as destructive (× glyph, red ink).
+ * @property {boolean[]} [disabled]   Options shown greyed out that focus skips (LF-14: the bed's Sleep before 21:00).
  * @property {number} [width]         Screen width (default 480) @property {number} [height]
  */
 
@@ -75,7 +76,7 @@ export function createConfirmScene(o) {
 
   const focus = createFocus({
     cols: options.length, wrap: true, index: safe,
-    items: options.map((t, i) => ({ id: String(i), rect: lay.buttons[i], enabled: true })),
+    items: options.map((t, i) => ({ id: String(i), rect: lay.buttons[i], enabled: !(Array.isArray(o.disabled) && o.disabled[i]) })),
   });
 
   function finish(i) {
@@ -120,7 +121,7 @@ export function createConfirmScene(o) {
       options.forEach((label, i) => {
         const b = lay.buttons[i];
         const role = i === safe ? 'safe' : o.danger ? 'danger' : 'neutral';
-        drawSealButton(ctx, label, b.x, b.y, { focused: i === focus.index, role, w: b.w });
+        drawSealButton(ctx, label, b.x, b.y, { focused: i === focus.index, role, w: b.w, disabled: Array.isArray(o.disabled) && !!o.disabled[i] });
       });
       // lock gauge: a ledger rule that shrinks while input is ignored (no press is ever asked for)
       const gx = lay.panel.x + 12, gw = lay.panel.w - 24, gy = lay.panel.y + lay.panel.h - 7;

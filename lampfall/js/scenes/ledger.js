@@ -77,11 +77,22 @@ export function createLedgerScene(G) {
       const res = G.store.tx('ledger:pay', world => loans.pay(world, row.amount, ctx()));
       if (!res.ok) { note(res, ''); return; }
       refresh(); G.persist?.autosave?.(G, 'loan-payment');
-      G.scenes.push(createCeremonyScene(G, {
+      const params = {
         ...res,
-        roofChoices: res.cleared ? loans.roofChoices(res.cleared.tier, ctx()) : [],
+        roofChoices: res.cleared && loans.hasRoofPhase(res.cleared.tier, ctx()) ? loans.roofChoices(res.cleared.tier, ctx()) : [],
         onRoof: colour => G.store.tx('loan:roof', world => loans.chooseRoof(world, res.cleared.tier, colour, ctx())),
-      }));
+      };
+      // LF-03 (MID-11): a commission loan (3-6) waiting on its room gets Wren's chalk plan in the
+      // ceremony here too, as at the yard counter, so paying from the Ledger never clears into no build
+      const prompt = loans.commissionPrompt(G.world, res, ctx());
+      if (prompt) {
+        Object.assign(params, {
+          rooms: prompt.rooms, roomTier: prompt.tier, roomFirst: prompt.roomFirst,
+          onRoom: (roomId) => G.store.tx('loan:commission', (world) => loans.chooseCommission(world, roomId, ctx())),
+          roomPrompt: () => loans.commissionPrompt(G.world, null, ctx()),
+        });
+      }
+      G.scenes.push(createCeremonyScene(G, params));
       return;
     }
     if (page === 1) {
@@ -125,16 +136,18 @@ export function createLedgerScene(G) {
       drawPanel(canvas, { x: 12, y: 46, w: 226, h: 202 }, 'ledger');
       drawPanel(canvas, { x: 246, y: 46, w: 222, h: 202 }, 'card');
       const st = status();
-      drawText(canvas, `Loan ${Math.min(7, st.tier)} of 7`, 23, 57, { color: COLORS.paper.ink });
-      drawText(canvas, 'No interest. No deadline.', 23, 71, { color: COLORS.paper.inkSoft, font: 'small' });
-      drawText(canvas, `Owed: ${money(st.balance)}`, 23, 87, { color: PALETTE.waxRed });
-      drawText(canvas, `In your apron: ${money(G.world.wallet.main)}`, 23, 103, { color: COLORS.paper.ink, font: 'small' });
+      // FE-19: every line sits just above a rule (rules at 61 + 10k: a main line's descender ends on
+      // row 8, so its top is the rule - 9; a small line's on row 5, top = rule - 6), never through one
+      drawText(canvas, `Loan ${Math.min(7, st.tier)} of 7`, 23, 52, { color: COLORS.paper.ink });
+      drawText(canvas, 'No interest. No deadline.', 23, 65, { color: COLORS.paper.inkSoft, font: 'small' });
+      drawText(canvas, `Owed: ${money(st.balance)}`, 23, 82, { color: PALETTE.waxRed });
+      drawText(canvas, `In your apron: ${money(G.world.wallet.main)}`, 23, 95, { color: COLORS.paper.ink, font: 'small' });
       st.houses.forEach((house, i) => {
         const title = G.data.tryGet('loans', `tier-${house.tier}`)?.name ?? `Loan ${house.tier}`;
-        drawText(canvas, `${house.built ? '*' : house.state === 'paid' ? '+' : '-'} ${house.tier}. ${title}`, 23, 125 + i * 13, { color: house.built ? COLORS.paper.ink : COLORS.paper.inkSoft, font: 'small', maxWidth: 202 });
+        drawText(canvas, `${house.built ? '*' : house.state === 'paid' ? '+' : '-'} ${house.tier}. ${title}`, 23, 115 + i * 10, { color: house.built ? COLORS.paper.ink : COLORS.paper.inkSoft, font: 'small', maxWidth: 202 });
       });
-      drawText(canvas, `Scaffold: ${st.scaffold} / ${st.scaffoldMax}`, 23, 224, { color: COLORS.paper.inkSoft, font: 'small' });
-      drawText(canvas, residentShareLine(G.world, G.data), 23, 235, { color: COLORS.paper.inkSoft, font: 'small', maxWidth: 206 });
+      drawText(canvas, `Scaffold: ${st.scaffold} / ${st.scaffoldMax}`, 23, 215, { color: COLORS.paper.inkSoft, font: 'small' });
+      drawText(canvas, residentShareLine(G.world, G.data), 23, 225, { color: COLORS.paper.inkSoft, font: 'small', maxWidth: 206 });
       if (page === 2) drawText(canvas, `Jar: ${money(st.jar)}`, 258, 51, { color: COLORS.paper.inkSoft, font: 'small' });
       if (page === 1) drawText(canvas, st.needsCommission ? `Choose for loan ${st.pendingPickTier}` : st.paidOff ? 'Two rooms can still be yours.' : 'Plans for your next room', 258, 51, { color: COLORS.paper.inkSoft, font: 'small' });
       if (!rows.length) drawText(canvas, st.paidOff ? 'Paid in full. The light is yours.' : 'Your buttons can wait. Errands, and finds sold at Pell\'s or to Ludo, fill the apron.', 258, 82, { color: COLORS.paper.inkSoft, maxWidth: 194 }); // str
@@ -146,7 +159,7 @@ export function createLedgerScene(G) {
         drawText(canvas, `${top + i === index ? '>' : ' '} ${row.label}`, 258, y + 2, { color: row.disabled ? COLORS.paper.inkFaint : COLORS.paper.ink, font: 'small', maxWidth: 196 });
       });
       const selected = rows[index];
-      const detail = selected?.detail || (page === 0 ? 'Payments notch the stick. A cleared loan raises the scaffold at dawn.' : 'Pick four rooms as loans three through six open. Each one changes your home.');
+      const detail = selected?.detail || (page === 0 ? 'Payments post to Wren\'s book from anywhere and notch the stick. A cleared loan raises the scaffold at dawn.' : 'Pick four rooms as loans three through six open. Each one changes your home.');
       wrapText(detail, 192, { font: 'small' }).slice(0, 4).forEach((line, i) => drawText(canvas, line, 258, 204 + i * 9, { color: COLORS.paper.inkSoft, font: 'small' }));
       drawHints(canvas, G.input, [['left', 'Page'], ['right', 'Page'], ['confirm', 'Choose'], ['cancel', 'Back']]);
     },

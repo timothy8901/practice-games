@@ -148,6 +148,10 @@ export function createNpcDriver(ent, opts = {}) {
   let settled = false;     // reported 'arrived' for the current goal
   let reached = false;     // reached the placement since it was set (wander reports 'arrived' once)
   let routeIdx = 0;
+  /** the real goal while settled beside it because someone stood on it (FE-04); retaken once free */
+  let displaced = null;
+  /** blocked mid-route past giveUpMs: the next plan routes round actors too (FE-04) */
+  let avoidActors = false;
   /** @type {NpcStatus} */
   let status = 'idle';
   let pose = 'stand';
@@ -157,7 +161,7 @@ export function createNpcDriver(ent, opts = {}) {
 
   function setGoal(x, y) {
     if (hasGoal && gx === x && gy === y) return;
-    gx = x; gy = y; hasGoal = true; settled = false; blockedMs = 0;
+    gx = x; gy = y; hasGoal = true; settled = false; blockedMs = 0; avoidActors = false;
     clearPath();
   }
 
@@ -167,6 +171,7 @@ export function createNpcDriver(ent, opts = {}) {
       && pl.pose === placement.pose && pl.facing === placement.facing && pl.pathId === placement.pathId) return;
     placement = pl || null;
     routeIdx = 0;
+    displaced = null;
     pauseMs = 0;
     repathMs = 0;
     reached = false;
@@ -201,9 +206,9 @@ export function createNpcDriver(ent, opts = {}) {
     // Tile-only cached routes can cross benches and other solid field props. Re-route around
     // those props; actors still use the existing wait/settle rules, including an occupied goal.
     const blocked = (x, y) => (x !== gx || y !== gy) && ctx.ents.near(x, y, 0)
-      .some((e) => e.solid && e !== ent && e.kind !== 'npc' && e.kind !== 'player');
+      .some((e) => e.solid && e !== ent && (avoidActors || (e.kind !== 'npc' && e.kind !== 'player')));
     if (path) for (let i = 0; i < path.length; i += 2) {
-      if (blocked(path[i], path[i + 1])) { path = findPath(ctx.map, from, to, { ...po, blocked }); break; }
+      if (blocked(path[i], path[i + 1])) { path = findPath(ctx.map, from, to, { ...po, blocked }) || (avoidActors ? path : null); break; }
     }
     pathIdx = 0; pathGx = gx; pathGy = gy; pathVariant = v;
     ent.path = /** @type {number[]|null} */ (path);
@@ -256,6 +261,14 @@ export function createNpcDriver(ent, opts = {}) {
         return (status = 'idle');
       }
       pose = p;
+      // settled beside an occupied goal (FE-04: Dimity on the door step after the player stood at her
+      // post): walk back to it as soon as it is free, rather than idling in the way all evening
+      if (displaced && !ctx.ents.solidAt(displaced.x, displaced.y)) {
+        const d = displaced;
+        displaced = null;
+        setGoal(d.x, d.y);
+        return (status = 'walking');
+      }
       if (!settled) {
         settled = true;
         face();
@@ -278,7 +291,16 @@ export function createNpcDriver(ent, opts = {}) {
     }
     blockedMs += ms;
     if (nx === gx && ny === gy && blockedMs >= T('giveUpMs')) {
-      // someone stands on the goal: settle here, facing it
+      // a walking loop goes on to its next point rather than parking on the way (FE-04: Wick on the
+      // cottage gate while someone stood at the porch post)
+      if (p === 'path' && ctx.route && ctx.route.length > 1) {
+        const pt = ctx.route[routeIdx % ctx.route.length];
+        routeIdx = (routeIdx + 1) % ctx.route.length;
+        setGoal(pt.x, pt.y);
+        return (status = 'walking');
+      }
+      // someone stands on the goal: settle here, facing it (and take the goal back once it is free)
+      displaced = { x: gx, y: gy };
       setGoal(ent.x, ent.y);
       ent.facing = dir;
       settled = true;
@@ -287,7 +309,8 @@ export function createNpcDriver(ent, opts = {}) {
       reached = true;
       return (status = 'arrived');
     }
-    if (blockedMs >= T('giveUpMs')) clearPath();   // an obstacle mid-route: re-plan (the map may route round)
+    // an obstacle mid-route: re-plan round it (actors included), else keep waiting on this path
+    if (blockedMs >= T('giveUpMs')) { clearPath(); avoidActors = true; blockedMs = 0; }
     return (status = 'blocked');
   }
 

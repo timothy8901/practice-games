@@ -280,13 +280,15 @@
             // keep the offered name: Done, then "Call it …?" (answered by the confirm branch)
             const ov = top.overlayState;
             if (ov && !ov.busy && ov.done) ov.done(); else await wait(40);
-            opts = { ...opts, confirmYes: true };
+            // "Call it …?" defaults to Yes (FE-23): confirm as it stands
+            opts = { ...opts, confirmDefault: true };
           } else if (s.scene === 'forecast') {
             await debug().press(top.mode === 'cards' ? 'cancel' : 'confirm', 2);
           } else if (s.scene === 'battle' && (s.mode === 'busy' || s.mode === 'intro' || s.mode === 'end' || s.mode === 'modal' || s.mode === 'party')) {
             await debug().press('confirm', 2);
           } else if (s.scene === 'confirm') {
             await wait(520);
+            if (opts.confirmDefault) { opts = { ...opts, confirmDefault: false }; await debug().press('confirm', 2); continue; }
             await debug().press(opts.confirmYes ? 'right' : 'left', 2);
             if (opts.confirmYes) await debug().press('confirm', 2); else await debug().press('cancel', 2);
           } else {

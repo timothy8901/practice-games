@@ -114,8 +114,6 @@ export default {
   ],
   topics: [
     topic('first', 'talk-ambrose-first', 10, { cond: { npc: { id: ID, met: false } }, once: true }),
-    // The Fence beat 3 is Ambrose's (the beat's npcId): the resolver reads only an npc's own threadId, so the hook is a topic (MID-03)
-    topic('fence-posts', 'th-the-fence-3', 20, { cond: { all: [{ thread: { id: 'the-fence', beat: { eq: 2 } } }, { hasItem: 'timber', n: 3 }, { hour: [7, 19] }] } }),
     topic('perch', 'talk-ambrose-perch', 6, { cond: { all: [{ npc: { id: ID, talks: { gte: 2 } } }, { party: { size: { gte: 1 } } }] }, once: true }),
     topic('alder-floor', 'talk-ambrose-alder-floor', 7, { cond: { flag: 'np.ambrose.alder-floor' }, once: true }),
     topic('lamp-room', 'talk-ambrose-lamp-room', 8, { cond: { all: [{ flag: 'sp.lamp-room-built' }, { not: { flag: 'sp.relighting' } }] }, once: true }),

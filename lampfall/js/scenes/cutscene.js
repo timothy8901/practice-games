@@ -162,7 +162,7 @@ export function createCutsceneScene(G) {
         return;
       case 'openShop':
         state = 'child'; childOp = r;
-        G.push('shop', { shop: r.shop, from: 'script' });
+        G.push('shop', { shop: r.shop, from: 'script', mode: r.mode ?? undefined });
         return;
       case 'move': {
         const dirs = parsePath(r.path);

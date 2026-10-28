@@ -791,6 +791,18 @@ export function roofChoices(tier, ctx) {
 }
 
 /**
+ * Whether paying a tier off asks for a cottage roof colour (LF-11): every build but the Lamp Room,
+ * which goes on the lighthouse, not the cottage. Pure.
+ * @param {number} tier
+ * @param {EconCtx} [ctx]
+ * @returns {boolean}
+ */
+export function hasRoofPhase(tier, ctx) {
+  const row = loanRow(tier, ctx);
+  return !row || row.build !== 'lamp-room';
+}
+
+/**
  * Sets the roof colour of a queued build (by tier, or by build id) before it lands.
  * @param {World} world
  * @param {number|string} target   tier number or build id

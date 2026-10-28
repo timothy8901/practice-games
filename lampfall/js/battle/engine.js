@@ -270,6 +270,7 @@ export class BattleError extends Error {
  * @property {'route'|'story'|'spire'|'rematch'|'duel'} [source='route']   EXP source; 'rematch' is damped over the curve
  * @property {((battle: Battle, side: number) => Action)|null} [foeAi]     fills side 1's action when omitted (battle/ai.js)
  * @property {Creature[]} [yard]                      Training Yard creatures (share of party EXP)
+ * @property {Creature[]} [bench]                     party members outside this battle's roster (a Relay round's sitters): bench share of KO EXP
  * @property {{seen: Set<string>, read: Set<string>}} [fieldLog]   built by the flow from world.fieldLog; the engine adds to it
  * @property {boolean} [prism=false]                  Scouting Prism owned
  * @property {Partial<DialRules>|Record<string, any>} [rules]   overrides of the dial's {@link DIAL_RULES}; a `data/dials.js` `rules` row works as is (see {@link normalizeDialRules})
@@ -398,6 +399,10 @@ export class Battle {
     if (opts.restat != null && typeof opts.restat !== 'function') throw new TypeError('createBattle: restat must be a function (creature) => void');
     this._restat = opts.restat || null;
     this.yard = opts.yard || [];
+    /** party members sitting this battle out (a Relay round's sitters): bench EXP like an unused party slot */
+    this.bench = Array.isArray(opts.bench) ? opts.bench : [];
+    /** @type {Array<{foe: Creature, battlers: Set<string>, bench: Set<string>}>} who stood when each foe fell (KO EXP, GDD-00 §8) */
+    this.koLog = [];
     this.prism = !!opts.prism;
     this.fieldLog = opts.fieldLog || { seen: new Set(), read: new Set() };
     const tuning = this.tuning;
@@ -2015,6 +2020,12 @@ export class Battle {
     this._emit({ type: 'damage', side, target: c.nickname, amount: dmg, hp: c.hp, maxHp: c.stats.hp, source, stanceFloor: floored && c.hp === 1 && dmg < want });
     if (held && endured) this._heldFired(side, c, held, 'endure', endured);
     if (isFainted(c)) {
+      if (side === 1 && !this.koLog.some((k) => k.foe === c)) {
+        // KO EXP is earned at the KO (GDD-00 §8): note who stood then, paid at the end (LF-12)
+        const me = this.sides[0];
+        const up = me.party.filter((p) => !isFainted(p));
+        this.koLog.push({ foe: c, battlers: new Set(up.filter((p) => me.participants.has(p.uid)).map((p) => p.uid)), bench: new Set(up.filter((p) => !me.participants.has(p.uid)).map((p) => p.uid)) });
+      }
       this._emit({ type: 'faint', side, target: c.nickname, text: `${c.nickname} fainted.` });
     } else if (held && c.heldItem === held.id) {
       const r = held.hooks.onDamageTaken({ phase: 'after', self: c, amount: dmg, source, uses: this._heldUses(side, c, held), mends: c.mends });
@@ -2221,7 +2232,11 @@ export class Battle {
         // a trainer who pays nothing (a story set piece, a Relay round before the last) says nothing about it
         if (this.payout > 0) this._emit({ type: 'payout', amount: this.payout, text: `You won ${this.payout} glint.` });
       }
-    } else if (outcome === 'loss') {
+    } else if ((outcome === 'loss' || outcome === 'draw') && this.koLog.length && !this.readingPhases) {
+      // the KOs scored before a loss still pay (LF-12)
+      this._distributeExp();
+    }
+    if (outcome === 'loss') {
       this.blackoutCost = this.summit ? 0 : Math.max(0, Math.min(t.blackoutCap, Math.floor(this.sides[0].glint * t.blackoutRate)));
       this._emit({ type: 'blackout', cost: this.blackoutCost, summit: this.summit, text: this.summit ? 'The Summit takes nothing.' : `You black out and lose ${this.blackoutCost} glint.` });
     }
@@ -2241,18 +2256,25 @@ export class Battle {
       gains.set(c.uid, (gains.get(c.uid) || 0) + amount);
       this._emit({ type: 'exp', creature: c.nickname, uid: c.uid, amount, share, text: `${c.nickname} gained ${amount} EXP${share === 'bench' ? ' (bench)' : share === 'sibling' ? ' (shared)' : share === 'yard' ? ' (Training Yard)' : ''}.` });
     };
-    const recipients = player.party.filter((c) => !isFainted(c));
+    const sitters = this.bench.filter((c) => !isFainted(c));
     for (const d of defeated) {
       const base = Math.floor((this.data.species(d.speciesId).expYield * d.level) / t.expYieldDivisor) * (this.kind === 'trainer' ? t.trainerExpMult : 1);
-      for (const c of recipients) {
-        const battler = player.participants.has(c.uid);
+      // the creatures standing when this foe fell (a battler that scored and fainted later still
+      // earns it); a catch has no KO, so the party standing now
+      const ko = this.koLog.find((k) => k.foe === d);
+      const recipients = ko
+        ? player.party.filter((c) => ko.battlers.has(c.uid) || ko.bench.has(c.uid))
+        : player.party.filter((c) => !isFainted(c));
+      for (const c of [...recipients, ...sitters]) {
+        const battler = ko ? ko.battlers.has(c.uid) : player.participants.has(c.uid);
         const share = battler ? 1 : this._benchShare(c);
         let amount = Math.floor(base * share * catchUpMult(c.level, this.curveLevel, t));
         if (this.source === 'rematch' && this.curveLevel != null && c.level > this.curveLevel + t.dampStart) amount = Math.floor(amount * t.dampFactor);
         add(c, amount, battler ? 'battler' : 'bench');
       }
     }
-    for (const c of recipients) {
+    for (const c of player.party) {
+      if (!gains.has(c.uid)) continue;
       const ability = this.data.ability(c.ability);
       if (ability.expShare && player.participants.has(c.uid)) {
         const others = player.party.filter((o) => o !== c && !isFainted(o));
@@ -2264,7 +2286,7 @@ export class Battle {
     const partyTotal = [...gains.values()].reduce((a, b) => a + b, 0);
     const yard = this.yard.slice(0, t.yardMax);
     for (const y of yard) add(y, Math.floor(partyTotal * t.yardShare), 'yard');
-    this._applyGains(gains, [...player.party, ...yard]);
+    this._applyGains(gains, [...player.party, ...sitters, ...yard]);
   }
 
   /** A bench creature's EXP share: its held item's `benchShare` (Tally Charm) or tuning.benchShare. @param {Creature} c @returns {number} */
@@ -2302,8 +2324,8 @@ export class Battle {
       this.expReport.push({ uid: c.uid, name: c.nickname, amount, from: r.from, to: r.to, levelsGained: r.to - r.from, learned: r.learned, offers: r.offers });
       if (r.to > r.from) {
         this._emit({ type: 'levelup', creature: c.nickname, uid: c.uid, from: r.from, to: r.to, stats: r.statsAfter, text: `${c.nickname} grew to Lv${r.to}.` });
-        for (const mv of r.learned) this._emit({ type: 'learn', creature: c.nickname, uid: c.uid, move: mv, text: `${c.nickname} learned ${this.data.move(mv).name}.` });
-        for (const mv of r.offers) this._emit({ type: 'learn-offer', creature: c.nickname, uid: c.uid, move: mv, text: `${c.nickname} wants to learn ${this.data.move(mv).name}, but its slots are full.` });
+        for (const mv of r.learned) this._emit({ type: 'learn', creature: c.nickname, uid: c.uid, move: mv, moveName: this.data.move(mv).name, text: `${c.nickname} learned ${this.data.move(mv).name}.` });
+        for (const mv of r.offers) this._emit({ type: 'learn-offer', creature: c.nickname, uid: c.uid, move: mv, moveName: this.data.move(mv).name, text: `${c.nickname} wants to learn ${this.data.move(mv).name}, but its slots are full.` });
       }
     }
   }

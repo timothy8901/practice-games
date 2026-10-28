@@ -10,6 +10,8 @@ import * as clockSys from '../systems/clockSys.js';
 import { litPorchCount, inRect } from './flowKit.js';
 // the HUD chip's picker, so the map's objective marker agrees with the chip
 import { objectiveFor } from '../ui/objectiveChip.js';
+import * as loans from '../systems/loans.js';
+import * as rooms from '../systems/flow/rooms.js';
 import { lanternPathTo, walkLanternPath } from '../systems/flow/interactFlow.js';
 
 /** Local-map label colours: cream text on a night-ink shadow, the objective ring in porch amber. */
@@ -50,6 +52,8 @@ export function createMapScreenScene(G) {
   let selected = 0, local = false, localMap = null, ms = 0;
   let objective = null;
   let asking = false; // the Lantern-path confirm is open
+  /** @type {Array<{speciesId: string, name: string, place: string, region: string}>} */
+  let errants = [];
   const maps = () => G.data.list('maps');
   const region = (id) => G.data.tryGet('regions', id);
   const mapOf = (id) => maps().find((m) => m.id === id) ?? maps().find((m) => m.region === id);
@@ -153,11 +157,25 @@ export function createMapScreenScene(G) {
       drawText(c, region(n.id)?.name ?? n.id, n.x, n.y + 12, { color: on ? PALETTE.porchAmber : PALETTE.paperLightest, align: 'center', font: 'small' });
       if (on) { c.strokeStyle = PALETTE.paperLightest; c.strokeRect(n.x - 11, n.y - 11, 22, 22); }
     });
+    // the Errant layer (Porch & Loft): the loft telescope marks the isles an Errant is over tonight
+    for (const e of errants) {
+      const n = NODES.find((x) => x.id === e.region);
+      if (!n) continue;
+      const tw = Math.floor(ms / 400) % 2;
+      c.fillStyle = PALETTE.paperLightest;
+      c.fillRect(n.x - 13, n.y - 13 - tw, 1, 5); c.fillRect(n.x - 15, n.y - 11 - tw, 5, 1);
+      c.fillStyle = PALETTE.porchAmber; c.fillRect(n.x - 13, n.y - 11 - tw, 1, 1);
+    }
+  }
+  /** Errants the loft telescope shows tonight (only once the Porch & Loft is built). */
+  function telescopeErrants() {
+    try { return loans.roomBuilt(G.world, 'porch-loft') ? rooms.telescopeView(G.world, G.data) : []; } catch { return []; }
   }
   return {
     name: 'mapScreen', opaque: true,
     enter() {
       selected = Math.max(0, NODES.findIndex((n) => n.id === currentRegion())); local = false; ms = 0; refresh();
+      errants = telescopeErrants();
       try { objective = objectiveFor(G.world, G.data); } catch { objective = null; }
     },
     update(dt) { ms += dt; },
@@ -189,24 +207,35 @@ export function createMapScreenScene(G) {
       if (r?.wild) drawText(c, `Wilds Lv${r.wild.join('-')}`, 320, 78, { color: COLORS.paper.inkSoft, font: 'small' });
       drawText(c, NODES[selected].id === currentRegion() ? 'You are here.' : 'Take the long road, or a ferry.', 320, 94, { color: PALETTE.waxRed, maxWidth: 130, font: 'small' });
       const routes = (m?.warps ?? []).map((w) => ({ w, name: destination(w) })).filter((r) => r.name);
-      let y = 119;
-      for (const { w, name } of routes.slice(0, 4)) {
-        drawText(c, name, 320, y, { color: COLORS.paper.ink, font: 'small', maxWidth: 132 });
-        drawText(c, w.way ? `Short way: ${gate(w)}` : 'Long road: any tide', 320, y + 10, { color: COLORS.paper.inkSoft, font: 'small', maxWidth: 132 });
-        y += 28;
-      }
+      // the footer (Lantern-path line, Seals, lit porches) keeps its rows: the route list flows by
+      // measured height and stops above it, tighter when there are more than three (FE-12)
+      let pathLine = '';
+      let lp = null;
       if (local) {
-        const lp = lanternPath();
-        const line = lp.ok ? (lp.home ? t('map.lanternPathHome') : t('map.lanternPathTo', { place: r?.name ?? m?.name ?? '' }))
+        lp = lanternPath();
+        pathLine = lp.ok ? (lp.home ? t('map.lanternPathHome') : t('map.lanternPathTo', { place: r?.name ?? m?.name ?? '' }))
           : lp.reason === 'locked' ? t('map.lanternPathLocked') : lp.reason === 'unlit' ? t('map.lanternPathUnlit') : '';
-        if (line) drawText(c, line, 320, 196, { color: lp.ok ? PALETTE.waxRed : COLORS.paper.inkSoft, font: 'small', maxWidth: 136 });
       }
+      const pathH = pathLine ? measureText(pathLine, { font: 'small', maxWidth: 136 }).h : 0;
+      const footY = pathLine ? 218 - pathH - 4 : 218;
+      const gap = routes.length > 3 ? 3 : 8;
+      let y = 112;
+      for (const { w, name } of routes) {
+        const way = w.way ? `Short way: ${gate(w)}` : 'Long road: any tide';
+        const hName = measureText(name, { font: 'small', maxWidth: 132 }).h;
+        const hWay = measureText(way, { font: 'small', maxWidth: 132 }).h;
+        if (y + hName + 1 + hWay > footY) break;
+        drawText(c, name, 320, y, { color: COLORS.paper.ink, font: 'small', maxWidth: 132 });
+        drawText(c, way, 320, y + hName + 1, { color: COLORS.paper.inkSoft, font: 'small', maxWidth: 132 });
+        y += hName + 1 + hWay + gap;
+      }
+      if (pathLine && lp) drawText(c, pathLine, 320, footY, { color: lp.ok ? PALETTE.waxRed : COLORS.paper.inkSoft, font: 'small', maxWidth: 136 });
       drawText(c, `Seals: ${G.world.badges.length}/6`, 320, 222, { color: COLORS.paper.ink, font: 'small' });
       drawText(c, t('map.litPorches', { n: litPorchCount(G.world, G.data) }), 320, 232, { color: COLORS.paper.inkSoft, font: 'small' });
       if (objective) drawText(c, t('map.next', { text: objective.text }), 20, 247, { color: PALETTE.porchAmber, font: 'small', maxWidth: 440 });
       drawText(c, local ? t('map.legend') : 'Arrows: choose   Confirm: local chart   Back: close', 240, 261, { color: PALETTE.paperLightest, font: 'small', align: 'center' });
     },
-    state: () => ({ region: NODES[selected].id, local, mapId: selectedMap()?.id, objective, lanternPath: lanternPath() }),
+    state: () => ({ region: NODES[selected].id, local, mapId: selectedMap()?.id, objective, lanternPath: lanternPath(), errants: errants.map((e) => e.region) }),
     debugText: () => `${t('map.heading')}\n${region(NODES[selected].id)?.name ?? ''} ${local ? 'local chart' : 'isles chart'}\n${selectedMap()?.warps.map((w) => destination(w)).filter(Boolean).join(', ')}${objective ? `\n${t('map.next', { text: objective.text })}` : ''}${local ? `\n${mapLabels(selectedMap(), G.data).map((l) => l.text).join(', ')}` : ''}`,
   };
 }

@@ -16,6 +16,27 @@ import {
 const ID = 'ludo';
 
 export const scripts = {
+  // FE-05: talking to Ludo at night sells (the eave trigger is a wall cell behind him). Until the
+  // first sale (storyHooks marks seen.ludo-first-sale on any sale here) he gives his first-sale pitch.
+  'talk-ludo-sell': [
+    { op: 'if', cond: { not: { seen: 'ludo-first-sale' } },
+      then: [
+        'Ludo: Buying. ~ Anything. Full price. Fruit, fish, finds, whatever\'s in that apron. Night\'s my shop. Day\'s for sleeping.',
+        { op: 'openShop', shop: 'ludo-eave', mode: 'sell' },
+        { op: 'if', cond: { seen: 'ludo-first-sale' },
+          then: [{ op: 'if', cond: { wallet: { gte: 3000 } },
+            then: ['Ludo: Three thousand in your apron. ~ The yard\'s still lit. Wren pays attention to people who pay attention.'],
+            else: ['Ludo: Come back with more. Ten till eight, every night. Someone\'s always buying. Usually me.'] }],
+          else: ['Ludo: Nothing tonight? ~ I\'ll be here. Upside down. Ten till eight.'] },
+        { op: 'end' },
+      ] },
+    'Ludo: Selling? ~ Full price. Always full price.',
+    { op: 'choice', options: [
+      { text: 'Sell', then: [{ op: 'openShop', shop: 'ludo-eave', mode: 'sell' }] },
+      { text: 'Just saying hello.', then: ['Ludo: Hello. ~ Nobody says hello to the shop. I\'m going to hum about that later.'] },
+    ], defaultIndex: 0 },
+    { op: 'end' },
+  ],
   'talk-ludo-first': [
     { op: 'if', cond: { seen: 'ludo-first-sale' },
       then: ['Ludo: The walker. You sold me a whole tree\'s worth on your first night. I hummed the whole count. Did you hear?'],
@@ -87,6 +108,10 @@ export default {
     topic('market', 'talk-ludo-market', 5, { cond: { flag: 'sp.first-market' }, once: true }),
     topic('relit', 'talk-ludo-relit', 8, { cond: { flag: 'sp.relighting' }, once: true }),
     topic('heart-1', 'talk-ludo-heart-1', 2, { cond: { npc: { id: ID, talks: { gte: 6 } } }, once: true }),
+    // the night shop (FE-05): before the first sale it comes first (his pitch, then the shop); after
+    // it, lowest priority, so his one-time topics still get their turn first
+    topic('sell-first', 'talk-ludo-sell', 11, { cond: { all: [{ hour: [22, 8] }, { not: { seen: 'ludo-first-sale' } }] } }),
+    topic('sell', 'talk-ludo-sell', 1, { cond: { hour: [22, 8] } }),
   ],
   gifts: {
     love: ['fig', 'mulberry', 'peach'],

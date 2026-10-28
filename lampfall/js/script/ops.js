@@ -71,7 +71,7 @@ export const OPS = Object.freeze({
   playSfx: { kind: 'host', fields: { name: req('string') } },
   music: { kind: 'host', fields: { track: req('any'), fade: opt('number') } },            // track: string|null
   stem: { kind: 'host', fields: { name: req('string'), on: req('boolean') } },
-  openShop: { kind: 'host', fields: { shop: req('string', { ref: 'shops' }) } },
+  openShop: { kind: 'host', fields: { shop: req('string', { ref: 'shops' }), mode: opt('string', { enum: ['buy', 'sell'] }) } }, // mode: the tab it opens on
   startBattle: { kind: 'host', fields: { trainer: opt('string', { ref: 'trainers' }), wild: opt('any'), source: opt('string'), holdOut: opt('number'), onLose: opt('string') } },
   forecast: { kind: 'host', fields: { who: req('string'), scripted: opt('any') } },
   letter: { kind: 'host', fields: { n: opt('number') } },

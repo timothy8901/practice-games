@@ -78,8 +78,9 @@ const ROW_H = 13;
 const LABEL_X = 24;
 const VALUE_R = 238;
 const PREVIEW = Object.freeze({ x: 280, y: 40, w: 96, h: 120 });
-const WREN = Object.freeze({ x: 412, y: 150, w: 48, h: 48 });
-const SPEECH = Object.freeze({ x: 382, y: 36, w: 86, h: 108 });
+// FE-22: Wren's bust and name tag end above the Play button (y 202); the slip is a little shorter
+const WREN = Object.freeze({ x: 412, y: 142, w: 48, h: 48 });
+const SPEECH = Object.freeze({ x: 382, y: 36, w: 86, h: 100 });
 const CHIME_X = 104;
 const CHIME_Y = 202;
 const playRect = Object.freeze({ x: 350, y: 202, w: 108, h: 16 });
@@ -470,7 +471,7 @@ export function createLeaseCardScene(G) {
   function drawSignal(ctx) {
     const focusedRow = row === ROW_SIGNAL;
     drawText(ctx, t('lease.field.signal'), 18, CHIME_Y, { color: COLORS.paper.ink });
-    drawText(ctx, 'Six notes on six chimes. Your door chime, Dimity\'s hum, the ferry horn\'s answer.', 18, CHIME_Y + 11, { color: COLORS.paper.inkSoft, font: 'small', maxWidth: 80 }); // str
+    drawText(ctx, 'Six notes on six chimes: your door chime, and Dimity\'s hum.', 18, CHIME_Y + 13, { color: COLORS.paper.inkSoft, font: 'small', maxWidth: 82, lineSpacing: 2 }); // str
     // the crossbar the chimes hang from
     ctx.fillStyle = COLORS.tally.dark;
     ctx.fillRect(CHIME_X - 6, CHIME_Y - 2, 6 * 40 - 4, 2);

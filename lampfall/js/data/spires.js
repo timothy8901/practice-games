@@ -73,7 +73,7 @@ export const SPIRES = f([
     dossier: f({
       title: 'Turn Spire: Maud Tallis',
       tacticTag: 'posted scripted Shifts, one sure, one rolled',
-      text: 'Puddlepip Lv8 (Brine). Strip: Up to Sloshkin, 100%. Bilgebob Lv10 (Brine, Sodden). Strip: Up Brinelance / Side Rushling / Down Puddlepip at your dial\'s odds. One Salve. Plan a move for every card, not just the one you like. "Read them. Then decide. Confirm?" -M.T.',
+      text: 'Puddlepip Lv8 (Brine). Strip: Up to Sloshkin, 100%. Bilgebob Lv10 (Brine, Sodden). Strip: Up Brinelance / Side Rushling / Down Puddlepip at your dial\'s odds. One Salve. Plan a move for every card, not just the one you like. Memory moves the new form can use: Barnaby\'s desk at the Archive teaches them back, free. "Read them. Then decide. Confirm?" -M.T.',
     }),
     badge: f({ id: 'turn', name: 'Turn Seal', seal: 'a goose feather pressed into grey wax' }),
     prize: f({ buttons: 2000, starsalt: 3 }),
