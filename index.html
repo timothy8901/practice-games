@@ -47,6 +47,7 @@
       --c-punch: #3f3428;
       --c-lumon:  #6fa4c8;
       --c-a22:    #e3350d;
+      --c-hollow: #4b6a9e;
     }
 
     * { box-sizing: border-box; }
@@ -196,6 +197,8 @@
     .featured.a22 .preview { background: radial-gradient(circle at 50% 40%, #74d98e 0%, #2f8a3c 60%, #1d5f2a 100%); }
     .featured.faleria { --accent: var(--c-faleria); }
     .featured.faleria .preview { background: radial-gradient(circle at 50% 38%, #7d5a52 0%, #402c28 55%, #140f0d 100%); }
+    .featured.hollow { --accent: var(--c-hollow); margin-top: 20px; }
+    .featured.hollow .preview { background: radial-gradient(circle at 50% 40%, #3b4a66 0%, #1b2130 55%, #0a0c12 100%); }
 
     /* "new game" flag on the freshest release */
     .featured .new-flag {
@@ -283,6 +286,63 @@
     </section>
 
     <h2 class="section-title" id="featured">Featured</h2>
+
+    <article class="featured hollow">
+      <div class="new-flag" aria-label="New game">NEW GAME!</div>
+      <div>
+        <span class="label">New &middot; 3D Arena Fighter</span>
+        <h2><a href="hollow-arena/index.html">Hollow Arena</a></h2>
+        <p>A <b>single-player 3D arena fighter</b> in the browser. <b>Five original vessels</b>, <b>three arenas</b>, <b>Solo Battle</b> against up to three CPUs, and an endless <b>Survival Mode</b> with scaling waves and power-ups. Keyboard or controller.</p>
+        <div class="meta">
+          <span>WebGL 3D &middot; three.js</span>
+          <span>5 vessels &middot; 3 arenas</span>
+          <span>Solo Battle vs up to 3 CPUs</span>
+          <span>Endless Survival Mode</span>
+          <span>Keyboard or gamepad &middot; remappable</span>
+        </div>
+        <div class="cta-row">
+          <span class="play-cta">Play now &rarr;</span>
+        </div>
+      </div>
+      <div class="preview" aria-hidden="true">
+        <!-- pale horned vessel mask in a dark arena ring (original art) -->
+        <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <radialGradient id="haSoul" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#d8f0ff" stop-opacity="0.55"/>
+              <stop offset="100%" stop-color="#d8f0ff" stop-opacity="0"/>
+            </radialGradient>
+          </defs>
+          <!-- arena ring -->
+          <ellipse cx="100" cy="166" rx="74" ry="16" fill="none" stroke="#6f86b3" stroke-width="3" opacity="0.7"/>
+          <ellipse cx="100" cy="166" rx="56" ry="11" fill="#141926" opacity="0.8"/>
+          <!-- soul glow -->
+          <circle cx="100" cy="92" r="58" fill="url(#haSoul)"/>
+          <!-- drifting soul motes -->
+          <circle cx="40" cy="60" r="2.2" fill="#d8f0ff" opacity="0.7"/>
+          <circle cx="162" cy="48" r="1.8" fill="#d8f0ff" opacity="0.55"/>
+          <circle cx="150" cy="118" r="2.4" fill="#d8f0ff" opacity="0.5"/>
+          <circle cx="52" cy="128" r="1.6" fill="#d8f0ff" opacity="0.6"/>
+          <!-- horns -->
+          <path d="M72 70 C 56 52, 54 30, 66 14 C 70 34, 78 48, 88 58 Z" fill="#ece9df" stroke="#b9b5a8" stroke-width="2.5" stroke-linejoin="round"/>
+          <path d="M128 70 C 144 52, 146 30, 134 14 C 130 34, 122 48, 112 58 Z" fill="#ece9df" stroke="#b9b5a8" stroke-width="2.5" stroke-linejoin="round"/>
+          <!-- mask -->
+          <path d="M64 78 C 64 54, 136 54, 136 78 L 136 110 C 136 136, 118 148, 100 150 C 82 148, 64 136, 64 110 Z" fill="#ece9df" stroke="#b9b5a8" stroke-width="3" stroke-linejoin="round"/>
+          <!-- eye holes -->
+          <ellipse cx="85" cy="104" rx="8" ry="15" fill="#0a0c12"/>
+          <ellipse cx="115" cy="104" rx="8" ry="15" fill="#0a0c12"/>
+          <!-- nail (blade) -->
+          <g transform="rotate(-38 150 120)">
+            <rect x="146" y="60" width="8" height="98" rx="3" fill="#d9d5c7" stroke="#8d8a80" stroke-width="2"/>
+            <polygon points="146,60 154,60 150,44" fill="#fffdf6" stroke="#8d8a80" stroke-width="2" stroke-linejoin="round"/>
+            <rect x="136" y="156" width="28" height="7" rx="3" fill="#4b6a9e"/>
+            <rect x="147" y="163" width="6" height="18" rx="2" fill="#2b3550"/>
+          </g>
+          <!-- gold power-up spark -->
+          <polygon points="44,152 48,142 52,152 62,156 52,160 48,170 44,160 34,156" fill="#ffd36b" opacity="0.9"/>
+        </svg>
+      </div>
+    </article>
 
     <article class="featured a22">
       <div class="new-flag" aria-label="New game">NEW GAME!</div>
