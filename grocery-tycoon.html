@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="description" content="Grocery Tycoon — run a produce store, fight spoilage, grow from a fruit stand to a hypermarket empire. 110 achievements.">
 <title>Grocery Tycoon</title>
 <style>
@@ -299,18 +299,375 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:14px 0;}
   .tile .emoji{font-size:1.8rem;}
   .stat .val{font-size:.92rem;}
 }
+/* The market floor and the original tycoon controls share the same palette. */
+:root{
+  color-scheme:dark;
+  --bg:#151019;--bg2:#1d1523;--panel:#231a2a;--panel2:#291e2c;
+  --card:#261d2c;--card-hi:#302435;--line:#49394e;
+  --text:#f0e7da;--muted:#c6b6c5;--dim:#ae9aad;
+  --green:#8bc5a2;--green-d:#4b8668;--accent:#e9c483;--accent-d:#a47948;
+  --red:#fa9d9a;--red-d:#a44c55;--orange:#e7ae7a;--blue:#a1bfdc;--purple:#c9a5e7;
+  --fresh:#8bc5a2;--aging:#eac779;--stale:#df9c66;--rotten:#9c6560;
+  --glow-accent:0 0 0 1px #e9c48342,0 0 16px #e9c48320;
+  --night:#1b1320;--ink:#17111b;--hair:#49394e;--brass:#a87c4e;--display:Georgia,"Times New Roman",serif;
+}
+body{background:radial-gradient(ellipse at 50% 0%,#39253e 0%,#211827 45%,#151019 100%);transition:none}
+#app{max-width:1440px}
+#topbar{padding:13px 27px;background:linear-gradient(180deg,#221927,#1b1420);gap:14px 25px;border-bottom-color:#604650}
+.stat .lbl{color:#b6a5b5;font-size:.65rem;letter-spacing:.105em}
+.stat .val{font-size:1.12rem;margin-top:4px}
+#repWrap{max-width:140px}
+#repBar,#speedCtl,#store h2.section .stChip,#coach .cx{background:#1b1420}
+#repFill{background:linear-gradient(90deg,#a7755f,#d4b57d,#84b397)}
+#speedCtl{border-radius:9px;gap:3px;padding:3px}
+#speedCtl button{min-width:44px;height:44px}
+#speedCtl button.on{background:#e9c483;color:#2e1c20;box-shadow:none}
+#dayProg{box-shadow:none}
+.market-brand{display:flex;align-items:center;gap:12px;margin-right:13px;white-space:nowrap}
+.market-brand .brand-mark{width:48px;height:48px;display:grid;place-items:center;color:#e9c483;border:1px solid #8b6648;border-radius:12px 12px 18px 18px;background:linear-gradient(155deg,#402c40,#231824)}
+.brand-mark svg{width:27px;height:29px}
+.market-brand h1{font:700 clamp(1.25rem,2.7vw,1.85rem)/1.08 var(--display);letter-spacing:-.035em;margin:0}
+#store{padding:21px 27px 100px;scrollbar-color:#6b5367 #1a1320}
+#market{display:grid;grid-template-columns:minmax(0,1fr) minmax(252px,300px);gap:16px;align-items:start;margin-bottom:24px}
+.market-stage,.market-controls{border:1px solid #624851;border-radius:15px;background:#211827;min-width:0}
+.market-stage{position:relative;overflow:hidden;isolation:isolate;display:flex;flex-direction:column;justify-content:space-between;background:#1b1321}
+.market-stage::before{content:"";position:absolute;z-index:-1;inset:0;background:radial-gradient(ellipse at 50% 45%,#55405188,transparent 69%),repeating-linear-gradient(90deg,transparent 0 70px,#88708c0b 70px 71px),linear-gradient(180deg,#302237,#1d1523 58%,#19121c)}
+.market-stage-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:16px 17px 0;z-index:1}
+.market-stage-head h2,.market-controls h2{font:700 1.46rem/1.08 var(--display);letter-spacing:-.015em;margin:0;color:#f3e5d3}
+.market-stage-head span{display:block;font-size:.77rem;margin-top:4px;color:#cbb6c8}
+#marketHelp{width:44px;height:44px;border:1px solid #654c60;border-radius:10px;background:#2b2030;color:#e9c483;font:700 1.1rem var(--display)}
+#marketBoard{display:block;width:100%;max-height:clamp(320px,calc(100dvh - 230px),540px);overflow:visible;margin:-14px 0 -12px;touch-action:manipulation}
+.market-legend{display:flex;align-items:center;gap:16px;padding:0 16px 13px;font-size:.72rem;color:#cbb6c8}
+.market-legend span{display:inline-flex;align-items:center;gap:6px}
+.legend-marker{width:8px;height:8px;transform:rotate(45deg);border:1px solid #dabd89}
+.legend-marker.in{background:#dabd89}
+.market-legend .market-live{margin-left:auto;color:#b6ceb9}
+.market-live i{display:block;width:7px;height:7px;border-radius:50%;background:#8bc5a2;box-shadow:0 0 8px #8bc5a270}
+.market-live[data-paused=true] i{background:#e9c483}
+.market-controls{padding:17px;background:linear-gradient(180deg,#2d2032,#241a2a);min-height:376px}
+.market-guide{color:#c7b6c9;margin:6px 0 13px;font-size:.83rem}
+.market-tools{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-bottom:13px}
+.market-tools button{min-height:55px;background:#201725;border:1px solid #59445a;border-radius:9px;color:#dfcde0;font-size:.73rem;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+.market-tools svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linejoin:round;stroke-linecap:round}
+.market-tools button[aria-pressed=true]{color:#f7db9d;background:#493343;border-color:#ab8059}
+#marketInspector{padding:12px;border:1px solid #5a4356;border-radius:10px;background:#201724;font-size:.83rem}
+.board-selected-head{display:flex;align-items:center;gap:10px;margin-bottom:10px;min-height:32px}
+.board-selected-head .produce-art{width:45px;height:45px;flex-shrink:0}
+.board-selected-head b{display:block;font:700 1.06rem var(--display);color:#f3e5d3}
+.board-selected-head small{display:block;margin-top:2px;color:#c5b0c6;font-size:.69rem}
+.board-inspector-copy{margin:4px 0 0;color:#cbb9cc}
+.market-field{display:grid;gap:4px;margin:8px 0 0;color:#d5c0d5;font-size:.76rem}
+.market-field select{width:100%;min-height:44px;border:1px solid #6a5165;border-radius:8px;background:#302333;color:#f4e6d4;padding:6px 7px;font:inherit}
+.board-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}
+.board-actions button{min-height:44px;padding:0 10px;border:1px solid #6a5165;border-radius:8px;background:#302333;color:#efd7ae;font-size:.73rem;flex:1}
+.board-actions button.primary{background:#e9c483;color:#2d1d26;border-color:#e9c483;font-weight:800}
+.board-actions button:disabled{opacity:.48;cursor:default}
+#marketStatus{min-height:2.4em;margin:9px 0 0;font-size:.73rem;color:#d8c4d7}
+#marketStatus[data-error=true]{color:#ffaeab}
+.market-square{cursor:pointer;outline:none}
+.market-square polygon{fill:transparent;stroke:transparent;stroke-width:2.5px}
+.market-square:hover polygon,.market-square:focus-visible polygon{fill:#f0d17a40;stroke:#fff0be}
+.market-square[aria-pressed=true] polygon{fill:#edb96b34;stroke:#ffe1a0}
+.market-square[data-reserved=true]{cursor:default}
+.market-fixture{cursor:pointer}
+.market-fixture:hover .fixture-edge{stroke:#ffe1a0}
+.market-board-label{font-family:var(--display);fill:#e8c991;font-weight:700;font-size:13px;letter-spacing:.06em}
+.market-actor{pointer-events:none}
+.market-sale{pointer-events:none;font:700 19px system-ui;paint-order:stroke;stroke:#261b27;stroke-width:3px;fill:#ccedb1}
+button:focus-visible,select:focus-visible{outline:2px solid #ffe1a0;outline-offset:2px}
+#store h2.section{font:700 1.3rem var(--display);letter-spacing:0;text-transform:none;color:#f3e5d3}
+#store h2.section .stChip{font-family:system-ui;color:#cdbbd0}
+#coach{background:#2f2334;border-left-color:var(--accent);color:#eddfed}
+.tile{background:linear-gradient(155deg,#312538,#251c2d 95%)}
+.tile.empty{background:#241a29}
+.tile .emoji{height:72px;display:grid;place-items:center}
+.produce-art{display:inline-block;width:48px;height:52px;overflow:visible;vertical-align:middle}
+.tile .produce-art{width:65px;height:72px}
+#panel .produce-art{width:36px;height:40px}
+.tile .display-info{display:block;font-size:.68rem;color:#c0aaba}
+.tile[data-display=false] .display-info{color:#debd92}
+#tabbar,#panel,#modal{background:#251b2c;border-color:#614951}
+#tabbar button{min-height:54px}
+#tabbar button.on,#tabbar button:hover{background:#3d2c42}
+#tabbar button .ic{width:21px;height:21px;color:#d4b28d}
+#tabbar .ic svg{display:block;width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:1.65;stroke-linecap:round;stroke-linejoin:round}
+#panelHead,.stepper,.note,.kv,.toast{background:#2a2030}
+#panelHead button{background:#3d2c42}
+.btn,.tile .btns .buy{background:#4b775e;color:#fff7e9}
+.btn.gold{background:#e9c483;color:#2d1d26}
+@media(max-width:1100px){
+  #topbar{padding:11px 17px;gap:10px 15px}
+  #store{padding:16px 17px 95px}
+  #market{grid-template-columns:minmax(0,1fr) minmax(234px,265px);gap:12px}
+}
+@media(max-width:820px){
+  .market-brand{flex:1 0 100%;margin-right:0}
+  .market-brand .brand-mark{width:35px;height:35px}
+  .brand-mark svg{width:20px;height:21px}
+  #topbar{gap:8px 13px;padding:9px 13px}
+  #repWrap{min-width:90px}
+}
+@media(max-width:640px){
+  #topbar{gap:7px 12px}
+  #topbar .spacer{display:none}
+  #speedCtl{margin-left:auto;gap:0;padding:2px}
+  #speedCtl button{min-width:35px;height:44px}
+  #store{padding:10px 9px 84px}
+  #market{grid-template-columns:minmax(0,1fr);gap:8px;margin-bottom:17px}
+  .market-controls{padding:12px;min-height:0}
+  .market-stage-head{padding:10px 10px 0}
+  .market-stage-head h2,.market-controls h2{font-size:1.23rem}
+  #marketBoard{max-height:none;margin:-3px 0 -8px}
+  .market-legend{padding:1px 10px 10px;gap:11px}
+  .market-guide{margin:4px 0 8px}
+  .market-tools{margin-bottom:8px}
+  .market-tools button{min-height:46px}
+  #marketStatus{min-height:1.4em;margin-top:6px}
+  #marketInspector{padding:8px 10px}
+  .board-selected-head{margin-bottom:5px}
+}
+@media(max-width:420px){
+  #topbar .stat .val{font-size:.98rem}
+  #topbar .stat .lbl{font-size:.59rem}
+  #repWrap{min-width:75px}
+  #speedCtl{margin-left:0}
+  #tabbar button{padding-inline:3px}
+}
 </style>
 </head>
 <body>
+<svg xmlns="http://www.w3.org/2000/svg" width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute;overflow:hidden">
+  <defs>
+    <linearGradient id="gp-paint-brass" x1="0" y1="0" x2="1" y2="1" gradientUnits="objectBoundingBox">
+      <stop stop-color="#48404c"/><stop offset=".25" stop-color="#bd986a"/><stop offset=".42" stop-color="#f5d69c"/><stop offset=".58" stop-color="#96704e"/><stop offset=".81" stop-color="#54364c"/><stop offset="1" stop-color="#ac845e"/>
+    </linearGradient>
+    <linearGradient id="gp-paint-onyx" x1="0" y1="0" x2="1" y2=".75" gradientUnits="objectBoundingBox">
+      <stop stop-color="#594254"/><stop offset=".4" stop-color="#2d2137"/><stop offset=".7" stop-color="#1a1222"/><stop offset="1" stop-color="#38223a"/>
+    </linearGradient>
+    <radialGradient id="gp-paint-red" cx=".29" cy=".2" r=".75">
+      <stop stop-color="#ffb386"/><stop offset=".27" stop-color="#f4776c"/><stop offset=".61" stop-color="#b83053"/><stop offset="1" stop-color="#551c3e"/>
+    </radialGradient>
+    <radialGradient id="gp-paint-rose" cx=".28" cy=".22" r=".77">
+      <stop stop-color="#ffc8a2"/><stop offset=".29" stop-color="#f79a9c"/><stop offset=".61" stop-color="#cf537c"/><stop offset="1" stop-color="#702d57"/>
+    </radialGradient>
+    <radialGradient id="gp-paint-orange" cx=".28" cy=".23" r=".81">
+      <stop stop-color="#ffd48e"/><stop offset=".34" stop-color="#f3a058"/><stop offset=".7" stop-color="#c35b44"/><stop offset="1" stop-color="#7d3842"/>
+    </radialGradient>
+    <radialGradient id="gp-paint-gold" cx=".33" cy=".24" r=".82">
+      <stop stop-color="#fff3bb"/><stop offset=".35" stop-color="#e8c571"/><stop offset=".7" stop-color="#be7e46"/><stop offset="1" stop-color="#794044"/>
+    </radialGradient>
+    <radialGradient id="gp-paint-amber" cx=".27" cy=".26" r=".79">
+      <stop stop-color="#f3ce8e"/><stop offset=".36" stop-color="#db9d5c"/><stop offset=".73" stop-color="#9b5450"/><stop offset="1" stop-color="#59324a"/>
+    </radialGradient>
+    <radialGradient id="gp-paint-leaf" cx=".33" cy=".2" r=".83">
+      <stop stop-color="#d4df9c"/><stop offset=".32" stop-color="#8daa77"/><stop offset=".7" stop-color="#426357"/><stop offset="1" stop-color="#233844"/>
+    </radialGradient>
+    <radialGradient id="gp-paint-emerald" cx=".28" cy=".17" r=".9">
+      <stop stop-color="#b9deb2"/><stop offset=".34" stop-color="#6ca68c"/><stop offset=".7" stop-color="#346251"/><stop offset="1" stop-color="#233441"/>
+    </radialGradient>
+    <radialGradient id="gp-paint-violet" cx=".27" cy=".16" r=".82">
+      <stop stop-color="#f1bee6"/><stop offset=".33" stop-color="#a67bbd"/><stop offset=".64" stop-color="#735690"/><stop offset="1" stop-color="#40264f"/>
+    </radialGradient>
+    <radialGradient id="gp-paint-blue" cx=".28" cy=".2" r=".83">
+      <stop stop-color="#ceb9f4"/><stop offset=".35" stop-color="#807fbe"/><stop offset=".67" stop-color="#56568f"/><stop offset="1" stop-color="#33274f"/>
+    </radialGradient>
+    <radialGradient id="gp-paint-ivory" cx=".26" cy=".18" r=".85">
+      <stop stop-color="#fff3cd"/><stop offset=".4" stop-color="#e7cfa9"/><stop offset=".72" stop-color="#b998a0"/><stop offset="1" stop-color="#845d80"/>
+    </radialGradient>
+    <radialGradient id="gp-paint-shadow">
+      <stop stop-color="#180f23" stop-opacity=".68"/><stop offset="1" stop-color="#180f23" stop-opacity="0"/>
+    </radialGradient>
+    <g id="gp-plinth">
+      <ellipse cx="28" cy="59" rx="25" ry="4.5" fill="url(#gp-paint-shadow)"/>
+      <path d="M13 49c0-2 6-4 15-4s15 2 15 4v2l5 3v3c-4 3-12 4-20 4s-16-1-20-4v-3l5-3z" fill="url(#gp-paint-onyx)" stroke="#211421" stroke-width="1.25"/>
+      <path d="M8 54c5 2 12 3 20 3s15-1 20-3v2c-4 3-12 4-20 4s-16-1-20-4z" fill="url(#gp-paint-brass)"/>
+      <path d="M14 48c3 2 8 3 14 3s11-1 14-3m-28 3c3 2 8 3 14 3s11-1 14-3" fill="none" stroke="url(#gp-paint-brass)" stroke-width="1"/>
+      <path d="m28 43 8 2.5v3L28 51l-8-2.5v-3z" fill="url(#gp-paint-brass)" stroke="#221521" stroke-width=".85"/>
+      <path d="m28 54 1.6 1.4L28 57l-1.6-1.6z" fill="#f6d9a0"/>
+    </g>
+    <g id="gp-leaf-finial">
+      <path d="M27 18c1-8 6-11 13-11-1 7-6 11-13 11Z" fill="url(#gp-paint-leaf)" stroke="#393341" stroke-width="1.15"/>
+      <path d="m30 16 7-6" fill="none" stroke="#c6cb8d" stroke-width=".8" stroke-linecap="round"/>
+    </g>
+    <radialGradient id="gp-paint-mango" cx=".31" cy=".25" r=".8">
+      <stop stop-color="#ffe5a0"/><stop offset=".32" stop-color="#eba25d"/><stop offset=".66" stop-color="#c26062"/><stop offset="1" stop-color="#643050"/>
+    </radialGradient>
+    <radialGradient id="gp-paint-truffle" cx=".32" cy=".24" r=".83">
+      <stop stop-color="#b48b75"/><stop offset=".37" stop-color="#73504f"/><stop offset=".7" stop-color="#482f40"/><stop offset="1" stop-color="#25192f"/>
+    </radialGradient>
+  </defs>
+  <symbol id="gp-apple" viewBox="0 0 56 64">
+    <use href="#gp-plinth"/>
+    <path d="M28 21c0-7-2-11-5-13" fill="none" stroke="#6d4741" stroke-width="3" stroke-linecap="round"/>
+    <use href="#gp-leaf-finial"/>
+    <path d="M28 20c-7-5-16-4-20 3-5 7 0 17 5 22 4 4 9 4 15 1 6 3 11 3 15-1 5-5 10-15 5-22-4-7-13-8-20-3Z" fill="url(#gp-paint-red)" stroke="#47213e" stroke-width="1.4"/>
+    <path d="M12 27c2-4 5-6 9-6m9 23c5 2 9 0 13-4" fill="none" stroke="#ffcc9f" stroke-opacity=".7" stroke-width="1.2" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="gp-banana" viewBox="0 0 56 64">
+    <use href="#gp-plinth"/>
+    <path d="M13 15c3 9 9 15 17 16 8 1 13-2 18-7-1 12-8 20-20 21-13 1-20-8-22-20Z" fill="url(#gp-paint-amber)" stroke="#5e3945" stroke-width="1.4"/>
+    <path d="M14 11 17 9l3 6-2 5c7 12 18 17 30 9l3 2-2 4c-8 13-25 16-36 7-7-6-8-16-3-24Z" fill="url(#gp-paint-gold)" stroke="#674141" stroke-width="1.4"/>
+    <path d="M12 22c-2 11 5 19 14 21m-7-18c7 10 18 13 27 9" fill="none" stroke="#f9e8aa" stroke-width="1.3" stroke-linecap="round"/>
+    <path d="m14 11 3-2 2.7 4.6-4.2 2.4zM48 29l3 2-2 4-3.6-1.4z" fill="#6e4744"/>
+  </symbol>
+  <symbol id="gp-tomato" viewBox="0 0 56 64">
+    <use href="#gp-plinth"/>
+    <path d="M27 20c7-6 18-3 23 3 7 12-1 22-10 24-7 1-8 0-12-1-4 1-7 2-14 1-9-2-17-12-10-24 5-6 16-9 23-3Z" fill="url(#gp-paint-red)" stroke="#4b2140" stroke-width="1.4"/>
+    <path d="M11 27c2-4 6-6 10-5m21 20c3-2 5-4 5-8" fill="none" stroke="#ffca9d" stroke-opacity=".65" stroke-width="1.2" stroke-linecap="round"/>
+    <path d="m28 21-13-4 4 5-7 3 10 1 6-2 5 4 1-5 9-4-12 1-1-8-3 1z" fill="url(#gp-paint-leaf)" stroke="#35423d" stroke-width="1"/>
+  </symbol>
+  <symbol id="gp-lettuce" viewBox="0 0 56 64">
+    <use href="#gp-plinth"/>
+    <path d="M11 42C3 41 3 33 7 29c-3-5 0-9 5-10-2-6 4-9 10-8 3-7 9-6 13-1 7-3 12 2 12 7 6 1 8 7 4 11 5 8 0 12-6 13-8 7-26 9-34 1Z" fill="url(#gp-paint-emerald)" stroke="#253640" stroke-width="1.4"/>
+    <path d="M14 33c-5-3-1-8 3-10-3-5 1-8 6-7 2-6 6-5 8 0 4-5 11-3 11 2 7 0 10 7 5 10 5 3 4 8-1 10-5 7-23 12-31 4-4-2-5-6-1-9Z" fill="url(#gp-paint-leaf)" stroke="#426050" stroke-width="1.15"/>
+    <path d="M28 44c-2-8-1-17 0-24m0 15 10-10m-10 8-8-9m8 15 13-5m-13 6-11-5" fill="none" stroke="#d4d999" stroke-width="1" stroke-linecap="round" opacity=".82"/>
+  </symbol>
+  <symbol id="gp-carrot" viewBox="0 0 56 64">
+    <use href="#gp-plinth"/>
+    <path d="M35 23C30 13 33 7 38 4c4 5 2 10-3 19Zm1 0c3-11 9-14 15-12-1 5-7 10-15 12Zm-2 1C26 14 20 14 15 17c2 5 11 6 19 7Z" fill="url(#gp-paint-leaf)" stroke="#384844" stroke-width="1.1"/>
+    <path d="M36 21c4 3 5 6 1 11-6 9-26 20-29 16-4-4 8-23 18-28 4-2 7-1 10 1Z" fill="url(#gp-paint-orange)" stroke="#653841" stroke-width="1.4"/>
+    <path d="m26 25 6 5m-13 1 4 4m0 6 4-3m-14 4 3 2" fill="none" stroke="#974846" stroke-width="1.1" stroke-linecap="round"/>
+    <path d="M14 37c2-4 6-8 10-10" fill="none" stroke="#ffd2a2" stroke-width="1.1" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="gp-potato" viewBox="0 0 56 64">
+    <use href="#gp-plinth"/>
+    <path d="M21 17c8-4 19-5 25 2 6 6 6 16-1 22-7 7-21 9-28 5C7 43 4 36 7 29c2-5 8-9 14-12Z" fill="url(#gp-paint-amber)" stroke="#623b45" stroke-width="1.4"/>
+    <path d="M13 30c2-3 7-7 12-8m9 20c4 0 8-2 10-6" fill="none" stroke="#ffe4a9" stroke-opacity=".7" stroke-width="1.1" stroke-linecap="round"/>
+    <path d="m19 32 1.6 1.4L19 35l-1.6-1.6zm18-9 1.6 1.4L37 26l-1.6-1.6zm-9 14 1.6 1.4L28 40l-1.6-1.6zm15-7 1.3 1.2L43 33l-1.3-1.8z" fill="#885657"/>
+  </symbol>
+  <symbol id="gp-orange" viewBox="0 0 56 64">
+    <use href="#gp-plinth"/>
+    <path d="M28 15c2-7 8-10 15-9-1 7-7 11-15 9Z" fill="url(#gp-paint-leaf)" stroke="#3c4440" stroke-width="1"/>
+    <path d="M28 11c14 0 23 9 23 19 0 12-9 18-23 18S5 42 5 30c0-10 9-19 23-19Z" fill="url(#gp-paint-orange)" stroke="#6a3b43" stroke-width="1.4"/>
+    <path d="M12 28c2-5 6-8 11-9m17 22c3-2 4-4 5-6" fill="none" stroke="#ffe1ae" stroke-width="1.15" stroke-linecap="round"/>
+    <path d="M27 20h.1m9 0h.1m7 6h.1m-5 3h.1m-8 3h.1m8 4h.1m-24-3h.1m6 5h.1m5 3h.1" fill="none" stroke="#9f4e43" stroke-width="1.65" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="gp-grapes" viewBox="0 0 56 64">
+    <use href="#gp-plinth"/>
+    <path d="M28 20c0-5 4-9 7-11m-5 8c-9 1-14-3-15-10 8 0 13 4 15 10Z" fill="url(#gp-paint-leaf)" stroke="#3e3d43" stroke-width="1.5" stroke-linecap="round"/>
+    <g stroke="#382343" stroke-width="1.1">
+      <circle cx="15" cy="23" r="8" fill="url(#gp-paint-violet)"/><circle cx="28" cy="21" r="8" fill="url(#gp-paint-violet)"/><circle cx="41" cy="22" r="8" fill="url(#gp-paint-rose)"/>
+      <circle cx="34" cy="32" r="9" fill="url(#gp-paint-violet)"/><circle cx="21" cy="33" r="8" fill="url(#gp-paint-blue)"/><circle cx="28" cy="41" r="8" fill="url(#gp-paint-violet)"/>
+    </g>
+    <path d="M13 21c1-1 2-2 3-2m9 20c1-1 2-2 3-2" fill="none" stroke="#edc2eb" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="gp-avocado" viewBox="0 0 56 64">
+    <use href="#gp-plinth"/>
+    <path d="M33 7c7 2 7 10 10 15 4 7 8 13 4 19-6 9-24 11-35 4-8-5-7-12-3-17 4-5 8-8 12-14 4-6 8-8 12-7Z" fill="url(#gp-paint-emerald)" stroke="#263743" stroke-width="1.45"/>
+    <path d="M32 11c5 1 5 7 8 13 4 7 8 12 3 17-6 6-20 7-28 2-7-4-6-10-2-14 4-4 8-8 12-14 2-3 4-4 7-4Z" fill="url(#gp-paint-leaf)" stroke="#a9ae78" stroke-width="1.05"/>
+    <ellipse cx="26" cy="33.5" rx="9" ry="8" fill="url(#gp-paint-amber)" stroke="#744347" stroke-width="1.2"/>
+    <path d="M22 31c1-2 3-3 5-3" fill="none" stroke="#f6cf91" stroke-width="1.15" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="gp-corn" viewBox="0 0 56 64">
+    <use href="#gp-plinth"/>
+    <path d="M33 9c9 2 10 11 7 21-2 9-8 18-15 17-7 0-10-7-8-17 2-11 7-22 16-21Z" fill="url(#gp-paint-gold)" stroke="#705043" stroke-width="1.35"/>
+    <path d="M24 20c4 0 11 2 15 4m-18 2c6 0 11 2 16 5m-18 1c6 0 10 2 16 5m-7-24c-4 6-7 15-7 23m13-22c0 7-2 15-7 23" fill="none" stroke="#a8744d" stroke-width="1" stroke-linecap="round"/>
+    <path d="M25 47C13 48 7 36 7 27c10 2 14 6 19 16 5-9 12-12 21-15 0 11-10 20-22 19Z" fill="url(#gp-paint-emerald)" stroke="#33473f" stroke-width="1.2"/>
+    <path d="M12 32c5 3 7 6 9 10m17-7-8 7" fill="none" stroke="#bfd095" stroke-width="1" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="gp-broccoli" viewBox="0 0 56 64">
+    <use href="#gp-plinth"/>
+    <path d="M23 46c1-7-4-12-9-19l5-3 7 7 3-12 5 1-1 12 6-5 5 4c-6 5-8 9-9 15-3 3-9 3-12 0Z" fill="url(#gp-paint-leaf)" stroke="#334641" stroke-width="1.2"/>
+    <path d="M7 26c-5-5-1-11 6-11 0-6 5-9 11-7 6-6 14-2 16 3 7-1 11 3 10 9 5 5 1 11-5 12-4 5-12 5-17 0-7 5-14 3-16-2-3 1-5-1-5-4Z" fill="url(#gp-paint-emerald)" stroke="#263740" stroke-width="1.4"/>
+    <path d="M10 23c0-2 2-4 5-4m6-5c0-2 3-3 5-3m6 3c3-1 6 1 7 3m-14 7c2-3 5-3 8-1m8 2c2-2 4-2 6 0" fill="none" stroke="#c4d69c" stroke-width="1.1" stroke-linecap="round" opacity=".68"/>
+  </symbol>
+  <symbol id="gp-eggs" viewBox="0 0 56 64">
+    <use href="#gp-plinth"/>
+    <path d="M28 8c9 0 18 17 18 27 0 10-7 14-18 14s-18-4-18-14C10 25 19 8 28 8Z" fill="url(#gp-paint-ivory)" stroke="#68515e" stroke-width="1.4"/>
+    <path d="M17 33c1-6 5-13 9-15m8 26c4-1 7-4 7-8" fill="none" stroke="#fff1c9" stroke-width="1.25" stroke-linecap="round"/>
+    <path d="M22 36h.1m-2 5h.1m7 2h.1m6-9h.1m5 2h.1" fill="none" stroke="#a17c90" stroke-width="1.4" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="gp-milk" viewBox="0 0 56 64">
+    <use href="#gp-plinth"/>
+    <path d="M21 8h14v7c0 6 7 9 7 15v14c0 4-5 5-14 5s-14-1-14-5V30c0-6 7-9 7-15Z" fill="url(#gp-paint-ivory)" stroke="#655064" stroke-width="1.4"/>
+    <path d="M15 29c3-2 8-3 13-3s10 1 13 3v12c-3 2-8 3-13 3s-10-1-13-3Z" fill="url(#gp-paint-violet)" stroke="#5b4169" stroke-width="1"/>
+    <path d="M28 29c-2 4-5 6-5 8 0 3 3 4 5 4s5-1 5-4c0-2-3-4-5-8Z" fill="#f1ddb5"/>
+    <path d="M20 8c0-3 16-3 16 0v5c0 2-16 2-16 0Z" fill="url(#gp-paint-brass)" stroke="#584052"/>
+    <path d="M19 27c1-2 4-5 5-7m-6 4h.1" fill="none" stroke="#fff1cd" stroke-width="1.1" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="gp-cheese" viewBox="0 0 56 64">
+    <use href="#gp-plinth"/>
+    <path d="M8 26 34 12c8 1 14 5 16 9v17L13 48l-6-7Z" fill="url(#gp-paint-gold)" stroke="#6f4643" stroke-width="1.4"/>
+    <path d="m8 26 7 7 35-12-8-6-8-3Z" fill="url(#gp-paint-ivory)" stroke="#ac7549" stroke-width="1.2"/>
+    <path d="M16 33v12" fill="none" stroke="#f6d990" stroke-width="1.1"/>
+    <ellipse cx="27" cy="35" rx="3.1" ry="2.4" fill="#aa6950" transform="rotate(-19 27 35)"/>
+    <ellipse cx="39" cy="31" rx="3.8" ry="2.4" fill="#9c5b4f" transform="rotate(-19 39 31)"/>
+    <ellipse cx="45" cy="34.5" rx="2.1" ry="1.4" fill="#ad6b4b"/>
+    <ellipse cx="29" cy="22" rx="3.2" ry="1.3" fill="#b18667" transform="rotate(-14 29 22)"/>
+  </symbol>
+  <symbol id="gp-honey" viewBox="0 0 56 64">
+    <use href="#gp-plinth"/>
+    <path d="M17 15h22c0 5 5 7 5 13v13c0 6-5 8-16 8s-16-2-16-8V28c0-6 5-8 5-13Z" fill="url(#gp-paint-amber)" stroke="#653b46" stroke-width="1.4"/>
+    <path d="M16 27c2-2 6-4 12-4s10 2 12 4v13c-2 2-6 4-12 4s-10-2-12-4Z" fill="url(#gp-paint-gold)" stroke="#9e694b" stroke-width="1.15"/>
+    <path d="m28 27 6 4v6l-6 4-6-4v-6Z" fill="#8c5347" stroke="#f9d791" stroke-width="1"/>
+    <path d="M28 30c-1 2-3 4-3 6 0 1 1 2 3 2s3-1 3-2c0-2-2-4-3-6Z" fill="#ecca7f"/>
+    <path d="M15 12c0-4 26-4 26 0v5c0 3-26 3-26 0Z" fill="url(#gp-paint-brass)" stroke="#593d47" stroke-width="1.1"/>
+    <path d="M19 13v3m5-3v3m5-3v3m5-3v3m4-3v3" stroke="#6b4c4b" stroke-width=".75"/>
+  </symbol>
+  <symbol id="gp-pineapple" viewBox="0 0 56 64">
+    <use href="#gp-plinth"/>
+    <path d="M28 22C22 14 21 7 28 3c7 5 7 11 0 19Zm-2-1C16 19 12 14 13 8c7 1 11 6 13 13Zm4 0c2-9 8-12 14-12-1 5-6 11-14 12Z" fill="url(#gp-paint-leaf)" stroke="#374741" stroke-width="1.2"/>
+    <path d="M28 18c10 0 16 6 16 15 0 10-6 16-16 16s-16-6-16-16c0-9 6-15 16-15Z" fill="url(#gp-paint-gold)" stroke="#714744" stroke-width="1.4"/>
+    <path d="m17 24 21 20m-15-23 19 18m-29-8 17 16m9-23L18 44m15-23L14 39m29-8L26 47" fill="none" stroke="#9c644a" stroke-width=".95" opacity=".9"/>
+    <path d="M18 30c1-3 3-5 6-6m-7 11h.1" fill="none" stroke="#fce6b1" stroke-width="1.1" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="gp-watermelon" viewBox="0 0 56 64">
+    <use href="#gp-plinth"/>
+    <path d="M4 26c0 12 10 22 24 22s24-10 24-22c0-3-2-6-5-6H9c-3 0-5 3-5 6Z" fill="url(#gp-paint-emerald)" stroke="#31413e" stroke-width="1.4"/>
+    <path d="M7 24c0 11 9 20 21 20s21-9 21-20Z" fill="url(#gp-paint-ivory)" stroke="#9a9a71" stroke-width="1"/>
+    <path d="M9 23c0 9 8 17 19 17s19-8 19-17c0-2-1-3-2-3H11c-1 0-2 1-2 3Z" fill="url(#gp-paint-rose)" stroke="#a84b6b" stroke-width="1.1"/>
+    <path d="m18 27 1.5 2.5m6-2 1 3m6-4-1 2.5m9-3-1.6 2.5m-8 3-1 2.7" fill="none" stroke="#543347" stroke-width="1.3" stroke-linecap="round"/>
+    <path d="M12 23h31m-32 9c2 3 4 5 7 6" fill="none" stroke="#ffd0ab" stroke-width="1.1" stroke-linecap="round" opacity=".65"/>
+  </symbol>
+  <symbol id="gp-strawberry" viewBox="0 0 56 64">
+    <use href="#gp-plinth"/>
+    <path d="M28 16c13-8 23 0 23 9 0 11-17 23-23 23S5 36 5 25c0-9 10-17 23-9Z" fill="url(#gp-paint-red)" stroke="#5a2949" stroke-width="1.45"/>
+    <path d="m29 16-3-9 3-1 3 8 10-2-6 7-5-1-4 5-4-5-7 1 4-4-6-4z" fill="url(#gp-paint-emerald)" stroke="#3b4843" stroke-width="1.1"/>
+    <path d="m13 25 1 1.6m6 1.4 1 1.6m8-4.6 1 1.6m7 1.4 1 1.6m5-5.6 1 1.6m-27 9.4 1 1.5m7-2.5 1 1.6m7 2.4 1 1.6m-8 1.4 1 1.6" fill="none" stroke="#ffd59e" stroke-width="1.15" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="gp-lemon" viewBox="0 0 56 64">
+    <use href="#gp-plinth"/>
+    <path d="M32 17c5-7 10-8 16-6-3 6-8 7-16 6Z" fill="url(#gp-paint-leaf)" stroke="#42483f" stroke-width="1.15"/>
+    <path d="M43 17c2 0 3 2 4 4 5 5 4 12-1 19-5 6-13 8-21 7-4-1-7-2-11-2-3 1-5-1-5-4-5-7-4-15 1-21 6-8 18-11 29-4 1 1 2 1 4 1Z" fill="url(#gp-paint-gold)" stroke="#735046" stroke-width="1.4"/>
+    <path d="M13 29c2-5 7-9 13-10m-2 10h.1m5 7h.1m-10 2h.1m16 2h.1m5-7h.1m0-7h.1" fill="none" stroke="#f8e8b0" stroke-width="1.15" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="gp-mango" viewBox="0 0 56 64">
+    <use href="#gp-plinth"/>
+    <path d="M34 17c1-6 5-8 10-8" fill="none" stroke="#765044" stroke-width="2.3" stroke-linecap="round"/>
+    <path d="M36 14c-7-7-12-7-16-6 3 6 9 8 16 6Z" fill="url(#gp-paint-leaf)" stroke="#44433f" stroke-width="1.05"/>
+    <path d="M39 15c11 3 14 12 11 19-4 12-20 17-37 13C6 45 5 40 7 35c4-13 19-24 32-20Z" fill="url(#gp-paint-mango)" stroke="#613647" stroke-width="1.4"/>
+    <path d="M12 35c4-7 11-12 18-14m5 21c4-1 7-3 9-6" fill="none" stroke="#ffdda5" stroke-width="1.1" stroke-linecap="round"/>
+    <path d="M16 39h.1m7-5h.1m5 4h.1m8-6h.1m5-7h.1" fill="none" stroke="#ab5c54" stroke-width="1.3" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="gp-truffle" viewBox="0 0 56 64">
+    <use href="#gp-plinth"/>
+    <path d="M7 32c-3-4-2-11 4-13 1-5 7-7 12-5 3-5 11-5 14 0 6-1 11 3 11 8 5 4 3 11-1 14-1 7-8 11-14 10-8 4-12 1-16-1-6 1-12-4-10-13Z" fill="url(#gp-paint-truffle)" stroke="#342031" stroke-width="1.4"/>
+    <path d="m12 23 5-3 4 2 1 6-5 4-6-2m12-9 4-5 6 1 2 5-4 4-8-1m13-3 6-3 3 4m-31 11 5 2 3 5m-3-9 5-4 7 2" fill="none" stroke="#b58977" stroke-width="1" stroke-linecap="round" opacity=".7"/>
+    <path d="M49 35c2 7-5 14-15 14-6 0-9-3-8-7 1-6 6-11 13-12 5-1 9 1 10 5Z" fill="url(#gp-paint-amber)" stroke="#533344" stroke-width="1.4"/>
+    <path d="m30 43 5-4 1-4 4 2 6-1m-12 10 3-3 4 1 2-4" fill="none" stroke="#f7d59f" stroke-width=".9" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="gp-crate" viewBox="0 0 56 64">
+    <use href="#gp-plinth"/>
+    <path d="M9 24 28 15l19 9v17l-19 8-19-8Z" fill="url(#gp-paint-amber)" stroke="#5d3b49" stroke-width="1.4"/>
+    <path d="m9 24 19 8 19-8M28 32v17m-17-20 16 7m2 0 16-7" fill="none" stroke="#f0c994" stroke-width="1.05"/>
+    <path d="m28 17 14 7-14 6-14-6Z" fill="url(#gp-paint-onyx)" stroke="#9f7864"/>
+    <path d="m28 19 5 5-5 4-5-4z" fill="url(#gp-paint-brass)"/>
+  </symbol>
+</svg>
+
 <div id="app">
   <div id="topbar">
+    <div class="market-brand">
+      <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 34"><path d="M6 28h20l2 4H4l2-4Zm2-3c4-3 6-7 6-12h4c0 5 2 9 6 12H8Z" fill="currentColor"/><path d="m8 6 4 3 4-6 4 6 4-3-2 8H10L8 6Z" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linejoin="round"/><circle cx="16" cy="2.5" r="1.5" fill="currentColor"/></svg></span>
+      <h1>Grocery Tycoon</h1>
+    </div>
     <div class="stat" id="cashStat"><span class="lbl">Cash</span><span class="val" id="cashVal">$0</span></div>
     <div class="stat"><span class="lbl">Net Worth</span><span class="val" id="nwVal">$0</span></div>
     <div class="stat"><span class="lbl">Day</span><span class="val" id="dayVal">1 <small id="seasonVal">Spring</small></span></div>
     <div class="stat" id="repWrap"><span class="lbl">Reputation <span id="repNum" style="color:var(--text)"></span></span><div id="repBar"><div id="repFill"></div></div></div>
     <div class="spacer"></div>
     <div id="speedCtl">
-      <button data-spd="0" id="spdPause">❚❚</button>
+      <button data-spd="0" id="spdPause" aria-label="Pause" title="Pause">❚❚</button>
       <button data-spd="1" class="on">1×</button>
       <button data-spd="2">2×</button>
       <button data-spd="4">4×</button>
@@ -320,18 +677,42 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:14px 0;}
 
   <div id="body">
     <div id="store">
-      <h2 class="section" id="storeTitle">🍎 Fruit Stand</h2>
+      <section id="market" aria-label="Market layout">
+        <div class="market-stage">
+          <div class="market-stage-head">
+            <div><h2>Market floor</h2><span id="marketCapacity"></span></div>
+            <button id="marketHelp" type="button" aria-label="How to play" title="How to play">?</button>
+          </div>
+          <svg id="marketBoard" viewBox="0 0 800 464" role="group" aria-label="8 by 8 market chessboard" preserveAspectRatio="xMidYMid meet"></svg>
+          <div class="market-legend" aria-label="Board key">
+            <span><i class="legend-marker in"></i>Entrance</span><span><i class="legend-marker out"></i>Exit</span>
+            <span class="market-live"><i></i><span id="marketPace">Market open</span></span>
+          </div>
+        </div>
+        <aside class="market-controls" aria-labelledby="marketControlsTitle">
+          <h2 id="marketControlsTitle">Lay out your shop</h2>
+          <p class="market-guide">Place displays and leave aisles for your customers.</p>
+          <div class="market-tools" role="group" aria-label="Placement tool">
+            <button type="button" data-market-mode="inspect" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12s3.2-5 9-5 9 5 9 5-3.2 5-9 5-9-5-9-5Zm9-2a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z"/></svg>Inspect</button>
+            <button type="button" data-market-mode="stand" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 9 2-4h14l2 4M3 9h18M5 9v10h14V9M5 14h14m-7-9v4"/></svg>Stand</button>
+            <button type="button" data-market-mode="shelf" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V5h14v15M5 9h14M5 14h14M5 19h14"/></svg>Shelf</button>
+          </div>
+          <div id="marketInspector"></div>
+          <p id="marketStatus" role="status" aria-live="polite"></p>
+        </aside>
+      </section>
+      <h2 class="section" id="storeTitle">Fruit Stand inventory</h2>
       <div id="coach" class="hidden"><span class="ci">💡</span><span class="ctxt" id="coachTxt"></span><button class="cx" id="coachClose" title="Dismiss">✕</button></div>
       <div id="shelf"></div>
     </div>
   </div>
 
   <div id="tabbar">
-    <button data-tab="restock"><span class="ic">📦</span>Restock</button>
-    <button data-tab="upgrades"><span class="ic">🏪</span>Store</button>
-    <button data-tab="marketing"><span class="ic">📣</span>Marketing</button>
-    <button data-tab="staff"><span class="ic">👥</span>Staff</button>
-    <button data-tab="achievements"><span class="ic">🏆</span>Awards</button>
+    <button data-tab="restock"><span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 7 12 3l9 4v10l-9 4-9-4V7Zm0 0 9 4 9-4M12 11v10M8 5l9 4"/></svg></span>Restock</button>
+    <button data-tab="upgrades"><span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 9 6 4h12l2 5v2a2 2 0 0 1-4 0 2 2 0 0 1-4 0 2 2 0 0 1-4 0 2 2 0 0 1-4 0V9Zm1 4v7h14v-7m-9 7v-5h4v5"/></svg></span>Store</button>
+    <button data-tab="marketing"><span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 10h4l10-5v14L8 14H4v-4Zm4 4 2 6h3l-2-5m10-6v6"/></svg></span>Marketing</button>
+    <button data-tab="staff"><span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M15 19v-2c0-2.2-2.7-3.5-5.5-3.5S4 14.8 4 17v2m16 0v-2c0-1.7-1.5-2.7-3-3.2M12.5 8a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm4-2.8a3 3 0 0 1 0 5.6"/></svg></span>Staff</button>
+    <button data-tab="achievements"><span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 4h8v7a4 4 0 0 1-8 0V4Zm0 2H4v2a4 4 0 0 0 4 4m8-6h4v2a4 4 0 0 1-4 4m-4 3v4m-4 1h8"/></svg></span>Awards</button>
   </div>
 
   <div id="panelWrap">
@@ -356,7 +737,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:14px 0;}
    Everything tunable lives here, grouped & commented for easy iteration.
    ============================================================================ */
 const C = {
-  VERSION: 4,                       // save schema version
+  VERSION: 4,                       // additive layout field; preserve the existing save key
   SAVE_KEY: 'grocery_tycoon_save_v4',
 
   START_CASH: 200,                  // starting bankroll (a few hundred bucks)
@@ -483,6 +864,194 @@ function marketPrice(p){ return p.wholesale * C.MARKET_MARKUP; }
 // profit-maximising price under the linear-elastic demand model (see math in design)
 function optimalPrice(p){ const m=marketPrice(p),E=C.ELASTICITY; return (1+E)*m/(2*E) + p.wholesale/2; }
 
+const GroceryBoard = (() => {
+  const size = 8;
+  const area = size * size;
+  const entry = 60;
+  const exit = 57;
+
+  const neighbors = Array.from({length: area}, (_, tile) => {
+    const row = Math.floor(tile / size);
+    const column = tile % size;
+    const adjacent = [];
+    if (row > 0) adjacent.push(tile - size);
+    if (column > 0) adjacent.push(tile - 1);
+    if (column < size - 1) adjacent.push(tile + 1);
+    if (row < size - 1) adjacent.push(tile + size);
+    return adjacent;
+  });
+
+  function isTile(tile) {
+    return Number.isInteger(tile) && tile >= 0 && tile < area;
+  }
+
+  function explore(blocked, start) {
+    const distance = new Int16Array(area).fill(-1);
+    const previous = new Int16Array(area).fill(-1);
+    if (!isTile(start) || blocked.has(start)) return {distance, previous};
+
+    const queue = [start];
+    distance[start] = 0;
+    previous[start] = start;
+
+    for (let index = 0; index < queue.length; index++) {
+      const current = queue[index];
+      for (const next of neighbors[current]) {
+        if (blocked.has(next) || distance[next] !== -1) continue;
+        distance[next] = distance[current] + 1;
+        previous[next] = current;
+        queue.push(next);
+      }
+    }
+    return {distance, previous};
+  }
+
+  function trace(previous, destination) {
+    if (!isTile(destination) || previous[destination] === -1) return null;
+    const path = [destination];
+    while (previous[destination] !== destination) {
+      destination = previous[destination];
+      path.push(destination);
+    }
+    return path.reverse();
+  }
+
+  function validate(fixtures) {
+    if (!Array.isArray(fixtures)) return {ok: false, reason: "Choose a valid layout."};
+    const blocked = new Set();
+    for (const fixture of fixtures) {
+      if (!fixture || !isTile(fixture.tile)) return {ok: false, reason: "Choose a tile on the board."};
+      if (fixture.type !== "stand" && fixture.type !== "shelf") {
+        return {ok: false, reason: "Choose a stand or a shelf."};
+      }
+      if (fixture.tile === entry || fixture.tile === exit) {
+        return {ok: false, reason: "Keep the entrance and exit clear."};
+      }
+      if (blocked.has(fixture.tile)) return {ok: false, reason: "That tile is already occupied."};
+      blocked.add(fixture.tile);
+    }
+
+    const {distance} = explore(blocked, entry);
+    if (distance[exit] === -1) return {ok: false, reason: "Leave a path from the entrance to the exit."};
+    for (const tile of blocked) {
+      if (!neighbors[tile].some(adjacent => distance[adjacent] !== -1)) {
+        return {ok: false, reason: "Leave an aisle beside every display."};
+      }
+    }
+    return {ok: true, reason: ""};
+  }
+
+  function place(fixtures, fixture, fromTile) {
+    if (fromTile !== undefined && !fixtures.some(existing => existing.tile === fromTile)) {
+      return {ok: false, reason: "Choose a display to move.", fixtures};
+    }
+    const proposed = fromTile === undefined
+      ? [...fixtures, fixture]
+      : fixtures.map(existing => existing.tile === fromTile ? fixture : existing);
+    const result = validate(proposed);
+    return {...result, fixtures: result.ok ? proposed : fixtures};
+  }
+
+  function path(fixtures, from = entry, to = exit) {
+    const blocked = new Set(fixtures.map(fixture => fixture.tile));
+    return trace(explore(blocked, from).previous, to);
+  }
+
+  function visit(fixtures, fixtureTile, from = entry, to = exit) {
+    const blocked = new Set(fixtures.map(fixture => fixture.tile));
+    if (!isTile(fixtureTile) || !blocked.has(fixtureTile)) return null;
+
+    const start = explore(blocked, from);
+    const end = explore(blocked, to);
+    let stop = null;
+    let shortest = Infinity;
+    for (const adjacent of neighbors[fixtureTile]) {
+      if (start.distance[adjacent] === -1 || end.distance[adjacent] === -1) continue;
+      const length = start.distance[adjacent] + end.distance[adjacent];
+      if (length < shortest) {
+        shortest = length;
+        stop = adjacent;
+      }
+    }
+    if (stop === null) return null;
+
+    const approach = trace(start.previous, stop);
+    const departure = trace(end.previous, stop);
+    departure.pop();
+    return {path: approach.concat(departure.reverse()), stopIndex: approach.length - 1};
+  }
+
+  return Object.freeze({size, entry, exit, isTile, validate, place, path, visit});
+})();
+
+const STARTER_DISPLAYS = [
+  {tile:19, type:'stand', product:'banana'},
+  {tile:21, type:'stand', product:'apple'},
+  {tile:34, type:'stand', product:'lettuce'},
+];
+
+function fixtureFor(pid){
+  if(!pid) return null;
+  return S.fixtures.find(fixture => fixture.product === pid) || null;
+}
+
+function availableFixtures(){
+  return S.fixtures.filter(fixture => fixture.product !== null);
+}
+
+function layoutStatus(fixtures){
+  const boardStatus = GroceryBoard.validate(fixtures);
+  if(!boardStatus.ok) return boardStatus;
+  if(fixtures.length > tier().slots){
+    return {ok:false, reason:'Upgrade the store to place more displays.'};
+  }
+  const assigned = new Set();
+  for(const {product} of fixtures){
+    if(product === null) continue;
+    if(typeof product !== 'string' || !Object.hasOwn(CAT, product) || CAT[product].tier > S.tier){
+      return {ok:false, reason:'Choose a product available at your store tier.'};
+    }
+    if(assigned.has(product)){
+      return {ok:false, reason:CAT[product].name+' already have a display.'};
+    }
+    assigned.add(product);
+  }
+  return boardStatus;
+}
+
+function commitLayout(fixtures){
+  const result = layoutStatus(fixtures);
+  if(!result.ok) return result;
+  S.fixtures = fixtures.map(({tile, type, product}) => ({tile, type, product}));
+  checkAch();
+  save();
+  return result;
+}
+
+function migrateLayout(){
+  if(layoutStatus(S.fixtures).ok) return;
+
+  // Older saves have shelves implied by product stock instead of physical tiles.
+  // Restore sale-ready stock first, followed by incoming goods and starter produce.
+  const catalog = CATALOG.filter(product => product.tier <= S.tier);
+  const incoming = new Set(S.deliveries.map(delivery => delivery.pid));
+  const ids = new Set([
+    ...catalog.filter(product => units(product.id) > 0).map(product => product.id),
+    ...catalog.filter(product => incoming.has(product.id)).map(product => product.id),
+    ...catalog.filter(product => S.products[product.id].spoiled > 0).map(product => product.id),
+    ...STARTER_DISPLAYS.map(fixture => fixture.product),
+  ]);
+  const tiles = [
+    ...STARTER_DISPLAYS.map(fixture => fixture.tile),
+    // Display rows separated by open aisles, with the bottom gates kept clear.
+    ...[1,3,5].flatMap(row => [1,2,3,4,5,6].map(column => row * GroceryBoard.size + column)),
+    56,58,59,61,62,63,
+  ];
+  S.fixtures = [...ids].slice(0, tier().slots).map((product, index) => ({
+    tile:tiles[index], type:index < STARTER_DISPLAYS.length ? 'stand' : 'shelf', product,
+  }));
+}
+
 /* ============================================================================
    ==============================  GAME STATE  ================================
    ============================================================================ */
@@ -510,6 +1079,7 @@ function freshState(){
     rep: C.START_REP,
     tier: 0,
     products,
+    fixtures: STARTER_DISPLAYS.map(fixture => ({...fixture})),
     refrig: 0,
     supply: { coopSigned:false, reefer:0, bulk:0, jit:0 },
     marketing: { flyers:{active:false,days:0}, radio:{active:false,days:0}, social:{active:false,days:0}, loyalty:false },
@@ -580,6 +1150,7 @@ function load(){
     if(!S.flags) S.flags = freshState().flags;
     if(S.flags.wetFloor===undefined) S.flags.wetFloor=false;
     if(!S.today) S.today = freshDay();
+    migrateLayout();
     return true;
   }catch(e){ return false; }
 }
@@ -589,6 +1160,7 @@ function resetGame(){
   RT.sessionDays=0;
   closePanel(); closeModal();
   startDay(true);
+  resetMarketView();
   fullRender();
   save();
 }
@@ -617,7 +1189,7 @@ function inSeason(pid){ return CAT[pid].seasons.includes(S.season); }
 function units(pid){ const pr=S.products[pid]; let n=0; for(const b of pr.batches) n+=b.qty; return n; }
 function totalUnits(){ let n=0; for(const id in S.products) n+=units(id); return n; }
 function totalSpoiledSitting(){ let n=0; for(const id in S.products) n+=S.products[id].spoiled; return n; }
-function distinctStocked(){ let n=0; for(const id in S.products) if(units(id)>0) n++; return n; }
+function distinctStocked(){ return availableFixtures().filter(fixture => units(fixture.product) > 0).length; }
 // slots a player can actually fill = min(store slots, products unlocked at this tier)
 function slotsFillable(){ return Math.min(tier().slots, CATALOG.filter(p=>p.tier<=S.tier).length); }
 
@@ -739,7 +1311,7 @@ function rivalShare(){
   if(!S.rival||!S.rival.open||S.rival.closed) return 0;
   // compare average price ratio across shared products + rep
   let myAvg=0,rvAvg=0,n=0;
-  for(const id in S.rival.prices){ if(units(id)>0){ myAvg+=S.products[id].price; rvAvg+=S.rival.prices[id]; n++; } }
+  for(const id in S.rival.prices){ if(fixtureFor(id) && units(id)>0){ myAvg+=S.products[id].price; rvAvg+=S.rival.prices[id]; n++; } }
   let priceEdge=0;
   if(n){ myAvg/=n; rvAvg/=n; priceEdge=(myAvg-rvAvg)/rvAvg; } // >0 means you're pricier
   const repEdge=(70 - S.rep)/100; // higher your rep, less share lost
@@ -750,7 +1322,8 @@ function rivalShare(){
 function processCustomers(n){
   const T=S.today;
   const avail = CATALOG.filter(p=>p.tier<=S.tier);
-  // build desire weights (independent of stock, so OOS => empty-shelf signal)
+  const displayed = new Set(availableFixtures().map(fixture => fixture.product));
+  // Keep demand for the unlocked catalog, even when a product lacks a display.
   const weights=[]; let wsum=0;
   for(const p of avail){
     let w=p.demand;
@@ -773,27 +1346,42 @@ function processCustomers(n){
     // line / checkout capacity: beyond capacity, rising chance to abandon
     if(T.served >= capacity){
       const over=(T.served-capacity)/Math.max(20,capacity);
-      if(rnd() < clamp(0.35+over*0.5,0,0.95)){ T.lostLine++; S.stats.lostLineEver=true; continue; }
+      if(rnd() < clamp(0.35+over*0.5,0,0.95)){
+        T.lostLine++;
+        S.stats.lostLineEver=true;
+        marketVisitor(null, 'pass');
+        continue;
+      }
     }
     // pick desired product
     let r=rnd()*wsum, di=0; for(;di<avail.length;di++){ r-=weights[di]; if(r<=0) break; }
     if(di>=avail.length) di=avail.length-1;
-    const p=avail[di]; const pr=S.products[p.id];
+    const p=avail[di];
+    if(!displayed.has(p.id)){
+      marketVisitor(p.id, 'pass');
+      continue;
+    }
+    const stock = units(p.id);
+    if(stock <= 0){
+      T.emptyShelf=true;
+      marketVisitor(p.id, 'empty');
+      continue;
+    }
+    const pr=S.products[p.id];
     // price-based purchase probability
     const rel = pr.price / marketPrice(p);
     let buyProb = clamp(1 - C.ELASTICITY*(rel-1), 0.02, 1.6);
     buyProb *= (0.6 + freshFrac(p.id)*0.4);     // fresher sells better
-    if(units(p.id)<=0){
-      // wanted it, none in stock -> empty shelf
-      T.emptyShelf=true;
+    if(rnd()>clamp(buyProb,0,0.98)){
+      T.served++;
+      marketVisitor(p.id, 'browsing');
       continue;
     }
-    if(rnd()>clamp(buyProb,0,0.98)) { T.served++; continue; } // browsed, didn't buy
     // BUY: basket quantity, capped by stock
-    let want = Math.max(1, Math.round(basket*(0.6+rnd()*0.9)));
-    want = Math.min(want, units(p.id));
+    const want = Math.min(stock, Math.max(1, Math.round(basket*(0.6+rnd()*0.9))));
     const got = sellUnits(p.id, want, false);
     T.served++; S.stats.customersTotal++;
+    marketVisitor(p.id, 'sale', got * pr.price);
   }
 }
 
@@ -907,8 +1495,9 @@ function endDay(){
   // --- streaks ---
   const hadStock = Object.keys(T.stockedSet).length>0;
   if(hadStock && spoiledToday===0) S.stats.noSpoilStreak++; else S.stats.noSpoilStreak=0;
-  if(!T.emptyShelf) S.stats.noEmptyStreak++; else S.stats.noEmptyStreak=0;
-  if(hadStock && spoiledToday===0 && !T.emptyShelf) S.stats.flawlessStreak++; else S.stats.flawlessStreak=0;
+  const servedWithoutEmptyDisplays = T.served > 0 && !T.emptyShelf;
+  if(servedWithoutEmptyDisplays) S.stats.noEmptyStreak++; else S.stats.noEmptyStreak=0;
+  if(hadStock && spoiledToday===0 && servedWithoutEmptyDisplays) S.stats.flawlessStreak++; else S.stats.flawlessStreak=0;
 
   // --- health inspection resolution ---
   if(S.event && S.event.type==='inspection'){
@@ -973,12 +1562,16 @@ function units2(n){ return n; }
 function updateReputation(T){
   // availability: 1 - emptyShelfPenalty
   const avail = T.emptyShelf ? 0.55 : 1.0;
-  // freshness: avg fresh frac across stocked
-  let fr=0,fn=0; for(const id in S.products){ if(units(id)>0){ fr+=freshFrac(id); fn++; } }
-  const freshness = fn? fr/fn : 0.7;
+  // Stock off the board remains in inventory, but only displayed goods affect shoppers.
+  const displayedStock = availableFixtures().map(fixture => fixture.product).filter(pid => units(pid)>0);
+  let fr=0,pr=0;
+  for(const pid of displayedStock){
+    fr += freshFrac(pid);
+    pr += S.products[pid].price/marketPrice(CAT[pid]);
+  }
+  const freshness = displayedStock.length ? fr/displayedStock.length : 0.7;
   // price fairness: avg price vs market (cheaper => better, but with floor)
-  let pr=0,pn=0; for(const id in S.products){ if(units(id)>0){ pr += S.products[id].price/marketPrice(CAT[id]); pn++; } }
-  const relPrice = pn? pr/pn : 1;
+  const relPrice = displayedStock.length ? pr/displayedStock.length : 1;
   const priceFair = clamp(1.6 - relPrice*0.6, 0, 1); // 1.0 at/below market, ~0.83 at optimal, low when gouging
   // variety
   const variety = clamp(distinctStocked()/Math.max(1,tier().slots),0,1);
@@ -1014,7 +1607,7 @@ function updateRivalDaily(){
   shared.forEach(p=>{ S.rival.prices[p.id]=+(marketPrice(p)*(0.85+rnd()*0.2)).toFixed(2); });
   // undercut streak: are you beating rival on every shared product?
   let beatAll=true, any=false;
-  for(const p of shared){ if(units(p.id)>0){ any=true; if(S.products[p.id].price>=S.rival.prices[p.id]) beatAll=false; } }
+  for(const p of shared){ if(fixtureFor(p.id) && units(p.id)>0){ any=true; if(S.products[p.id].price>=S.rival.prices[p.id]) beatAll=false; } }
   if(any && beatAll) S.rival.undercutStreak++; else S.rival.undercutStreak=0;
   // dominance: better rep AND beating on price share
   if(S.rep>62 && rivalShare()<0.22){ S.rival.dominateDays++; } else { S.rival.dominateDays=Math.max(0,S.rival.dominateDays-1); }
@@ -1038,17 +1631,14 @@ function announceEvent(ev){
    ===========================  PLAYER ACTIONS  ===============================
    ============================================================================ */
 function canStock(pid){
-  // can we put this product on a shelf slot? (already stocked OR slots free)
-  if(units(pid)>0 || S.products[pid].batches.length>0) return true;
-  // count distinct slots in use (units or incoming-but-shelved). incoming deliveries don't take a slot until arrival
-  return distinctStocked() < tier().slots;
+  return fixtureFor(pid) !== null;
 }
 function capRemaining(){ return tier().cap - totalUnits(); }
 
 // QUICK restock at the counter (instant, premium price) -> emergency
 function quickRestock(pid, qty){
   qty=Math.floor(qty); if(qty<=0) return;
-  if(!canStock(pid)){ toast('🚫','No free shelf slot. Sell out or pick a stocked item.','bad'); return; }
+  if(!canStock(pid)){ toast('🚫','Assign this product to a stand or shelf first.','bad'); return; }
   const room=capRemaining(); if(room<=0){ toast('🚫','Shelves are full!','bad'); return; }
   qty=Math.min(qty, room);
   const unit=effWholesale(pid,'quick');
@@ -1076,7 +1666,7 @@ function supplierOrder(pid, qty, supKey){
   if(S.event && S.event.type==='disruption' && S.event.data.supplier===supKey){ toast('⛔','That supplier is disrupted right now.','bad'); return; }
   if(qty<sup.min){ toast('🚫','Minimum order for this supplier is '+sup.min+'.','bad'); return; }
   if(qty>sup.max) qty=sup.max;
-  if(!canStock(pid)){ toast('🚫','No free shelf slot for a new product.','bad'); return; }
+  if(!canStock(pid)){ toast('🚫','Assign this product to a stand or shelf first.','bad'); return; }
   // capacity check against current + already-incoming for this product is loose; just cap by store cap on arrival
   const unit=effWholesale(pid,supKey);
   let cost=qty*unit;
@@ -1111,6 +1701,7 @@ function setPrice(pid, price){
 }
 
 function markdown(pid){
+  if(!canStock(pid)){ toast('🚫','Assign this product to a stand or shelf first.','bad'); return; }
   const pr=S.products[pid]; if(units(pid)<=0){ toast('🚫','Nothing to mark down.','bad'); return; }
   // mark down the OLDEST batch — quick low-margin clearance of aging stock
   pr.batches.sort((a,b)=>b.age-a.age);
@@ -1366,7 +1957,7 @@ function checkAchEndOfDay(T, dayProfit){
   RT.overstaffed = T.wages>0 && T.wages>T.revenue;
   // event-driven
   RT.trendsetter = (T.eventType==='craze' && T.revenue>0 && T.revenue>=S.stats.bestDayRev-0.001);
-  RT.disasterRecovery = (T.eventType==='disruption' && !T.emptyShelf);
+  RT.disasterRecovery = (T.eventType==='disruption' && T.served > 0 && !T.emptyShelf);
   RT.passedInspect = (T.inspectResult==='pass');
   RT.failedInspect = (T.inspectResult==='fail');
   // in-season sellout: a product in season sold out today (S.season is still this
@@ -1441,7 +2032,7 @@ function syncTop(){
   const t=tier(); const slots=distinctStocked(), capU=totalUnits();
   const capPct = capU/t.cap;
   document.getElementById('storeTitle').innerHTML =
-    t.emoji+' '+t.name+
+    t.name+' inventory'+
     ' <span class="stChip'+(slots>=slotsFillable()?' warn':'')+'">'+slots+'/'+t.slots+' slots</span>'+
     ' <span class="stChip'+(capPct>0.9?' warn':'')+'">'+fmtStock(capU)+'/'+fmtStock(t.cap)+' units</span>';
   // recolor the ambient background per season
@@ -1517,24 +2108,24 @@ let tileRefs={};
 function renderShelfStatic(){
   const shelf=document.getElementById('shelf');
   const avail=CATALOG.filter(p=>p.tier<=S.tier);
-  // figure which to show: stocked ones + an "add" affordance
+  renderMarketLayout();
   shelf.innerHTML=''; tileRefs={};
   avail.forEach(p=>{
     const u=units(p.id); const pr=S.products[p.id];
-    if(u<=0 && pr.batches.length===0 && pr.spoiled<=0){
-      // unstocked but available -> compact "add" style only if slots available, else skip showing as full tile
-    }
+    const display=fixtureFor(p.id);
     const tile=document.createElement('div');
     const f=freshFrac(p.id);
     const low=u>0 && u<10, spoiling=u>0 && f<0.2;
     const ps=priceStatus(p.id);
     tile.className='tile'+(u<=0?' empty':'')+(pr.front?' front':'')+(low?' low':'')+(spoiling?' spoiling':'');
     tile.dataset.pid=p.id;
+    tile.dataset.display=String(Boolean(display));
     tile.innerHTML=`
       ${isHotItem(p.id)?'<span class="hotbadge">🔥 HOT</span>':''}
       <span class="seas" title="${inSeason(p.id)?'In season':'Out of season'}">${inSeason(p.id)?C.SEASON_EMOJI[S.season]:'·'}</span>
-      <div class="emoji">${p.emoji}</div>
+      <div class="emoji">${produceArt(p.id)}</div>
       <div class="nm">${p.name}<span class="vegtag ${p.vegan?'':'nonveg'}">${p.vegan?'V':'N'}</span></div>
+      <span class="display-info">${display?"Displayed at "+squareName(display.tile):"No display assigned"}</span>
       <div class="row"><span>📦 <span class="stock">${fmtStock(u)}</span></span><button class="price${ps==='ok'?' optimal':''}" data-act="price" title="Tap to set price"><span class="pdot ${ps}"></span><span class="ptxt">$${pr.price.toFixed(2)}</span></button></div>
       <div class="freshWrap"><div class="freshFill${spoiling?' danger':''}" style="width:${Math.round(f*100)}%;background:${freshColor(f)}"></div></div>
       ${pr.spoiled>0?`<button class="tossBtn" data-act="toss">🗑️ Toss ${pr.spoiled} spoiled</button>`:''}
@@ -1618,9 +2209,9 @@ function panelRestock(){
   let html=`<div class="note">Pick a product, supplier & quantity. Cheaper suppliers are slower and may be less fresh. Co-op needs a contract; the counter is instant but pricey.</div>`;
   // product selector
   html+=`<div class="subhd">Product</div><div style="display:flex;flex-wrap:wrap;gap:6px;">`;
-  avail.forEach(pp=>{ html+=`<button class="pill ${pp.id===p.id?'on':''}" data-rp="${pp.id}" style="font-size:1.1rem;padding:6px 9px;">${pp.emoji}</button>`; });
+  avail.forEach(pp=>{ html+=`<button class="pill ${pp.id===p.id?'on':''}" data-rp="${pp.id}" aria-label="${pp.name}" title="${pp.name}" style="padding:4px 8px;">${produceArt(pp.id)}</button>`; });
   html+=`</div>`;
-  html+=`<div class="itemRow" style="margin-top:10px;"><div class="ic">${p.emoji}</div><div class="info"><div class="t">${p.name} ${inSeason(p.id)?'<span class="pill on">in season</span>':'<span class="pill warn">off season</span>'}</div><div class="d">In stock: ${units(p.id)} · Shelf life ~${effShelf(p.id)}d · Sells ~$${pr.price.toFixed(2)} · Optimal $${optimalPrice(p).toFixed(2)}</div></div></div>`;
+  html+=`<div class="itemRow" style="margin-top:10px;"><div class="ic">${produceArt(p.id)}</div><div class="info"><div class="t">${p.name} ${inSeason(p.id)?'<span class="pill on">in season</span>':'<span class="pill warn">off season</span>'}</div><div class="d">In stock: ${units(p.id)} · Shelf life ~${effShelf(p.id)}d · Sells ~$${pr.price.toFixed(2)} · Optimal $${optimalPrice(p).toFixed(2)}</div></div></div>`;
   // supplier selector
   html+=`<div class="subhd">Supplier</div>`;
   supList.forEach(k=>{
@@ -1648,7 +2239,7 @@ function panelRestock(){
   if(S.deliveries.length){
     html+=`<div class="subhd">Incoming deliveries</div>`;
     S.deliveries.slice().sort((a,b)=>a.arriveDay-b.arriveDay).forEach(d=>{
-      html+=`<div class="kv"><span class="k">${CAT[d.pid].emoji} ${d.qty} ${CAT[d.pid].name}</span><span class="v">day ${d.arriveDay} (in ${d.arriveDay-S.day}d)</span></div>`;
+      html+=`<div class="kv"><span class="k">${produceArt(d.pid)} ${d.qty} ${CAT[d.pid].name}</span><span class="v">day ${d.arriveDay} (in ${d.arriveDay-S.day}d)</span></div>`;
     });
   }
   return html;
@@ -1807,9 +2398,9 @@ function confirmModal(title,msg,okLabel,onOk){
 function priceModal(pid){
   const p=CAT[pid]; const pr=S.products[pid];
   const opt=optimalPrice(p), mkt=marketPrice(p);
-  openModal(`<h3>${p.emoji} ${p.name} — set price</h3>
+  openModal(`<h3>${produceArt(p.id)} ${p.name} pricing</h3>
     <p>Wholesale ${money(p.wholesale)} · Market ${money(mkt)} · Optimal ≈ <b class="gold-t">${money(opt)}</b></p>
-    <p>Higher price = more margin but fewer sales. ${S.rival&&S.rival.prices[pid]?'Rival sells at '+money(S.rival.prices[pid])+'.':''}</p>
+    <p>Higher price means more margin but fewer sales. ${S.rival&&S.rival.prices[pid]?'Rival sells at '+money(S.rival.prices[pid])+'.':''}</p>
     <div style="display:flex;align-items:center;gap:10px;justify-content:center;margin:14px 0;">
       <div class="stepper"><button id="pm10">−10¢</button><div class="qv" id="pmv">$${pr.price.toFixed(2)}</div><button id="pp10">+10¢</button></div>
     </div>
@@ -1830,7 +2421,8 @@ function priceModal(pid){
 }
 
 function showHelp(){
-  openModal(`<h3>🛒 How to Play</h3>
+  openModal(`<h3>Running the market</h3>
+  <p>Choose <b>Stand</b> or <b>Shelf</b>, place it on an open square, and assign a product. Keep a path between the doors and leave room beside each display. Use <b>Inspect</b> to move a display, change its product, or restock it.</p>
   <p><b>Goal:</b> grow a humble fruit stand into a hypermarket empire by maximizing daily profit — while fighting spoilage.</p>
   <p><b>The day plays out in real time.</b> Use the speed controls (❚❚ / 1× / 2× / 4×) up top. Customers arrive based on your reputation, marketing & store size, and buy what's in stock.</p>
   <p><b>📦 Restock</b> to buy produce. The counter is instant but pricey; suppliers are cheaper but slower & have minimums. Don't over-order — produce <b>spoils</b> (watch the freshness bar: green→yellow→brown).</p>
@@ -1882,12 +2474,12 @@ function setSpeed(s){
   S.speed=s;
   document.querySelectorAll('#speedCtl button').forEach(b=>b.classList.toggle('on', +b.dataset.spd===s));
   if(s>0){ RT.pauseStart=0; } else { RT.pauseStart=performance.now(); }
+  syncMarket();
   queueSave();
 }
 document.getElementById('speedCtl').addEventListener('click',e=>{ const b=e.target.closest('button'); if(b) setSpeed(+b.dataset.spd); });
 
-function frame(now){
-  const dt=Math.min(120, now-(RT.lastFrame||now)); RT.lastFrame=now;
+function runFrame(dt,now){
   if(S.speed>0){
     const dayMs=C.DAY_MS_1X/S.speed;
     RT.dayClock+=dt;
@@ -1900,7 +2492,8 @@ function frame(now){
     // pulse tiles that recorded a sale this frame (throttled so big crowds don't strobe)
     RT.pulseTick=(RT.pulseTick||0)+dt;
     if(RT.pulseTick>=420){ RT.pulseTick=0; for(const pid in RT.dirtyTiles){ if(RT.dirtyTiles[pid]) pulseTile(pid); } RT.dirtyTiles={}; }
-    syncTiles(); syncTop();
+    syncTiles(); syncTop(); syncMarket();
+    stepMarket(dt);
     // periodic mid-day achievement check (cheap)
     RT.achTick=(RT.achTick||0)+dt; if(RT.achTick>500){ RT.achTick=0; checkAch(); }
     if(RT.dayClock>=dayMs){ endDay(); }
@@ -1908,8 +2501,23 @@ function frame(now){
     // paused: idle hands achievement
     if(RT.pauseStart && !RT.idleHands && (now-RT.pauseStart)>=300000){ RT.idleHands=true; checkAch(); }
   }
+}
+function frame(now){
+  const dt=Math.min(120,Math.max(0,now-(RT.lastFrame||now)));
+  RT.lastFrame=now;
+  runFrame(dt,now);
   requestAnimationFrame(frame);
 }
+window.advanceTime=(ms)=>{
+  const realNow=performance.now();
+  let elapsed=0;
+  while(elapsed<ms){
+    const dt=Math.min(1000/60,ms-elapsed);
+    elapsed+=dt;
+    runFrame(dt,realNow+elapsed);
+  }
+  RT.lastFrame=performance.now();
+};
 
 /* ============================================================================
    ============================  WIRE-UP / INIT  ==============================
@@ -1923,6 +2531,454 @@ const _coachClose=document.getElementById('coachClose');
 if(_coachClose) _coachClose.onclick=()=>{ const k=document.getElementById('coach').dataset.key; if(k) coachDismissed[k]=true; document.getElementById('coach').classList.add('hidden'); };
 
 function fullRender(){ renderShelfStatic(); syncTop(); if(curTab) renderPanel(); }
+
+/* ============================================================================
+   MARKET FLOOR — fixed oblique projection, fixture controls and customer art
+   ============================================================================ */
+const BOARD_ART = {
+  x:400, y:72, tileW:44, tileH:20.5, frame:0.24, depth:15,
+  moveMs:150, shopMs:460, spawnInterval:145, maxVisitors:8, maxPending:8,
+};
+const boardView = {
+  tool:'inspect', selected:19, moving:null, key:'', focus:19, actors:[], pending:[],
+  elapsed:0, lastSpawn:-Infinity, order:'', serial:0, fixtureNodes:[],
+};
+const boardSvg=document.getElementById('marketBoard');
+const boardInspector=document.getElementById('marketInspector');
+const boardStatus=document.getElementById('marketStatus');
+const SVG_NS='http://www.w3.org/2000/svg';
+
+function produceArt(pid, x, y, w, h){
+  const id=pid||'crate';
+  if(x===undefined) return '<svg class="produce-art" viewBox="0 0 56 64" aria-hidden="true"><use href="#gp-'+id+'"></use></svg>';
+  return '<use href="#gp-'+id+'" x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'"/>';
+}
+function boardPoint(col,row){
+  return [BOARD_ART.x+(col-row)*BOARD_ART.tileW, BOARD_ART.y+(col+row)*BOARD_ART.tileH];
+}
+function tilePoint(tile){
+  return boardPoint(tile%8+0.5,Math.floor(tile/8)+0.5);
+}
+function squareName(tile){
+  return 'ABCDEFGH'[tile%8]+(8-Math.floor(tile/8));
+}
+function boardCorners(col,row,size=1){
+  return [[col,row],[col+size,row],[col+size,row+size],[col,row+size]].map(([c,r])=>boardPoint(c,r));
+}
+function svgPoints(points){ return points.map(p=>p.join(',')).join(' '); }
+function fixtureAt(tile){ return S.fixtures.find(f=>f.tile===tile); }
+function fixtureName(type){ return type==='stand'?'Stand':'Shelf'; }
+function squareLabel(tile){
+  const f=fixtureAt(tile);
+  const desc=tile===GroceryBoard.entry?'Entrance':tile===GroceryBoard.exit?'Exit':f?
+    (f.product?CAT[f.product].name+', ':'')+fixtureName(f.type):'Empty square';
+  return squareName(tile)+', '+desc;
+}
+
+function mountMarketBoard(){
+  const defs=`<defs>
+    <linearGradient id="floorLight" x2=".72" y2="1">
+      <stop stop-color="#f2ebe1"/><stop offset=".6" stop-color="#d0c8c1"/><stop offset="1" stop-color="#ab9fa7"/>
+    </linearGradient>
+    <linearGradient id="floorDark" x2=".72" y2="1">
+      <stop stop-color="#514753"/><stop offset=".48" stop-color="#2a232e"/><stop offset="1" stop-color="#1a1720"/>
+    </linearGradient>
+    <linearGradient id="boardBrass" x2=".7" y2="1">
+      <stop stop-color="#f1d0a0"/><stop offset=".32" stop-color="#936448"/><stop offset=".54" stop-color="#d4a976"/><stop offset="1" stop-color="#6f463b"/>
+    </linearGradient>
+    <linearGradient id="boardWood" x2="0" y2="1">
+      <stop stop-color="#412c39"/><stop offset="1" stop-color="#201621"/>
+    </linearGradient>
+    <linearGradient id="fixtureVelvet" x2="0" y2="1">
+      <stop stop-color="#5f4059"/><stop offset="1" stop-color="#281b2b"/>
+    </linearGradient>
+    <linearGradient id="fixtureWood" x2=".85" y2="1">
+      <stop stop-color="#865b48"/><stop offset=".54" stop-color="#60404a"/><stop offset="1" stop-color="#2c1d2a"/>
+    </linearGradient>
+    <radialGradient id="hallGlow"><stop stop-color="#e2a977" stop-opacity=".29"/><stop offset="1" stop-color="#977290" stop-opacity="0"/></radialGradient>
+    <radialGradient id="boardShadow"><stop stop-color="#100b13" stop-opacity=".95"/><stop offset="1" stop-color="#100b13" stop-opacity="0"/></radialGradient>
+    <linearGradient id="chessIvory">
+      <stop stop-color="#8a6b64"/><stop offset=".28" stop-color="#e3c8a5"/><stop offset=".49" stop-color="#fff0d5"/><stop offset=".72" stop-color="#bf9c80"/><stop offset="1" stop-color="#70505a"/>
+    </linearGradient>
+    <linearGradient id="chessLilac">
+      <stop stop-color="#4b324f"/><stop offset=".3" stop-color="#b087b1"/><stop offset=".48" stop-color="#ead1e0"/><stop offset=".73" stop-color="#98729c"/><stop offset="1" stop-color="#493052"/>
+    </linearGradient>
+    <linearGradient id="chessGold">
+      <stop stop-color="#63424a"/><stop offset=".27" stop-color="#ae774a"/><stop offset=".48" stop-color="#f1cb80"/><stop offset=".74" stop-color="#af7851"/><stop offset="1" stop-color="#5a3943"/>
+    </linearGradient>
+    <g id="chessBase"><ellipse cx="2" cy="-1" rx="19" ry="7.5" fill="#160f19" opacity=".55" stroke="none"/>
+      <path d="M-14-4Q-16-9-10-11L-8-16H8L10-11Q16-9 14-4Q0 1-14-4Z"/>
+      <path d="M-12-8Q0-3 12-8M-8-14Q0-11 8-14" fill="none" stroke="#fff2d5" stroke-opacity=".5" stroke-width=".9"/>
+    </g>
+    <g id="chessPawn"><path d="M-9-15Q-4-22-4-32H4Q4-22 9-15Q0-11-9-15Z"/>
+      <ellipse cy="-32" rx="8" ry="3"/><circle cy="-41" r="7.2"/>
+      <circle cx="-2.4" cy="-43.5" r="1.8" fill="#fff1d0" opacity=".63" stroke="none"/>
+    </g>
+    <g id="chessRook"><path d="M-10-15Q-6-25-6-34H6Q6-25 10-15Q0-11-10-15Z"/>
+      <path d="M-9-33-12-39v-10h6v4h4v-4h5v4h4v-4h5v10l-3 6Q0-29-9-33Z"/>
+      <path d="M-9-39Q0-36 9-39M-3-33v11" fill="none" stroke="#fff1d0" stroke-opacity=".46" stroke-width="1"/>
+    </g>
+    <g id="chessBishop"><path d="M-10-15Q-4-24-4-36H4Q4-24 10-15Q0-11-10-15Z"/>
+      <ellipse cy="-36" rx="10" ry="3"/><path d="M0-59C-3-52-11-48-9-42Q0-34 9-42C11-48 4-51 0-59Z"/>
+      <path d="m6-51-6 8" fill="none" stroke="#3b2839" stroke-width="2.2"/><circle cy="-59" r="2.1"/>
+    </g>
+    <g id="chessKnight"><path d="M-10-15Q-4-24 0-31L-10-26-15-31l7-13 6-6L0-56l5 7q13 3 10 16L10-15Q0-11-10-15Z"/>
+      <path d="M5-45q8 8 4 16L5-20M-13-31l5-3" fill="none" stroke="#fff1d0" stroke-opacity=".58" stroke-width="1.1"/>
+      <circle cx="-4" cy="-42" r="1.65" fill="#402b3c" stroke="none"/>
+    </g>
+    <g id="chessQueen"><path d="M-11-15Q-4-25-4-38H4Q4-25 11-15Q0-11-11-15Z"/>
+      <path d="M-9-39-13-54l8 7 5-12 5 12 8-7-4 15Q0-34-9-39Z"/>
+      <circle cx="-13" cy="-54" r="2"/><circle cy="-59" r="2.4"/><circle cx="13" cy="-54" r="2"/>
+    </g>
+  </defs>`;
+  const border=boardCorners(-BOARD_ART.frame,-BOARD_ART.frame,8+BOARD_ART.frame*2);
+  const [back,right,front,left]=border;
+  const lower=([x,y])=>[x,y+BOARD_ART.depth];
+  const leftBevel=[left,front,lower(front),lower(left)];
+  const rightBevel=[front,right,lower(right),lower(front)];
+  const art=[defs,`<g aria-hidden="true">
+    <ellipse cx="400" cy="251" rx="390" ry="151" fill="url(#hallGlow)"/>
+    <ellipse cx="400" cy="318" rx="378" ry="140" fill="url(#boardShadow)"/>
+    <g fill="none" stroke="#c49c7e" opacity=".23">
+      <path d="M176 154V116Q176 65 216 42Q256 65 256 116v38M184 153v-37q0-42 32-64 32 22 32 64v37M216 54v62"/>
+      <path d="M544 154V116Q544 65 584 42Q624 65 624 116v38M552 153v-37q0-42 32-64 32 22 32 64v37M584 54v62"/>
+      <path d="M330 112V83Q330 48 367 26Q404 48 404 83v29M404 112V83Q404 48 441 26Q478 48 478 83v29"/>
+      <path d="M194 120q22-26 44 0m324 0q22-26 44 0M356 70l11-11 11 11-11 11ZM430 70l11-11 11 11-11 11Z"/>
+    </g>
+    <path d="M400 29l5 7-5 7-5-7z" fill="#e4bf85" opacity=".7"/>
+    <polygon points="${svgPoints(leftBevel)}" fill="url(#boardWood)" stroke="#966a5b" stroke-width="1.2"/>
+    <polygon points="${svgPoints(rightBevel)}" fill="#261c29" stroke="#745058" stroke-width="1.2"/>
+    <path d="M${left[0]} ${left[1]+6}L${front[0]} ${front[1]+6}L${right[0]} ${right[1]+6}" fill="none" stroke="#bd9167" opacity=".34"/>
+    <polygon points="${svgPoints([back,right,front,left])}" fill="url(#boardBrass)" stroke="#e7cda0" stroke-width="1"/>
+  `];
+  const hit=[];
+  for(let row=0;row<8;row++){
+    for(let col=0;col<8;col++){
+      const tile=row*8+col;
+      const points=svgPoints(boardCorners(col,row));
+      const light=(row+col)%2===0;
+      art.push(`<polygon points="${points}" fill="url(#${light?'floorLight':'floorDark'})" stroke="#211925" stroke-opacity=".47" stroke-width="1"/>`);
+      const [x,y]=tilePoint(tile);
+      const n=(tile*23)%17;
+      art.push(`<path d="M${x-27} ${y+n/4-7}q11 0 24 ${-8+n/3}t28 2m-38 9q7-1 16-6t20 1" fill="none" stroke="${light?'#534250':'#ac95a0'}" stroke-width=".65" opacity="${light?.12:.17}"/>`);
+      if(tile===GroceryBoard.entry || tile===GroceryBoard.exit){
+        art.push(`<path d="M${x-13} ${y}l13-7 13 7-13 7Z" fill="${tile===GroceryBoard.entry?'#d6b483':'#312331'}" stroke="${light?'#64434b':'#e8c58d'}" stroke-width="1.6"/>`);
+      }
+      hit.push(`<g class="market-square" data-square="${tile}" role="button" tabindex="-1" aria-pressed="false" data-reserved="${tile===GroceryBoard.entry||tile===GroceryBoard.exit}"><polygon points="${points}"/></g>`);
+    }
+  }
+  for(let i=0;i<8;i++){
+    const [cx,cy]=boardPoint(i+.5,8.48);
+    const [rx,ry]=boardPoint(8.48,i+.5);
+    art.push(`<text class="market-board-label" x="${cx}" y="${cy+10}" text-anchor="middle">${'ABCDEFGH'[i]}</text><text class="market-board-label" x="${rx}" y="${ry+10}" text-anchor="middle">${8-i}</text>`);
+  }
+  art.push('<path d="m382 440 18 5 18-5m-23 9 5 3 5-3" fill="none" stroke="#b48560" opacity=".68"/></g>');
+  boardSvg.innerHTML=art.join('')+'<g id="marketHit">'+hit.join('')+'</g><g id="marketPieces"></g><g id="marketEffects" aria-hidden="true"></g>';
+}
+function fixtureArt(f){
+  const empty=f.product?'':' opacity=".66"';
+  const top=`<path d="M-31-19 1-35 32-20 0-4Z" fill="url(#fixtureWood)" class="fixture-edge"/>
+    <path d="M0-4 32-20v7L0 3Z" fill="#3e2938"/>
+    <path d="M-31-19 0-4v7l-31-15Z" fill="url(#fixtureVelvet)"/>`;
+  const legs=`<path d="M-22-18v17m43-16v16M0-6v12" stroke="#5d3e42" stroke-width="4.8"/>
+    <path d="M-23-15v14m43-14v14M-1-4v9" stroke="#b88a62" stroke-width="1.4"/>`;
+  const stock=produceArt(f.product,-23,-65,46,51);
+  if(f.type==='shelf'){
+    return `<ellipse cx="3" cy="2" rx="28" ry="11" fill="#170e18" opacity=".51" stroke="none"/>
+      <g stroke="#b38a67" stroke-width="1.1" stroke-linejoin="round"${empty}>
+        ${legs}${top}
+        <path d="M-27-20v-39l12-7L0-81l15 15 12 7v40L0-6Z" fill="url(#fixtureVelvet)" class="fixture-edge"/>
+        <path d="M-23-24v-33l10-6L0-76l13 13 10 6v33M-25-42l25 12 25-12" fill="none"/>
+        <path d="M0-70l4 5-4 5-4-5z" fill="#dec18d" stroke="none"/>
+        ${stock}
+        <path d="M-27-22 0-9l27-13v5L0-4l-27-13Z" fill="url(#fixtureWood)"/>
+        <path d="M-12-13 0-7l12-6" fill="none" stroke="#e3bc83" stroke-width="1"/>
+      </g>`;
+  }
+  return `<ellipse cx="3" cy="1" rx="29" ry="10" fill="#170e18" opacity=".5" stroke="none"/>
+    <g stroke="#b38a67" stroke-width="1.1" stroke-linejoin="round"${empty}>
+      ${legs}${top}
+      <path d="M-28-18 0-5l27-14v10L0 4-28-9Z" fill="#34232f"/>
+      <path d="M-26-17 0-5l25-13M-20-13v3m8 1v3m8 1v3m11 0v-3m8-1v-3m8-2v-3" fill="none" stroke="#c4926c"/>
+      ${stock}
+    </g>`;
+}
+function renderMarketLayout(force=false){
+  if(!boardSvg.firstElementChild) mountMarketBoard();
+  const key=S.tier+':'+JSON.stringify(S.fixtures);
+  const changed=boardView.key!==key;
+  if(changed || force){
+    boardView.key=key;
+    clearMarketTraffic();
+    const pieces=document.getElementById('marketPieces');
+    pieces.innerHTML=S.fixtures.map(f=>{
+      const [x,y]=tilePoint(f.tile);
+      return `<g class="market-fixture" data-square="${f.tile}" data-fixture-type="${f.type}" transform="translate(${x} ${y})" aria-hidden="true">${fixtureArt(f)}</g>`;
+    }).join('');
+    boardView.fixtureNodes=S.fixtures.map((f,i)=>({node:pieces.children[i], y:tilePoint(f.tile)[1], id:'fixture'+f.tile}));
+  }
+  boardSvg.querySelectorAll('.market-square').forEach(s=>{
+    const tile=Number(s.dataset.square);
+    s.setAttribute('aria-label',squareLabel(tile));
+    s.setAttribute('aria-pressed',String(tile===boardView.selected));
+    s.setAttribute('tabindex',tile===boardView.focus?'0':'-1');
+  });
+  if(changed || force || !boardInspector.firstElementChild) renderMarketInspector();
+  syncMarket();
+}
+function syncMarket(){
+  const text=`${S.fixtures.length} / ${tier().slots} displays installed`;
+  const capacity=document.getElementById('marketCapacity');
+  if(capacity.textContent!==text) capacity.textContent=text;
+  const pace=document.getElementById('marketPace');
+  const state=S.speed?'Market open':'Paused';
+  if(pace.textContent!==state){
+    pace.textContent=state;
+    pace.parentElement.dataset.paused=String(!S.speed);
+  }
+  const summary=boardInspector.querySelector('[data-stock-summary]');
+  if(summary){
+    const pid=summary.dataset.stockSummary;
+    const next=`${fmtStock(units(pid))} in stock · ${money(S.products[pid].price)} each`;
+    if(summary.textContent!==next) summary.textContent=next;
+  }
+}
+function marketNotice(text,error=false){
+  boardStatus.textContent=text;
+  boardStatus.dataset.error=String(error);
+}
+function marketChoices(){
+  const empty=Array.from({length:64},(_,i)=>i).filter(i=>
+    i!==GroceryBoard.entry && i!==GroceryBoard.exit && !fixtureAt(i));
+  const choices=empty.map(i=>`<option value="${i}">${squareName(i)}</option>`).join('');
+  return `<label class="market-field">Destination square<select id="marketSquareChoice">${choices}</select></label><div class="board-actions"><button type="button" class="primary" id="marketChooseSquare" ${choices?'':'disabled'}>${boardView.moving===null?'Place here':'Move here'}</button>${boardView.moving!==null?'<button type="button" id="marketCancel">Cancel</button>':''}</div>`;
+}
+function renderMarketInspector(){
+  document.querySelectorAll('[data-market-mode]').forEach(button=>
+    button.setAttribute('aria-pressed',String(button.dataset.marketMode===boardView.tool && boardView.moving===null)));
+  const f=fixtureAt(boardView.selected);
+  if(boardView.moving!==null){
+    boardInspector.innerHTML=`<div class="board-selected-head"><div><b>Move ${fixtureName(fixtureAt(boardView.moving).type).toLowerCase()}</b><small>From ${squareName(boardView.moving)}</small></div></div>
+      <p class="board-inspector-copy">Tap an empty square or choose one below.</p>${marketChoices()}`;
+  }else if(boardView.tool!=='inspect'){
+    boardInspector.innerHTML=`<div class="board-selected-head"><div><b>Place a ${boardView.tool}</b></div></div>
+      <p class="board-inspector-copy">Tap an empty square or choose one below.</p>${marketChoices()}`;
+  }else if(f){
+    const options=CATALOG.filter(p=>p.tier<=S.tier).map(p=>{
+      const used=fixtureFor(p.id);
+      return `<option value="${p.id}" ${p.id===f.product?'selected':''} ${used&&used.tile!==f.tile?'disabled':''}>${p.name}${used&&used.tile!==f.tile?' · '+squareName(used.tile):''}</option>`;
+    }).join('');
+    boardInspector.innerHTML=`<div class="board-selected-head">${produceArt(f.product)}<div><b>${f.product?CAT[f.product].name:fixtureName(f.type)}</b><small>${squareName(f.tile)}${' · '+fixtureName(f.type)+(f.product?'':' · Empty')}</small></div></div>
+      <label class="market-field">Product<select id="marketProduct"><option value="">No product</option>${options}</select></label>
+      ${f.product?`<p class="board-inspector-copy" data-stock-summary="${f.product}"></p>`:''}
+      <div class="board-actions">${f.product?'<button type="button" class="primary" id="marketStock">Restock</button>':''}<button type="button" id="marketMove">Move</button><button type="button" id="marketRemove">Remove</button></div>`;
+  }else{
+    const isDoor=boardView.selected===GroceryBoard.entry||boardView.selected===GroceryBoard.exit;
+    boardInspector.innerHTML=`<div class="board-selected-head"><div><b>${boardView.selected===GroceryBoard.entry?'Entrance':boardView.selected===GroceryBoard.exit?'Exit':'Open floor'}</b><small>${squareName(boardView.selected)}</small></div></div>
+      <p class="board-inspector-copy">${isDoor?'Keep this square clear for shoppers.':'Choose Stand or Shelf to place a grocery display.'}</p>`;
+  }
+  syncMarket();
+}
+function selectMarketSquare(tile){
+  boardView.selected=tile;
+  boardView.focus=tile;
+  renderMarketLayout();
+}
+function applyMarketLayout(fixtures,message){
+  const result=commitLayout(fixtures);
+  if(!result.ok){ marketNotice(result.reason,true); return false; }
+  boardView.moving=null;
+  boardView.tool='inspect';
+  renderShelfStatic();
+  renderMarketInspector();
+  marketNotice(message);
+  return true;
+}
+function useMarketSquare(tile){
+  if(!GroceryBoard.isTile(tile)) return;
+  if(boardView.moving!==null || boardView.tool!=='inspect'){
+    const origin=boardView.moving;
+    const from=origin===null?null:fixtureAt(origin);
+    const proposed={tile,type:from?from.type:boardView.tool,product:from?from.product:null};
+    const attempt=GroceryBoard.place(S.fixtures,proposed,origin===null?undefined:origin);
+    if(!attempt.ok){ marketNotice(attempt.reason,true); return; }
+    const previous=boardView.selected;
+    boardView.selected=boardView.focus=tile;
+    const message=fixtureName(proposed.type)+(from?' moved to ':' placed at ')+squareName(tile)+'.';
+    if(!applyMarketLayout(attempt.fixtures,message)) boardView.selected=boardView.focus=previous;
+    return;
+  }
+  selectMarketSquare(tile);
+  renderMarketInspector();
+  marketNotice('');
+}
+function resetMarketView(){
+  boardView.tool='inspect';
+  boardView.selected=boardView.focus=S.fixtures[0]?.tile??0;
+  boardView.moving=null;
+  marketNotice('');
+  renderMarketLayout(true);
+}
+document.querySelector('.market-tools').addEventListener('click',e=>{
+  const button=e.target.closest('[data-market-mode]');
+  if(!button) return;
+  boardView.tool=button.dataset.marketMode;
+  boardView.moving=null;
+  renderMarketInspector();
+  marketNotice('');
+});
+boardSvg.addEventListener('click',e=>{
+  const square=e.target.closest('[data-square]');
+  if(square) useMarketSquare(Number(square.dataset.square));
+});
+boardSvg.addEventListener('keydown',e=>{
+  const square=e.target.closest('.market-square');
+  if(!square) return;
+  const current=Number(square.dataset.square);
+  if(e.key==='Enter'||e.key===' '){
+    e.preventDefault();
+    useMarketSquare(current);
+    return;
+  }
+  const steps={ArrowRight:1,ArrowLeft:-1,ArrowUp:-8,ArrowDown:8};
+  if(!(e.key in steps)) return;
+  e.preventDefault();
+  const next=current+steps[e.key];
+  if(!GroceryBoard.isTile(next)|| (Math.abs(steps[e.key])===1&&Math.floor(next/8)!==Math.floor(current/8))) return;
+  boardView.focus=next;
+  square.setAttribute('tabindex','-1');
+  const target=boardSvg.querySelector('.market-square[data-square="'+next+'"]');
+  target.setAttribute('tabindex','0');
+  target.focus();
+});
+boardInspector.addEventListener('change',e=>{
+  if(e.target.id!=='marketProduct') return;
+  const pid=e.target.value||null;
+  const tile=boardView.selected;
+  const next=S.fixtures.map(f=>f.tile===tile?{...f,product:pid}:f);
+  if(!applyMarketLayout(next,pid?CAT[pid].name+' assigned to '+squareName(tile)+'.':'Product removed from display.')) renderMarketInspector();
+  document.getElementById('marketProduct')?.focus();
+});
+boardInspector.addEventListener('click',e=>{
+  const id=e.target.closest('button')?.id;
+  if(id==='marketChooseSquare'){
+    useMarketSquare(Number(document.getElementById('marketSquareChoice').value));
+    if(!document.getElementById('marketChooseSquare')) document.getElementById('marketProduct')?.focus();
+  }else if(id==='marketMove'){
+    boardView.moving=boardView.selected;
+    renderMarketInspector();
+    document.getElementById('marketSquareChoice')?.focus();
+    marketNotice('');
+  }else if(id==='marketCancel'){
+    boardView.moving=null;
+    renderMarketInspector();
+    document.getElementById('marketMove')?.focus();
+    marketNotice('');
+  }else if(id==='marketRemove'){
+    const tile=boardView.selected;
+    applyMarketLayout(S.fixtures.filter(f=>f.tile!==tile),'Display removed from '+squareName(tile)+'.');
+  }else if(id==='marketStock'){
+    restockState.pid=fixtureAt(boardView.selected).product;
+    openTab('restock');
+  }
+});
+document.getElementById('marketHelp').onclick=showHelp;
+
+function clearMarketTraffic(){
+  for(const actor of boardView.actors) actor.node.remove();
+  boardView.actors=[];
+  boardView.pending=[];
+  boardView.order='';
+  boardView.lastSpawn=-Infinity;
+  document.getElementById('marketEffects')?.replaceChildren();
+}
+function marketVisitor(pid,outcome,revenue=0){
+  if(!boardSvg.firstElementChild) return;
+  if(boardView.pending.length>=BOARD_ART.maxPending){
+    const sample=boardView.pending.findIndex(visitor=>visitor.outcome!=='sale');
+    if(outcome!=='sale' || sample===-1) return;
+    boardView.pending.splice(sample,1);
+  }
+  boardView.pending.push({pid,outcome,revenue});
+}
+function spawnMarketVisitor(){
+  const visit=boardView.pending.shift();
+  const display=fixtureFor(visit.pid);
+  const trip=display?GroceryBoard.visit(S.fixtures,display.tile):null;
+  const path=trip?.path||GroceryBoard.path(S.fixtures);
+  if(!path) return;
+  const piece=['Pawn','Rook','Bishop','Knight','Queen'][boardView.serial%5];
+  const tone=['Ivory','Lilac','Gold'][boardView.serial%3];
+  const node=document.createElementNS(SVG_NS,'g');
+  node.classList.add('market-actor');
+  node.setAttribute('aria-hidden','true');
+  node.innerHTML=`<g fill="url(#chess${tone})" stroke="#3d2940" stroke-width="1.15" stroke-linejoin="round"><use href="#chessBase"/><use href="#chess${piece}"/></g>`;
+  const id='visitor'+ ++boardView.serial;
+  const positions=path.map(tilePoint);
+  const offset=14;
+  const outside=([x,y])=>[x-offset,y+offset/2];
+  positions.unshift(outside(positions[0]));
+  positions.push(outside(positions[positions.length-1]));
+  boardView.actors.push({
+    ...visit,node,id,positions,tilePath:path,born:boardView.elapsed,y:0,
+    stop:trip?trip.stopIndex+1:-1,saleShown:false,
+  });
+  boardView.lastSpawn=boardView.elapsed;
+}
+function stepMarket(dt){
+  if(!S.speed || !boardSvg.firstElementChild) return;
+  boardView.elapsed+=dt*Math.min(S.speed,2.2);
+  if(boardView.pending.length && boardView.actors.length<BOARD_ART.maxVisitors &&
+      boardView.elapsed-boardView.lastSpawn>=BOARD_ART.spawnInterval) spawnMarketVisitor();
+  for(let index=boardView.actors.length-1;index>=0;index--){
+    const actor=boardView.actors[index];
+    const elapsed=boardView.elapsed-actor.born;
+    const pause=actor.stop>=0?BOARD_ART.shopMs:0;
+    const dwellAt=actor.stop*BOARD_ART.moveMs;
+    let traveled=elapsed;
+    if(actor.stop>=0 && elapsed>=dwellAt) traveled-=Math.min(elapsed-dwellAt,pause);
+    if(!actor.saleShown && actor.revenue>0 && actor.stop>=0 && elapsed>=dwellAt){
+      actor.saleShown=true;
+      const [x,y]=actor.positions[actor.stop];
+      const label=document.createElementNS(SVG_NS,'text');
+      label.setAttribute('class','market-sale');
+      label.setAttribute('x',x);
+      label.setAttribute('y',y-56);
+      label.setAttribute('text-anchor','middle');
+      label.textContent='+'+money(actor.revenue);
+      document.getElementById('marketEffects').append(label);
+      const animation=label.animate([{transform:'translateY(0)',opacity:1},{transform:'translateY(-22px)',opacity:0}],{duration:780,easing:'ease-out'});
+      animation.onfinish=()=>label.remove();
+    }
+    const step=traveled/BOARD_ART.moveMs;
+    const segment=Math.floor(step);
+    if(segment>=actor.positions.length-1){ actor.node.remove(); boardView.actors.splice(index,1); continue; }
+    const [x1,y1]=actor.positions[segment];
+    const [x2,y2]=actor.positions[segment+1];
+    const frac=step-segment;
+    const x=x1+(x2-x1)*frac;
+    const y=y1+(y2-y1)*frac;
+    actor.y=y;
+    actor.node.setAttribute('transform',`translate(${x.toFixed(1)} ${y.toFixed(1)})`);
+  }
+  const ordered=boardView.fixtureNodes.concat(boardView.actors).sort((a,b)=>a.y-b.y);
+  const order=ordered.map(item=>item.id).join(',');
+  if(order!==boardView.order){
+    document.getElementById('marketPieces').replaceChildren(...ordered.map(item=>item.node));
+    boardView.order=order;
+  }
+}
+
+window.render_game_to_text=()=>JSON.stringify({
+  coordinates:'Rows 8 to 1, rear to front along the left edge. Files A to H, left to right along the right edge.',
+  day:S.day,cash:+S.cash.toFixed(2),speed:S.speed,tier:S.tier,fixturesAvailable:tier().slots,
+  entrance:squareName(GroceryBoard.entry),exit:squareName(GroceryBoard.exit),
+  tool:boardView.moving===null?boardView.tool:'move',selected:squareName(boardView.selected),
+  fixtures:S.fixtures.map(f=>({...f,square:squareName(f.tile),stock:f.product?units(f.product):0})),
+  customers:boardView.actors.map(a=>({outcome:a.outcome,product:a.pid,route:a.tilePath.map(squareName)})),
+  unitsSold:S.stats.itemsSold,notice:boardStatus.textContent,
+});
+
 
 function init(){
   RT={dirtyTiles:{}, sessionDays:0, dayClock:0, lastFrame:performance.now(),
@@ -1939,8 +2995,6 @@ function init(){
   fullRender();
   // autosave heartbeat
   setInterval(()=>{ save(); }, 3000);
-  // first-run help
-  if(!had) setTimeout(showHelp, 400);
   requestAnimationFrame(frame);
 }
 init();
